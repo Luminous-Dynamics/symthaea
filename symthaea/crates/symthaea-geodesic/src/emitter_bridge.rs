@@ -442,6 +442,72 @@ struct TemplateContext<'a> {
     return_type: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RustExpr {
+    source: String,
+}
+
+impl RustExpr {
+    fn raw(source: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+        }
+    }
+
+    fn iter(self) -> Self {
+        self.method("iter")
+    }
+
+    fn chars(self) -> Self {
+        self.method("chars")
+    }
+
+    fn split_whitespace(self) -> Self {
+        self.method("split_whitespace")
+    }
+
+    fn method(mut self, name: &str) -> Self {
+        self.source.push('.');
+        self.source.push_str(name);
+        self.source.push_str("()");
+        self
+    }
+
+    fn chain(mut self, suffix: impl AsRef<str>) -> Self {
+        self.source.push('.');
+        self.source.push_str(suffix.as_ref());
+        self
+    }
+
+    fn finish(self) -> String {
+        self.source
+    }
+}
+
+fn rust_block(statements: &[String], tail: impl AsRef<str>) -> String {
+    let mut source = String::from("{ ");
+    for statement in statements {
+        source.push_str(statement.trim_end_matches(';'));
+        source.push_str("; ");
+    }
+    source.push_str(tail.as_ref());
+    source.push_str(" }");
+    source
+}
+
+fn rust_statement_sequence(statements: &[String]) -> String {
+    let mut source = String::new();
+    for statement in statements {
+        source.push_str(statement.trim_end_matches(';'));
+        source.push_str("; ");
+    }
+    source.trim_end().to_string()
+}
+
+fn first_param_expr(ctx: &TemplateContext<'_>) -> RustExpr {
+    RustExpr::raw(first_param(ctx))
+}
+
 fn emit_request_aware_body(
     function_name: &str,
     signature: Option<&str>,
@@ -787,7 +853,9 @@ fn matches_dedup_sorted(ctx: &TemplateContext<'_>) -> bool {
         && first_param_type(ctx).starts_with("&mutVec<")
 }
 fn render_dedup_sorted(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.sort(); {}.dedup();", first_param(ctx), first_param(ctx))
+    let input = first_param(ctx);
+    let statements = vec![format!("{input}.sort()"), format!("{input}.dedup()")];
+    rust_statement_sequence(&statements)
 }
 
 fn matches_push_if_missing(ctx: &TemplateContext<'_>) -> bool {
@@ -798,12 +866,11 @@ fn matches_push_if_missing(ctx: &TemplateContext<'_>) -> bool {
         && has_two_params(ctx)
 }
 fn render_push_if_missing(ctx: &TemplateContext<'_>) -> String {
+    let input = first_param(ctx);
+    let value = second_param(ctx);
     format!(
         "if !{}.contains(&{}) {{ {}.push({}); }};",
-        first_param(ctx),
-        second_param(ctx),
-        first_param(ctx),
-        second_param(ctx)
+        input, value, input, value
     )
 }
 
@@ -814,9 +881,15 @@ fn matches_sort_clone(ctx: &TemplateContext<'_>) -> bool {
         && (first_param_type(ctx).contains("&[") || first_param_type(ctx).contains("Vec<"))
 }
 fn render_sort_clone(ctx: &TemplateContext<'_>) -> String {
-    format!(
-        "{{ let mut result = {}.to_vec(); result.sort(); result }}",
-        first_param(ctx)
+    rust_block(
+        &[
+            format!(
+                "let mut result = {}",
+                first_param_expr(ctx).chain("to_vec()").finish()
+            ),
+            "result.sort()".to_string(),
+        ],
+        "result",
     )
 }
 
@@ -838,7 +911,7 @@ fn matches_abs(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("absolute") || ctx.function_name.contains("abs")
 }
 fn render_abs(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.abs()", first_param(ctx))
+    first_param_expr(ctx).method("abs").finish()
 }
 
 fn matches_even_scalar(ctx: &TemplateContext<'_>) -> bool {
@@ -870,7 +943,11 @@ fn matches_sum(ctx: &TemplateContext<'_>) -> bool {
     (ctx.haystack.contains("sum") || ctx.haystack.contains("accumulate")) && is_numeric_context(ctx)
 }
 fn render_sum(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.iter().copied().sum()", first_param(ctx))
+    first_param_expr(ctx)
+        .iter()
+        .method("copied")
+        .method("sum")
+        .finish()
 }
 
 fn matches_count_positive(ctx: &TemplateContext<'_>) -> bool {
@@ -879,38 +956,53 @@ fn matches_count_positive(ctx: &TemplateContext<'_>) -> bool {
         && matches!(ctx.return_type.as_str(), "usize" | "u64" | "u32")
 }
 fn render_count_positive(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.iter().filter(|x| **x > 0).count()", first_param(ctx))
+    first_param_expr(ctx)
+        .iter()
+        .chain("filter(|x| **x > 0)")
+        .method("count")
+        .finish()
 }
 
 fn matches_any_even(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("any") && ctx.haystack.contains("even") && ctx.return_type == "bool"
 }
 fn render_any_even(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.iter().any(|x| *x % 2 == 0)", first_param(ctx))
+    first_param_expr(ctx)
+        .iter()
+        .chain("any(|x| *x % 2 == 0)")
+        .finish()
 }
 
 fn matches_normalize_lowercase(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("lowercase") || ctx.haystack.contains("normalize")
 }
 fn render_normalize_lowercase(ctx: &TemplateContext<'_>) -> String {
-    format!(
-        "{}.iter().map(|s| s.to_lowercase()).collect()",
-        first_param(ctx)
-    )
+    first_param_expr(ctx)
+        .iter()
+        .chain("map(|s| s.to_lowercase())")
+        .method("collect")
+        .finish()
 }
 
 fn matches_reverse_string(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("reverse") && ctx.return_type == "String"
 }
 fn render_reverse_string(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.chars().rev().collect()", first_param(ctx))
+    first_param_expr(ctx)
+        .chars()
+        .method("rev")
+        .method("collect")
+        .finish()
 }
 
 fn matches_count_words(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("count") && ctx.haystack.contains("word") && ctx.return_type == "usize"
 }
 fn render_count_words(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.split_whitespace().count()", first_param(ctx))
+    first_param_expr(ctx)
+        .split_whitespace()
+        .method("count")
+        .finish()
 }
 
 fn matches_word_counts(ctx: &TemplateContext<'_>) -> bool {
@@ -918,10 +1010,15 @@ fn matches_word_counts(ctx: &TemplateContext<'_>) -> bool {
         && ctx.return_type.contains("HashMap<")
 }
 fn render_word_counts(ctx: &TemplateContext<'_>) -> String {
-    format!(
-        "{{ let mut counts = std::collections::HashMap::new(); for word in {}.split_whitespace() {{ *counts.entry(word.to_string()).or_insert(0usize) += 1; }} counts }}",
-        first_param(ctx)
-    )
+    let input = first_param(ctx);
+    let statements = vec![
+        "let mut counts = std::collections::HashMap::new()".to_string(),
+        format!(
+            "for word in {} {{ *counts.entry(word.to_string()).or_insert(0usize) += 1; }}",
+            RustExpr::raw(input).split_whitespace().finish()
+        ),
+    ];
+    rust_block(&statements, "counts")
 }
 
 fn matches_hashmap_group_by_len(ctx: &TemplateContext<'_>) -> bool {
@@ -931,10 +1028,14 @@ fn matches_hashmap_group_by_len(ctx: &TemplateContext<'_>) -> bool {
         && first_param_type(ctx).contains("[String]")
 }
 fn render_hashmap_group_by_len(ctx: &TemplateContext<'_>) -> String {
-    format!(
-        "{{ let mut groups = std::collections::HashMap::<usize, Vec<String>>::new(); for item in {}.iter() {{ groups.entry(item.len()).or_insert_with(Vec::new).push(item.clone()); }} groups }}",
-        first_param(ctx)
-    )
+    let input = first_param_expr(ctx).iter().finish();
+    let statements = vec![
+        "let mut groups = std::collections::HashMap::<usize, Vec<String>>::new()".to_string(),
+        format!(
+            "for item in {input} {{ groups.entry(item.len()).or_insert_with(Vec::new).push(item.clone()); }}"
+        ),
+    ];
+    rust_block(&statements, "groups")
 }
 
 fn matches_btree_len_index(ctx: &TemplateContext<'_>) -> bool {
@@ -942,24 +1043,29 @@ fn matches_btree_len_index(ctx: &TemplateContext<'_>) -> bool {
         && ctx.return_type.contains("BTreeMap<")
 }
 fn render_btree_len_index(ctx: &TemplateContext<'_>) -> String {
-    format!(
-        "{{ let mut index = std::collections::BTreeMap::new(); for item in {}.iter() {{ index.insert(item.len(), item.clone()); }} index }}",
-        first_param(ctx)
-    )
+    let input = first_param_expr(ctx).iter().finish();
+    let statements = vec![
+        "let mut index = std::collections::BTreeMap::new()".to_string(),
+        format!("for item in {input} {{ index.insert(item.len(), item.clone()); }}"),
+    ];
+    rust_block(&statements, "index")
 }
 
 fn matches_trim_string(ctx: &TemplateContext<'_>) -> bool {
     (ctx.haystack.contains("trim") || ctx.haystack.contains("strip")) && ctx.return_type == "String"
 }
 fn render_trim_string(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.trim().to_string()", first_param(ctx))
+    first_param_expr(ctx)
+        .method("trim")
+        .chain("to_string()")
+        .finish()
 }
 
 fn matches_uppercase_string(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("uppercase") && ctx.return_type == "String"
 }
 fn render_uppercase_string(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.to_uppercase()", first_param(ctx))
+    first_param_expr(ctx).method("to_uppercase").finish()
 }
 
 fn matches_option_or(ctx: &TemplateContext<'_>) -> bool {
@@ -967,14 +1073,19 @@ fn matches_option_or(ctx: &TemplateContext<'_>) -> bool {
         && (ctx.haystack.contains("fallback") || ctx.haystack.contains("or"))
 }
 fn render_option_or(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.unwrap_or({})", first_param(ctx), second_param(ctx))
+    format!(
+        "{}",
+        first_param_expr(ctx)
+            .chain(format!("unwrap_or({})", second_param(ctx)))
+            .finish()
+    )
 }
 
 fn matches_parse_result(ctx: &TemplateContext<'_>) -> bool {
     ctx.haystack.contains("parse") && ctx.return_type.starts_with("Result<")
 }
 fn render_parse_result(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.parse()", first_param(ctx))
+    first_param_expr(ctx).method("parse").finish()
 }
 
 fn matches_parse_vec_result(ctx: &TemplateContext<'_>) -> bool {
@@ -986,11 +1097,11 @@ fn render_parse_vec_result(ctx: &TemplateContext<'_>) -> String {
     let target = result_ok_type(&ctx.return_type)
         .and_then(vec_inner_type)
         .unwrap_or("i32");
-    format!(
-        "{}.iter().map(|s| (*s).parse::<{}>()).collect()",
-        first_param(ctx),
-        target
-    )
+    first_param_expr(ctx)
+        .iter()
+        .chain(format!("map(|s| (*s).parse::<{target}>())"))
+        .method("collect")
+        .finish()
 }
 
 fn matches_async_option_parse_result(ctx: &TemplateContext<'_>) -> bool {
@@ -1003,11 +1114,10 @@ fn render_async_option_parse_result(ctx: &TemplateContext<'_>) -> String {
     let target = result_ok_type(&ctx.return_type)
         .and_then(option_inner_type)
         .unwrap_or("i32");
-    format!(
-        "{}.map(|value| value.parse::<{}>()).transpose()",
-        first_param(ctx),
-        target
-    )
+    first_param_expr(ctx)
+        .chain(format!("map(|value| value.parse::<{target}>())"))
+        .method("transpose")
+        .finish()
 }
 
 fn matches_filter_map_parse(ctx: &TemplateContext<'_>) -> bool {
@@ -1017,11 +1127,11 @@ fn matches_filter_map_parse(ctx: &TemplateContext<'_>) -> bool {
 }
 fn render_filter_map_parse(ctx: &TemplateContext<'_>) -> String {
     let target = vec_inner_type(&ctx.return_type).unwrap_or("i32");
-    format!(
-        "{}.iter().filter_map(|s| (*s).parse::<{}>().ok()).collect()",
-        first_param(ctx),
-        target
-    )
+    first_param_expr(ctx)
+        .iter()
+        .chain(format!("filter_map(|s| (*s).parse::<{target}>().ok())"))
+        .method("collect")
+        .finish()
 }
 
 fn vec_inner_type(type_name: &str) -> Option<&str> {
@@ -1066,7 +1176,7 @@ fn matches_option_map_increment(ctx: &TemplateContext<'_>) -> bool {
         && (ctx.haystack.contains("increment") || ctx.haystack.contains("map"))
 }
 fn render_option_map_increment(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.map(|x| x + 1)", first_param(ctx))
+    first_param_expr(ctx).chain("map(|x| x + 1)").finish()
 }
 
 fn matches_option_ok_or(ctx: &TemplateContext<'_>) -> bool {
@@ -1084,9 +1194,12 @@ fn matches_first(ctx: &TemplateContext<'_>) -> bool {
 }
 fn render_first(ctx: &TemplateContext<'_>) -> String {
     if is_slice_of_references(&first_param_type(ctx)) {
-        format!("{}.first().copied()", first_param(ctx))
+        first_param_expr(ctx)
+            .method("first")
+            .method("copied")
+            .finish()
     } else {
-        format!("{}.first()", first_param(ctx))
+        first_param_expr(ctx).method("first").finish()
     }
 }
 
@@ -1120,7 +1233,10 @@ fn matches_clone_first(ctx: &TemplateContext<'_>) -> bool {
         && !ctx.return_type.starts_with("Option<&")
 }
 fn render_clone_first(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.first().cloned()", first_param(ctx))
+    first_param_expr(ctx)
+        .method("first")
+        .method("cloned")
+        .finish()
 }
 
 fn matches_to_vec(ctx: &TemplateContext<'_>) -> bool {
@@ -1129,7 +1245,7 @@ fn matches_to_vec(ctx: &TemplateContext<'_>) -> bool {
         || ctx.haystack.contains("copy a slice")
 }
 fn render_to_vec(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.to_vec()", first_param(ctx))
+    first_param_expr(ctx).chain("to_vec()").finish()
 }
 
 fn matches_contains(ctx: &TemplateContext<'_>) -> bool {
@@ -1149,7 +1265,7 @@ fn matches_len(ctx: &TemplateContext<'_>) -> bool {
     (ctx.haystack.contains("length") || ctx.haystack.contains("len")) && ctx.return_type == "usize"
 }
 fn render_len(ctx: &TemplateContext<'_>) -> String {
-    format!("{}.len()", first_param(ctx))
+    first_param_expr(ctx).method("len").finish()
 }
 
 fn matches_max(ctx: &TemplateContext<'_>) -> bool {
@@ -1183,9 +1299,12 @@ fn matches_async_first(ctx: &TemplateContext<'_>) -> bool {
 }
 fn render_async_first(ctx: &TemplateContext<'_>) -> String {
     if ctx.return_type.starts_with("Option<&") {
-        format!("{}.first()", first_param(ctx))
+        first_param_expr(ctx).method("first").finish()
     } else {
-        format!("{}.first().copied()", first_param(ctx))
+        first_param_expr(ctx)
+            .method("first")
+            .method("copied")
+            .finish()
     }
 }
 
@@ -1384,11 +1503,9 @@ mod tests {
         assert_eq!(steps.last().unwrap().action, GeodesicPlanAction::Complete);
 
         // No loops or branches
-        assert!(
-            !steps
-                .iter()
-                .any(|s| s.action == GeodesicPlanAction::AddLoop)
-        );
+        assert!(!steps
+            .iter()
+            .any(|s| s.action == GeodesicPlanAction::AddLoop));
     }
 
     #[test]

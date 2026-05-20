@@ -1,22 +1,24 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Oracle Discrimination Test — THE critical experiment.
+//! Oracle Discrimination Test — critical experiment.
 //!
-//! Does the execution oracle actually distinguish between correct and
-//! incorrect programs? If yes, the entire GCS architecture works.
-//! If no, the oracle needs fundamental redesign.
+//! Does the scoring layer actually distinguish between correct and incorrect
+//! programs? The old endpoint-only execution oracle is useful as convergence
+//! telemetry, but it is not a correctness discriminator by itself. The
+//! pass/fail gate therefore uses the tri-oracle consensus layer.
 //!
 //! Methodology:
 //! 1. Encode 10 "correct" programs as ProgramNode → BinaryHV
 //! 2. For each, create a "wrong" variant (different operator, wrong structure)
 //! 3. Create an "expected output" encoding from the correct program
-//! 4. Score both correct and wrong via the oracle
+//! 4. Score both correct and wrong via the tri-oracle
 //! 5. Measure: does correct consistently score higher than wrong?
 
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::program_algebra::ProgramNode;
 use symthaea_geodesic::execution_oracle::{ExecutionOracle, OperationType};
+use symthaea_geodesic::tri_oracle::TriOracle;
 
 /// Helper: encode a ProgramNode, run oracle, score against expected.
 fn oracle_score(program: &ProgramNode, expected: &BinaryHV) -> f32 {
@@ -33,6 +35,13 @@ fn oracle_score(program: &ProgramNode, expected: &BinaryHV) -> f32 {
     let _prediction = oracle.predict_sequence(&statements);
     // Score: similarity between oracle's predicted final state and expected output
     oracle.verify_output(expected) as f32
+}
+
+/// Helper: score via the discriminative consensus oracle.
+fn tri_oracle_score(program: &ProgramNode, expected: &ProgramNode) -> f32 {
+    TriOracle::with_defaults()
+        .score(program, expected)
+        .composite
 }
 
 /// Helper: score using the program's OWN encoding as expected (self-consistency).
@@ -194,11 +203,8 @@ fn test_oracle_correct_vs_wrong_programs() {
     let mut deltas: Vec<f32> = Vec::new();
 
     for (name, correct, wrong) in &test_cases {
-        // Expected output = the correct program's own encoding
-        let expected = correct.encode();
-
-        let correct_score = oracle_score(correct, &expected);
-        let wrong_score = oracle_score(wrong, &expected);
+        let correct_score = tri_oracle_score(correct, correct);
+        let wrong_score = tri_oracle_score(wrong, correct);
         let delta = correct_score - wrong_score;
 
         let discriminates = correct_score > wrong_score;
@@ -242,16 +248,45 @@ fn test_oracle_correct_vs_wrong_programs() {
         println!("The oracle needs fundamental redesign before the architecture can work.");
     }
 
-    // The key assertion: we need at least >50% discrimination for the architecture to have value
+    // The key assertion: the consensus scoring layer should discriminate well
+    // above chance before it is used as a selection signal.
     assert!(
-        accuracy >= 0.5,
-        "Oracle discrimination accuracy ({:.0}%) must be at least 50% (chance level). \
+        accuracy >= 0.7,
+        "Tri-oracle discrimination accuracy ({:.0}%) must be at least 70%. \
          Got {}/{} correct wins. If this fails, the oracle cannot distinguish \
-         correct from incorrect programs and needs fundamental work.",
+         correct from incorrect programs reliably enough for selection.",
         accuracy * 100.0,
         correct_wins,
         total,
     );
+    assert!(
+        mean_delta > 0.05,
+        "Tri-oracle mean discrimination delta must be meaningfully positive, got {mean_delta:+.4}"
+    );
+}
+
+#[test]
+fn test_legacy_execution_oracle_endpoint_is_telemetry_not_gate() {
+    let correct = ProgramNode::apply(
+        ProgramNode::op("ADD"),
+        vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+    );
+    let wrong = ProgramNode::apply(
+        ProgramNode::op("MUL"),
+        vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+    );
+    let expected = correct.encode();
+
+    let correct_score = oracle_score(&correct, &expected);
+    let wrong_score = oracle_score(&wrong, &expected);
+
+    println!(
+        "legacy endpoint scores: correct={correct_score:.4} wrong={wrong_score:.4} delta={:+.4}",
+        correct_score - wrong_score
+    );
+
+    assert!((0.0..=1.0).contains(&correct_score));
+    assert!((0.0..=1.0).contains(&wrong_score));
 }
 
 #[test]
