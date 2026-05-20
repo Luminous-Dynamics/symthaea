@@ -356,7 +356,7 @@ impl CognitiveLoopService {
                     .map(|p| {
                         symthaea_core::genesis::GenesisSeed::from_phrase(p)
                             .domain("causal_enhancer")
-                            .gen::<u64>()
+                            .r#gen::<u64>()
                     })
                     .unwrap_or_else(|| {
                         tracing::debug!("CausalEnhancer: using default seed (no genesis phrase)");
@@ -482,7 +482,7 @@ impl CognitiveLoopService {
                     .map(|p| {
                         symthaea_core::genesis::GenesisSeed::from_phrase(p)
                             .domain("cognitive_loop::cross_manifold")
-                            .gen::<u64>()
+                            .r#gen::<u64>()
                     })
                     .unwrap_or_else(|| super::thresholds::CROSS_MANIFOLD_SEED_DEFAULT);
                 Some(symthaea_vision_manifold::CrossManifoldPredictor::new(

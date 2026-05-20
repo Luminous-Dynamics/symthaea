@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 
 /// Prime factorization of a number with HDC encoding
 #[derive(Debug, Clone)]
@@ -189,7 +189,7 @@ impl NumberTheoryEngine {
         is_prime
             .iter()
             .enumerate()
-            .filter(|(_, &prime)| prime)
+            .filter(|&(_, &prime)| prime)
             .map(|(i, _)| {
                 let p = i as u64;
                 let encoding = BinaryHV::random(seed_from_name(&format!("prime_{p}")));
@@ -400,11 +400,7 @@ impl NumberTheoryEngine {
             }
             a %= n;
         }
-        if n == 1 {
-            result
-        } else {
-            0
-        }
+        if n == 1 { result } else { 0 }
     }
 
     /// Tonelli–Shanks: modular square root of `a` mod prime `p`.

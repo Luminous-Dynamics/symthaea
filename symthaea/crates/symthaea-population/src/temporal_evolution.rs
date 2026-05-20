@@ -198,11 +198,7 @@ impl PopulationTrajectoryPredictor {
         let het_a = Self::decode_heterozygosity(&evolved_a);
         let het_b = Self::decode_heterozygosity(&evolved_b);
 
-        if het_b > 1e-10 {
-            het_a / het_b
-        } else {
-            1.0
-        }
+        if het_b > 1e-10 { het_a / het_b } else { 1.0 }
     }
 
     /// CfC-calibrated heterozygosity prediction blending neural and analytical.
@@ -447,10 +443,10 @@ mod tests {
     fn test_neutral_prediction_matches_analytical() {
         let h0 = 0.75;
         let ne = 100.0;
-        for gen in [1, 10, 50, 100, 500] {
+        for r#gen in [1, 10, 50, 100, 500] {
             let predicted =
-                PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, gen);
-            let expected = crate::diversity::heterozygosity_after_generations(h0, ne, gen);
+                PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, r#gen);
+            let expected = crate::diversity::heterozygosity_after_generations(h0, ne, r#gen);
             assert!(
                 (predicted - expected).abs() < 1e-12,
                 "neutral prediction at gen {gen}: {predicted} vs {expected}"
@@ -463,8 +459,8 @@ mod tests {
         let h0 = 0.8;
         let ne = 50.0;
         let mut prev = h0;
-        for gen in 1..=20 {
-            let h = PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, gen);
+        for r#gen in 1..=20 {
+            let h = PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, r#gen);
             assert!(h <= prev + 1e-12, "should decay: gen {gen}, {h} > {prev}");
             assert!(h >= 0.0);
             prev = h;
@@ -476,8 +472,8 @@ mod tests {
         let pop = make_test_population(50);
         let ne = 25.0;
         let mut pred = PopulationTrajectoryPredictor::new();
-        for gen in [1, 5, 10, 20] {
-            let h = pred.predict_heterozygosity_calibrated(&pop, ne, gen);
+        for r#gen in [1, 5, 10, 20] {
+            let h = pred.predict_heterozygosity_calibrated(&pop, ne, r#gen);
             pred.reset();
             assert!(
                 (0.0..=1.0).contains(&h),

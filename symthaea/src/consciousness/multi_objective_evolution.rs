@@ -126,12 +126,12 @@ impl MultiObjectiveEvolution {
         let mut converged = false;
         let mut prev_frontier_size = 0;
 
-        for gen in 0..self.config.num_generations {
-            self.generation = gen;
+        for r#gen in 0..self.config.num_generations {
+            self.generation = r#gen;
 
             println!(
                 "\n🧬 Multi-Objective Generation {}/{}...",
-                gen + 1,
+                r#gen + 1,
                 self.config.num_generations
             );
 
@@ -144,7 +144,7 @@ impl MultiObjectiveEvolution {
             println!("   Pareto frontier size: {}", frontier.profiles.len());
 
             // Check convergence
-            if gen > 0 && frontier.profiles.len() == prev_frontier_size {
+            if r#gen > 0 && frontier.profiles.len() == prev_frontier_size {
                 println!("   ✅ Frontier stabilized - converged!");
                 converged = true;
                 break;

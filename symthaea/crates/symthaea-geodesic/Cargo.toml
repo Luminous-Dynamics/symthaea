@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-geodesic"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Geodesic Code Synthesis — topology-aware code generation via manifold navigation, execution prediction, and sheaf coherence"
 license = "AGPL-3.0-or-later"

@@ -2411,7 +2411,7 @@ pub fn solve_ice(
     let x_min_raw = stoich_coeffs
         .iter()
         .zip(initial_concentrations.iter())
-        .filter(|(&c, _)| c < 0)
+        .filter(|&(&c, _)| c < 0)
         .map(|(&c, &conc)| -conc / (c as f64)) // c < 0, so this is positive upper bound
         .fold(f64::INFINITY, f64::min);
     let x_max = if x_min_raw.is_infinite() || x_min_raw < 1e-12 {
@@ -2424,7 +2424,7 @@ pub fn solve_ice(
     let x_min = stoich_coeffs
         .iter()
         .zip(initial_concentrations.iter())
-        .filter(|(&c, _)| c > 0)
+        .filter(|&(&c, _)| c > 0)
         .map(|(&c, &conc)| -conc / (c as f64)) // c > 0, conc >= 0, so this is <= 0
         .fold(-f64::INFINITY, f64::max);
     let x_lo = x_min * 0.9999;

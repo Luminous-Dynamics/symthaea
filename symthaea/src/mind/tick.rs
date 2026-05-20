@@ -9,9 +9,9 @@
 use crate::chronobiology::{Biorhythm, CircadianPhase};
 use symthaea_core::hdc::ContinuousHV;
 
-use super::utils::permute_hv;
 #[cfg(feature = "mesh")]
 use super::MindInput;
+use super::utils::permute_hv;
 use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
 
 impl ContinuousMind {
@@ -213,7 +213,7 @@ impl ContinuousMind {
 
         // Occasional Dream Thought (Random Permutation)
         let dream_roll: f32 = if let Some(ref mut rng) = self.seeded_rng {
-            rand::Rng::gen(rng)
+            rand::Rng::r#gen(rng)
         } else {
             rand::random::<f32>()
         };
@@ -413,7 +413,10 @@ impl ContinuousMind {
             let predicted_load = self.state.holocell.simulate(&self.state.current_thought, 5);
 
             if predicted_load > 0.9 && self.state.thermodynamic_load > 0.7 {
-                tracing::warn!(load = predicted_load, "PREFRONTAL VETO: Thought predicted to cause thermodynamic red-line. Inhibiting output.");
+                tracing::warn!(
+                    load = predicted_load,
+                    "PREFRONTAL VETO: Thought predicted to cause thermodynamic red-line. Inhibiting output."
+                );
                 return None;
             }
 
@@ -1750,7 +1753,7 @@ mod tests {
         let evicted = mind.take_evicted();
         assert_eq!(evicted.len(), 1);
         assert_eq!(evicted[0].1, 42); // steps_survived
-                                      // Buffer should be empty after drain
+        // Buffer should be empty after drain
         assert!(mind.take_evicted().is_empty());
     }
 

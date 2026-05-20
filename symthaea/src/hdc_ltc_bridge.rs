@@ -319,7 +319,7 @@ impl HdcLtcBridge {
         let mut rng = genesis.domain(label);
         let scale = (2.0 / (input_dim + output_dim) as f32).sqrt();
         (0..input_dim * output_dim)
-            .map(|_| (rng.gen::<f32>() * 2.0 - 1.0) * scale)
+            .map(|_| (rng.r#gen::<f32>() * 2.0 - 1.0) * scale)
             .collect()
     }
 

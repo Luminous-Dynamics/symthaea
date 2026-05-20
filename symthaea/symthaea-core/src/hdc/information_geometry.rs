@@ -132,7 +132,7 @@ pub fn kl_divergence_normal(mu1: f64, s1: f64, mu2: f64, s2: f64) -> f64 {
 pub fn kl_divergence_categorical(p: &[f64], q: &[f64]) -> f64 {
     p.iter()
         .zip(q.iter())
-        .filter(|(&pi, _)| pi > 1e-15)
+        .filter(|&(&pi, _)| pi > 1e-15)
         .map(|(&pi, &qi)| pi * (pi / qi.max(1e-300)).ln())
         .sum()
 }

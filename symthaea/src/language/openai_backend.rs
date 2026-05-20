@@ -242,12 +242,15 @@ mod tests {
     fn test_openai_from_env_missing_key() {
         // Save and clear
         let prev = std::env::var("OPENAI_API_KEY").ok();
-        std::env::remove_var("OPENAI_API_KEY");
+        // SAFETY: This test temporarily owns the process environment key and
+        // restores it before returning.
+        unsafe { std::env::remove_var("OPENAI_API_KEY") };
 
         assert!(OpenAiBackend::from_env().is_none());
 
         if let Some(val) = prev {
-            std::env::set_var("OPENAI_API_KEY", val);
+            // SAFETY: Restores the process environment value saved above.
+            unsafe { std::env::set_var("OPENAI_API_KEY", val) };
         }
     }
 

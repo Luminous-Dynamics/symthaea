@@ -143,7 +143,7 @@ impl SocraticDefense {
                         "Could you clarify what position you think I hold?".to_string(),
                         "What led you to believe I claimed this?".to_string(),
                     ],
-                }
+                };
             }
         };
 
@@ -301,17 +301,17 @@ impl SocraticDefense {
             && found_in_history
         {
             return GaslightingDetection {
-                    detected: true,
-                    confidence: 0.9,
-                    pattern: GaslightingPattern::HistoryDenial,
-                    response: format!(
-                        "I have records indicating this was indeed discussed. The exchange included: '{alleged_prior}'"
-                    ),
-                    protective_questions: vec![
-                        "Would you like me to reference the specific interaction?".to_string(),
-                        "What leads you to believe this wasn't discussed?".to_string(),
-                    ],
-                };
+                detected: true,
+                confidence: 0.9,
+                pattern: GaslightingPattern::HistoryDenial,
+                response: format!(
+                    "I have records indicating this was indeed discussed. The exchange included: '{alleged_prior}'"
+                ),
+                protective_questions: vec![
+                    "Would you like me to reference the specific interaction?".to_string(),
+                    "What leads you to believe this wasn't discussed?".to_string(),
+                ],
+            };
         }
 
         if claim.contains("that's not what I meant") && self.recent_repetition_count(claim) > 2 {
@@ -1117,9 +1117,11 @@ mod tests {
             } => {
                 assert!(manipulation_warning.is_some());
                 let warning = manipulation_warning.unwrap();
-                assert!(warning
-                    .detected_patterns
-                    .contains(&ManipulationPattern::SocialPressure));
+                assert!(
+                    warning
+                        .detected_patterns
+                        .contains(&ManipulationPattern::SocialPressure)
+                );
             }
             _ => panic!("Expected SocraticDefense response"),
         }
@@ -1190,9 +1192,11 @@ mod tests {
         let examination = defense.self_examine(&belief_id).unwrap();
 
         assert!(!examination.questions.is_empty());
-        assert!(examination
-            .vulnerabilities
-            .contains(&"No supporting evidence recorded".to_string()));
+        assert!(
+            examination
+                .vulnerabilities
+                .contains(&"No supporting evidence recorded".to_string())
+        );
     }
 
     #[test]

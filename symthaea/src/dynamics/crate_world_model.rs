@@ -141,7 +141,7 @@ impl HierarchicalCfCWorldModel {
     /// Create a new World Model with given configuration
     pub fn new(config: WorldModelConfig) -> Result<Self> {
         let mut rng = rand::thread_rng();
-        let base_seed: u64 = rng.gen();
+        let base_seed: u64 = rng.r#gen();
 
         // Input projection: [hidden_dim, 2 * hdc_dim]
         // Uses sparse random projection (Johnson-Lindenstrauss style)
@@ -151,7 +151,7 @@ impl HierarchicalCfCWorldModel {
             let mut sparse_rng = rand_chacha::ChaCha8Rng::seed_from_u64(base_seed);
             let scale = (1.0 / config.hidden_dim as f32).sqrt();
             Array2::from_shape_fn((config.hidden_dim, input_dim), |_| {
-                if sparse_rng.gen::<f32>() < 0.1 {
+                if sparse_rng.r#gen::<f32>() < 0.1 {
                     sparse_rng.gen_range(-scale..scale) * (10.0_f32).sqrt()
                 } else {
                     0.0

@@ -13,8 +13,8 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::genesis::{GenesisSeed, ShakeRng};
-use symthaea_core::hdc::primitive_system::PrimitiveTier;
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::primitive_system::PrimitiveTier;
 
 /// Configuration for the primitive evolver
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,7 +191,7 @@ impl PrimitiveEvolver {
     /// Generate a random f32, using the genesis RNG if available.
     fn rand_f32(&mut self) -> f32 {
         match &mut self.rng {
-            Some(rng) => rng.gen::<f32>(),
+            Some(rng) => rng.r#gen::<f32>(),
             None => rand::random::<f32>(),
         }
     }
@@ -708,8 +708,8 @@ impl PrimitiveEvolution {
         let mut prev_best_fitness = 0.0;
         let mut stagnation_count = 0;
 
-        for gen in 0..self.config.num_generations {
-            self.current_generation = gen;
+        for r#gen in 0..self.config.num_generations {
+            self.current_generation = r#gen;
 
             // Evaluate fitness for all candidates
             for i in 0..self.population.len() {
@@ -763,7 +763,7 @@ impl PrimitiveEvolution {
     /// Generate a random f64, using the genesis RNG if available.
     fn rand_f64(&mut self) -> f64 {
         match &mut self.rng {
-            Some(rng) => rng.gen::<f64>(),
+            Some(rng) => rng.r#gen::<f64>(),
             None => rand::random::<f64>(),
         }
     }

@@ -126,7 +126,7 @@ impl SubstrateDegradationBenchmark {
             .iter()
             .zip(accuracies.iter())
             .rev()
-            .find(|(_, &acc)| acc >= 0.5)
+            .find(|&(_, &acc)| acc >= 0.5)
             .map(|(&q, _)| q)
             .unwrap_or(0.1);
 

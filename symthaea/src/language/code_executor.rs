@@ -855,7 +855,7 @@ impl CompileError {
 
     /// Categorize an error based on its code and message.
     fn categorize(code: &Option<String>, message: &str) -> ErrorCategory {
-        if let Some(ref c) = code {
+        if let Some(c) = code {
             match c.as_str() {
                 "E0308" => ErrorCategory::TypeMismatch,
                 "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,

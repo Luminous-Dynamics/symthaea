@@ -1736,7 +1736,7 @@ pub fn train_with_adam(
                     #[cfg(not(feature = "mamba-cpu"))]
                     let projection_weights = None;
 
-                    if let Err(e) = generator.save_checkpoint(
+                    match generator.save_checkpoint(
                         &config.best_checkpoint_path,
                         epoch,
                         avg_loss,
@@ -1744,14 +1744,17 @@ pub fn train_with_adam(
                         projection_weights,
                         None,
                     ) {
-                        tracing::warn!(error = %e, "Failed to save best checkpoint");
-                    } else {
-                        tracing::info!(
-                            epoch = epoch,
-                            val_loss = stopping_loss,
-                            path = %config.best_checkpoint_path,
-                            "Saved best checkpoint"
-                        );
+                        Err(e) => {
+                            tracing::warn!(error = %e, "Failed to save best checkpoint");
+                        }
+                        _ => {
+                            tracing::info!(
+                                epoch = epoch,
+                                val_loss = stopping_loss,
+                                path = %config.best_checkpoint_path,
+                                "Saved best checkpoint"
+                            );
+                        }
                     }
                 }
             } else {
@@ -2324,7 +2327,7 @@ pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
                         channels.set_emotion(valence, arousal, warmth);
                         channels.set_consciousness(psi, meta_aw, coh);
                         channels.channels[15] = stage; // relationship_stage
-                                                       // Vary trust with relationship stage
+                        // Vary trust with relationship stage
                         channels.channels[16] = (stage / 6.0) * 0.5 + 0.25;
                         // Vary mood temperature with arousal
                         channels.channels[17] = 0.8 + arousal * 0.4;

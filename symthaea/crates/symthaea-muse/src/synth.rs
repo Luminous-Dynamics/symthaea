@@ -147,7 +147,7 @@ pub fn render_arrangement(
         0.0
     };
     let fm_ratio = 2.0; // fixed ratio for all (original B-grade tense used 2.0)
-                        // Filter envelope parameters: emotion-dependent spectral movement
+    // Filter envelope parameters: emotion-dependent spectral movement
     let (filter_open, filter_close) = if state.valence > 0.2 && state.arousal > 0.5 {
         (12.0, 8.0) // Joyful: stay very bright
     } else if state.valence > 0.2 {
@@ -424,7 +424,10 @@ fn render_noise(bl: &mut [f32], br: &mut [f32], sr: f32, n: usize, mix: f32, ne:
     let a = (1.0 / sr) / (1.0 / (std::f32::consts::TAU * cut) + 1.0 / sr);
     let (mut pl, mut pr) = (0.0f32, 0.0f32);
     for i in 0..n {
-        let (wl, wr) = (rng.gen::<f32>() * 2.0 - 1.0, rng.gen::<f32>() * 2.0 - 1.0);
+        let (wl, wr) = (
+            rng.r#gen::<f32>() * 2.0 - 1.0,
+            rng.r#gen::<f32>() * 2.0 - 1.0,
+        );
         pl += a * (wl - pl);
         pr += a * (wr - pr);
         bl[i] += pl * mix;

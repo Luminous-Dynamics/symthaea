@@ -410,13 +410,12 @@ impl LongTermMemory {
                 };
 
                 // Location similarity (if cue has location)
-                let location_similarity = if let (Some(ref cue_loc), Some(ref exp_loc)) =
-                    (&cue.location, &exp.location)
-                {
-                    Self::compute_similarity_static(cue_loc, exp_loc)
-                } else {
-                    0.5 // Neutral if no location
-                };
+                let location_similarity =
+                    if let (Some(cue_loc), Some(exp_loc)) = (&cue.location, &exp.location) {
+                        Self::compute_similarity_static(cue_loc, exp_loc)
+                    } else {
+                        0.5 // Neutral if no location
+                    };
 
                 // Temporal proximity (recent memories weighted higher if specified)
                 let temporal_bonus = if let Some(proximity) = cue.temporal_proximity {
@@ -1597,11 +1596,7 @@ impl MockQdrantMemoryStore {
             }
         }
 
-        if count > 0 {
-            total / count as f32
-        } else {
-            0.0
-        }
+        if count > 0 { total / count as f32 } else { 0.0 }
     }
 }
 

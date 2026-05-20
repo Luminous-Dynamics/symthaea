@@ -570,21 +570,20 @@ impl FixRuleGenerator {
         }
 
         // Apply the fix
-        let fixed = if let (Some(ref search), Some(ref replacement)) =
-            (&rule.search_pattern, &rule.replacement)
-        {
-            if source.contains(search.as_str()) {
-                Some(source.replacen(search.as_str(), replacement.as_str(), 1))
+        let fixed =
+            if let (Some(search), Some(replacement)) = (&rule.search_pattern, &rule.replacement) {
+                if source.contains(search.as_str()) {
+                    Some(source.replacen(search.as_str(), replacement.as_str(), 1))
+                } else {
+                    None
+                }
+            } else if let Some(ref replacement) = rule.replacement {
+                // No search pattern — append the fix (e.g., type conversion)
+                // This is a heuristic: apply to the last expression before the error
+                Some(format!("{}\n// Auto-fix applied: {}", source, replacement))
             } else {
                 None
-            }
-        } else if let Some(ref replacement) = rule.replacement {
-            // No search pattern — append the fix (e.g., type conversion)
-            // This is a heuristic: apply to the last expression before the error
-            Some(format!("{}\n// Auto-fix applied: {}", source, replacement))
-        } else {
-            None
-        };
+            };
 
         if fixed.is_some() {
             self.stats.rule_applications += 1;
@@ -788,18 +787,18 @@ mod tests {
 
     #[test]
     fn test_construction() {
-        let gen = FixRuleGenerator::new();
-        assert_eq!(gen.stats().rules_generated, 0);
-        assert!(gen.all_rules().is_empty());
+        let r#gen = FixRuleGenerator::new();
+        assert_eq!(r#gen.stats().rules_generated, 0);
+        assert!(r#gen.all_rules().is_empty());
     }
 
     #[test]
     fn test_observe_and_cluster() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         // Observe 5 similar errors
         for i in 0..5 {
-            gen.observe_error(
+            r#gen.observe_error(
                 "E0308",
                 "TypeMismatch",
                 "mismatched types: expected String, found &str",
@@ -809,18 +808,18 @@ mod tests {
             );
         }
 
-        assert_eq!(gen.stats().clusters_detected, 1);
-        assert_eq!(gen.clusters[0].total_attempts, 5);
-        assert_eq!(gen.clusters[0].successful_fixes, 2);
+        assert_eq!(r#gen.stats().clusters_detected, 1);
+        assert_eq!(r#gen.clusters[0].total_attempts, 5);
+        assert_eq!(r#gen.clusters[0].successful_fixes, 2);
     }
 
     #[test]
     fn test_rule_generation_from_cluster() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         // Build cluster with enough failures
         for i in 0..6 {
-            gen.observe_error(
+            r#gen.observe_error(
                 "E0308",
                 "TypeMismatch",
                 "mismatched types",
@@ -831,40 +830,40 @@ mod tests {
         }
 
         // Generate rules (high Phi + calibration)
-        let generated = gen.try_generate_rules(0.5, 0.9);
+        let generated = r#gen.try_generate_rules(0.5, 0.9);
         assert!(
             !generated.is_empty(),
             "Should generate a rule for failing cluster"
         );
-        assert_eq!(gen.stats().rules_generated, 1);
+        assert_eq!(r#gen.stats().rules_generated, 1);
     }
 
     #[test]
     fn test_consciousness_gate() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         for _ in 0..6 {
-            gen.observe_error("E0308", "TypeMismatch", "x", "y", false, "z");
+            r#gen.observe_error("E0308", "TypeMismatch", "x", "y", false, "z");
         }
 
         // Low Phi → gated
-        let generated = gen.try_generate_rules(0.1, 0.9);
+        let generated = r#gen.try_generate_rules(0.1, 0.9);
         assert!(generated.is_empty());
-        assert_eq!(gen.stats().consciousness_gates, 1);
+        assert_eq!(r#gen.stats().consciousness_gates, 1);
     }
 
     #[test]
     fn test_calibration_gate() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         for _ in 0..6 {
-            gen.observe_error("E0308", "TypeMismatch", "x", "y", false, "z");
+            r#gen.observe_error("E0308", "TypeMismatch", "x", "y", false, "z");
         }
 
         // Low calibration → gated
-        let generated = gen.try_generate_rules(0.5, 0.3);
+        let generated = r#gen.try_generate_rules(0.5, 0.3);
         assert!(generated.is_empty());
-        assert_eq!(gen.stats().calibration_gates, 1);
+        assert_eq!(r#gen.stats().calibration_gates, 1);
     }
 
     #[test]
@@ -934,10 +933,10 @@ mod tests {
 
     #[test]
     fn test_try_apply_rule() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         // Manually insert a rule
-        gen.rules.insert(
+        r#gen.rules.insert(
             "rule_1".to_string(),
             GeneratedFixRule {
                 id: "rule_1".to_string(),
@@ -962,7 +961,7 @@ mod tests {
 
         // Apply the rule
         let source = "let x: String = input_value;";
-        let result = gen.try_apply_rule("rule_1", source, "error[E0308]: mismatched types");
+        let result = r#gen.try_apply_rule("rule_1", source, "error[E0308]: mismatched types");
 
         assert!(result.is_some());
         let fixed = result.unwrap();
@@ -971,9 +970,9 @@ mod tests {
 
     #[test]
     fn test_demoted_rule_not_applied() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
-        gen.rules.insert(
+        r#gen.rules.insert(
             "bad_rule".to_string(),
             GeneratedFixRule {
                 id: "bad_rule".to_string(),
@@ -996,21 +995,21 @@ mod tests {
             },
         );
 
-        let result = gen.try_apply_rule("bad_rule", "let x = 1;", "error[E0308]");
+        let result = r#gen.try_apply_rule("bad_rule", "let x = 1;", "error[E0308]");
         assert!(result.is_none(), "Demoted rules should not be applied");
     }
 
     #[test]
     fn test_high_success_no_new_rule() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         // Build cluster with high success rate (80%)
         for i in 0..6 {
-            gen.observe_error("E0308", "TypeMismatch", "test", "good_fix", i < 5, "ctx");
+            r#gen.observe_error("E0308", "TypeMismatch", "test", "good_fix", i < 5, "ctx");
         }
 
         // Should NOT generate new rules — existing fix works well
-        let generated = gen.try_generate_rules(0.5, 0.9);
+        let generated = r#gen.try_generate_rules(0.5, 0.9);
         assert!(
             generated.is_empty(),
             "Should not generate rules when existing fixes work well"
@@ -1019,19 +1018,19 @@ mod tests {
 
     #[test]
     fn test_summary() {
-        let gen = FixRuleGenerator::new();
-        let summary = gen.summary();
+        let r#gen = FixRuleGenerator::new();
+        let summary = r#gen.summary();
         assert!(summary.contains("Self-Modification"));
         assert!(summary.contains("0 rules generated"));
     }
 
     #[test]
     fn test_full_lifecycle() {
-        let mut gen = FixRuleGenerator::new();
+        let mut r#gen = FixRuleGenerator::new();
 
         // 1. Observe failures (build cluster)
         for _ in 0..7 {
-            gen.observe_error(
+            r#gen.observe_error(
                 "E0277",
                 "MissingImport",
                 "cannot find type HashMap",
@@ -1042,22 +1041,22 @@ mod tests {
         }
 
         // 2. Generate rule (high consciousness + calibration)
-        let rules = gen.try_generate_rules(0.6, 0.9);
+        let rules = r#gen.try_generate_rules(0.6, 0.9);
         assert!(!rules.is_empty());
         let rule_id = &rules[0];
 
         // 3. Apply the rule
         let source = "let m: HashMap<String, i32> = HashMap::new();";
-        let fixed = gen.try_apply_rule(rule_id, source, "error[E0277]: cannot find type HashMap");
+        let fixed = r#gen.try_apply_rule(rule_id, source, "error[E0277]: cannot find type HashMap");
         // Rule may or may not apply depending on synthesized fix
         // The important thing is the lifecycle works
 
         // 4. Record outcome
-        gen.record_rule_outcome(rule_id, true, Some(true));
-        assert_eq!(gen.stats().rule_applications, 1);
-        assert_eq!(gen.stats().compile_successes, 1);
+        r#gen.record_rule_outcome(rule_id, true, Some(true));
+        assert_eq!(r#gen.stats().rule_applications, 1);
+        assert_eq!(r#gen.stats().compile_successes, 1);
 
         // 5. Check events
-        assert!(gen.events().len() >= 2); // Generated + Applied
+        assert!(r#gen.events().len() >= 2); // Generated + Applied
     }
 }

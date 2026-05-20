@@ -74,7 +74,6 @@ impl DomainKnowledge {
                 content: "calculate compute solve equation formula result answer total count",
                 confidence: 1.0,
             },
-
             // =================================================================
             // SYSTEM ADMINISTRATION (NixOS Domain)
             // =================================================================
@@ -102,7 +101,6 @@ impl DomainKnowledge {
                 content: "rust cargo compiler build test debug git version control repository commit branch merge",
                 confidence: 1.0,
             },
-
             // =================================================================
             // SELF-KNOWLEDGE (Identity & Capabilities)
             // =================================================================
@@ -124,7 +122,6 @@ impl DomainKnowledge {
                 content: "hallucination unknown uncertainty probability confidence limit boundary cannot unable unsure",
                 confidence: 1.0,
             },
-
             // =================================================================
             // CONVERSATION (Social Patterns)
             // =================================================================
@@ -164,7 +161,6 @@ impl DomainKnowledge {
                 content: "please help assist could would can you need want request ask",
                 confidence: 1.0,
             },
-
             // =================================================================
             // EPISTEMICS (Knowledge about knowledge)
             // =================================================================
@@ -186,7 +182,6 @@ impl DomainKnowledge {
                 content: "know understand believe think assume suppose guess estimate infer conclude",
                 confidence: 1.0,
             },
-
             // =================================================================
             // COMMON FACTUAL DOMAINS (High confidence general knowledge)
             // =================================================================
@@ -268,7 +263,6 @@ impl DomainKnowledge {
                 content: "magic spell wizard witch sorcerer enchantment curse potion alchemy transmutation",
                 confidence: 1.0,
             },
-
             // =================================================================
             // FICTION (Literary/Media worlds)
             // =================================================================
@@ -284,7 +278,6 @@ impl DomainKnowledge {
                 content: "fictional story novel movie film book made up invented imaginary pretend fantasy",
                 confidence: 1.0,
             },
-
             // =================================================================
             // PSEUDOSCIENCE (Known false claims)
             // =================================================================
@@ -294,7 +287,6 @@ impl DomainKnowledge {
                 content: "perpetual motion flat earth astrology telepathy telekinesis crystal healing homeopathy",
                 confidence: 1.0,
             },
-
             // =================================================================
             // UNCERTAINTY MARKERS (Epistemic humility triggers)
             // =================================================================
@@ -310,7 +302,6 @@ impl DomainKnowledge {
                 content: "no idea don't know haven't a clue beats me who knows impossible to say cannot determine",
                 confidence: 1.0,
             },
-
             // =================================================================
             // FUTURE/COUNTERFACTUAL (Inherently unknowable)
             // =================================================================
@@ -326,7 +317,6 @@ impl DomainKnowledge {
                 content: "what if hypothetical alternate reality parallel universe if only would have been",
                 confidence: 0.8,
             },
-
             // =================================================================
             // SUBJECTIVE/OPINION (No objective answer)
             // =================================================================

@@ -535,7 +535,7 @@ impl RelationalConsciousness {
         // Count alternations
         let mut alternations = 0;
         for i in 1..recent.len() {
-            if let (Some(ref prev_active), Some(ref curr_active)) =
+            if let (Some(prev_active), Some(curr_active)) =
                 (&recent[i - 1].active_agent, &recent[i].active_agent)
             {
                 if prev_active != curr_active {

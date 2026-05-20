@@ -5,8 +5,8 @@
 [package]
 name = "symthaea-physics-catalog"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Lightweight physics equation catalog with HDC structural search — compiles to WASM for browser-side discovery"
 license = "AGPL-3.0-or-later"

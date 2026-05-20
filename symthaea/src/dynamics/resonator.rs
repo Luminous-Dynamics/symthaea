@@ -462,7 +462,7 @@ mod tests {
         use rand::SeedableRng;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         (0..dim)
-            .map(|_| if rng.gen::<bool>() { 1.0 } else { -1.0 })
+            .map(|_| if rng.r#gen::<bool>() { 1.0 } else { -1.0 })
             .collect()
     }
 
@@ -618,8 +618,10 @@ mod tests {
 
         // Should find correct factors
         let labels: Vec<&str> = result.iter().map(|(l, _)| l.as_str()).collect();
-        assert!(labels
-            .iter()
-            .any(|l| l.contains("s1_3") || l.contains("s2_7")));
+        assert!(
+            labels
+                .iter()
+                .any(|l| l.contains("s1_3") || l.contains("s2_7"))
+        );
     }
 }

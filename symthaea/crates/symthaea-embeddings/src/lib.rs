@@ -57,7 +57,7 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // Re-export qwen3 types at module level
-pub use qwen3::{Qwen3Config, Qwen3Embedder, QWEN3_FULL_DIMENSION};
+pub use qwen3::{QWEN3_FULL_DIMENSION, Qwen3Config, Qwen3Embedder};
 
 #[cfg(feature = "async-embed")]
 pub use qwen3::AsyncQwen3Embedder;
@@ -171,7 +171,7 @@ impl HdcBridge {
             // Each entry is +1, 0, or -1 with probabilities p, 1-2p, p
             let p = config.sparsity / 2.0;
             for _ in 0..total_size {
-                let r: f32 = rng.gen();
+                let r: f32 = rng.r#gen();
                 let val = if r < p {
                     scale
                 } else if r < 2.0 * p {
@@ -185,8 +185,8 @@ impl HdcBridge {
             // Dense Gaussian projection
             for _ in 0..total_size {
                 // Box-Muller transform for Gaussian distribution
-                let u1: f32 = rng.gen();
-                let u2: f32 = rng.gen();
+                let u1: f32 = rng.r#gen();
+                let u2: f32 = rng.r#gen();
                 let gaussian = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
                 matrix.push(gaussian * scale);
             }

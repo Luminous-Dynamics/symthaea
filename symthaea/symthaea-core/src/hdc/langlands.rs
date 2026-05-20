@@ -857,11 +857,7 @@ fn kronecker_symbol(a: i64, n: i64) -> i64 {
 }
 
 fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1244,10 +1240,13 @@ mod tests {
         let primes = [2, 3, 5, 7, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
         let mut all_match = true;
         for &p in &primes {
-            let gen = generated.c(p as usize);
+            let r#gen = generated.c(p as usize);
             let hc = hardcoded.c(p as usize);
-            if gen != hc {
-                eprintln!("  MISMATCH at c_{}: generated={}, hardcoded={}", p, gen, hc);
+            if r#gen != hc {
+                eprintln!(
+                    "  MISMATCH at c_{}: generated={}, hardcoded={}",
+                    p, r#gen, hc
+                );
                 all_match = false;
             }
         }

@@ -33,7 +33,7 @@ impl CodingAgent {
     /// Record the outcome of code generation into the dispatcher's Bayesian stats.
     pub(super) fn record_generation_outcome(&mut self, success: bool) {
         let tier = self.generation_tiers.last().copied();
-        if let (Some(tier), Some(ref mut dispatcher)) = (tier, &mut self.dispatcher) {
+        if let (Some(tier), Some(dispatcher)) = (tier, &mut self.dispatcher) {
             dispatcher.record_outcome_with_category(tier, success, &self.task);
         }
 

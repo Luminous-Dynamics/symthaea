@@ -276,7 +276,7 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
     let mut hdc_successes = 0usize;
     let mut hdc_attempts = 0usize;
 
-    for gen in 0..config.max_generations {
+    for r#gen in 0..config.max_generations {
         // ── Evaluate ──────────────────────────────────────────────────────
         let mut scored: Vec<(f64, usize, bool)> = population
             .iter()
@@ -301,7 +301,7 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
                     einstein_defect: defect,
                     betti_numbers: betti,
                     is_valid_topology: is_valid_topo,
-                    generation_found: gen,
+                    generation_found: r#gen,
                     from_hdc_crossover: false,
                     is_positive_definite: is_pd,
                 });

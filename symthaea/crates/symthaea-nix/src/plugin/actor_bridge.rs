@@ -174,8 +174,8 @@ impl NixActorBridge {
 
             let mut meta = HashMap::new();
             meta.insert("services".into(), snapshot.services.len().to_string());
-            if let Some(gen) = snapshot.generation {
-                meta.insert("generation".into(), gen.to_string());
+            if let Some(r#gen) = snapshot.generation {
+                meta.insert("generation".into(), r#gen.to_string());
             }
 
             messages.push(NixActorMessage {
@@ -499,9 +499,11 @@ mod tests {
         let mut engine = NixActiveInference::new();
 
         let (plan, messages) = bridge.process_input(&mut engine, "install firefox");
-        assert!(messages
-            .iter()
-            .any(|m| m.kind == NixMessageKind::GoalUpdate));
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.kind == NixMessageKind::GoalUpdate)
+        );
         assert!(!plan.goal.description.is_empty());
     }
 

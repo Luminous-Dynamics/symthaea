@@ -415,7 +415,7 @@ impl ConfusionMatrix {
                         }
                     }
                     EditOp::Substitution => {
-                        if let (Some(ref r), Some(ref h)) =
+                        if let (Some(r), Some(h)) =
                             (&alignment.reference[i], &alignment.hypothesis[i])
                         {
                             matrix.add_substitution(r, h);

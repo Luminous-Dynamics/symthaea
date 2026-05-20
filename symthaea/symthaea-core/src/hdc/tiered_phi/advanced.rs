@@ -631,9 +631,9 @@ pub fn transfer_from_ring(
     target_components: &[ContinuousHV],
     target_phi: f64,
 ) -> PhiTransferResult {
+    use crate::hdc::HDC_DIMENSION;
     use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
     use crate::hdc::spectral_connectivity::ConnectivityCalculator;
-    use crate::hdc::HDC_DIMENSION;
 
     let n = target_components.len().max(8);
     let dim = if target_components.is_empty() {
@@ -1782,13 +1782,13 @@ impl PhiModularityAnalyzer {
                     let nodes1: Vec<usize> = assignments
                         .iter()
                         .enumerate()
-                        .filter(|(_, &c)| c == c1)
+                        .filter(|&(_, &c)| c == c1)
                         .map(|(i, _)| i)
                         .collect();
                     let nodes2: Vec<usize> = assignments
                         .iter()
                         .enumerate()
-                        .filter(|(_, &c)| c == c2)
+                        .filter(|&(_, &c)| c == c2)
                         .map(|(i, _)| i)
                         .collect();
 
@@ -1962,14 +1962,14 @@ impl PhiModularityAnalyzer {
         let to_degree: f64 = assignments
             .iter()
             .enumerate()
-            .filter(|(_, &c)| c == to_cluster)
+            .filter(|&(_, &c)| c == to_cluster)
             .map(|(i, _)| sim_matrix[i].iter().sum::<f64>())
             .sum();
 
         let from_degree: f64 = assignments
             .iter()
             .enumerate()
-            .filter(|(i, &c)| c == from_cluster && i != &node)
+            .filter(|&(ref i, &c)| c == from_cluster && i != &node)
             .map(|(i, _)| sim_matrix[i].iter().sum::<f64>())
             .sum();
 
@@ -2069,7 +2069,7 @@ impl PhiModularityAnalyzer {
                 let members: Vec<usize> = assignments
                     .iter()
                     .enumerate()
-                    .filter(|(_, &a)| a == c)
+                    .filter(|&(_, &a)| a == c)
                     .map(|(i, _)| i)
                     .collect();
 
@@ -2099,7 +2099,7 @@ impl PhiModularityAnalyzer {
             let node_indices: Vec<usize> = assignments
                 .iter()
                 .enumerate()
-                .filter(|(_, &a)| a == module_id)
+                .filter(|&(_, &a)| a == module_id)
                 .map(|(i, _)| i)
                 .collect();
 
@@ -2117,11 +2117,7 @@ impl PhiModularityAnalyzer {
                         count += 1;
                     }
                 }
-                if count > 0 {
-                    sum / count as f64
-                } else {
-                    0.0
-                }
+                if count > 0 { sum / count as f64 } else { 0.0 }
             } else {
                 1.0
             };

@@ -225,7 +225,7 @@ impl ConsciousnessGenome {
         for _ in 0..input_size {
             neurons.push(NeuronGene {
                 id,
-                tau: 0.5 + rng.gen::<f64>() * 0.5,
+                tau: 0.5 + rng.r#gen::<f64>() * 0.5,
                 bias: 0.0,
                 activation: ActivationType::Identity,
                 layer: NeuronLayer::Input,
@@ -237,7 +237,7 @@ impl ConsciousnessGenome {
         for _ in 0..output_size {
             neurons.push(NeuronGene {
                 id,
-                tau: 0.5 + rng.gen::<f64>() * 0.5,
+                tau: 0.5 + rng.r#gen::<f64>() * 0.5,
                 bias: rng.gen_range(-0.5..0.5),
                 activation: *ActivationType::ALL
                     .get(rng.gen_range(0..ActivationType::ALL.len()))
@@ -252,7 +252,7 @@ impl ConsciousnessGenome {
         let mut innovation = 0u64;
         for out_idx in input_size..(input_size + output_size) {
             for in_idx in 0..input_size {
-                if rng.gen::<f64>() < INITIAL_CONNECTION_DENSITY {
+                if rng.r#gen::<f64>() < INITIAL_CONNECTION_DENSITY {
                     connections.push(ConnectionGene {
                         from_id: in_idx,
                         to_id: out_idx,
@@ -302,7 +302,7 @@ impl ConsciousnessGenome {
     pub fn mutate(&mut self, mutation_rate: f64, rng: &mut impl Rng, innovation_counter: &mut u64) {
         // Weight mutation
         for conn in &mut self.network_topology {
-            if rng.gen::<f64>() < mutation_rate {
+            if rng.r#gen::<f64>() < mutation_rate {
                 conn.weight += rng.gen_range(-WEIGHT_MUTATION_SIGMA..WEIGHT_MUTATION_SIGMA);
                 conn.weight = conn.weight.clamp(-5.0, 5.0);
             }
@@ -313,18 +313,18 @@ impl ConsciousnessGenome {
             if neuron.layer == NeuronLayer::Input {
                 continue;
             }
-            if rng.gen::<f64>() < mutation_rate {
+            if rng.r#gen::<f64>() < mutation_rate {
                 neuron.tau += rng.gen_range(-TAU_MUTATION_SIGMA..TAU_MUTATION_SIGMA);
                 neuron.tau = neuron.tau.clamp(0.01, 2.0);
             }
-            if rng.gen::<f64>() < mutation_rate {
+            if rng.r#gen::<f64>() < mutation_rate {
                 neuron.bias += rng.gen_range(-BIAS_MUTATION_SIGMA..BIAS_MUTATION_SIGMA);
                 neuron.bias = neuron.bias.clamp(-5.0, 5.0);
             }
         }
 
         // Add connection
-        if rng.gen::<f64>() < ADD_CONNECTION_PROB && self.neuron_params.len() >= 2 {
+        if rng.r#gen::<f64>() < ADD_CONNECTION_PROB && self.neuron_params.len() >= 2 {
             let from_id = self.neuron_params[rng.gen_range(0..self.neuron_params.len())].id;
             let to_candidates: Vec<usize> = self
                 .neuron_params
@@ -352,7 +352,7 @@ impl ConsciousnessGenome {
         }
 
         // Add neuron (split existing connection)
-        if rng.gen::<f64>() < ADD_NEURON_PROB && !self.network_topology.is_empty() {
+        if rng.r#gen::<f64>() < ADD_NEURON_PROB && !self.network_topology.is_empty() {
             let enabled_indices: Vec<usize> = self
                 .network_topology
                 .iter()
@@ -373,7 +373,7 @@ impl ConsciousnessGenome {
                 let new_id = self.neuron_params.iter().map(|n| n.id).max().unwrap_or(0) + 1;
                 self.neuron_params.push(NeuronGene {
                     id: new_id,
-                    tau: 0.5 + rng.gen::<f64>() * 0.5,
+                    tau: 0.5 + rng.r#gen::<f64>() * 0.5,
                     bias: 0.0,
                     activation: ActivationType::ALL[rng.gen_range(0..ActivationType::ALL.len())],
                     layer: NeuronLayer::Hidden,
@@ -406,7 +406,7 @@ impl ConsciousnessGenome {
             if neuron.layer == NeuronLayer::Input {
                 continue;
             }
-            if rng.gen::<f64>() < TOGGLE_ACTIVATION_PROB {
+            if rng.r#gen::<f64>() < TOGGLE_ACTIVATION_PROB {
                 neuron.activation =
                     ActivationType::ALL[rng.gen_range(0..ActivationType::ALL.len())];
             }
@@ -988,9 +988,9 @@ impl EvolutionaryLandscape {
 
         let entropy = Self::compute_entropy(species, organisms.len());
 
-        let gen = self.generation_stats.len() as u32;
+        let r#gen = self.generation_stats.len() as u32;
         self.generation_stats.push(GenerationStats {
-            generation: gen,
+            generation: r#gen,
             mean_phi,
             max_phi,
             min_phi,
@@ -1144,7 +1144,7 @@ pub fn run_evolution(config: EvolutionConfig) -> EvolutionaryLandscape {
                 next_gen.push(ConsciousnessGenome::random(
                     config.input_size,
                     config.output_size,
-                    config.seed + rng.gen::<u64>(),
+                    config.seed + rng.r#gen::<u64>(),
                 ));
             }
         }

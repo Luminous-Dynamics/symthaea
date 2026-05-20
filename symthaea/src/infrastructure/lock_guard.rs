@@ -225,13 +225,13 @@ impl<T> ResilientRwLock<T> for RwLock<T> {
 /// ```
 #[macro_export]
 macro_rules! lock {
-    ($mutex:expr) => {
+    ($mutex:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientMutex::lock_resilient(
             &$mutex,
             concat!(file!(), ":", line!()),
         )
     };
-    ($mutex:expr, $context:expr) => {
+    ($mutex:expr_2021, $context:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientMutex::lock_resilient(&$mutex, $context)
     };
 }
@@ -239,13 +239,13 @@ macro_rules! lock {
 /// Macro for resilient read lock acquisition.
 #[macro_export]
 macro_rules! read_lock {
-    ($rwlock:expr) => {
+    ($rwlock:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::read_resilient(
             &$rwlock,
             concat!(file!(), ":", line!()),
         )
     };
-    ($rwlock:expr, $context:expr) => {
+    ($rwlock:expr_2021, $context:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::read_resilient(&$rwlock, $context)
     };
 }
@@ -253,13 +253,13 @@ macro_rules! read_lock {
 /// Macro for resilient write lock acquisition.
 #[macro_export]
 macro_rules! write_lock {
-    ($rwlock:expr) => {
+    ($rwlock:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::write_resilient(
             &$rwlock,
             concat!(file!(), ":", line!()),
         )
     };
-    ($rwlock:expr, $context:expr) => {
+    ($rwlock:expr_2021, $context:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::write_resilient(&$rwlock, $context)
     };
 }
@@ -272,7 +272,7 @@ macro_rules! write_lock {
 /// ```
 #[macro_export]
 macro_rules! lock_with_pain {
-    ($mutex:expr, $context:expr, $pain_tx:expr) => {
+    ($mutex:expr_2021, $context:expr_2021, $pain_tx:expr_2021) => {
         $crate::infrastructure::lock_guard::ResilientMutexWithPain::lock_with_pain(
             &$mutex, $context, $pain_tx,
         )

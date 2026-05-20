@@ -11,7 +11,7 @@ use rand::Rng;
 use symthaea_core::genesis::GenesisSeed;
 
 use super::gradients::{AdamState, CfCCellCache, CfCGradients};
-use super::types::{sigmoid, CfCConfig, OnlineLearningStats, MIN_TAU};
+use super::types::{CfCConfig, MIN_TAU, OnlineLearningStats, sigmoid};
 
 /// A single Closed-form Continuous-time cell
 #[derive(Debug, Clone)]
@@ -166,22 +166,22 @@ impl CfCCell {
         let scale = (2.0 / (effective_input_dim + config.hidden_dim) as f32).sqrt();
 
         let w_in = Array2::from_shape_fn((config.hidden_dim, effective_input_dim), |_| {
-            (rng.gen::<f32>() - 0.5) * 2.0 * scale
+            (rng.r#gen::<f32>() - 0.5) * 2.0 * scale
         });
 
         let w_h = Array2::from_shape_fn((config.hidden_dim, config.hidden_dim), |_| {
-            (rng.gen::<f32>() - 0.5) * 2.0 * scale
+            (rng.r#gen::<f32>() - 0.5) * 2.0 * scale
         });
 
         let w_out = Array2::from_shape_fn((config.hidden_dim, config.hidden_dim), |_| {
-            (rng.gen::<f32>() - 0.5) * 2.0 * scale
+            (rng.r#gen::<f32>() - 0.5) * 2.0 * scale
         });
 
         let b_h = Array1::zeros(config.hidden_dim);
 
         let (tau_min, tau_max) = config.tau_range;
         let tau = Array1::from_shape_fn(config.hidden_dim, |_| {
-            let log_tau = tau_min.ln() + rng.gen::<f32>() * (tau_max.ln() - tau_min.ln());
+            let log_tau = tau_min.ln() + rng.r#gen::<f32>() * (tau_max.ln() - tau_min.ln());
             log_tau.exp().max(MIN_TAU)
         });
 
@@ -191,14 +191,14 @@ impl CfCCell {
 
             weights.push(Array2::from_shape_fn(
                 (config.backbone_dim, config.input_dim),
-                |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale,
+                |_| (rng.r#gen::<f32>() - 0.5) * 2.0 * scale,
             ));
             biases.push(Array1::zeros(config.backbone_dim));
 
             for _ in 1..config.backbone_layers {
                 weights.push(Array2::from_shape_fn(
                     (config.backbone_dim, config.backbone_dim),
-                    |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale,
+                    |_| (rng.r#gen::<f32>() - 0.5) * 2.0 * scale,
                 ));
                 biases.push(Array1::zeros(config.backbone_dim));
             }

@@ -235,18 +235,18 @@ impl FlakeParser {
 
         if parts.len() == 2 {
             // inputs.foo = "github:..."
-            if let NixValue::String(ref s) = value {
+            if let NixValue::String(s) = value {
                 input.url = Some(s.clone());
             }
         } else if parts.len() >= 3 {
             match parts[2] {
                 "url" => {
-                    if let NixValue::String(ref s) = value {
+                    if let NixValue::String(s) = value {
                         input.url = Some(s.clone());
                     }
                 }
                 "follows" => {
-                    if let NixValue::String(ref s) = value {
+                    if let NixValue::String(s) = value {
                         input.follows = Some(s.clone());
                     }
                 }
@@ -285,10 +285,10 @@ impl FlakeParser {
                     follows: None,
                     is_flake: None,
                 };
-                if let Some(NixValue::String(ref url)) = attrs.get("url") {
+                if let Some(NixValue::String(url)) = attrs.get("url") {
                     decl.url = Some(url.clone());
                 }
-                if let Some(NixValue::String(ref f)) = attrs.get("follows") {
+                if let Some(NixValue::String(f)) = attrs.get("follows") {
                     decl.follows = Some(f.clone());
                 }
                 if let Some(NixValue::Bool(b)) = attrs.get("flake") {

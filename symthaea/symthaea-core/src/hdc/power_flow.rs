@@ -311,8 +311,8 @@ impl PowerNetwork {
         let mut remaining_load = total_load;
 
         for &gi in &gen_order {
-            let gen = &self.generators[gi];
-            let p = remaining_load.min(gen.p_max_mw).max(gen.p_min_mw);
+            let r#gen = &self.generators[gi];
+            let p = remaining_load.min(r#gen.p_max_mw).max(r#gen.p_min_mw);
             dispatch[gi] = p;
             remaining_load -= p;
             if remaining_load <= 0.0 {
@@ -322,8 +322,8 @@ impl PowerNetwork {
 
         // Create a modified network with the dispatch applied
         let mut network = self.clone();
-        for (gi, gen) in self.generators.iter().enumerate() {
-            if let Some(bus) = network.buses.iter_mut().find(|b| b.id == gen.bus_id) {
+        for (gi, r#gen) in self.generators.iter().enumerate() {
+            if let Some(bus) = network.buses.iter_mut().find(|b| b.id == r#gen.bus_id) {
                 bus.generation_mw = dispatch[gi];
             }
         }
@@ -620,7 +620,7 @@ mod tests {
 
         // Cheapest generator should be dispatched first
         assert!(opf.dispatch_mw[0] > 0.0); // Gen1 at $30/MWh
-                                           // Total dispatch should equal total load
+        // Total dispatch should equal total load
         let total_dispatch: f64 = opf.dispatch_mw.iter().sum();
         assert!((total_dispatch - 80.0).abs() < 1.0);
     }

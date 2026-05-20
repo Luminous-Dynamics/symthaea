@@ -5,13 +5,13 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
+use super::super::CognitiveLoopService;
 use super::super::feedback_state::Priority;
 use super::super::helpers;
 use super::super::phase_results::PerceptionPhaseResult;
 #[cfg(feature = "cpg")]
 use super::super::thresholds::CPG_SYNC_TAU_FLOOR;
 use super::super::thresholds::*;
-use super::super::CognitiveLoopService;
 
 impl CognitiveLoopService {
     /// Semantic memory lookup, CfC temporal step, multi-scale prediction,
@@ -314,16 +314,21 @@ impl CognitiveLoopService {
         if self.config.enable_substrate_encoding_noise {
             let frac = self.substrate_manager.effective_dim_fraction();
             if frac < 1.0 {
-                if let Ok(mut state) = self.temporal_network.read_state() {
-                    let mask_start = (frac * state.len() as f32) as usize;
-                    for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
-                        *h = 0.0;
+                match self.temporal_network.read_state() {
+                    Ok(mut state) => {
+                        let mask_start = (frac * state.len() as f32) as usize;
+                        for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
+                            *h = 0.0;
+                        }
+                        if let Err(e) = self.temporal_network.inject(&state) {
+                            tracing::warn!(err = %e, "substrate mask inject failed");
+                        }
                     }
-                    if let Err(e) = self.temporal_network.inject(&state) {
-                        tracing::warn!(err = %e, "substrate mask inject failed");
+                    _ => {
+                        tracing::warn!(
+                            "CfC read_state failed during substrate mask — skipping mask"
+                        );
                     }
-                } else {
-                    tracing::warn!("CfC read_state failed during substrate mask — skipping mask");
                 }
             }
         }
@@ -346,18 +351,23 @@ impl CognitiveLoopService {
                 let substrate_frac = self.substrate_manager.effective_dim_fraction();
                 let frac = substrate_frac.max(spectral_frac);
                 if frac < 1.0 {
-                    if let Ok(mut state) = self.temporal_network.read_state() {
-                        let mask_start = (frac * state.len() as f32) as usize;
-                        for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
-                            *h = 0.0;
+                    match self.temporal_network.read_state() {
+                        Ok(mut state) => {
+                            let mask_start = (frac * state.len() as f32) as usize;
+                            for h in
+                                state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut()
+                            {
+                                *h = 0.0;
+                            }
+                            if let Err(e) = self.temporal_network.inject(&state) {
+                                tracing::warn!(err = %e, "spectral entropy mask inject failed");
+                            }
                         }
-                        if let Err(e) = self.temporal_network.inject(&state) {
-                            tracing::warn!(err = %e, "spectral entropy mask inject failed");
+                        _ => {
+                            tracing::warn!(
+                                "CfC read_state failed during spectral entropy mask — skipping mask"
+                            );
                         }
-                    } else {
-                        tracing::warn!(
-                            "CfC read_state failed during spectral entropy mask — skipping mask"
-                        );
                     }
                 }
             }

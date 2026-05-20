@@ -50,8 +50,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use super::zk_proofs::{ZKEIGRangeProof, ZKTopicCommitment};
 use super::GISError;
+use super::zk_proofs::{ZKEIGRangeProof, ZKTopicCommitment};
 
 // HDC imports for semantic encoding
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};

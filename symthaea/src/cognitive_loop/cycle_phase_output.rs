@@ -1863,7 +1863,7 @@ impl CognitiveLoopService {
         {
             let tau =
                 (self.substrate_manager.tau_factor as f64).max(SUBSTRATE_TAU_FACTOR_MINIMUM as f64); // Guard: prevent div-by-zero
-                                                                                                     // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
+            // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
             let integration_rate = if tau.is_finite() {
                 (1.0_f64 / tau).clamp(FEEDBACK_INTEGRATION_RATE_LOWER as f64, 1.0)
             } else {
@@ -2164,7 +2164,7 @@ impl CognitiveLoopService {
             language_output: {
                 let text = self.language_comm.last_broca_text.take();
                 // Send to async voice synthesis (non-blocking) if enabled
-                if let (Some(ref t), Some(ref vs)) = (&text, &self.voice_synthesis) {
+                if let (Some(t), Some(vs)) = (&text, &self.voice_synthesis) {
                     let _ = vs.send(super::voice_channel::VoiceRequest {
                         text: t.clone(),
                         cfc_output: dynamics.core.output.clone(),

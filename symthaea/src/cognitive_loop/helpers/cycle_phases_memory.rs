@@ -7,8 +7,8 @@
 
 use std::time::Instant;
 
-use super::super::temporal_network::TemporalNetwork;
 use super::super::CognitiveLoopService;
+use super::super::temporal_network::TemporalNetwork;
 use super::cycle_phases::{EpisodicReplayResult, ResonatorCodebookResult};
 
 impl CognitiveLoopService {
@@ -586,7 +586,7 @@ impl CognitiveLoopService {
                 let max_stratum = depth_counts
                     .iter()
                     .enumerate()
-                    .max_by_key(|(_, &c)| c)
+                    .max_by_key(|&(_, &c)| c)
                     .map(|(i, _)| i)
                     .unwrap_or(0);
                 // Evict oldest entry from that stratum (FIFO — first match removed)

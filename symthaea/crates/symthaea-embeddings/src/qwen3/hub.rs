@@ -125,9 +125,11 @@ mod tests {
     fn test_parse_shard_index_missing_weight_map() {
         let bad_json = r#"{"metadata": {}}"#;
         let index: serde_json::Value = serde_json::from_str(bad_json).unwrap();
-        assert!(index
-            .get("weight_map")
-            .and_then(|v| v.as_object())
-            .is_none());
+        assert!(
+            index
+                .get("weight_map")
+                .and_then(|v| v.as_object())
+                .is_none()
+        );
     }
 }

@@ -417,7 +417,7 @@ impl RProcessNetwork {
             // Collect nuclides to process (avoid borrow conflict)
             let current: Vec<(Nuclide, f64)> = abundances
                 .iter()
-                .filter(|(_, &y)| y > ABUNDANCE_FLOOR)
+                .filter(|&(_, &y)| y > ABUNDANCE_FLOOR)
                 .map(|(&nuc, &y)| (nuc, y))
                 .collect();
 
@@ -538,7 +538,7 @@ impl RProcessNetwork {
             if steps % 100 == 0 {
                 if let Some((&peak_nuc, _)) = abundances
                     .iter()
-                    .filter(|(_, &y)| y > ABUNDANCE_FLOOR)
+                    .filter(|&(_, &y)| y > ABUNDANCE_FLOOR)
                     .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 {
                     if path.last() != Some(&peak_nuc) {
@@ -555,7 +555,7 @@ impl RProcessNetwork {
         for _ in 0..config.freezeout_steps {
             let current: Vec<(Nuclide, f64)> = abundances
                 .iter()
-                .filter(|(_, &y)| y > ABUNDANCE_FLOOR)
+                .filter(|&(_, &y)| y > ABUNDANCE_FLOOR)
                 .map(|(&nuc, &y)| (nuc, y))
                 .collect();
 

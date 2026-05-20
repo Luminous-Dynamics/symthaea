@@ -476,8 +476,8 @@ impl RandomProjection {
                 (0..input_dim)
                     .map(|_| {
                         // Box-Muller transform for Gaussian
-                        let u1: f32 = rng.gen::<f32>().max(1e-7);
-                        let u2: f32 = rng.gen();
+                        let u1: f32 = rng.r#gen::<f32>().max(1e-7);
+                        let u2: f32 = rng.r#gen();
                         let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
                         z * std
                     })
@@ -487,7 +487,7 @@ impl RandomProjection {
 
         let bias: Vec<f32> = (0..output_dim)
             .map(|_| {
-                let u: f32 = rng.gen();
+                let u: f32 = rng.r#gen();
                 (u - 0.5) * 2.0 * std
             })
             .collect();

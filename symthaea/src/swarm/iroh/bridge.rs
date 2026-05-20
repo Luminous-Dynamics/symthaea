@@ -36,8 +36,8 @@
 use crate::mind::SocialMessage;
 #[allow(unused_imports)]
 use parking_lot::RwLock as ParkingRwLock;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc; // used via Arc<parking_lot::RwLock<...>>
 
 // ============================================================================

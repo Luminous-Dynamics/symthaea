@@ -107,7 +107,7 @@ impl ClosedLearningLoop {
     pub fn select_strategy(&mut self, phi: f64, _previous_reward: Option<f32>) -> ResponseStrategy {
         // Step 1: Q-learning selection (epsilon-greedy)
         let (explore_val, variant_val): (f32, u8) = match self.rng.as_mut() {
-            Some(rng) => (rng.gen::<f32>(), rng.gen::<u8>()),
+            Some(rng) => (rng.r#gen::<f32>(), rng.r#gen::<u8>()),
             None => (rand::random::<f32>(), rand::random::<u8>()),
         };
         let explore = explore_val < self.exploration_rate;

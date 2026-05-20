@@ -639,12 +639,14 @@ mod tests {
         let u = Uncertainty3D::new(0.8, 0.1, 0.5);
         let recs = u.recommendations();
 
-        assert!(recs
-            .iter()
-            .any(|r| r.uncertainty_type == UncertaintyType::Epistemic));
-        assert!(recs
-            .iter()
-            .any(|r| r.uncertainty_type == UncertaintyType::Structural));
+        assert!(
+            recs.iter()
+                .any(|r| r.uncertainty_type == UncertaintyType::Epistemic)
+        );
+        assert!(
+            recs.iter()
+                .any(|r| r.uncertainty_type == UncertaintyType::Structural)
+        );
     }
 
     // === GIS v4.0 Moral Uncertainty Tests ===
@@ -707,12 +709,14 @@ mod tests {
         let recs = m.recommendations();
 
         // Should have recommendations for axiological and deontic (both > 0.4)
-        assert!(recs
-            .iter()
-            .any(|r| r.dimension == MoralUncertaintyType::Axiological));
-        assert!(recs
-            .iter()
-            .any(|r| r.dimension == MoralUncertaintyType::Deontic));
+        assert!(
+            recs.iter()
+                .any(|r| r.dimension == MoralUncertaintyType::Axiological)
+        );
+        assert!(
+            recs.iter()
+                .any(|r| r.dimension == MoralUncertaintyType::Deontic)
+        );
 
         // Axiological should be higher priority
         let axio_rec = recs

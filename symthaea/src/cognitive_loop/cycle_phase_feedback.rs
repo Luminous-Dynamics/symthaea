@@ -966,8 +966,8 @@ impl CognitiveLoopService {
                             }
                         })
                         .unwrap_or(HOT_DEPTH_DEFAULT); // preserve backward compat when disabled
-                                                       // Hubris attenuates HOT: can't claim deep self-knowledge while
-                                                       // morally overconfident. 0.7× during hubris, 1.0× otherwise.
+                    // Hubris attenuates HOT: can't claim deep self-knowledge while
+                    // morally overconfident. 0.7× during hubris, 1.0× otherwise.
                     if self.ethics_engine.last_anomaly_report().moral_hubris {
                         raw_hot * HOT_HUBRIS_CONFIDENCE_DAMPEN as f64
                     } else {
@@ -1369,7 +1369,7 @@ impl CognitiveLoopService {
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
         if self.behavior.social_mgr.recent_ai_hvs.len() >= 2 {
-            if let (Some(ref dyad), Some(ref model)) = (
+            if let (Some(dyad), Some(model)) = (
                 &self.behavior.social_mgr.phi_dyad,
                 &self.behavior.social_mgr.partner_model,
             ) {
@@ -2164,11 +2164,12 @@ mod tests {
             svc.cycle("gradient warmup");
         }
         let r = svc.cycle("gradient recovery");
-        assert!(r
-            .metadata
-            .consciousness
-            .consciousness_gradient_magnitude
-            .is_finite());
+        assert!(
+            r.metadata
+                .consciousness
+                .consciousness_gradient_magnitude
+                .is_finite()
+        );
         assert!(r.metadata.prediction_coherence.is_finite());
     }
 

@@ -581,9 +581,11 @@ mod tests {
 
         let paths = hi.resolution_paths();
         assert_eq!(paths.len(), 2); // Only PSF and IW
-        assert!(paths
-            .iter()
-            .any(|p| p.harmony == Harmony::PanSentientFlourishing));
+        assert!(
+            paths
+                .iter()
+                .any(|p| p.harmony == Harmony::PanSentientFlourishing)
+        );
         assert!(paths.iter().any(|p| p.harmony == Harmony::IntegralWisdom));
     }
 

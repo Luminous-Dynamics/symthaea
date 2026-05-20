@@ -47,7 +47,7 @@
 //! let decoded = bridge.decode(&encoded);
 //! ```
 
-use crate::hdc::config::{hdc_dim, STT_DIMENSION};
+use crate::hdc::config::{STT_DIMENSION, hdc_dim};
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
@@ -267,7 +267,7 @@ impl LearnedProjection {
         }
 
         // Update bias with Adam (if present)
-        if let (Some(ref mut bias), Some(ref mut bias_m), Some(ref mut bias_v)) = (
+        if let (Some(bias), Some(bias_m), Some(bias_v)) = (
             &mut self.bias,
             &mut self.bias_momentum,
             &mut self.bias_velocity,

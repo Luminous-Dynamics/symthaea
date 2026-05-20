@@ -19,7 +19,7 @@ use super::cross_domain_prediction::CrossDomainMatrix;
 use super::normative_comparison::NormativeReport;
 use super::psychometric_report::PsychometricReport;
 use super::reliability_analysis::{ReliabilityBattery, ReliabilityClass};
-use super::report::{domain_of, key_metric_for_benchmark, BenchmarkReport};
+use super::report::{BenchmarkReport, domain_of, key_metric_for_benchmark};
 use super::sat_curves::SatCurve;
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -193,13 +193,16 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
         let _ = write!(
             html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" font-size=\"11\" fill=\"#555\">{}</text>\n",
-            lx, ly + 4.0, anchor, escape_html(domain.0),
+            lx,
+            ly + 4.0,
+            anchor,
+            escape_html(domain.0),
         );
     }
 
     // Data polygon
     let mut points = String::new();
-    for (i, (_, &score)) in domains.iter().enumerate() {
+    for (i, &(_, &score)) in domains.iter().enumerate() {
         let angle = std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
         let r = radius * score.clamp(0.0, 1.0);
         let x = cx + r * angle.cos();
@@ -216,7 +219,7 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
     );
 
     // Data points
-    for (i, (_, &score)) in domains.iter().enumerate() {
+    for (i, &(_, &score)) in domains.iter().enumerate() {
         let angle = std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
         let r = radius * score.clamp(0.0, 1.0);
         let x = cx + r * angle.cos();
@@ -245,7 +248,11 @@ fn write_domain_tables(html: &mut String, report: &BenchmarkReport, include_llm:
     }
 
     for (domain, indices) in &domains {
-        let _ = write!(html, "<h3>{}</h3>\n<table>\n<tr><th>Benchmark</th><th>Key Metric</th><th>Agent</th><th>Human</th><th>% Human</th><th>d</th><th>z</th><th>95% CI</th>", escape_html(domain));
+        let _ = write!(
+            html,
+            "<h3>{}</h3>\n<table>\n<tr><th>Benchmark</th><th>Key Metric</th><th>Agent</th><th>Human</th><th>% Human</th><th>d</th><th>z</th><th>95% CI</th>",
+            escape_html(domain)
+        );
         if include_llm {
             let _ = write!(html, "<th>LLM (GPT-4)</th><th>LLM %</th>");
         }
@@ -356,7 +363,10 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
     let _ = write!(
         html,
         "<line x1=\"{}\" y1=\"{:.0}\" x2=\"{}\" y2=\"{:.0}\" stroke=\"#999\" stroke-width=\"1\"/>\n",
-        left_margin, axis_y, left_margin + plot_width, axis_y,
+        left_margin,
+        axis_y,
+        left_margin + plot_width,
+        axis_y,
     );
 
     // Tick marks and labels
@@ -365,12 +375,17 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         let _ = write!(
             html,
             "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{}\" stroke=\"#ccc\" stroke-width=\"1\" stroke-dasharray=\"2,2\"/>\n",
-            x, axis_y, x, total_height - 10,
+            x,
+            axis_y,
+            x,
+            total_height - 10,
         );
         let _ = write!(
             html,
             "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"middle\" font-size=\"10\" fill=\"#666\">{:+.0}</text>\n",
-            x, axis_y - 5.0, d_val,
+            x,
+            axis_y - 5.0,
+            d_val,
         );
     }
 
@@ -379,7 +394,10 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
     let _ = write!(
         html,
         "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{}\" stroke=\"#333\" stroke-width=\"1.5\"/>\n",
-        zero_x, axis_y, zero_x, total_height - 10,
+        zero_x,
+        axis_y,
+        zero_x,
+        total_height - 10,
     );
 
     // Data rows
@@ -393,7 +411,9 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         let _ = write!(
             html,
             "<text x=\"{}\" y=\"{:.0}\" text-anchor=\"end\" font-size=\"11\" fill=\"#333\" dominant-baseline=\"middle\">{}</text>\n",
-            left_margin - 10, yf, escape_html(&row.benchmark),
+            left_margin - 10,
+            yf,
+            escape_html(&row.benchmark),
         );
 
         // CI whisker
@@ -406,7 +426,10 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         let _ = write!(
             html,
             "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{:.0}\" stroke=\"#666\" stroke-width=\"1\"/>\n",
-            d_to_x(ci_lo.min(d_clamped)), yf, d_to_x(ci_hi.max(d_clamped)), yf,
+            d_to_x(ci_lo.min(d_clamped)),
+            yf,
+            d_to_x(ci_hi.max(d_clamped)),
+            yf,
         );
 
         // Point
@@ -422,7 +445,9 @@ fn write_forest_plot_svg(html: &mut String, report: &BenchmarkReport) {
         let _ = write!(
             html,
             "<text x=\"{}\" y=\"{:.0}\" font-size=\"10\" fill=\"#666\" dominant-baseline=\"middle\">{:+.2}</text>\n",
-            left_margin + plot_width + 10, yf, d,
+            left_margin + plot_width + 10,
+            yf,
+            d,
         );
     }
 
@@ -435,7 +460,10 @@ fn write_composite_scores(html: &mut String, report: &BenchmarkReport) {
         return;
     }
 
-    let _ = writeln!(html, "<h2>Composite Scores</h2>\n<table>\n<tr><th>Domain</th><th>Mean z</th><th>n</th><th>Benchmarks</th></tr>");
+    let _ = writeln!(
+        html,
+        "<h2>Composite Scores</h2>\n<table>\n<tr><th>Domain</th><th>Mean z</th><th>n</th><th>Benchmarks</th></tr>"
+    );
 
     for (domain, cs) in &composites {
         let z_class = if cs.mean_z > 0.5 {
@@ -547,7 +575,9 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
         let _ = write!(
             html,
             "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"middle\" font-size=\"10\" fill=\"#666\">{:.1}</text>\n",
-            x, y_base + 15.0, tp,
+            x,
+            y_base + 15.0,
+            tp,
         );
     }
     // X axis title
@@ -565,12 +595,17 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
         let _ = write!(
             html,
             "<line x1=\"{}\" y1=\"{:.0}\" x2=\"{}\" y2=\"{:.0}\" stroke=\"#ddd\" stroke-width=\"1\"/>\n",
-            margin_l, y, margin_l + plot_w, y,
+            margin_l,
+            y,
+            margin_l + plot_w,
+            y,
         );
         let _ = write!(
             html,
             "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"end\" font-size=\"10\" fill=\"#666\">{:.1}</text>\n",
-            margin_l as f64 - 5.0, y + 3.0, acc,
+            margin_l as f64 - 5.0,
+            y + 3.0,
+            acc,
         );
     }
     // Y axis title
@@ -643,7 +678,8 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
         let _ = write!(
             html,
             "<path d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"1.5\" stroke-dasharray=\"4,3\" opacity=\"0.6\"/>\n",
-            fit_d.trim(), color,
+            fit_d.trim(),
+            color,
         );
 
         // Legend entry
@@ -653,12 +689,17 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
             let _ = write!(
                 html,
                 "<line x1=\"{:.0}\" y1=\"{:.0}\" x2=\"{:.0}\" y2=\"{:.0}\" stroke=\"{}\" stroke-width=\"2\"/>\n",
-                legend_x, legend_y, legend_x + 15.0, legend_y, color,
+                legend_x,
+                legend_y,
+                legend_x + 15.0,
+                legend_y,
+                color,
             );
             let _ = write!(
                 html,
                 "<text x=\"{:.0}\" y=\"{:.0}\" font-size=\"9\" fill=\"#333\">{} (R\u{00b2}={:.2})</text>\n",
-                legend_x + 18.0, legend_y + 3.0,
+                legend_x + 18.0,
+                legend_y + 3.0,
                 escape_html(&short_name[..short_name.len().min(20)]),
                 curve.fit.r_squared,
             );
@@ -697,7 +738,10 @@ pub fn write_reliability_section(html: &mut String, battery: &ReliabilityBattery
     let _ = write!(
         html,
         "<div class=\"summary\"><strong>Mean ICC:</strong> {:.3} | <strong>Excellent:</strong> {} | <strong>Good:</strong> {} | <strong>Total:</strong> {}</div>\n",
-        mean_icc, excellent, good, battery.results.len(),
+        mean_icc,
+        excellent,
+        good,
+        battery.results.len(),
     );
 
     let _ = write!(

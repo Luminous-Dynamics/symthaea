@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-logparse"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Log ingestion and HDC semantic clustering for Symthaea IT-ops reasoning (Phase 1 spike). Parses Windows Event Log (evtx) + syslog (RFC5424) into structured events and encodes them as 16,384D hypervectors for clustering."
 license = "AGPL-3.0-or-later"

@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-muse-wasm"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "WASM bridge for consciousness-driven music synthesis"
 license = "AGPL-3.0-or-later"
 

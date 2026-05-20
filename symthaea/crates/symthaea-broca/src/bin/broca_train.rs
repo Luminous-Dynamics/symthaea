@@ -16,7 +16,7 @@ use std::process;
 use symthaea_broca::evaluation;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::training::{
-    train_with_adam, CurriculumSchedule, TrainingConfig, TrainingDataset,
+    CurriculumSchedule, TrainingConfig, TrainingDataset, train_with_adam,
 };
 
 use symthaea_core::genesis::GenesisSeed;
@@ -84,7 +84,7 @@ fn main() {
             BrocaGenerator::from_checkpoint(resume_path, &genesis)
         };
         match load_result {
-            Ok((gen, adam, _proj, _lm_config)) => (gen, adam),
+            Ok((loaded_generator, adam, _proj, _lm_config)) => (loaded_generator, adam),
             Err(e) => {
                 eprintln!("Failed to load checkpoint '{}': {e}", resume_path);
                 process::exit(1);
@@ -820,7 +820,9 @@ fn print_usage() {
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
     eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");
     eprintln!("  --neurons-per-layer N  CfC neurons per layer (default: 8, fresh train only)");
-    eprintln!("  --adaptive-veto F    Ramp veto threshold to F over final --veto-warmup epochs (default: 0.0 = off)");
+    eprintln!(
+        "  --adaptive-veto F    Ramp veto threshold to F over final --veto-warmup epochs (default: 0.0 = off)"
+    );
     eprintln!("  --veto-warmup N      Epochs over which to ramp veto threshold (default: 10)");
     eprintln!("  --soft-veto-training Enable soft veto (partial CfC restore) during training");
     eprintln!("  --help, -h           Show this help message");

@@ -40,8 +40,8 @@ use crate::benchmarks::qualia_confidence::helpers::jitter_from_seed;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 
 /// Activation levels to test (0.2 to 0.9 in 0.1 steps).
 const ACTIVATION_LEVELS: [f64; 8] = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
@@ -276,7 +276,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
         let ignition_threshold = ACTIVATION_LEVELS
             .iter()
             .zip(ignition_rates.iter())
-            .find(|(_, &rate)| rate > 0.5)
+            .find(|&(_, &rate)| rate > 0.5)
             .map(|(&level, _)| level)
             .unwrap_or(1.0);
 

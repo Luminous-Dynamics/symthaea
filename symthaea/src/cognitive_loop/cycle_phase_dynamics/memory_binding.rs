@@ -4,11 +4,11 @@
 
 use std::time::Instant;
 
+use super::super::CognitiveLoopService;
 use super::super::feedback_state::Priority;
 use super::super::helpers;
 use super::super::phase_results::PerceptionPhaseResult;
 use super::super::thresholds::*;
-use super::super::CognitiveLoopService;
 
 impl CognitiveLoopService {
     /// Memory recall, resonator matching, phenomenal binding, and goal attention.

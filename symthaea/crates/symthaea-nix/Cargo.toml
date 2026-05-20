@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-nix"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea NixOS: A conscious mind for NixOS system management via HDC and active inference"
 license = "AGPL-3.0-or-later"

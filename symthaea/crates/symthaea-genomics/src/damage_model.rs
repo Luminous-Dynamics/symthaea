@@ -84,7 +84,7 @@ impl DamageModel {
             // Deamination: only affects C (->T) and G (->A on complementary strand)
             if base == Base::C || base == Base::G {
                 let p_deamination = cumulative_probability(self.deamination_rate, age_years);
-                if rng.gen::<f64>() < p_deamination {
+                if rng.r#gen::<f64>() < p_deamination {
                     events.push(DamageEvent {
                         position: pos,
                         damage_type: DamageType::Deamination,
@@ -96,7 +96,7 @@ impl DamageModel {
             // Depurination: only affects purines (A, G)
             if base == Base::A || base == Base::G {
                 let p_depurination = cumulative_probability(self.depurination_rate, age_years);
-                if rng.gen::<f64>() < p_depurination {
+                if rng.r#gen::<f64>() < p_depurination {
                     events.push(DamageEvent {
                         position: pos,
                         damage_type: DamageType::Depurination,
@@ -107,7 +107,7 @@ impl DamageModel {
 
             // Strand break: affects any base
             let p_break = cumulative_probability(self.strand_break_rate, age_years);
-            if rng.gen::<f64>() < p_break {
+            if rng.r#gen::<f64>() < p_break {
                 events.push(DamageEvent {
                     position: pos,
                     damage_type: DamageType::StrandBreak,
@@ -117,7 +117,7 @@ impl DamageModel {
 
             // Crosslink: affects any base
             let p_crosslink = cumulative_probability(self.crosslink_rate, age_years);
-            if rng.gen::<f64>() < p_crosslink {
+            if rng.r#gen::<f64>() < p_crosslink {
                 events.push(DamageEvent {
                     position: pos,
                     damage_type: DamageType::Crosslink,

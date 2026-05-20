@@ -23,8 +23,8 @@
 
 use crate::{Embedder, EmbeddingResult};
 use anyhow::Result;
-use ort::session::builder::GraphOptimizationLevel;
 use ort::session::Session;
+use ort::session::builder::GraphOptimizationLevel;
 use ort::value::Tensor;
 
 /// Configuration for the ONNX embedder.

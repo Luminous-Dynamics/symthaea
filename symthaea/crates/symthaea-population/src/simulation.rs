@@ -96,7 +96,7 @@ impl PopulationSimulator {
         // Record initial state
         snapshots.push(self.snapshot(&current_pop));
 
-        for gen in 1..=generations {
+        for r#gen in 1..=generations {
             // Select breeding pairs
             let num_pairs = self.target_population_size / 2;
             let pairs = select_pairs(self.strategy, &current_pop, pedigree, num_pairs.max(1), rng);
@@ -121,12 +121,12 @@ impl PopulationSimulator {
                         if offspring.len() >= self.target_population_size {
                             break;
                         }
-                        let child = self.generate_offspring(next_id, pa, pb, gen, loci, rng);
+                        let child = self.generate_offspring(next_id, pa, pb, r#gen, loci, rng);
                         pedigree.add_entry(PedigreeEntry {
                             individual_id: child.id,
                             parent_a_id: Some(pa.id),
                             parent_b_id: Some(pb.id),
-                            generation: gen,
+                            generation: r#gen,
                         });
                         offspring.push(child);
                         next_id += 1;
@@ -145,14 +145,14 @@ impl PopulationSimulator {
             // Update population
             let diversity_hv_temp = compute_diversity_hv(&Population {
                 individuals: offspring.clone(),
-                generation: gen,
+                generation: r#gen,
                 founding_size: initial.founding_size,
                 diversity_hv: current_pop.diversity_hv.clone(),
             });
 
             current_pop = Population {
                 individuals: offspring,
-                generation: gen,
+                generation: r#gen,
                 founding_size: initial.founding_size,
                 diversity_hv: diversity_hv_temp,
             };
@@ -239,7 +239,7 @@ impl PopulationSimulator {
     fn maybe_mutate(&self, mut allele: Allele, rng: &mut impl Rng) -> Allele {
         if rng.gen_bool(self.mutation_rate.min(1.0)) {
             // Create a new allele ID (mutation)
-            allele.id = rng.gen::<u64>();
+            allele.id = rng.r#gen::<u64>();
             // 10% chance mutation is deleterious
             if rng.gen_bool(0.1) {
                 allele.is_deleterious = true;
@@ -531,11 +531,11 @@ mod tests {
                 .map(|l| Genotype {
                     locus_id: l.id,
                     allele_a: if rng.gen_bool(0.3) {
-                        Allele::deleterious(rng.gen(), -0.05, 0.3)
+                        Allele::deleterious(rng.r#gen(), -0.05, 0.3)
                     } else {
-                        Allele::neutral(rng.gen())
+                        Allele::neutral(rng.r#gen())
                     },
-                    allele_b: Allele::neutral(rng.gen()),
+                    allele_b: Allele::neutral(rng.r#gen()),
                 })
                 .collect();
             let genome_hv = encode_individual(&loci, &genotypes);

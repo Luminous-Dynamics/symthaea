@@ -392,7 +392,7 @@ impl ConsciousnessTopology {
 
         let mut final_edges = Vec::new();
         for (i, j) in edges {
-            if rng.gen::<f64>() < p {
+            if rng.r#gen::<f64>() < p {
                 // Rewire: keep i, replace j with random node
                 let mut new_target = rng.gen_range(0..n_nodes);
 

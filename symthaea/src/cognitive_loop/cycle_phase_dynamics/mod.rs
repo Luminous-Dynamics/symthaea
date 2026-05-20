@@ -408,7 +408,7 @@ impl CognitiveLoopService {
             // `self.subsystem_health`, and `self.subsystem_collector` are all separate
             // fields of CognitiveLoopService, so the borrow checker accepts this.
             macro_rules! run_subsystem {
-                ($mgr:expr, $name:literal, $snapshot:expr) => {
+                ($mgr:expr_2021, $name:literal, $snapshot:expr_2021) => {
                     if !self.subsystem_health.is_faulted($name) {
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             $mgr.process($snapshot)

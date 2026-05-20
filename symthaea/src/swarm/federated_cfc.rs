@@ -761,8 +761,8 @@ fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
     let mut rng = rand::thread_rng();
     for v in gradient.iter_mut() {
         // Box-Muller transform for Gaussian noise
-        let u1: f32 = rng.gen::<f32>().max(f32::EPSILON);
-        let u2: f32 = rng.gen();
+        let u1: f32 = rng.r#gen::<f32>().max(f32::EPSILON);
+        let u2: f32 = rng.r#gen();
         let normal = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
         *v += sigma * normal;
     }

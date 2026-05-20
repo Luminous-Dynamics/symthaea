@@ -102,7 +102,7 @@ impl IrohNode {
         label: &str,
     ) -> SwarmResult<Self> {
         let mut rng = genesis.domain(&format!("{label}::iroh_node"));
-        let node_id = format!("{:064x}", rand::Rng::gen::<u64>(&mut rng));
+        let node_id = format!("{:064x}", rand::Rng::r#gen::<u64>(&mut rng));
 
         tracing::warn!(
             "Iroh node created in STUB mode (genesis-seeded). NodeId: {}",

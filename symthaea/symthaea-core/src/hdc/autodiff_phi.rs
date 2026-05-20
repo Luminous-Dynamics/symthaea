@@ -202,8 +202,7 @@ impl DiffNetwork {
             node.normalize(); // Keep on unit hypersphere
         }
 
-        if let (Some(ref mut weights), Some(ref grads)) = (&mut self.edge_weights, &self.edge_grad)
-        {
+        if let (Some(weights), Some(grads)) = (&mut self.edge_weights, &self.edge_grad) {
             for i in 0..weights.len() {
                 for j in 0..weights[i].len() {
                     weights[i][j] += learning_rate * grads[i][j];
@@ -482,8 +481,7 @@ impl AutodiffPhiEngine {
         }
 
         // Optionally backpropagate to edge weights
-        if let (Some(ref mut edge_grad), Some(_)) = (&mut network.edge_grad, &network.edge_weights)
-        {
+        if let (Some(edge_grad), Some(_)) = (&mut network.edge_grad, &network.edge_weights) {
             for i in 0..n {
                 for j in 0..n {
                     if i != j {

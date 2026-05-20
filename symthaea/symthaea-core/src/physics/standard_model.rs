@@ -263,8 +263,8 @@ impl PropertyVectors {
     }
 
     /// Encode generation (1, 2, 3)
-    pub fn encode_generation(&self, gen: u8) -> ContinuousHV {
-        let shift = (gen as usize - 1) * 1000;
+    pub fn encode_generation(&self, r#gen: u8) -> ContinuousHV {
+        let shift = (r#gen as usize - 1) * 1000;
         self.generation.permute(shift)
     }
 }

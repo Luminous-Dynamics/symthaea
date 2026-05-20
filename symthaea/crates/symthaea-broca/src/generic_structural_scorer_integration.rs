@@ -42,11 +42,11 @@ impl GenericStructuralScorer {
     }
 
     fn compare_elements(
-        gen: &[StructuralElement],
+        r#gen: &[StructuralElement],
         gold: &[StructuralElement],
     ) -> StructuralVerdict {
         // Simple Jaccard + missing path detection
-        let gen_set: HashSet<_> = gen.iter().map(|e| e.dotted_path.clone()).collect();
+        let gen_set: HashSet<_> = r#gen.iter().map(|e| e.dotted_path.clone()).collect();
         let gold_set: HashSet<_> = gold.iter().map(|e| e.dotted_path.clone()).collect();
 
         let missing: Vec<_> = gold_set.difference(&gen_set).cloned().collect();

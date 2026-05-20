@@ -88,7 +88,7 @@ impl HSICTest {
     pub fn from_genesis(genesis: &symthaea_core::genesis::GenesisSeed, label: &str) -> Self {
         use rand::SeedableRng;
         let mut shake = genesis.domain(&format!("{label}::hsic"));
-        let seed: u64 = rand::Rng::gen(&mut shake);
+        let seed: u64 = rand::Rng::r#gen(&mut shake);
         Self {
             sigma: None,
             seeded_rng: Some(rand::rngs::StdRng::seed_from_u64(seed)),
@@ -762,7 +762,7 @@ impl CausalConsciousness {
     ) -> Self {
         use rand::Rng;
         let mut rng = genesis.domain(&format!("{label}::causal_consciousness"));
-        let seed: u64 = rng.gen();
+        let seed: u64 = rng.r#gen();
         Self {
             discovery: CausalDiscoveryEngine::with_ensemble_size(seed, 5),
             hsic: HSICTest::from_genesis(genesis, &format!("{label}::hsic")),

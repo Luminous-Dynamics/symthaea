@@ -9,8 +9,8 @@
 //! 3. Semantic veto: mid-sentence self-correction when coherence drops
 //! 4. Thermodynamic subjective time: dt varies with system load
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "mamba-cpu")]
@@ -21,8 +21,8 @@ use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 #[cfg(feature = "therapeutic")]
 use crate::gating::TherapeuticGate;
 use crate::gating::{
-    confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
-    EmotionalModulator, EpistemicGate, GatingConfig,
+    CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig,
+    confidence_adjusted_veto_threshold, consciousness_gated_max_tokens,
 };
 use crate::tokenizer::{BpeTokenizer, MergePair, VocabFile};
 
@@ -396,28 +396,29 @@ impl BrocaGenerator {
         match ProjectionCheckpoint::load_from_file(&path) {
             Ok(proj_ckpt) => {
                 // If it has a full snapshot, restore everything
-                let (mut gen, adam, _, config_str) = if let Some(snapshot) = proj_ckpt.full_snapshot
-                {
-                    (
-                        Self::from_checkpoint_struct(*snapshot, genesis),
-                        None::<AdamState>,
-                        None::<Vec<f32>>,
-                        None::<String>,
-                    )
-                } else {
-                    (
-                        Self::new(genesis, BrocaConfig::default()),
-                        None::<AdamState>,
-                        None::<Vec<f32>>,
-                        None::<String>,
-                    )
-                };
+                let (mut r#gen, adam, _, config_str) =
+                    if let Some(snapshot) = proj_ckpt.full_snapshot {
+                        (
+                            Self::from_checkpoint_struct(*snapshot, genesis),
+                            None::<AdamState>,
+                            None::<Vec<f32>>,
+                            None::<String>,
+                        )
+                    } else {
+                        (
+                            Self::new(genesis, BrocaConfig::default()),
+                            None::<AdamState>,
+                            None::<Vec<f32>>,
+                            None::<String>,
+                        )
+                    };
 
                 // Restore projection weights
-                gen.controller
+                r#gen
+                    .controller
                     .restore_projection_weights(proj_ckpt.projection_weights.clone());
 
-                return Ok((gen, adam, Some(proj_ckpt.projection_weights), config_str));
+                return Ok((r#gen, adam, Some(proj_ckpt.projection_weights), config_str));
             }
             Err(e) => {
                 tracing::debug!("Failed to load as ProjectionCheckpoint: {}", e);
@@ -446,28 +447,29 @@ impl BrocaGenerator {
         #[cfg(feature = "mamba-cpu")]
         match ProjectionCheckpoint::load_from_file_allow_checksum_mismatch(&path) {
             Ok(proj_ckpt) => {
-                let (mut gen, adam, _, config_str) = if let Some(snapshot) = proj_ckpt.full_snapshot
-                {
-                    (
-                        Self::from_checkpoint_struct(*snapshot, genesis),
-                        None::<AdamState>,
-                        None::<Vec<f32>>,
-                        None::<String>,
-                    )
-                } else {
-                    (
-                        Self::new(genesis, BrocaConfig::default()),
-                        None::<AdamState>,
-                        None::<Vec<f32>>,
-                        None::<String>,
-                    )
-                };
+                let (mut r#gen, adam, _, config_str) =
+                    if let Some(snapshot) = proj_ckpt.full_snapshot {
+                        (
+                            Self::from_checkpoint_struct(*snapshot, genesis),
+                            None::<AdamState>,
+                            None::<Vec<f32>>,
+                            None::<String>,
+                        )
+                    } else {
+                        (
+                            Self::new(genesis, BrocaConfig::default()),
+                            None::<AdamState>,
+                            None::<Vec<f32>>,
+                            None::<String>,
+                        )
+                    };
 
                 // Restore projection weights
-                gen.controller
+                r#gen
+                    .controller
                     .restore_projection_weights(proj_ckpt.projection_weights.clone());
 
-                return Ok((gen, adam, Some(proj_ckpt.projection_weights), config_str));
+                return Ok((r#gen, adam, Some(proj_ckpt.projection_weights), config_str));
             }
             Err(e) => {
                 tracing::debug!("Failed to load as ProjectionCheckpoint (recovery): {}", e);
@@ -478,11 +480,12 @@ impl BrocaGenerator {
     }
 
     fn from_checkpoint_struct(checkpoint: BrocaCheckpoint, genesis: &GenesisSeed) -> Self {
-        let mut gen = Self::new(genesis, checkpoint.config);
-        gen.controller.restore_network(checkpoint.network_state);
-        gen.controller
+        let mut r#gen = Self::new(genesis, checkpoint.config);
+        r#gen.controller.restore_network(checkpoint.network_state);
+        r#gen
+            .controller
             .restore_token_embeddings(checkpoint.token_embeddings);
-        gen
+        r#gen
     }
 
     /// Save the current generator state to a checkpoint file.
@@ -889,7 +892,7 @@ impl BrocaGenerator {
             let next_token = self.sample(&logits);
 
             // Observe token for NSM prime coverage tracking
-            if let (Some(ref mut tracker), Some(ref gate)) = (&mut nsm_tracker, &self.nsm_gate) {
+            if let (Some(tracker), Some(gate)) = (&mut nsm_tracker, &self.nsm_gate) {
                 tracker.observe_token(next_token, gate);
             }
 
@@ -1228,8 +1231,8 @@ fn top_p_sample(logits: &[f32], p: f32, temperature: f32, rng: Option<&mut StdRn
 fn random_f32(rng: Option<&mut StdRng>) -> f32 {
     use rand::Rng;
     match rng {
-        Some(rng) => rng.gen::<f32>(),
-        None => rand::thread_rng().gen::<f32>(),
+        Some(rng) => rng.r#gen::<f32>(),
+        None => rand::thread_rng().r#gen::<f32>(),
     }
 }
 
@@ -1265,8 +1268,8 @@ mod tests {
     fn test_generator_creation() {
         let genesis = test_genesis();
         let config = test_config();
-        let gen = BrocaGenerator::new(&genesis, config);
-        assert!(gen.tokenizer().vocab_size() > 100);
+        let r#gen = BrocaGenerator::new(&genesis, config);
+        assert!(r#gen.tokenizer().vocab_size() > 100);
     }
 
     #[test]
@@ -1292,10 +1295,10 @@ mod tests {
     fn test_generation_produces_tokens() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         assert!(result.num_tokens > 0, "Should generate at least 1 token");
     }
@@ -1307,9 +1310,9 @@ mod tests {
         config.gating.base_max_tokens = 5;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         assert!(
             result.num_tokens <= 5,
@@ -1322,11 +1325,11 @@ mod tests {
     fn test_streaming_callback() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let channels = ThoughtChannels::default();
         let mut streamed = String::new();
-        let result = gen.generate_with_callback(&channels, &mut |token| {
+        let result = r#gen.generate_with_callback(&channels, &mut |token| {
             streamed.push_str(token);
         });
 
@@ -1370,12 +1373,12 @@ mod tests {
         config.enable_consciousness_gating = true;
         config.gating.base_max_tokens = 100;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         // Low psi → shorter
         let mut low_psi = ThoughtChannels::default();
         low_psi.set_consciousness(0.1, 0.5, 0.5);
-        let result_low = gen.generate(&low_psi);
+        let result_low = r#gen.generate(&low_psi);
 
         let mut gen2 = BrocaGenerator::new(
             &test_genesis(),
@@ -1413,13 +1416,13 @@ mod tests {
     fn test_no_state_leakage_between_generations() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let channels = ThoughtChannels::with_intent(1); // Answer
 
         // Generate twice with same input — should produce identical output
-        let result1 = gen.generate(&channels);
-        let result2 = gen.generate(&channels);
+        let result1 = r#gen.generate(&channels);
+        let result2 = r#gen.generate(&channels);
 
         assert_eq!(
             result1.token_ids, result2.token_ids,
@@ -1434,18 +1437,18 @@ mod tests {
         config.gating.base_max_tokens = 64;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // Should produce tokens without crashing at 64 token horizon
         assert!(result.num_tokens > 0, "Should produce tokens");
         // All token IDs should be valid
         for &id in &result.token_ids {
             assert!(
-                (id as usize) < gen.tokenizer().vocab_size(),
+                (id as usize) < r#gen.tokenizer().vocab_size(),
                 "Token ID {id} exceeds vocab size {}",
-                gen.tokenizer().vocab_size()
+                r#gen.tokenizer().vocab_size()
             );
         }
         // Final coherence should be finite
@@ -1459,13 +1462,13 @@ mod tests {
     fn test_nan_channels_dont_crash() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let mut channels = ThoughtChannels::default();
         channels.channels[9] = f32::NAN; // NaN valence
         channels.channels[10] = f32::INFINITY; // Inf arousal
 
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
         // Should not crash, should produce some output
         assert!(
             result.num_tokens > 0 || result.eos_terminated,
@@ -1504,9 +1507,9 @@ mod tests {
         config.gating.base_max_tokens = 30;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // Compute max consecutive repetition
         let max_rep = if result.token_ids.len() < 2 {
@@ -1611,9 +1614,9 @@ mod tests {
         config.gating.base_max_tokens = 30;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // If veto triggered, text should contain the hesitation token
         if result.veto_triggered {
@@ -1633,15 +1636,15 @@ mod tests {
     fn test_generate_continuing_preserves_state() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let channels = ThoughtChannels::with_intent(1);
 
         // First generation (with reset)
-        let result1 = gen.generate(&channels);
+        let result1 = r#gen.generate(&channels);
 
         // Continuing generation (without reset) — should differ from fresh
-        let result2 = gen.generate_continuing(&channels);
+        let result2 = r#gen.generate_continuing(&channels);
 
         // The continuing generation should produce different output because
         // it builds on the CfC state from result1
@@ -1653,7 +1656,7 @@ mod tests {
         );
 
         // Now do a fresh generation — should match result1 exactly
-        let result3 = gen.generate(&channels);
+        let result3 = r#gen.generate(&channels);
         assert_eq!(
             result1.token_ids, result3.token_ids,
             "Fresh generation should be identical to first"
@@ -1668,9 +1671,9 @@ mod tests {
         config.gating.base_max_tokens = 10;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // Gating trace should have entries for every token position
         assert_eq!(
@@ -1728,9 +1731,9 @@ mod tests {
         config.gating.base_max_tokens = 10;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // Coherence dynamics should have entries
         assert_eq!(
@@ -1752,9 +1755,9 @@ mod tests {
         config.gating.base_max_tokens = 10;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         assert_eq!(
             result.logit_diagnostics.len(),
@@ -1787,9 +1790,9 @@ mod tests {
         config.gating.base_max_tokens = 10;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         assert_eq!(
             result.coherence_dynamics.len(),
@@ -1819,9 +1822,9 @@ mod tests {
         config.gating.base_max_tokens = 15;
         config.enable_consciousness_gating = false;
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // Just verify the flag is populated (true or false, both valid)
         let _ = result.hallucination_flag;
@@ -1836,8 +1839,8 @@ mod tests {
         let mut outputs: Vec<Vec<u32>> = Vec::new();
         for intent in 0..8 {
             let channels = ThoughtChannels::with_intent(intent);
-            let mut gen = BrocaGenerator::new(&genesis, config.clone());
-            let result = gen.generate(&channels);
+            let mut r#gen = BrocaGenerator::new(&genesis, config.clone());
+            let result = r#gen.generate(&channels);
             outputs.push(result.token_ids);
         }
 
@@ -1862,22 +1865,22 @@ mod tests {
     fn test_generate_continuing_context_accumulates() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let channels = ThoughtChannels::with_intent(1);
 
         // First generation (resets state)
-        let result1 = gen.generate(&channels);
+        let result1 = r#gen.generate(&channels);
 
         // Second generation (continuing — builds on CfC state)
-        let result2 = gen.generate_continuing(&channels);
+        let result2 = r#gen.generate_continuing(&channels);
 
         // Both should produce output
         assert!(result1.num_tokens > 0);
         assert!(result2.num_tokens > 0);
 
         // Third fresh generation should match first (state reset)
-        let result3 = gen.generate(&channels);
+        let result3 = r#gen.generate(&channels);
         assert_eq!(
             result1.token_ids, result3.token_ids,
             "Fresh generation should reproduce first result"
@@ -1890,12 +1893,12 @@ mod tests {
         let config = test_config();
 
         // Fresh generator → generate() to establish CfC state
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut r#gen = BrocaGenerator::new(&genesis, config.clone());
         let channels = ThoughtChannels::with_intent(1);
-        let _warm_up = gen.generate(&channels);
+        let _warm_up = r#gen.generate(&channels);
 
         // generate_continuing() builds on the CfC state left by warm_up
-        let continuing_result = gen.generate_continuing(&channels);
+        let continuing_result = r#gen.generate_continuing(&channels);
 
         // Fresh generator → generate() with no prior state
         let mut gen_fresh = BrocaGenerator::new(&genesis, config);
@@ -1915,17 +1918,17 @@ mod tests {
     fn test_context_accumulation_changes_output() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         let channels = ThoughtChannels::with_intent(1);
 
         // Initial generation resets state
-        let _initial = gen.generate(&channels);
+        let _initial = r#gen.generate(&channels);
 
         // Successive continuing generations should evolve (CfC state accumulates)
-        let cont1 = gen.generate_continuing(&channels);
-        let cont2 = gen.generate_continuing(&channels);
-        let cont3 = gen.generate_continuing(&channels);
+        let cont1 = r#gen.generate_continuing(&channels);
+        let cont2 = r#gen.generate_continuing(&channels);
+        let cont3 = r#gen.generate_continuing(&channels);
 
         // All should produce tokens
         assert!(
@@ -1955,12 +1958,12 @@ mod tests {
     fn test_sequential_generation_stability() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         // Generate 50 times with varying intents — no panics, no NaN leakage
         for i in 0..50 {
             let channels = ThoughtChannels::with_intent(i % 8);
-            let result = gen.generate(&channels);
+            let result = r#gen.generate(&channels);
 
             assert!(
                 result.final_coherence.is_finite(),
@@ -1969,7 +1972,7 @@ mod tests {
             // Token IDs should all be in range
             for &id in &result.token_ids {
                 assert!(
-                    (id as usize) < gen.tokenizer().vocab_size(),
+                    (id as usize) < r#gen.tokenizer().vocab_size(),
                     "Token ID {id} out of range at generation {i}"
                 );
             }
@@ -2009,9 +2012,9 @@ mod tests {
             ..Default::default()
         };
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         // Veto should have triggered (coherence < 0.99 is almost guaranteed
         // for random network weights)
@@ -2092,9 +2095,9 @@ mod tests {
             ..Default::default()
         };
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
 
         assert!(
             !result.veto_triggered,
@@ -2139,13 +2142,13 @@ mod tests {
             ..Default::default()
         };
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         // Simulate a 5-turn conversation using generate_continuing()
         let mut veto_count = 0;
         for turn in 0..5 {
             let channels = ThoughtChannels::with_intent(turn % 4);
-            let result = gen.generate_continuing(&channels);
+            let result = r#gen.generate_continuing(&channels);
 
             // No NaN in coherence dynamics
             for &c in &result.coherence_dynamics {
@@ -2168,7 +2171,7 @@ mod tests {
             // All token IDs in range
             for &id in &result.token_ids {
                 assert!(
-                    (id as usize) < gen.tokenizer().vocab_size(),
+                    (id as usize) < r#gen.tokenizer().vocab_size(),
                     "Token ID {id} out of range at turn {turn}"
                 );
             }
@@ -2190,7 +2193,7 @@ mod tests {
     /// CfC network → generation → coherence feedback.
     #[test]
     fn test_train_generate_round_trip() {
-        use crate::training::{train, TrainingConfig, TrainingDataset, TrainingPair};
+        use crate::training::{TrainingConfig, TrainingDataset, TrainingPair, train};
 
         let genesis = test_genesis();
         let config = BrocaConfig {
@@ -2212,12 +2215,12 @@ mod tests {
         };
 
         // Generate BEFORE training (baseline)
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut r#gen = BrocaGenerator::new(&genesis, config.clone());
         let channels = ThoughtChannels::default();
-        let pre_train_result = gen.generate(&channels);
+        let pre_train_result = r#gen.generate(&channels);
 
         // Train on a small corpus
-        let tok = gen.tokenizer().clone();
+        let tok = r#gen.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         for _ in 0..10 {
             dataset.push(TrainingPair::new(channels, "hello world".to_string(), &tok));
@@ -2234,7 +2237,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut r#gen, &dataset, &train_config);
 
         // Verify training reduced loss
         let first_loss = metrics[0].avg_loss;
@@ -2245,7 +2248,7 @@ mod tests {
         );
 
         // Generate AFTER training
-        let post_train_result = gen.generate(&channels);
+        let post_train_result = r#gen.generate(&channels);
 
         // Both should produce valid output
         assert!(
@@ -2290,13 +2293,13 @@ mod tests {
             ..Default::default()
         };
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         // Generate for all 8 intents
         let mut results: Vec<Vec<u32>> = Vec::new();
         for intent in 0..8 {
             let channels = ThoughtChannels::with_intent(intent);
-            let result = gen.generate(&channels);
+            let result = r#gen.generate(&channels);
             results.push(result.token_ids);
         }
 

@@ -449,10 +449,10 @@ impl NixOSExecutor {
         for line in stdout.lines() {
             if line.contains("(current)") {
                 if let Some(gen_str) = line.split_whitespace().next() {
-                    if let Ok(gen) = gen_str.trim().parse::<u32>() {
-                        self.current_generation = Some(gen);
-                        info!(generation = gen, "Captured current NixOS generation");
-                        return Ok(gen);
+                    if let Ok(r#gen) = gen_str.trim().parse::<u32>() {
+                        self.current_generation = Some(r#gen);
+                        info!(generation = r#gen, "Captured current NixOS generation");
+                        return Ok(r#gen);
                     }
                 }
             }

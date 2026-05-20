@@ -728,7 +728,7 @@ impl UncertaintyEngine {
 
         for _ in 0..n_trajectories {
             // Generate random base point in normalized space [0,1]^k
-            let base: Vec<f64> = (0..k).map(|_| rng.gen::<f64>()).collect();
+            let base: Vec<f64> = (0..k).map(|_| rng.r#gen::<f64>()).collect();
 
             // Compute output at base point
             let base_params = self.normalized_to_actual(&base);

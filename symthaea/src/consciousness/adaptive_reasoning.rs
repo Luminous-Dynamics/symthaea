@@ -305,7 +305,7 @@ impl QLearningAgent {
         let mut rng = rand::thread_rng();
 
         // Epsilon-greedy: explore with probability epsilon
-        if rng.gen::<f64>() < self.epsilon {
+        if rng.r#gen::<f64>() < self.epsilon {
             // Explore: random action
             let idx = rng.gen_range(0..available_actions.len());
             return available_actions[idx].clone();

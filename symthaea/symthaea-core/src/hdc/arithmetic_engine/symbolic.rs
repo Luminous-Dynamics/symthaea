@@ -457,7 +457,7 @@ impl Polynomial {
         let term_encodings: Vec<BinaryHV> = coeffs
             .iter()
             .enumerate()
-            .filter(|(_, &c)| c != 0)
+            .filter(|&(_, &c)| c != 0)
             .map(|(degree, &coeff)| {
                 let coeff_enc = HdcNumber::from_value(coeff.unsigned_abs(), primitives).encoding;
                 let degree_enc = HdcNumber::from_value(degree as u64, primitives).encoding;

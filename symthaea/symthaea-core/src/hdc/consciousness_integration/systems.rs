@@ -205,7 +205,7 @@ impl ConsciousnessPipeline {
             return None;
         }
 
-        if let (Some(ref mut optimizer), Some(ref mut network)) =
+        if let (Some(optimizer), Some(network)) =
             (&mut self.phi_optimizer, &mut self.consciousness_network)
         {
             let result = optimizer.optimize_step(network);

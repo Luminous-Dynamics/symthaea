@@ -10,7 +10,7 @@
 use crate::aesthetic_listener::AestheticListener;
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::critic;
-use crate::{compose, AudioData, MuseConfig, MusicalState};
+use crate::{AudioData, MuseConfig, MusicalState, compose};
 
 /// Parameter bounds: name, min, max.
 #[derive(Debug, Clone)]
@@ -199,11 +199,7 @@ impl Genome {
             .zip(other.genes.iter())
             .map(|(&a, &b)| {
                 s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
-                if (s >> 63) == 0 {
-                    a
-                } else {
-                    b
-                }
+                if (s >> 63) == 0 { a } else { b }
             })
             .collect();
         Genome { genes }
@@ -419,7 +415,7 @@ pub fn evolve(config: &TunerConfig) -> TunerResult {
     let mut history = Vec::new();
     let mut best_ever = (population[0].0.clone(), population[0].1);
 
-    for gen in 0..config.max_generations {
+    for r#gen in 0..config.max_generations {
         // Sort by fitness (descending)
         population.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
@@ -431,7 +427,7 @@ pub fn evolve(config: &TunerConfig) -> TunerResult {
             best_ever = (population[0].0.clone(), best);
         }
 
-        if gen % 10 == 0 || gen == config.max_generations - 1 {
+        if r#gen % 10 == 0 || r#gen == config.max_generations - 1 {
             println!(
                 "  Gen {gen:3}/{}: best={best:.4} mean={mean:.4}",
                 config.max_generations
@@ -447,7 +443,7 @@ pub fn evolve(config: &TunerConfig) -> TunerResult {
         }
 
         // Fill remaining with tournament selection + crossover + mutation
-        let seed_base = (gen as u64 + 1) * 104729;
+        let seed_base = (r#gen as u64 + 1) * 104729;
         while next_gen.len() < config.population_size {
             let parent_a = tournament_select(
                 &population,
@@ -587,7 +583,7 @@ pub fn evolve_taste(config: &TunerConfig) -> TunerResult {
     let mut history = Vec::new();
     let mut best_ever = (population[0].0.clone(), population[0].1);
 
-    for gen in 0..config.max_generations {
+    for r#gen in 0..config.max_generations {
         population.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
         let best = population[0].1;
@@ -598,7 +594,7 @@ pub fn evolve_taste(config: &TunerConfig) -> TunerResult {
             best_ever = (population[0].0.clone(), best);
         }
 
-        if gen % 5 == 0 || gen == config.max_generations - 1 {
+        if r#gen % 5 == 0 || r#gen == config.max_generations - 1 {
             println!(
                 "  Gen {gen:3}/{}: best={best:.1} mean={mean:.1}",
                 config.max_generations
@@ -610,7 +606,7 @@ pub fn evolve_taste(config: &TunerConfig) -> TunerResult {
             next_gen.push(population[i].clone());
         }
 
-        let seed_base = (gen as u64 + 1) * 104729;
+        let seed_base = (r#gen as u64 + 1) * 104729;
         while next_gen.len() < config.population_size {
             let pa = tournament_select(
                 &population,

@@ -24,7 +24,7 @@ mod swarm;
 mod tick;
 mod utils;
 
-pub use async_mind::{connect_social, AsyncMind, AsyncMindHandle};
+pub use async_mind::{AsyncMind, AsyncMindHandle, connect_social};
 pub use config::*;
 pub use intent::{
     ConceptLabel, ConceptPrototype, EpistemicAssessment, IntentClassification, IntentClassifier,
@@ -33,7 +33,7 @@ pub use intent::{
 pub use knowledge::{DomainKnowledge, KnowledgeEntry, SeedingResult};
 pub use structured_thought::*;
 pub use utils::{
-    float_eq, float_eq_f32, is_nonzero, is_nonzero_f32, is_zero, is_zero_f32, EPSILON, EPSILON_F32,
+    EPSILON, EPSILON_F32, float_eq, float_eq_f32, is_nonzero, is_nonzero_f32, is_zero, is_zero_f32,
 };
 
 use crate::memory::memory_coordinator::MemorySource;
@@ -328,7 +328,7 @@ impl ContinuousMind {
             #[cfg(feature = "mesh-encryption")]
             mesh_encryption_key: None,
             #[cfg(feature = "mesh-encryption")]
-            mesh_encryption_epoch: rand::Rng::gen::<u8>(&mut rand::thread_rng()),
+            mesh_encryption_epoch: rand::Rng::r#gen::<u8>(&mut rand::thread_rng()),
             #[cfg(feature = "mesh-key-exchange")]
             mesh_peer_keys: None,
             #[cfg(feature = "mesh-encryption")]

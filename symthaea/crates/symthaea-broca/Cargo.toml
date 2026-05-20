@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-broca"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "SSM Language Center: CfC-HDC autoregressive thought-to-text generation"
 license = "AGPL-3.0-or-later"
 autobins = false

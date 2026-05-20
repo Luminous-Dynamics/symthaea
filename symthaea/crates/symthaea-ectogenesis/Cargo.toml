@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-ectogenesis"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Artificial womb ectogenesis with 40-week developmental gating, consent proxy escalation, and FEP control"
 license = "AGPL-3.0-or-later"

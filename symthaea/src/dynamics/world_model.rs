@@ -22,8 +22,8 @@
 //! └────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use crate::dynamics::CrystalizedConcept;
+use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use ndarray::{Array1, Array2};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -356,13 +356,13 @@ impl HierarchicalCfCWorldModel {
 
             let mut up_rng = genesis.domain(&format!("{label}::up_{i}"));
             let up_proj = Array2::from_shape_fn((upper_dim, lower_dim), |_| {
-                (up_rng.gen::<f32>() - 0.5) * 2.0 * scale
+                (up_rng.r#gen::<f32>() - 0.5) * 2.0 * scale
             });
             up_projections.push(up_proj);
 
             let mut down_rng = genesis.domain(&format!("{label}::down_{i}"));
             let down_proj = Array2::from_shape_fn((lower_dim, upper_dim), |_| {
-                (down_rng.gen::<f32>() - 0.5) * 2.0 * scale
+                (down_rng.r#gen::<f32>() - 0.5) * 2.0 * scale
             });
             down_projections.push(down_proj);
         }

@@ -195,11 +195,14 @@ impl<K: Eq + Hash + Clone, T: Clone> Paginator<K, T> {
     pub fn cache_page(&mut self, key: K, page: Page<T>) {
         // Evict if at capacity
         while self.page_cache.len() >= self.max_cached_pages {
-            if let Some(old_key) = self.access_order.front().cloned() {
-                self.page_cache.remove(&old_key);
-                self.access_order.pop_front();
-            } else {
-                break;
+            match self.access_order.front().cloned() {
+                Some(old_key) => {
+                    self.page_cache.remove(&old_key);
+                    self.access_order.pop_front();
+                }
+                _ => {
+                    break;
+                }
             }
         }
 
@@ -267,20 +270,23 @@ where
         }
 
         let request = PageRequest::new(self.current_page, self.page_size);
-        if let Some(page) = (self.fetcher)(request) {
-            self.total_pages = Some(page.total_pages);
-            self.buffer = page.items;
-            self.buffer_index = 0;
-            self.current_page += 1;
+        match (self.fetcher)(request) {
+            Some(page) => {
+                self.total_pages = Some(page.total_pages);
+                self.buffer = page.items;
+                self.buffer_index = 0;
+                self.current_page += 1;
 
-            if self.buffer.is_empty() || !page.has_next {
-                self.exhausted = self.buffer.is_empty();
+                if self.buffer.is_empty() || !page.has_next {
+                    self.exhausted = self.buffer.is_empty();
+                }
+
+                !self.buffer.is_empty()
             }
-
-            !self.buffer.is_empty()
-        } else {
-            self.exhausted = true;
-            false
+            _ => {
+                self.exhausted = true;
+                false
+            }
         }
     }
 }

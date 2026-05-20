@@ -72,7 +72,7 @@ fi  # end merge-skip wrapper
 # module declaration pointing at a file that hasn't been written yet —
 # a common state during concurrent multi-session development.
 #
-# Edition defaults to 2021 here; per-crate `rustfmt.toml` can override
+# Edition defaults to 2024 here; per-crate `rustfmt.toml` can override
 # other options (rustfmt walks up from each file to find it).
 
 STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
@@ -93,7 +93,7 @@ while IFS= read -r file; do
     [ -z "$file" ] && continue
     # Skip files staged for deletion / removed on disk.
     [ ! -f "$file" ] && continue
-    if ! rustfmt --check --edition 2021 "$file" > /dev/null 2>&1; then
+    if ! rustfmt --check --edition 2024 "$file" > /dev/null 2>&1; then
         FMT_FAILED=1
         FMT_FAILED_FILES+=$'\n   '"$file"
     fi
@@ -103,7 +103,7 @@ if [ "$FMT_FAILED" -eq 1 ]; then
     echo ""
     echo "pre-commit: rustfmt violations in staged files:${FMT_FAILED_FILES}"
     echo ""
-    echo "  Fix with: rustfmt --edition 2021${FMT_FAILED_FILES}"
+    echo "  Fix with: rustfmt --edition 2024${FMT_FAILED_FILES}"
     exit 1
 fi
 

@@ -164,9 +164,9 @@ impl BrocaManager {
                 continue;
             }
             match BrocaGenerator::from_checkpoint(path, genesis) {
-                Ok((gen, _adam, _proj, _lm_config)) => {
+                Ok((r#gen, _adam, _proj, _lm_config)) => {
                     tracing::info!(path = %path, "Loaded Broca checkpoint");
-                    return Some(gen);
+                    return Some(r#gen);
                 }
                 Err(e) => {
                     tracing::warn!(path = %path, err = %e, "Failed to load Broca checkpoint");

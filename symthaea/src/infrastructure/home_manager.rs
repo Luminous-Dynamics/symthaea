@@ -196,8 +196,8 @@ impl HomeManagerBridge {
             let stdout = String::from_utf8_lossy(&out.stdout);
 
             for line in stdout.lines() {
-                if let Some(gen) = self.parse_generation_line(line) {
-                    self.generations.push(gen);
+                if let Some(r#gen) = self.parse_generation_line(line) {
+                    self.generations.push(r#gen);
                 }
             }
         }
@@ -454,14 +454,17 @@ impl HomeManagerBridge {
             output.push_str(&format!("User: {}\n", config.user));
             output.push_str(&format!("Config: {}\n", config.config_path.display()));
 
-            if let Some(gen) = config.generation {
+            if let Some(r#gen) = config.generation {
                 output.push_str(&format!("Generation: {gen}\n"));
             }
 
             output.push_str(&format!("\nGenerations ({}):\n", self.generations.len()));
-            for (i, gen) in self.generations.iter().take(5).enumerate() {
+            for (i, r#gen) in self.generations.iter().take(5).enumerate() {
                 let marker = if i == 0 { "→" } else { " " };
-                output.push_str(&format!("  {} {} - {}\n", marker, gen.id, gen.timestamp));
+                output.push_str(&format!(
+                    "  {} {} - {}\n",
+                    marker, r#gen.id, r#gen.timestamp
+                ));
             }
         } else {
             output.push_str("Home-manager not configured for current user.\n");

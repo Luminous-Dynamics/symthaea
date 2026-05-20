@@ -88,7 +88,7 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
     );
 
     // Causal enhancement: track (input, output) pairs and discover structure
-    if let Some(ref mut enhancer) = causal_enhancer {
+    if let Some(enhancer) = causal_enhancer {
         enhancer.record_cycle_from_f32(compressed_state, output);
 
         if enhancer.should_discover() {
@@ -153,7 +153,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     }
 
     // Resonator memory: store with bound attributes for factorized recall
-    if let Some(ref mut res_mem) = resonator_memory {
+    if let Some(res_mem) = resonator_memory {
         let res_dim_ok = ctx.compressed_state.len() == res_mem.resonator.config.dim;
         if res_dim_ok
             && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN
@@ -221,7 +221,7 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
         ctx.total_cycles as f64,
     );
 
-    if let Some(ref prev_state) = prev_primitive_state {
+    if let &mut Some(ref prev_state) = prev_primitive_state {
         let pred_error = primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
         let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
         *fep_learning_signal +=
@@ -345,7 +345,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     // ── Phi validation ──────────────────────────────────────────────────
     let t = Instant::now();
     let (phi_validation_correlation, new_phi_validation, new_spectral) =
-        if let Some(ref mut validator) = phi_validation {
+        if let Some(validator) = phi_validation {
             if total_cycles % 997 == 0 && total_cycles >= 997 {
                 let results = validator.run_validation_study(10);
                 let r = results.pearson_r;
@@ -375,7 +375,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     // ── Dissipative consciousness ───────────────────────────────────────
     let t = Instant::now();
     let (dissipative_health, dissipative_regime, dissipative_entropy_rate, new_dissipative) =
-        if let Some(ref mut dc) = dissipative_consciousness {
+        if let Some(dc) = dissipative_consciousness {
             let energy = prediction_error as f64;
             let info = coherence as f64 * unified_psi;
             dc.update(unified_psi, energy, info, coherence as f64);
@@ -529,7 +529,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
     // ── Fiduciary harmonics ──────────────────────────────────────────────
     let t = Instant::now();
     let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences, new_harmonic) =
-        if let Some(ref mut field) = harmonic_field {
+        if let Some(field) = harmonic_field {
             if total_cycles % 11 == 0 {
                 use crate::consciousness::harmonics::FiduciaryHarmonic;
                 field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
@@ -544,7 +544,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
                 );
                 field.detect_interferences();
                 if !field.interferences.is_empty() {
-                    if let Some(ref resolver) = harmonic_resolver {
+                    if let Some(resolver) = harmonic_resolver {
                         let _resolution = resolver.resolve(field);
                     }
                 }
@@ -580,7 +580,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
     // ── Primitive reasoning ─────────────────────────────────────────────
     let t = Instant::now();
     let (reasoning_chain_confidence, reasoning_chain_depth) =
-        if let Some(ref mut reasoner) = primitive_reasoner {
+        if let Some(reasoner) = primitive_reasoner {
             if total_cycles % 47 == 0 && total_cycles > 0 {
                 let result = reasoner.reason("cognitive_state", &[]);
                 (result.confidence, result.reasoning_chain.len())
@@ -610,12 +610,11 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
         new_phi_eff,
         new_conflict_count,
         epi_override,
-    ) = if let (Some(ref mut detector), Some(ref calibrator)) =
-        (epistemic_conflict_detector, theory_calibrator)
+    ) = if let (Some(detector), Some(calibrator)) = (epistemic_conflict_detector, theory_calibrator)
     {
         if total_cycles % 97 == 0 && total_cycles > 0 {
             use crate::consciousness::epistemic_conflict::{
-                compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
+                ConflictMatrix, MultiTheoryMetrics, compute_phi_eff,
             };
             let metrics = MultiTheoryMetrics {
                 phi: unified_psi,

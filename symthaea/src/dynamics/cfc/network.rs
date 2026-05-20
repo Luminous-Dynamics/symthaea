@@ -13,10 +13,10 @@ use symthaea_core::genesis::GenesisSeed;
 
 use super::cell::CfCCell;
 use super::gradients::{AdamState, OutputAdamState};
-use super::phi_gated::{compute_phi_attention_weights, weighted_array_bundle, PhiGatedConfig};
+use super::phi_gated::{PhiGatedConfig, compute_phi_attention_weights, weighted_array_bundle};
 use super::types::{
-    mse_loss, CfCConfig, DynamicsDiagnostic, NetworkOnlineLearningStats, OnlineLearningConfig,
-    MIN_TAU,
+    CfCConfig, DynamicsDiagnostic, MIN_TAU, NetworkOnlineLearningStats, OnlineLearningConfig,
+    mse_loss,
 };
 
 /// Configuration for a CfC network
@@ -190,7 +190,7 @@ impl CfCNetwork {
         let mut rng = genesis.domain(&format!("{label}::output"));
         let scale = (2.0 / (config.hidden_dim + config.output_dim) as f32).sqrt();
         let output_weights = Array2::from_shape_fn((config.output_dim, config.hidden_dim), |_| {
-            (rng.gen::<f32>() - 0.5) * 2.0 * scale
+            (rng.r#gen::<f32>() - 0.5) * 2.0 * scale
         });
         let output_bias = Array1::zeros(config.output_dim);
 

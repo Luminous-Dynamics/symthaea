@@ -119,7 +119,7 @@ impl CsrMatrix {
 
         for _ in 0..rows {
             for col in 0..cols {
-                if rng.gen::<f32>() < connectivity {
+                if rng.r#gen::<f32>() < connectivity {
                     values.push(rng.gen_range(-value_range..value_range));
                     col_indices.push(col);
                 }

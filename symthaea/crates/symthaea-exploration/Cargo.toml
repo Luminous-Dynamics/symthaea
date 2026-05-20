@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-exploration"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Free Energy Principle exploration — surprise-driven adaptive exploration strategies"
 license = "AGPL-3.0-or-later"

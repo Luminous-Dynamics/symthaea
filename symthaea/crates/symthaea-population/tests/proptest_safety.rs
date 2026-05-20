@@ -12,8 +12,8 @@
 use proptest::prelude::*;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_population::{
-    ethical_balance, evaluate_decision_ethics, BiologicalSex, BreedingStrategy, GeneticRescuePlan,
-    GovernanceTier, Individual, MatingPair, Population, PopulationDecision,
+    BiologicalSex, BreedingStrategy, GeneticRescuePlan, GovernanceTier, Individual, MatingPair,
+    Population, PopulationDecision, ethical_balance, evaluate_decision_ethics,
 };
 
 fn make_population(n: usize) -> Population {
@@ -51,17 +51,17 @@ fn arb_decision() -> impl Strategy<Value = PopulationDecision> {
                 hla_complementarity: 0.8,
             })
         }),
-        (1_usize..1000, 1_u32..100).prop_map(|(size, gen)| {
+        (1_usize..1000, 1_u32..100).prop_map(|(size, r#gen)| {
             PopulationDecision::SetGrowthTarget {
                 size,
-                generation: gen,
+                generation: r#gen,
             }
         }),
-        (1_usize..20, 1_u32..50).prop_map(|(migrants, gen)| {
+        (1_usize..20, 1_u32..50).prop_map(|(migrants, r#gen)| {
             PopulationDecision::ApproveGeneticRescue(GeneticRescuePlan {
                 source_population: "ext".to_string(),
                 num_migrants: migrants,
-                target_generation: gen,
+                target_generation: r#gen,
                 expected_heterozygosity_gain: 0.05,
             })
         }),

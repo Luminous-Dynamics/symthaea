@@ -313,7 +313,7 @@ impl MemoryCoordinator {
         let mut pairs: Vec<(u64, u32)> = self
             .retrieval_counts
             .iter()
-            .filter(|(_, &count)| count > 0)
+            .filter(|&(_, &count)| count > 0)
             .map(|(&hash, &count)| (hash, count))
             .collect();
         // Sort descending by count (stable so ties preserve HashMap order)

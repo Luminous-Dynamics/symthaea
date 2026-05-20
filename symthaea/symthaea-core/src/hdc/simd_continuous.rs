@@ -85,77 +85,79 @@ pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
 #[target_feature(enable = "avx2", enable = "fma")]
 #[inline]
 unsafe fn dot_product_avx2_fma(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let chunks = len / 32; // Process 32 floats per iteration (4 AVX registers)
-    let remainder = len % 32;
+    unsafe {
+        let len = a.len();
+        let chunks = len / 32; // Process 32 floats per iteration (4 AVX registers)
+        let remainder = len % 32;
 
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
+        let a_ptr = a.as_ptr();
+        let b_ptr = b.as_ptr();
 
-    // Use 4 accumulators for better instruction-level parallelism
-    let mut sum0 = _mm256_setzero_ps();
-    let mut sum1 = _mm256_setzero_ps();
-    let mut sum2 = _mm256_setzero_ps();
-    let mut sum3 = _mm256_setzero_ps();
+        // Use 4 accumulators for better instruction-level parallelism
+        let mut sum0 = _mm256_setzero_ps();
+        let mut sum1 = _mm256_setzero_ps();
+        let mut sum2 = _mm256_setzero_ps();
+        let mut sum3 = _mm256_setzero_ps();
 
-    // Main loop: 32 elements per iteration
-    for i in 0..chunks {
-        let offset = i * 32;
+        // Main loop: 32 elements per iteration
+        for i in 0..chunks {
+            let offset = i * 32;
 
-        let a0 = _mm256_loadu_ps(a_ptr.add(offset));
-        let b0 = _mm256_loadu_ps(b_ptr.add(offset));
-        let a1 = _mm256_loadu_ps(a_ptr.add(offset + 8));
-        let b1 = _mm256_loadu_ps(b_ptr.add(offset + 8));
-        let a2 = _mm256_loadu_ps(a_ptr.add(offset + 16));
-        let b2 = _mm256_loadu_ps(b_ptr.add(offset + 16));
-        let a3 = _mm256_loadu_ps(a_ptr.add(offset + 24));
-        let b3 = _mm256_loadu_ps(b_ptr.add(offset + 24));
+            let a0 = _mm256_loadu_ps(a_ptr.add(offset));
+            let b0 = _mm256_loadu_ps(b_ptr.add(offset));
+            let a1 = _mm256_loadu_ps(a_ptr.add(offset + 8));
+            let b1 = _mm256_loadu_ps(b_ptr.add(offset + 8));
+            let a2 = _mm256_loadu_ps(a_ptr.add(offset + 16));
+            let b2 = _mm256_loadu_ps(b_ptr.add(offset + 16));
+            let a3 = _mm256_loadu_ps(a_ptr.add(offset + 24));
+            let b3 = _mm256_loadu_ps(b_ptr.add(offset + 24));
 
-        // FMA: sum += a * b (fused multiply-add)
-        sum0 = _mm256_fmadd_ps(a0, b0, sum0);
-        sum1 = _mm256_fmadd_ps(a1, b1, sum1);
-        sum2 = _mm256_fmadd_ps(a2, b2, sum2);
-        sum3 = _mm256_fmadd_ps(a3, b3, sum3);
+            // FMA: sum += a * b (fused multiply-add)
+            sum0 = _mm256_fmadd_ps(a0, b0, sum0);
+            sum1 = _mm256_fmadd_ps(a1, b1, sum1);
+            sum2 = _mm256_fmadd_ps(a2, b2, sum2);
+            sum3 = _mm256_fmadd_ps(a3, b3, sum3);
+        }
+
+        // Handle remaining 8-element chunks
+        let remainder_chunks = remainder / 8;
+        let final_remainder = remainder % 8;
+        let offset = chunks * 32;
+
+        for i in 0..remainder_chunks {
+            let idx = offset + i * 8;
+            let a_vec = _mm256_loadu_ps(a_ptr.add(idx));
+            let b_vec = _mm256_loadu_ps(b_ptr.add(idx));
+            sum0 = _mm256_fmadd_ps(a_vec, b_vec, sum0);
+        }
+
+        // Combine all accumulators
+        sum0 = _mm256_add_ps(sum0, sum1);
+        sum2 = _mm256_add_ps(sum2, sum3);
+        sum0 = _mm256_add_ps(sum0, sum2);
+
+        // Horizontal sum within AVX register
+        // sum0 = [a0, a1, a2, a3, a4, a5, a6, a7]
+        let hi = _mm256_extractf128_ps(sum0, 1); // [a4, a5, a6, a7]
+        let lo = _mm256_castps256_ps128(sum0); // [a0, a1, a2, a3]
+        let sum128 = _mm_add_ps(lo, hi); // [a0+a4, a1+a5, a2+a6, a3+a7]
+
+        // Shuffle and add pairs
+        let shuf = _mm_movehdup_ps(sum128); // [a1+a5, a1+a5, a3+a7, a3+a7]
+        let sums = _mm_add_ps(sum128, shuf); // [a0+a1+a4+a5, ...]
+        let shuf2 = _mm_movehl_ps(sums, sums); // [a2+a3+a6+a7, ...]
+        let result = _mm_add_ss(sums, shuf2);
+
+        let mut total = _mm_cvtss_f32(result);
+
+        // Handle final scalar remainder
+        let scalar_start = chunks * 32 + remainder_chunks * 8;
+        for i in 0..final_remainder {
+            total += a[scalar_start + i] * b[scalar_start + i];
+        }
+
+        total
     }
-
-    // Handle remaining 8-element chunks
-    let remainder_chunks = remainder / 8;
-    let final_remainder = remainder % 8;
-    let offset = chunks * 32;
-
-    for i in 0..remainder_chunks {
-        let idx = offset + i * 8;
-        let a_vec = _mm256_loadu_ps(a_ptr.add(idx));
-        let b_vec = _mm256_loadu_ps(b_ptr.add(idx));
-        sum0 = _mm256_fmadd_ps(a_vec, b_vec, sum0);
-    }
-
-    // Combine all accumulators
-    sum0 = _mm256_add_ps(sum0, sum1);
-    sum2 = _mm256_add_ps(sum2, sum3);
-    sum0 = _mm256_add_ps(sum0, sum2);
-
-    // Horizontal sum within AVX register
-    // sum0 = [a0, a1, a2, a3, a4, a5, a6, a7]
-    let hi = _mm256_extractf128_ps(sum0, 1); // [a4, a5, a6, a7]
-    let lo = _mm256_castps256_ps128(sum0); // [a0, a1, a2, a3]
-    let sum128 = _mm_add_ps(lo, hi); // [a0+a4, a1+a5, a2+a6, a3+a7]
-
-    // Shuffle and add pairs
-    let shuf = _mm_movehdup_ps(sum128); // [a1+a5, a1+a5, a3+a7, a3+a7]
-    let sums = _mm_add_ps(sum128, shuf); // [a0+a1+a4+a5, ...]
-    let shuf2 = _mm_movehl_ps(sums, sums); // [a2+a3+a6+a7, ...]
-    let result = _mm_add_ss(sums, shuf2);
-
-    let mut total = _mm_cvtss_f32(result);
-
-    // Handle final scalar remainder
-    let scalar_start = chunks * 32 + remainder_chunks * 8;
-    for i in 0..final_remainder {
-        total += a[scalar_start + i] * b[scalar_start + i];
-    }
-
-    total
 }
 
 /// AVX2 dot product without FMA
@@ -163,71 +165,73 @@ unsafe fn dot_product_avx2_fma(a: &[f32], b: &[f32]) -> f32 {
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let chunks = len / 32;
-    let remainder = len % 32;
+    unsafe {
+        let len = a.len();
+        let chunks = len / 32;
+        let remainder = len % 32;
 
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
+        let a_ptr = a.as_ptr();
+        let b_ptr = b.as_ptr();
 
-    let mut sum0 = _mm256_setzero_ps();
-    let mut sum1 = _mm256_setzero_ps();
-    let mut sum2 = _mm256_setzero_ps();
-    let mut sum3 = _mm256_setzero_ps();
+        let mut sum0 = _mm256_setzero_ps();
+        let mut sum1 = _mm256_setzero_ps();
+        let mut sum2 = _mm256_setzero_ps();
+        let mut sum3 = _mm256_setzero_ps();
 
-    for i in 0..chunks {
-        let offset = i * 32;
+        for i in 0..chunks {
+            let offset = i * 32;
 
-        let a0 = _mm256_loadu_ps(a_ptr.add(offset));
-        let b0 = _mm256_loadu_ps(b_ptr.add(offset));
-        let a1 = _mm256_loadu_ps(a_ptr.add(offset + 8));
-        let b1 = _mm256_loadu_ps(b_ptr.add(offset + 8));
-        let a2 = _mm256_loadu_ps(a_ptr.add(offset + 16));
-        let b2 = _mm256_loadu_ps(b_ptr.add(offset + 16));
-        let a3 = _mm256_loadu_ps(a_ptr.add(offset + 24));
-        let b3 = _mm256_loadu_ps(b_ptr.add(offset + 24));
+            let a0 = _mm256_loadu_ps(a_ptr.add(offset));
+            let b0 = _mm256_loadu_ps(b_ptr.add(offset));
+            let a1 = _mm256_loadu_ps(a_ptr.add(offset + 8));
+            let b1 = _mm256_loadu_ps(b_ptr.add(offset + 8));
+            let a2 = _mm256_loadu_ps(a_ptr.add(offset + 16));
+            let b2 = _mm256_loadu_ps(b_ptr.add(offset + 16));
+            let a3 = _mm256_loadu_ps(a_ptr.add(offset + 24));
+            let b3 = _mm256_loadu_ps(b_ptr.add(offset + 24));
 
-        sum0 = _mm256_add_ps(sum0, _mm256_mul_ps(a0, b0));
-        sum1 = _mm256_add_ps(sum1, _mm256_mul_ps(a1, b1));
-        sum2 = _mm256_add_ps(sum2, _mm256_mul_ps(a2, b2));
-        sum3 = _mm256_add_ps(sum3, _mm256_mul_ps(a3, b3));
+            sum0 = _mm256_add_ps(sum0, _mm256_mul_ps(a0, b0));
+            sum1 = _mm256_add_ps(sum1, _mm256_mul_ps(a1, b1));
+            sum2 = _mm256_add_ps(sum2, _mm256_mul_ps(a2, b2));
+            sum3 = _mm256_add_ps(sum3, _mm256_mul_ps(a3, b3));
+        }
+
+        // Handle remaining 8-element chunks
+        let remainder_chunks = remainder / 8;
+        let final_remainder = remainder % 8;
+        let offset = chunks * 32;
+
+        for i in 0..remainder_chunks {
+            let idx = offset + i * 8;
+            let a_vec = _mm256_loadu_ps(a_ptr.add(idx));
+            let b_vec = _mm256_loadu_ps(b_ptr.add(idx));
+            sum0 = _mm256_add_ps(sum0, _mm256_mul_ps(a_vec, b_vec));
+        }
+
+        // Combine accumulators
+        sum0 = _mm256_add_ps(sum0, sum1);
+        sum2 = _mm256_add_ps(sum2, sum3);
+        sum0 = _mm256_add_ps(sum0, sum2);
+
+        // Horizontal sum
+        let hi = _mm256_extractf128_ps(sum0, 1);
+        let lo = _mm256_castps256_ps128(sum0);
+        let sum128 = _mm_add_ps(lo, hi);
+        let shuf = _mm_movehdup_ps(sum128);
+        let sums = _mm_add_ps(sum128, shuf);
+        let shuf2 = _mm_movehl_ps(sums, sums);
+        let result = _mm_add_ss(sums, shuf2);
+
+        let mut total = _mm_cvtss_f32(result);
+
+        // Scalar remainder
+        let scalar_start = chunks * 32 + remainder_chunks * 8;
+        for i in 0..final_remainder {
+            total += a[scalar_start + i] * b[scalar_start + i];
+        }
+
+        total
     }
-
-    // Handle remaining 8-element chunks
-    let remainder_chunks = remainder / 8;
-    let final_remainder = remainder % 8;
-    let offset = chunks * 32;
-
-    for i in 0..remainder_chunks {
-        let idx = offset + i * 8;
-        let a_vec = _mm256_loadu_ps(a_ptr.add(idx));
-        let b_vec = _mm256_loadu_ps(b_ptr.add(idx));
-        sum0 = _mm256_add_ps(sum0, _mm256_mul_ps(a_vec, b_vec));
-    }
-
-    // Combine accumulators
-    sum0 = _mm256_add_ps(sum0, sum1);
-    sum2 = _mm256_add_ps(sum2, sum3);
-    sum0 = _mm256_add_ps(sum0, sum2);
-
-    // Horizontal sum
-    let hi = _mm256_extractf128_ps(sum0, 1);
-    let lo = _mm256_castps256_ps128(sum0);
-    let sum128 = _mm_add_ps(lo, hi);
-    let shuf = _mm_movehdup_ps(sum128);
-    let sums = _mm_add_ps(sum128, shuf);
-    let shuf2 = _mm_movehl_ps(sums, sums);
-    let result = _mm_add_ss(sums, shuf2);
-
-    let mut total = _mm_cvtss_f32(result);
-
-    // Scalar remainder
-    let scalar_start = chunks * 32 + remainder_chunks * 8;
-    for i in 0..final_remainder {
-        total += a[scalar_start + i] * b[scalar_start + i];
-    }
-
-    total
 }
 
 /// SSE4.1 dot product (fallback for older CPUs)
@@ -235,68 +239,70 @@ unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn dot_product_sse41(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let chunks = len / 16; // Process 16 floats per iteration
-    let remainder = len % 16;
+    unsafe {
+        let len = a.len();
+        let chunks = len / 16; // Process 16 floats per iteration
+        let remainder = len % 16;
 
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
+        let a_ptr = a.as_ptr();
+        let b_ptr = b.as_ptr();
 
-    let mut sum0 = _mm_setzero_ps();
-    let mut sum1 = _mm_setzero_ps();
-    let mut sum2 = _mm_setzero_ps();
-    let mut sum3 = _mm_setzero_ps();
+        let mut sum0 = _mm_setzero_ps();
+        let mut sum1 = _mm_setzero_ps();
+        let mut sum2 = _mm_setzero_ps();
+        let mut sum3 = _mm_setzero_ps();
 
-    for i in 0..chunks {
-        let offset = i * 16;
+        for i in 0..chunks {
+            let offset = i * 16;
 
-        let a0 = _mm_loadu_ps(a_ptr.add(offset));
-        let b0 = _mm_loadu_ps(b_ptr.add(offset));
-        let a1 = _mm_loadu_ps(a_ptr.add(offset + 4));
-        let b1 = _mm_loadu_ps(b_ptr.add(offset + 4));
-        let a2 = _mm_loadu_ps(a_ptr.add(offset + 8));
-        let b2 = _mm_loadu_ps(b_ptr.add(offset + 8));
-        let a3 = _mm_loadu_ps(a_ptr.add(offset + 12));
-        let b3 = _mm_loadu_ps(b_ptr.add(offset + 12));
+            let a0 = _mm_loadu_ps(a_ptr.add(offset));
+            let b0 = _mm_loadu_ps(b_ptr.add(offset));
+            let a1 = _mm_loadu_ps(a_ptr.add(offset + 4));
+            let b1 = _mm_loadu_ps(b_ptr.add(offset + 4));
+            let a2 = _mm_loadu_ps(a_ptr.add(offset + 8));
+            let b2 = _mm_loadu_ps(b_ptr.add(offset + 8));
+            let a3 = _mm_loadu_ps(a_ptr.add(offset + 12));
+            let b3 = _mm_loadu_ps(b_ptr.add(offset + 12));
 
-        sum0 = _mm_add_ps(sum0, _mm_mul_ps(a0, b0));
-        sum1 = _mm_add_ps(sum1, _mm_mul_ps(a1, b1));
-        sum2 = _mm_add_ps(sum2, _mm_mul_ps(a2, b2));
-        sum3 = _mm_add_ps(sum3, _mm_mul_ps(a3, b3));
+            sum0 = _mm_add_ps(sum0, _mm_mul_ps(a0, b0));
+            sum1 = _mm_add_ps(sum1, _mm_mul_ps(a1, b1));
+            sum2 = _mm_add_ps(sum2, _mm_mul_ps(a2, b2));
+            sum3 = _mm_add_ps(sum3, _mm_mul_ps(a3, b3));
+        }
+
+        // Handle remaining 4-element chunks
+        let remainder_chunks = remainder / 4;
+        let final_remainder = remainder % 4;
+        let offset = chunks * 16;
+
+        for i in 0..remainder_chunks {
+            let idx = offset + i * 4;
+            let a_vec = _mm_loadu_ps(a_ptr.add(idx));
+            let b_vec = _mm_loadu_ps(b_ptr.add(idx));
+            sum0 = _mm_add_ps(sum0, _mm_mul_ps(a_vec, b_vec));
+        }
+
+        // Combine accumulators
+        sum0 = _mm_add_ps(sum0, sum1);
+        sum2 = _mm_add_ps(sum2, sum3);
+        sum0 = _mm_add_ps(sum0, sum2);
+
+        // Horizontal sum using SSE3 hadd
+        let shuf = _mm_movehdup_ps(sum0);
+        let sums = _mm_add_ps(sum0, shuf);
+        let shuf2 = _mm_movehl_ps(sums, sums);
+        let result = _mm_add_ss(sums, shuf2);
+
+        let mut total = _mm_cvtss_f32(result);
+
+        // Scalar remainder
+        let scalar_start = chunks * 16 + remainder_chunks * 4;
+        for i in 0..final_remainder {
+            total += a[scalar_start + i] * b[scalar_start + i];
+        }
+
+        total
     }
-
-    // Handle remaining 4-element chunks
-    let remainder_chunks = remainder / 4;
-    let final_remainder = remainder % 4;
-    let offset = chunks * 16;
-
-    for i in 0..remainder_chunks {
-        let idx = offset + i * 4;
-        let a_vec = _mm_loadu_ps(a_ptr.add(idx));
-        let b_vec = _mm_loadu_ps(b_ptr.add(idx));
-        sum0 = _mm_add_ps(sum0, _mm_mul_ps(a_vec, b_vec));
-    }
-
-    // Combine accumulators
-    sum0 = _mm_add_ps(sum0, sum1);
-    sum2 = _mm_add_ps(sum2, sum3);
-    sum0 = _mm_add_ps(sum0, sum2);
-
-    // Horizontal sum using SSE3 hadd
-    let shuf = _mm_movehdup_ps(sum0);
-    let sums = _mm_add_ps(sum0, shuf);
-    let shuf2 = _mm_movehl_ps(sums, sums);
-    let result = _mm_add_ss(sums, shuf2);
-
-    let mut total = _mm_cvtss_f32(result);
-
-    // Scalar remainder
-    let scalar_start = chunks * 16 + remainder_chunks * 4;
-    for i in 0..final_remainder {
-        total += a[scalar_start + i] * b[scalar_start + i];
-    }
-
-    total
 }
 
 /// Scalar dot product (baseline)
@@ -358,46 +364,48 @@ pub fn bind_simd(a: &[f32], b: &[f32]) -> Vec<f32> {
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn bind_avx2(a: &[f32], b: &[f32], result: &mut [f32]) {
-    let len = a.len();
-    let chunks = len / 32;
+    unsafe {
+        let len = a.len();
+        let chunks = len / 32;
 
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
-    let r_ptr = result.as_mut_ptr();
+        let a_ptr = a.as_ptr();
+        let b_ptr = b.as_ptr();
+        let r_ptr = result.as_mut_ptr();
 
-    for i in 0..chunks {
-        let offset = i * 32;
+        for i in 0..chunks {
+            let offset = i * 32;
 
-        let a0 = _mm256_loadu_ps(a_ptr.add(offset));
-        let b0 = _mm256_loadu_ps(b_ptr.add(offset));
-        let a1 = _mm256_loadu_ps(a_ptr.add(offset + 8));
-        let b1 = _mm256_loadu_ps(b_ptr.add(offset + 8));
-        let a2 = _mm256_loadu_ps(a_ptr.add(offset + 16));
-        let b2 = _mm256_loadu_ps(b_ptr.add(offset + 16));
-        let a3 = _mm256_loadu_ps(a_ptr.add(offset + 24));
-        let b3 = _mm256_loadu_ps(b_ptr.add(offset + 24));
+            let a0 = _mm256_loadu_ps(a_ptr.add(offset));
+            let b0 = _mm256_loadu_ps(b_ptr.add(offset));
+            let a1 = _mm256_loadu_ps(a_ptr.add(offset + 8));
+            let b1 = _mm256_loadu_ps(b_ptr.add(offset + 8));
+            let a2 = _mm256_loadu_ps(a_ptr.add(offset + 16));
+            let b2 = _mm256_loadu_ps(b_ptr.add(offset + 16));
+            let a3 = _mm256_loadu_ps(a_ptr.add(offset + 24));
+            let b3 = _mm256_loadu_ps(b_ptr.add(offset + 24));
 
-        _mm256_storeu_ps(r_ptr.add(offset), _mm256_mul_ps(a0, b0));
-        _mm256_storeu_ps(r_ptr.add(offset + 8), _mm256_mul_ps(a1, b1));
-        _mm256_storeu_ps(r_ptr.add(offset + 16), _mm256_mul_ps(a2, b2));
-        _mm256_storeu_ps(r_ptr.add(offset + 24), _mm256_mul_ps(a3, b3));
-    }
+            _mm256_storeu_ps(r_ptr.add(offset), _mm256_mul_ps(a0, b0));
+            _mm256_storeu_ps(r_ptr.add(offset + 8), _mm256_mul_ps(a1, b1));
+            _mm256_storeu_ps(r_ptr.add(offset + 16), _mm256_mul_ps(a2, b2));
+            _mm256_storeu_ps(r_ptr.add(offset + 24), _mm256_mul_ps(a3, b3));
+        }
 
-    // Handle remainder with 8-element chunks
-    let offset = chunks * 32;
-    let remainder_chunks = (len - offset) / 8;
+        // Handle remainder with 8-element chunks
+        let offset = chunks * 32;
+        let remainder_chunks = (len - offset) / 8;
 
-    for i in 0..remainder_chunks {
-        let idx = offset + i * 8;
-        let a_vec = _mm256_loadu_ps(a_ptr.add(idx));
-        let b_vec = _mm256_loadu_ps(b_ptr.add(idx));
-        _mm256_storeu_ps(r_ptr.add(idx), _mm256_mul_ps(a_vec, b_vec));
-    }
+        for i in 0..remainder_chunks {
+            let idx = offset + i * 8;
+            let a_vec = _mm256_loadu_ps(a_ptr.add(idx));
+            let b_vec = _mm256_loadu_ps(b_ptr.add(idx));
+            _mm256_storeu_ps(r_ptr.add(idx), _mm256_mul_ps(a_vec, b_vec));
+        }
 
-    // Scalar remainder
-    let scalar_start = offset + remainder_chunks * 8;
-    for i in scalar_start..len {
-        *r_ptr.add(i) = *a_ptr.add(i) * *b_ptr.add(i);
+        // Scalar remainder
+        let scalar_start = offset + remainder_chunks * 8;
+        for i in scalar_start..len {
+            *r_ptr.add(i) = *a_ptr.add(i) * *b_ptr.add(i);
+        }
     }
 }
 
@@ -406,35 +414,37 @@ unsafe fn bind_avx2(a: &[f32], b: &[f32], result: &mut [f32]) {
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn bind_sse41(a: &[f32], b: &[f32], result: &mut [f32]) {
-    let len = a.len();
-    let chunks = len / 16;
+    unsafe {
+        let len = a.len();
+        let chunks = len / 16;
 
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
-    let r_ptr = result.as_mut_ptr();
+        let a_ptr = a.as_ptr();
+        let b_ptr = b.as_ptr();
+        let r_ptr = result.as_mut_ptr();
 
-    for i in 0..chunks {
-        let offset = i * 16;
+        for i in 0..chunks {
+            let offset = i * 16;
 
-        let a0 = _mm_loadu_ps(a_ptr.add(offset));
-        let b0 = _mm_loadu_ps(b_ptr.add(offset));
-        let a1 = _mm_loadu_ps(a_ptr.add(offset + 4));
-        let b1 = _mm_loadu_ps(b_ptr.add(offset + 4));
-        let a2 = _mm_loadu_ps(a_ptr.add(offset + 8));
-        let b2 = _mm_loadu_ps(b_ptr.add(offset + 8));
-        let a3 = _mm_loadu_ps(a_ptr.add(offset + 12));
-        let b3 = _mm_loadu_ps(b_ptr.add(offset + 12));
+            let a0 = _mm_loadu_ps(a_ptr.add(offset));
+            let b0 = _mm_loadu_ps(b_ptr.add(offset));
+            let a1 = _mm_loadu_ps(a_ptr.add(offset + 4));
+            let b1 = _mm_loadu_ps(b_ptr.add(offset + 4));
+            let a2 = _mm_loadu_ps(a_ptr.add(offset + 8));
+            let b2 = _mm_loadu_ps(b_ptr.add(offset + 8));
+            let a3 = _mm_loadu_ps(a_ptr.add(offset + 12));
+            let b3 = _mm_loadu_ps(b_ptr.add(offset + 12));
 
-        _mm_storeu_ps(r_ptr.add(offset), _mm_mul_ps(a0, b0));
-        _mm_storeu_ps(r_ptr.add(offset + 4), _mm_mul_ps(a1, b1));
-        _mm_storeu_ps(r_ptr.add(offset + 8), _mm_mul_ps(a2, b2));
-        _mm_storeu_ps(r_ptr.add(offset + 12), _mm_mul_ps(a3, b3));
-    }
+            _mm_storeu_ps(r_ptr.add(offset), _mm_mul_ps(a0, b0));
+            _mm_storeu_ps(r_ptr.add(offset + 4), _mm_mul_ps(a1, b1));
+            _mm_storeu_ps(r_ptr.add(offset + 8), _mm_mul_ps(a2, b2));
+            _mm_storeu_ps(r_ptr.add(offset + 12), _mm_mul_ps(a3, b3));
+        }
 
-    // Scalar remainder
-    let scalar_start = chunks * 16;
-    for i in scalar_start..len {
-        *r_ptr.add(i) = *a_ptr.add(i) * *b_ptr.add(i);
+        // Scalar remainder
+        let scalar_start = chunks * 16;
+        for i in scalar_start..len {
+            *r_ptr.add(i) = *a_ptr.add(i) * *b_ptr.add(i);
+        }
     }
 }
 
@@ -530,39 +540,41 @@ unsafe fn bundle_avx2_fma(
     result: &mut [f32],
     inv_weight_sum: f32,
 ) {
-    let dim = result.len();
-    let chunks = dim / 8;
-    let remainder = dim % 8;
+    unsafe {
+        let dim = result.len();
+        let chunks = dim / 8;
+        let remainder = dim % 8;
 
-    let r_ptr = result.as_mut_ptr();
-    let inv_weight_vec = _mm256_set1_ps(inv_weight_sum);
+        let r_ptr = result.as_mut_ptr();
+        let inv_weight_vec = _mm256_set1_ps(inv_weight_sum);
 
-    // Process in 8-element chunks
-    for chunk in 0..chunks {
-        let offset = chunk * 8;
-        let mut acc = _mm256_setzero_ps();
+        // Process in 8-element chunks
+        for chunk in 0..chunks {
+            let offset = chunk * 8;
+            let mut acc = _mm256_setzero_ps();
 
-        // Accumulate weighted sum across all HVs
-        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
-            let weight_vec = _mm256_set1_ps(weight);
-            let hv_vec = _mm256_loadu_ps(hv.as_ptr().add(offset));
-            acc = _mm256_fmadd_ps(hv_vec, weight_vec, acc);
+            // Accumulate weighted sum across all HVs
+            for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+                let weight_vec = _mm256_set1_ps(weight);
+                let hv_vec = _mm256_loadu_ps(hv.as_ptr().add(offset));
+                acc = _mm256_fmadd_ps(hv_vec, weight_vec, acc);
+            }
+
+            // Normalize by weight sum
+            let normalized = _mm256_mul_ps(acc, inv_weight_vec);
+            _mm256_storeu_ps(r_ptr.add(offset), normalized);
         }
 
-        // Normalize by weight sum
-        let normalized = _mm256_mul_ps(acc, inv_weight_vec);
-        _mm256_storeu_ps(r_ptr.add(offset), normalized);
-    }
-
-    // Scalar remainder
-    let scalar_start = chunks * 8;
-    for i in 0..remainder {
-        let idx = scalar_start + i;
-        let mut sum = 0.0f32;
-        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
-            sum += hv[idx] * weight;
+        // Scalar remainder
+        let scalar_start = chunks * 8;
+        for i in 0..remainder {
+            let idx = scalar_start + i;
+            let mut sum = 0.0f32;
+            for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+                sum += hv[idx] * weight;
+            }
+            result[idx] = sum * inv_weight_sum;
         }
-        result[idx] = sum * inv_weight_sum;
     }
 }
 
@@ -571,36 +583,38 @@ unsafe fn bundle_avx2_fma(
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn bundle_avx2(hvs: &[&[f32]], weights: &[f32], result: &mut [f32], inv_weight_sum: f32) {
-    let dim = result.len();
-    let chunks = dim / 8;
-    let remainder = dim % 8;
+    unsafe {
+        let dim = result.len();
+        let chunks = dim / 8;
+        let remainder = dim % 8;
 
-    let r_ptr = result.as_mut_ptr();
-    let inv_weight_vec = _mm256_set1_ps(inv_weight_sum);
+        let r_ptr = result.as_mut_ptr();
+        let inv_weight_vec = _mm256_set1_ps(inv_weight_sum);
 
-    for chunk in 0..chunks {
-        let offset = chunk * 8;
-        let mut acc = _mm256_setzero_ps();
+        for chunk in 0..chunks {
+            let offset = chunk * 8;
+            let mut acc = _mm256_setzero_ps();
 
-        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
-            let weight_vec = _mm256_set1_ps(weight);
-            let hv_vec = _mm256_loadu_ps(hv.as_ptr().add(offset));
-            acc = _mm256_add_ps(acc, _mm256_mul_ps(hv_vec, weight_vec));
+            for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+                let weight_vec = _mm256_set1_ps(weight);
+                let hv_vec = _mm256_loadu_ps(hv.as_ptr().add(offset));
+                acc = _mm256_add_ps(acc, _mm256_mul_ps(hv_vec, weight_vec));
+            }
+
+            let normalized = _mm256_mul_ps(acc, inv_weight_vec);
+            _mm256_storeu_ps(r_ptr.add(offset), normalized);
         }
 
-        let normalized = _mm256_mul_ps(acc, inv_weight_vec);
-        _mm256_storeu_ps(r_ptr.add(offset), normalized);
-    }
-
-    // Scalar remainder
-    let scalar_start = chunks * 8;
-    for i in 0..remainder {
-        let idx = scalar_start + i;
-        let mut sum = 0.0f32;
-        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
-            sum += hv[idx] * weight;
+        // Scalar remainder
+        let scalar_start = chunks * 8;
+        for i in 0..remainder {
+            let idx = scalar_start + i;
+            let mut sum = 0.0f32;
+            for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+                sum += hv[idx] * weight;
+            }
+            result[idx] = sum * inv_weight_sum;
         }
-        result[idx] = sum * inv_weight_sum;
     }
 }
 
@@ -609,36 +623,38 @@ unsafe fn bundle_avx2(hvs: &[&[f32]], weights: &[f32], result: &mut [f32], inv_w
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn bundle_sse41(hvs: &[&[f32]], weights: &[f32], result: &mut [f32], inv_weight_sum: f32) {
-    let dim = result.len();
-    let chunks = dim / 4;
-    let remainder = dim % 4;
+    unsafe {
+        let dim = result.len();
+        let chunks = dim / 4;
+        let remainder = dim % 4;
 
-    let r_ptr = result.as_mut_ptr();
-    let inv_weight_vec = _mm_set1_ps(inv_weight_sum);
+        let r_ptr = result.as_mut_ptr();
+        let inv_weight_vec = _mm_set1_ps(inv_weight_sum);
 
-    for chunk in 0..chunks {
-        let offset = chunk * 4;
-        let mut acc = _mm_setzero_ps();
+        for chunk in 0..chunks {
+            let offset = chunk * 4;
+            let mut acc = _mm_setzero_ps();
 
-        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
-            let weight_vec = _mm_set1_ps(weight);
-            let hv_vec = _mm_loadu_ps(hv.as_ptr().add(offset));
-            acc = _mm_add_ps(acc, _mm_mul_ps(hv_vec, weight_vec));
+            for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+                let weight_vec = _mm_set1_ps(weight);
+                let hv_vec = _mm_loadu_ps(hv.as_ptr().add(offset));
+                acc = _mm_add_ps(acc, _mm_mul_ps(hv_vec, weight_vec));
+            }
+
+            let normalized = _mm_mul_ps(acc, inv_weight_vec);
+            _mm_storeu_ps(r_ptr.add(offset), normalized);
         }
 
-        let normalized = _mm_mul_ps(acc, inv_weight_vec);
-        _mm_storeu_ps(r_ptr.add(offset), normalized);
-    }
-
-    // Scalar remainder
-    let scalar_start = chunks * 4;
-    for i in 0..remainder {
-        let idx = scalar_start + i;
-        let mut sum = 0.0f32;
-        for (hv, &weight) in hvs.iter().zip(weights.iter()) {
-            sum += hv[idx] * weight;
+        // Scalar remainder
+        let scalar_start = chunks * 4;
+        for i in 0..remainder {
+            let idx = scalar_start + i;
+            let mut sum = 0.0f32;
+            for (hv, &weight) in hvs.iter().zip(weights.iter()) {
+                sum += hv[idx] * weight;
+            }
+            result[idx] = sum * inv_weight_sum;
         }
-        result[idx] = sum * inv_weight_sum;
     }
 }
 
@@ -713,59 +729,61 @@ pub fn similarity_simd(a: &[f32], b: &[f32]) -> f32 {
 #[target_feature(enable = "avx2", enable = "fma")]
 #[inline]
 unsafe fn similarity_avx2_fma(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let chunks = len / 8;
-    let remainder = len % 8;
+    unsafe {
+        let len = a.len();
+        let chunks = len / 8;
+        let remainder = len % 8;
 
-    let a_ptr = a.as_ptr();
-    let b_ptr = b.as_ptr();
+        let a_ptr = a.as_ptr();
+        let b_ptr = b.as_ptr();
 
-    // Compute dot(a,b), dot(a,a), dot(b,b) simultaneously
-    let mut dot_ab = _mm256_setzero_ps();
-    let mut dot_aa = _mm256_setzero_ps();
-    let mut dot_bb = _mm256_setzero_ps();
+        // Compute dot(a,b), dot(a,a), dot(b,b) simultaneously
+        let mut dot_ab = _mm256_setzero_ps();
+        let mut dot_aa = _mm256_setzero_ps();
+        let mut dot_bb = _mm256_setzero_ps();
 
-    for i in 0..chunks {
-        let offset = i * 8;
-        let a_vec = _mm256_loadu_ps(a_ptr.add(offset));
-        let b_vec = _mm256_loadu_ps(b_ptr.add(offset));
+        for i in 0..chunks {
+            let offset = i * 8;
+            let a_vec = _mm256_loadu_ps(a_ptr.add(offset));
+            let b_vec = _mm256_loadu_ps(b_ptr.add(offset));
 
-        dot_ab = _mm256_fmadd_ps(a_vec, b_vec, dot_ab);
-        dot_aa = _mm256_fmadd_ps(a_vec, a_vec, dot_aa);
-        dot_bb = _mm256_fmadd_ps(b_vec, b_vec, dot_bb);
-    }
+            dot_ab = _mm256_fmadd_ps(a_vec, b_vec, dot_ab);
+            dot_aa = _mm256_fmadd_ps(a_vec, a_vec, dot_aa);
+            dot_bb = _mm256_fmadd_ps(b_vec, b_vec, dot_bb);
+        }
 
-    // Horizontal sum helper
-    let hsum = |v: __m256| -> f32 {
-        let hi = _mm256_extractf128_ps(v, 1);
-        let lo = _mm256_castps256_ps128(v);
-        let sum128 = _mm_add_ps(lo, hi);
-        let shuf = _mm_movehdup_ps(sum128);
-        let sums = _mm_add_ps(sum128, shuf);
-        let shuf2 = _mm_movehl_ps(sums, sums);
-        _mm_cvtss_f32(_mm_add_ss(sums, shuf2))
-    };
+        // Horizontal sum helper
+        let hsum = |v: __m256| -> f32 {
+            let hi = _mm256_extractf128_ps(v, 1);
+            let lo = _mm256_castps256_ps128(v);
+            let sum128 = _mm_add_ps(lo, hi);
+            let shuf = _mm_movehdup_ps(sum128);
+            let sums = _mm_add_ps(sum128, shuf);
+            let shuf2 = _mm_movehl_ps(sums, sums);
+            _mm_cvtss_f32(_mm_add_ss(sums, shuf2))
+        };
 
-    let mut ab = hsum(dot_ab);
-    let mut aa = hsum(dot_aa);
-    let mut bb = hsum(dot_bb);
+        let mut ab = hsum(dot_ab);
+        let mut aa = hsum(dot_aa);
+        let mut bb = hsum(dot_bb);
 
-    // Scalar remainder
-    let scalar_start = chunks * 8;
-    for i in 0..remainder {
-        let idx = scalar_start + i;
-        let av = *a_ptr.add(idx);
-        let bv = *b_ptr.add(idx);
-        ab += av * bv;
-        aa += av * av;
-        bb += bv * bv;
-    }
+        // Scalar remainder
+        let scalar_start = chunks * 8;
+        for i in 0..remainder {
+            let idx = scalar_start + i;
+            let av = *a_ptr.add(idx);
+            let bv = *b_ptr.add(idx);
+            ab += av * bv;
+            aa += av * av;
+            bb += bv * bv;
+        }
 
-    let denom = (aa * bb).sqrt();
-    if denom < 1e-10 {
-        0.0
-    } else {
-        (ab / denom).clamp(-1.0, 1.0)
+        let denom = (aa * bb).sqrt();
+        if denom < 1e-10 {
+            0.0
+        } else {
+            (ab / denom).clamp(-1.0, 1.0)
+        }
     }
 }
 

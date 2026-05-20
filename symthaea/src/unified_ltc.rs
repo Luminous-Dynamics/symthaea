@@ -410,7 +410,7 @@ impl UnifiedLTC {
 
                 for i in 0..n {
                     for j in 0..n {
-                        if rng.gen::<f32>() < *sparsity {
+                        if rng.r#gen::<f32>() < *sparsity {
                             w[i * n + j] = rng.gen_range(-0.1..0.1);
                             let mask_idx = i * mask_row_len + j / 64;
                             m[mask_idx] |= 1u64 << (j % 64);
@@ -533,7 +533,7 @@ impl UnifiedLTC {
                 let mut m = vec![0u64; n * *mask_row_len];
                 for i in 0..n {
                     for j in 0..n {
-                        if w_rng.gen::<f32>() < *sparsity {
+                        if w_rng.r#gen::<f32>() < *sparsity {
                             w[i * n + j] = w_rng.gen_range(-0.1..0.1);
                             let mask_idx = i * mask_row_len + j / 64;
                             m[mask_idx] |= 1u64 << (j % 64);

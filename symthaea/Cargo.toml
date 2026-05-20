@@ -135,7 +135,7 @@ default-members = [
 ]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [workspace.metadata.symthaea.tiers]
@@ -213,7 +213,7 @@ proptest = "1.4"
 [package]
 name = "symthaea"
 version = "2.0.0"
-edition = "2021"
+edition = "2024"
 autoexamples = false
 autotests = false
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]

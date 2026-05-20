@@ -296,66 +296,68 @@ unsafe fn fused_tanh_avx2(
     one_minus_sigma: f32,
     pre_scale: f32,
 ) {
-    use std::arch::x86_64::*;
+    unsafe {
+        use std::arch::x86_64::*;
 
-    let dim = state.len();
-    let chunks = dim / 8;
+        let dim = state.len();
+        let chunks = dim / 8;
 
-    let sigma_v = _mm256_set1_ps(sigma);
-    let oms_v = _mm256_set1_ps(one_minus_sigma);
-    let scale_v = _mm256_set1_ps(pre_scale);
-    let c27 = _mm256_set1_ps(27.0);
-    let c9 = _mm256_set1_ps(9.0);
-    let thresh = _mm256_set1_ps(4.97);
-    let neg_thresh = _mm256_set1_ps(-4.97);
-    let one = _mm256_set1_ps(1.0);
-    let neg_one = _mm256_set1_ps(-1.0);
+        let sigma_v = _mm256_set1_ps(sigma);
+        let oms_v = _mm256_set1_ps(one_minus_sigma);
+        let scale_v = _mm256_set1_ps(pre_scale);
+        let c27 = _mm256_set1_ps(27.0);
+        let c9 = _mm256_set1_ps(9.0);
+        let thresh = _mm256_set1_ps(4.97);
+        let neg_thresh = _mm256_set1_ps(-4.97);
+        let one = _mm256_set1_ps(1.0);
+        let neg_one = _mm256_set1_ps(-1.0);
 
-    let s_ptr = state.as_mut_ptr();
-    let w_ptr = weight.as_ptr();
-    let m_ptr = input_mask.as_ptr();
-    let i_ptr = input.as_ptr();
+        let s_ptr = state.as_mut_ptr();
+        let w_ptr = weight.as_ptr();
+        let m_ptr = input_mask.as_ptr();
+        let i_ptr = input.as_ptr();
 
-    for c in 0..chunks {
-        let off = c * 8;
+        for c in 0..chunks {
+            let off = c * 8;
 
-        // Load 8 elements from each array
-        let s = _mm256_loadu_ps(s_ptr.add(off));
-        let w = _mm256_loadu_ps(w_ptr.add(off));
-        let m = _mm256_loadu_ps(m_ptr.add(off));
-        let inp = _mm256_loadu_ps(i_ptr.add(off));
+            // Load 8 elements from each array
+            let s = _mm256_loadu_ps(s_ptr.add(off));
+            let w = _mm256_loadu_ps(w_ptr.add(off));
+            let m = _mm256_loadu_ps(m_ptr.add(off));
+            let inp = _mm256_loadu_ps(i_ptr.add(off));
 
-        // pre_act = (w*s + m*inp) * pre_scale
-        // FMA: w*s is mul, then fmadd for m*inp + w*s, then mul by scale
-        let ws = _mm256_mul_ps(w, s);
-        let pre_act = _mm256_mul_ps(_mm256_fmadd_ps(m, inp, ws), scale_v);
+            // pre_act = (w*s + m*inp) * pre_scale
+            // FMA: w*s is mul, then fmadd for m*inp + w*s, then mul by scale
+            let ws = _mm256_mul_ps(w, s);
+            let pre_act = _mm256_mul_ps(_mm256_fmadd_ps(m, inp, ws), scale_v);
 
-        // fast_tanh SIMD: x*(27+x²) / (27+9x²)
-        let x2 = _mm256_mul_ps(pre_act, pre_act);
-        let num = _mm256_mul_ps(pre_act, _mm256_add_ps(c27, x2));
-        let denom = _mm256_fmadd_ps(c9, x2, c27);
-        let tanh_v = _mm256_div_ps(num, denom);
+            // fast_tanh SIMD: x*(27+x²) / (27+9x²)
+            let x2 = _mm256_mul_ps(pre_act, pre_act);
+            let num = _mm256_mul_ps(pre_act, _mm256_add_ps(c27, x2));
+            let denom = _mm256_fmadd_ps(c9, x2, c27);
+            let tanh_v = _mm256_div_ps(num, denom);
 
-        // Clip: |x| > 4.97 → signum(x)
-        let clip_hi = _mm256_cmp_ps(pre_act, thresh, _CMP_GT_OQ);
-        let clip_lo = _mm256_cmp_ps(pre_act, neg_thresh, _CMP_LT_OQ);
-        let x_inf = _mm256_blendv_ps(tanh_v, one, clip_hi);
-        let x_inf = _mm256_blendv_ps(x_inf, neg_one, clip_lo);
+            // Clip: |x| > 4.97 → signum(x)
+            let clip_hi = _mm256_cmp_ps(pre_act, thresh, _CMP_GT_OQ);
+            let clip_lo = _mm256_cmp_ps(pre_act, neg_thresh, _CMP_LT_OQ);
+            let x_inf = _mm256_blendv_ps(tanh_v, one, clip_hi);
+            let x_inf = _mm256_blendv_ps(x_inf, neg_one, clip_lo);
 
-        // Lerp: new_state = oms*s + sigma*x_inf
-        let new_s = _mm256_fmadd_ps(sigma_v, x_inf, _mm256_mul_ps(oms_v, s));
+            // Lerp: new_state = oms*s + sigma*x_inf
+            let new_s = _mm256_fmadd_ps(sigma_v, x_inf, _mm256_mul_ps(oms_v, s));
 
-        _mm256_storeu_ps(s_ptr.add(off), new_s);
-    }
+            _mm256_storeu_ps(s_ptr.add(off), new_s);
+        }
 
-    // Scalar remainder (dim % 8 elements)
-    for i in (chunks * 8)..dim {
-        let si = *state.get_unchecked(i);
-        let x = (*weight.get_unchecked(i) * si
-            + *input_mask.get_unchecked(i) * *input.get_unchecked(i))
-            * pre_scale;
-        let x_inf = fast_tanh(x);
-        *state.get_unchecked_mut(i) = one_minus_sigma * si + sigma * x_inf;
+        // Scalar remainder (dim % 8 elements)
+        for i in (chunks * 8)..dim {
+            let si = *state.get_unchecked(i);
+            let x = (*weight.get_unchecked(i) * si
+                + *input_mask.get_unchecked(i) * *input.get_unchecked(i))
+                * pre_scale;
+            let x_inf = fast_tanh(x);
+            *state.get_unchecked_mut(i) = one_minus_sigma * si + sigma * x_inf;
+        }
     }
 }
 
@@ -373,44 +375,46 @@ unsafe fn fused_identity_avx2(
     sigma: f32,
     one_minus_sigma: f32,
 ) {
-    use std::arch::x86_64::*;
+    unsafe {
+        use std::arch::x86_64::*;
 
-    let dim = state.len();
-    let chunks = dim / 8;
+        let dim = state.len();
+        let chunks = dim / 8;
 
-    let sigma_v = _mm256_set1_ps(sigma);
-    let oms_v = _mm256_set1_ps(one_minus_sigma);
-    let half = _mm256_set1_ps(0.5);
+        let sigma_v = _mm256_set1_ps(sigma);
+        let oms_v = _mm256_set1_ps(one_minus_sigma);
+        let half = _mm256_set1_ps(0.5);
 
-    let s_ptr = state.as_mut_ptr();
-    let w_ptr = weight.as_ptr();
-    let m_ptr = input_mask.as_ptr();
-    let i_ptr = input.as_ptr();
+        let s_ptr = state.as_mut_ptr();
+        let w_ptr = weight.as_ptr();
+        let m_ptr = input_mask.as_ptr();
+        let i_ptr = input.as_ptr();
 
-    for c in 0..chunks {
-        let off = c * 8;
+        for c in 0..chunks {
+            let off = c * 8;
 
-        let s = _mm256_loadu_ps(s_ptr.add(off));
-        let w = _mm256_loadu_ps(w_ptr.add(off));
-        let m = _mm256_loadu_ps(m_ptr.add(off));
-        let inp = _mm256_loadu_ps(i_ptr.add(off));
+            let s = _mm256_loadu_ps(s_ptr.add(off));
+            let w = _mm256_loadu_ps(w_ptr.add(off));
+            let m = _mm256_loadu_ps(m_ptr.add(off));
+            let inp = _mm256_loadu_ps(i_ptr.add(off));
 
-        // x_inf = (w*s + m*inp) * 0.5
-        let x_inf = _mm256_mul_ps(_mm256_fmadd_ps(m, inp, _mm256_mul_ps(w, s)), half);
+            // x_inf = (w*s + m*inp) * 0.5
+            let x_inf = _mm256_mul_ps(_mm256_fmadd_ps(m, inp, _mm256_mul_ps(w, s)), half);
 
-        // Lerp: new_state = oms*s + sigma*x_inf
-        let new_s = _mm256_fmadd_ps(sigma_v, x_inf, _mm256_mul_ps(oms_v, s));
+            // Lerp: new_state = oms*s + sigma*x_inf
+            let new_s = _mm256_fmadd_ps(sigma_v, x_inf, _mm256_mul_ps(oms_v, s));
 
-        _mm256_storeu_ps(s_ptr.add(off), new_s);
-    }
+            _mm256_storeu_ps(s_ptr.add(off), new_s);
+        }
 
-    // Scalar remainder
-    for i in (chunks * 8)..dim {
-        let si = *state.get_unchecked(i);
-        let x_inf = (*weight.get_unchecked(i) * si
-            + *input_mask.get_unchecked(i) * *input.get_unchecked(i))
-            * 0.5;
-        *state.get_unchecked_mut(i) = one_minus_sigma * si + sigma * x_inf;
+        // Scalar remainder
+        for i in (chunks * 8)..dim {
+            let si = *state.get_unchecked(i);
+            let x_inf = (*weight.get_unchecked(i) * si
+                + *input_mask.get_unchecked(i) * *input.get_unchecked(i))
+                * 0.5;
+            *state.get_unchecked_mut(i) = one_minus_sigma * si + sigma * x_inf;
+        }
     }
 }
 

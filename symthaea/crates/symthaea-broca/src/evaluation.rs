@@ -1736,7 +1736,7 @@ fn evaluate_token_overlap(target: &[u32], generated: &[u32], _mamba: &dyn MambaB
 
 #[cfg(feature = "mamba-cpu")]
 pub fn evaluate_liquid_mamba(
-    gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
+    r#gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     config: &LiquidMambaEvalConfig,
 ) -> LiquidMambaEvalResult {
     let mut total_ce = 0.0f32;
@@ -1768,21 +1768,25 @@ pub fn evaluate_liquid_mamba(
 
         if config.compute_perplexity && !pair.target_text.is_empty() {
             // Encode thought to HDC → SSM space, inject into Mamba
-            let thought_hv = gen.encoder().encode(&channels);
-            let ssm_context = gen.controller_mut().project_to_ssm(&thought_hv);
+            let thought_hv = r#gen.encoder().encode(&channels);
+            let ssm_context = r#gen.controller_mut().project_to_ssm(&thought_hv);
 
-            gen.mamba_mut().reset();
-            if gen.mamba_mut().inject_initial_context(&ssm_context).is_ok() {
+            r#gen.mamba_mut().reset();
+            if r#gen
+                .mamba_mut()
+                .inject_initial_context(&ssm_context)
+                .is_ok()
+            {
                 // Tokenize target with Mamba's tokenizer
-                if let Ok(target_ids) = gen.mamba().encode(&pair.target_text) {
+                if let Ok(target_ids) = r#gen.mamba().encode(&pair.target_text) {
                     let target_ids: Vec<u32> = target_ids;
                     all_target_token_ids.extend(target_ids.clone());
-                    let eos_id = gen.mamba().eos_token_id();
+                    let eos_id = r#gen.mamba().eos_token_id();
                     let mut prev_token = eos_id;
                     let window = target_ids.len().min(config.max_gen_tokens);
 
                     for &target_id in &target_ids[..window] {
-                        if let Ok(logits) = gen.mamba_mut().forward_one_token(prev_token) {
+                        if let Ok(logits) = r#gen.mamba_mut().forward_one_token(prev_token) {
                             let logits: Vec<f32> = logits;
                             let loss = cross_entropy_loss(&logits, target_id as usize);
                             pair_ce += loss;
@@ -1802,10 +1806,10 @@ pub fn evaluate_liquid_mamba(
         let mut pair_coherence = 0.0f32;
 
         if config.compute_english_ratio {
-            let thought_hv = gen.encoder().encode(&channels);
-            let result = gen.generate(&channels);
+            let thought_hv = r#gen.encoder().encode(&channels);
+            let result = r#gen.generate(&channels);
             all_generated_token_ids.extend(result.token_ids.clone());
-            pair_english_ratio = english_word_ratio_mamba(&result.token_ids, gen.mamba());
+            pair_english_ratio = english_word_ratio_mamba(&result.token_ids, r#gen.mamba());
             pair_coherence = result.final_coherence;
             total_english_ratio += pair_english_ratio;
             total_coherence += pair_coherence;
@@ -1899,10 +1903,10 @@ pub fn evaluate_liquid_mamba(
 
     // Effective rank from collected output HVs
     let avg_effective_rank = if all_output_hvs.len() >= 4 {
-        if let Some(tp) = gen.temporal_proj() {
+        if let Some(tp) = r#gen.temporal_proj() {
             tp.effective_rank(&all_output_hvs)
         } else {
-            gen.controller_mut().effective_rank(&all_output_hvs)
+            r#gen.controller_mut().effective_rank(&all_output_hvs)
         }
     } else {
         0.0
@@ -1950,7 +1954,7 @@ pub fn evaluate_liquid_mamba(
         target_token_overlap: Some(evaluate_token_overlap(
             &all_target_token_ids,
             &all_generated_token_ids,
-            gen.mamba(),
+            r#gen.mamba(),
         )),
         moral_refusal_rate: None,
     };
@@ -1958,7 +1962,7 @@ pub fn evaluate_liquid_mamba(
     // --- Consciousness gating test ---
     let gating_verification =
         if config.consciousness_gating_test && !config.dataset.pairs.is_empty() {
-            consciousness_gating_test(gen, &config.dataset)
+            consciousness_gating_test(r#gen, &config.dataset)
         } else {
             None
         };
@@ -1974,7 +1978,7 @@ pub fn evaluate_liquid_mamba(
     };
 
     // PE history statistics from the generator's ring buffer
-    let (pe_mean, pe_std_dev, pe_trend) = gen.pe_stats();
+    let (pe_mean, pe_std_dev, pe_trend) = r#gen.pe_stats();
 
     LiquidMambaEvalResult {
         base,
@@ -1995,7 +1999,7 @@ pub fn evaluate_liquid_mamba(
 /// under Certain vs Unknown epistemic states.
 #[cfg(feature = "mamba-cpu")]
 fn consciousness_gating_test(
-    gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
+    r#gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     dataset: &TrainingDataset,
 ) -> Option<GatingTestResult> {
     // Sample up to 20 pairs for the gating test (avoid running full dataset twice)
@@ -2012,12 +2016,12 @@ fn consciousness_gating_test(
         // Generate with Certain epistemic (0.0)
         let mut certain_channels = pair.to_thought_channels();
         certain_channels.set_epistemic(0.0);
-        let certain_result = gen.generate(&certain_channels);
+        let certain_result = r#gen.generate(&certain_channels);
 
         // Generate with Unknown epistemic (3.0)
         let mut unknown_channels = pair.to_thought_channels();
         unknown_channels.set_epistemic(3.0);
-        let unknown_result = gen.generate(&unknown_channels);
+        let unknown_result = r#gen.generate(&unknown_channels);
 
         certain_hedging_total += hedging_ratio(&certain_result.text);
         unknown_hedging_total += hedging_ratio(&unknown_result.text);
@@ -2316,8 +2320,8 @@ mod tests {
         }
     }
 
-    fn make_dataset(gen: &BrocaGenerator) -> TrainingDataset {
-        let tok = gen.tokenizer().clone();
+    fn make_dataset(r#gen: &BrocaGenerator) -> TrainingDataset {
+        let tok = r#gen.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for text in &["hello world", "the cat", "is good"] {
@@ -2336,27 +2340,33 @@ mod tests {
         assert!(dataset.cases.len() >= 50);
         assert!(dataset.cases.iter().all(|case| case.channels.len() == 43));
         assert!(dataset.cases.iter().any(|case| case.category == "code"));
-        assert!(dataset
-            .cases
-            .iter()
-            .any(|case| case.category == "epistemic"));
+        assert!(
+            dataset
+                .cases
+                .iter()
+                .any(|case| case.category == "epistemic")
+        );
         assert!(dataset.cases.iter().any(|case| case.category == "moral"));
         assert!(dataset.cases.iter().any(|case| case.category == "high-psi"));
-        assert!(dataset
-            .cases
-            .iter()
-            .any(|case| case.category == "complex-code"));
-        assert!(dataset
-            .cases
-            .iter()
-            .any(|case| case.category == "long-context"));
+        assert!(
+            dataset
+                .cases
+                .iter()
+                .any(|case| case.category == "complex-code")
+        );
+        assert!(
+            dataset
+                .cases
+                .iter()
+                .any(|case| case.category == "long-context")
+        );
     }
 
     #[test]
     fn test_quality_suite_serializes() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let cases = vec![
             CanonicalEvalCase {
                 category: "intent".to_string(),
@@ -2375,7 +2385,7 @@ mod tests {
         ];
         let dataset = CanonicalEvalDataset { cases };
 
-        let result = evaluate_quality_suite(&mut gen, &dataset, 8, 0, true);
+        let result = evaluate_quality_suite(&mut r#gen, &dataset, 8, 0, true);
         assert_eq!(result.schema_version, 1);
         assert_eq!(result.num_cases, 2);
         assert!(result.categories.contains_key("intent"));
@@ -2388,7 +2398,7 @@ mod tests {
     fn test_quality_suite_num_cases_respects_limit() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let cases = vec![
             CanonicalEvalCase {
                 category: "intent".to_string(),
@@ -2407,7 +2417,7 @@ mod tests {
         ];
         let dataset = CanonicalEvalDataset { cases };
 
-        let result = evaluate_quality_suite(&mut gen, &dataset, 4, 1, false);
+        let result = evaluate_quality_suite(&mut r#gen, &dataset, 4, 1, false);
         assert_eq!(result.num_cases, 1);
         assert_eq!(result.raw_generation.num_samples, 1);
         assert_eq!(result.gated_generation.num_samples, 1);
@@ -2425,7 +2435,7 @@ mod tests {
     fn test_structured_output_respects_canonical_limit() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let cases = vec![
             CanonicalEvalCase {
                 category: "intent".to_string(),
@@ -2444,7 +2454,7 @@ mod tests {
         ];
         let dataset = CanonicalEvalDataset { cases };
 
-        let result = evaluate_quality_suite(&mut gen, &dataset, 4, 1, true);
+        let result = evaluate_quality_suite(&mut r#gen, &dataset, 4, 1, true);
         assert_eq!(result.num_cases, 1);
         assert!(result.structured_output.is_none());
     }
@@ -2454,7 +2464,7 @@ mod tests {
     fn test_quality_suite_reports_code_sheaf_slice() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let cases = vec![CanonicalEvalCase {
             category: "code".to_string(),
             id: "simple_function".to_string(),
@@ -2464,7 +2474,7 @@ mod tests {
         }];
         let dataset = CanonicalEvalDataset { cases };
 
-        let result = evaluate_quality_suite(&mut gen, &dataset, 4, 0, true);
+        let result = evaluate_quality_suite(&mut r#gen, &dataset, 4, 0, true);
         let code_sheaf = result
             .code_sheaf
             .expect("code-sheaf-eval should populate the canonical code slice");
@@ -2504,7 +2514,7 @@ mod tests {
     fn test_code_sheaf_reports_each_target_function() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
         let dataset = CanonicalEvalDataset {
             cases: vec![CanonicalEvalCase {
                 category: "complex-code".to_string(),
@@ -2519,20 +2529,24 @@ mod tests {
             }],
         };
 
-        let result = evaluate_quality_suite(&mut gen, &dataset, 1, 0, true);
+        let result = evaluate_quality_suite(&mut r#gen, &dataset, 1, 0, true);
         let code_sheaf = result.code_sheaf.expect("code-sheaf slice");
         assert_eq!(code_sheaf.gated.function_checks, 2);
         assert_eq!(code_sheaf.gated.functions.len(), 2);
-        assert!(code_sheaf
-            .gated
-            .functions
-            .iter()
-            .any(|f| f.function_name == "parse_count"));
-        assert!(code_sheaf
-            .gated
-            .functions
-            .iter()
-            .any(|f| f.function_name == "double_count"));
+        assert!(
+            code_sheaf
+                .gated
+                .functions
+                .iter()
+                .any(|f| f.function_name == "parse_count")
+        );
+        assert!(
+            code_sheaf
+                .gated
+                .functions
+                .iter()
+                .any(|f| f.function_name == "double_count")
+        );
     }
 
     #[cfg(feature = "code-sheaf-eval")]
@@ -2680,7 +2694,7 @@ mod tests {
                         present: false,
                         coherent: false,
                         diagnostics: vec![
-                            "generated output missing target function `foo`".to_string()
+                            "generated output missing target function `foo`".to_string(),
                         ],
                     }],
                 },
@@ -2724,26 +2738,38 @@ mod tests {
         );
         assert!(failures.iter().any(|f| f.metric == "gated_perplexity"));
         assert!(failures.iter().any(|f| f.metric == "gated_avg_coherence"));
-        assert!(failures
-            .iter()
-            .any(|f| f.metric == "gated_english_word_ratio"));
-        assert!(failures
-            .iter()
-            .any(|f| f.metric == "gated_hallucination_rate"));
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "gated_english_word_ratio")
+        );
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "gated_hallucination_rate")
+        );
         assert!(failures.iter().any(|f| f.metric == "coherence_delta"));
-        assert!(failures
-            .iter()
-            .any(|f| f.metric == "target_token_overlap_delta"));
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "target_token_overlap_delta")
+        );
         assert!(failures.iter().any(|f| f.metric == "moral_refusal_rate"));
-        assert!(failures
-            .iter()
-            .any(|f| f.metric == "code_sheaf_incoherence_rate"));
-        assert!(failures
-            .iter()
-            .any(|f| f.metric == "code_sheaf_function_coherence_rate"));
-        assert!(failures
-            .iter()
-            .any(|f| f.metric == "structured_output_validity_rate"));
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "code_sheaf_incoherence_rate")
+        );
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "code_sheaf_function_coherence_rate")
+        );
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "structured_output_validity_rate")
+        );
     }
 
     #[test]
@@ -2769,8 +2795,8 @@ mod tests {
     fn test_perplexity_finite() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
-        let dataset = make_dataset(&gen);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
+        let dataset = make_dataset(&r#gen);
 
         let eval_config = EvalConfig {
             dataset,
@@ -2783,7 +2809,7 @@ mod tests {
             compute_contrastive_intent: true,
         };
 
-        let result = evaluate(&mut gen, &eval_config);
+        let result = evaluate(&mut r#gen, &eval_config);
         assert!(
             result.perplexity.is_finite(),
             "Perplexity should be finite: {}",
@@ -2800,8 +2826,8 @@ mod tests {
     fn test_evaluate_basic() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
-        let dataset = make_dataset(&gen);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
+        let dataset = make_dataset(&r#gen);
 
         let eval_config = EvalConfig {
             dataset,
@@ -2814,7 +2840,7 @@ mod tests {
             compute_contrastive_intent: true,
         };
 
-        let result = evaluate(&mut gen, &eval_config);
+        let result = evaluate(&mut r#gen, &eval_config);
         assert_eq!(result.num_samples, 3);
         assert!(result.perplexity.is_finite());
         assert!(result.english_word_ratio >= 0.0);
@@ -2825,8 +2851,8 @@ mod tests {
     fn test_evaluate_num_samples_respects_limit() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
-        let dataset = make_dataset(&gen);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
+        let dataset = make_dataset(&r#gen);
 
         let eval_config = EvalConfig {
             dataset,
@@ -2839,7 +2865,7 @@ mod tests {
             compute_contrastive_intent: false,
         };
 
-        let result = evaluate(&mut gen, &eval_config);
+        let result = evaluate(&mut r#gen, &eval_config);
         assert_eq!(result.num_samples, 1);
     }
 
@@ -2847,8 +2873,8 @@ mod tests {
     fn test_per_intent_breakdown() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
-        let tok = gen.tokenizer().clone();
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
+        let tok = r#gen.tokenizer().clone();
 
         let mut dataset = TrainingDataset::default();
         // Two different intents
@@ -2872,7 +2898,7 @@ mod tests {
             compute_contrastive_intent: true,
         };
 
-        let result = evaluate(&mut gen, &eval_config);
+        let result = evaluate(&mut r#gen, &eval_config);
         assert!(
             result.intent_scores.contains_key("Answer"),
             "Should have Answer intent"
@@ -2932,7 +2958,7 @@ mod tests {
     fn test_perplexity_no_tokens_is_inf() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
 
         // Empty dataset → no CE tokens → perplexity should be INFINITY
         let eval_config = EvalConfig {
@@ -2946,7 +2972,7 @@ mod tests {
             compute_contrastive_intent: true,
         };
 
-        let result = evaluate(&mut gen, &eval_config);
+        let result = evaluate(&mut r#gen, &eval_config);
         assert!(
             result.perplexity.is_infinite(),
             "Perplexity with no tokens should be INFINITY, got: {}",
@@ -3184,7 +3210,7 @@ mod tests {
                 max_tokens: 16,
                 ..Default::default()
             };
-            let mut gen = LiquidMambaGenerator::new(&genesis, config)
+            let mut r#gen = LiquidMambaGenerator::new(&genesis, config)
                 .expect("Failed to create LiquidMambaGenerator");
 
             let mut dataset = TrainingDataset::default();
@@ -3206,7 +3232,7 @@ mod tests {
                 consciousness_gating_test: false,
             };
 
-            let result = evaluate_liquid_mamba(&mut gen, &eval_config);
+            let result = evaluate_liquid_mamba(&mut r#gen, &eval_config);
             assert!(
                 result.base.perplexity.is_finite(),
                 "Perplexity should be finite: {}",
@@ -3231,7 +3257,7 @@ mod tests {
                 max_tokens: 32,
                 ..Default::default()
             };
-            let mut gen = LiquidMambaGenerator::new(&genesis, config)
+            let mut r#gen = LiquidMambaGenerator::new(&genesis, config)
                 .expect("Failed to create LiquidMambaGenerator");
 
             let mut dataset = TrainingDataset::default();
@@ -3255,7 +3281,7 @@ mod tests {
                 consciousness_gating_test: true,
             };
 
-            let result = evaluate_liquid_mamba(&mut gen, &eval_config);
+            let result = evaluate_liquid_mamba(&mut r#gen, &eval_config);
             assert!(
                 result.gating_verification.is_some(),
                 "Gating verification should produce results"
@@ -3288,7 +3314,7 @@ mod tests {
                 max_tokens: 16,
                 ..Default::default()
             };
-            let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+            let mut r#gen = LiquidMambaGenerator::with_mock(&genesis, config);
 
             let mut dataset = TrainingDataset::default();
             for intent in 0..3 {
@@ -3311,7 +3337,7 @@ mod tests {
                 consciousness_gating_test: true,
             };
 
-            let result = evaluate_liquid_mamba(&mut gen, &eval_config);
+            let result = evaluate_liquid_mamba(&mut r#gen, &eval_config);
             assert_eq!(result.base.num_samples, 3);
             assert!(result.base.perplexity.is_finite() || result.base.perplexity.is_infinite());
             assert!(result.avg_semantic_pe.is_finite());

@@ -27,7 +27,7 @@
 //! - Penalize exact copies (novelty bonus for creative interpolation)
 
 use crate::{
-    midi_loader, neural_melody::NeuralMelody, pitch, rhythm, MuseConfig, MusicalState, Note,
+    MuseConfig, MusicalState, Note, midi_loader, neural_melody::NeuralMelody, pitch, rhythm,
 };
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -174,7 +174,7 @@ pub fn train_projections(
                 .iter()
                 .map(|proj| {
                     let noise: Vec<f32> = (0..proj.values.len())
-                        .map(|_| rng.gen::<f32>() * 2.0 - 1.0)
+                        .map(|_| rng.r#gen::<f32>() * 2.0 - 1.0)
                         .map(|n| n * config.noise_sigma)
                         .collect();
                     let mut p = proj.clone();

@@ -497,12 +497,12 @@ fn extract_winget_id(line: &str) -> Option<String> {
 // ═══════════════════════════════════════════════════════
 
 macro_rules! app {
-    ($name:expr, $cat:expr, $prop:expr,
-     win: [$($w:expr),*], mac: [$($m:expr),*], linux: [$($l:expr),*],
-     flatpak: [$($fp:expr),*], snap: [$($sn:expr),*],
-     winget: [$($wg:expr),*], brew: [$($br:expr),*],
-     primary: ($pkg:expr, $dname:expr, $quality:expr, $just:expr, [$($tradeoff:expr),*]),
-     alts: [$(($apkg:expr, $adname:expr, $aquality:expr, $ajust:expr, [$($atradeoff:expr),*])),*]
+    ($name:expr_2021, $cat:expr_2021, $prop:expr_2021,
+     win: [$($w:expr_2021),*], mac: [$($m:expr_2021),*], linux: [$($l:expr_2021),*],
+     flatpak: [$($fp:expr_2021),*], snap: [$($sn:expr_2021),*],
+     winget: [$($wg:expr_2021),*], brew: [$($br:expr_2021),*],
+     primary: ($pkg:expr_2021, $dname:expr_2021, $quality:expr_2021, $just:expr_2021, [$($tradeoff:expr_2021),*]),
+     alts: [$(($apkg:expr_2021, $adname:expr_2021, $aquality:expr_2021, $ajust:expr_2021, [$($atradeoff:expr_2021),*])),*]
     ) => {
         AppEntry {
             name: $name,
@@ -1575,7 +1575,14 @@ static BUNDLES: &[AppBundle] = &[
         description: "Low-latency audio, DAW, MIDI support",
         trigger_categories: &[AppCategory::Audio],
         trigger_threshold: 1,
-        packages: &["ardour", "audacity", "lmms", "hydrogen", "musescore", "qjackctl"],
+        packages: &[
+            "ardour",
+            "audacity",
+            "lmms",
+            "hydrogen",
+            "musescore",
+            "qjackctl",
+        ],
         nix_options: &[
             ("services.pipewire.jack.enable", "true"),
             ("security.rtkit.enable", "true"),
@@ -1586,21 +1593,48 @@ static BUNDLES: &[AppBundle] = &[
     AppBundle {
         name: "Creative Suite",
         description: "Image editing, vector graphics, video production",
-        trigger_categories: &[AppCategory::Creative2D, AppCategory::Creative3D, AppCategory::Video, AppCategory::Photo],
+        trigger_categories: &[
+            AppCategory::Creative2D,
+            AppCategory::Creative3D,
+            AppCategory::Video,
+            AppCategory::Photo,
+        ],
         trigger_threshold: 2,
-        packages: &["gimp", "inkscape", "krita", "blender", "kdenlive", "darktable", "obs-studio"],
+        packages: &[
+            "gimp",
+            "inkscape",
+            "krita",
+            "blender",
+            "kdenlive",
+            "darktable",
+            "obs-studio",
+        ],
         nix_options: &[],
         explanation: "Comprehensive creative tools. GIMP for photos, Inkscape for vectors, Blender for 3D, Kdenlive for video.",
     },
     AppBundle {
         name: "Development",
         description: "Editors, containers, version control, build tools",
-        trigger_categories: &[AppCategory::IDE, AppCategory::Editor, AppCategory::VersionControl, AppCategory::Container, AppCategory::DevTools],
-        trigger_threshold: 2,
-        packages: &["git", "vscode", "direnv", "nix-direnv", "ripgrep", "fd", "bat", "jq", "curl"],
-        nix_options: &[
-            ("programs.direnv.enable", "true"),
+        trigger_categories: &[
+            AppCategory::IDE,
+            AppCategory::Editor,
+            AppCategory::VersionControl,
+            AppCategory::Container,
+            AppCategory::DevTools,
         ],
+        trigger_threshold: 2,
+        packages: &[
+            "git",
+            "vscode",
+            "direnv",
+            "nix-direnv",
+            "ripgrep",
+            "fd",
+            "bat",
+            "jq",
+            "curl",
+        ],
+        nix_options: &[("programs.direnv.enable", "true")],
         explanation: "Modern development toolkit with direnv for per-project environments. No more version managers.",
     },
     AppBundle {
@@ -1608,7 +1642,15 @@ static BUNDLES: &[AppBundle] = &[
         description: "Steam, game launchers, performance tools",
         trigger_categories: &[AppCategory::Gaming, AppCategory::GamingTools],
         trigger_threshold: 1,
-        packages: &["steam", "lutris", "mangohud", "gamemode", "gamescope", "protonup-qt", "heroic"],
+        packages: &[
+            "steam",
+            "lutris",
+            "mangohud",
+            "gamemode",
+            "gamescope",
+            "protonup-qt",
+            "heroic",
+        ],
         nix_options: &[
             ("programs.steam.enable", "true"),
             ("programs.gamemode.enable", "true"),
@@ -1621,10 +1663,14 @@ static BUNDLES: &[AppBundle] = &[
         description: "VPN, password management, encryption",
         trigger_categories: &[AppCategory::Security, AppCategory::VPN],
         trigger_threshold: 2,
-        packages: &["bitwarden-desktop", "keepassxc", "gnupg", "age", "tor-browser"],
-        nix_options: &[
-            ("networking.firewall.enable", "true"),
+        packages: &[
+            "bitwarden-desktop",
+            "keepassxc",
+            "gnupg",
+            "age",
+            "tor-browser",
         ],
+        nix_options: &[("networking.firewall.enable", "true")],
         explanation: "Privacy-focused tools. Firewall always enabled. Encrypted password storage.",
     },
 ];
@@ -1835,10 +1881,12 @@ mod tests {
         assert!(office.primary.justification.contains("compatibility"));
 
         // LibreOffice should be an alternative
-        assert!(office
-            .alternatives
-            .iter()
-            .any(|a| a.nix_pkg == "libreoffice"));
+        assert!(
+            office
+                .alternatives
+                .iter()
+                .any(|a| a.nix_pkg == "libreoffice")
+        );
     }
 
     #[test]

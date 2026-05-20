@@ -1041,7 +1041,7 @@ impl CollectiveDreamHub {
     pub fn get_resonant_themes(&self, threshold: f64) -> Vec<String> {
         self.shared_themes
             .iter()
-            .filter(|(_, &strength)| strength > threshold)
+            .filter(|&(_, &strength)| strength > threshold)
             .map(|(theme, _)| theme.clone())
             .collect()
     }
@@ -1531,10 +1531,12 @@ mod tests {
         let insight = processor.process_dream(&dream).unwrap();
         assert_eq!(insight.insight_type, InsightType::CreativeSolution);
         // Creative solution should generate a "creativity" attention hint
-        assert!(insight
-            .attention_hints
-            .iter()
-            .any(|h| h.focus_area == "creativity"));
+        assert!(
+            insight
+                .attention_hints
+                .iter()
+                .any(|h| h.focus_area == "creativity")
+        );
     }
 
     #[test]
@@ -1545,10 +1547,12 @@ mod tests {
         let insight = processor.process_dream(&dream).unwrap();
         assert_eq!(insight.insight_type, InsightType::Warning);
         // Warning should generate a "safety" attention hint
-        assert!(insight
-            .attention_hints
-            .iter()
-            .any(|h| h.focus_area == "safety"));
+        assert!(
+            insight
+                .attention_hints
+                .iter()
+                .any(|h| h.focus_area == "safety")
+        );
     }
 
     #[test]

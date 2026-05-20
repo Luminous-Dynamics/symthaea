@@ -292,12 +292,16 @@ mod tests {
         let b = ProvenanceTag::from_episodic(100, 0.8);
         let merged = a.merge(&b);
 
-        assert!(merged
-            .contributing_sources
-            .contains(&InformationSource::EpisodicMemory));
-        assert!(merged
-            .contributing_sources
-            .contains(&InformationSource::KnowledgeGraph));
+        assert!(
+            merged
+                .contributing_sources
+                .contains(&InformationSource::EpisodicMemory)
+        );
+        assert!(
+            merged
+                .contributing_sources
+                .contains(&InformationSource::KnowledgeGraph)
+        );
     }
 
     #[test]
@@ -339,9 +343,11 @@ mod tests {
         let input = ProvenanceTag::user_input(100);
         let broca = ProvenanceTag::from_broca(101, Some(&input));
         assert_eq!(broca.source, InformationSource::BrocaGeneration);
-        assert!(broca
-            .contributing_sources
-            .contains(&InformationSource::UserInput));
+        assert!(
+            broca
+                .contributing_sources
+                .contains(&InformationSource::UserInput)
+        );
         assert!(broca.attribution_confidence < 1.0); // decayed
     }
 

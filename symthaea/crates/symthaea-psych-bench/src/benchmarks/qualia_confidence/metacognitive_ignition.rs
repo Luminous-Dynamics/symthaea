@@ -86,9 +86,9 @@ use crate::benchmarks::qualia_confidence::helpers::{
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::higher_order_thought::{HOTConfig, HigherOrderThoughtSystem};
-use symthaea_core::hdc::BinaryHV;
 
 /// Number of activation levels to sweep (0.10 to 0.90, step 0.05).
 const NUM_LEVELS: usize = 17;
@@ -595,11 +595,7 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
                     * (pressure_levels[i + 1] - pressure_levels[i]);
             }
             let span = pressure_levels.last().unwrap() - pressure_levels.first().unwrap();
-            if span > 0.0 {
-                area / span
-            } else {
-                0.0
-            }
+            if span > 0.0 { area / span } else { 0.0 }
         } else {
             0.0
         };
@@ -661,7 +657,7 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
             .iter()
             .zip(noise_accuracies.iter())
             .rev()
-            .find(|(_, &acc)| acc > 0.70)
+            .find(|&(_, &acc)| acc > 0.70)
             .map(|(&sigma, _)| sigma)
             .unwrap_or(0.0);
 

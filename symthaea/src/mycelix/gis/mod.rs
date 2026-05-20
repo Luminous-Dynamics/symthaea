@@ -297,7 +297,7 @@ impl GracefulIgnoranceSystem {
         let (max_idx, _) = counts
             .iter()
             .enumerate()
-            .max_by_key(|(_, &c)| c)
+            .max_by_key(|&(_, &c)| c)
             .unwrap_or((0, &0));
 
         match max_idx {

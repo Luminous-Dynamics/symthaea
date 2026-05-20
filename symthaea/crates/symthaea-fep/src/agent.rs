@@ -161,7 +161,7 @@ impl ActiveInferenceAgent {
             .update_from_error(fe_components.prediction_error, self.timestamp);
 
         // Temporal difference learning: if we have a previous state and action
-        if let (Some(ref prev_state), Some(action)) = (&self.previous_state, self.last_action) {
+        if let (Some(prev_state), Some(action)) = (&self.previous_state, self.last_action) {
             if let Some(ref mut td_learner) = self.td_learner {
                 // Observe the transition and compute TD error
                 let td_error = td_learner.observe_transition(

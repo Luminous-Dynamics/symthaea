@@ -74,23 +74,25 @@ pub fn bind_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
 #[target_feature(enable = "avx512f")]
 #[inline]
 unsafe fn bind_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m512i;
-    let b_ptr = b.as_ptr() as *const __m512i;
-    let r_ptr = result.as_mut_ptr() as *mut __m512i;
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m512i;
+        let b_ptr = b.as_ptr() as *const __m512i;
+        let r_ptr = result.as_mut_ptr() as *mut __m512i;
 
-    // 2048 bytes / 64 bytes = 32 iterations
-    // Unroll by 2 for better instruction-level parallelism
-    for i in (0..32).step_by(2) {
-        let a0 = _mm512_loadu_si512(a_ptr.add(i));
-        let b0 = _mm512_loadu_si512(b_ptr.add(i));
-        let a1 = _mm512_loadu_si512(a_ptr.add(i + 1));
-        let b1 = _mm512_loadu_si512(b_ptr.add(i + 1));
+        // 2048 bytes / 64 bytes = 32 iterations
+        // Unroll by 2 for better instruction-level parallelism
+        for i in (0..32).step_by(2) {
+            let a0 = _mm512_loadu_si512(a_ptr.add(i));
+            let b0 = _mm512_loadu_si512(b_ptr.add(i));
+            let a1 = _mm512_loadu_si512(a_ptr.add(i + 1));
+            let b1 = _mm512_loadu_si512(b_ptr.add(i + 1));
 
-        let r0 = _mm512_xor_si512(a0, b0);
-        let r1 = _mm512_xor_si512(a1, b1);
+            let r0 = _mm512_xor_si512(a0, b0);
+            let r1 = _mm512_xor_si512(a1, b1);
 
-        _mm512_storeu_si512(r_ptr.add(i), r0);
-        _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+            _mm512_storeu_si512(r_ptr.add(i), r0);
+            _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+        }
     }
 }
 
@@ -99,32 +101,34 @@ unsafe fn bind_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn bind_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m256i;
-    let b_ptr = b.as_ptr() as *const __m256i;
-    let r_ptr = result.as_mut_ptr() as *mut __m256i;
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m256i;
+        let b_ptr = b.as_ptr() as *const __m256i;
+        let r_ptr = result.as_mut_ptr() as *mut __m256i;
 
-    // 2048 bytes / 32 bytes = 64 iterations
-    // Unroll by 4 for better instruction-level parallelism
-    // Source arrays are align(32) from BinaryHV, so use aligned loads
-    for i in (0..64).step_by(4) {
-        let a0 = _mm256_load_si256(a_ptr.add(i));
-        let b0 = _mm256_load_si256(b_ptr.add(i));
-        let a1 = _mm256_load_si256(a_ptr.add(i + 1));
-        let b1 = _mm256_load_si256(b_ptr.add(i + 1));
-        let a2 = _mm256_load_si256(a_ptr.add(i + 2));
-        let b2 = _mm256_load_si256(b_ptr.add(i + 2));
-        let a3 = _mm256_load_si256(a_ptr.add(i + 3));
-        let b3 = _mm256_load_si256(b_ptr.add(i + 3));
+        // 2048 bytes / 32 bytes = 64 iterations
+        // Unroll by 4 for better instruction-level parallelism
+        // Source arrays are align(32) from BinaryHV, so use aligned loads
+        for i in (0..64).step_by(4) {
+            let a0 = _mm256_load_si256(a_ptr.add(i));
+            let b0 = _mm256_load_si256(b_ptr.add(i));
+            let a1 = _mm256_load_si256(a_ptr.add(i + 1));
+            let b1 = _mm256_load_si256(b_ptr.add(i + 1));
+            let a2 = _mm256_load_si256(a_ptr.add(i + 2));
+            let b2 = _mm256_load_si256(b_ptr.add(i + 2));
+            let a3 = _mm256_load_si256(a_ptr.add(i + 3));
+            let b3 = _mm256_load_si256(b_ptr.add(i + 3));
 
-        let r0 = _mm256_xor_si256(a0, b0);
-        let r1 = _mm256_xor_si256(a1, b1);
-        let r2 = _mm256_xor_si256(a2, b2);
-        let r3 = _mm256_xor_si256(a3, b3);
+            let r0 = _mm256_xor_si256(a0, b0);
+            let r1 = _mm256_xor_si256(a1, b1);
+            let r2 = _mm256_xor_si256(a2, b2);
+            let r3 = _mm256_xor_si256(a3, b3);
 
-        _mm256_storeu_si256(r_ptr.add(i), r0);
-        _mm256_storeu_si256(r_ptr.add(i + 1), r1);
-        _mm256_storeu_si256(r_ptr.add(i + 2), r2);
-        _mm256_storeu_si256(r_ptr.add(i + 3), r3);
+            _mm256_storeu_si256(r_ptr.add(i), r0);
+            _mm256_storeu_si256(r_ptr.add(i + 1), r1);
+            _mm256_storeu_si256(r_ptr.add(i + 2), r2);
+            _mm256_storeu_si256(r_ptr.add(i + 3), r3);
+        }
     }
 }
 
@@ -133,31 +137,33 @@ unsafe fn bind_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn bind_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m128i;
-    let b_ptr = b.as_ptr() as *const __m128i;
-    let r_ptr = result.as_mut_ptr() as *mut __m128i;
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m128i;
+        let b_ptr = b.as_ptr() as *const __m128i;
+        let r_ptr = result.as_mut_ptr() as *mut __m128i;
 
-    // 2048 bytes / 16 bytes = 128 iterations
-    // Unroll by 4
-    for i in (0..128).step_by(4) {
-        let a0 = _mm_loadu_si128(a_ptr.add(i));
-        let b0 = _mm_loadu_si128(b_ptr.add(i));
-        let a1 = _mm_loadu_si128(a_ptr.add(i + 1));
-        let b1 = _mm_loadu_si128(b_ptr.add(i + 1));
-        let a2 = _mm_loadu_si128(a_ptr.add(i + 2));
-        let b2 = _mm_loadu_si128(b_ptr.add(i + 2));
-        let a3 = _mm_loadu_si128(a_ptr.add(i + 3));
-        let b3 = _mm_loadu_si128(b_ptr.add(i + 3));
+        // 2048 bytes / 16 bytes = 128 iterations
+        // Unroll by 4
+        for i in (0..128).step_by(4) {
+            let a0 = _mm_loadu_si128(a_ptr.add(i));
+            let b0 = _mm_loadu_si128(b_ptr.add(i));
+            let a1 = _mm_loadu_si128(a_ptr.add(i + 1));
+            let b1 = _mm_loadu_si128(b_ptr.add(i + 1));
+            let a2 = _mm_loadu_si128(a_ptr.add(i + 2));
+            let b2 = _mm_loadu_si128(b_ptr.add(i + 2));
+            let a3 = _mm_loadu_si128(a_ptr.add(i + 3));
+            let b3 = _mm_loadu_si128(b_ptr.add(i + 3));
 
-        let r0 = _mm_xor_si128(a0, b0);
-        let r1 = _mm_xor_si128(a1, b1);
-        let r2 = _mm_xor_si128(a2, b2);
-        let r3 = _mm_xor_si128(a3, b3);
+            let r0 = _mm_xor_si128(a0, b0);
+            let r1 = _mm_xor_si128(a1, b1);
+            let r2 = _mm_xor_si128(a2, b2);
+            let r3 = _mm_xor_si128(a3, b3);
 
-        _mm_storeu_si128(r_ptr.add(i), r0);
-        _mm_storeu_si128(r_ptr.add(i + 1), r1);
-        _mm_storeu_si128(r_ptr.add(i + 2), r2);
-        _mm_storeu_si128(r_ptr.add(i + 3), r3);
+            _mm_storeu_si128(r_ptr.add(i), r0);
+            _mm_storeu_si128(r_ptr.add(i + 1), r1);
+            _mm_storeu_si128(r_ptr.add(i + 2), r2);
+            _mm_storeu_si128(r_ptr.add(i + 3), r3);
+        }
     }
 }
 
@@ -201,20 +207,22 @@ pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
 #[target_feature(enable = "avx512f")]
 #[inline]
 unsafe fn intersection_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m512i;
-    let b_ptr = b.as_ptr() as *const __m512i;
-    let r_ptr = result.as_mut_ptr() as *mut __m512i;
-    for i in (0..32).step_by(2) {
-        let r0 = _mm512_and_si512(
-            _mm512_loadu_si512(a_ptr.add(i)),
-            _mm512_loadu_si512(b_ptr.add(i)),
-        );
-        let r1 = _mm512_and_si512(
-            _mm512_loadu_si512(a_ptr.add(i + 1)),
-            _mm512_loadu_si512(b_ptr.add(i + 1)),
-        );
-        _mm512_storeu_si512(r_ptr.add(i), r0);
-        _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m512i;
+        let b_ptr = b.as_ptr() as *const __m512i;
+        let r_ptr = result.as_mut_ptr() as *mut __m512i;
+        for i in (0..32).step_by(2) {
+            let r0 = _mm512_and_si512(
+                _mm512_loadu_si512(a_ptr.add(i)),
+                _mm512_loadu_si512(b_ptr.add(i)),
+            );
+            let r1 = _mm512_and_si512(
+                _mm512_loadu_si512(a_ptr.add(i + 1)),
+                _mm512_loadu_si512(b_ptr.add(i + 1)),
+            );
+            _mm512_storeu_si512(r_ptr.add(i), r0);
+            _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+        }
     }
 }
 
@@ -222,39 +230,41 @@ unsafe fn intersection_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn intersection_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m256i;
-    let b_ptr = b.as_ptr() as *const __m256i;
-    let r_ptr = result.as_mut_ptr() as *mut __m256i;
-    // Source arrays are align(32) from BinaryHV, so use aligned loads
-    for i in (0..64).step_by(4) {
-        _mm256_storeu_si256(
-            r_ptr.add(i),
-            _mm256_and_si256(
-                _mm256_load_si256(a_ptr.add(i)),
-                _mm256_load_si256(b_ptr.add(i)),
-            ),
-        );
-        _mm256_storeu_si256(
-            r_ptr.add(i + 1),
-            _mm256_and_si256(
-                _mm256_load_si256(a_ptr.add(i + 1)),
-                _mm256_load_si256(b_ptr.add(i + 1)),
-            ),
-        );
-        _mm256_storeu_si256(
-            r_ptr.add(i + 2),
-            _mm256_and_si256(
-                _mm256_load_si256(a_ptr.add(i + 2)),
-                _mm256_load_si256(b_ptr.add(i + 2)),
-            ),
-        );
-        _mm256_storeu_si256(
-            r_ptr.add(i + 3),
-            _mm256_and_si256(
-                _mm256_load_si256(a_ptr.add(i + 3)),
-                _mm256_load_si256(b_ptr.add(i + 3)),
-            ),
-        );
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m256i;
+        let b_ptr = b.as_ptr() as *const __m256i;
+        let r_ptr = result.as_mut_ptr() as *mut __m256i;
+        // Source arrays are align(32) from BinaryHV, so use aligned loads
+        for i in (0..64).step_by(4) {
+            _mm256_storeu_si256(
+                r_ptr.add(i),
+                _mm256_and_si256(
+                    _mm256_load_si256(a_ptr.add(i)),
+                    _mm256_load_si256(b_ptr.add(i)),
+                ),
+            );
+            _mm256_storeu_si256(
+                r_ptr.add(i + 1),
+                _mm256_and_si256(
+                    _mm256_load_si256(a_ptr.add(i + 1)),
+                    _mm256_load_si256(b_ptr.add(i + 1)),
+                ),
+            );
+            _mm256_storeu_si256(
+                r_ptr.add(i + 2),
+                _mm256_and_si256(
+                    _mm256_load_si256(a_ptr.add(i + 2)),
+                    _mm256_load_si256(b_ptr.add(i + 2)),
+                ),
+            );
+            _mm256_storeu_si256(
+                r_ptr.add(i + 3),
+                _mm256_and_si256(
+                    _mm256_load_si256(a_ptr.add(i + 3)),
+                    _mm256_load_si256(b_ptr.add(i + 3)),
+                ),
+            );
+        }
     }
 }
 
@@ -262,35 +272,37 @@ unsafe fn intersection_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 20
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn intersection_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m128i;
-    let b_ptr = b.as_ptr() as *const __m128i;
-    let r_ptr = result.as_mut_ptr() as *mut __m128i;
-    for i in (0..128).step_by(4) {
-        _mm_storeu_si128(
-            r_ptr.add(i),
-            _mm_and_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))),
-        );
-        _mm_storeu_si128(
-            r_ptr.add(i + 1),
-            _mm_and_si128(
-                _mm_loadu_si128(a_ptr.add(i + 1)),
-                _mm_loadu_si128(b_ptr.add(i + 1)),
-            ),
-        );
-        _mm_storeu_si128(
-            r_ptr.add(i + 2),
-            _mm_and_si128(
-                _mm_loadu_si128(a_ptr.add(i + 2)),
-                _mm_loadu_si128(b_ptr.add(i + 2)),
-            ),
-        );
-        _mm_storeu_si128(
-            r_ptr.add(i + 3),
-            _mm_and_si128(
-                _mm_loadu_si128(a_ptr.add(i + 3)),
-                _mm_loadu_si128(b_ptr.add(i + 3)),
-            ),
-        );
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m128i;
+        let b_ptr = b.as_ptr() as *const __m128i;
+        let r_ptr = result.as_mut_ptr() as *mut __m128i;
+        for i in (0..128).step_by(4) {
+            _mm_storeu_si128(
+                r_ptr.add(i),
+                _mm_and_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))),
+            );
+            _mm_storeu_si128(
+                r_ptr.add(i + 1),
+                _mm_and_si128(
+                    _mm_loadu_si128(a_ptr.add(i + 1)),
+                    _mm_loadu_si128(b_ptr.add(i + 1)),
+                ),
+            );
+            _mm_storeu_si128(
+                r_ptr.add(i + 2),
+                _mm_and_si128(
+                    _mm_loadu_si128(a_ptr.add(i + 2)),
+                    _mm_loadu_si128(b_ptr.add(i + 2)),
+                ),
+            );
+            _mm_storeu_si128(
+                r_ptr.add(i + 3),
+                _mm_and_si128(
+                    _mm_loadu_si128(a_ptr.add(i + 3)),
+                    _mm_loadu_si128(b_ptr.add(i + 3)),
+                ),
+            );
+        }
     }
 }
 
@@ -333,20 +345,22 @@ pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
 #[target_feature(enable = "avx512f")]
 #[inline]
 unsafe fn union_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m512i;
-    let b_ptr = b.as_ptr() as *const __m512i;
-    let r_ptr = result.as_mut_ptr() as *mut __m512i;
-    for i in (0..32).step_by(2) {
-        let r0 = _mm512_or_si512(
-            _mm512_loadu_si512(a_ptr.add(i)),
-            _mm512_loadu_si512(b_ptr.add(i)),
-        );
-        let r1 = _mm512_or_si512(
-            _mm512_loadu_si512(a_ptr.add(i + 1)),
-            _mm512_loadu_si512(b_ptr.add(i + 1)),
-        );
-        _mm512_storeu_si512(r_ptr.add(i), r0);
-        _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m512i;
+        let b_ptr = b.as_ptr() as *const __m512i;
+        let r_ptr = result.as_mut_ptr() as *mut __m512i;
+        for i in (0..32).step_by(2) {
+            let r0 = _mm512_or_si512(
+                _mm512_loadu_si512(a_ptr.add(i)),
+                _mm512_loadu_si512(b_ptr.add(i)),
+            );
+            let r1 = _mm512_or_si512(
+                _mm512_loadu_si512(a_ptr.add(i + 1)),
+                _mm512_loadu_si512(b_ptr.add(i + 1)),
+            );
+            _mm512_storeu_si512(r_ptr.add(i), r0);
+            _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+        }
     }
 }
 
@@ -354,39 +368,41 @@ unsafe fn union_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) 
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn union_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m256i;
-    let b_ptr = b.as_ptr() as *const __m256i;
-    let r_ptr = result.as_mut_ptr() as *mut __m256i;
-    // Source arrays are align(32) from BinaryHV, so use aligned loads
-    for i in (0..64).step_by(4) {
-        _mm256_storeu_si256(
-            r_ptr.add(i),
-            _mm256_or_si256(
-                _mm256_load_si256(a_ptr.add(i)),
-                _mm256_load_si256(b_ptr.add(i)),
-            ),
-        );
-        _mm256_storeu_si256(
-            r_ptr.add(i + 1),
-            _mm256_or_si256(
-                _mm256_load_si256(a_ptr.add(i + 1)),
-                _mm256_load_si256(b_ptr.add(i + 1)),
-            ),
-        );
-        _mm256_storeu_si256(
-            r_ptr.add(i + 2),
-            _mm256_or_si256(
-                _mm256_load_si256(a_ptr.add(i + 2)),
-                _mm256_load_si256(b_ptr.add(i + 2)),
-            ),
-        );
-        _mm256_storeu_si256(
-            r_ptr.add(i + 3),
-            _mm256_or_si256(
-                _mm256_load_si256(a_ptr.add(i + 3)),
-                _mm256_load_si256(b_ptr.add(i + 3)),
-            ),
-        );
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m256i;
+        let b_ptr = b.as_ptr() as *const __m256i;
+        let r_ptr = result.as_mut_ptr() as *mut __m256i;
+        // Source arrays are align(32) from BinaryHV, so use aligned loads
+        for i in (0..64).step_by(4) {
+            _mm256_storeu_si256(
+                r_ptr.add(i),
+                _mm256_or_si256(
+                    _mm256_load_si256(a_ptr.add(i)),
+                    _mm256_load_si256(b_ptr.add(i)),
+                ),
+            );
+            _mm256_storeu_si256(
+                r_ptr.add(i + 1),
+                _mm256_or_si256(
+                    _mm256_load_si256(a_ptr.add(i + 1)),
+                    _mm256_load_si256(b_ptr.add(i + 1)),
+                ),
+            );
+            _mm256_storeu_si256(
+                r_ptr.add(i + 2),
+                _mm256_or_si256(
+                    _mm256_load_si256(a_ptr.add(i + 2)),
+                    _mm256_load_si256(b_ptr.add(i + 2)),
+                ),
+            );
+            _mm256_storeu_si256(
+                r_ptr.add(i + 3),
+                _mm256_or_si256(
+                    _mm256_load_si256(a_ptr.add(i + 3)),
+                    _mm256_load_si256(b_ptr.add(i + 3)),
+                ),
+            );
+        }
     }
 }
 
@@ -394,35 +410,37 @@ unsafe fn union_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn union_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m128i;
-    let b_ptr = b.as_ptr() as *const __m128i;
-    let r_ptr = result.as_mut_ptr() as *mut __m128i;
-    for i in (0..128).step_by(4) {
-        _mm_storeu_si128(
-            r_ptr.add(i),
-            _mm_or_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))),
-        );
-        _mm_storeu_si128(
-            r_ptr.add(i + 1),
-            _mm_or_si128(
-                _mm_loadu_si128(a_ptr.add(i + 1)),
-                _mm_loadu_si128(b_ptr.add(i + 1)),
-            ),
-        );
-        _mm_storeu_si128(
-            r_ptr.add(i + 2),
-            _mm_or_si128(
-                _mm_loadu_si128(a_ptr.add(i + 2)),
-                _mm_loadu_si128(b_ptr.add(i + 2)),
-            ),
-        );
-        _mm_storeu_si128(
-            r_ptr.add(i + 3),
-            _mm_or_si128(
-                _mm_loadu_si128(a_ptr.add(i + 3)),
-                _mm_loadu_si128(b_ptr.add(i + 3)),
-            ),
-        );
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m128i;
+        let b_ptr = b.as_ptr() as *const __m128i;
+        let r_ptr = result.as_mut_ptr() as *mut __m128i;
+        for i in (0..128).step_by(4) {
+            _mm_storeu_si128(
+                r_ptr.add(i),
+                _mm_or_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))),
+            );
+            _mm_storeu_si128(
+                r_ptr.add(i + 1),
+                _mm_or_si128(
+                    _mm_loadu_si128(a_ptr.add(i + 1)),
+                    _mm_loadu_si128(b_ptr.add(i + 1)),
+                ),
+            );
+            _mm_storeu_si128(
+                r_ptr.add(i + 2),
+                _mm_or_si128(
+                    _mm_loadu_si128(a_ptr.add(i + 2)),
+                    _mm_loadu_si128(b_ptr.add(i + 2)),
+                ),
+            );
+            _mm_storeu_si128(
+                r_ptr.add(i + 3),
+                _mm_or_si128(
+                    _mm_loadu_si128(a_ptr.add(i + 3)),
+                    _mm_loadu_si128(b_ptr.add(i + 3)),
+                ),
+            );
+        }
     }
 }
 
@@ -480,27 +498,29 @@ pub fn matching_bits_simd(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 #[target_feature(enable = "avx512f", enable = "avx512vpopcntdq")]
 #[inline]
 unsafe fn matching_bits_avx512_vpopcntdq(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    let a_ptr = a.as_ptr() as *const __m512i;
-    let b_ptr = b.as_ptr() as *const __m512i;
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m512i;
+        let b_ptr = b.as_ptr() as *const __m512i;
 
-    let mut total = _mm512_setzero_si512();
+        let mut total = _mm512_setzero_si512();
 
-    // Process 64 bytes at a time
-    for i in 0..32 {
-        let va = _mm512_loadu_si512(a_ptr.add(i));
-        let vb = _mm512_loadu_si512(b_ptr.add(i));
-        let diff = _mm512_xor_si512(va, vb);
+        // Process 64 bytes at a time
+        for i in 0..32 {
+            let va = _mm512_loadu_si512(a_ptr.add(i));
+            let vb = _mm512_loadu_si512(b_ptr.add(i));
+            let diff = _mm512_xor_si512(va, vb);
 
-        // Native 64-bit popcount on each of 8 qwords
-        let popcnt = _mm512_popcnt_epi64(diff);
-        total = _mm512_add_epi64(total, popcnt);
+            // Native 64-bit popcount on each of 8 qwords
+            let popcnt = _mm512_popcnt_epi64(diff);
+            total = _mm512_add_epi64(total, popcnt);
+        }
+
+        // Horizontal sum of 8 64-bit values
+        let differing = _mm512_reduce_add_epi64(total) as u64;
+
+        // Total bits - differing bits = matching bits
+        (16_384 - differing) as u32
     }
-
-    // Horizontal sum of 8 64-bit values
-    let differing = _mm512_reduce_add_epi64(total) as u64;
-
-    // Total bits - differing bits = matching bits
-    (16_384 - differing) as u32
 }
 
 /// AVX-512 with scalar POPCNT fallback
@@ -509,34 +529,36 @@ unsafe fn matching_bits_avx512_vpopcntdq(a: &[u8; 2048], b: &[u8; 2048]) -> u32 
 #[target_feature(enable = "avx512f", enable = "popcnt")]
 #[inline]
 unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    let a_ptr = a.as_ptr() as *const u64;
-    let b_ptr = b.as_ptr() as *const u64;
+    unsafe {
+        let a_ptr = a.as_ptr() as *const u64;
+        let b_ptr = b.as_ptr() as *const u64;
 
-    let mut total: u64 = 0;
+        let mut total: u64 = 0;
 
-    // 2048 bytes / 8 bytes = 256 u64s
-    // Process 8 at a time for better ILP
-    for i in (0..256).step_by(8) {
-        let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
-        let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
-        let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
-        let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
-        let xor4 = *a_ptr.add(i + 4) ^ *b_ptr.add(i + 4);
-        let xor5 = *a_ptr.add(i + 5) ^ *b_ptr.add(i + 5);
-        let xor6 = *a_ptr.add(i + 6) ^ *b_ptr.add(i + 6);
-        let xor7 = *a_ptr.add(i + 7) ^ *b_ptr.add(i + 7);
+        // 2048 bytes / 8 bytes = 256 u64s
+        // Process 8 at a time for better ILP
+        for i in (0..256).step_by(8) {
+            let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
+            let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
+            let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
+            let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
+            let xor4 = *a_ptr.add(i + 4) ^ *b_ptr.add(i + 4);
+            let xor5 = *a_ptr.add(i + 5) ^ *b_ptr.add(i + 5);
+            let xor6 = *a_ptr.add(i + 6) ^ *b_ptr.add(i + 6);
+            let xor7 = *a_ptr.add(i + 7) ^ *b_ptr.add(i + 7);
 
-        total += _popcnt64(xor0 as i64) as u64;
-        total += _popcnt64(xor1 as i64) as u64;
-        total += _popcnt64(xor2 as i64) as u64;
-        total += _popcnt64(xor3 as i64) as u64;
-        total += _popcnt64(xor4 as i64) as u64;
-        total += _popcnt64(xor5 as i64) as u64;
-        total += _popcnt64(xor6 as i64) as u64;
-        total += _popcnt64(xor7 as i64) as u64;
+            total += _popcnt64(xor0 as i64) as u64;
+            total += _popcnt64(xor1 as i64) as u64;
+            total += _popcnt64(xor2 as i64) as u64;
+            total += _popcnt64(xor3 as i64) as u64;
+            total += _popcnt64(xor4 as i64) as u64;
+            total += _popcnt64(xor5 as i64) as u64;
+            total += _popcnt64(xor6 as i64) as u64;
+            total += _popcnt64(xor7 as i64) as u64;
+        }
+
+        (16_384 - total) as u32
     }
-
-    (16_384 - total) as u32
 }
 
 /// AVX2 + POPCNT implementation
@@ -546,28 +568,30 @@ unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 #[target_feature(enable = "avx2", enable = "popcnt")]
 #[inline]
 unsafe fn matching_bits_avx2_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
-    let a_ptr = a.as_ptr() as *const u64;
-    let b_ptr = b.as_ptr() as *const u64;
+    unsafe {
+        let a_ptr = a.as_ptr() as *const u64;
+        let b_ptr = b.as_ptr() as *const u64;
 
-    let mut total: u64 = 0;
+        let mut total: u64 = 0;
 
-    // 2048 bytes / 8 bytes = 256 u64s, process 4 at a time for ILP
-    for i in (0..256).step_by(4) {
-        let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
-        let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
-        let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
-        let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
+        // 2048 bytes / 8 bytes = 256 u64s, process 4 at a time for ILP
+        for i in (0..256).step_by(4) {
+            let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
+            let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
+            let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
+            let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
 
-        // Count DIFFERING bits (popcount of XOR)
-        // Matching = total bits - differing
-        total += _popcnt64(xor0 as i64) as u64;
-        total += _popcnt64(xor1 as i64) as u64;
-        total += _popcnt64(xor2 as i64) as u64;
-        total += _popcnt64(xor3 as i64) as u64;
+            // Count DIFFERING bits (popcount of XOR)
+            // Matching = total bits - differing
+            total += _popcnt64(xor0 as i64) as u64;
+            total += _popcnt64(xor1 as i64) as u64;
+            total += _popcnt64(xor2 as i64) as u64;
+            total += _popcnt64(xor3 as i64) as u64;
+        }
+
+        // Total bits - differing bits = matching bits
+        (16_384 - total) as u32
     }
-
-    // Total bits - differing bits = matching bits
-    (16_384 - total) as u32
 }
 
 /// POPCNT-only implementation (fallback when AVX2 not available)
@@ -623,27 +647,29 @@ pub fn invert_simd(a: &[u8; 2048]) -> [u8; 2048] {
 #[target_feature(enable = "avx2")]
 #[inline]
 unsafe fn invert_avx2(a: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m256i;
-    let r_ptr = result.as_mut_ptr() as *mut __m256i;
-    let ones = _mm256_set1_epi8(-1i8); // All 1s
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m256i;
+        let r_ptr = result.as_mut_ptr() as *mut __m256i;
+        let ones = _mm256_set1_epi8(-1i8); // All 1s
 
-    // Source array is align(32) from BinaryHV, so use aligned loads
-    for i in (0..64).step_by(4) {
-        let a0 = _mm256_load_si256(a_ptr.add(i));
-        let a1 = _mm256_load_si256(a_ptr.add(i + 1));
-        let a2 = _mm256_load_si256(a_ptr.add(i + 2));
-        let a3 = _mm256_load_si256(a_ptr.add(i + 3));
+        // Source array is align(32) from BinaryHV, so use aligned loads
+        for i in (0..64).step_by(4) {
+            let a0 = _mm256_load_si256(a_ptr.add(i));
+            let a1 = _mm256_load_si256(a_ptr.add(i + 1));
+            let a2 = _mm256_load_si256(a_ptr.add(i + 2));
+            let a3 = _mm256_load_si256(a_ptr.add(i + 3));
 
-        // XOR with all 1s = NOT
-        let r0 = _mm256_xor_si256(a0, ones);
-        let r1 = _mm256_xor_si256(a1, ones);
-        let r2 = _mm256_xor_si256(a2, ones);
-        let r3 = _mm256_xor_si256(a3, ones);
+            // XOR with all 1s = NOT
+            let r0 = _mm256_xor_si256(a0, ones);
+            let r1 = _mm256_xor_si256(a1, ones);
+            let r2 = _mm256_xor_si256(a2, ones);
+            let r3 = _mm256_xor_si256(a3, ones);
 
-        _mm256_storeu_si256(r_ptr.add(i), r0);
-        _mm256_storeu_si256(r_ptr.add(i + 1), r1);
-        _mm256_storeu_si256(r_ptr.add(i + 2), r2);
-        _mm256_storeu_si256(r_ptr.add(i + 3), r3);
+            _mm256_storeu_si256(r_ptr.add(i), r0);
+            _mm256_storeu_si256(r_ptr.add(i + 1), r1);
+            _mm256_storeu_si256(r_ptr.add(i + 2), r2);
+            _mm256_storeu_si256(r_ptr.add(i + 3), r3);
+        }
     }
 }
 
@@ -652,25 +678,27 @@ unsafe fn invert_avx2(a: &[u8; 2048], result: &mut [u8; 2048]) {
 #[target_feature(enable = "sse4.1")]
 #[inline]
 unsafe fn invert_sse41(a: &[u8; 2048], result: &mut [u8; 2048]) {
-    let a_ptr = a.as_ptr() as *const __m128i;
-    let r_ptr = result.as_mut_ptr() as *mut __m128i;
-    let ones = _mm_set1_epi8(-1i8);
+    unsafe {
+        let a_ptr = a.as_ptr() as *const __m128i;
+        let r_ptr = result.as_mut_ptr() as *mut __m128i;
+        let ones = _mm_set1_epi8(-1i8);
 
-    for i in (0..128).step_by(4) {
-        let a0 = _mm_loadu_si128(a_ptr.add(i));
-        let a1 = _mm_loadu_si128(a_ptr.add(i + 1));
-        let a2 = _mm_loadu_si128(a_ptr.add(i + 2));
-        let a3 = _mm_loadu_si128(a_ptr.add(i + 3));
+        for i in (0..128).step_by(4) {
+            let a0 = _mm_loadu_si128(a_ptr.add(i));
+            let a1 = _mm_loadu_si128(a_ptr.add(i + 1));
+            let a2 = _mm_loadu_si128(a_ptr.add(i + 2));
+            let a3 = _mm_loadu_si128(a_ptr.add(i + 3));
 
-        let r0 = _mm_xor_si128(a0, ones);
-        let r1 = _mm_xor_si128(a1, ones);
-        let r2 = _mm_xor_si128(a2, ones);
-        let r3 = _mm_xor_si128(a3, ones);
+            let r0 = _mm_xor_si128(a0, ones);
+            let r1 = _mm_xor_si128(a1, ones);
+            let r2 = _mm_xor_si128(a2, ones);
+            let r3 = _mm_xor_si128(a3, ones);
 
-        _mm_storeu_si128(r_ptr.add(i), r0);
-        _mm_storeu_si128(r_ptr.add(i + 1), r1);
-        _mm_storeu_si128(r_ptr.add(i + 2), r2);
-        _mm_storeu_si128(r_ptr.add(i + 3), r3);
+            _mm_storeu_si128(r_ptr.add(i), r0);
+            _mm_storeu_si128(r_ptr.add(i + 1), r1);
+            _mm_storeu_si128(r_ptr.add(i + 2), r2);
+            _mm_storeu_si128(r_ptr.add(i + 3), r3);
+        }
     }
 }
 

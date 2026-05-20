@@ -41,8 +41,8 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::HDC_DIMENSION;
+use crate::hdc::unified_hv::ContinuousHV;
 
 // =============================================================================
 // CINCINNATI ALGORITHM - Core Differential Engine
@@ -138,7 +138,7 @@ impl CincinnatiEstimator {
 
         // 1. Pair and check for first mismatch from high-order (index 0)
         for i in 0..self.model.len() {
-            let random_bit = rng.gen::<bool>();
+            let random_bit = rng.r#gen::<bool>();
             if self.model[i] != random_bit {
                 mismatch_index = Some(i);
                 mismatch_random_bit = random_bit;

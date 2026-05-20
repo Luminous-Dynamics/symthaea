@@ -97,7 +97,7 @@ impl CollectiveKosmicSong {
         let (dominant_idx, _) = harmony_counts
             .iter()
             .enumerate()
-            .max_by_key(|(_, &c)| c)
+            .max_by_key(|&(_, &c)| c)
             .unwrap_or((0, &0));
 
         let dominant_harmony = index_to_harmony(dominant_idx);

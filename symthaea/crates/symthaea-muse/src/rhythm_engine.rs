@@ -250,7 +250,7 @@ impl SyncopationPattern {
         self.onset_positions
             .iter()
             .zip(self.accents.iter())
-            .find(|(&pos, _)| pos > current_beat + 0.01)
+            .find(|&(&pos, _)| pos > current_beat + 0.01)
             .map(|(&pos, &accent)| (pos, accent))
     }
 }

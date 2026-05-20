@@ -53,8 +53,8 @@ use std::io::{self, BufRead, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use symthaea::consciousness::recursive_improvement::{
@@ -1163,7 +1163,7 @@ impl MagiCli {
                     Err(_) => false,
                 };
 
-                let status_display = if let Ok(output) = Command::new("curl")
+                let status_display = match Command::new("curl")
                     .args([
                         "-s",
                         "-o",
@@ -1176,9 +1176,8 @@ impl MagiCli {
                     ])
                     .output()
                 {
-                    String::from_utf8_lossy(&output.stdout).trim().to_string()
-                } else {
-                    "ERR".to_string()
+                    Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+                    _ => "ERR".to_string(),
                 };
 
                 println!(
@@ -1992,7 +1991,7 @@ impl MagiCli {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Unknown check type",
-                ))
+                ));
             }
         };
 
@@ -2056,7 +2055,11 @@ impl MagiCli {
                 let suggested_low = (accuracy * 0.9).max(0.1);
                 let suggested_high = (accuracy * 1.1).min(0.95);
                 let reason = if cal.is_overconfident {
-                    format!("You've been overconfident on {:?} checks ({:.0}% accuracy vs higher confidence)", relevant_domain, accuracy * 100.0)
+                    format!(
+                        "You've been overconfident on {:?} checks ({:.0}% accuracy vs higher confidence)",
+                        relevant_domain,
+                        accuracy * 100.0
+                    )
                 } else {
                     format!(
                         "Based on your {:?} history ({:.0}% accuracy)",
@@ -2462,7 +2465,10 @@ impl MagiCli {
         }
 
         if brier > 0.25 {
-            println!("    - {}Calibration is poor (Brier > 0.25). Consider lowering confidence levels.{}", YELLOW, RESET);
+            println!(
+                "    - {}Calibration is poor (Brier > 0.25). Consider lowering confidence levels.{}",
+                YELLOW, RESET
+            );
         }
 
         let overconfident_count = snapshot
@@ -3247,7 +3253,10 @@ impl MagiCli {
                 let in_pos = args.iter().position(|&x| x == "in");
 
                 if in_pos.is_none() || in_pos.unwrap() < 3 {
-                    println!("  {}Error:{} Invalid format. Use: schedule \"statement\" confidence in time", RED, RESET);
+                    println!(
+                        "  {}Error:{} Invalid format. Use: schedule \"statement\" confidence in time",
+                        RED, RESET
+                    );
                     println!(
                         "  {}Example:{} schedule \"build completes\" 0.85 in 5m",
                         DIM, RESET
@@ -3394,8 +3403,12 @@ impl MagiCli {
             BOLD, BLUE, RESET
         );
         println!();
-        println!("  Commands: status, predict, resolve, verify, calibration, domains, trend, batch, schedule,");
-        println!("            export, import, analytics, gate, bridge, metrics, attributions, history, monitor,");
+        println!(
+            "  Commands: status, predict, resolve, verify, calibration, domains, trend, batch, schedule,"
+        );
+        println!(
+            "            export, import, analytics, gate, bridge, metrics, attributions, history, monitor,"
+        );
         println!("            where, drift, reset, help, quit");
         println!();
 
@@ -4074,7 +4087,10 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
                 "  {}╭────────────────────────────────────────────────────────────────────╮{}",
                 DIM, RESET
             );
-            println!("  {}│{} {}DOMAIN CALIBRATION{}                                                {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
+            println!(
+                "  {}│{} {}DOMAIN CALIBRATION{}                                                {}│{}",
+                DIM, RESET, BOLD, RESET, DIM, RESET
+            );
             println!(
                 "  {}├────────────────────────────────────────────────────────────────────┤{}",
                 DIM, RESET

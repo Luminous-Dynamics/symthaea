@@ -58,7 +58,7 @@ impl MockWomb {
         self.week = new_week;
         self.metrics = FetalMetrics::normative(new_week);
 
-        if self.complications_enabled && rng.gen::<f64>() < self.complication_rate {
+        if self.complications_enabled && rng.r#gen::<f64>() < self.complication_rate {
             self.inject_complication(rng);
         }
     }

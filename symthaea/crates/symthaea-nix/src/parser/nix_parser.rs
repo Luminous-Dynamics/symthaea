@@ -427,10 +427,9 @@ impl NixParser {
 
     /// Check if source has syntax errors
     pub fn has_errors(&mut self, source: &str) -> bool {
-        if let Some(tree) = self.parser.parse(source, None) {
-            tree.root_node().has_error()
-        } else {
-            true
+        match self.parser.parse(source, None) {
+            Some(tree) => tree.root_node().has_error(),
+            _ => true,
         }
     }
 

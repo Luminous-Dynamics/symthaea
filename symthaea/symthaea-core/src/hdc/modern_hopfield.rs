@@ -455,7 +455,7 @@ impl HierarchicalHopfield {
             .fine_to_coarse
             .iter()
             .enumerate()
-            .filter(|(_, &c_idx)| c_idx == coarse_idx)
+            .filter(|&(_, &c_idx)| c_idx == coarse_idx)
             .map(|(idx, _)| idx)
             .collect();
 

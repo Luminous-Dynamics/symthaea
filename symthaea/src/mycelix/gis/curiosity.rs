@@ -757,9 +757,11 @@ mod tests {
         assert!(!plans.is_empty());
 
         // Plans should include semantic exploration
-        assert!(plans
-            .iter()
-            .any(|(s, _)| *s == ExplorationStrategy::Semantic));
+        assert!(
+            plans
+                .iter()
+                .any(|(s, _)| *s == ExplorationStrategy::Semantic)
+        );
     }
 
     #[test]
@@ -772,9 +774,10 @@ mod tests {
 
         // Why question
         let subs = explorer.socratic_decompose("Why does water freeze?");
-        assert!(subs
-            .iter()
-            .any(|q| q.contains("context") || q.contains("factors")));
+        assert!(
+            subs.iter()
+                .any(|q| q.contains("context") || q.contains("factors"))
+        );
     }
 
     #[test]
@@ -857,9 +860,11 @@ mod tests {
 
         // Should have explorations for affected harmonies
         assert!(explorations.len() >= 2);
-        assert!(explorations
-            .iter()
-            .any(|(h, _)| *h == Harmony::PanSentientFlourishing));
+        assert!(
+            explorations
+                .iter()
+                .any(|(h, _)| *h == Harmony::PanSentientFlourishing)
+        );
     }
 
     #[test]

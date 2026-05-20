@@ -7,8 +7,8 @@
 //! structured inputs. Designed to run in the browser via WASM for the
 //! Sovereign Inoculation installer.
 
-use crate::aliases;
 use crate::AppDatabase;
+use crate::aliases;
 use std::fmt::Write;
 
 // ═══════════════════════════════════════════════════════
@@ -487,7 +487,11 @@ fn write_desktop(out: &mut String, desktop: &str, choices: &UserChoices) {
         }
         _ => {
             writeln!(out, "  # No desktop environment — console only").unwrap();
-            writeln!(out, "  # Install a DE later with: services.xserver.desktopManager.<name>.enable = true;").unwrap();
+            writeln!(
+                out,
+                "  # Install a DE later with: services.xserver.desktopManager.<name>.enable = true;"
+            )
+            .unwrap();
         }
     }
     // Auto-login (works with display-manager-based DEs)
@@ -1071,9 +1075,11 @@ mod tests {
         c.secure_boot = false;
         let result = generate(&test_hw(), &c, &[]);
         assert!(!result.flake_nix.contains("lanzaboote"));
-        assert!(result
-            .configuration_nix
-            .contains("boot.loader.systemd-boot.enable = true"));
+        assert!(
+            result
+                .configuration_nix
+                .contains("boot.loader.systemd-boot.enable = true")
+        );
     }
 
     #[test]
@@ -1090,9 +1096,11 @@ mod tests {
         let mut c = test_choices();
         c.desktop = "hyprland".into();
         let result = generate(&test_hw(), &c, &[]);
-        assert!(result
-            .configuration_nix
-            .contains("programs.hyprland.enable = true"));
+        assert!(
+            result
+                .configuration_nix
+                .contains("programs.hyprland.enable = true")
+        );
         assert!(result.configuration_nix.contains("greetd"));
     }
 
@@ -1185,10 +1193,12 @@ mod tests {
             &test_choices(),
             &["Firefox".into(), "TotallyFakeApp9000".into()],
         );
-        assert!(result
-            .warnings
-            .iter()
-            .any(|w| w.contains("TotallyFakeApp9000")));
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.contains("TotallyFakeApp9000"))
+        );
         assert!(result.configuration_nix.contains("firefox"));
     }
 
@@ -1224,9 +1234,11 @@ mod tests {
         let mut c = test_choices();
         c.desktop = "sway".into();
         let result = generate(&test_hw(), &c, &[]);
-        assert!(result
-            .configuration_nix
-            .contains("programs.sway.enable = true"));
+        assert!(
+            result
+                .configuration_nix
+                .contains("programs.sway.enable = true")
+        );
     }
 
     #[test]
@@ -1366,9 +1378,11 @@ mod tests {
     fn validate_missing_hardware_import() {
         let nix = "{ config }: { imports = [ ./other.nix ]; }";
         let errors = validate_nix_syntax(nix);
-        assert!(errors
-            .iter()
-            .any(|e| e.contains("hardware-configuration.nix")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("hardware-configuration.nix"))
+        );
     }
 
     #[test]
@@ -1852,9 +1866,11 @@ mod tests {
         c.tpm2_unlock = true;
         c.fido2_unlock = true;
         let result = generate(&test_hw(), &c, &[]);
-        assert!(result
-            .configuration_nix
-            .contains("boot.initrd.systemd.enable = true"));
+        assert!(
+            result
+                .configuration_nix
+                .contains("boot.initrd.systemd.enable = true")
+        );
         assert!(result.configuration_nix.contains("fido2-device=auto"));
     }
 
@@ -1883,9 +1899,11 @@ mod tests {
         c.home_manager = true;
         c.shell = "fish".into();
         let result = generate(&test_hw(), &c, &[]);
-        assert!(result
-            .configuration_nix
-            .contains("programs.fish.enable = true"));
+        assert!(
+            result
+                .configuration_nix
+                .contains("programs.fish.enable = true")
+        );
     }
 
     #[test]

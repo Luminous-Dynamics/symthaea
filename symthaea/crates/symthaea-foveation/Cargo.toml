@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-foveation"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Dual-stream foveation bridge: dorsal surprise → ventral recognition via background dispatch"
 license = "AGPL-3.0-or-later"

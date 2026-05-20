@@ -6,8 +6,8 @@
 use symthaea_core::hdc::ContinuousHV;
 
 use super::{
-    is_nonzero_f32, knowledge, ActivatedConcept, ContinuousMind, EmotionalTone, EpistemicStatus,
-    MindState, ResponseType, SeedingResult, SemanticIntent, StructuredThought,
+    ActivatedConcept, ContinuousMind, EmotionalTone, EpistemicStatus, MindState, ResponseType,
+    SeedingResult, SemanticIntent, StructuredThought, is_nonzero_f32, knowledge,
 };
 use crate::memory::memory_coordinator::MemorySource;
 

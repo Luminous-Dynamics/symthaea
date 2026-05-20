@@ -919,8 +919,9 @@ mod tests {
 
     #[test]
     fn test_ollama_backend_env_var_model_override() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         let prev = std::env::var("SYMTHAEA_LLM_MODEL").ok();
-        std::env::set_var("SYMTHAEA_LLM_MODEL", "mistral:7b");
+        set_test_env("SYMTHAEA_LLM_MODEL", "mistral:7b");
 
         let backend = OllamaBackend::new();
         assert_eq!(backend.model, "mistral:7b");
@@ -928,8 +929,8 @@ mod tests {
 
         // Restore
         match prev {
-            Some(val) => std::env::set_var("SYMTHAEA_LLM_MODEL", val),
-            None => std::env::remove_var("SYMTHAEA_LLM_MODEL"),
+            Some(val) => set_test_env("SYMTHAEA_LLM_MODEL", val),
+            None => remove_test_env("SYMTHAEA_LLM_MODEL"),
         }
     }
 
@@ -1002,6 +1003,25 @@ mod tests {
     /// thread-safe, so parallel test threads can race.
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+    fn set_test_env<K, V>(key: K, value: V)
+    where
+        K: AsRef<std::ffi::OsStr>,
+        V: AsRef<std::ffi::OsStr>,
+    {
+        // SAFETY: Tests that call this helper hold ENV_MUTEX, serializing
+        // process-wide environment mutation within this module.
+        unsafe { std::env::set_var(key, value) };
+    }
+
+    fn remove_test_env<K>(key: K)
+    where
+        K: AsRef<std::ffi::OsStr>,
+    {
+        // SAFETY: Tests that call this helper hold ENV_MUTEX, serializing
+        // process-wide environment mutation within this module.
+        unsafe { std::env::remove_var(key) };
+    }
+
     #[test]
     fn test_create_backend_from_env_default() {
         let _lock = ENV_MUTEX.lock().unwrap();
@@ -1010,21 +1030,21 @@ mod tests {
         let prev_openai = std::env::var("OPENAI_API_KEY").ok();
         let prev_anthropic = std::env::var("ANTHROPIC_API_KEY").ok();
 
-        std::env::remove_var("SYMTHAEA_LLM_PROVIDER");
-        std::env::remove_var("OPENAI_API_KEY");
-        std::env::remove_var("ANTHROPIC_API_KEY");
+        remove_test_env("SYMTHAEA_LLM_PROVIDER");
+        remove_test_env("OPENAI_API_KEY");
+        remove_test_env("ANTHROPIC_API_KEY");
 
         let backend = create_backend_from_env();
         assert_eq!(backend.name(), "Ollama");
 
         if let Some(v) = prev_provider {
-            std::env::set_var("SYMTHAEA_LLM_PROVIDER", v);
+            set_test_env("SYMTHAEA_LLM_PROVIDER", v);
         }
         if let Some(v) = prev_openai {
-            std::env::set_var("OPENAI_API_KEY", v);
+            set_test_env("OPENAI_API_KEY", v);
         }
         if let Some(v) = prev_anthropic {
-            std::env::set_var("ANTHROPIC_API_KEY", v);
+            set_test_env("ANTHROPIC_API_KEY", v);
         }
     }
 
@@ -1033,14 +1053,14 @@ mod tests {
         let _lock = ENV_MUTEX.lock().unwrap();
 
         let prev = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
-        std::env::set_var("SYMTHAEA_LLM_PROVIDER", "simulated");
+        set_test_env("SYMTHAEA_LLM_PROVIDER", "simulated");
 
         let backend = create_backend_from_env();
         assert_eq!(backend.name(), "Simulated");
 
         match prev {
-            Some(v) => std::env::set_var("SYMTHAEA_LLM_PROVIDER", v),
-            None => std::env::remove_var("SYMTHAEA_LLM_PROVIDER"),
+            Some(v) => set_test_env("SYMTHAEA_LLM_PROVIDER", v),
+            None => remove_test_env("SYMTHAEA_LLM_PROVIDER"),
         }
     }
 

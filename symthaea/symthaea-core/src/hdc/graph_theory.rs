@@ -55,11 +55,7 @@ impl Graph {
     /// Number of edges
     pub fn num_edges(&self) -> usize {
         let total: usize = self.adj.iter().map(|a| a.len()).sum();
-        if self.directed {
-            total
-        } else {
-            total / 2
-        }
+        if self.directed { total } else { total / 2 }
     }
 
     /// HDC encoding of the graph
@@ -217,7 +213,7 @@ impl Graph {
         let mut queue: VecDeque<usize> = in_degree
             .iter()
             .enumerate()
-            .filter(|(_, &d)| d == 0)
+            .filter(|&(_, &d)| d == 0)
             .map(|(i, _)| i)
             .collect();
 
@@ -381,11 +377,7 @@ impl Graph {
     /// - Related to Cheeger constant: h(G) ≥ λ₂ / 2 (Cheeger inequality)
     pub fn algebraic_connectivity(&self) -> f64 {
         let evals = self.laplacian_eigenvalues();
-        if evals.len() >= 2 {
-            evals[1]
-        } else {
-            0.0
-        }
+        if evals.len() >= 2 { evals[1] } else { 0.0 }
     }
 
     /// Spectral gap: λ₂ (difference between first two distinct eigenvalues).

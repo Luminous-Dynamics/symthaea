@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-swarm"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "P2P swarm protocol for collective consciousness and distributed Phi (Φ) measurement"
 license = "AGPL-3.0-or-later"

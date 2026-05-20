@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-consciousness-equation"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Master Consciousness Equation — 7-theory synthesis of IIT, GWT, HOT, attention, embodiment, knowledge, and synchrony into a single computable Phi metric."
 license = "AGPL-3.0-or-later"

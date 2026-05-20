@@ -320,7 +320,7 @@ fn generate_verified_inner<'a>(
 
         let mut result = match intent {
             CodeIntent::Solve {
-                target: ref repo_target,
+                target: repo_target,
                 ..
             } => {
                 if let Err(e) = executor.apply_patch(&repo_target.root, &source) {
@@ -431,7 +431,7 @@ fn generate_verified_inner<'a>(
 
                     let mut retry_result = match intent {
                         CodeIntent::Solve {
-                            target: ref repo_target,
+                            target: repo_target,
                             ..
                         } => {
                             if let Err(e) = executor.apply_patch(&repo_target.root, &source) {

@@ -93,7 +93,7 @@ impl CalibrationAudit {
         self.bins
             .iter()
             .enumerate()
-            .filter(|(_, &(total, _))| total > 0)
+            .filter(|&(_, &(total, _))| total > 0)
             .map(|(i, &(total, correct))| {
                 let bin_confidence = (i as f64 + 0.5) / 10.0;
                 let bin_accuracy = correct as f64 / total as f64;
@@ -107,7 +107,7 @@ impl CalibrationAudit {
         self.bins
             .iter()
             .enumerate()
-            .filter(|(_, &(total, _))| total > 0)
+            .filter(|&(_, &(total, _))| total > 0)
             .map(|(i, &(total, correct))| {
                 let midpoint = (i as f32 + 0.5) / 10.0;
                 let accuracy = if total > 0 {

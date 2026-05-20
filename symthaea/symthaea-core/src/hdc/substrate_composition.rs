@@ -159,7 +159,7 @@ impl SubstrateComposition {
 
 impl fmt::Display for SubstrateComposition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut parts: Vec<_> = self.weights.iter().filter(|(_, &w)| w > 0.0).collect();
+        let mut parts: Vec<_> = self.weights.iter().filter(|&(_, &w)| w > 0.0).collect();
         // Sort by weight descending for consistent display
         parts.sort_by(|a, b| b.1.total_cmp(a.1));
 

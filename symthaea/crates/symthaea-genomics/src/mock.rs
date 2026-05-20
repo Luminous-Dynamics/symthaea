@@ -115,15 +115,15 @@ impl MockSequencer {
 
         for base in bases.iter_mut() {
             // Deamination: C->T, G->A
-            if *base == Base::C && rng.gen::<f64>() < deam_prob {
+            if *base == Base::C && rng.r#gen::<f64>() < deam_prob {
                 *base = Base::T;
-            } else if *base == Base::G && rng.gen::<f64>() < deam_prob {
+            } else if *base == Base::G && rng.r#gen::<f64>() < deam_prob {
                 *base = Base::A;
             }
 
             // Depurination: A or G -> N (with much lower probability)
             let depurin_prob = 1.0 - (-self.damage_model.depurination_rate * age_years).exp();
-            if (*base == Base::A || *base == Base::G) && rng.gen::<f64>() < depurin_prob {
+            if (*base == Base::A || *base == Base::G) && rng.r#gen::<f64>() < depurin_prob {
                 *base = Base::N;
             }
         }
@@ -134,7 +134,7 @@ impl MockSequencer {
         let all_bases = [Base::A, Base::T, Base::G, Base::C];
 
         for base in bases.iter_mut() {
-            if rng.gen::<f64>() < self.error_rate {
+            if rng.r#gen::<f64>() < self.error_rate {
                 // Replace with a random different base
                 let current = *base;
                 let alternatives: Vec<Base> = all_bases
@@ -322,7 +322,7 @@ mod tests {
     fn test_no_damage_at_age_zero() {
         let model = DamageModel::new(15.0);
         let sequencer = MockSequencer::new(100, 0.0, 50, model); // No sequencing errors
-                                                                 // Use only C and G to make deamination detectable
+        // Use only C and G to make deamination detectable
         let genome = DnaSequence::from_str(&"CCCCGGGG".repeat(125)); // 1000 bases
         let mut rng = rand::thread_rng();
 

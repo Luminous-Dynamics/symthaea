@@ -199,7 +199,7 @@ impl CompositionCache {
         if let Some((lru_key, _)) = self
             .access_order
             .iter()
-            .min_by_key(|(_, &access_time)| access_time)
+            .min_by_key(|&(_, &access_time)| access_time)
             .map(|(k, v)| (k.clone(), *v))
         {
             self.cache.remove(&lru_key);

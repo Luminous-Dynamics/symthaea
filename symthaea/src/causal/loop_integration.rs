@@ -262,7 +262,7 @@ impl CausalLoopEnhancer {
 
     /// Generate deterministic subsample indices
     fn generate_subsample_indices(total_dim: usize, subsample_dim: usize, seed: u64) -> Vec<usize> {
-        use rand::{seq::SliceRandom, SeedableRng};
+        use rand::{SeedableRng, seq::SliceRandom};
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         let mut indices: Vec<usize> = (0..total_dim).collect();
         indices.shuffle(&mut rng);
@@ -561,7 +561,7 @@ impl CausalLoopEnhancer {
         );
 
         // Only intervene with configured probability
-        if rng.gen::<f32>() > self.config.exploration_probability {
+        if rng.r#gen::<f32>() > self.config.exploration_probability {
             return None;
         }
 

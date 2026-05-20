@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-quicken-fb"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Mycelial colonization boot animation for NixOS installer — bare-metal DRM/KMS framebuffer"
 license = "AGPL-3.0-or-later"

@@ -827,7 +827,7 @@ fn test_peer_expiry_cleans_social_coherence() {
 #[tokio::test]
 async fn test_mind_to_mind_lora_fragmentation_roundtrip() {
     use crate::swarm::mesh::{
-        BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver, LORA_MTU,
+        BiLoopbackTransport, DualLayerMesh, LORA_MTU, MeshBridgeHandle, MeshReceiver,
     };
 
     // Create paired transports at LoRa MTU (222 bytes — forces fragmentation)
@@ -910,7 +910,7 @@ fn test_bandwidth_metering_emit() {
 #[cfg(feature = "mesh")]
 #[test]
 fn test_bandwidth_metering_receive() {
-    use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket, WISDOM_PACKET_SIZE};
+    use crate::swarm::mesh::{MeshUrgency, PayloadType, WISDOM_PACKET_SIZE, WisdomPacket};
     use symthaea_core::hdc::BinaryHV;
 
     let mut mind = ContinuousMind::default();
@@ -1141,7 +1141,7 @@ async fn test_mind_to_mind_affective_roundtrip() {
 #[cfg(feature = "mesh")]
 #[test]
 fn test_lora_double_loss_graceful() {
-    use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket, LORA_MTU};
+    use crate::swarm::mesh::{LORA_MTU, MeshUrgency, PayloadType, WisdomPacket};
     use symthaea_core::hdc::BinaryHV;
 
     // Build a WisdomPacket and fragment it
@@ -2878,8 +2878,8 @@ async fn test_bridge_key_propagation_roundtrip() {
 #[test]
 fn test_xchacha_send_receive_roundtrip() {
     use crate::swarm::mesh::{
-        compress_packet, encrypt_packet_xchacha, MeshReceiver, MeshUrgency, PayloadType,
-        WisdomPacket,
+        MeshReceiver, MeshUrgency, PayloadType, WisdomPacket, compress_packet,
+        encrypt_packet_xchacha,
     };
     use symthaea_core::hdc::BinaryHV;
 
@@ -2926,7 +2926,7 @@ fn test_xchacha_send_receive_roundtrip() {
 #[test]
 fn test_rapid_key_rotation_under_load() {
     use crate::swarm::mesh::{
-        compress_packet, MeshReceiver, MeshUrgency, PayloadType, RotatingKeyPair, WisdomPacket,
+        MeshReceiver, MeshUrgency, PayloadType, RotatingKeyPair, WisdomPacket, compress_packet,
     };
     use symthaea_core::hdc::BinaryHV;
 
@@ -2981,7 +2981,7 @@ fn test_rapid_key_rotation_under_load() {
 #[cfg(feature = "mesh-encryption")]
 #[test]
 fn test_rotating_key_pair_version_wrapping() {
-    use crate::swarm::mesh::{compress_packet, RotatingKeyPair};
+    use crate::swarm::mesh::{RotatingKeyPair, compress_packet};
 
     let initial_key = [0xAA; 32];
     let mut pair = RotatingKeyPair::new(initial_key);
@@ -3244,7 +3244,7 @@ fn test_fragment_cross_stream_rejected() {
 #[cfg(feature = "mesh-encryption")]
 #[test]
 fn test_fragment_replay_after_completion() {
-    use crate::swarm::mesh::{MeshReceiver, MeshUrgency, PayloadType, WisdomPacket, LORA_MTU};
+    use crate::swarm::mesh::{LORA_MTU, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket};
     use symthaea_core::hdc::BinaryHV;
 
     let source = [0x05u8; 8];
@@ -3304,7 +3304,7 @@ fn test_fragment_replay_after_completion() {
 #[test]
 fn test_downgrade_unencrypted_rejected() {
     use crate::swarm::mesh::{
-        compress_packet, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket,
+        MeshReceiver, MeshUrgency, PayloadType, WisdomPacket, compress_packet,
     };
     use symthaea_core::hdc::BinaryHV;
 
@@ -3344,7 +3344,7 @@ fn test_downgrade_unencrypted_rejected() {
 #[test]
 fn test_downgrade_legacy_format_backward_compat() {
     use crate::swarm::mesh::{
-        compress_packet, encrypt_packet, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket,
+        MeshReceiver, MeshUrgency, PayloadType, WisdomPacket, compress_packet, encrypt_packet,
     };
     use symthaea_core::hdc::BinaryHV;
 

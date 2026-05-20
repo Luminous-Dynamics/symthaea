@@ -280,8 +280,8 @@ impl PhiArchitectureSearch {
                 .fitness,
         );
 
-        for gen in 0..generations {
-            self.generation = gen + 1;
+        for r#gen in 0..generations {
+            self.generation = r#gen + 1;
             self.evolve_generation();
             self.phi_history.push(
                 self.best
@@ -360,8 +360,8 @@ impl PhiArchitectureSearch {
                 .fitness,
         );
 
-        for gen in 0..generations {
-            self.generation = gen + 1;
+        for r#gen in 0..generations {
+            self.generation = r#gen + 1;
 
             // Evolutionary step
             self.evolve_generation();
@@ -438,8 +438,8 @@ impl PhiArchitectureSearch {
             .expect("best individual must be set after initialization")
             .fitness;
 
-        for gen in 0..generations {
-            self.generation = gen + 1;
+        for r#gen in 0..generations {
+            self.generation = r#gen + 1;
 
             // Gradient-guided evolution step
             self.evolve_generation_with_gradients(&population_gradients);
@@ -692,14 +692,14 @@ impl PhiArchitectureSearch {
                 .fitness,
         ];
 
-        for gen in 0..generations {
+        for r#gen in 0..generations {
             // Evolve each island independently
             for island in &mut islands {
                 self.evolve_island(island);
             }
 
             // Migration phase
-            if gen > 0 && gen % self.config.migration_interval == 0 {
+            if r#gen > 0 && r#gen % self.config.migration_interval == 0 {
                 self.migrate_with_gradient_refinement(&mut islands);
             }
 

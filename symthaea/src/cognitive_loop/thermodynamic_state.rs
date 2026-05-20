@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn test_update_energy() {
         let mut state = UnifiedThermodynamicState::default();
-        state.update_energy(1e-10, 5e-8, 0.45);
+        state.update_energy(1e-10, 5e-8, 0.45, 0.0);
         assert_eq!(state.energy_per_cycle, 1e-10);
         assert_eq!(state.total_energy_spent, 5e-8);
         assert_eq!(state.metabolic_stress, 0.45);
@@ -296,7 +296,7 @@ mod tests {
     fn test_energy_nan_guard() {
         let mut state = UnifiedThermodynamicState::default();
         state.metabolic_stress = 0.3;
-        state.update_energy(0.0, 0.0, f32::NAN);
+        state.update_energy(0.0, 0.0, f32::NAN, 0.0);
         assert_eq!(state.metabolic_stress, 0.3); // Retained
     }
 }

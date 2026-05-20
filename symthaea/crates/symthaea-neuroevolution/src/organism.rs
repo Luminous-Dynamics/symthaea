@@ -473,9 +473,9 @@ mod tests {
         id: u64,
         genome: NeuralGenome,
         genesis: &GenesisSeed,
-        gen: u32,
+        r#gen: u32,
     ) -> NeuralOrganism {
-        NeuralOrganism::spawn_with_dim(id, genome, genesis, gen, FAST_TEST_DIM)
+        NeuralOrganism::spawn_with_dim(id, genome, genesis, r#gen, FAST_TEST_DIM)
     }
 
     #[test]

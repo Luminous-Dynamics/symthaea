@@ -14,6 +14,7 @@ use std::time::Instant;
 #[cfg(feature = "parallel")]
 use rayon::join as rayon_join;
 
+use super::CognitiveLoopService;
 use super::thresholds::{
     CAUSAL_BINDING_THRESHOLD, HARMONIC_FIELD_BOOST_FACTOR, HARMONIC_FIELD_BOOST_THRESHOLD,
     PHI_VALIDATION_HIGH_THRESHOLD, PHI_VALIDATION_LOW_THRESHOLD, REASONING_CONFIDENCE_BOOST_FACTOR,
@@ -21,7 +22,6 @@ use super::thresholds::{
     TEMPORAL_CHAIN_BOOST_FACTOR, TEMPORAL_CONTINUITY_BOOST_FACTOR,
     TEMPORAL_CONTINUITY_BOOST_THRESHOLD, TEMPORAL_REPLAY_TRIGGER,
 };
-use super::CognitiveLoopService;
 
 /// Values computed by the consciousness metrics phase.
 /// Passed to later phases that need these results.
@@ -1199,13 +1199,13 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> (f64, usize) {
         let _t = Instant::now();
-        let result = if let (Some(ref mut detector), Some(ref calibrator)) = (
+        let result = if let (Some(detector), Some(calibrator)) = (
             &mut self.primitive_tier.epistemic_conflict_detector,
             &self.primitive_tier.theory_calibrator,
         ) {
             if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
                 use crate::consciousness::epistemic_conflict::{
-                    compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
+                    ConflictMatrix, MultiTheoryMetrics, compute_phi_eff,
                 };
                 let metrics = MultiTheoryMetrics {
                     phi: unified_psi,

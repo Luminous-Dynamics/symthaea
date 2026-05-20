@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-vision-manifold"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Patch-based HDC video encoding with CfC temporal manifold and surprise-driven attention"
 license = "AGPL-3.0-or-later"

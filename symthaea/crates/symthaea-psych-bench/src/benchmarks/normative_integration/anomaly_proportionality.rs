@@ -229,7 +229,7 @@ impl PsychBenchmark for AnomalyProportionalityBenchmark {
         let min_severity_consciousness: f64 = consciousness_drops
             .iter()
             .zip(severity_levels.iter())
-            .filter(|(_, &s)| s < 0.05)
+            .filter(|&(_, &s)| s < 0.05)
             .map(|(&d, _)| base_consciousness - d)
             .sum::<f64>()
             / REPEATS_PER_LEVEL as f64;
@@ -237,7 +237,7 @@ impl PsychBenchmark for AnomalyProportionalityBenchmark {
         let max_severity_consciousness: f64 = consciousness_drops
             .iter()
             .zip(severity_levels.iter())
-            .filter(|(_, &s)| s > 0.95)
+            .filter(|&(_, &s)| s > 0.95)
             .map(|(&d, _)| base_consciousness - d)
             .sum::<f64>()
             / REPEATS_PER_LEVEL as f64;

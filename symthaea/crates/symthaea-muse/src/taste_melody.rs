@@ -349,11 +349,11 @@ mod tests {
     fn never_stagnates() {
         let scale = build_scale(0, true); // C major
         let chord = vec![261.63, 329.63, 392.00]; // C major triad
-        let mut gen = TasteMelody::new();
+        let mut r#gen = TasteMelody::new();
 
         let mut freqs = Vec::new();
         for _ in 0..100 {
-            freqs.push(gen.next_freq(&scale, &chord, 0.5, 0.5));
+            freqs.push(r#gen.next_freq(&scale, &chord, 0.5, 0.5));
         }
 
         // Count repeated
@@ -372,13 +372,13 @@ mod tests {
     fn direction_balanced() {
         let scale = build_scale(0, true);
         let chord = vec![261.63, 329.63, 392.00];
-        let mut gen = TasteMelody::new();
+        let mut r#gen = TasteMelody::new();
 
         let mut ascending = 0;
         let mut total = 0;
         let mut prev = 0.0f32;
         for _ in 0..200 {
-            let f = gen.next_freq(&scale, &chord, 0.5, 0.5);
+            let f = r#gen.next_freq(&scale, &chord, 0.5, 0.5);
             if prev > 0.0 {
                 if f > prev + 1.0 {
                     ascending += 1;
@@ -399,10 +399,10 @@ mod tests {
     fn stays_in_range() {
         let scale = build_scale(0, true);
         let chord = vec![261.63, 329.63, 392.00];
-        let mut gen = TasteMelody::new();
+        let mut r#gen = TasteMelody::new();
 
         for _ in 0..200 {
-            let f = gen.next_freq(&scale, &chord, 0.5, 0.5);
+            let f = r#gen.next_freq(&scale, &chord, 0.5, 0.5);
             let midi = ((12.0 * (f / 440.0).log2() + 69.0).round() as i32).clamp(0, 127);
             assert!(
                 midi >= 50 && midi <= 85,
@@ -415,11 +415,11 @@ mod tests {
     fn uses_variety() {
         let scale = build_scale(0, true);
         let chord = vec![261.63, 329.63, 392.00];
-        let mut gen = TasteMelody::new();
+        let mut r#gen = TasteMelody::new();
 
         let mut pitches = std::collections::HashSet::new();
         for _ in 0..100 {
-            let f = gen.next_freq(&scale, &chord, 0.5, 0.5);
+            let f = r#gen.next_freq(&scale, &chord, 0.5, 0.5);
             pitches.insert((f * 10.0) as i32); // bin to 0.1 Hz
         }
         assert!(

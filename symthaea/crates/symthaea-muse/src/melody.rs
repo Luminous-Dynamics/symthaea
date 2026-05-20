@@ -84,8 +84,8 @@ pub fn generate_melody(
         // Duration: gesture shapes note length, but high arousal FORCES longer
         // sustained notes to avoid dense polyphony sounding harsh.
         // Energy should come from harmony and register, not from rapid-fire notes.
-        let dur_factor = if rng.gen::<f32>() < syncopation {
-            0.5 + rng.gen::<f32>() * 1.5
+        let dur_factor = if rng.r#gen::<f32>() < syncopation {
+            0.5 + rng.r#gen::<f32>() * 1.5
         } else {
             1.0
         };
@@ -100,12 +100,12 @@ pub fn generate_melody(
         let duration = (base_note_dur * dur_factor * arousal_sustain).max(0.05);
 
         // Expressive velocity: gesture + contour + jitter
-        let vel_jitter = (rng.gen::<f32>() - 0.5) * 0.10; // ±5%
+        let vel_jitter = (rng.r#gen::<f32>() - 0.5) * 0.10; // ±5%
         let velocity = (base_velocity + contour * dynamic_range + vel_jitter).clamp(0.10, 1.0);
 
         // Rest probability: SacredStillness increases rests.
         let rest_prob = (state.harmony_activations[7] * 0.4).min(0.25);
-        if notes.len() >= 4 && rng.gen::<f32>() < rest_prob {
+        if notes.len() >= 4 && rng.r#gen::<f32>() < rest_prob {
             let rest_steps = (duration / base_note_dur).round().max(1.0);
             time += rest_steps * base_note_dur;
             continue;
@@ -125,7 +125,7 @@ pub fn generate_melody(
         time = grid_time + grid_steps * base_note_dur;
 
         // Pitch contour: arc pull dominates, random walk adds flavor
-        let random_step = (rng.gen::<f32>() - (1.0 - ascend_bias)) * 0.12;
+        let random_step = (rng.r#gen::<f32>() - (1.0 - ascend_bias)) * 0.12;
         let arc_pull = (contour_pitch - pitch_selector) * 0.30 * contour_strength;
         pitch_selector += random_step + arc_pull;
 

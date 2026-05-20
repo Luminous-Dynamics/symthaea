@@ -20,7 +20,7 @@
 use rayon::prelude::*;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
-    ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
+    ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
 /// GPU-resident pre-normalized embedding matrix for accelerated logit computation.
@@ -750,9 +750,9 @@ impl LanguageController {
     /// Restore projection weights (for Liquid-Mamba fusion).
     #[cfg(feature = "mamba-cpu")]
     pub fn restore_projection_weights(&mut self, weights: Vec<f32>) {
-        if let Some(ref mut gen) = self.liquid_mamba {
-            let gen: &mut crate::liquid_mamba::LiquidMambaGenerator = gen;
-            gen.projection.restore_live_weights(&weights);
+        if let Some(ref mut r#gen) = self.liquid_mamba {
+            let r#gen: &mut crate::liquid_mamba::LiquidMambaGenerator = r#gen;
+            r#gen.projection.restore_live_weights(&weights);
         }
     }
 
@@ -761,8 +761,8 @@ impl LanguageController {
     pub fn projection_weights(&self) -> Option<Vec<f32>> {
         self.liquid_mamba
             .as_ref()
-            .map(|gen: &Box<crate::liquid_mamba::LiquidMambaGenerator>| {
-                gen.projection.flatten_weights()
+            .map(|r#gen: &Box<crate::liquid_mamba::LiquidMambaGenerator>| {
+                r#gen.projection.flatten_weights()
             })
     }
 

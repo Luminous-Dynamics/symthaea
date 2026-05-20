@@ -62,7 +62,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 // Re-export core types for HDC integration
@@ -187,13 +187,8 @@ impl CModSample {
         let timestamp_s = self.time_ms / 1000.0;
 
         // Handle NaN values by replacing with typical defaults
-        let safe_value = |v: f32, default: f64| -> f64 {
-            if v.is_nan() {
-                default
-            } else {
-                v as f64
-            }
-        };
+        let safe_value =
+            |v: f32, default: f64| -> f64 { if v.is_nan() { default } else { v as f64 } };
 
         PlasmaState::new(
             timestamp_s,
@@ -1342,27 +1337,28 @@ pub fn generate_synthetic_data(config: &SyntheticConfig) -> Vec<CModShot> {
         let mut shot = CModShot::new(shot_id);
 
         // Determine if this shot disrupts
-        shot.disrupted = rng.gen::<f32>() < config.disruption_probability;
+        shot.disrupted = rng.r#gen::<f32>() < config.disruption_probability;
 
         // Set disruption time if applicable (towards end of shot)
         let num_samples = config.samples_per_shot + rng.gen_range(0..50);
         if shot.disrupted {
             // Disruption happens somewhere in the last 10-30% of the shot
-            let disruption_offset = (num_samples as f64 * (0.7 + rng.gen::<f64>() * 0.2)) as usize;
+            let disruption_offset =
+                (num_samples as f64 * (0.7 + rng.r#gen::<f64>() * 0.2)) as usize;
             let disruption_sample = disruption_offset.max(1);
             shot.disruption_time_ms = Some(disruption_sample as f64 * config.sample_interval_ms);
         }
 
         // Generate samples
         // Base values with some shot-to-shot variation
-        let base_ip = 0.6 + rng.gen::<f32>() * 0.4;
-        let base_ne = 1.5 + rng.gen::<f32>() * 1.5;
-        let base_te = 2.0 + rng.gen::<f32>() * 2.0;
-        let base_prad = 1.0 + rng.gen::<f32>() * 2.0;
-        let base_vloop = 1.0 + rng.gen::<f32>() * 0.5;
-        let base_q95 = 3.0 + rng.gen::<f32>() * 2.0;
-        let base_wmhd = 0.1 + rng.gen::<f32>() * 0.1;
-        let base_beta = 0.8 + rng.gen::<f32>() * 0.6;
+        let base_ip = 0.6 + rng.r#gen::<f32>() * 0.4;
+        let base_ne = 1.5 + rng.r#gen::<f32>() * 1.5;
+        let base_te = 2.0 + rng.r#gen::<f32>() * 2.0;
+        let base_prad = 1.0 + rng.r#gen::<f32>() * 2.0;
+        let base_vloop = 1.0 + rng.r#gen::<f32>() * 0.5;
+        let base_q95 = 3.0 + rng.r#gen::<f32>() * 2.0;
+        let base_wmhd = 0.1 + rng.r#gen::<f32>() * 0.1;
+        let base_beta = 0.8 + rng.r#gen::<f32>() * 0.6;
 
         for sample_idx in 0..num_samples {
             let time_ms = sample_idx as f64 * config.sample_interval_ms;
@@ -1376,7 +1372,7 @@ pub fn generate_synthetic_data(config: &SyntheticConfig) -> Vec<CModShot> {
 
             // Add temporal evolution and noise
             let t_norm = sample_idx as f32 / num_samples as f32;
-            let mut noise = || (rng.gen::<f32>() - 0.5) * 0.1;
+            let mut noise = || (rng.r#gen::<f32>() - 0.5) * 0.1;
 
             // Disruption precursor effects
             let disruption_factor = if let Some(ttd_val) = ttd {

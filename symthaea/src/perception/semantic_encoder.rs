@@ -35,7 +35,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 
-use symthaea_core::hdc::{PackedBipolar, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar};
 
 /// Johnson-Lindenstrauss random projector
 ///
@@ -74,10 +74,10 @@ impl JLProjector {
 
         for row in 0..output_dim {
             for col in 0..input_dim {
-                let p: f32 = rng.gen();
+                let p: f32 = rng.r#gen();
                 if p < prob {
                     // Rademacher: +1 or -1 with equal probability
-                    let val: i8 = if rng.gen::<bool>() { 1 } else { -1 };
+                    let val: i8 = if rng.r#gen::<bool>() { 1 } else { -1 };
                     entries.push((row, col, val));
                 }
             }
@@ -189,7 +189,7 @@ impl NGramEncoder {
         );
 
         let vec: Vec<i8> = (0..self.dimension)
-            .map(|_| if rng.gen::<bool>() { 1 } else { -1 })
+            .map(|_| if rng.r#gen::<bool>() { 1 } else { -1 })
             .collect();
 
         self.ngram_cache.insert(ngram.to_string(), vec.clone());

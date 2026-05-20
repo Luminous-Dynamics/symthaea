@@ -498,7 +498,7 @@ impl SovereignConfigGenerator {
                 reasoning,
                 confidence: 0.85,
                 consequences: vec![
-                    "GPU acceleration available for desktop and applications.".into()
+                    "GPU acceleration available for desktop and applications.".into(),
                 ],
                 alternatives,
             },
@@ -888,8 +888,8 @@ mod tests {
 
     #[test]
     fn test_generate_gnome_nvidia() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 gpu_model: "NVIDIA RTX 3060".into(),
@@ -942,8 +942,8 @@ mod tests {
 
     #[test]
     fn test_generate_server_no_desktop() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 ..Default::default()
             },
@@ -968,8 +968,8 @@ mod tests {
 
     #[test]
     fn test_generate_musician() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "amd".into(),
                 gpu_model: "AMD RX 6600".into(),
@@ -998,8 +998,8 @@ mod tests {
 
     #[test]
     fn test_welcome_personalization() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile::default(),
             &UserChoices {
                 desktop: "gnome".into(),
@@ -1058,10 +1058,10 @@ mod tests {
     #[test]
     fn test_all_desktop_configs_valid_nix() {
         let desktops = ["gnome", "plasma", "hyprland", "sway", "xfce", "none"];
-        let mut gen = SovereignConfigGenerator::new();
+        let mut r#gen = SovereignConfigGenerator::new();
 
         for desktop in &desktops {
-            let config = gen.generate(
+            let config = r#gen.generate(
                 &HardwareProfile::default(),
                 &UserChoices {
                     desktop: desktop.to_string(),
@@ -1089,10 +1089,10 @@ mod tests {
             ("auto", ""),
             ("none", ""),
         ];
-        let mut gen = SovereignConfigGenerator::new();
+        let mut r#gen = SovereignConfigGenerator::new();
 
         for (driver, model) in &gpus {
-            let config = gen.generate(
+            let config = r#gen.generate(
                 &HardwareProfile {
                     gpu_vendor: driver.to_string(),
                     gpu_model: model.to_string(),
@@ -1127,8 +1127,8 @@ mod tests {
 
     #[test]
     fn test_persona_maya_student() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "intel".into(),
                 efi_available: true,
@@ -1156,8 +1156,8 @@ mod tests {
 
     #[test]
     fn test_persona_kai_developer() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "intel".into(),
                 has_tpm: true,
@@ -1193,8 +1193,8 @@ mod tests {
 
     #[test]
     fn test_persona_jordan_gamer() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 gpu_model: "NVIDIA RTX 4070".into(),
@@ -1219,8 +1219,8 @@ mod tests {
 
     #[test]
     fn test_persona_river_musician() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "amd".into(),
                 gpu_model: "AMD RX 6600".into(),
@@ -1249,8 +1249,8 @@ mod tests {
 
     #[test]
     fn test_persona_sam_sysadmin() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 disk_count: 2,
                 total_disk_gb: 4000,
@@ -1274,15 +1274,17 @@ mod tests {
         assert!(!config.sovereign_config_nix.contains("pipewire.enable"));
         assert!(config.sovereign_config_nix.contains("docker"));
         // Firewall must always be enabled
-        assert!(config
-            .sovereign_config_nix
-            .contains("firewall.enable = true"));
+        assert!(
+            config
+                .sovereign_config_nix
+                .contains("firewall.enable = true")
+        );
     }
 
     #[test]
     fn test_persona_alex_privacy() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "intel".into(),
                 has_tpm: true,
@@ -1307,15 +1309,17 @@ mod tests {
         assert!(config.sovereign_config_nix.contains("sway.enable"));
         assert!(config.sovereign_config_nix.contains("\"de\""));
         assert!(config.sovereign_config_nix.contains("Europe/Berlin"));
-        assert!(config
-            .sovereign_config_nix
-            .contains("firewall.enable = true"));
+        assert!(
+            config
+                .sovereign_config_nix
+                .contains("firewall.enable = true")
+        );
     }
 
     #[test]
     fn test_persona_avery_data_scientist() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 gpu_model: "NVIDIA RTX 3060 Laptop".into(),
@@ -1357,17 +1361,19 @@ mod tests {
 
     #[test]
     fn test_empty_everything() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile::default(),
             &UserChoices::default(),
             &MigrationData::default(),
         );
         validate_nix_syntax(&config.sovereign_config_nix).unwrap();
         // Should still produce valid config with sensible defaults
-        assert!(config
-            .sovereign_config_nix
-            .contains("firewall.enable = true"));
+        assert!(
+            config
+                .sovereign_config_nix
+                .contains("firewall.enable = true")
+        );
         assert!(config.sovereign_config_nix.contains("flakes"));
         assert!(!config.decisions.is_empty());
     }
@@ -1375,10 +1381,10 @@ mod tests {
     #[test]
     fn test_every_desktop_has_decisions() {
         let desktops = ["gnome", "plasma", "hyprland", "sway", "xfce", "none"];
-        let mut gen = SovereignConfigGenerator::new();
+        let mut r#gen = SovereignConfigGenerator::new();
 
         for desktop in &desktops {
-            let config = gen.generate(
+            let config = r#gen.generate(
                 &HardwareProfile::default(),
                 &UserChoices {
                     desktop: desktop.to_string(),
@@ -1398,8 +1404,8 @@ mod tests {
 
     #[test]
     fn test_nvidia_hybrid_warning() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 gpu_hybrid: true,
@@ -1425,8 +1431,8 @@ mod tests {
 
     #[test]
     fn test_nvidia_wayland_tiling_warning() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 ..Default::default()
@@ -1452,8 +1458,8 @@ mod tests {
 
     #[test]
     fn test_packages_from_migration() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile::default(),
             &UserChoices {
                 desktop: "gnome".into(),
@@ -1480,8 +1486,8 @@ mod tests {
 
     #[test]
     fn test_no_duplicate_packages() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile::default(),
             &UserChoices {
                 desktop: "gnome".into(),
@@ -1503,8 +1509,8 @@ mod tests {
 
     #[test]
     fn test_config_has_comments() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 ..Default::default()
@@ -1517,9 +1523,11 @@ mod tests {
             &MigrationData::default(),
         );
         // Config should have section comments
-        assert!(config
-            .sovereign_config_nix
-            .contains("# Generated by Symthaea"));
+        assert!(
+            config
+                .sovereign_config_nix
+                .contains("# Generated by Symthaea")
+        );
         assert!(
             config.sovereign_config_nix.contains("# Display & GPU")
                 || config.sovereign_config_nix.contains("# Audio")
@@ -1529,8 +1537,8 @@ mod tests {
 
     #[test]
     fn test_xfce_for_small_disk() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 total_disk_gb: 32,
                 ..Default::default()
@@ -1557,8 +1565,8 @@ mod tests {
 
     #[test]
     fn test_welcome_without_git_user() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile::default(),
             &UserChoices {
                 desktop: "gnome".into(),
@@ -1572,8 +1580,8 @@ mod tests {
 
     #[test]
     fn test_welcome_with_docker_user() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile::default(),
             &UserChoices {
                 desktop: "gnome".into(),
@@ -1593,8 +1601,8 @@ mod tests {
 
     #[test]
     fn test_confidence_levels() {
-        let mut gen = SovereignConfigGenerator::new();
-        let config = gen.generate(
+        let mut r#gen = SovereignConfigGenerator::new();
+        let config = r#gen.generate(
             &HardwareProfile {
                 gpu_vendor: "nvidia".into(),
                 ..Default::default()

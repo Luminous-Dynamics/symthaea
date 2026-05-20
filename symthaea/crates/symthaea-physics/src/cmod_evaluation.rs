@@ -1933,7 +1933,7 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut scored = Vec::new();
         for _ in 0..500 {
-            let score: f64 = rng.gen();
+            let score: f64 = rng.r#gen();
             let label = rng.gen_bool(0.5);
             scored.push((score, label));
         }

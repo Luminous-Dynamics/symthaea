@@ -200,7 +200,7 @@ impl PerturbationSchedule {
                         sim.apply_external_force([-decel_impulse * 1500.0, 0.0]);
                     }
                     VehiclePerturbation::TireBlowout {
-                        ref tire,
+                        tire,
                         grip_reduction,
                     } => {
                         // Map tire position to front/rear axle (bicycle model collapses L/R)

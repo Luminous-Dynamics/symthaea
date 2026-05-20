@@ -790,7 +790,7 @@ impl EnactivistPerception {
         let mut actions: Vec<_> = self
             .motor_readiness
             .iter()
-            .filter(|(_, &r)| r > 0.3)
+            .filter(|&(_, &r)| r > 0.3)
             .map(|(&a, &r)| (a, r))
             .collect();
 

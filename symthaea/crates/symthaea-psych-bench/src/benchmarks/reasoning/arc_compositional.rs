@@ -26,9 +26,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::BinaryHV;
 
 /// ARC-style compositional reasoning benchmark (chained transforms + size variation + symmetry).
 pub struct ArcCompositionalBenchmark;
@@ -676,11 +676,11 @@ mod tests {
             ..Default::default()
         };
         let result = ArcCompositionalBenchmark.run(&config);
-        let gen = result.metrics["size_generalization"].mean;
+        let r#gen = result.metrics["size_generalization"].mean;
         assert!(
-            gen > 0.3,
+            r#gen > 0.3,
             "Size generalization should be above chance, got {}",
-            gen
+            r#gen
         );
     }
 

@@ -66,7 +66,7 @@ impl ScntProtocol {
             ScntStage::Complete | ScntStage::Failed => 1.0,
         };
 
-        let roll: f64 = rng.gen();
+        let roll: f64 = rng.r#gen();
         let threshold = self.success_probability * stage_multiplier;
 
         if roll < threshold {

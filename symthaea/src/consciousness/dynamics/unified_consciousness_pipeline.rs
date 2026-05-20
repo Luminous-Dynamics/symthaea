@@ -419,7 +419,7 @@ impl UnifiedConsciousnessPipeline {
         let feature_hvs: Vec<BinaryHV> = input
             .iter()
             .enumerate()
-            .filter(|(_, &value)| value.abs() > 0.01)
+            .filter(|&(_, &value)| value.abs() > 0.01)
             .map(|(i, &value)| {
                 let index_hv = BinaryHV::random(i as u64);
                 let value_hv = BinaryHV::random((value * 1000.0) as u64);

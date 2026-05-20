@@ -90,7 +90,7 @@ impl BrowserSafetyPolicy {
         }
 
         // URL-specific checks for navigation
-        if let BrowserAction::Navigate { ref url } = action {
+        if let BrowserAction::Navigate { url } = action {
             return self.is_url_allowed(url);
         }
 

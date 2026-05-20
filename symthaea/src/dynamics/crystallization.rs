@@ -483,11 +483,7 @@ fn signature_to_hypervector(signature: &[f32], dim: usize) -> Vec<f32> {
         .chunks_exact(4)
         .map(|chunk| {
             let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-            if bits & 1 == 0 {
-                1.0
-            } else {
-                -1.0
-            }
+            if bits & 1 == 0 { 1.0 } else { -1.0 }
         })
         .collect()
 }
@@ -692,7 +688,7 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         for _ in 0..50 {
-            let state: Vec<f32> = (0..4).map(|_| rng.gen()).collect();
+            let state: Vec<f32> = (0..4).map(|_| rng.r#gen()).collect();
             analyzer.update(&state);
         }
 

@@ -1,8 +1,8 @@
 [package]
 name = "symthaea-gravcraft"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Non-inertial embodiment: metric perturbation propulsion via gravity amplifiers — the craft moves by warping spacetime, not applying force"
 license = "AGPL-3.0-or-later"

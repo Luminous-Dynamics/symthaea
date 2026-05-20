@@ -905,7 +905,7 @@ impl ConsciousnessPipeline {
     /// This runs one optimization step to improve the consciousness network
     /// topology, maximizing integrated information (Φ).
     pub(crate) fn process_phi_optimization(&mut self) {
-        if let (Some(ref mut optimizer), Some(ref mut network)) =
+        if let (Some(optimizer), Some(network)) =
             (&mut self.phi_optimizer, &mut self.consciousness_network)
         {
             // Run one optimization step

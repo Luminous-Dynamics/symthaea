@@ -477,8 +477,8 @@ impl BurnBackend {
 // multiple Qwen3Embedder instances share the same weights.
 
 #[cfg(feature = "burn")]
-fn model_cache(
-) -> &'static std::sync::Mutex<std::collections::HashMap<String, Arc<std::sync::Mutex<BurnBackend>>>>
+fn model_cache()
+-> &'static std::sync::Mutex<std::collections::HashMap<String, Arc<std::sync::Mutex<BurnBackend>>>>
 {
     use std::sync::OnceLock;
     static CACHE: OnceLock<

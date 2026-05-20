@@ -80,20 +80,18 @@ pub fn generate_narrative(
     if let Some(cf) = counterfactual {
         let cf_desc = match cf {
             CausalQueryOutcome::Identified {
-                ref method,
-                confidence,
-                ..
+                method, confidence, ..
             } => {
                 format!(
                     "Causal effect identified via {:?} (conf={:.2}).",
                     method, confidence
                 )
             }
-            CausalQueryOutcome::Unidentified { ref reason, .. } => {
+            CausalQueryOutcome::Unidentified { reason, .. } => {
                 format!("Causal effect unidentifiable: {:?}.", reason)
             }
             CausalQueryOutcome::AssumptionRequired {
-                ref assumption,
+                assumption,
                 plausibility,
                 ..
             } => {

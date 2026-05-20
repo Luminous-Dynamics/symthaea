@@ -38,7 +38,7 @@ fn main() {
     let mut prev_best = f64::NEG_INFINITY;
     let mut monotonic_violations = 0;
 
-    for gen in 1..=50 {
+    for r#gen in 1..=50 {
         let gen_start = Instant::now();
         let snapshot = engine.step_generation();
         let gen_time = gen_start.elapsed();
@@ -48,12 +48,12 @@ fn main() {
             monotonic_violations += 1;
             println!(
                 "  !! Gen {:3}: REGRESSION best={:+.6} < prev={:+.6}",
-                gen, snapshot.best_fitness, prev_best
+                r#gen, snapshot.best_fitness, prev_best
             );
         }
         prev_best = snapshot.best_fitness;
 
-        if gen % 5 == 0 || gen == 1 {
+        if r#gen % 5 == 0 || r#gen == 1 {
             println!(
                 "  Gen {:3}: best={:+.6}, mean={:+.6}, div={:.3}, species={}, time={:.1}s",
                 snapshot.generation,
