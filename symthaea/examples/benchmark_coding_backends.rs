@@ -171,6 +171,10 @@ struct BenchReport {
     structural_prior_observations: usize,
     mean_structural_prior_score: Option<f32>,
     mean_structural_prior_delta: Option<f32>,
+    distillation_import_path: Option<String>,
+    distillation_imported: usize,
+    distillation_export_path: Option<String>,
+    distillation_exported: usize,
     certificate_source_provenance_counts: BTreeMap<String, usize>,
     broca_eval_gate_passed: bool,
     broca_selection_score: f32,
@@ -227,6 +231,22 @@ fn run_benchmark() {
     if let Some(budget) = args.energy_budget {
         orch = orch.with_energy_budget(budget);
     }
+    let distillation_imported = if let Some(path) = args.load_distillation_jsonl.as_deref() {
+        match orch.load_distillation(std::path::Path::new(path)) {
+            Ok(count) => {
+                eprintln!(
+                    "[benchmark] imported {count} distillation structural memories from {path}"
+                );
+                count
+            }
+            Err(error) => {
+                eprintln!("error: failed to load distillation JSONL from {path}: {error}");
+                std::process::exit(2);
+            }
+        }
+    } else {
+        0
+    };
     let mut tasks = Vec::new();
     let mut backend_attempts = BTreeMap::new();
     let mut rejection_categories = BTreeMap::new();
@@ -669,6 +689,7 @@ fn run_benchmark() {
             .collect::<Vec<_>>()
             .as_slice(),
     );
+    let distillation_exported = orch.distillation_buffer().len();
     let report = BenchReport {
         benchmark: format!("coding_backends_{}", args.lane),
         feature_geodesic: cfg!(feature = "geodesic_synthesis"),
@@ -713,6 +734,10 @@ fn run_benchmark() {
         structural_prior_observations,
         mean_structural_prior_score,
         mean_structural_prior_delta,
+        distillation_import_path: args.load_distillation_jsonl.clone(),
+        distillation_imported,
+        distillation_export_path: args.save_distillation_jsonl.clone(),
+        distillation_exported,
         certificate_source_provenance_counts,
         broca_eval_gate_passed,
         broca_selection_score,
@@ -725,6 +750,17 @@ fn run_benchmark() {
         mean_attempts_per_task,
         tasks,
     };
+
+    if let Some(path) = args.save_distillation_jsonl.as_deref() {
+        if let Err(error) = orch.save_distillation(std::path::Path::new(path)) {
+            eprintln!("error: failed to save distillation JSONL to {path}: {error}");
+            std::process::exit(2);
+        }
+        eprintln!(
+            "[benchmark] exported {} distillation structural memories to {path}",
+            report.distillation_exported
+        );
+    }
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
@@ -795,6 +831,13 @@ fn run_benchmark() {
             report.structural_prior_observations,
             report.mean_structural_prior_score,
             report.mean_structural_prior_delta
+        );
+        println!(
+            "distillation memory: imported={} from={:?} exported={} to={:?}",
+            report.distillation_imported,
+            report.distillation_import_path,
+            report.distillation_exported,
+            report.distillation_export_path
         );
         println!(
             "Broca eval gate: passed={} selection_score={:.3}",
@@ -911,6 +954,8 @@ struct Args {
     energy_budget: Option<f32>,
     lane: String,
     repair_lessons_jsonl: Option<String>,
+    load_distillation_jsonl: Option<String>,
+    save_distillation_jsonl: Option<String>,
     disable_fep_repair_hints: bool,
     disable_ast_hdc_fep: bool,
 }
@@ -957,6 +1002,18 @@ impl Args {
                     };
                     args.repair_lessons_jsonl = Some(path);
                 }
+                "--load-distillation-jsonl" => {
+                    let Some(path) = iter.next() else {
+                        print_help_and_exit(2, "--load-distillation-jsonl requires a path");
+                    };
+                    args.load_distillation_jsonl = Some(path);
+                }
+                "--save-distillation-jsonl" => {
+                    let Some(path) = iter.next() else {
+                        print_help_and_exit(2, "--save-distillation-jsonl requires a path");
+                    };
+                    args.save_distillation_jsonl = Some(path);
+                }
                 "--disable-fep-repair-hints" => args.disable_fep_repair_hints = true,
                 "--disable-ast-hdc-fep" => args.disable_ast_hdc_fep = true,
                 "--help" | "-h" => print_help_and_exit(0, ""),
@@ -983,6 +1040,10 @@ fn print_help_and_exit(code: i32, error: &str) -> ! {
     eprintln!("  --lane NAME         Benchmark lane: smoke, hard, repair, frontier, or all");
     eprintln!("  --repair-lessons-jsonl PATH");
     eprintln!("                      Write one structured repair lesson per JSONL line");
+    eprintln!("  --load-distillation-jsonl PATH");
+    eprintln!("                      Seed verified structural memory from distillation JSONL");
+    eprintln!("  --save-distillation-jsonl PATH");
+    eprintln!("                      Export verified structural memory after the benchmark");
     eprintln!("  --disable-fep-repair-hints");
     eprintln!(
         "                      Ablate FEP prediction-error hints while still measuring failures"

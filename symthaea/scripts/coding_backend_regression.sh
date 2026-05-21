@@ -31,6 +31,8 @@ fi
 ENERGY_BUDGET="${CODING_BACKEND_ENERGY_BUDGET:-256}"
 REPAIR_LESSONS="${CODING_BACKEND_REPAIR_LESSONS:-}"
 BROCA_REPAIR_TRAINING="${CODING_BACKEND_BROCA_REPAIR_TRAINING:-}"
+DISTILLATION_IN="${CODING_BACKEND_DISTILLATION_IN:-}"
+DISTILLATION_OUT="${CODING_BACKEND_DISTILLATION_OUT:-}"
 
 if [[ "$LANE" == "repair" || "$LANE" == "all" ]]; then
     export SYMTHAEA_ENABLE_FORCED_REPAIR_BENCH=1
@@ -47,6 +49,12 @@ echo "[coding-backend] running deterministic benchmark"
 benchmark_args=(--json --simulated-llm --energy-budget "$ENERGY_BUDGET" --lane "$LANE")
 if [[ -n "$REPAIR_LESSONS" ]]; then
     benchmark_args+=(--repair-lessons-jsonl "$REPAIR_LESSONS")
+fi
+if [[ -n "$DISTILLATION_IN" ]]; then
+    benchmark_args+=(--load-distillation-jsonl "$DISTILLATION_IN")
+fi
+if [[ -n "$DISTILLATION_OUT" ]]; then
+    benchmark_args+=(--save-distillation-jsonl "$DISTILLATION_OUT")
 fi
 cargo run --example benchmark_coding_backends \
     --features code_generation,geodesic_synthesis \
@@ -77,4 +85,10 @@ if [[ -n "$REPAIR_LESSONS" ]]; then
 fi
 if [[ -n "$BROCA_REPAIR_TRAINING" ]]; then
     echo "  broca repair training: $BROCA_REPAIR_TRAINING"
+fi
+if [[ -n "$DISTILLATION_IN" ]]; then
+    echo "  distillation in: $DISTILLATION_IN"
+fi
+if [[ -n "$DISTILLATION_OUT" ]]; then
+    echo "  distillation out: $DISTILLATION_OUT"
 fi
