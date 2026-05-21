@@ -78,6 +78,8 @@ pub mod code_parser;
 #[cfg(feature = "code_generation")]
 pub mod code_verifier;
 #[cfg(feature = "code_generation")]
+pub mod coding_prediction_error;
+#[cfg(feature = "code_generation")]
 pub mod compose_codegen;
 #[cfg(feature = "code_generation")]
 pub mod compose_scorer;
@@ -127,6 +129,8 @@ pub mod repair_taxonomy;
 #[cfg(feature = "code_generation")]
 pub mod repo_map;
 #[cfg(feature = "code_generation")]
+pub mod rust_ast_hdc;
+#[cfg(feature = "code_generation")]
 pub mod rust_lsp;
 #[cfg(feature = "code_generation")]
 pub mod rust_parser;
@@ -134,6 +138,8 @@ pub mod rust_parser;
 pub mod sequencer_benchmark;
 #[cfg(feature = "code_generation")]
 pub mod sequencer_training;
+#[cfg(feature = "code_generation")]
+pub mod structural_prototype;
 #[cfg(feature = "code_generation")]
 pub mod triune_intent;
 #[cfg(feature = "code_generation")]

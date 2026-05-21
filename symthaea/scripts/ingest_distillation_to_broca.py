@@ -126,6 +126,7 @@ def repair_lesson_to_training_pair(lesson: dict[str, Any], fixed_source: str) ->
     task_name = str(lesson.get("task_name") or "unknown")
     signature = str(lesson.get("signature") or "")
     final_backend = str(lesson.get("final_backend") or "")
+    structural_context = repair_lesson_structural_context(lesson)
 
     target_text = "\n".join(
         [
@@ -136,6 +137,7 @@ def repair_lesson_to_training_pair(lesson: dict[str, Any], fixed_source: str) ->
             f"diagnostic: {diagnostic}",
             f"repair_hint: {hint}",
             f"successful_backend: {final_backend}",
+            *structural_context,
             "failed_source:",
             bad_source or "<unavailable>",
             "corrected_source:",
@@ -150,6 +152,31 @@ def repair_lesson_to_training_pair(lesson: dict[str, Any], fixed_source: str) ->
         "valence": -0.15,
         "arousal": 0.65,
     }
+
+
+def repair_lesson_structural_context(lesson: dict[str, Any]) -> list[str]:
+    lines = []
+    label = lesson.get("structural_prior_label")
+    broken_score = lesson.get("broken_structural_prior_score")
+    fixed_score = lesson.get("fixed_structural_prior_score")
+    delta = lesson.get("structural_prior_delta")
+    similarity = lesson.get("structural_similarity")
+    l1_delta = lesson.get("structural_l1_delta")
+
+    if label is not None:
+        lines.append(f"structural_prior_label: {label}")
+    if broken_score is not None:
+        lines.append(f"broken_structural_prior_score: {float(broken_score):.4f}")
+    if fixed_score is not None:
+        lines.append(f"fixed_structural_prior_score: {float(fixed_score):.4f}")
+    if delta is not None:
+        lines.append(f"structural_prior_delta: {float(delta):.4f}")
+    if similarity is not None:
+        lines.append(f"structural_repair_similarity: {float(similarity):.4f}")
+    if l1_delta is not None:
+        lines.append(f"structural_repair_l1_delta: {int(l1_delta)}")
+
+    return lines
 
 
 def repair_channels(category: str) -> list[float]:

@@ -16,6 +16,11 @@ use symthaea::language::repair_taxonomy::{
     FORCE_REPAIR_BENCH_ENV, categorize_rejection, extract_embedded_category,
     repair_lesson_for_rejection,
 };
+use symthaea::language::rust_ast_hdc::{ast_feature_cosine_similarity, ast_feature_l1_distance};
+use symthaea::language::structural_prototype::{
+    StructuralPrototypeBank, StructuralPrototypeLabels, ast_features_for_source,
+    return_shape_for_signature,
+};
 use symthaea_core::synthesis_trait::SynthesisRequest;
 
 #[derive(Debug, Clone)]
@@ -49,6 +54,20 @@ struct TaskReport {
     successful_backend_after_repair: Option<String>,
     repair_priors_seen: BTreeMap<String, usize>,
     repair_prior_labels_seen: Vec<String>,
+    prediction_errors_seen: usize,
+    prediction_error_categories: BTreeMap<String, usize>,
+    prediction_error_hinted_retry_successful: bool,
+    surprise_before_retry: Option<f32>,
+    surprise_after_retry: Option<f32>,
+    ast_hdc_parse_successes: usize,
+    ast_hdc_parse_failures: usize,
+    structural_prediction_errors: usize,
+    mean_ast_feature_count: Option<f32>,
+    structural_repair_similarity: Option<f32>,
+    structural_repair_l1_delta: Option<usize>,
+    structural_prior_score: Option<f32>,
+    structural_prior_label: Option<String>,
+    structural_prior_delta: Option<f32>,
     attempt_count: usize,
     certificate_backend: Option<String>,
     certificate_source_provenance: Option<String>,
@@ -68,6 +87,15 @@ struct AttemptRejectionReport {
     source_preview: Option<String>,
     repair_prior_count: usize,
     repair_prior_labels: Vec<String>,
+    surprise: f32,
+    diagnostic_hv_count: usize,
+    ast_hdc_parse_successes: usize,
+    ast_hdc_parse_failures: usize,
+    structural_prediction_errors: usize,
+    ast_hdc_feature_count: usize,
+    ast_hdc_last_features: Option<BTreeMap<String, usize>>,
+    structural_prior_score: Option<f32>,
+    structural_prior_label: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -83,6 +111,18 @@ struct RepairLessonReport {
     fixed_source_preview: Option<String>,
     final_outcome: String,
     broca_training_record: bool,
+    prediction_error_training_record: bool,
+    prediction_error_hv_count: usize,
+    surprise_before_retry: Option<f32>,
+    surprise_after_retry: Option<f32>,
+    broken_ast_features: Option<BTreeMap<String, usize>>,
+    fixed_ast_features: Option<BTreeMap<String, usize>>,
+    structural_similarity: Option<f32>,
+    structural_l1_delta: Option<usize>,
+    broken_structural_prior_score: Option<f32>,
+    fixed_structural_prior_score: Option<f32>,
+    structural_prior_delta: Option<f32>,
+    structural_prior_label: Option<String>,
     final_backend: String,
 }
 
@@ -112,6 +152,25 @@ struct BenchReport {
     repair_memory_successes: usize,
     repair_memory_success_rate: f32,
     repair_memory_categories_used: BTreeMap<String, usize>,
+    prediction_error_repair_hints_enabled: bool,
+    ast_hdc_fep_enabled: bool,
+    prediction_errors_seen: usize,
+    prediction_error_categories: BTreeMap<String, usize>,
+    prediction_error_hinted_retry_tasks: usize,
+    prediction_error_hinted_retry_successes: usize,
+    prediction_error_hinted_retry_success_rate: f32,
+    mean_surprise_before_retry: Option<f32>,
+    mean_surprise_after_retry: Option<f32>,
+    ast_hdc_parse_successes: usize,
+    ast_hdc_parse_failures: usize,
+    structural_prediction_errors: usize,
+    mean_ast_feature_count: Option<f32>,
+    mean_structural_repair_similarity: Option<f32>,
+    mean_structural_repair_l1_delta: Option<f32>,
+    structural_success_prototypes: usize,
+    structural_prior_observations: usize,
+    mean_structural_prior_score: Option<f32>,
+    mean_structural_prior_delta: Option<f32>,
     certificate_source_provenance_counts: BTreeMap<String, usize>,
     broca_eval_gate_passed: bool,
     broca_selection_score: f32,
@@ -143,6 +202,16 @@ fn main() {
 
 fn run_benchmark() {
     let args = Args::parse();
+    if args.disable_fep_repair_hints {
+        unsafe {
+            std::env::set_var("SYMTHAEA_DISABLE_FEP_REPAIR_HINTS", "1");
+        }
+    }
+    if args.disable_ast_hdc_fep {
+        unsafe {
+            std::env::set_var("SYMTHAEA_DISABLE_AST_HDC_FEP", "1");
+        }
+    }
     if matches!(args.lane.as_str(), "repair" | "all")
         && std::env::var_os(FORCE_REPAIR_BENCH_ENV).is_none()
     {
@@ -167,8 +236,10 @@ fn run_benchmark() {
     let mut repair_prior_counts_by_backend = BTreeMap::new();
     let mut repair_prior_labels = BTreeMap::new();
     let selected_tasks = tasks_for_lane(&args.lane);
+    let mut structural_prototypes = StructuralPrototypeBank::default();
 
     for task in selected_tasks {
+        let return_shape = return_shape_for_signature(task.signature);
         let before_attempts = orch.attempt_history().len();
         let before_certs = orch.certificates().len();
         let task_start = Instant::now();
@@ -182,6 +253,21 @@ fn run_benchmark() {
         }
 
         let response = orch.synthesize(&request);
+        let response_ast_features = response
+            .accepted
+            .then(|| ast_features_for_source(&response.source))
+            .flatten();
+        let response_backend_name = response.backend_name.clone();
+        let response_structural_prior = response_ast_features.as_ref().and_then(|features| {
+            structural_prototypes.score(
+                features,
+                &StructuralPrototypeLabels::new(
+                    task.category,
+                    return_shape.clone(),
+                    response_backend_name.clone(),
+                ),
+            )
+        });
         let attempts = orch.attempt_history();
         let new_attempts = &attempts[before_attempts..];
         let mut task_attempts = BTreeMap::new();
@@ -190,6 +276,38 @@ fn run_benchmark() {
         let mut repair_lessons = Vec::new();
         let mut task_repair_priors_seen = BTreeMap::new();
         let mut task_repair_prior_labels_seen = Vec::new();
+        let mut task_prediction_error_categories = BTreeMap::new();
+        let mut task_structural_repair_similarities = Vec::new();
+        let mut task_structural_repair_l1_deltas = Vec::new();
+        let mut task_structural_prior_deltas = Vec::new();
+        let task_prediction_errors_seen = new_attempts
+            .iter()
+            .map(|attempt| attempt.diagnostic_hv_count)
+            .sum::<usize>();
+        let task_ast_hdc_parse_successes = new_attempts
+            .iter()
+            .map(|attempt| attempt.ast_hdc_parse_successes)
+            .sum::<usize>();
+        let task_ast_hdc_parse_failures = new_attempts
+            .iter()
+            .map(|attempt| attempt.ast_hdc_parse_failures)
+            .sum::<usize>();
+        let task_structural_prediction_errors = new_attempts
+            .iter()
+            .map(|attempt| attempt.structural_prediction_errors)
+            .sum::<usize>();
+        let task_ast_feature_counts = new_attempts
+            .iter()
+            .filter_map(|attempt| {
+                (attempt.ast_hdc_feature_count > 0).then_some(attempt.ast_hdc_feature_count as f32)
+            })
+            .collect::<Vec<_>>();
+        let task_mean_ast_feature_count = mean_optional(&task_ast_feature_counts);
+        let surprise_before_retry = new_attempts
+            .iter()
+            .find(|attempt| attempt.diagnostic_hv_count > 0 || attempt.surprise > 0.0)
+            .map(|attempt| attempt.surprise);
+        let surprise_after_retry = new_attempts.last().map(|attempt| attempt.surprise);
         for attempt in new_attempts {
             *task_attempts.entry(attempt.backend.clone()).or_insert(0) += 1;
             *backend_attempts.entry(attempt.backend.clone()).or_insert(0) += 1;
@@ -206,6 +324,17 @@ fn run_benchmark() {
                 }
             }
             if let Some(reason) = &attempt.rejection_reason {
+                let attempt_structural_prior =
+                    attempt.ast_hdc_last_features.as_ref().and_then(|features| {
+                        structural_prototypes.score(
+                            features,
+                            &StructuralPrototypeLabels::new(
+                                task.category,
+                                return_shape.clone(),
+                                attempt.backend.clone(),
+                            ),
+                        )
+                    });
                 let category = extract_embedded_category(reason)
                     .unwrap_or_else(|| categorize_rejection(reason))
                     .to_string();
@@ -218,8 +347,56 @@ fn run_benchmark() {
                     source_preview: attempt.source_preview.clone(),
                     repair_prior_count: attempt.repair_prior_count,
                     repair_prior_labels: attempt.repair_prior_labels.clone(),
+                    surprise: attempt.surprise,
+                    diagnostic_hv_count: attempt.diagnostic_hv_count,
+                    ast_hdc_parse_successes: attempt.ast_hdc_parse_successes,
+                    ast_hdc_parse_failures: attempt.ast_hdc_parse_failures,
+                    structural_prediction_errors: attempt.structural_prediction_errors,
+                    ast_hdc_feature_count: attempt.ast_hdc_feature_count,
+                    ast_hdc_last_features: attempt.ast_hdc_last_features.clone(),
+                    structural_prior_score: attempt_structural_prior
+                        .as_ref()
+                        .map(|prior| prior.score),
+                    structural_prior_label: attempt_structural_prior
+                        .as_ref()
+                        .map(|prior| prior.label.clone()),
                 });
+                if attempt.diagnostic_hv_count > 0 {
+                    *task_prediction_error_categories
+                        .entry(category.clone())
+                        .or_insert(0) += attempt.diagnostic_hv_count;
+                }
                 let lesson = repair_lesson_for_rejection(reason);
+                let structural_similarity = attempt
+                    .ast_hdc_last_features
+                    .as_ref()
+                    .zip(response_ast_features.as_ref())
+                    .and_then(|(broken, fixed)| ast_feature_cosine_similarity(broken, fixed));
+                let structural_l1_delta = attempt
+                    .ast_hdc_last_features
+                    .as_ref()
+                    .zip(response_ast_features.as_ref())
+                    .map(|(broken, fixed)| ast_feature_l1_distance(broken, fixed));
+                if let Some(similarity) = structural_similarity {
+                    task_structural_repair_similarities.push(similarity);
+                }
+                if let Some(delta) = structural_l1_delta {
+                    task_structural_repair_l1_deltas.push(delta as f32);
+                }
+                let broken_structural_prior_score =
+                    attempt_structural_prior.as_ref().map(|prior| prior.score);
+                let fixed_structural_prior_score =
+                    response_structural_prior.as_ref().map(|prior| prior.score);
+                let structural_prior_delta = broken_structural_prior_score
+                    .zip(fixed_structural_prior_score)
+                    .map(|(broken, fixed)| fixed - broken);
+                if let Some(delta) = structural_prior_delta {
+                    task_structural_prior_deltas.push(delta);
+                }
+                let structural_prior_label = response_structural_prior
+                    .as_ref()
+                    .or(attempt_structural_prior.as_ref())
+                    .map(|prior| prior.label.clone());
                 *repair_lesson_categories
                     .entry(category.clone())
                     .or_insert(0) += 1;
@@ -243,12 +420,27 @@ fn run_benchmark() {
                         "unresolved".to_string()
                     },
                     broca_training_record: response.accepted,
-                    final_backend: response.backend_name.clone(),
+                    prediction_error_training_record: response.accepted
+                        && attempt.diagnostic_hv_count > 0,
+                    prediction_error_hv_count: attempt.diagnostic_hv_count,
+                    surprise_before_retry,
+                    surprise_after_retry,
+                    broken_ast_features: attempt.ast_hdc_last_features.clone(),
+                    fixed_ast_features: response_ast_features.clone(),
+                    structural_similarity,
+                    structural_l1_delta,
+                    broken_structural_prior_score,
+                    fixed_structural_prior_score,
+                    structural_prior_delta,
+                    structural_prior_label,
+                    final_backend: response_backend_name.clone(),
                 });
             }
         }
         let repair_attempt_count = detailed_rejections.len();
         let repair_successful = response.accepted && repair_attempt_count > 0;
+        let prediction_error_hinted_retry_successful =
+            response.accepted && task_prediction_errors_seen > 0 && repair_attempt_count > 0;
         let successful_backend_after_repair =
             repair_successful.then(|| response.backend_name.clone());
         if repair_successful {
@@ -269,6 +461,12 @@ fn run_benchmark() {
             .map(|t| t.beta_1);
         let certificate_sheaf_coherent = cert.as_ref().and_then(|c| c.sheaf_coherent);
         let quality_gate_passed = response.accepted && certificate_sheaf_coherent != Some(false);
+        let structural_repair_similarity = mean_optional(&task_structural_repair_similarities);
+        let structural_repair_l1_delta =
+            mean_optional(&task_structural_repair_l1_deltas).map(|mean| mean.round() as usize);
+        let structural_prior_delta = mean_optional(&task_structural_prior_deltas);
+        let observed_response_features = response_ast_features.clone();
+        let repair_categories_for_prototype = task_rejections.keys().cloned().collect::<Vec<_>>();
         tasks.push(TaskReport {
             id: task.id.to_string(),
             lane: task.lane.to_string(),
@@ -276,7 +474,7 @@ fn run_benchmark() {
             accepted: response.accepted,
             quality_gate_passed,
             confidence: response.confidence,
-            backend_name: response.backend_name,
+            backend_name: response_backend_name.clone(),
             elapsed_ms: task_start.elapsed().as_millis(),
             attempts: task_attempts,
             rejection_categories: task_rejections,
@@ -287,6 +485,22 @@ fn run_benchmark() {
             successful_backend_after_repair,
             repair_priors_seen: task_repair_priors_seen,
             repair_prior_labels_seen: task_repair_prior_labels_seen,
+            prediction_errors_seen: task_prediction_errors_seen,
+            prediction_error_categories: task_prediction_error_categories,
+            prediction_error_hinted_retry_successful,
+            surprise_before_retry,
+            surprise_after_retry,
+            ast_hdc_parse_successes: task_ast_hdc_parse_successes,
+            ast_hdc_parse_failures: task_ast_hdc_parse_failures,
+            structural_prediction_errors: task_structural_prediction_errors,
+            mean_ast_feature_count: task_mean_ast_feature_count,
+            structural_repair_similarity,
+            structural_repair_l1_delta,
+            structural_prior_score: response_structural_prior.as_ref().map(|prior| prior.score),
+            structural_prior_label: response_structural_prior
+                .as_ref()
+                .map(|prior| prior.label.clone()),
+            structural_prior_delta,
             attempt_count: new_attempts.len(),
             certificate_backend: cert.as_ref().map(|c| c.backend_used.clone()),
             certificate_source_provenance: cert.as_ref().map(|c| c.source_provenance.clone()),
@@ -297,6 +511,15 @@ fn run_benchmark() {
             topology_beta_1,
             oracle_convergence: cert.as_ref().and_then(|c| c.oracle_convergence),
         });
+        if let Some(features) = observed_response_features.as_ref() {
+            structural_prototypes.observe_success(
+                features,
+                &StructuralPrototypeLabels::new(task.category, return_shape, response_backend_name),
+            );
+            for category in repair_categories_for_prototype {
+                structural_prototypes.observe_repair_success(features, &category);
+            }
+        }
     }
 
     let accepted_count = tasks.iter().filter(|task| task.accepted).count();
@@ -366,6 +589,86 @@ fn run_benchmark() {
     let repair_memory_success_rate =
         repair_memory_successes as f32 / repair_memory_hits.max(1) as f32;
     let repair_memory_categories_used = repair_memory_categories(&repair_prior_labels);
+    let prediction_errors_seen = tasks
+        .iter()
+        .map(|task| task.prediction_errors_seen)
+        .sum::<usize>();
+    let prediction_error_categories = prediction_error_categories(&tasks);
+    let prediction_error_hinted_retry_tasks = tasks
+        .iter()
+        .filter(|task| task.prediction_errors_seen > 0 && task.repair_attempt_count > 0)
+        .count();
+    let prediction_error_hinted_retry_successes = tasks
+        .iter()
+        .filter(|task| task.prediction_error_hinted_retry_successful)
+        .count();
+    let prediction_error_hinted_retry_success_rate = prediction_error_hinted_retry_successes as f32
+        / prediction_error_hinted_retry_tasks.max(1) as f32;
+    let mean_surprise_before_retry = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.surprise_before_retry)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    let mean_surprise_after_retry = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.surprise_after_retry)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    let ast_hdc_parse_successes = tasks
+        .iter()
+        .map(|task| task.ast_hdc_parse_successes)
+        .sum::<usize>();
+    let ast_hdc_parse_failures = tasks
+        .iter()
+        .map(|task| task.ast_hdc_parse_failures)
+        .sum::<usize>();
+    let structural_prediction_errors = tasks
+        .iter()
+        .map(|task| task.structural_prediction_errors)
+        .sum::<usize>();
+    let mean_ast_feature_count = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.mean_ast_feature_count)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    let mean_structural_repair_similarity = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.structural_repair_similarity)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    let mean_structural_repair_l1_delta = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.structural_repair_l1_delta.map(|delta| delta as f32))
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    let structural_prior_observations = tasks
+        .iter()
+        .filter(|task| task.structural_prior_score.is_some())
+        .count();
+    let mean_structural_prior_score = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.structural_prior_score)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+    let mean_structural_prior_delta = mean_optional(
+        tasks
+            .iter()
+            .filter_map(|task| task.structural_prior_delta)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
     let report = BenchReport {
         benchmark: format!("coding_backends_{}", args.lane),
         feature_geodesic: cfg!(feature = "geodesic_synthesis"),
@@ -391,6 +694,25 @@ fn run_benchmark() {
         repair_memory_successes,
         repair_memory_success_rate,
         repair_memory_categories_used,
+        prediction_error_repair_hints_enabled: !args.disable_fep_repair_hints,
+        ast_hdc_fep_enabled: !args.disable_ast_hdc_fep,
+        prediction_errors_seen,
+        prediction_error_categories,
+        prediction_error_hinted_retry_tasks,
+        prediction_error_hinted_retry_successes,
+        prediction_error_hinted_retry_success_rate,
+        mean_surprise_before_retry,
+        mean_surprise_after_retry,
+        ast_hdc_parse_successes,
+        ast_hdc_parse_failures,
+        structural_prediction_errors,
+        mean_ast_feature_count,
+        mean_structural_repair_similarity,
+        mean_structural_repair_l1_delta,
+        structural_success_prototypes: structural_prototypes.prototype_count(),
+        structural_prior_observations,
+        mean_structural_prior_score,
+        mean_structural_prior_delta,
         certificate_source_provenance_counts,
         broca_eval_gate_passed,
         broca_selection_score,
@@ -450,6 +772,31 @@ fn run_benchmark() {
             report.repair_memory_categories_used
         );
         println!(
+            "prediction errors: hints_enabled={} seen={} categories={:?} hinted_retry={}/{} rate={:.3} surprise_before={:?} surprise_after={:?}",
+            report.prediction_error_repair_hints_enabled,
+            report.prediction_errors_seen,
+            report.prediction_error_categories,
+            report.prediction_error_hinted_retry_successes,
+            report.prediction_error_hinted_retry_tasks,
+            report.prediction_error_hinted_retry_success_rate,
+            report.mean_surprise_before_retry,
+            report.mean_surprise_after_retry
+        );
+        println!(
+            "AST-HDC: enabled={} parse_successes={} parse_failures={} structural_errors={} mean_features={:?} repair_similarity={:?} repair_l1_delta={:?} prototypes={} prior_observations={} prior_score={:?} prior_delta={:?}",
+            report.ast_hdc_fep_enabled,
+            report.ast_hdc_parse_successes,
+            report.ast_hdc_parse_failures,
+            report.structural_prediction_errors,
+            report.mean_ast_feature_count,
+            report.mean_structural_repair_similarity,
+            report.mean_structural_repair_l1_delta,
+            report.structural_success_prototypes,
+            report.structural_prior_observations,
+            report.mean_structural_prior_score,
+            report.mean_structural_prior_delta
+        );
+        println!(
             "Broca eval gate: passed={} selection_score={:.3}",
             report.broca_eval_gate_passed, report.broca_selection_score
         );
@@ -478,6 +825,30 @@ fn run_benchmark() {
                 task.certificate_sheaf_coherent,
                 task.topology_beta_1
             );
+            if task.prediction_errors_seen > 0 {
+                println!(
+                    "      prediction errors: count={} categories={:?} hinted_success={} surprise={:?}->{:?}",
+                    task.prediction_errors_seen,
+                    task.prediction_error_categories,
+                    task.prediction_error_hinted_retry_successful,
+                    task.surprise_before_retry,
+                    task.surprise_after_retry
+                );
+            }
+            if task.ast_hdc_parse_successes > 0 || task.ast_hdc_parse_failures > 0 {
+                println!(
+                    "      AST-HDC: parse_successes={} parse_failures={} structural_errors={} mean_features={:?} repair_similarity={:?} repair_l1_delta={:?} prior={:?}@{:?} prior_delta={:?}",
+                    task.ast_hdc_parse_successes,
+                    task.ast_hdc_parse_failures,
+                    task.structural_prediction_errors,
+                    task.mean_ast_feature_count,
+                    task.structural_repair_similarity,
+                    task.structural_repair_l1_delta,
+                    task.structural_prior_score,
+                    task.structural_prior_label,
+                    task.structural_prior_delta
+                );
+            }
             if !task.repair_priors_seen.is_empty() {
                 println!(
                     "      repair priors seen: {:?} labels={:?}",
@@ -540,6 +911,8 @@ struct Args {
     energy_budget: Option<f32>,
     lane: String,
     repair_lessons_jsonl: Option<String>,
+    disable_fep_repair_hints: bool,
+    disable_ast_hdc_fep: bool,
 }
 
 impl Args {
@@ -584,6 +957,8 @@ impl Args {
                     };
                     args.repair_lessons_jsonl = Some(path);
                 }
+                "--disable-fep-repair-hints" => args.disable_fep_repair_hints = true,
+                "--disable-ast-hdc-fep" => args.disable_ast_hdc_fep = true,
                 "--help" | "-h" => print_help_and_exit(0, ""),
                 other => print_help_and_exit(2, &format!("unknown argument: {other}")),
             }
@@ -608,6 +983,12 @@ fn print_help_and_exit(code: i32, error: &str) -> ! {
     eprintln!("  --lane NAME         Benchmark lane: smoke, hard, repair, frontier, or all");
     eprintln!("  --repair-lessons-jsonl PATH");
     eprintln!("                      Write one structured repair lesson per JSONL line");
+    eprintln!("  --disable-fep-repair-hints");
+    eprintln!(
+        "                      Ablate FEP prediction-error hints while still measuring failures"
+    );
+    eprintln!("  --disable-ast-hdc-fep");
+    eprintln!("                      Ablate AST-HDC structural FEP observations");
     std::process::exit(code);
 }
 
@@ -650,6 +1031,20 @@ fn category_reports(tasks: &[TaskReport]) -> BTreeMap<String, CategoryReport> {
     reports
 }
 
+fn prediction_error_categories(tasks: &[TaskReport]) -> BTreeMap<String, usize> {
+    let mut categories = BTreeMap::new();
+    for task in tasks {
+        for (category, count) in &task.prediction_error_categories {
+            *categories.entry(category.clone()).or_insert(0) += count;
+        }
+    }
+    categories
+}
+
+fn mean_optional(values: &[f32]) -> Option<f32> {
+    (!values.is_empty()).then(|| values.iter().sum::<f32>() / values.len() as f32)
+}
+
 fn task_uses_repair_memory(task: &TaskReport) -> bool {
     task.repair_prior_labels_seen
         .iter()
@@ -659,17 +1054,27 @@ fn task_uses_repair_memory(task: &TaskReport) -> bool {
 fn repair_memory_categories(labels: &BTreeMap<String, usize>) -> BTreeMap<String, usize> {
     let mut categories = BTreeMap::new();
     for (label, count) in labels {
-        let Some(rest) = label.strip_prefix("repair_memory_") else {
+        let Some(category) = repair_memory_category_from_label(label) else {
             continue;
         };
-        let category = rest
-            .split_once('_')
-            .map(|(_, category)| category)
-            .filter(|category| !category.is_empty())
-            .unwrap_or("unknown");
-        *categories.entry(category.to_string()).or_insert(0) += count;
+        *categories.entry(category).or_insert(0) += count;
     }
     categories
+}
+
+fn repair_memory_category_from_label(label: &str) -> Option<String> {
+    let rest = label.strip_prefix("repair_memory_")?;
+    if let Some(rest) = rest.strip_prefix("diagnostic_") {
+        return rest
+            .splitn(2, '_')
+            .nth(1)
+            .filter(|category| !category.is_empty())
+            .map(ToString::to_string);
+    }
+    rest.split_once('_')
+        .map(|(_, category)| category)
+        .filter(|category| !category.is_empty())
+        .map(ToString::to_string)
 }
 
 fn tasks_for_lane(lane: &str) -> Vec<BenchTask> {

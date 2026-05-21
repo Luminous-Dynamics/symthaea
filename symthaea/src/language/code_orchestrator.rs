@@ -23,6 +23,7 @@
 //! adding verification layers and code-by-analogy before falling back to LLM.
 
 use parking_lot::Mutex;
+use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
@@ -43,7 +44,8 @@ use super::repair_memory;
 use super::repair_taxonomy;
 use super::repo_map::{RepoMap, RepoMapStats};
 use super::rust_lsp::RustAnalyzerClient;
-use super::verified_generation::{VerifiedCode, generate_verified_full};
+use super::structural_prototype::{ast_features_for_source, return_shape_for_signature};
+use super::verified_generation::{AstHdcTrace, generate_verified_full};
 use crate::coding_experience::CodingExperienceStore;
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
@@ -131,6 +133,12 @@ pub struct DistillationCapture {
     pub backend: String,
     /// Function/type name for tracking
     pub name: String,
+    /// Original request purpose for retrieval and curriculum shaping.
+    pub purpose: String,
+    /// Original signature, when available.
+    pub signature: Option<String>,
+    /// Normalized return-shape bucket for structural retrieval.
+    pub return_shape: String,
 }
 
 /// Record of a single synthesis attempt (for audit trail)
@@ -144,6 +152,28 @@ pub struct SynthesisAttempt {
     pub similarity: f32,
     /// Energy cost of this attempt
     pub energy_cost: f32,
+    /// Surprise scalar from the verified generation loop.
+    pub surprise: f32,
+    /// Number of distinct diagnostic hypervectors captured during repair.
+    pub diagnostic_hv_count: usize,
+    /// Successful AST-HDC parse observations captured during verification.
+    pub ast_hdc_parse_successes: usize,
+    /// AST-HDC parse failures captured as structural surprise.
+    pub ast_hdc_parse_failures: usize,
+    /// Structural prediction errors emitted by AST-HDC observation.
+    pub structural_prediction_errors: usize,
+    /// Last observed AST-HDC feature count.
+    pub ast_hdc_feature_count: usize,
+    /// Last observed AST-HDC feature map.
+    pub ast_hdc_last_features: Option<BTreeMap<String, usize>>,
+    /// Number of structural-prior comparisons made during verification.
+    pub structural_prior_observations: usize,
+    /// Last similarity against a known successful AST prototype.
+    pub structural_prior_score: Option<f32>,
+    /// Label of the nearest successful AST prototype.
+    pub structural_prior_label: Option<String>,
+    /// Last movement in structural-prior score across retries.
+    pub structural_prior_delta: Option<f32>,
     /// Why it was rejected (if applicable)
     pub rejection_reason: Option<String>,
     /// Short source preview for diagnostics and benchmark reporting.
@@ -309,7 +339,15 @@ impl CodeOrchestrator {
                 json!({
                     "channels": cap.channels,
                     "target_text": cap.source,
-                    "target_ids": []
+                    "target_ids": [],
+                    "metadata": {
+                        "backend": cap.backend,
+                        "name": cap.name,
+                        "purpose": cap.purpose,
+                        "signature": cap.signature,
+                        "return_shape": cap.return_shape,
+                        "quality": cap.quality,
+                    }
                 })
                 .to_string()
             })
@@ -324,6 +362,91 @@ impl CodeOrchestrator {
             return Ok(());
         }
         std::fs::write(path, jsonl)
+    }
+
+    /// Import verified code-shape memory from distillation JSONL.
+    ///
+    /// This accepts the format produced by `export_distillation_jsonl()`. It is
+    /// intentionally conservative: only records whose `target_text` parses as
+    /// Rust AST are admitted as structural memory, so generic Broca language
+    /// samples cannot contaminate code-shape retrieval.
+    pub fn import_distillation_jsonl(&self, jsonl: &str) -> io::Result<usize> {
+        let mut imported = Vec::new();
+        for (line_idx, line) in jsonl.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let value: serde_json::Value = serde_json::from_str(trimmed).map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "invalid distillation JSONL at line {}: {error}",
+                        line_idx + 1
+                    ),
+                )
+            })?;
+            let Some(source) = value.get("target_text").and_then(serde_json::Value::as_str) else {
+                continue;
+            };
+            if ast_features_for_source(source).is_none() {
+                continue;
+            }
+
+            let channels = value
+                .get("channels")
+                .cloned()
+                .and_then(|channels| serde_json::from_value::<Vec<f32>>(channels).ok())
+                .unwrap_or_else(|| vec![0.0; 43]);
+            let metadata = value.get("metadata");
+            let signature = metadata
+                .and_then(|metadata| metadata.get("signature"))
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string);
+            let return_shape = metadata
+                .and_then(|metadata| metadata.get("return_shape"))
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string)
+                .or_else(|| signature.as_deref().map(return_shape_for_signature))
+                .unwrap_or_else(|| "unit".to_string());
+
+            imported.push(DistillationCapture {
+                channels,
+                source: source.to_string(),
+                quality: metadata
+                    .and_then(|metadata| metadata.get("quality"))
+                    .and_then(serde_json::Value::as_f64)
+                    .map(|quality| quality as f32)
+                    .unwrap_or(1.0),
+                backend: metadata
+                    .and_then(|metadata| metadata.get("backend"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("imported_distillation")
+                    .to_string(),
+                name: metadata
+                    .and_then(|metadata| metadata.get("name"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| format!("imported_{}", line_idx + 1)),
+                purpose: metadata
+                    .and_then(|metadata| metadata.get("purpose"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                signature,
+                return_shape,
+            });
+        }
+
+        let count = imported.len();
+        self.state.lock().distillation_buffer.extend(imported);
+        Ok(count)
+    }
+
+    /// Load verified code-shape memory from a distillation JSONL file.
+    pub fn load_distillation(&self, path: &std::path::Path) -> io::Result<usize> {
+        let jsonl = std::fs::read_to_string(path)?;
+        self.import_distillation_jsonl(&jsonl)
     }
 
     /// Capture a successful generation for distillation training.
@@ -384,12 +507,20 @@ impl CodeOrchestrator {
         let quality = similarity;
 
         let mut state = self.state.lock();
+        let return_shape = request
+            .signature
+            .as_deref()
+            .map(return_shape_for_signature)
+            .unwrap_or_else(|| "unit".to_string());
         state.distillation_buffer.push(DistillationCapture {
             channels,
             source: source.to_string(),
             quality,
             backend: backend.to_string(),
             name: request.name.clone(),
+            purpose: request.purpose.clone(),
+            signature: request.signature.clone(),
+            return_shape,
         });
 
         // === EXPERIENTIAL MEMORY: Store the fix geometry ===
@@ -664,6 +795,19 @@ impl CodeOrchestrator {
                 verified: geodesic_result.verified,
                 similarity: geodesic_result.similarity,
                 energy_cost: 0.75,
+                surprise: geodesic_result.surprise,
+                diagnostic_hv_count: geodesic_result.diagnostic_hvs.len(),
+                ast_hdc_parse_successes: geodesic_result.ast_hdc.parse_successes,
+                ast_hdc_parse_failures: geodesic_result.ast_hdc.parse_failures,
+                structural_prediction_errors: geodesic_result.ast_hdc.structural_prediction_errors,
+                ast_hdc_feature_count: geodesic_result.ast_hdc.last_feature_count,
+                ast_hdc_last_features: geodesic_result.ast_hdc.last_features.clone(),
+                structural_prior_observations: geodesic_result
+                    .ast_hdc
+                    .structural_prior_observations,
+                structural_prior_score: geodesic_result.ast_hdc.last_structural_prior_score,
+                structural_prior_label: geodesic_result.ast_hdc.last_structural_prior_label.clone(),
+                structural_prior_delta: geodesic_result.ast_hdc.structural_prior_delta,
                 rejection_reason: geodesic_rejection.clone(),
                 source_preview: source_preview(&geodesic_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -736,6 +880,17 @@ impl CodeOrchestrator {
                 verified: native_result.verified,
                 similarity: native_result.similarity,
                 energy_cost: 1.0,
+                surprise: native_result.surprise,
+                diagnostic_hv_count: native_result.diagnostic_hvs.len(),
+                ast_hdc_parse_successes: native_result.ast_hdc.parse_successes,
+                ast_hdc_parse_failures: native_result.ast_hdc.parse_failures,
+                structural_prediction_errors: native_result.ast_hdc.structural_prediction_errors,
+                ast_hdc_feature_count: native_result.ast_hdc.last_feature_count,
+                ast_hdc_last_features: native_result.ast_hdc.last_features.clone(),
+                structural_prior_observations: native_result.ast_hdc.structural_prior_observations,
+                structural_prior_score: native_result.ast_hdc.last_structural_prior_score,
+                structural_prior_label: native_result.ast_hdc.last_structural_prior_label.clone(),
+                structural_prior_delta: native_result.ast_hdc.structural_prior_delta,
                 rejection_reason: native_rejection.clone(),
                 source_preview: source_preview(&native_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -810,6 +965,17 @@ impl CodeOrchestrator {
                 verified: analogy_result.verified,
                 similarity: analogy_result.similarity,
                 energy_cost: 0.5,
+                surprise: analogy_result.surprise,
+                diagnostic_hv_count: analogy_result.diagnostic_hvs.len(),
+                ast_hdc_parse_successes: analogy_result.ast_hdc.parse_successes,
+                ast_hdc_parse_failures: analogy_result.ast_hdc.parse_failures,
+                structural_prediction_errors: analogy_result.ast_hdc.structural_prediction_errors,
+                ast_hdc_feature_count: analogy_result.ast_hdc.last_feature_count,
+                ast_hdc_last_features: analogy_result.ast_hdc.last_features.clone(),
+                structural_prior_observations: analogy_result.ast_hdc.structural_prior_observations,
+                structural_prior_score: analogy_result.ast_hdc.last_structural_prior_score,
+                structural_prior_label: analogy_result.ast_hdc.last_structural_prior_label.clone(),
+                structural_prior_delta: analogy_result.ast_hdc.structural_prior_delta,
                 rejection_reason: analogy_rejection.clone(),
                 source_preview: source_preview(&analogy_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -884,6 +1050,17 @@ impl CodeOrchestrator {
                 verified: llm_result.verified,
                 similarity: llm_result.similarity,
                 energy_cost: 10.0,
+                surprise: llm_result.surprise,
+                diagnostic_hv_count: llm_result.diagnostic_hvs.len(),
+                ast_hdc_parse_successes: llm_result.ast_hdc.parse_successes,
+                ast_hdc_parse_failures: llm_result.ast_hdc.parse_failures,
+                structural_prediction_errors: llm_result.ast_hdc.structural_prediction_errors,
+                ast_hdc_feature_count: llm_result.ast_hdc.last_feature_count,
+                ast_hdc_last_features: llm_result.ast_hdc.last_features.clone(),
+                structural_prior_observations: llm_result.ast_hdc.structural_prior_observations,
+                structural_prior_score: llm_result.ast_hdc.last_structural_prior_score,
+                structural_prior_label: llm_result.ast_hdc.last_structural_prior_label.clone(),
+                structural_prior_delta: llm_result.ast_hdc.structural_prior_delta,
                 rejection_reason: llm_result.rejection.clone(),
                 source_preview: source_preview(&llm_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -988,6 +1165,7 @@ impl CodeOrchestrator {
                     similarity: 0.0,
                     surprise: 1.0,
                     diagnostic_hvs: Vec::new(),
+                    ast_hdc: AstHdcTrace::default(),
                     epistemic: EpistemicStatus::Uncertain,
                     rejection: Some(format!(
                         "[category={}; repair_hint={}] {}",
@@ -1009,6 +1187,7 @@ impl CodeOrchestrator {
                 similarity: 0.0,
                 surprise: 1.0,
                 diagnostic_hvs: Vec::new(),
+                ast_hdc: AstHdcTrace::default(),
                 epistemic: EpistemicStatus::Uncertain,
                 rejection: Some(format!(
                     "[category={}; repair_hint={}] {}",
@@ -1062,6 +1241,7 @@ impl CodeOrchestrator {
                         similarity: 0.0,
                         surprise: 1.0,
                         diagnostic_hvs: Vec::new(),
+                        ast_hdc: AstHdcTrace::default(),
                         epistemic: EpistemicStatus::Uncertain,
                         rejection: Some(
                             "Geodesic skeleton contained unfilled slots and could not emit Rust"
@@ -1134,6 +1314,7 @@ impl CodeOrchestrator {
             similarity: verified.confidence.confidence,
             surprise,
             diagnostic_hvs: verified.diagnostic_hvs,
+            ast_hdc: verified.ast_hdc,
             epistemic: if is_verified {
                 EpistemicStatus::Certain
             } else {
@@ -1234,6 +1415,7 @@ impl CodeOrchestrator {
                 similarity: 0.0,
                 surprise,
                 diagnostic_hvs: verified.diagnostic_hvs,
+                ast_hdc: verified.ast_hdc,
                 epistemic: EpistemicStatus::Uncertain,
                 rejection: Some(format!(
                     "Failed to compile after {} retries: {}",
@@ -1254,6 +1436,7 @@ impl CodeOrchestrator {
                 similarity: 0.0,
                 surprise: 1.0,
                 diagnostic_hvs: verified.diagnostic_hvs,
+                ast_hdc: verified.ast_hdc,
                 epistemic: EpistemicStatus::Uncertain,
                 rejection: Some(
                     "Native repair loop produced an implementation stub; rejecting before acceptance"
@@ -1308,6 +1491,7 @@ impl CodeOrchestrator {
             similarity: reported_similarity,
             surprise,
             diagnostic_hvs: verified.diagnostic_hvs,
+            ast_hdc: verified.ast_hdc,
             epistemic: if is_verified {
                 EpistemicStatus::Certain
             } else {
@@ -1346,6 +1530,7 @@ impl CodeOrchestrator {
                 similarity: 0.0,
                 surprise: 0.0,
                 diagnostic_hvs: Vec::new(),
+                ast_hdc: AstHdcTrace::default(),
                 epistemic: EpistemicStatus::Unknown,
                 rejection: Some("No similar patterns found for analogy".to_string()),
             };
@@ -1364,6 +1549,7 @@ impl CodeOrchestrator {
                 similarity: best_sim,
                 surprise: 0.0,
                 diagnostic_hvs: Vec::new(),
+                ast_hdc: AstHdcTrace::default(),
                 epistemic: EpistemicStatus::Uncertain,
                 rejection: Some(format!(
                     "Best analogy similarity {:.3} too low (need >= 0.3)",
@@ -1397,6 +1583,7 @@ impl CodeOrchestrator {
                 similarity: 0.0,
                 surprise: 0.0,
                 diagnostic_hvs: Vec::new(),
+                ast_hdc: AstHdcTrace::default(),
                 epistemic: generated.epistemic_status,
                 rejection: Some("Analogy-guided generation produced stubs".to_string()),
             };
@@ -1451,6 +1638,7 @@ impl CodeOrchestrator {
             similarity: best_sim.min(verified.confidence.confidence),
             surprise,
             diagnostic_hvs: verified.diagnostic_hvs,
+            ast_hdc: verified.ast_hdc,
             epistemic: if is_verified {
                 EpistemicStatus::Certain
             } else {
@@ -1529,6 +1717,7 @@ impl CodeOrchestrator {
             similarity: verified.confidence.confidence as f32,
             surprise,
             diagnostic_hvs: verified.diagnostic_hvs,
+            ast_hdc: verified.ast_hdc,
             epistemic: if is_verified {
                 EpistemicStatus::Certain
             } else {
@@ -1583,8 +1772,145 @@ impl CodeOrchestrator {
         context
             .error_hints
             .extend(request_repair_priors(request).into_iter());
+        let structural_examples = self.structural_success_examples_for_request(request, 5);
+        if !structural_examples.is_empty() {
+            context.error_hints.push((
+                "structural_success_memory".to_string(),
+                format!(
+                    "{} verified prior code shape(s) are available as AST-HDC structural prototypes; prefer repairs that move toward these successful structures without copying irrelevant semantics.",
+                    structural_examples.len()
+                ),
+            ));
+            context.past_examples.extend(structural_examples);
+        }
         context
     }
+
+    fn structural_success_examples_for_request(
+        &self,
+        request: &SynthesisRequest,
+        limit: usize,
+    ) -> Vec<(String, String)> {
+        let request_text = format!(
+            "{} {} {}",
+            request.name,
+            request.purpose,
+            request.signature.as_deref().unwrap_or_default()
+        );
+        let request_return_shape = request
+            .signature
+            .as_deref()
+            .map(return_shape_for_signature)
+            .unwrap_or_else(|| "unit".to_string());
+        let mut candidates = self
+            .state
+            .lock()
+            .distillation_buffer
+            .iter()
+            .filter(|capture| !capture.source.trim().is_empty())
+            .map(|capture| {
+                let relevance =
+                    structural_memory_relevance(&request_text, &request_return_shape, capture);
+                (relevance, capture.clone())
+            })
+            .collect::<Vec<_>>();
+
+        candidates.sort_by(|(score_a, capture_a), (score_b, capture_b)| {
+            score_b
+                .partial_cmp(score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    capture_b
+                        .quality
+                        .partial_cmp(&capture_a.quality)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        });
+
+        candidates
+            .into_iter()
+            .filter(|(score, _)| *score > 0.0)
+            .take(limit)
+            .map(|(_, capture)| {
+                (
+                    format!(
+                        "verified structural memory: {} via {} return {} quality {:.3}",
+                        capture.name, capture.backend, capture.return_shape, capture.quality
+                    ),
+                    capture.source,
+                )
+            })
+            .collect()
+    }
+}
+
+fn structural_memory_relevance(
+    request_text: &str,
+    request_return_shape: &str,
+    capture: &DistillationCapture,
+) -> f32 {
+    let request_tokens = lexical_tokens(request_text);
+    let capture_text = format!(
+        "{} {} {} {}",
+        capture.name,
+        capture.purpose,
+        capture.signature.as_deref().unwrap_or_default(),
+        capture.backend
+    );
+    let capture_tokens = lexical_tokens(&capture_text);
+    let overlap = request_tokens
+        .iter()
+        .filter(|token| capture_tokens.contains(*token))
+        .count() as f32;
+    let lexical_score = if request_tokens.is_empty() {
+        0.0
+    } else {
+        overlap / request_tokens.len().max(1) as f32
+    };
+    let return_shape_score =
+        f32::from(!request_return_shape.is_empty() && request_return_shape == capture.return_shape);
+
+    // Quality is only useful after there is some evidence of relevance. Without
+    // lexical or return-shape overlap, high-quality unrelated code should not
+    // enter the prompt as misleading structural memory.
+    if lexical_score == 0.0 && return_shape_score == 0.0 {
+        return 0.0;
+    }
+
+    if request_tokens.is_empty() {
+        return (0.85 * return_shape_score + 0.15 * capture.quality).clamp(0.0, 1.0);
+    }
+
+    (0.55 * lexical_score + 0.30 * return_shape_score + 0.15 * capture.quality).clamp(0.0, 1.0)
+}
+
+fn lexical_tokens(text: &str) -> std::collections::BTreeSet<String> {
+    text.split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+        .map(|token| token.trim().to_ascii_lowercase())
+        .filter(|token| token.len() >= 3 && !is_low_signal_token(token))
+        .collect()
+}
+
+fn is_low_signal_token(token: &str) -> bool {
+    matches!(
+        token,
+        "rust"
+            | "pub"
+            | "fn"
+            | "let"
+            | "mut"
+            | "str"
+            | "i32"
+            | "i64"
+            | "usize"
+            | "bool"
+            | "vec"
+            | "string"
+            | "result"
+            | "option"
+            | "self"
+            | "return"
+    )
 }
 
 fn request_repair_priors(request: &SynthesisRequest) -> Vec<(String, String)> {
@@ -1789,6 +2115,8 @@ struct BackendResult {
     surprise: f32,
     /// Diagnostic geometries captured during repair.
     diagnostic_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// AST-HDC structural observations captured during repair.
+    ast_hdc: AstHdcTrace,
     epistemic: EpistemicStatus,
     rejection: Option<String>,
 }
@@ -1985,6 +2313,117 @@ mod tests {
                 .iter()
                 .any(|(_, snippet)| snippet.contains("normalize_name"))
         );
+    }
+
+    #[test]
+    fn test_request_context_reuses_verified_structural_memory() {
+        let orch = CodeOrchestrator::new();
+        let prior_request = SynthesisRequest::new("rust", "sum_values", "sum integer values")
+            .with_signature("fn sum_values(values: &[i32]) -> i32");
+        orch.capture_distillation(
+            &prior_request,
+            "pub fn sum_values(values: &[i32]) -> i32 { values.iter().copied().sum() }",
+            "CodeGenerator",
+            0.95,
+            0.0,
+            Vec::new(),
+        );
+
+        let request = SynthesisRequest::new("rust", "sum_scores", "sum integer scores")
+            .with_signature("fn sum_scores(scores: &[i32]) -> i32");
+        let context = orch.context_for_request(&request);
+
+        assert!(context.past_examples.iter().any(|(label, source)| {
+            label.contains("verified structural memory") && source.contains("sum_values")
+        }));
+        assert!(
+            context
+                .error_hints
+                .iter()
+                .any(|(label, _)| label == "structural_success_memory")
+        );
+    }
+
+    #[test]
+    fn test_request_context_does_not_reuse_irrelevant_structural_memory() {
+        let orch = CodeOrchestrator::new();
+        let prior_request = SynthesisRequest::new("rust", "format_name", "format a display name")
+            .with_signature("fn format_name(name: &str) -> String");
+        orch.capture_distillation(
+            &prior_request,
+            "pub fn format_name(name: &str) -> String { name.trim().to_string() }",
+            "CodeGenerator",
+            0.99,
+            0.0,
+            Vec::new(),
+        );
+
+        let request = SynthesisRequest::new("rust", "count_edges", "count graph edges")
+            .with_signature("fn count_edges(edges: &[(usize, usize)]) -> usize");
+        let context = orch.context_for_request(&request);
+
+        assert!(
+            context
+                .past_examples
+                .iter()
+                .all(|(label, _)| !label.contains("verified structural memory"))
+        );
+    }
+
+    #[test]
+    fn test_distillation_export_includes_structural_metadata() {
+        let orch = CodeOrchestrator::new();
+        let request = SynthesisRequest::new("rust", "parse_count", "parse count")
+            .with_signature("fn parse_count(input: &str) -> Result<usize, String>");
+        orch.capture_distillation(
+            &request,
+            "pub fn parse_count(input: &str) -> Result<usize, String> { input.parse().map_err(|e| e.to_string()) }",
+            "CodeGenerator",
+            0.9,
+            0.0,
+            Vec::new(),
+        );
+
+        let jsonl = orch.export_distillation_jsonl();
+        let record: serde_json::Value = serde_json::from_str(jsonl.trim()).unwrap();
+
+        assert_eq!(record["metadata"]["name"], "parse_count");
+        assert_eq!(record["metadata"]["return_shape"], "Result");
+        assert_eq!(
+            record["metadata"]["signature"],
+            "fn parse_count(input: &str) -> Result<usize, String>"
+        );
+    }
+
+    #[test]
+    fn test_distillation_import_seeds_structural_memory() {
+        let source = r#"{"channels":[1.0,0.0],"target_text":"pub fn sum_values(values: &[i32]) -> i32 { values.iter().copied().sum() }","target_ids":[],"metadata":{"backend":"fixture","name":"sum_values","purpose":"sum integer values","signature":"fn sum_values(values: &[i32]) -> i32","return_shape":"i32","quality":0.91}}"#;
+        let orch = CodeOrchestrator::new();
+
+        let imported = orch.import_distillation_jsonl(source).unwrap();
+        let request = SynthesisRequest::new("rust", "sum_scores", "sum integer scores")
+            .with_signature("fn sum_scores(scores: &[i32]) -> i32");
+        let context = orch.context_for_request(&request);
+
+        assert_eq!(imported, 1);
+        assert_eq!(orch.distillation_buffer().len(), 1);
+        assert!(
+            context
+                .past_examples
+                .iter()
+                .any(|(_, source)| source.contains("sum_values"))
+        );
+    }
+
+    #[test]
+    fn test_distillation_import_skips_non_rust_text() {
+        let source = r#"{"channels":[1.0],"target_text":"This is not Rust code.","metadata":{"name":"text_only","purpose":"not code","quality":1.0}}"#;
+        let orch = CodeOrchestrator::new();
+
+        let imported = orch.import_distillation_jsonl(source).unwrap();
+
+        assert_eq!(imported, 0);
+        assert!(orch.distillation_buffer().is_empty());
     }
 
     #[test]

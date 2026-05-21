@@ -22,16 +22,27 @@
 //! An LLM returns code and hopes it works.
 //! Symthaea returns code that is **proven to compile and pass its own tests**.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use super::code_executor::{CodeExecutor, ExecutionResult, try_auto_fix};
 use super::code_generator::{CodeContext, CodeGenerator};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
+use super::coding_prediction_error::{
+    CodingPredictionError, prediction_error_categories, prediction_error_diagnostics,
+    prediction_error_hints, prediction_errors_from_execution,
+    structural_prediction_error_from_ast_parse,
+};
 use super::llm_backend::{GenerationParams, LLMBackend};
+use super::repair_memory;
 use super::repo_map::RepoMap;
+use super::rust_ast_hdc::encode_rust_ast_hdc;
 use super::rust_lsp::{LspPosition, RustAnalyzerClient};
+use super::structural_prototype::{
+    StructuralPriorScore, StructuralPrototypeBank, StructuralPrototypeLabels,
+    ast_features_for_source, return_shape_for_signature,
+};
 use crate::coding_experience::CodingExperienceStore;
 use crate::hdc::diagnostic_encoder::DiagnosticHDEncoder;
 use crate::mind::structured_thought::EpistemicStatus;
@@ -71,6 +82,37 @@ pub struct VerifiedCode {
     pub test_failures: Vec<String>,
     /// Diagnostic geometries captured during repair.
     pub diagnostic_hvs: Vec<ContinuousHV>,
+    /// AST-HDC observations captured during generation and repair.
+    pub ast_hdc: AstHdcTrace,
+}
+
+/// Lightweight telemetry for Rust AST-HDC structural observations.
+///
+/// The actual hypervectors stay inside retry contexts and repair memory. This
+/// trace keeps reportable counts and feature maps so benchmarks can measure
+/// structural surprise without serializing high-dimensional vectors.
+#[derive(Debug, Clone, Default)]
+pub struct AstHdcTrace {
+    pub parse_successes: usize,
+    pub parse_failures: usize,
+    pub structural_prediction_errors: usize,
+    pub feature_observations: usize,
+    pub total_feature_count: usize,
+    pub last_feature_count: usize,
+    pub first_features: Option<BTreeMap<String, usize>>,
+    pub last_features: Option<BTreeMap<String, usize>>,
+    pub structural_prior_observations: usize,
+    pub last_structural_prior_score: Option<f32>,
+    pub last_structural_prior_label: Option<String>,
+    pub best_structural_prior_score: Option<f32>,
+    pub structural_prior_delta: Option<f32>,
+}
+
+impl AstHdcTrace {
+    pub fn mean_feature_count(&self) -> Option<f32> {
+        (self.feature_observations > 0)
+            .then(|| self.total_feature_count as f32 / self.feature_observations as f32)
+    }
 }
 
 impl VerifiedCode {
@@ -263,15 +305,15 @@ fn generate_verified_inner<'a>(
             compile_errors: vec![reason],
             test_failures: Vec::new(),
             diagnostic_hvs: Vec::new(),
+            ast_hdc: AstHdcTrace::default(),
         };
     }
 
     // Step 1: Generate the function body (which may include inline tests)
     let generated_source = if let Some(llm) = llm_backend.as_ref() {
-        let rt = tokio::runtime::Handle::current();
         let prompt = build_llm_repair_prompt(intent, context, &[]);
         let params = GenerationParams::default();
-        let res = tokio::task::block_in_place(|| rt.block_on(llm.generate(&prompt, &params)));
+        let res = generate_llm_blocking(llm.as_ref(), &prompt, &params);
         match res {
             Ok(src) => {
                 let stripped = strip_markdown(&src);
@@ -305,6 +347,12 @@ fn generate_verified_inner<'a>(
     let mut compile_retries = 0;
     let mut last_compile_errors = Vec::new();
     let mut all_diagnostic_hvs = Vec::new();
+    let mut seen_prediction_error_keys = HashSet::new();
+    let mut ast_hdc = AstHdcTrace::default();
+    let mut last_ast_hv: Option<ContinuousHV> = None;
+    let structural_prototypes = structural_prototypes_from_context(context, spec);
+    let structural_labels = structural_labels_for_spec(spec);
+    let mut last_structural_prior: Option<StructuralPriorScore> = None;
 
     loop {
         let full_source = match intent {
@@ -317,6 +365,27 @@ fn generate_verified_inner<'a>(
                 }
             }
         };
+
+        let ast_observation = observe_ast_hdc(
+            &source,
+            compile_retries,
+            &mut ast_hdc,
+            &structural_prototypes,
+            &structural_labels,
+        );
+        if let Some(hv) = ast_observation.hv {
+            last_ast_hv = Some(hv);
+        }
+        if let Some(prior) = ast_observation.structural_prior {
+            last_structural_prior = Some(prior);
+        }
+        let structural_prediction_errors: Vec<_> =
+            ast_observation.prediction_error.into_iter().collect();
+        record_prediction_error_hvs(
+            &structural_prediction_errors,
+            &mut all_diagnostic_hvs,
+            &mut seen_prediction_error_keys,
+        );
 
         let mut result = match intent {
             CodeIntent::Solve {
@@ -363,6 +432,7 @@ fn generate_verified_inner<'a>(
                     compile_errors: Vec::new(),
                     test_failures: Vec::new(),
                     diagnostic_hvs: all_diagnostic_hvs.clone(),
+                    ast_hdc: ast_hdc.clone(),
                 };
             } else {
                 // Tests failed — try to fix based on test output
@@ -393,8 +463,21 @@ fn generate_verified_inner<'a>(
 
                     let retry_spec =
                         augment_spec_with_test_failures(spec, &latest_test_failures, test_retries);
-                    let retry_context =
-                        build_test_retry_context(context, &latest_test_failures, test_retries);
+                    let prediction_errors =
+                        prediction_errors_from_execution(&latest_result, test_retries);
+                    record_prediction_error_hvs(
+                        &prediction_errors,
+                        &mut all_diagnostic_hvs,
+                        &mut seen_prediction_error_keys,
+                    );
+                    let retry_context = build_test_retry_context(
+                        context,
+                        &latest_test_failures,
+                        &prediction_errors,
+                        last_ast_hv.as_ref(),
+                        last_structural_prior.as_ref(),
+                        test_retries,
+                    );
                     let retry_intent = CodeIntent::Create {
                         target: CodeTarget {
                             kind: EntityKind::Function,
@@ -407,13 +490,10 @@ fn generate_verified_inner<'a>(
                     };
 
                     let generated_retry = if let Some(llm) = llm_backend.as_ref() {
-                        let rt = tokio::runtime::Handle::current();
                         // retry_context.error_hints contains the test failures
                         let prompt = build_llm_repair_prompt(&retry_intent, &retry_context, &[]);
                         let params = GenerationParams::default();
-                        let res = tokio::task::block_in_place(|| {
-                            rt.block_on(llm.generate(&prompt, &params))
-                        });
+                        let res = generate_llm_blocking(llm.as_ref(), &prompt, &params);
                         match res {
                             Ok(src) => strip_markdown(&src),
                             Err(e) => {
@@ -428,6 +508,27 @@ fn generate_verified_inner<'a>(
                         generator.generate(&retry_intent, &retry_context).source
                     };
                     source = generated_retry;
+
+                    let ast_observation = observe_ast_hdc(
+                        &source,
+                        test_retries,
+                        &mut ast_hdc,
+                        &structural_prototypes,
+                        &structural_labels,
+                    );
+                    if let Some(hv) = ast_observation.hv {
+                        last_ast_hv = Some(hv);
+                    }
+                    if let Some(prior) = ast_observation.structural_prior {
+                        last_structural_prior = Some(prior);
+                    }
+                    let retry_structural_prediction_errors: Vec<_> =
+                        ast_observation.prediction_error.into_iter().collect();
+                    record_prediction_error_hvs(
+                        &retry_structural_prediction_errors,
+                        &mut all_diagnostic_hvs,
+                        &mut seen_prediction_error_keys,
+                    );
 
                     let mut retry_result = match intent {
                         CodeIntent::Solve {
@@ -483,17 +584,26 @@ fn generate_verified_inner<'a>(
                             compile_errors: Vec::new(),
                             test_failures: Vec::new(),
                             diagnostic_hvs: all_diagnostic_hvs.clone(),
+                            ast_hdc: ast_hdc.clone(),
                         };
                     }
 
                     if !retry_result.compiled {
                         last_compile_errors = retry_result.compile_errors.clone();
                         let stderr = retry_result.compile_errors.join("\n");
-                        if let Some(fixed) = generator.try_auto_fix_with_hints(
-                            &source,
-                            &stderr,
-                            &retry_context.error_hints,
-                        ) {
+                        let mut prediction_errors =
+                            prediction_errors_from_execution(&retry_result, compile_retries + 1);
+                        prediction_errors.extend(retry_structural_prediction_errors);
+                        record_prediction_error_hvs(
+                            &prediction_errors,
+                            &mut all_diagnostic_hvs,
+                            &mut seen_prediction_error_keys,
+                        );
+                        let mut active_error_hints = retry_context.error_hints.clone();
+                        active_error_hints.extend(prediction_error_hints(&prediction_errors));
+                        if let Some(fixed) =
+                            generator.try_auto_fix_with_hints(&source, &stderr, &active_error_hints)
+                        {
                             source = fixed;
                         }
                     }
@@ -534,6 +644,7 @@ fn generate_verified_inner<'a>(
                     compile_errors: last_compile_errors,
                     test_failures: latest_test_failures,
                     diagnostic_hvs: all_diagnostic_hvs.clone(),
+                    ast_hdc: ast_hdc.clone(),
                 };
             }
         }
@@ -554,8 +665,25 @@ fn generate_verified_inner<'a>(
 
         // Apply auto-fix
         let stderr = result.compile_errors.join("\n");
+        let mut prediction_errors = prediction_errors_from_execution(&result, compile_retries);
+        prediction_errors.extend(structural_prediction_errors);
+        let diagnostics = prediction_error_diagnostics(&prediction_errors);
+        let categories = prediction_error_categories(&prediction_errors);
+        record_prediction_error_hvs(
+            &prediction_errors,
+            &mut all_diagnostic_hvs,
+            &mut seen_prediction_error_keys,
+        );
+        let mut active_error_hints = context.error_hints.clone();
+        active_error_hints.extend(prediction_error_hints(&prediction_errors));
+        active_error_hints.extend(repair_memory::repair_priors_for_spec_diagnostics(
+            spec,
+            &diagnostics,
+            &categories,
+            3,
+        ));
         if let Some(fixed) = generator
-            .try_auto_fix_with_hints(&source, &stderr, &context.error_hints)
+            .try_auto_fix_with_hints(&source, &stderr, &active_error_hints)
             .or_else(|| try_auto_fix(&source, &result.compile_errors))
         {
             source = fixed;
@@ -573,6 +701,10 @@ fn generate_verified_inner<'a>(
                 experience_store.as_deref_mut(),
                 &mut all_diagnostic_hvs,
                 &result.compile_errors,
+                spec,
+                &prediction_errors,
+                last_ast_hv.as_ref(),
+                last_structural_prior.as_ref(),
                 compile_retries,
             );
             let retry_intent = CodeIntent::Create {
@@ -588,13 +720,11 @@ fn generate_verified_inner<'a>(
 
             let generated = if let Some(llm) = llm_backend.as_ref() {
                 // If LLM is available, use it to solve the problem if it's complex
-                let rt = tokio::runtime::Handle::current();
                 let prompt =
                     build_llm_repair_prompt(&retry_intent, &retry_context, &result.compile_errors);
                 let params = GenerationParams::default();
 
-                let res =
-                    tokio::task::block_in_place(|| rt.block_on(llm.generate(&prompt, &params)));
+                let res = generate_llm_blocking(llm.as_ref(), &prompt, &params);
 
                 match res {
                     Ok(src) => strip_markdown(&src),
@@ -622,6 +752,7 @@ fn generate_verified_inner<'a>(
         compile_errors: last_compile_errors,
         test_failures: Vec::new(),
         diagnostic_hvs: all_diagnostic_hvs,
+        ast_hdc,
     }
 }
 
@@ -645,6 +776,29 @@ fn simulated_verification_failure(
         compile_errors: vec![reason],
         test_failures: Vec::new(),
         diagnostic_hvs: Vec::new(),
+        ast_hdc: AstHdcTrace::default(),
+    }
+}
+
+fn generate_llm_blocking(
+    llm: &dyn LLMBackend,
+    prompt: &str,
+    params: &GenerationParams,
+) -> anyhow::Result<String> {
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => {
+            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
+                tokio::task::block_in_place(|| handle.block_on(llm.generate(prompt, params)))
+            } else {
+                handle.block_on(llm.generate(prompt, params))
+            }
+        }
+        Err(_) => {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            runtime.block_on(llm.generate(prompt, params))
+        }
     }
 }
 
@@ -665,6 +819,76 @@ fn augment_spec_with_test_failures(
     retry_spec
 }
 
+struct AstHdcObservation {
+    hv: Option<ContinuousHV>,
+    prediction_error: Option<CodingPredictionError>,
+    structural_prior: Option<StructuralPriorScore>,
+}
+
+fn observe_ast_hdc(
+    source: &str,
+    retry_number: usize,
+    trace: &mut AstHdcTrace,
+    structural_prototypes: &StructuralPrototypeBank,
+    structural_labels: &StructuralPrototypeLabels,
+) -> AstHdcObservation {
+    if std::env::var_os("SYMTHAEA_DISABLE_AST_HDC_FEP").is_some() {
+        return AstHdcObservation {
+            hv: None,
+            prediction_error: None,
+            structural_prior: None,
+        };
+    }
+
+    match encode_rust_ast_hdc(source, symthaea_core::hdc::unified_hv::HDC_DIMENSION) {
+        Ok(encoded) => {
+            let feature_count = encoded.features.values().sum();
+            let structural_prior =
+                structural_prototypes.score(&encoded.features, structural_labels);
+            trace.parse_successes += 1;
+            trace.feature_observations += 1;
+            trace.total_feature_count += feature_count;
+            trace.last_feature_count = feature_count;
+            if trace.first_features.is_none() {
+                trace.first_features = Some(encoded.features.clone());
+            }
+            if let Some(prior) = &structural_prior {
+                trace.structural_prior_observations += 1;
+                let previous = trace.last_structural_prior_score;
+                trace.last_structural_prior_score = Some(prior.score);
+                trace.last_structural_prior_label = Some(prior.label.clone());
+                trace.best_structural_prior_score = Some(
+                    trace
+                        .best_structural_prior_score
+                        .map(|best| best.max(prior.score))
+                        .unwrap_or(prior.score),
+                );
+                if let Some(previous) = previous {
+                    trace.structural_prior_delta = Some(prior.score - previous);
+                }
+            }
+            trace.last_features = Some(encoded.features);
+            AstHdcObservation {
+                hv: Some(encoded.hv),
+                prediction_error: None,
+                structural_prior,
+            }
+        }
+        Err(error) => {
+            trace.parse_failures += 1;
+            trace.structural_prediction_errors += 1;
+            AstHdcObservation {
+                hv: None,
+                prediction_error: Some(structural_prediction_error_from_ast_parse(
+                    format!("Generated Rust did not parse as an AST before compilation: {error}"),
+                    retry_number,
+                )),
+                structural_prior: None,
+            }
+        }
+    }
+}
+
 fn augment_spec_with_compile_errors(
     spec: &CodeSpec,
     compile_errors: &[String],
@@ -682,6 +906,77 @@ fn augment_spec_with_compile_errors(
     retry_spec
 }
 
+fn structural_prototypes_from_context(
+    context: &CodeContext<'_>,
+    spec: &CodeSpec,
+) -> StructuralPrototypeBank {
+    let mut bank = StructuralPrototypeBank::default();
+    let labels = structural_labels_for_spec(spec);
+
+    if let Some(template) = &context.learned_template {
+        if let Some(features) = ast_features_for_source(template) {
+            bank.observe_success(
+                &features,
+                &StructuralPrototypeLabels::new(
+                    format!("template:{}", labels.category),
+                    labels.return_shape.clone(),
+                    "learned_template",
+                ),
+            );
+        }
+    }
+
+    for (label, source) in &context.past_examples {
+        if let Some(features) = ast_features_for_source(source) {
+            bank.observe_success(
+                &features,
+                &StructuralPrototypeLabels::new(
+                    format!("example:{}", structural_label_fragment(label)),
+                    labels.return_shape.clone(),
+                    "past_example",
+                ),
+            );
+        }
+    }
+
+    bank
+}
+
+fn structural_labels_for_spec(spec: &CodeSpec) -> StructuralPrototypeLabels {
+    StructuralPrototypeLabels::new(
+        structural_label_fragment(&spec.purpose),
+        spec.signature
+            .as_deref()
+            .map(return_shape_for_signature)
+            .unwrap_or_else(|| "unit".to_string()),
+        "candidate",
+    )
+}
+
+fn structural_label_fragment(value: &str) -> String {
+    let mut fragment = value
+        .chars()
+        .filter_map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                Some(ch.to_ascii_lowercase())
+            } else if ch.is_whitespace() || matches!(ch, '-' | '_' | ':' | '/') {
+                Some('_')
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
+    while fragment.contains("__") {
+        fragment = fragment.replace("__", "_");
+    }
+    let fragment = fragment.trim_matches('_');
+    if fragment.is_empty() {
+        "unknown".to_string()
+    } else {
+        fragment.chars().take(48).collect()
+    }
+}
+
 fn build_compile_retry_context<'a>(
     context: &CodeContext<'a>,
     repo_map: Option<&'a RepoMap>,
@@ -689,6 +984,10 @@ fn build_compile_retry_context<'a>(
     mut experience_store: Option<&mut CodingExperienceStore>,
     all_diagnostic_hvs: &mut Vec<ContinuousHV>,
     compile_errors: &[String],
+    spec: &CodeSpec,
+    prediction_errors: &[CodingPredictionError],
+    ast_hv: Option<&ContinuousHV>,
+    structural_prior: Option<&StructuralPriorScore>,
     retry_number: usize,
 ) -> CodeContext<'a> {
     let diagnostic_context =
@@ -698,6 +997,40 @@ fn build_compile_retry_context<'a>(
     let mut error_hints = context.error_hints.clone();
     let mut diagnostic_hvs = context.diagnostic_hvs.clone();
     let mut learned_template = context.learned_template.clone();
+
+    error_hints.extend(prediction_error_hints(prediction_errors));
+    error_hints.extend(repair_memory::repair_priors_for_spec_diagnostics(
+        spec,
+        &prediction_error_diagnostics(prediction_errors),
+        &prediction_error_categories(prediction_errors),
+        3,
+    ));
+    diagnostic_hvs.extend(
+        prediction_errors
+            .iter()
+            .map(|error| error.diagnostic_hv.clone()),
+    );
+    if let Some(ast_hv) = ast_hv {
+        diagnostic_hvs.push(ast_hv.clone());
+        error_hints.push((
+            format!("ast_hdc_structural_context_retry_{retry_number}"),
+            "AST-HDC structural context from the previous candidate is available; preserve useful structure while repairing the compiler error."
+                .to_string(),
+        ));
+    }
+    if let Some(prior) = structural_prior {
+        error_hints.push((
+            format!(
+                "ast_hdc_structural_prior_retry_{}_{}",
+                retry_number,
+                sanitize_hint_label(&prior.label)
+            ),
+            format!(
+                "Nearest successful AST prototype is `{}` with similarity {:.3}. Move the repair toward this known-good structure while preserving the requested semantics.",
+                prior.label, prior.score
+            ),
+        ));
+    }
 
     // Neuro-symbolic encoding: translate diagnostics into HDC geometry
     let encoder = DiagnosticHDEncoder::default_dim();
@@ -803,6 +1136,18 @@ fn build_compile_retry_context<'a>(
     }
 }
 
+fn record_prediction_error_hvs(
+    prediction_errors: &[CodingPredictionError],
+    all_diagnostic_hvs: &mut Vec<ContinuousHV>,
+    seen_prediction_error_keys: &mut HashSet<String>,
+) {
+    for error in prediction_errors {
+        if seen_prediction_error_keys.insert(error.key.clone()) {
+            all_diagnostic_hvs.push(error.diagnostic_hv.clone());
+        }
+    }
+}
+
 fn categorize_rustc_diagnostic(error: &str) -> &'static str {
     let lower = error.to_ascii_lowercase();
     if lower.contains("e0308") || lower.contains("mismatched types") {
@@ -872,6 +1217,9 @@ fn repair_hint_for_rustc_category(category: &str) -> &'static str {
 fn build_test_retry_context<'a>(
     context: &CodeContext<'a>,
     test_failures: &[String],
+    prediction_errors: &[CodingPredictionError],
+    ast_hv: Option<&ContinuousHV>,
+    structural_prior: Option<&StructuralPriorScore>,
     retry_number: usize,
 ) -> CodeContext<'a> {
     let mut error_hints = context.error_hints.clone();
@@ -881,6 +1229,27 @@ fn build_test_retry_context<'a>(
             format!("Fix the generated function so this failure no longer occurs: {failure}"),
         )
     }));
+    error_hints.extend(prediction_error_hints(prediction_errors));
+    if ast_hv.is_some() {
+        error_hints.push((
+            format!("ast_hdc_structural_context_retry_{retry_number}"),
+            "AST-HDC structural context from the previous candidate is available; preserve useful structure while repairing the test failure."
+                .to_string(),
+        ));
+    }
+    if let Some(prior) = structural_prior {
+        error_hints.push((
+            format!(
+                "ast_hdc_structural_prior_retry_{}_{}",
+                retry_number,
+                sanitize_hint_label(&prior.label)
+            ),
+            format!(
+                "Nearest successful AST prototype is `{}` with similarity {:.3}. Adjust behavior without drifting away from this known-good structure.",
+                prior.label, prior.score
+            ),
+        ));
+    }
 
     CodeContext {
         memory: context.memory,
@@ -889,10 +1258,35 @@ fn build_test_retry_context<'a>(
         past_examples: context.past_examples.clone(),
         mcts_plan_confidence: context.mcts_plan_confidence,
         error_hints,
-        diagnostic_hvs: context.diagnostic_hvs.clone(),
+        diagnostic_hvs: {
+            let mut diagnostic_hvs = context.diagnostic_hvs.clone();
+            diagnostic_hvs.extend(
+                prediction_errors
+                    .iter()
+                    .map(|error| error.diagnostic_hv.clone()),
+            );
+            if let Some(ast_hv) = ast_hv {
+                diagnostic_hvs.push(ast_hv.clone());
+            }
+            diagnostic_hvs
+        },
         issue_text: context.issue_text.clone(),
         learned_template: context.learned_template.clone(),
     }
+}
+
+fn sanitize_hint_label(label: &str) -> String {
+    let sanitized = label
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    sanitized.trim_matches('_').chars().take(48).collect()
 }
 
 /// Generate and verify a function from minimal inputs (convenience wrapper).
@@ -1005,6 +1399,7 @@ mod tests {
             compile_errors: Vec::new(),
             test_failures: Vec::new(),
             diagnostic_hvs: Vec::new(),
+            ast_hdc: AstHdcTrace::default(),
         };
 
         assert!(verified.is_guaranteed());
@@ -1023,6 +1418,19 @@ mod tests {
         .unwrap();
         let compile_errors =
             vec!["error[E0412]: cannot find type `EngineConfig` in this scope".to_string()];
+        let spec = CodeSpec::new("rust", "load_config", "Load engine config");
+        let result = ExecutionResult {
+            compiled: false,
+            compile_errors: compile_errors.clone(),
+            tests_passed: 0,
+            tests_failed: 0,
+            test_output: String::new(),
+            runtime_error: None,
+            elapsed: std::time::Duration::from_millis(1),
+            simulated: false,
+            test_failures: Vec::new(),
+        };
+        let prediction_errors = prediction_errors_from_execution(&result, 1);
 
         let context = build_compile_retry_context(
             &CodeContext::default(),
@@ -1031,6 +1439,10 @@ mod tests {
             None,
             &mut Vec::new(),
             &compile_errors,
+            &spec,
+            &prediction_errors,
+            None,
+            None,
             1,
         );
 
@@ -1048,6 +1460,9 @@ mod tests {
                 .any(|(pattern, hint)| pattern == "compile_error_E0412"
                     && hint.contains("cannot find type"))
         );
+        assert!(context.error_hints.iter().any(|(pattern, hint)| {
+            pattern.starts_with("fep_prediction_error") && hint.contains("Prediction-error signal")
+        }));
     }
 
     #[test]
