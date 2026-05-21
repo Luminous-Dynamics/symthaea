@@ -28,9 +28,16 @@ pub fn try_semantic_ast_repair(source: &str, diagnostics: &[String]) -> Option<S
         }
     }
 
-    // NEW: Compiler Help-Driven Return Injection
     if joined.contains("you might have meant to return this value") {
         if let Some(repaired) = inject_explicit_return(source) {
+            return Some(repaired);
+        }
+    }
+
+    if joined.contains("use the `?` operator to extract")
+        || joined.contains("propagating a `result::err` value")
+    {
+        if let Some(repaired) = try_append_question_mark_to_ok_arg(source) {
             return Some(repaired);
         }
     }
@@ -73,22 +80,16 @@ fn wrap_result_tail_expression(source: &str) -> Option<String> {
         changed = true;
     }
 
-    if changed {
-        Some(file.into_token_stream().to_string())
-    } else {
-        None
-    }
+    changed.then(|| file.into_token_stream().to_string())
 }
 
 fn inject_explicit_return(source: &str) -> Option<String> {
     let mut file = syn::parse_file(source).ok()?;
     let mut visitor = ExplicitReturnVisitor { changed: false };
     visitor.visit_file_mut(&mut file);
-    if visitor.changed {
-        Some(file.into_token_stream().to_string())
-    } else {
-        None
-    }
+    visitor
+        .changed
+        .then(|| file.into_token_stream().to_string())
 }
 
 struct ExplicitReturnVisitor {
@@ -98,13 +99,51 @@ struct ExplicitReturnVisitor {
 impl VisitMut for ExplicitReturnVisitor {
     fn visit_block_mut(&mut self, block: &mut syn::Block) {
         if let Some(syn::Stmt::Expr(expr, None)) = block.stmts.last_mut() {
-            if !matches!(expr, syn::Expr::Return(_)) {
+            // Guard against prepending return to control flow structures or existing returns
+            if !matches!(
+                expr,
+                syn::Expr::Return(_)
+                    | syn::Expr::While(_)
+                    | syn::Expr::ForLoop(_)
+                    | syn::Expr::Loop(_)
+                    | syn::Expr::If(_)
+            ) {
                 let original = expr.clone();
                 *expr = syn::parse_quote!(return #original);
                 self.changed = true;
             }
         }
         visit_mut::visit_block_mut(self, block);
+    }
+}
+
+fn try_append_question_mark_to_ok_arg(source: &str) -> Option<String> {
+    let mut file = syn::parse_file(source).ok()?;
+    let mut visitor = OkArgQuestionMarkVisitor { changed: false };
+    visitor.visit_file_mut(&mut file);
+    visitor
+        .changed
+        .then(|| file.into_token_stream().to_string())
+}
+
+struct OkArgQuestionMarkVisitor {
+    changed: bool,
+}
+
+impl VisitMut for OkArgQuestionMarkVisitor {
+    fn visit_expr_call_mut(&mut self, call: &mut syn::ExprCall) {
+        if let syn::Expr::Path(path) = call.func.as_ref() {
+            if path.path.is_ident("Ok") {
+                if let Some(arg) = call.args.first_mut() {
+                    if !matches!(arg, syn::Expr::Try(_)) {
+                        let original = arg.clone();
+                        *arg = syn::parse_quote!(#original?);
+                        self.changed = true;
+                    }
+                }
+            }
+        }
+        visit_mut::visit_expr_call_mut(self, call);
     }
 }
 
@@ -115,11 +154,9 @@ fn add_mut_to_binding(source: &str, binding: &str) -> Option<String> {
         changed: false,
     };
     visitor.visit_file_mut(&mut file);
-    if visitor.changed {
-        Some(file.into_token_stream().to_string())
-    } else {
-        None
-    }
+    visitor
+        .changed
+        .then(|| file.into_token_stream().to_string())
 }
 
 struct AddMutVisitor<'a> {
@@ -223,6 +260,21 @@ mod tests {
         let diagnostic = "help: you might have meant to return this value";
         let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
         assert!(repaired.contains("return result"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn appends_question_mark_to_ok_argument_on_help_signal() {
+        let source = r#"
+            pub fn first_positive(items: &[i32]) -> Result<i32, &'static str> {
+                Ok(items.first().copied().ok_or_else(|| "empty"))
+            }
+        "#;
+        let diagnostic = "help: use the `?` operator to extract the `Result<i32, String>` value";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+        assert!(
+            repaired.contains("Ok (items . first () . copied () . ok_or_else (|| \"empty\") ?)")
+        );
         syn::parse_file(&repaired).unwrap();
     }
 }
