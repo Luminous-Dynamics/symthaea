@@ -28,6 +28,13 @@ pub fn try_semantic_ast_repair(source: &str, diagnostics: &[String]) -> Option<S
         }
     }
 
+    // NEW: Compiler Help-Driven Return Injection
+    if joined.contains("you might have meant to return this value") {
+        if let Some(repaired) = inject_explicit_return(source) {
+            return Some(repaired);
+        }
+    }
+
     None
 }
 
@@ -66,7 +73,39 @@ fn wrap_result_tail_expression(source: &str) -> Option<String> {
         changed = true;
     }
 
-    changed.then(|| file.into_token_stream().to_string())
+    if changed {
+        Some(file.into_token_stream().to_string())
+    } else {
+        None
+    }
+}
+
+fn inject_explicit_return(source: &str) -> Option<String> {
+    let mut file = syn::parse_file(source).ok()?;
+    let mut visitor = ExplicitReturnVisitor { changed: false };
+    visitor.visit_file_mut(&mut file);
+    if visitor.changed {
+        Some(file.into_token_stream().to_string())
+    } else {
+        None
+    }
+}
+
+struct ExplicitReturnVisitor {
+    changed: bool,
+}
+
+impl VisitMut for ExplicitReturnVisitor {
+    fn visit_block_mut(&mut self, block: &mut syn::Block) {
+        if let Some(syn::Stmt::Expr(expr, None)) = block.stmts.last_mut() {
+            if !matches!(expr, syn::Expr::Return(_)) {
+                let original = expr.clone();
+                *expr = syn::parse_quote!(return #original);
+                self.changed = true;
+            }
+        }
+        visit_mut::visit_block_mut(self, block);
+    }
 }
 
 fn add_mut_to_binding(source: &str, binding: &str) -> Option<String> {
@@ -76,9 +115,11 @@ fn add_mut_to_binding(source: &str, binding: &str) -> Option<String> {
         changed: false,
     };
     visitor.visit_file_mut(&mut file);
-    visitor
-        .changed
-        .then(|| file.into_token_stream().to_string())
+    if visitor.changed {
+        Some(file.into_token_stream().to_string())
+    } else {
+        None
+    }
 }
 
 struct AddMutVisitor<'a> {
@@ -125,11 +166,15 @@ fn binding_name_from_backticks(diagnostic: &str) -> Option<String> {
     let start = diagnostic.find('`')? + 1;
     let end = diagnostic[start..].find('`')? + start;
     let name = &diagnostic[start..end];
-    (!name.is_empty()
+    if !name.is_empty()
         && name
             .chars()
-            .all(|ch| ch == '_' || ch.is_ascii_alphanumeric()))
-    .then(|| name.to_string())
+            .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+    {
+        Some(name.to_string())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -159,6 +204,25 @@ mod tests {
         .unwrap();
 
         assert!(repaired.contains("let mut value"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn injects_explicit_return_based_on_compiler_help() {
+        let source = r#"
+            pub fn first_positive(items: &[i32]) -> Result<i32, &'static str> {
+                let mut result = Ok(0);
+                if false {
+                    // check branch
+                } else {
+                    result
+                }
+                result
+            }
+        "#;
+        let diagnostic = "help: you might have meant to return this value";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+        assert!(repaired.contains("return result"));
         syn::parse_file(&repaired).unwrap();
     }
 }
