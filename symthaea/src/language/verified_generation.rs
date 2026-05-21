@@ -39,6 +39,7 @@ use super::repair_memory;
 use super::repo_map::RepoMap;
 use super::rust_ast_hdc::encode_rust_ast_hdc;
 use super::rust_lsp::{LspPosition, RustAnalyzerClient};
+use super::semantic_repair::try_semantic_ast_repair;
 use super::structural_prototype::{
     StructuralPriorScore, StructuralPrototypeBank, StructuralPrototypeLabels,
     ast_features_for_source, return_shape_for_signature,
@@ -106,6 +107,8 @@ pub struct AstHdcTrace {
     pub last_structural_prior_label: Option<String>,
     pub best_structural_prior_score: Option<f32>,
     pub structural_prior_delta: Option<f32>,
+    pub geodesic_rejection_shadow_hits: usize,
+    pub hard_geodesic_rejections: usize,
 }
 
 impl AstHdcTrace {
@@ -386,6 +389,39 @@ fn generate_verified_inner<'a>(
             &mut all_diagnostic_hvs,
             &mut seen_prediction_error_keys,
         );
+        if ast_observation.fast_fail && compile_retries < MAX_COMPILE_RETRIES {
+            compile_retries += 1;
+            let retry_spec = augment_spec_with_compile_errors(
+                spec,
+                &prediction_error_diagnostics(&structural_prediction_errors),
+                compile_retries,
+            );
+            let retry_context = build_compile_retry_context(
+                context,
+                repo_map,
+                lsp_client.as_deref_mut(),
+                experience_store.as_deref_mut(),
+                &mut all_diagnostic_hvs,
+                &prediction_error_diagnostics(&structural_prediction_errors),
+                spec,
+                &structural_prediction_errors,
+                last_ast_hv.as_ref(),
+                last_structural_prior.as_ref(),
+                compile_retries,
+            );
+            let retry_intent = CodeIntent::Create {
+                target: CodeTarget {
+                    kind: EntityKind::Function,
+                    name: retry_spec.name.clone(),
+                    path: None,
+                    language: Some(retry_spec.language.clone()),
+                    hv: None,
+                },
+                spec: retry_spec,
+            };
+            source = generator.generate(&retry_intent, &retry_context).source;
+            continue;
+        }
 
         let mut result = match intent {
             CodeIntent::Solve {
@@ -602,6 +638,10 @@ fn generate_verified_inner<'a>(
                         let mut active_error_hints = retry_context.error_hints.clone();
                         active_error_hints.extend(prediction_error_hints(&prediction_errors));
                         if let Some(fixed) =
+                            try_semantic_ast_repair(&source, &retry_result.compile_errors)
+                        {
+                            source = fixed;
+                        } else if let Some(fixed) =
                             generator.try_auto_fix_with_hints(&source, &stderr, &active_error_hints)
                         {
                             source = fixed;
@@ -682,8 +722,8 @@ fn generate_verified_inner<'a>(
             &categories,
             3,
         ));
-        if let Some(fixed) = generator
-            .try_auto_fix_with_hints(&source, &stderr, &active_error_hints)
+        if let Some(fixed) = try_semantic_ast_repair(&source, &result.compile_errors)
+            .or_else(|| generator.try_auto_fix_with_hints(&source, &stderr, &active_error_hints))
             .or_else(|| try_auto_fix(&source, &result.compile_errors))
         {
             source = fixed;
@@ -823,6 +863,7 @@ struct AstHdcObservation {
     hv: Option<ContinuousHV>,
     prediction_error: Option<CodingPredictionError>,
     structural_prior: Option<StructuralPriorScore>,
+    fast_fail: bool,
 }
 
 fn observe_ast_hdc(
@@ -837,6 +878,7 @@ fn observe_ast_hdc(
             hv: None,
             prediction_error: None,
             structural_prior: None,
+            fast_fail: false,
         };
     }
 
@@ -848,6 +890,16 @@ fn observe_ast_hdc(
             let prior_prediction_error = structural_prior
                 .as_ref()
                 .and_then(|prior| structural_prior_prediction_error(prior, retry_number));
+            let fast_fail = prior_prediction_error.is_some()
+                && std::env::var_os("SYMTHAEA_HARD_GEODESIC_REJECTION").is_some();
+            if prior_prediction_error.is_some()
+                && std::env::var_os("SYMTHAEA_GEODESIC_REJECTION_SHADOW").is_some()
+            {
+                trace.geodesic_rejection_shadow_hits += 1;
+            }
+            if fast_fail {
+                trace.hard_geodesic_rejections += 1;
+            }
             trace.parse_successes += 1;
             trace.feature_observations += 1;
             trace.total_feature_count += feature_count;
@@ -875,6 +927,7 @@ fn observe_ast_hdc(
                 hv: Some(encoded.hv),
                 prediction_error: prior_prediction_error,
                 structural_prior,
+                fast_fail,
             }
         }
         Err(error) => {
@@ -887,6 +940,7 @@ fn observe_ast_hdc(
                     retry_number,
                 )),
                 structural_prior: None,
+                fast_fail: std::env::var_os("SYMTHAEA_HARD_GEODESIC_REJECTION").is_some(),
             }
         }
     }

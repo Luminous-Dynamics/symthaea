@@ -55,6 +55,8 @@ pub mod code_orchestrator;
 // Pattern library bootstrap — parse Rust source files to populate HDC pattern library
 #[cfg(feature = "code_generation")]
 pub mod pattern_bootstrap;
+#[cfg(feature = "code_generation")]
+pub mod proof_memory;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
@@ -134,6 +136,8 @@ pub mod rust_ast_hdc;
 pub mod rust_lsp;
 #[cfg(feature = "code_generation")]
 pub mod rust_parser;
+#[cfg(feature = "code_generation")]
+pub mod semantic_repair;
 #[cfg(feature = "code_generation")]
 pub mod sequencer_benchmark;
 #[cfg(feature = "code_generation")]

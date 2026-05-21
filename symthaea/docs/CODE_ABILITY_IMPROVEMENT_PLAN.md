@@ -1,5 +1,66 @@
 # Symthaea Code Ability Improvement Plan
 
+## 2026-05-21 Update: From Structural Memory to Semantic Governance
+
+Recent benchmark telemetry exposed the next ceiling clearly: the structural
+prototype score can reach 1.000 while pass rate remains below 1.0. That means
+AST shape is no longer the main bottleneck. The next phase must make Symthaea's
+coding loop semantic, repair-oriented, and eventually proof-aware.
+
+### Six-Part Improvement Track
+
+1. **Semantic/Data-Flow HDC**
+   - Extend Rust AST-HDC with behavioral features: definitions, uses,
+     mutation, assignment, borrow style, iterator ownership, result/option
+     flow, binary operators, and return-path shape.
+   - Reuse existing PDG and sheaf diagnostics as the deeper source of truth
+     once the lightweight visitor stabilizes.
+   - Acceptance signal: snippets with identical AST shape but different
+     behavior no longer collapse to the same prototype.
+
+2. **Fast-Fail Geodesic Rejection**
+   - Keep shadow mode first: count candidates that would be rejected before
+     `rustc`, but still compile them to measure false rejects.
+   - Promote to hard mode only under an explicit environment flag after the
+     false-reject rate is understood.
+   - Metrics: would-reject count, hard rejects, compiler invocations saved,
+     and pass-rate impact.
+
+3. **Deterministic AST Repair**
+   - Apply narrow AST transforms before asking an LLM to retry.
+   - Initial transforms: wrap `Result` tail expressions in `Ok(...)`, add
+     `mut` to a named local binding when diagnostics demand it, and later add
+     iterator ownership transforms such as `.iter().copied()`.
+   - The LLM should handle domain logic; Symthaea should handle mechanical
+     Rust repairs.
+
+4. **SMT/HDC Proof Memory**
+   - Start with pure, loop-free arithmetic/string functions.
+   - Store Z3 verdicts, SMTLIB2, examples, and proof/witness summaries behind
+     the same HDC prototype lookup path.
+   - Do not attempt full Rust ownership or heap semantics in v0.
+
+5. **Epistemic Foraging**
+   - Run bounded offline experiments that perturb small Rust snippets, compile
+     them, and store successes/failures as repair memory and semantic
+     prototypes.
+   - This is an offline curriculum generator, not an autonomous production
+     committer.
+
+6. **Swarm, CI, and Embodiment**
+   - Swarm repair should broadcast hard failure states only after single-node
+     semantic repair is measurably useful.
+   - CI should become a sensory organ: failed jobs become structured repair
+     tasks.
+   - Robotics/FEP work should stay separate from coding-agent acceptance, but
+     reuse the same precision-weighted prediction-error philosophy.
+
+### Immediate Contract
+
+The short-term target is not a bigger benchmark. It is lower mean repair
+attempts and fewer compiler invocations on the existing hard lane while keeping
+the quality pass rate stable or better.
+
 Concrete, phased plan to bring Symthaea from 3/10 to 7/10 coding ability.
 Based on comprehensive review of all subsystems (March 6, 2026).
 
