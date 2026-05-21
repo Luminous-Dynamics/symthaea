@@ -10,23 +10,34 @@
 
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::rust_ast_hdc::{
     ast_feature_similarity_to_any, encode_rust_ast_hdc, merge_ast_feature_counts,
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuralPriorScore {
     pub label: String,
     pub score: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuralPrototypeLabels {
     pub category: String,
     pub return_shape: String,
     pub backend: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StructuralPrototypeSnapshot {
+    pub version: u32,
+    pub success_count: usize,
+    pub global: BTreeMap<String, usize>,
+    pub by_category: BTreeMap<String, BTreeMap<String, usize>>,
+    pub by_return_shape: BTreeMap<String, BTreeMap<String, usize>>,
+    pub by_backend: BTreeMap<String, BTreeMap<String, usize>>,
+    pub by_repair_category: BTreeMap<String, BTreeMap<String, usize>>,
 }
 
 impl StructuralPrototypeLabels {
@@ -135,6 +146,37 @@ impl StructuralPrototypeBank {
     pub fn success_count(&self) -> usize {
         self.success_count
     }
+
+    pub fn to_snapshot(&self) -> StructuralPrototypeSnapshot {
+        StructuralPrototypeSnapshot {
+            version: 1,
+            success_count: self.success_count,
+            global: self.global.clone(),
+            by_category: self.by_category.clone(),
+            by_return_shape: self.by_return_shape.clone(),
+            by_backend: self.by_backend.clone(),
+            by_repair_category: self.by_repair_category.clone(),
+        }
+    }
+
+    pub fn from_snapshot(snapshot: StructuralPrototypeSnapshot) -> Self {
+        Self {
+            global: snapshot.global,
+            success_count: snapshot.success_count,
+            by_category: snapshot.by_category,
+            by_return_shape: snapshot.by_return_shape,
+            by_backend: snapshot.by_backend,
+            by_repair_category: snapshot.by_repair_category,
+        }
+    }
+
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(&self.to_snapshot())
+    }
+
+    pub fn from_json(json: &str) -> serde_json::Result<Self> {
+        serde_json::from_str::<StructuralPrototypeSnapshot>(json).map(Self::from_snapshot)
+    }
 }
 
 pub fn ast_features_for_source(source: &str) -> Option<BTreeMap<String, usize>> {
@@ -209,5 +251,24 @@ mod tests {
             "Vec"
         );
         assert_eq!(return_shape_for_signature("fn log()"), "unit");
+    }
+
+    #[test]
+    fn round_trips_compact_prototype_json() {
+        let mut bank = StructuralPrototypeBank::default();
+        let labels = StructuralPrototypeLabels::new("result", "Result", "GeodesicSkeleton");
+        let features = ast_features_for_source(
+            "pub fn parse_i32(raw: &str) -> Result<i32, std::num::ParseIntError> { raw.parse() }",
+        )
+        .unwrap();
+        bank.observe_success(&features, &labels);
+
+        let json = bank.to_json().unwrap();
+        let restored = StructuralPrototypeBank::from_json(&json).unwrap();
+        let score = restored.score(&features, &labels).unwrap();
+
+        assert_eq!(restored.success_count(), 1);
+        assert_eq!(restored.prototype_count(), bank.prototype_count());
+        assert!(score.score > 0.99);
     }
 }

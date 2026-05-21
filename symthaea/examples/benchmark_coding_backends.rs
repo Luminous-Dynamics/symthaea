@@ -175,6 +175,9 @@ struct BenchReport {
     distillation_imported: usize,
     distillation_export_path: Option<String>,
     distillation_exported: usize,
+    structural_prototype_import_path: Option<String>,
+    structural_prototype_imported: bool,
+    structural_prototype_export_path: Option<String>,
     certificate_source_provenance_counts: BTreeMap<String, usize>,
     broca_eval_gate_passed: bool,
     broca_selection_score: f32,
@@ -256,7 +259,26 @@ fn run_benchmark() {
     let mut repair_prior_counts_by_backend = BTreeMap::new();
     let mut repair_prior_labels = BTreeMap::new();
     let selected_tasks = tasks_for_lane(&args.lane);
-    let mut structural_prototypes = StructuralPrototypeBank::default();
+    let mut structural_prototypes = if let Some(path) = args.load_structural_prototypes.as_deref() {
+        match std::fs::read_to_string(path)
+            .map_err(anyhow::Error::from)
+            .and_then(|json| StructuralPrototypeBank::from_json(&json).map_err(anyhow::Error::from))
+        {
+            Ok(bank) => {
+                eprintln!("[benchmark] loaded compact structural prototypes from {path}");
+                bank
+            }
+            Err(error) => {
+                eprintln!(
+                    "error: failed to load compact structural prototypes from {path}: {error}"
+                );
+                std::process::exit(2);
+            }
+        }
+    } else {
+        StructuralPrototypeBank::default()
+    };
+    let structural_prototype_imported = args.load_structural_prototypes.is_some();
 
     for task in selected_tasks {
         let return_shape = return_shape_for_signature(task.signature);
@@ -738,6 +760,9 @@ fn run_benchmark() {
         distillation_imported,
         distillation_export_path: args.save_distillation_jsonl.clone(),
         distillation_exported,
+        structural_prototype_import_path: args.load_structural_prototypes.clone(),
+        structural_prototype_imported,
+        structural_prototype_export_path: args.save_structural_prototypes.clone(),
         certificate_source_provenance_counts,
         broca_eval_gate_passed,
         broca_selection_score,
@@ -760,6 +785,32 @@ fn run_benchmark() {
             "[benchmark] exported {} distillation structural memories to {path}",
             report.distillation_exported
         );
+    }
+    if let Some(path) = args.save_structural_prototypes.as_deref() {
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            if let Err(error) = std::fs::create_dir_all(parent) {
+                eprintln!("error: failed to create parent directory for {path}: {error}");
+                std::process::exit(2);
+            }
+        }
+        match structural_prototypes.to_json() {
+            Ok(json) => {
+                if let Err(error) = std::fs::write(path, json) {
+                    eprintln!(
+                        "error: failed to save compact structural prototypes to {path}: {error}"
+                    );
+                    std::process::exit(2);
+                }
+                eprintln!(
+                    "[benchmark] exported {} compact structural prototypes to {path}",
+                    report.structural_success_prototypes
+                );
+            }
+            Err(error) => {
+                eprintln!("error: failed to serialize compact structural prototypes: {error}");
+                std::process::exit(2);
+            }
+        }
     }
 
     if args.json {
@@ -838,6 +889,12 @@ fn run_benchmark() {
             report.distillation_import_path,
             report.distillation_exported,
             report.distillation_export_path
+        );
+        println!(
+            "compact structural prototypes: imported={} from={:?} exported_to={:?}",
+            report.structural_prototype_imported,
+            report.structural_prototype_import_path,
+            report.structural_prototype_export_path
         );
         println!(
             "Broca eval gate: passed={} selection_score={:.3}",
@@ -956,6 +1013,8 @@ struct Args {
     repair_lessons_jsonl: Option<String>,
     load_distillation_jsonl: Option<String>,
     save_distillation_jsonl: Option<String>,
+    load_structural_prototypes: Option<String>,
+    save_structural_prototypes: Option<String>,
     disable_fep_repair_hints: bool,
     disable_ast_hdc_fep: bool,
 }
@@ -1014,6 +1073,18 @@ impl Args {
                     };
                     args.save_distillation_jsonl = Some(path);
                 }
+                "--load-structural-prototypes" => {
+                    let Some(path) = iter.next() else {
+                        print_help_and_exit(2, "--load-structural-prototypes requires a path");
+                    };
+                    args.load_structural_prototypes = Some(path);
+                }
+                "--save-structural-prototypes" => {
+                    let Some(path) = iter.next() else {
+                        print_help_and_exit(2, "--save-structural-prototypes requires a path");
+                    };
+                    args.save_structural_prototypes = Some(path);
+                }
                 "--disable-fep-repair-hints" => args.disable_fep_repair_hints = true,
                 "--disable-ast-hdc-fep" => args.disable_ast_hdc_fep = true,
                 "--help" | "-h" => print_help_and_exit(0, ""),
@@ -1044,6 +1115,10 @@ fn print_help_and_exit(code: i32, error: &str) -> ! {
     eprintln!("                      Seed verified structural memory from distillation JSONL");
     eprintln!("  --save-distillation-jsonl PATH");
     eprintln!("                      Export verified structural memory after the benchmark");
+    eprintln!("  --load-structural-prototypes PATH");
+    eprintln!("                      Seed compact AST-HDC prototype memory from JSON");
+    eprintln!("  --save-structural-prototypes PATH");
+    eprintln!("                      Export compact AST-HDC prototype memory after the benchmark");
     eprintln!("  --disable-fep-repair-hints");
     eprintln!(
         "                      Ablate FEP prediction-error hints while still measuring failures"

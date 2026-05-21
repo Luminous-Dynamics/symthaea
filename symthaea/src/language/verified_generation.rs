@@ -32,7 +32,7 @@ use super::code_parser::EntityKind;
 use super::coding_prediction_error::{
     CodingPredictionError, prediction_error_categories, prediction_error_diagnostics,
     prediction_error_hints, prediction_errors_from_execution,
-    structural_prediction_error_from_ast_parse,
+    structural_prediction_error_from_ast_parse, structural_prediction_error_from_prior,
 };
 use super::llm_backend::{GenerationParams, LLMBackend};
 use super::repair_memory;
@@ -845,6 +845,9 @@ fn observe_ast_hdc(
             let feature_count = encoded.features.values().sum();
             let structural_prior =
                 structural_prototypes.score(&encoded.features, structural_labels);
+            let prior_prediction_error = structural_prior
+                .as_ref()
+                .and_then(|prior| structural_prior_prediction_error(prior, retry_number));
             trace.parse_successes += 1;
             trace.feature_observations += 1;
             trace.total_feature_count += feature_count;
@@ -870,7 +873,7 @@ fn observe_ast_hdc(
             trace.last_features = Some(encoded.features);
             AstHdcObservation {
                 hv: Some(encoded.hv),
-                prediction_error: None,
+                prediction_error: prior_prediction_error,
                 structural_prior,
             }
         }
@@ -887,6 +890,29 @@ fn observe_ast_hdc(
             }
         }
     }
+}
+
+fn structural_prior_prediction_error(
+    prior: &StructuralPriorScore,
+    retry_number: usize,
+) -> Option<CodingPredictionError> {
+    let threshold = std::env::var("SYMTHAEA_STRUCTURAL_PRIOR_SURPRISE_THRESHOLD")
+        .ok()
+        .and_then(|raw| raw.parse::<f32>().ok())
+        .unwrap_or(0.25)
+        .clamp(0.0, 1.0);
+    if prior.score >= threshold {
+        return None;
+    }
+
+    Some(structural_prediction_error_from_prior(
+        format!(
+            "Candidate AST similarity {:.3} is below structural prior threshold {:.3} for `{}`",
+            prior.score, threshold, prior.label
+        ),
+        retry_number,
+        1.0 - prior.score,
+    ))
 }
 
 fn augment_spec_with_compile_errors(

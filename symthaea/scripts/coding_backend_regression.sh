@@ -33,6 +33,8 @@ REPAIR_LESSONS="${CODING_BACKEND_REPAIR_LESSONS:-}"
 BROCA_REPAIR_TRAINING="${CODING_BACKEND_BROCA_REPAIR_TRAINING:-}"
 DISTILLATION_IN="${CODING_BACKEND_DISTILLATION_IN:-}"
 DISTILLATION_OUT="${CODING_BACKEND_DISTILLATION_OUT:-}"
+STRUCTURAL_PROTOTYPES_IN="${CODING_BACKEND_STRUCTURAL_PROTOTYPES_IN:-}"
+STRUCTURAL_PROTOTYPES_OUT="${CODING_BACKEND_STRUCTURAL_PROTOTYPES_OUT:-}"
 
 if [[ "$LANE" == "repair" || "$LANE" == "all" ]]; then
     export SYMTHAEA_ENABLE_FORCED_REPAIR_BENCH=1
@@ -55,6 +57,12 @@ if [[ -n "$DISTILLATION_IN" ]]; then
 fi
 if [[ -n "$DISTILLATION_OUT" ]]; then
     benchmark_args+=(--save-distillation-jsonl "$DISTILLATION_OUT")
+fi
+if [[ -n "$STRUCTURAL_PROTOTYPES_IN" ]]; then
+    benchmark_args+=(--load-structural-prototypes "$STRUCTURAL_PROTOTYPES_IN")
+fi
+if [[ -n "$STRUCTURAL_PROTOTYPES_OUT" ]]; then
+    benchmark_args+=(--save-structural-prototypes "$STRUCTURAL_PROTOTYPES_OUT")
 fi
 cargo run --example benchmark_coding_backends \
     --features code_generation,geodesic_synthesis \
@@ -91,4 +99,10 @@ if [[ -n "$DISTILLATION_IN" ]]; then
 fi
 if [[ -n "$DISTILLATION_OUT" ]]; then
     echo "  distillation out: $DISTILLATION_OUT"
+fi
+if [[ -n "$STRUCTURAL_PROTOTYPES_IN" ]]; then
+    echo "  structural prototypes in: $STRUCTURAL_PROTOTYPES_IN"
+fi
+if [[ -n "$STRUCTURAL_PROTOTYPES_OUT" ]]; then
+    echo "  structural prototypes out: $STRUCTURAL_PROTOTYPES_OUT"
 fi

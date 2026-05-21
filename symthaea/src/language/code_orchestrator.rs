@@ -1815,9 +1815,11 @@ impl CodeOrchestrator {
             })
             .collect::<Vec<_>>();
 
-        candidates.sort_by(|(score_a, capture_a), (score_b, capture_b)| {
+        candidates.sort_by(|(relevance_a, capture_a), (relevance_b, capture_b)| {
+            let score_a = relevance_a.score;
+            let score_b = relevance_b.score;
             score_b
-                .partial_cmp(score_a)
+                .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| {
                     capture_b
@@ -1829,13 +1831,19 @@ impl CodeOrchestrator {
 
         candidates
             .into_iter()
-            .filter(|(score, _)| *score > 0.0)
+            .filter(|(relevance, _)| relevance.score > 0.0)
             .take(limit)
-            .map(|(_, capture)| {
+            .map(|(relevance, capture)| {
                 (
                     format!(
-                        "verified structural memory: {} via {} return {} quality {:.3}",
-                        capture.name, capture.backend, capture.return_shape, capture.quality
+                        "verified structural memory: {} via {} return {} quality {:.3} relevance {:.3} lexical {:.3} return_match {:.1}",
+                        capture.name,
+                        capture.backend,
+                        capture.return_shape,
+                        capture.quality,
+                        relevance.score,
+                        relevance.lexical_score,
+                        relevance.return_shape_score
                     ),
                     capture.source,
                 )
@@ -1844,11 +1852,18 @@ impl CodeOrchestrator {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct StructuralMemoryRelevance {
+    score: f32,
+    lexical_score: f32,
+    return_shape_score: f32,
+}
+
 fn structural_memory_relevance(
     request_text: &str,
     request_return_shape: &str,
     capture: &DistillationCapture,
-) -> f32 {
+) -> StructuralMemoryRelevance {
     let request_tokens = lexical_tokens(request_text);
     let capture_text = format!(
         "{} {} {} {}",
@@ -1874,14 +1889,24 @@ fn structural_memory_relevance(
     // lexical or return-shape overlap, high-quality unrelated code should not
     // enter the prompt as misleading structural memory.
     if lexical_score == 0.0 && return_shape_score == 0.0 {
-        return 0.0;
+        return StructuralMemoryRelevance {
+            score: 0.0,
+            lexical_score,
+            return_shape_score,
+        };
     }
 
-    if request_tokens.is_empty() {
-        return (0.85 * return_shape_score + 0.15 * capture.quality).clamp(0.0, 1.0);
-    }
+    let score = if request_tokens.is_empty() {
+        (0.85 * return_shape_score + 0.15 * capture.quality).clamp(0.0, 1.0)
+    } else {
+        (0.55 * lexical_score + 0.30 * return_shape_score + 0.15 * capture.quality).clamp(0.0, 1.0)
+    };
 
-    (0.55 * lexical_score + 0.30 * return_shape_score + 0.15 * capture.quality).clamp(0.0, 1.0)
+    StructuralMemoryRelevance {
+        score,
+        lexical_score,
+        return_shape_score,
+    }
 }
 
 fn lexical_tokens(text: &str) -> std::collections::BTreeSet<String> {

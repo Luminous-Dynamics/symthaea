@@ -80,6 +80,22 @@ pub fn structural_prediction_error_from_ast_parse(
     )
 }
 
+pub fn structural_prediction_error_from_prior(
+    diagnostic: impl Into<String>,
+    retry_number: usize,
+    surprise: f32,
+) -> CodingPredictionError {
+    let diagnostic = diagnostic.into();
+    text_prediction_error(
+        CodingFeedbackKind::Structural,
+        "structural_prior_mismatch",
+        &diagnostic,
+        None,
+        retry_number,
+        surprise.clamp(0.0, 1.0),
+    )
+}
+
 pub fn prediction_error_hints(errors: &[CodingPredictionError]) -> Vec<(String, String)> {
     if std::env::var_os("SYMTHAEA_DISABLE_FEP_REPAIR_HINTS").is_some() {
         return Vec::new();
@@ -387,5 +403,15 @@ mod tests {
         assert_eq!(error.category, "ast_parse_failure");
         assert_eq!(error.retry_number, 3);
         assert!(error.surprise >= 0.75);
+    }
+
+    #[test]
+    fn low_structural_prior_becomes_prediction_error() {
+        let error = structural_prediction_error_from_prior("low AST prior similarity", 2, 0.42);
+
+        assert_eq!(error.kind, CodingFeedbackKind::Structural);
+        assert_eq!(error.category, "structural_prior_mismatch");
+        assert_eq!(error.retry_number, 2);
+        assert_eq!(error.surprise, 0.42);
     }
 }
