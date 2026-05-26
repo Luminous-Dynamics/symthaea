@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-space-screener"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license.workspace = true
 description = "Automated conjunction screening daemon for mycelix-space"
 

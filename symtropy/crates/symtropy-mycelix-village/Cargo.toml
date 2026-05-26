@@ -1,7 +1,7 @@
 [package]
 name = "symtropy-mycelix-village"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 publish = false
 
@@ -12,14 +12,24 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
     "bevy_core_pipeline",
-    "multi_threaded",
-    "x11"
+    "bevy_pbr",
+    "multi_threaded"
 ] }
 symtropy-bevy-core = { path = "../symtropy-bevy-core" }
 symthaea-bevy-brain = { path = "../symthaea-bevy-brain" }
 symtropy-physics = { path = "../symtropy-physics" }
+symtropy-physics-gpu = { path = "../symtropy-physics-gpu" }
+symtropy-rapier3d-bridge = { path = "../symtropy-rapier3d-bridge" }
+symtropy-terrain = { path = "../symtropy-terrain" }
+rapier3d = "0.18"
 nalgebra = "0.34"
 rand = "0.8"
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+serde_json = "1.0"
+base64 = "0.22"
+image = { version = "0.25", features = ["jpeg"] }
 
 [[bin]]
 name = "mycelix-village-visual"
@@ -28,3 +38,7 @@ path = "src/main.rs"
 [[bin]]
 name = "mycelix-scenario-harness"
 path = "src/headless.rs"
+
+[[bin]]
+name = "city-scale"
+path = "src/city_scale.rs"

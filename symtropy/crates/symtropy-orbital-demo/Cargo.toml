@@ -1,7 +1,7 @@
 [package]
 name = "symtropy-orbital-demo"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Consciousness-gated orbital-arm demo — Φ tracks comm-window + solar + attitude drift"
 

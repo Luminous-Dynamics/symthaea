@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Secure Dreaming — Zero-Trust Architectural Evolution with Post-Quantum Attestation
 
-use crate::evolutionary_scaffolder::EvolutionResult;
 use crate::self_optimization::SelfOptimizationEngine;
 use pqcrypto_dilithium::dilithium5;
 use pqcrypto_traits::sign::{PublicKey, SecretKey, SignedMessage};

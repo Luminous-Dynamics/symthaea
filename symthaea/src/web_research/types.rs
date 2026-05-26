@@ -313,9 +313,9 @@ impl Default for WebResearchConfig {
             confidence_threshold: 0.3,
             meta_learning_enabled: false,
             source_credibility: HashMap::new(),
-            search_provider: std::env::var("SYMTHAEA_SEARCH_PROVIDER").ok(),
+            search_provider: Some(std::env::var("SYMTHAEA_SEARCH_PROVIDER").unwrap_or_else(|_| "searxng".to_string())),
             search_api_key: std::env::var("SYMTHAEA_SEARCH_API_KEY").ok(),
-            search_endpoint: std::env::var("SYMTHAEA_SEARCH_ENDPOINT").ok(),
+            search_endpoint: Some(std::env::var("SYMTHAEA_SEARCH_ENDPOINT").unwrap_or_else(|_| "http://127.0.0.1:8888".to_string())),
             enable_arxiv_api: env_flag("SYMTHAEA_ARXIV_API_ENABLED", true),
             arxiv_endpoint: std::env::var("SYMTHAEA_ARXIV_API_ENDPOINT")
                 .unwrap_or_else(|_| "https://export.arxiv.org/api/query".to_string()),

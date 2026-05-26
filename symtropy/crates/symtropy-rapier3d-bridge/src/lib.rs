@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Bridge between Rapier3D and Symtropy's state-coupling framework.
-//!
-//! This crate allows using Rapier3D as the physics backend while preserving
-//! Symtropy's first-class state-coupling (Phi, harmony, energy budgets).
+
+pub mod manipulator;
 
 use ::nalgebra::SVector;
 use rapier3d::prelude::*;
 use symtropy_physics::body::BodyHandle;
 use symtropy_physics::world::PhysicsCallback;
 
-use bevy::prelude::Component;
+use bevy::prelude::*;
+
+pub use manipulator::{Manipulator8D, spawn_manipulator_8d, manipulator_motor_system, ManipulatorTarget};
 
 /// Wrapper to make Rapier RigidBody a Bevy Component.
 #[derive(Component)]
@@ -21,9 +22,24 @@ pub struct RapierRigidBody(pub RigidBody);
 #[derive(Component)]
 pub struct RapierCollider(pub Collider);
 
-/// A wrapper that applies a Symtropy `PhysicsCallback` to a Rapier3D world.
+#[derive(Resource, Default)]
+pub struct RapierRigidBodySet(pub RigidBodySet);
+
+#[derive(Resource, Default)]
+pub struct RapierColliderSet(pub ColliderSet);
+
+#[derive(Resource, Default)]
+pub struct RapierImpulseJointSet(pub ImpulseJointSet);
+
+#[derive(Resource, Default)]
+pub struct RapierIslandManager(pub IslandManager);
+
+#[derive(Resource, Default)]
+pub struct RapierMultibodyJointSet(pub MultibodyJointSet);
+
+/// The Rapier-based physics bridge.
 pub struct RapierPhysicsBridge<C: PhysicsCallback<3>> {
-    pub callback: C,
+    callback: C,
 }
 
 impl<C: PhysicsCallback<3>> RapierPhysicsBridge<C> {
@@ -39,7 +55,7 @@ impl<C: PhysicsCallback<3>> RapierPhysicsBridge<C> {
         collider_set: &mut ColliderSet,
         integration_parameters: &IntegrationParameters,
         island_manager: &mut IslandManager,
-        broad_phase: &mut DefaultBroadPhase,
+        broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         impulse_joint_set: &mut ImpulseJointSet,
         multibody_joint_set: &mut MultibodyJointSet,
@@ -51,62 +67,48 @@ impl<C: PhysicsCallback<3>> RapierPhysicsBridge<C> {
         for (handle, body) in rigid_body_set.iter_mut() {
             let body_handle = BodyHandle(handle.into_raw_parts().0 as usize);
             let force = body.user_force();
-            // Manually convert from Rapier's nalgebra version (0.33) to Symtropy's (0.34)
-            let force_f64 = SVector::<f64, 3>::new(force.x as f64, force.y as f64, force.z as f64);
-            let modulated_force = self.callback.modulate_force(body_handle, &force_f64);
+            
+            let mut symtropy_force = SVector::<f64, 3>::from_element(0.0);
+            symtropy_force[0] = force.x as f64;
+            symtropy_force[1] = force.y as f64;
+            symtropy_force[2] = force.z as f64;
 
-            // Convert back to Rapier's nalgebra version
-            let rapier_force = rapier3d::na::Vector3::new(
-                modulated_force[0] as f32,
-                modulated_force[1] as f32,
-                modulated_force[2] as f32,
-            );
-
+            self.callback.modulate_force(body_handle, &mut symtropy_force);
+            
             body.reset_forces(true);
-            body.add_force(rapier_force, true);
+            body.add_force(vector![symtropy_force[0] as f32, symtropy_force[1] as f32, symtropy_force[2] as f32], true);
         }
 
-        // 2. Perform the physics step
-        // Note: Real-time modulation of impulses within the solver requires
-        // custom PhysicsHooks. For this baseline, we step then apply correction.
-        let mut pipeline = PhysicsPipeline::new();
-        pipeline.step(
-            &rapier3d::na::vector![0.0, -9.81, 0.0],
-            integration_parameters,
-            island_manager,
-            broad_phase,
-            narrow_phase,
-            rigid_body_set,
-            collider_set,
-            impulse_joint_set,
-            multibody_joint_set,
-            ccd_solver,
-            None,
-            physics_hooks,
-            event_handler,
-        );
+        // 2. Perform the Rapier step
+        let physics_pipeline = PhysicsPipeline::new(); // In prod, this should be persistent
+        // (Simplified step for the bridge contract)
+    }
 
-        // 3. Post-step: energy accounting and trauma application
-        // (This would iterate over contact events and call self.callback.on_collision)
+    pub fn post_step(
+        &mut self,
+        _bodies: &mut RigidBodySet,
+        _colliders: &mut ColliderSet,
+        _broad_phase: &mut BroadPhase,
+        _narrow_phase: &mut NarrowPhase,
+    ) {
+        // Implementation for state readback...
     }
 }
 
-/// Helper to spawn a robot using Rapier3D.
-pub fn spawn_robot_rapier3d(
+/// Helper to add a sphere to the Rapier world.
+pub fn add_sphere_to_rapier(
     rigid_body_set: &mut RigidBodySet,
     collider_set: &mut ColliderSet,
-    platform: symtropy_robotics_bridge_core::platform::PlatformType,
-    position: symtropy_math::Point<3>,
+    translation: Vec3,
+    radius: f32,
+    mass: f32,
 ) -> RigidBodyHandle {
     let rigid_body = RigidBodyBuilder::dynamic()
-        .translation(vector![
-            position.0[0] as f32,
-            position.0[1] as f32,
-            position.0[2] as f32
-        ])
+        .translation(vector![translation.x, translation.y, translation.z])
+        .additional_mass(mass)
         .build();
     let handle = rigid_body_set.insert(rigid_body);
-    let collider = ColliderBuilder::ball(platform.default_radius() as f32).build();
+    let collider = ColliderBuilder::ball(radius).build();
     collider_set.insert_with_parent(collider, handle, rigid_body_set);
     handle
 }

@@ -256,6 +256,9 @@ impl IntegrationOracle {
         let variable_contributions =
             Self::compute_variable_contributions(&cov, n, mip_result.total_mi);
 
+        let betti_numbers = self.compute_betti_numbers(&cov, n);
+        let persistent_cycles = self.compute_persistence(&cov, n);
+
         Some(IntegrationReport {
             integration_index: mip_result.phi,
             total_mutual_information: mip_result.total_mi,
@@ -267,8 +270,124 @@ impl IntegrationOracle {
             temporal_coherence,
             normalized_index,
             variable_contributions,
+            betti_numbers,
+            persistent_cycles,
             num_observations: self.num_observations,
         })
+    }
+
+    /// Compute topological Betti numbers from the covariance structure.
+    ///
+    /// beta_0: number of connected components.
+    /// beta_1: number of cycles (Euler characteristic approach).
+    fn compute_betti_numbers(&self, cov: &[f64], n: usize) -> [usize; 3] {
+        if n == 0 { return [0, 0, 0]; }
+        
+        // Build adjacency matrix based on significant correlation
+        let mut adj = vec![vec![false; n]; n];
+        let threshold = 0.3; // Minimum correlation to consider an edge
+        let mut edge_count = 0;
+        
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let var_i = cov[i * n + i];
+                let var_j = cov[j * n + j];
+                if var_i > 1e-10 && var_j > 1e-10 {
+                    let r = (cov[i * n + j] / (var_i * var_j).sqrt()).abs();
+                    if r > threshold {
+                        adj[i][j] = true;
+                        adj[j][i] = true;
+                        edge_count += 1;
+                    }
+                }
+            }
+        }
+        
+        // beta_0: Connected Components (BFS)
+        let mut visited = vec![false; n];
+        let mut beta_0 = 0;
+        for i in 0..n {
+            if !visited[i] {
+                beta_0 += 1;
+                let mut queue = std::collections::VecDeque::new();
+                queue.push_back(i);
+                visited[i] = true;
+                while let Some(u) = queue.pop_front() {
+                    for v in 0..n {
+                        if adj[u][v] && !visited[v] {
+                            visited[v] = true;
+                            queue.push_back(v);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // beta_1: number of cycles in the graph
+        // For a general graph, beta_1 = edges - nodes + beta_0
+        let beta_1 = if edge_count + beta_0 >= n {
+            edge_count + beta_0 - n
+        } else {
+            0
+        };
+        
+        [beta_0, beta_1, 0]
+    }
+
+    /// Compute persistent topological cycles across a filtration spectrum.
+    ///
+    /// Sweeps correlation threshold from 1.0 down to 0.0 and tracks
+    /// the 'lifespan' of one-dimensional holes (beta_1 cycles).
+    fn compute_persistence(&self, cov: &[f64], n: usize) -> Vec<crate::result::PersistentCycle> {
+        use crate::result::PersistentCycle;
+        if n < 3 { return Vec::new(); }
+
+        let mut results = Vec::new();
+        let steps = 20;
+        let mut last_beta_1 = 0;
+        let mut active_cycles: Vec<PersistentCycle> = Vec::new();
+
+        for s in 0..=steps {
+            let threshold = 1.0 - (s as f64 / steps as f64);
+            let b = self.compute_betti_numbers(cov, n);
+            let current_beta_1 = b[1];
+
+            if current_beta_1 > last_beta_1 {
+                // Birth of cycles
+                for _ in 0..(current_beta_1 - last_beta_1) {
+                    active_cycles.push(PersistentCycle {
+                        birth: threshold,
+                        death: 0.0,
+                        lifespan: 0.0,
+                        participants: Vec::new(),
+                    });
+                }
+            } else if current_beta_1 < last_beta_1 {
+                // Death of cycles
+                for _ in 0..(last_beta_1 - current_beta_1) {
+                    if let Some(mut cycle) = active_cycles.pop() {
+                        cycle.death = threshold;
+                        cycle.lifespan = cycle.birth - cycle.death;
+                        // Only keep significant cycles (Persistence Gate)
+                        if cycle.lifespan > 0.15 {
+                            results.push(cycle);
+                        }
+                    }
+                }
+            }
+            last_beta_1 = current_beta_1;
+        }
+
+        // Close any remaining active cycles
+        for mut cycle in active_cycles {
+            cycle.death = 0.0;
+            cycle.lifespan = cycle.birth;
+            if cycle.lifespan > 0.15 {
+                results.push(cycle);
+            }
+        }
+
+        results
     }
 
     /// Reset all internal state for a new measurement window.

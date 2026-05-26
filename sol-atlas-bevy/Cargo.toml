@@ -3,12 +3,14 @@
 [package]
 name = "sol-atlas-bevy"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Bevy 0.18 plugin for Sol Atlas globe rendering"
 
 [dependencies]
 sol-atlas-core = { path = "../sol-atlas-core" }
+mycelix-earth = { path = "../mycelix-earth" }
+mycelix-desci-core = { path = "../mycelix-desci/src/core" }
 
 bevy_camera = "0.18"
 

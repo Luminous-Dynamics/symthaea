@@ -78,17 +78,17 @@ pub fn player_consciousness_system(
     };
 
     let inputs = ConsciousnessInputs {
-        phi: (1.0 - load as f64) * 0.8 + 0.2, // integration degrades with stress
-        broadcast: (1.0 - stress.arousal as f64 * 0.5).max(0.1), // panic narrows broadcast
-        working_memory: (1.0 - load as f64 * 0.6).max(0.1),
-        attention: (stress.arousal as f64 * 0.3 + 0.5).min(1.0), // some arousal helps
-        recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
-        embodiment: (1.0_f64 - danger as f64 * 0.3).max(0.2),
-        knowledge: (harmony.activations.iter().filter(|&&a| a > 0.3).count() as f64 / 8.0).min(1.0),
+        phi: (1.0f64 - load as f64) * 0.8f64 + 0.2f64, // integration degrades with stress
+        broadcast: (1.0f64 - stress.arousal as f64 * 0.5f64).max(0.1f64), // panic narrows broadcast
+        working_memory: (1.0f64 - load as f64 * 0.6f64).max(0.1f64),
+        attention: (stress.arousal as f64 * 0.3f64 + 0.5f64).min(1.0f64), // some arousal helps
+        recurrence: (harmony.total_energy as f64 / 8.0f64).min(1.0f64),
+        embodiment: (1.0_f64 - danger as f64 * 0.3f64).max(0.2f64),
+        knowledge: (harmony.activations.iter().filter(|&&a| a as f64 > 0.3f64).count() as f64 / 8.0f64).min(1.0f64),
         synchrony: if harmony.is_sanctuary {
-            0.9
+            0.9f64
         } else {
-            0.4 + harmony.total_energy as f64 * 0.05
+            0.4f64 + harmony.total_energy as f64 * 0.05f64
         },
     };
 

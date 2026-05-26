@@ -1,0 +1,16 @@
+[package]
+name = "desci_claim_integrity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+mycelix-desci-core = { path = "../../../src/core" }
+mycelix-zkp-core = { path = "../../../../crates/mycelix-zkp-core", default-features = false, features = ["backend-winterfell"] }
+winterfell = "0.13"
+holochain_serialized_bytes = "0.0.57"

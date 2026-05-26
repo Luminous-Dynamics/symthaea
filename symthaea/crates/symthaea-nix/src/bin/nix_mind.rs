@@ -62,8 +62,8 @@ fn main() {
         }
 
         Command::Rollback { generation } => {
-            let cmd = if let Some(gen) = generation {
-                GenerationManager::switch_to(gen)
+            let cmd = if let Some(g) = generation {
+                GenerationManager::switch_to(g)
             } else {
                 GenerationManager::rollback()
             };
@@ -468,8 +468,8 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
                         println!("  Taking system snapshot...");
                         println!("  Services: {}", snap.services.len());
                         println!("  Packages: {}", snap.packages.len());
-                        if let Some(gen) = snap.generation {
-                            println!("  Generation: {}", gen);
+                        if let Some(g) = snap.generation {
+                            println!("  Generation: {}", g);
                         }
                         if let Some(size) = snap.store_size_bytes {
                             println!("  Store size: {} bytes", size);
@@ -726,20 +726,20 @@ fn cmd_generations_list(format: OutputFormat) {
                 );
             }
             OutputFormat::Minimal => {
-                for gen in &gens {
-                    let cur = if gen.current { "*" } else { "" };
+                for g in &gens {
+                    let cur = if g.current { "*" } else { "" };
                     println!(
                         "{}{}\t{}\t{}",
-                        gen.number, cur, gen.nixos_version, gen.kernel_version
+                        g.number, cur, g.nixos_version, g.kernel_version
                     );
                 }
             }
             _ => {
-                for gen in &gens {
-                    let current = if gen.current { " (current)" } else { "" };
+                for g in &gens {
+                    let current = if g.current { " (current)" } else { "" };
                     println!(
                         "  {}  {}  {}  {}{}",
-                        gen.number, gen.date, gen.nixos_version, gen.kernel_version, current
+                        g.number, g.date, g.nixos_version, g.kernel_version, current
                     );
                 }
                 println!("  {} generations total", gens.len());

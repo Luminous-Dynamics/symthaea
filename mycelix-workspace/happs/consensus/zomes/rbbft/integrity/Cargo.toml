@@ -1,7 +1,7 @@
 [package]
 name = "rbbft_integrity"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "RB-BFT Consensus Integrity Zome - Validation for reputation-based Byzantine fault tolerance"
 
 [lib]

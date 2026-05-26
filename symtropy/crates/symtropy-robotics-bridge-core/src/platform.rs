@@ -28,6 +28,12 @@ pub enum PlatformType {
     Exoskeleton,
 }
 
+impl Default for PlatformType {
+    fn default() -> Self {
+        Self::Humanoid
+    }
+}
+
 impl PlatformType {
     /// Number of actuators for this platform.
     ///

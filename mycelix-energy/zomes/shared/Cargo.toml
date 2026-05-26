@@ -1,7 +1,7 @@
 [package]
 name = "mycelix_energy_shared"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Shared utilities for Mycelix Energy zomes - batch queries and common types"
 
 [lib]

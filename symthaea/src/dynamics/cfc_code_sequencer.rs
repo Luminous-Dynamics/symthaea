@@ -914,6 +914,49 @@ impl CfCCodeSequencer {
         net.train_step_bptt(&inputs, &targets, &dts, learning_rate)
     }
 
+    /// Apply an online Reinforcement Learning from Compiler Feedback (RLCF) update.
+    ///
+    /// This method performs a non-blocking weight update based on the compiler validation
+    /// status of a generated code plan. It reinforces successful paths and penalizes
+    /// structures that lead to borrow-checker or type errors.
+    ///
+    /// # Arguments
+    /// * `intent_hv` - The original intent vector that drove the generation.
+    /// * `action_sequence` - The sequence of structural actions taken by the sequencer.
+    /// * `success` - Whether the resulting code compiled successfully.
+    pub fn apply_online_rlcf_update(
+        &self,
+        intent_hv: &ContinuousHV,
+        action_sequence: &[PlanAction],
+        success: bool,
+    ) -> anyhow::Result<f32> {
+        if action_sequence.is_empty() {
+            return Ok(0.0);
+        }
+
+        // 1. Map success/failure to a gradient direction and localized SGD learning rate.
+        // Verified successful paths are boosted to "matching activations".
+        // Failures (Borrow/Type) are used to "reinforce rejection boundaries" via negative steps.
+        let learning_rate = if success {
+            0.002f32 // Conservative reinforcement of successful patterns
+        } else {
+            -0.008f32 // Aggressive penalty to push dynamics away from failing states
+        };
+
+        if !success {
+            tracing::info!(
+                "RLCF: Penalizing disproven code path ({} actions) via negative RLCF step.",
+                action_sequence.len()
+            );
+        }
+
+        // 2. Execute localized gradient update.
+        // We leverage the BPTT engine to propagate the feedback through the temporal dynamics.
+        // A negative learning rate inverts the Adam/SGD step, effectively maximizing loss
+        // for failure sequences and thus hardening the rejection boundary.
+        self.train_sequence(intent_hv, action_sequence, learning_rate)
+    }
+
     /// Export all network weights as a flat f32 vector.
     ///
     /// Format: [cell0_w_in | cell0_w_h | cell0_b_h | cell0_tau | output_weights | output_bias]
@@ -1170,8 +1213,9 @@ impl CfCCodeSequencer {
         &self,
         intent_hv: &ContinuousHV,
         context_hvs: &[&ContinuousHV],
+        negatives: &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     ) -> Vec<CodePlanStep> {
-        self.plan_structure_inner(intent_hv, context_hvs, None)
+        self.plan_structure_inner(intent_hv, context_hvs, None, negatives)
     }
 
     /// Plan code structure with direct purpose text for improved pattern detection.
@@ -1185,8 +1229,9 @@ impl CfCCodeSequencer {
         intent_hv: &ContinuousHV,
         context_hvs: &[&ContinuousHV],
         purpose: &str,
+        negatives: &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     ) -> Vec<CodePlanStep> {
-        self.plan_structure_inner(intent_hv, context_hvs, Some(purpose))
+        self.plan_structure_inner(intent_hv, context_hvs, Some(purpose), negatives)
     }
 
     fn plan_structure_inner(
@@ -1194,6 +1239,7 @@ impl CfCCodeSequencer {
         intent_hv: &ContinuousHV,
         context_hvs: &[&ContinuousHV],
         purpose: Option<&str>,
+        negatives: &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     ) -> Vec<CodePlanStep> {
         // Build network input: intent HV blended with context
         let mut input = self.hv_to_input(intent_hv);
@@ -1222,7 +1268,12 @@ impl CfCCodeSequencer {
 
         for _step in 0..self.config.max_steps {
             let output = net.forward(&input, self.config.dt);
-            let (action, confidence) = self.decode_output(&output);
+            let (action, mut confidence) = self.decode_output(&output);
+
+            // Apply severe cost penalty for similarity to disproven approaches (INV-12)
+            let action_target = self.action_to_target(&action);
+            let penalty = negatives.compute_penalty(action_target.as_slice().unwrap_or(&[]));
+            confidence = (confidence - penalty as f32).max(0.0);
 
             // Stop if confidence is too low or we hit Complete
             if confidence < self.config.completion_threshold || action == PlanAction::Complete {
@@ -1279,8 +1330,9 @@ mod tests {
     fn test_plan_produces_steps() {
         let sequencer = CfCCodeSequencer::default();
         let intent = ContinuousHV::random(512, 42);
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
-        let plan = sequencer.plan_structure(&intent, &[]);
+        let plan = sequencer.plan_structure(&intent, &[], &negatives);
         assert!(!plan.is_empty());
 
         // All steps should have positive confidence
@@ -1295,8 +1347,9 @@ mod tests {
         let intent = ContinuousHV::random(512, 42);
         let ctx1 = ContinuousHV::random(512, 43);
         let ctx2 = ContinuousHV::random(512, 44);
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
-        let plan = sequencer.plan_structure(&intent, &[&ctx1, &ctx2]);
+        let plan = sequencer.plan_structure(&intent, &[&ctx1, &ctx2], &negatives);
         assert!(!plan.is_empty());
     }
 
@@ -1304,8 +1357,9 @@ mod tests {
     fn test_no_consecutive_duplicates() {
         let sequencer = CfCCodeSequencer::default();
         let intent = ContinuousHV::random(512, 42);
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
-        let plan = sequencer.plan_structure(&intent, &[]);
+        let plan = sequencer.plan_structure(&intent, &[], &negatives);
         for i in 1..plan.len() {
             assert_ne!(
                 plan[i].action,
@@ -1358,12 +1412,34 @@ mod tests {
     }
 
     #[test]
+    fn test_online_rlcf_update_improves_or_penalizes() {
+        let sequencer = CfCCodeSequencer::default();
+        let intent = ContinuousHV::random(512, 42);
+        let action = PlanAction::DefineFunction;
+        let actions = vec![action.clone()];
+
+        // Measure initial loss for this action
+        let initial_loss = sequencer.train_step(&intent, &action, 0.0).unwrap();
+
+        // Apply RLCF Success
+        sequencer.apply_online_rlcf_update(&intent, &actions, true).unwrap();
+        let success_loss = sequencer.train_step(&intent, &action, 0.0).unwrap();
+        assert!(success_loss < initial_loss, "Success RLCF should reduce loss for the path");
+
+        // Apply RLCF Failure (aggressive)
+        sequencer.apply_online_rlcf_update(&intent, &actions, false).unwrap();
+        let failure_loss = sequencer.train_step(&intent, &action, 0.0).unwrap();
+        assert!(failure_loss > success_loss, "Failure RLCF should increase loss for the path");
+    }
+
+    #[test]
     fn test_weight_export_import_roundtrip() {
         let sequencer = CfCCodeSequencer::default();
         let intent = ContinuousHV::random(512, 42);
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // Get plan before
-        let plan_before = sequencer.plan_structure(&intent, &[]);
+        let plan_before = sequencer.plan_structure(&intent, &[], &negatives);
 
         // Export and reimport weights
         let weights = sequencer.export_weights();
@@ -1377,7 +1453,7 @@ mod tests {
         sequencer2.import_weights(&weights).unwrap();
 
         // Plans should be identical after import
-        let plan_after = sequencer2.plan_structure(&intent, &[]);
+        let plan_after = sequencer2.plan_structure(&intent, &[], &negatives);
         assert_eq!(plan_before.len(), plan_after.len());
         for (a, b) in plan_before.iter().zip(plan_after.iter()) {
             assert_eq!(a.action, b.action);
@@ -1495,10 +1571,11 @@ mod tests {
             hdc_dim: dim,
             ..Default::default()
         });
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // A random HV with no algorithm-specific keywords should still produce a plan
         let intent = ContinuousHV::random(dim, 9999);
-        let plan = sequencer.plan_structure(&intent, &[]);
+        let plan = sequencer.plan_structure(&intent, &[], &negatives);
         assert!(!plan.is_empty(), "Generic fallback should produce a plan");
 
         // All steps should have positive confidence
@@ -1536,10 +1613,11 @@ mod tests {
             hdc_dim: dim,
             ..Default::default()
         });
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // Create a sorting-flavored intent HV
         let intent = make_keyword_hv(dim, &["sort", "compare", "swap", "order", "ascending"]);
-        let plan = sequencer.plan_structure(&intent, &[]);
+        let plan = sequencer.plan_structure(&intent, &[], &negatives);
 
         // Plan should contain algorithm-specific context strings from the template
         let has_sorting_context = plan
@@ -1641,6 +1719,7 @@ mod tests {
             hdc_dim: dim,
             ..Default::default()
         });
+        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // Random HV that wouldn't match any HV-based pattern, but purpose text is clear
         let random_hv = ContinuousHV::random(dim, 12345);
@@ -1648,6 +1727,7 @@ mod tests {
             &random_hv,
             &[],
             "Sort integers in ascending order",
+            &negatives,
         );
 
         let has_sorting_context = plan

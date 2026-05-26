@@ -6,7 +6,7 @@
 
 use crate::emotional_gating_integration::modulate_by_emotion;
 use crate::encoder::ThoughtChannels; // Assumed: has language_intent(), prompt_contains_any(), valence(), arousal(), moral_score() etc.
-use crate::language_gates::{LanguageGate, LanguageGateRegistry}; // for emotional modulation
+use crate::language_gates::LanguageGateRegistry; // for emotional modulation
 
 pub struct CodeGate {
     language_gate_registry: LanguageGateRegistry,

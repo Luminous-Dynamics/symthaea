@@ -24,7 +24,7 @@ use crate::gating::{
     CoherenceFeedback, EmotionalModulator, EpistemicGate, GatingConfig,
     confidence_adjusted_veto_threshold, consciousness_gated_max_tokens,
 };
-use crate::tokenizer::{BpeTokenizer, MergePair, VocabFile};
+use crate::tokenizer::{BpeTokenizer, is_code_contamination_token};
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -40,9 +40,51 @@ pub enum SamplingStrategy {
     TopP { p: f32, temperature: f32 },
 }
 
+/// High-level decoder path for Broca language realization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum BrocaDecoderKind {
+    /// Native CfC/HDC controller with weight-tied lexical readout.
+    #[default]
+    Direct,
+    /// Deterministic semantic molecule / thought-structure readout.
+    Structured,
+    /// Liquid-Mamba vocal-tract translator.
+    Mamba,
+    /// Structured meaning plus optional Mamba humanization.
+    Hybrid,
+}
+
+impl BrocaDecoderKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Direct => "direct",
+            Self::Structured => "structured",
+            Self::Mamba => "mamba",
+            Self::Hybrid => "hybrid",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "direct" | "cfc" | "hdc" => Some(Self::Direct),
+            "structured" | "semantic" | "molecule" => Some(Self::Structured),
+            "mamba" | "liquid-mamba" | "liquid_mamba" => Some(Self::Mamba),
+            "hybrid" => Some(Self::Hybrid),
+            _ => None,
+        }
+    }
+}
+
 /// Configuration for the Broca generator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrocaConfig {
+    /// Preferred decoder path for external orchestration.
+    ///
+    /// `BrocaGenerator` itself remains the native direct CfC/HDC decoder; Mamba
+    /// and structured/hybrid paths are selected by eval/orchestration harnesses.
+    #[serde(default)]
+    pub decoder_kind: BrocaDecoderKind,
     /// Controller configuration.
     pub controller: LanguageControllerConfig,
     /// Gating configuration.
@@ -110,6 +152,15 @@ pub struct BrocaConfig {
     /// from the gating stack.
     #[serde(default)]
     pub bypass_gating: bool,
+    /// Suppress `<unk>` during decoding. `<unk>` is not a useful emitted token
+    /// and tends to poison the next autoregressive step.
+    #[serde(default = "default_true")]
+    pub suppress_unknown_tokens: bool,
+    /// Suppress syntax-heavy code tokens when code-intent channels are inactive.
+    /// This protects prose generation from drifting into Rust/Python/Nix shards
+    /// while preserving explicit code-generation cases.
+    #[serde(default = "default_true")]
+    pub suppress_code_tokens_without_code_intent: bool,
 }
 
 fn default_true() -> bool {
@@ -139,6 +190,7 @@ fn default_nsm_coverage_veto_scale() -> f32 {
 impl Default for BrocaConfig {
     fn default() -> Self {
         Self {
+            decoder_kind: BrocaDecoderKind::Direct,
             controller: LanguageControllerConfig::default(),
             gating: GatingConfig::default(),
             sampling: SamplingStrategy::Greedy,
@@ -158,6 +210,8 @@ impl Default for BrocaConfig {
             nsm_prime_logit_boost: default_nsm_prime_logit_boost(),
             nsm_coverage_veto_scale: default_nsm_coverage_veto_scale(),
             bypass_gating: false,
+            suppress_unknown_tokens: true,
+            suppress_code_tokens_without_code_intent: true,
         }
     }
 }
@@ -236,6 +290,15 @@ pub struct GenerationStepLogits {
     pub selected_token_id: u32,
     pub entropy: f32,
     pub max_probability: f32,
+    pub pre_attractor_entropy: Option<f32>,
+    pub pre_attractor_max_probability: Option<f32>,
+    pub cfc_delta_scale: Option<f32>,
+    pub cfc_b_scale: Option<f32>,
+    pub semantic_attractor_mean_adjustment: Option<f32>,
+    pub semantic_attractor_max_adjustment: Option<f32>,
+    pub semantic_attractor_alignment_mean: Option<f32>,
+    pub semantic_attractor_alignment_std: Option<f32>,
+    pub selected_semantic_alignment: Option<f32>,
     pub top_k: Vec<GenerationTopLogit>,
 }
 
@@ -763,6 +826,8 @@ impl BrocaGenerator {
                 self.code_gate.apply(&mut logits, channels);
             }
 
+            apply_decode_suppression(&mut logits, &self.tokenizer, channels, &self.config);
+
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
             let mut this_veto = false;
@@ -1044,6 +1109,42 @@ fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32)
     }
 }
 
+fn apply_decode_suppression(
+    logits: &mut [f32],
+    tokenizer: &BpeTokenizer,
+    channels: &ThoughtChannels,
+    config: &BrocaConfig,
+) {
+    if config.suppress_unknown_tokens {
+        if let Some(logit) = logits.get_mut(tokenizer.unk_id as usize) {
+            *logit = f32::NEG_INFINITY;
+        }
+    }
+
+    if config.suppress_code_tokens_without_code_intent && !code_intent_active(channels) {
+        for token_id in 0..logits.len().min(tokenizer.vocab_size()) {
+            if is_code_contamination_token(tokenizer.token_str(token_id as u32)) {
+                logits[token_id] = f32::NEG_INFINITY;
+            }
+        }
+    }
+}
+
+fn code_intent_active(channels: &ThoughtChannels) -> bool {
+    channels
+        .channels
+        .get(24..28)
+        .map(|code_channels| {
+            code_channels
+                .iter()
+                .copied()
+                .fold(0.0f32, f32::max)
+                .max(code_channels.iter().copied().sum::<f32>() * 0.25)
+                > 0.25
+        })
+        .unwrap_or(false)
+}
+
 /// Greedy sampling: return the argmax token.
 fn greedy_sample(logits: &[f32]) -> u32 {
     logits
@@ -1066,6 +1167,15 @@ fn logit_diagnostics_for_step(
             selected_token_id,
             entropy: 0.0,
             max_probability: 0.0,
+            pre_attractor_entropy: None,
+            pre_attractor_max_probability: None,
+            cfc_delta_scale: None,
+            cfc_b_scale: None,
+            semantic_attractor_mean_adjustment: None,
+            semantic_attractor_max_adjustment: None,
+            semantic_attractor_alignment_mean: None,
+            semantic_attractor_alignment_std: None,
+            selected_semantic_alignment: None,
             top_k: Vec::new(),
         };
     }
@@ -1093,6 +1203,15 @@ fn logit_diagnostics_for_step(
             selected_token_id,
             entropy: 0.0,
             max_probability: 0.0,
+            pre_attractor_entropy: None,
+            pre_attractor_max_probability: None,
+            cfc_delta_scale: None,
+            cfc_b_scale: None,
+            semantic_attractor_mean_adjustment: None,
+            semantic_attractor_max_adjustment: None,
+            semantic_attractor_alignment_mean: None,
+            semantic_attractor_alignment_std: None,
+            selected_semantic_alignment: None,
             top_k: Vec::new(),
         };
     }
@@ -1126,6 +1245,15 @@ fn logit_diagnostics_for_step(
         selected_token_id,
         entropy,
         max_probability,
+        pre_attractor_entropy: None,
+        pre_attractor_max_probability: None,
+        cfc_delta_scale: None,
+        cfc_b_scale: None,
+        semantic_attractor_mean_adjustment: None,
+        semantic_attractor_max_adjustment: None,
+        semantic_attractor_alignment_mean: None,
+        semantic_attractor_alignment_std: None,
+        selected_semantic_alignment: None,
         top_k,
     }
 }

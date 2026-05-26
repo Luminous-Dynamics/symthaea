@@ -10,7 +10,7 @@
 //! - Contested: blended FM with mild noise
 
 use bevy::prelude::*;
-use symthaea_biometrics::muse_bridge::stress_to_musical_state;
+// use symthaea_biometrics::muse_bridge::stress_to_musical_state;
 use symthaea_muse::{MuseConfig, MusicalState, ReverbConfig};
 
 use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase};
@@ -99,8 +99,9 @@ pub fn audio_system(
     leviathan: Res<LeviathanState>,
     mut audio: ResMut<AudioState>,
 ) {
-    let stress = biometrics.encoder.compute_stress_vector();
-    let mut state = stress_to_musical_state(&stress, &biometrics.model);
+    let _stress = biometrics.encoder.compute_stress_vector();
+    // let mut state = stress_to_musical_state(&stress, &biometrics.model);
+    let mut state = MusicalState::default();
 
     match leviathan.phase {
         SleepPhase::Dormant => {

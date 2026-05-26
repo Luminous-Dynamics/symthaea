@@ -35,8 +35,9 @@ FEATURES=""
 GAME_ARGS=""
 for arg in "$@"; do
     case "$arg" in
-        --mycelix) FEATURES="--features mycelix" ;;
+        --mycelix) FEATURES="--features mycelix,vision-manifold,swarm,api_module" ;;
         --autostart) GAME_ARGS="$GAME_ARGS --autostart" ;;
+        --swarm) FEATURES="--features vision-manifold,swarm,api_module" ;;
     esac
 done
 

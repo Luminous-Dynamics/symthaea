@@ -7,24 +7,22 @@
 //! Provides HTTP interface for claims, queries, trust management, and more.
 
 use axum::{
-    extract::DefaultBodyLimit,
-    http::{header, HeaderValue, Method},
-    response::IntoResponse,
     Router,
+    extract::DefaultBodyLimit,
+    http::{HeaderValue, Method, header},
+    response::IntoResponse,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{
-    compression::CompressionLayer,
-    cors::CorsLayer,
-    timeout::TimeoutLayer,
-    trace::TraceLayer,
+    compression::CompressionLayer, cors::CorsLayer, timeout::TimeoutLayer, trace::TraceLayer,
 };
 use tracing::info;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+mod background;
 mod error;
 mod handlers;
 mod metrics;
@@ -57,7 +55,7 @@ async fn main() -> Result<()> {
     info!("✅ Application state initialized");
 
     // Start background workers
-    start_quantum_anchor(Arc::clone(&state));
+    background::start_quantum_anchor(Arc::clone(&state));
 
     // Build application
     let app = create_app(Arc::clone(&state));
@@ -80,9 +78,8 @@ fn init_logging() {
 
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "mycelix_api=debug,tower_http=debug,axum=trace".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "mycelix_api=debug,tower_http=debug,axum=trace".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -110,7 +107,7 @@ struct Config {
 }
 
 /// Create the Axum application with all routes and middleware
-fn create_app(state: AppState) -> Router {
+fn create_app(state: Arc<AppState>) -> Router {
     // Create OpenAPI documentation
     let openapi = routes::ApiDoc::openapi();
 
@@ -120,11 +117,14 @@ fn create_app(state: AppState) -> Router {
         // Swagger UI at /docs
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", openapi))
         // Health check at root
-        .route("/health", axum::routing::get(handlers::system::health_check))
+        .route(
+            "/health",
+            axum::routing::get(handlers::system::health_check),
+        )
         // Metrics endpoint for Prometheus
         .route("/metrics", axum::routing::get(metrics_handler))
         // Application state
-        .with_state(Arc::new(state))
+        .with_state(state)
         // Middleware stack (applied in reverse order)
         .layer(
             ServiceBuilder::new()
@@ -143,7 +143,7 @@ fn configure_cors() -> CorsLayer {
     CorsLayer::new()
         .allow_origin(
             "*".parse::<HeaderValue>()
-                .expect("Static CORS origin '*' must be valid")
+                .expect("Static CORS origin '*' must be valid"),
         )
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])

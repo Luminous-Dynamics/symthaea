@@ -3,7 +3,7 @@
 [package]
 name = "mycelix-governance-sim"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "100K-agent mechanism design simulation for Mycelix governance, economy, and reputation"
 
 [[bin]]

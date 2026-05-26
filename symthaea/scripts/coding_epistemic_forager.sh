@@ -38,8 +38,8 @@ echo "out_dir=$OUT_DIR"
     --lane "$LANE" \
     --simulated-llm \
     --energy-budget "$ENERGY_BUDGET" \
-    --distillation-export "$DISTILLATION" \
-    --structural-prototype-export "$PROTOTYPES" \
+    --save-distillation-jsonl "$DISTILLATION" \
+    --save-structural-prototypes "$PROTOTYPES" \
     > "$BASELINE_REPORT"
 )
 
@@ -53,8 +53,8 @@ echo "out_dir=$OUT_DIR"
     --lane "$LANE" \
     --simulated-llm \
     --energy-budget "$ENERGY_BUDGET" \
-    --distillation-import "$DISTILLATION" \
-    --structural-prototype-import "$PROTOTYPES" \
+    --load-distillation-jsonl "$DISTILLATION" \
+    --load-structural-prototypes "$PROTOTYPES" \
     > "$FORAGED_REPORT"
 )
 
@@ -89,3 +89,15 @@ echo "  $BASELINE_REPORT"
 echo "  $FORAGED_REPORT"
 echo "  $DISTILLATION"
 echo "  $PROTOTYPES"
+
+# Graduation Step: Merge results into the main project memory for immediate lookup
+if [[ -d "$ROOT/.symthaea" ]]; then
+  echo "Graduating new discoveries to .symthaea/repair_records.jsonl..."
+  cat "$DISTILLATION" >> "$ROOT/.symthaea/repair_records.jsonl" 2>/dev/null || true
+  # Deduplicate while preserving order (using awk to keep first occurrence)
+  if [[ -f "$ROOT/.symthaea/repair_records.jsonl" ]]; then
+    awk '!seen[$0]++' "$ROOT/.symthaea/repair_records.jsonl" > "$ROOT/.symthaea/repair_records.jsonl.tmp"
+    mv "$ROOT/.symthaea/repair_records.jsonl.tmp" "$ROOT/.symthaea/repair_records.jsonl"
+  fi
+  echo "Graduation complete."
+fi

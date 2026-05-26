@@ -1,8 +1,7 @@
-// src/systems/engine_physics.rs snippet
-// (Rest of imports...)
-use crate::components::PhysicsBody;
-use crate::experience::PhysicsWorldRes;
+// src/systems/engine_physics.rs
 use bevy::prelude::*;
+use symtropy_bevy_core::PhysicsBody;
+use crate::resources::PhysicsWorldRes;
 
 pub fn update_physics_consciousness(
     mut physics: ResMut<PhysicsWorldRes>,
@@ -33,9 +32,13 @@ pub fn physics_sync_transforms(
 ) {
     for (body_comp, mut transform) in &mut query {
         if let Some(body) = physics.world.body(body_comp.handle) {
-            let pos = body.position();
+            let pos: nalgebra::SVector<f64, 2> = body.position();
             transform.translation.x = pos[0] as f32;
             transform.translation.y = pos[1] as f32;
         }
     }
 }
+
+pub fn physics_apply_inputs() {}
+pub fn physics_step() {}
+pub fn consciousness_sync_system() {}

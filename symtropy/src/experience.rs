@@ -49,6 +49,26 @@ impl Default for ExperienceRegistry {
             available: true,
         });
 
+        // City-Scale Governance (Phase 11)
+        experiences.push(ExperienceDescriptor {
+            id: "city-scale",
+            name: "City-Scale Governance",
+            subtitle: "300,000 citizens + reactive hydrogeology",
+            icon_color: [0.9, 0.3, 0.2], // Toxic red/orange
+            phase: GamePhase::CityScale,
+            available: true,
+        });
+
+        // Muse: Thermodynamic Visualizer
+        experiences.push(ExperienceDescriptor {
+            id: "muse",
+            name: "Muse: Thermodynamic Visualizer",
+            subtitle: "Audio-reactive 64K geodesic imagination",
+            icon_color: [1.0, 0.5, 0.3], // High-entropy orange
+            phase: GamePhase::Muse,
+            available: true,
+        });
+
         Self {
             experiences,
             selected: 0,

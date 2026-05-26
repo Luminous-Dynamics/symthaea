@@ -8,8 +8,8 @@
 use crate::encoder::ThoughtChannels;
 use crate::language_gates::LanguageGate;
 use crate::rust_walker::StructuralElement;
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 pub struct StructuralGenerator {
     // In real use: a specialized CfC head that predicts Node types
@@ -67,7 +67,7 @@ impl StructuralGenerator {
     }
 
     /// Project the synthesized tree back into source code for human consumption.
-    pub fn project_to_source(&self, tree: &[StructuralElement], language: &str) -> String {
+    pub fn project_to_source(&self, _tree: &[StructuralElement], language: &str) -> String {
         match language {
             "rust" => "fn generated_fn() { let x = 42; }".to_string(),
             "nix" => "{ services.generated = { enable = true; }; }".to_string(),

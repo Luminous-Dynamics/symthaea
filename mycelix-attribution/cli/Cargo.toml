@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-attribution-scan"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Scans lockfiles and generates attribution data for the Mycelix DHT"
 
 [[bin]]

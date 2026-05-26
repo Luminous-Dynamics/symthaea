@@ -343,6 +343,18 @@ pub struct TrainingConfig {
     /// even before the decoder has learned strong temporal dynamics.
     pub thought_logit_aux_weight: f32,
 
+    // ── Distribution Anchoring ──
+    /// KL-style anchor loss weight (0.0 = disabled).
+    ///
+    /// On the first teacher-forced pass for each `(pair, position)`, the trainer
+    /// caches the current logit distribution as the local language prior. Later
+    /// passes penalize drift away from that cached distribution while still
+    /// allowing CE/aux losses to steer the model toward the target. This is a
+    /// lightweight frozen-teacher approximation that protects against
+    /// catastrophic distribution collapse without requiring a second model copy
+    /// in GPU memory.
+    pub logit_anchor_weight: f32,
+
     // ── Adaptive Veto Warmup ──
     /// Target veto threshold to ramp toward during training (0.0 = disabled).
     /// When > 0, the generator's veto_threshold is linearly ramped from 0.0
@@ -425,6 +437,7 @@ impl Default for TrainingConfig {
             scheduled_sampling_max: 0.0,
             label_smoothing: 0.0,
             thought_logit_aux_weight: 0.0,
+            logit_anchor_weight: 0.0,
             best_checkpoint_path: String::new(),
             hidden_dropout: 0.0,
             adaptive_veto_target: 0.0, // disabled by default
@@ -921,6 +934,9 @@ pub fn train_with_adam(
         || config.enable_diagnostics
         || config.enable_anomaly_response
         || track_alignment;
+    let anchor_enabled = config.logit_anchor_weight > 0.0;
+    let mut logit_anchor_cache: std::collections::HashMap<(usize, usize), Vec<f32>> =
+        std::collections::HashMap::new();
 
     // Pre-compute per-pair intent indices for contrastive sampling.
     // Group pairs by intent (argmax of channels 0-7) so we can sample negatives
@@ -1159,6 +1175,13 @@ pub fn train_with_adam(
 
                         // Forward on GPU
                         let logits = trainer.forward_step(&thought_tensor, gpu_prev_token, pos)?;
+                        let anchor_logits = logit_anchor_for_step(
+                            anchor_enabled,
+                            &mut logit_anchor_cache,
+                            dataset_idx,
+                            pos,
+                            &logits,
+                        );
 
                         // Loss computation (CPU — cheap)
                         let loss = cross_entropy_loss_smooth(
@@ -1202,6 +1225,16 @@ pub fn train_with_adam(
                                     config.thought_logit_aux_weight,
                                 )?;
                                 total_loss += aux_loss;
+                            }
+                            if let Some(ref reference_logits) = anchor_logits {
+                                let anchor_loss = trainer.gpu_distribution_anchor_gradient(
+                                    &logits,
+                                    reference_logits,
+                                    lr,
+                                    effective_grad_clip,
+                                    config.logit_anchor_weight,
+                                )?;
+                                total_loss += anchor_loss;
                             }
                         }
 
@@ -1313,6 +1346,17 @@ pub fn train_with_adam(
                             .controller_mut()
                             .forward_step(&thought_hv, prev_token, pos)
                     };
+                    let anchor_logits = if !use_sampled {
+                        logit_anchor_for_step(
+                            anchor_enabled,
+                            &mut logit_anchor_cache,
+                            dataset_idx,
+                            pos,
+                            &logits,
+                        )
+                    } else {
+                        None
+                    };
 
                     // Training-time dropout on CfC hidden states
                     if config.hidden_dropout > 0.0 {
@@ -1410,6 +1454,17 @@ pub fn train_with_adam(
                             );
                             total_loss += aux_loss;
                         }
+                        if let Some(ref reference_logits) = anchor_logits {
+                            let anchor_loss = apply_distribution_anchor_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                reference_logits,
+                                lr,
+                                effective_grad_clip,
+                                config.logit_anchor_weight,
+                            );
+                            total_loss += anchor_loss;
+                        }
                         result
                     } else {
                         let result = apply_weight_tied_gradient(
@@ -1430,6 +1485,17 @@ pub fn train_with_adam(
                                 config.thought_logit_aux_weight,
                             );
                             total_loss += aux_loss;
+                        }
+                        if let Some(ref reference_logits) = anchor_logits {
+                            let anchor_loss = apply_distribution_anchor_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                reference_logits,
+                                lr,
+                                effective_grad_clip,
+                                config.logit_anchor_weight,
+                            );
+                            total_loss += anchor_loss;
                         }
                         result
                     };
@@ -1769,6 +1835,28 @@ pub fn train_with_adam(
                     break;
                 }
             }
+        }
+
+        // NATIVE AUTO-SAVE: Secure current weights at the end of each completed epoch
+        {
+            #[cfg(feature = "mamba-cpu")]
+            let projection_weights = generator.controller().projection_weights();
+            #[cfg(not(feature = "mamba-cpu"))]
+            let projection_weights = None;
+
+            let auto_path = "data/models/broca-checkpoint-latest.bin";
+            if let Some(parent) = std::path::Path::new(auto_path).parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            
+            let _ = generator.save_checkpoint(
+                auto_path,
+                epoch,
+                avg_loss,
+                adam_state.as_ref().cloned(),
+                projection_weights,
+                None,
+            );
         }
     }
 
@@ -2290,6 +2378,114 @@ fn apply_thought_logit_aux_gradient(
     weight * loss
 }
 
+fn logit_anchor_for_step(
+    enabled: bool,
+    cache: &mut std::collections::HashMap<(usize, usize), Vec<f32>>,
+    dataset_idx: usize,
+    pos: usize,
+    logits: &[f32],
+) -> Option<Vec<f32>> {
+    if !enabled {
+        return None;
+    }
+    match cache.entry((dataset_idx, pos)) {
+        std::collections::hash_map::Entry::Occupied(entry) => Some(entry.get().clone()),
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            entry.insert(logits.to_vec());
+            None
+        }
+    }
+}
+
+fn distribution_anchor_loss(current_logits: &[f32], reference_logits: &[f32]) -> f32 {
+    let n = current_logits.len().min(reference_logits.len());
+    if n == 0 {
+        return 0.0;
+    }
+    let current_probs = softmax_prefix(current_logits, n);
+    let reference_probs = softmax_prefix(reference_logits, n);
+    let mut loss = 0.0f32;
+    for i in 0..n {
+        let q = reference_probs[i].max(1e-12);
+        let p = current_probs[i].max(1e-12);
+        loss += q * (q.ln() - p.ln());
+    }
+    loss.max(0.0)
+}
+
+fn softmax_prefix(logits: &[f32], n: usize) -> Vec<f32> {
+    let max_logit = logits[..n]
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .fold(f32::NEG_INFINITY, f32::max);
+    if !max_logit.is_finite() {
+        return vec![1.0 / n as f32; n];
+    }
+    let exps: Vec<f32> = logits[..n]
+        .iter()
+        .map(|&logit| {
+            if logit.is_finite() {
+                (logit - max_logit).exp()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let sum: f32 = exps.iter().sum();
+    if sum <= 1e-12 {
+        vec![1.0 / n as f32; n]
+    } else {
+        exps.into_iter().map(|exp| exp / sum).collect()
+    }
+}
+
+fn apply_distribution_anchor_gradient(
+    controller: &mut crate::controller::LanguageController,
+    current_logits: &[f32],
+    reference_logits: &[f32],
+    lr: f32,
+    grad_clip: f32,
+    weight: f32,
+) -> f32 {
+    if weight <= 0.0 {
+        return 0.0;
+    }
+    let n = current_logits
+        .len()
+        .min(reference_logits.len())
+        .min(controller.token_embeddings().len());
+    if n == 0 {
+        return 0.0;
+    }
+
+    let loss = distribution_anchor_loss(&current_logits[..n], &reference_logits[..n]);
+    let current_probs = softmax_prefix(current_logits, n);
+    let reference_probs = softmax_prefix(reference_logits, n);
+    let output_hv = controller.output_hv();
+    let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
+    let scaled_lr = lr * weight;
+    let embeddings = controller.token_embeddings_mut();
+
+    for i in 0..n {
+        let error = current_probs[i] - reference_probs[i];
+        if error.abs() < 1e-4 {
+            continue;
+        }
+        let raw = scaled_lr * scale * error;
+        let grad_scale = raw.clamp(-grad_clip, grad_clip);
+        let emb_values = &mut embeddings[i].values;
+        for (j, emb_val) in emb_values.iter_mut().enumerate() {
+            if j < output_slice.len() {
+                *emb_val -= grad_scale * output_slice[j];
+            }
+        }
+    }
+
+    weight * loss
+}
+
 /// Generate a diverse set of ThoughtChannels for training data collection.
 ///
 /// 8 intents × 5 epistemic × 5 emotional clusters × 3 relationship stages
@@ -2326,8 +2522,8 @@ pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
                         channels.set_epistemic(epistemic as f32);
                         channels.set_emotion(valence, arousal, warmth);
                         channels.set_consciousness(psi, meta_aw, coh);
-                        channels.channels[15] = stage; // relationship_stage
-                        // Vary trust with relationship stage
+                        // Relationship stage, then trust as a function of shared context depth.
+                        channels.channels[15] = stage;
                         channels.channels[16] = (stage / 6.0) * 0.5 + 0.25;
                         // Vary mood temperature with arousal
                         channels.channels[17] = 0.8 + arousal * 0.4;
@@ -2399,6 +2595,203 @@ pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
     }
 }
 
+/// Reconstruct a natural-language target from ThoughtChannels.
+///
+/// Unlike [`thought_to_prompt`], this intentionally avoids metadata/tag syntax.
+/// The goal is to teach the thought-to-token bridge fluent sentence starts while
+/// still preserving intent, epistemic stance, affect, relationship stage, and psi.
+pub fn thought_to_prose_prompt(channels: &ThoughtChannels) -> String {
+    let active_intent = (0..8)
+        .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
+        .unwrap_or(7);
+    let epistemic_idx = (channels.epistemic_ordinal() as usize).min(4);
+    let valence = channels.valence();
+    let arousal = channels.arousal();
+    let warmth = channels.warmth();
+    let psi = channels.psi();
+    let stage = channels.channels[15];
+
+    let emotion_idx = if valence > 0.6 && arousal < 0.5 {
+        0
+    } else if valence > 0.4 && arousal >= 0.5 {
+        1
+    } else if valence < -0.45 {
+        2
+    } else if valence < -0.1 {
+        3
+    } else {
+        4
+    };
+    let stage_idx = if stage < 1.0 {
+        0
+    } else if stage < 4.5 {
+        1
+    } else {
+        2
+    };
+    let psi_idx = if psi >= 0.75 {
+        2
+    } else if psi <= 0.3 {
+        0
+    } else {
+        1
+    };
+    let variant =
+        (active_intent * 31 + epistemic_idx * 17 + emotion_idx * 11 + stage_idx * 5 + psi_idx) % 4;
+
+    let stance_options = match epistemic_idx {
+        0 => ["I am confident", "The signal is clear", "My read is firm"],
+        1 => [
+            "It is likely",
+            "The evidence points that way",
+            "My read is probable",
+        ],
+        2 => [
+            "I am not fully certain",
+            "The evidence is mixed",
+            "My confidence is partial",
+        ],
+        3 => [
+            "I do not know enough yet",
+            "The ground is still incomplete",
+            "I need more context",
+        ],
+        _ => [
+            "This may be outside my scope",
+            "The request may exceed my evidence",
+            "I should not overclaim here",
+        ],
+    };
+    let stance = stance_options[variant % stance_options.len()];
+
+    let tone_options = if valence < -0.45 {
+        ["carefully", "steadily", "without rushing"]
+    } else if arousal > 0.7 {
+        ["directly", "with energy", "in concrete terms"]
+    } else if warmth > 0.75 {
+        ["warmly", "with care", "in a supportive voice"]
+    } else {
+        ["clearly", "plainly", "with focus"]
+    };
+    let tone = tone_options[(variant + active_intent) % tone_options.len()];
+
+    let relation_options = if stage < 1.0 {
+        [
+            "as we begin",
+            "from a fresh starting point",
+            "without assuming history",
+        ]
+    } else if stage < 4.5 {
+        [
+            "with the context we share",
+            "using the thread already established",
+            "inside the current conversation",
+        ]
+    } else {
+        [
+            "from our deeper context",
+            "with the longer pattern in mind",
+            "building on what is already known",
+        ]
+    };
+    let relation = relation_options[(variant + epistemic_idx) % relation_options.len()];
+
+    let awareness_options = if psi >= 0.75 {
+        [
+            "while keeping the whole situation in view",
+            "while watching the broader implications",
+            "while preserving the larger pattern",
+        ]
+    } else if psi <= 0.3 {
+        [
+            "while staying with the immediate facts",
+            "while keeping attention close to the data",
+            "while avoiding broad leaps",
+        ]
+    } else {
+        [
+            "while tracking the main thread",
+            "while holding the central point steady",
+            "while keeping the response coherent",
+        ]
+    };
+    let awareness = awareness_options[(variant + emotion_idx) % awareness_options.len()];
+
+    let action_options = match active_intent {
+        0 => [
+            "I understand the situation",
+            "I can acknowledge what is present",
+            "The first step is to reflect the point back",
+        ],
+        1 => [
+            "The answer should follow the available evidence",
+            "I can give a grounded answer",
+            "The response should resolve the question",
+        ],
+        2 => [
+            "One clearer detail is needed before I answer",
+            "The next move is to ask a focused question",
+            "I should narrow the ambiguity first",
+        ],
+        3 => [
+            "We should choose a small practical step",
+            "The next action should be concrete",
+            "I can propose a workable path forward",
+        ],
+        4 => [
+            "The uncertainty should be named openly",
+            "I should avoid pretending to know more",
+            "The limits of the evidence need to stay visible",
+        ],
+        5 => [
+            "This deserves reflection before action",
+            "The pattern should be mirrored back",
+            "I should slow down and examine the meaning",
+        ],
+        6 => [
+            "We can continue from here",
+            "The sequence should remain coherent",
+            "The next response should extend the thread",
+        ],
+        _ => [
+            "I should pause and ask for grounding",
+            "The safest response is to state the limit",
+            "I need to re-anchor before continuing",
+        ],
+    };
+    let action = action_options[(variant + stage_idx) % action_options.len()];
+
+    match variant {
+        0 => format!("{stance}: {action}. I will respond {tone} {relation} {awareness}.\n"),
+        1 => format!("{action}. {stance}, so I will respond {tone} {relation} {awareness}.\n"),
+        2 => {
+            format!("{stance}. {action}. I will keep the response {tone} {relation} {awareness}.\n")
+        }
+        _ => format!("{action}. {stance}, and I will proceed {tone} {relation} {awareness}.\n"),
+    }
+}
+
+/// Synthetic curriculum target style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurriculumStyle {
+    /// Metadata-like targets useful for channel inspection.
+    Structured,
+    /// Fluent prose targets for thought-to-language binding.
+    Prose,
+}
+
+impl CurriculumStyle {
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "structured" => Ok(Self::Structured),
+            "prose" => Ok(Self::Prose),
+            other => {
+                anyhow::bail!("unknown curriculum style {other:?}; expected structured or prose")
+            }
+        }
+    }
+}
+
 /// Generate a synthetic training curriculum from diverse ThoughtChannels.
 ///
 /// Uses `generate_diverse_thoughts()` to create 360 diverse ThoughtChannels,
@@ -2408,11 +2801,22 @@ pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
 /// This is "teacher-free" bootstrapping: the target text is the structured
 /// prompt itself, training the projection to reproduce thought→text mappings.
 pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
+    generate_curriculum_with_style(tokenizer, CurriculumStyle::Structured)
+}
+
+/// Generate a synthetic training curriculum from diverse ThoughtChannels.
+pub fn generate_curriculum_with_style(
+    tokenizer: &BpeTokenizer,
+    style: CurriculumStyle,
+) -> TrainingDataset {
     let thoughts = generate_diverse_thoughts();
     let mut dataset = TrainingDataset::default();
 
     for thought in &thoughts {
-        let prompt = thought_to_prompt(thought);
+        let prompt = match style {
+            CurriculumStyle::Structured => thought_to_prompt(thought),
+            CurriculumStyle::Prose => thought_to_prose_prompt(thought),
+        };
         let ids = tokenizer.encode(&prompt);
         dataset.pairs.push(TrainingPair {
             channels: thought.channels.to_vec(),
@@ -2566,7 +2970,18 @@ pub fn compute_validation_loss_gpu(
 ///
 /// Returns the number of pairs written.
 pub fn write_curriculum_jsonl(path: &str, tokenizer: &BpeTokenizer) -> Result<usize> {
-    let dataset = generate_curriculum(tokenizer);
+    write_curriculum_jsonl_with_style(path, tokenizer, CurriculumStyle::Structured)
+}
+
+/// Write a curriculum dataset to a JSONL file using a target style.
+///
+/// Returns the number of pairs written.
+pub fn write_curriculum_jsonl_with_style(
+    path: &str,
+    tokenizer: &BpeTokenizer,
+    style: CurriculumStyle,
+) -> Result<usize> {
+    let dataset = generate_curriculum_with_style(tokenizer, style);
     let count = dataset.pairs.len();
     dataset
         .to_jsonl(path)
@@ -2644,6 +3059,18 @@ mod tests {
         assert!(loss_correct >= 0.0, "Loss should be non-negative");
     }
 
+    #[test]
+    fn test_distribution_anchor_loss_tracks_drift() {
+        let reference = vec![4.0, 0.0, -1.0];
+        let same = distribution_anchor_loss(&reference, &reference);
+        let drifted = distribution_anchor_loss(&[-1.0, 0.0, 4.0], &reference);
+        assert!(same < 1e-6, "same distribution should have near-zero KL");
+        assert!(
+            drifted > same + 0.1,
+            "drifted distribution should be penalized"
+        );
+    }
+
     fn softmax_probability(logits: &[f32], target: usize) -> f32 {
         let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
@@ -2709,6 +3136,58 @@ mod tests {
             after_rank <= before_rank,
             "target rank should not get worse: before={before_rank} after={after_rank}"
         );
+    }
+
+    #[test]
+    fn test_tiny_binding_overfit_sanity_has_clean_decode() {
+        let genesis = test_genesis();
+        let mut generator = BrocaGenerator::new(&genesis, test_config());
+        let tokenizer = generator.tokenizer().clone();
+        let dataset = TrainingDataset {
+            pairs: vec![
+                TrainingPair::new(
+                    ThoughtChannels::with_intent(1),
+                    "I understand.".to_string(),
+                    &tokenizer,
+                ),
+                TrainingPair::new(
+                    ThoughtChannels::with_intent(2),
+                    "Which detail?".to_string(),
+                    &tokenizer,
+                ),
+            ],
+        };
+        let train_config = TrainingConfig {
+            epochs: 2,
+            learning_rate: 0.002,
+            bptt_window: 6,
+            train_network: true,
+            negative_samples: 0,
+            thought_logit_aux_weight: 0.1,
+            logit_anchor_weight: 0.02,
+            report_interval: 1000,
+            progress: false,
+            #[cfg(feature = "gpu")]
+            use_gpu_cfc: false,
+            ..Default::default()
+        };
+
+        let (metrics, _, _, _, _) = train_with_adam(&mut generator, &dataset, &train_config, None);
+        assert!(metrics.iter().all(|metric| metric.avg_loss.is_finite()));
+
+        generator.config_mut().gating.base_max_tokens = 4;
+        generator.config_mut().enable_consciousness_gating = false;
+        for pair in &dataset.pairs {
+            let result = generator.generate(&pair.to_thought_channels());
+            assert_eq!(
+                crate::evaluation::unknown_token_rate(&result.token_ids, generator.tokenizer()),
+                0.0
+            );
+            assert_eq!(
+                crate::evaluation::code_token_rate(&result.token_ids, generator.tokenizer()),
+                0.0
+            );
+        }
     }
 
     #[test]
@@ -3174,6 +3653,35 @@ mod tests {
             unique_intents.len() >= 6,
             "Should cover most intents, got {}",
             unique_intents.len()
+        );
+    }
+
+    #[test]
+    fn test_prose_curriculum_avoids_metadata_targets() {
+        let tokenizer = BpeTokenizer::default_minimal();
+        let dataset = generate_curriculum_with_style(&tokenizer, CurriculumStyle::Prose);
+
+        assert_eq!(dataset.pairs.len(), generate_diverse_thoughts().len());
+        assert!(dataset.pairs.iter().take(32).all(|pair| {
+            !pair.target_text.contains("SEMANTIC_INTENT")
+                && !pair.target_text.contains("EPISTEMIC_STATUS")
+                && !pair.target_text.contains("INTENT=")
+                && !pair.target_text.contains("Mode:")
+                && !pair.target_text.contains("Task=")
+        }));
+        assert!(
+            dataset
+                .pairs
+                .iter()
+                .take(32)
+                .any(|pair| pair.target_text.contains("I am confident"))
+        );
+        assert!(
+            dataset
+                .pairs
+                .iter()
+                .take(128)
+                .all(|pair| !pair.target_ids.is_empty())
         );
     }
 

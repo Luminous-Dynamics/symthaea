@@ -25,6 +25,7 @@ pub enum AnimationState {
 #[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component)]
 pub struct AnimationTarget {
+    #[reflect(ignore)]
     pub platform: PlatformType,
     pub index: usize,
 }

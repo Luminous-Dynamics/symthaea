@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-praxis-desktop"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Tauri v2 native client for Praxis — wraps Leptos frontend with Holochain conductor"
 

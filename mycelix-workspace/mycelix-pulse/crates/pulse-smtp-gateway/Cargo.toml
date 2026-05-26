@@ -1,7 +1,7 @@
 [package]
 name = "pulse-smtp-gateway"
 version = "0.1.0-alpha.1"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Mycelix Pulse SMTP gateway — the sovereign exit node bridging RFC 5322 legacy email with the Holochain DHT"
 publish = false

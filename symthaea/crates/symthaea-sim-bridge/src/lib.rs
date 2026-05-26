@@ -15,6 +15,11 @@ use symthaea_core::hdc::seed_from_name;
 use symthaea_core::hdc::ContinuousHV;
 use thiserror::Error;
 
+/// Simple deterministic text embedding for HDC space.
+pub fn embed_text(text: &str, dimension: usize) -> ContinuousHV {
+    ContinuousHV::random(dimension, seed_from_name(text))
+}
+
 /// Broad solver families Symthaea can request without binding to one vendor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SolverKind {
@@ -590,6 +595,11 @@ impl AmygdalaInterlock {
             SafetyStatus::Yellow => raw_value * 0.5, // Dampen output
             SafetyStatus::Red => 0.0,               // Clamp output
         }
+    }
+
+    /// Manually trigger a high-speed emergency stop.
+    pub fn trigger_emergency_stop(&mut self) {
+        self.status = SafetyStatus::Red;
     }
 }
 

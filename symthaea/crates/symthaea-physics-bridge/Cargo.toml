@@ -2,7 +2,7 @@
 name = "symthaea-physics-bridge"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "HDC semantic search engine for mathematical physics — encodes equations, tensors, symmetry groups as ContinuousHV for structural analogy discovery"
 license = "AGPL-3.0-or-later"

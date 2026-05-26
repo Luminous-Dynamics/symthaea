@@ -1,18 +1,21 @@
+pub type AgentPubKey = [u8; 32];
+pub type CapSecret = Vec<u8>;
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Mycelix Bridge Common — Shared dispatch types and utilities
-//!
-//! Provides the cross-domain dispatch primitives used by both the
-//! Commons and Civic cluster bridge zomes. Each cluster's bridge
-//! coordinator imports these types and calls `dispatch_call_checked()`
-//! with its own allowlist.
-//!
-//! ## Civic Thresholds (always available)
-//!
-//! The `consciousness_thresholds` module (legacy name) contains the canonical
-//! threshold constants. The `sovereign_gate` module provides the 8D Sovereign
-//! Profile gating system that replaces the old 4D consciousness gating.
+// Mycelix Bridge Common — Shared dispatch types and utilities
+//
+// Provides the cross-domain dispatch primitives used by both the
+// Commons and Civic cluster bridge zomes. Each cluster's bridge
+// coordinator imports these types and calls `dispatch_call_checked()`
+// with its own allowlist.
+//
+// ## Civic Thresholds (always available)
+//
+// The `consciousness_thresholds` module (legacy name) contains the canonical
+// threshold constants. The `sovereign_gate` module provides the 8D Sovereign
+// Profile gating system that replaces the old 4D consciousness gating.
 
 pub mod constitutional_envelope;
 // ── Model governance extensions (feature-gated) ──────────────────────────

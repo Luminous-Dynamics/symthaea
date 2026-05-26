@@ -108,6 +108,7 @@ pub mod curriculum;
 #[cfg(feature = "web_research_module")]
 pub mod curriculum_extender;
 pub mod curriculum_loader;
+pub mod engineering_curriculum;
 #[cfg(feature = "mathematics")]
 pub mod math_curriculum;
 pub mod objective;

@@ -109,13 +109,13 @@ impl BrocaPipeline {
 
         // Reconstruct the generator from the checkpoint
         let tokenizer = symthaea_broca::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
-        let mut gen = BrocaGenerator::with_tokenizer(&self.genesis, checkpoint.config, tokenizer);
+        let mut b_gen = BrocaGenerator::with_tokenizer(&self.genesis, checkpoint.config, tokenizer);
 
         // Restore trained weights
-        *gen.controller_mut().token_embeddings_mut() = checkpoint.token_embeddings;
-        *gen.controller_mut().network_mut() = checkpoint.network_state;
+        *b_gen.controller_mut().token_embeddings_mut() = checkpoint.token_embeddings;
+        *b_gen.controller_mut().network_mut() = checkpoint.network_state;
 
-        self.generator = Some(gen);
+        self.generator = Some(b_gen);
         Ok(())
     }
 
@@ -139,7 +139,7 @@ impl BrocaPipeline {
         neuromods: [f32; 4],
         max_tokens: usize,
     ) -> Option<PipelineGenerationResult> {
-        let gen = self.generator.as_mut()?;
+        let b_gen = self.generator.as_mut()?;
         let channels = Self::build_channels(consciousness, prediction_error, harmony, neuromods);
         // Consciousness gates verbosity: low Psi = fewer tokens
         let effective_max = if consciousness < 0.15 {
@@ -150,7 +150,7 @@ impl BrocaPipeline {
             max_tokens
         };
         // BrocaGenerator.generate applies its own consciousness gating on top
-        let result = gen.generate(&channels);
+        let result = b_gen.generate(&channels);
         // Truncate to effective_max if the generator produced more
         let mut pipeline_result = PipelineGenerationResult::from(result);
         if pipeline_result.num_tokens > effective_max {
@@ -177,11 +177,11 @@ impl BrocaPipeline {
         neuromods: [f32; 4],
         _max_tokens: usize,
     ) -> Option<PipelineGenerationResult> {
-        let gen = self.generator.as_mut()?;
+        let b_gen = self.generator.as_mut()?;
         let mut channels =
             Self::build_channels(consciousness, prediction_error, harmony, neuromods);
         Self::inject_intent(&mut channels, input);
-        let result = gen.generate(&channels);
+        let result = b_gen.generate(&channels);
         Some(PipelineGenerationResult::from(result))
     }
 

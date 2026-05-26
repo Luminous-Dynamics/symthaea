@@ -139,12 +139,12 @@
 
 mod agent;
 mod bridge;
-mod free_energy;
+pub mod free_energy;
 mod generative_model;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
-mod types;
+pub mod types;
 
 #[cfg(test)]
 mod tests;

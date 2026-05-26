@@ -1,7 +1,7 @@
 [package]
 name = "dkg_coordinator"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "DKG (Distributed Knowledge Graph) Coordinator Zome - Truth Ledger API"
 
 [lib]

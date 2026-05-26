@@ -8,8 +8,8 @@
 use crate::nix_kg::NixKg;
 use crate::structural_scorer::NixStructuralScorer;
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::path::Path;
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize)]

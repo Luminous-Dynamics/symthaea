@@ -2,7 +2,7 @@
 name = "symthaea-helicopter"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "HDC-LTC + FEP Active Inference SAR helicopter control for Symthaea"
 license = "AGPL-3.0-or-later"

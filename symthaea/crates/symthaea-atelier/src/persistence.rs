@@ -71,10 +71,10 @@ pub fn generate(
     let current_count = root.children.len();
     if current_count < min_cells {
         for _ in current_count..min_cells {
-            let x = rng.gen::<f32>() * config.width;
-            let y = rng.gen::<f32>() * config.height;
-            let r = 10.0 + rng.gen::<f32>() * 30.0;
-            let hue = rng.gen::<f32>() * 360.0;
+            let x = rng.r#gen::<f32>() * config.width;
+            let y = rng.r#gen::<f32>() * config.height;
+            let r = 10.0 + rng.r#gen::<f32>() * 30.0;
+            let hue = rng.r#gen::<f32>() * 360.0;
 
             let cell = SceneNode::circle(x, y, r).with_style(Style {
                 fill: Some(Color::from_hsl(hue, 0.4, 0.5)),

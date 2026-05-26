@@ -20,7 +20,7 @@
 
 use crate::mamba_model::{Config, Model, State};
 use anyhow::{Context, Result};
-use candle_core::{DType, Device, IndexOp, Tensor, D};
+use candle_core::{D, DType, Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
 
 /// Select the best available compute device.
@@ -378,6 +378,15 @@ impl MambaWrapper {
             delta_scale,
             b_scale,
         });
+    }
+
+    /// Set per-layer Δ scales for the next forward pass.
+    pub fn set_per_layer_delta_modulation(&mut self, modulation: &[f32]) {
+        if modulation.is_empty() {
+            self.state.per_layer_delta_modulation = None;
+        } else {
+            self.state.per_layer_delta_modulation = Some(modulation.to_vec());
+        }
     }
 
     /// Scale all hidden states by a biological modulation factor.
@@ -846,6 +855,10 @@ impl MambaBackend for MambaWrapper {
 
     fn set_cfc_modulation(&mut self, delta_scale: f32, b_scale: f32) {
         MambaWrapper::set_cfc_modulation(self, delta_scale, b_scale)
+    }
+
+    fn set_per_layer_delta_modulation(&mut self, modulation: &[f32]) {
+        MambaWrapper::set_per_layer_delta_modulation(self, modulation)
     }
 
     fn forward_with_state(&mut self, token_id: u32) -> Result<(Vec<f32>, Vec<f32>)> {

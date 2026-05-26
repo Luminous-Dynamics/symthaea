@@ -25,6 +25,8 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<crate::resources::DungeonSeed>()
             .init_resource::<systems::minimap::ExploredTiles>()
             .init_resource::<crate::experience::ExperienceRegistry>()
+            .add_plugins(systems::muse::MusePlugin)
+            .add_plugins(symtropy_mycelix_village::city_scale_logic::CityScalePlugin { state: GamePhase::CityScale })
             .init_resource::<systems::harmonies::LocalHarmonyState>()
             .init_resource::<systems::scavenge::CollectedPrimitives>()
             .init_resource::<systems::audio::AudioState>()

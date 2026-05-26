@@ -1,7 +1,7 @@
 [package]
 name = "craft-tests"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Integration tests for mycelix-craft cluster hApp"
 publish = false
 autotests = false

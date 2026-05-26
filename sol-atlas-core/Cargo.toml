@@ -3,7 +3,7 @@
 [package]
 name = "sol-atlas-core"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Shared types, geo math, and constants for Sol Atlas renderers"
 

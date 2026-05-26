@@ -57,6 +57,8 @@ pub mod code_orchestrator;
 pub mod pattern_bootstrap;
 #[cfg(feature = "code_generation")]
 pub mod proof_memory;
+#[cfg(feature = "code_generation")]
+pub mod smt_serializer;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]

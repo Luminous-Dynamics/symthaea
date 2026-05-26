@@ -1,7 +1,7 @@
 [package]
 name = "symtropy"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "The Symtropy distribution: an opinionated Bevy bundle with consciousness-coupled physics, scene scaffolding, and a built-in dev console. One dependency for the full Symtropy game-dev experience."
 repository = "https://github.com/luminous-dynamics/symtropy"

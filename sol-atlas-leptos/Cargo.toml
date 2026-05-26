@@ -1,7 +1,7 @@
 [package]
 name = "sol-atlas-leptos"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Leptos WebGL globe for Sol Atlas — energy infrastructure, Resontia vaults, maglev corridors"
 
 [dependencies]

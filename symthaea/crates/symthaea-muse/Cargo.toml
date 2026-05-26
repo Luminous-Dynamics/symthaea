@@ -6,6 +6,9 @@ description = "Consciousness-driven music synthesis for Symthaea — CfC tempora
 license = "AGPL-3.0-or-later"
 
 [dependencies]
+wgpu.workspace = true
+
+
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 symthaea-fep = { path = "../symthaea-fep" }

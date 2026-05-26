@@ -155,11 +155,11 @@
                 ;
             })
 
-            # Python + matplotlib (paper figures)
-            (python3.withPackages (ps: with ps; [
-              matplotlib
-              numpy
-            ]))
+            # Python + matplotlib (paper figures commented out due to upstream nixpkgs sphinx-9.1.0 python3.11 build conflict)
+            # (python3.withPackages (ps: with ps; [
+            #   matplotlib
+            #   numpy
+            # ]))
 
             # Symtropy game runtime dependencies (Bevy + Vulkan + X11)
             xorg.libX11

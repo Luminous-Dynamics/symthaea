@@ -105,6 +105,10 @@ pub enum GamePhase {
     /// Sol Atlas globe view — planetary coordination layer.
     #[cfg(feature = "atlas")]
     GlobeView,
+    /// Phase 11: City-Scale Governance Demonstration.
+    CityScale,
+    /// Muse: Thermodynamic Visualizer.
+    Muse,
 }
 
 // ============================================================================

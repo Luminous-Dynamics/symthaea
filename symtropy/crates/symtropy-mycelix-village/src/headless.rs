@@ -3,8 +3,10 @@
 
 use bevy::prelude::*;
 use bevy::app::AppExit;
+use bevy::ecs::event::EventWriter; // Explicitly import this!
+
 use symthaea_bevy_brain::{CognitiveBrain, SymthaeaBrainPlugin};
-use symtropy_bevy_core::{BevyPhysicsCorePlugin, PhysicsBody};
+use symtropy_bevy_core::BevyPhysicsCorePlugin;
 
 #[derive(Resource)]
 struct ScenarioStats {
@@ -16,6 +18,9 @@ fn main() {
     App::new()
         .add_plugins(MinimalPlugins)
         .add_plugins(bevy::log::LogPlugin::default())
+        .add_plugins(bevy::transform::TransformPlugin)
+        .add_plugins(bevy::hierarchy::HierarchyPlugin)
+        .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
         .add_plugins(BevyPhysicsCorePlugin::<3> {
             gravity: nalgebra::SVector::from([0.0, -9.81, 0.0]),
         })
@@ -40,7 +45,7 @@ fn spawn_scenario(mut commands: Commands) {
     brain_0.profile.epistemic_integrity = 1.0;
     commands.spawn((
         brain_0,
-        PhysicsBody {
+        symtropy_bevy_core::PhysicsBody {
             handle: symtropy_physics::body::BodyHandle(0),
             visual_radius: 0.5,
         },
@@ -54,7 +59,7 @@ fn spawn_scenario(mut commands: Commands) {
     brain_1.profile.epistemic_integrity = 1.0;
     commands.spawn((
         brain_1,
-        PhysicsBody {
+        symtropy_bevy_core::PhysicsBody {
             handle: symtropy_physics::body::BodyHandle(1),
             visual_radius: 0.5,
         },
@@ -64,7 +69,7 @@ fn spawn_scenario(mut commands: Commands) {
 }
 
 fn wastefulness_monitor_system(
-    mut query: Query<(&PhysicsBody, &mut CognitiveBrain)>,
+    mut query: Query<(&symtropy_bevy_core::PhysicsBody, &mut CognitiveBrain)>,
 ) {
     for (body, mut brain) in &mut query {
         let power = if body.handle.0 == 1 { 500.0 } else { 0.0 };
@@ -80,17 +85,17 @@ fn wastefulness_monitor_system(
 
 fn tick_scenario(
     mut stats: ResMut<ScenarioStats>,
-    mut app_exit: MessageWriter<AppExit>,
+    mut app_exit: EventWriter<AppExit>,
 ) {
     stats.ticks += 1;
     if stats.ticks >= stats.max_ticks {
         info!("Scenario complete after {} ticks.", stats.ticks);
-        app_exit.write(AppExit::Success);
+        app_exit.send(AppExit::Success);
     }
 }
 
 fn validate_governance_invariants(
-    query: Query<(&PhysicsBody, &CognitiveBrain)>,
+    query: Query<(&symtropy_bevy_core::PhysicsBody, &CognitiveBrain)>,
     stats: Res<ScenarioStats>,
 ) {
     if stats.ticks % 100 != 0 {
@@ -109,7 +114,6 @@ fn validate_governance_invariants(
         }
 
         if body.handle.0 == 0 {
-            // Virtuous NPC should maintain high care (it might fluctuate slightly due to cycle updates, but here we force it)
             if profile.stewardship_care < 0.8 {
                 error!("NPC-0: Stewardship Care dropped too low: {:.4}", profile.stewardship_care);
             }

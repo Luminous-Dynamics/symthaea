@@ -48,7 +48,7 @@ exclude = ["tests", "crates/praxis-agg", "crates/praxis-content-gen", "crates/pr
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <info@mycelix.org>"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/mycelix-praxis"

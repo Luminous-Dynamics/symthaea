@@ -113,8 +113,8 @@ impl RdGrid {
                     let y = cy + dy - radius;
                     if x < GRID && y < GRID {
                         let idx = y * GRID + x;
-                        u[idx] = 0.5 + rng.gen::<f32>() * 0.1;
-                        v[idx] = 0.25 + rng.gen::<f32>() * 0.1;
+                        u[idx] = 0.5 + rng.r#gen::<f32>() * 0.1;
+                        v[idx] = 0.25 + rng.r#gen::<f32>() * 0.1;
                     }
                 }
             }

@@ -391,7 +391,7 @@ fn extract_features(samples: &[f32], sr: u32) -> Features {
     let active_pcs: Vec<usize> = chroma
         .iter()
         .enumerate()
-        .filter(|(_, &v)| v > 0.05)
+        .filter(|&(_, &v)| v > 0.05)
         .map(|(i, _)| i)
         .collect();
     let note_range = if active_pcs.len() > 1 {

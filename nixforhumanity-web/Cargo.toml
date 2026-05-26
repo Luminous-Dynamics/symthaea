@@ -1,7 +1,7 @@
 [package]
 name = "nixforhumanity-web"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "NixForHumanity — accessible NixOS installer, pure Rust/Leptos CSR"
 license = "AGPL-3.0-or-later"
 

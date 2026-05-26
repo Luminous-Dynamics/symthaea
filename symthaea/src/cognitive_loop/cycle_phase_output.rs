@@ -2028,6 +2028,7 @@ impl CognitiveLoopService {
                                     channels: manifold.last_frame_channels(),
                                     path_length: path.len(),
                                     semantic_coherence: 0.0,
+                                    trajectory: path,
                                 });
                         }
                     }

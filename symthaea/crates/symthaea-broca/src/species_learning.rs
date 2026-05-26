@@ -6,7 +6,6 @@
 //! Uses HDC similarity to identify and deduplicate improvements.
 
 use crate::architectural_memory::ArchitecturalMemory;
-use crate::evolutionary_scaffolder::EvolutionResult;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 pub struct MemoryConsolidator {

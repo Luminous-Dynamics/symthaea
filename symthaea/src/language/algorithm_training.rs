@@ -1591,7 +1591,7 @@ pub fn train_cfc_sequencer(epochs: usize, learning_rate: f32) -> CfcTrainingRepo
 
     for pair in eval.iter() {
         let projected = projection.project(&pair.hv);
-        let planned = sequencer.plan_structure(&projected, &[]);
+        let planned = sequencer.plan_structure(&projected, &[], &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default());
         let target_plan = class_to_plan(pair.class, &pair.channels);
 
         if let (Some(predicted), Some(expected)) = (planned.first(), target_plan.get(1)) {
@@ -1769,7 +1769,7 @@ fn evaluate_plans(
 
     for pair in eval {
         let projected = projection.project(&pair.hv);
-        let planned = sequencer.plan_structure(&projected, &[]);
+        let planned = sequencer.plan_structure(&projected, &[], &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default());
         let target_plan = class_to_plan(pair.class, &pair.channels);
 
         if let (Some(predicted), Some(expected)) = (planned.first(), target_plan.get(1)) {
@@ -2217,7 +2217,7 @@ pub fn cold_generate(
     let projected = projection.project(&hv);
 
     // Step 4: CfC plan
-    let plan_steps = sequencer.plan_structure(&projected, &[]);
+    let plan_steps = sequencer.plan_structure(&projected, &[], &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default());
     let plan: Vec<String> = plan_steps
         .iter()
         .map(|s| format!("{:?}({:.2})", s.action, s.confidence))
@@ -2478,7 +2478,7 @@ pub fn generate_with_repair(
         channels.set_class(classify_from_purpose(purpose));
         let hv = encoder.encode(&channels);
         let projected = projection.project(&hv);
-        let plan_steps = sequencer.plan_structure(&projected, &[]);
+        let plan_steps = sequencer.plan_structure(&projected, &[], &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default());
 
         // Use 1-NN retrieval to enhance the body if plan is trivial
         let class = AlgorithmClass::from_channels(&channels);

@@ -3,7 +3,7 @@
 [package]
 name = "symthaea-bridge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Bridge connecting Symthaea LLM inference to civic-happ DHT knowledge"
 license = "Apache-2.0"
 

@@ -9,7 +9,7 @@
 //! Stitch frames into video: ffmpeg -framerate 24 -i frame_%05d.png -c:v libx264 demo.mp4
 
 use bevy::prelude::*;
-use bevy::render::view::screenshot::{save_to_disk, Screenshot};
+use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
 /// Configuration for frame capture.
 #[derive(Resource)]
@@ -51,8 +51,10 @@ pub fn frame_capture_system(
             let _ = std::fs::create_dir_all(&config.output_dir);
             info!("[capture] Recording started → {}", config.output_dir);
         } else {
-            info!("[capture] Stopped. {} frames. Stitch: ffmpeg -framerate 24 -i {}/frame_%05d.png -c:v libx264 -pix_fmt yuv420p demo.mp4",
-                config.frame_count, config.output_dir);
+            info!(
+                "[capture] Stopped. {} frames. Stitch: ffmpeg -framerate 24 -i {}/frame_%05d.png -c:v libx264 -pix_fmt yuv420p demo.mp4",
+                config.frame_count, config.output_dir
+            );
         }
     }
 
@@ -62,8 +64,10 @@ pub fn frame_capture_system(
 
     if config.max_frames > 0 && config.frame_count >= config.max_frames {
         config.active = false;
-        info!("[capture] Max frames ({}). Stitch: ffmpeg -framerate 24 -i {}/frame_%05d.png -c:v libx264 -pix_fmt yuv420p demo.mp4",
-            config.frame_count, config.output_dir);
+        info!(
+            "[capture] Max frames ({}). Stitch: ffmpeg -framerate 24 -i {}/frame_%05d.png -c:v libx264 -pix_fmt yuv420p demo.mp4",
+            config.frame_count, config.output_dir
+        );
         return;
     }
 

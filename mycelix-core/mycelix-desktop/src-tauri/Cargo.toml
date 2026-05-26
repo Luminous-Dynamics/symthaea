@@ -5,8 +5,8 @@ description = "Mycelix Desktop - P2P Consciousness Network"
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/mycelix-desktop"
-edition = "2021"
-rust-version = "1.70"
+edition = "2024"
+rust-version = "1.94"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

@@ -11,7 +11,7 @@
 # will likely look very different (and much more reasonable)
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "rand_chacha"
 version = "0.3.1"
 authors = ["The Rand Project Developers", "The Rust Project Developers", "The CryptoCorrosion Contributors"]

@@ -1,7 +1,7 @@
 [package]
 name = "civic_knowledge_integrity"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Civic knowledge integrity zome - stores civic information for AI agents"
 
 [lib]

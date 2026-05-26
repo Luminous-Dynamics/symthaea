@@ -52,7 +52,7 @@ cat > "${CRATE_DIR}/Cargo.toml" << TOML
 name = "${CRATE_NAME}"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "HDC-LTC + FEP Active Inference ${STRUCT_PREFIX} platform"
 license = "AGPL-3.0-or-later"

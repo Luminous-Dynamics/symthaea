@@ -60,9 +60,7 @@ pub struct ZkReviewResponse {
 /// 3. They have no declared conflicts of interest
 ///
 /// All without revealing their identity (double-blind review).
-pub async fn verify_review_proof(
-    Json(req): Json<ZkReviewRequest>,
-) -> impl IntoResponse {
+pub async fn verify_review_proof(Json(req): Json<ZkReviewRequest>) -> impl IntoResponse {
     let domain_tag = DomainTag::new("DeSci", "ReviewIntegrity", 1);
 
     // Validate inputs
@@ -131,7 +129,11 @@ pub async fn verify_review_proof(
         && req.review_commitment.len() == 32;
 
     (
-        if proof_valid { StatusCode::OK } else { StatusCode::UNPROCESSABLE_ENTITY },
+        if proof_valid {
+            StatusCode::OK
+        } else {
+            StatusCode::UNPROCESSABLE_ENTITY
+        },
         Json(ZkReviewResponse {
             verified: proof_valid,
             domain_tag: domain_tag.as_str().to_string(),

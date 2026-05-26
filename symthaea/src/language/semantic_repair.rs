@@ -28,6 +28,7 @@ pub fn try_semantic_ast_repair(source: &str, diagnostics: &[String]) -> Option<S
         }
     }
 
+    // NEW: Compiler Help-Driven Return Injection
     if joined.contains("you might have meant to return this value") {
         if let Some(repaired) = inject_explicit_return(source) {
             return Some(repaired);
@@ -42,7 +43,259 @@ pub fn try_semantic_ast_repair(source: &str, diagnostics: &[String]) -> Option<S
         }
     }
 
+    // NEW: Missing Import Injection
+    if joined.contains("cannot find") && joined.contains("in this scope") {
+        if let Some(repaired) = try_inject_missing_imports(source, &joined) {
+            return Some(repaired);
+        }
+    }
+
+    // NEW: Vector/Slice Conversion
+    if mentions_vec_slice_mismatch(&joined) {
+        if let Some(repaired) = try_fix_vec_slice_mismatch(source, &joined) {
+            return Some(repaired);
+        }
+    }
+
+    // NEW: Lifetime Return Fix
+    if joined.contains("missing lifetime specifier") || joined.contains("explicit lifetime name needed") {
+        if let Some(repaired) = try_fix_missing_lifetime(source) {
+            return Some(repaired);
+        }
+    }
+
+    // NEW: Missing Reference Fix
+    if joined.contains("expected `&") && !joined.contains("found `&") {
+        if let Some(repaired) = try_fix_missing_reference(source, &joined) {
+            return Some(repaired);
+        }
+    }
+
     None
+}
+
+fn mentions_vec_slice_mismatch(diagnostics: &str) -> bool {
+    (diagnostics.contains("expected `&[") && diagnostics.contains("found `&vec<"))
+        || (diagnostics.contains("expected `vec<") && diagnostics.contains("found `&["))
+}
+
+fn try_inject_missing_imports(source: &str, diagnostics: &str) -> Option<String> {
+    let mut file = syn::parse_file(source).ok()?;
+    let mut changed = false;
+
+    let missing_types = [
+        ("HashMap", "std::collections::HashMap"),
+        ("BTreeMap", "std::collections::BTreeMap"),
+        ("Arc", "std::sync::Arc"),
+        ("Mutex", "std::sync::Mutex"),
+        ("RefCell", "std::cell::RefCell"),
+        ("Instant", "std::time::Instant"),
+        ("Duration", "std::time::Duration"),
+    ];
+
+    for (name, path) in missing_types {
+        let name_lower = name.to_lowercase();
+        if diagnostics.contains(&format!("cannot find type `{name_lower}`"))
+            || diagnostics.contains(&format!("cannot find value `{name_lower}`"))
+        {
+            if !has_import(&file, name) {
+                let path_segments: Vec<syn::Ident> =
+                    path.split("::").map(|s| syn::parse_str(s).unwrap()).collect();
+                let use_item: syn::ItemUse = syn::parse_quote!(use #(#path_segments)::* ;);
+                file.items.insert(0, syn::Item::Use(use_item));
+                changed = true;
+            }
+        }
+    }
+
+    changed.then(|| file.into_token_stream().to_string())
+}
+
+fn has_import(file: &syn::File, name: &str) -> bool {
+    for item in &file.items {
+        if let syn::Item::Use(item_use) = item {
+            let use_str = item_use.to_token_stream().to_string();
+            if use_str.contains(name) || use_str.contains(&format!("::{}", name)) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn try_fix_vec_slice_mismatch(source: &str, diagnostics: &str) -> Option<String> {
+    let mut file = syn::parse_file(source).ok()?;
+    let mut visitor = VecSliceFixVisitor {
+        diagnostics: diagnostics.to_string(),
+        changed: false,
+    };
+    visitor.visit_file_mut(&mut file);
+    visitor
+        .changed
+        .then(|| file.into_token_stream().to_string())
+}
+
+struct VecSliceFixVisitor {
+    diagnostics: String,
+    changed: bool,
+}
+
+impl VisitMut for VecSliceFixVisitor {
+    fn visit_expr_mut(&mut self, expr: &mut syn::Expr) {
+        if self.changed {
+            return;
+        }
+
+        // expected `Vec<...>`, found `&[...]` -> .to_vec()
+        if self.diagnostics.contains("expected `vec") && self.diagnostics.contains("found `&[") {
+            if matches!(expr, syn::Expr::Reference(_) | syn::Expr::Path(_)) {
+                let original = expr.clone();
+                *expr = syn::parse_quote!(#original.to_vec());
+                self.changed = true;
+                return;
+            }
+        }
+
+        // expected `&[...]`, found `&Vec<...>` -> .as_slice()
+        if self.diagnostics.contains("expected `&[") && self.diagnostics.contains("found `&vec") {
+            if let syn::Expr::Reference(r) = expr {
+                let inner = &r.expr;
+                *expr = syn::parse_quote!(#inner.as_slice());
+                self.changed = true;
+                return;
+            }
+        }
+
+        visit_mut::visit_expr_mut(self, expr);
+    }
+}
+
+fn try_fix_missing_lifetime(source: &str) -> Option<String> {
+    let mut file = syn::parse_file(source).ok()?;
+    let mut visitor = LifetimeFixVisitor { changed: false };
+    visitor.visit_file_mut(&mut file);
+    visitor
+        .changed
+        .then(|| file.into_token_stream().to_string())
+}
+
+struct LifetimeFixVisitor {
+    changed: bool,
+}
+
+impl VisitMut for LifetimeFixVisitor {
+    fn visit_item_fn_mut(&mut self, i: &mut syn::ItemFn) {
+        // Collect all available lifetimes from parameters
+        let mut available_lifetimes = Vec::new();
+        for input in &i.sig.inputs {
+            if let syn::FnArg::Typed(pat_type) = input {
+                let type_str = pat_type.ty.to_token_stream().to_string();
+                if let Some(start) = type_str.find('\'') {
+                    let end = type_str[start..]
+                        .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                        .unwrap_or(type_str[start..].len())
+                        + start;
+                    available_lifetimes.push(type_str[start..end].to_string());
+                }
+            }
+        }
+
+        // If no explicit lifetimes found, check for the default 'a pattern or use 'static if no inputs
+        let target_lifetime = if let Some(lt) = available_lifetimes.first() {
+            lt.clone()
+        } else if i.sig.inputs.is_empty() {
+            "'static".to_string()
+        } else {
+            // Default to 'a if it exists in generics, otherwise nothing
+            if i.sig.generics.params.iter().any(|p| matches!(p, syn::GenericParam::Lifetime(_))) {
+                "'a".to_string()
+            } else {
+                return;
+            }
+        };
+
+        let lt: syn::Lifetime = syn::parse_str(&target_lifetime).unwrap();
+
+        // Apply to return type if it's a reference lacking a lifetime
+        if let syn::ReturnType::Type(_, ty) = &mut i.sig.output {
+            if inject_lifetime_if_missing(ty.as_mut(), &lt) {
+                self.changed = true;
+            }
+        }
+
+        visit_mut::visit_item_fn_mut(self, i);
+    }
+}
+
+fn inject_lifetime_if_missing(ty: &mut syn::Type, lt: &syn::Lifetime) -> bool {
+    match ty {
+        syn::Type::Reference(tr) => {
+            if tr.lifetime.is_none() {
+                tr.lifetime = Some(lt.clone());
+                return true;
+            }
+        }
+        syn::Type::Path(tp) => {
+            // Check for Result<T, E> or Option<T>
+            if let Some(last) = tp.path.segments.last_mut() {
+                if let syn::PathArguments::AngleBracketed(args) = &mut last.arguments {
+                    let mut changed = false;
+                    for arg in &mut args.args {
+                        if let syn::GenericArgument::Type(inner_ty) = arg {
+                            if inject_lifetime_if_missing(inner_ty, lt) {
+                                changed = true;
+                            }
+                        }
+                    }
+                    return changed;
+                }
+            }
+        }
+        _ => {}
+    }
+    false
+}
+
+fn try_fix_missing_reference(source: &str, diagnostics: &str) -> Option<String> {
+    let mut file = syn::parse_file(source).ok()?;
+    // Heuristic: extract the 'found' type or variable name if possible
+    let name = binding_name_from_backticks(diagnostics);
+    
+    let mut visitor = ReferenceFixVisitor {
+        name,
+        changed: false,
+    };
+    visitor.visit_file_mut(&mut file);
+    visitor
+        .changed
+        .then(|| file.into_token_stream().to_string())
+}
+
+struct ReferenceFixVisitor {
+    name: Option<String>,
+    changed: bool,
+}
+
+impl VisitMut for ReferenceFixVisitor {
+    fn visit_expr_mut(&mut self, expr: &mut syn::Expr) {
+        if self.changed {
+            return;
+        }
+
+        if let Some(ref target_name) = self.name {
+            match expr {
+                syn::Expr::Path(p) if p.path.is_ident(target_name) => {
+                    let original = expr.clone();
+                    *expr = syn::parse_quote!(&#original);
+                    self.changed = true;
+                    return;
+                }
+                _ => {}
+            }
+        }
+        
+        visit_mut::visit_expr_mut(self, expr);
+    }
 }
 
 fn mentions_result_mismatch(diagnostics: &str) -> bool {
@@ -99,7 +352,6 @@ struct ExplicitReturnVisitor {
 impl VisitMut for ExplicitReturnVisitor {
     fn visit_block_mut(&mut self, block: &mut syn::Block) {
         if let Some(syn::Stmt::Expr(expr, None)) = block.stmts.last_mut() {
-            // Guard against prepending return to control flow structures or existing returns
             if !matches!(
                 expr,
                 syn::Expr::Return(_)
@@ -272,9 +524,62 @@ mod tests {
         "#;
         let diagnostic = "help: use the `?` operator to extract the `Result<i32, String>` value";
         let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
-        assert!(
-            repaired.contains("Ok (items . first () . copied () . ok_or_else (|| \"empty\") ?)")
-        );
+
+        // Strip out spacing artifacts to survive any local token formatting configurations safely
+        let normalized = repaired.replace(' ', "");
+        assert!(normalized.contains("Ok(items.first().copied().ok_or_else(||\"empty\")?)"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn injects_missing_hashmap_import() {
+        let source = "pub fn new_map() { let mut m = HashMap::new(); }";
+        let diagnostic = "error[E0433]: failed to resolve: cannot find type `HashMap` in this scope";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+
+        let normalized = repaired.replace(' ', "");
+        assert!(normalized.contains("usestd::collections::HashMap;"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn fixes_vec_to_slice_mismatch() {
+        let source = "pub fn take_slice(s: &[i32]) {} pub fn main() { let v = vec![1]; take_slice(&v); }";
+        let diagnostic = "expected `&[i32]`, found `&Vec<i32>`";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+
+        assert!(repaired.replace(' ', "").contains("v.as_slice()"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn fixes_slice_to_vec_mismatch() {
+        let source = "pub fn take_vec(v: Vec<i32>) {} pub fn main() { let s = &[1]; take_vec(s); }";
+        let diagnostic = "expected `Vec<i32>`, found `&[i32]`";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+
+        let normalized = repaired.replace(' ', "");
+        assert!(normalized.contains("s.to_vec()") || normalized.contains("[1].to_vec()"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn fixes_missing_lifetime_in_return() {
+        let source = "pub fn get_ref<'a>(data: &'a [i32]) -> &i32 { &data[0] }";
+        let diagnostic = "error[E0106]: missing lifetime specifier";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+
+        assert!(repaired.contains("-> &'a i32"));
+        syn::parse_file(&repaired).unwrap();
+    }
+
+    #[test]
+    fn fixes_missing_reference_operator() {
+        let source = "pub fn take_ref(s: &str) {} pub fn main() { let val = \"hi\".to_string(); take_ref(val); }";
+        let diagnostic = "expected `&str`, found `String` (variable `val`)";
+        let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
+
+        assert!(repaired.contains("take_ref(&val)"));
         syn::parse_file(&repaired).unwrap();
     }
 }

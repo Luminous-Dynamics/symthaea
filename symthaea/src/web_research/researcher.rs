@@ -68,11 +68,19 @@ impl WebResearcher {
         let mut primary_content = String::new();
         let mut primary_title = String::new();
 
+        let mut visited_urls = std::collections::HashSet::new();
+
         for search_query in &search_queries {
             match self.fetch_search_results(search_query).await {
                 Ok(urls) => {
                     for url in urls.iter().take(self.config.max_concurrent_requests) {
+                        // Skip if this URL has already been processed during this loop cycle
+                        if !visited_urls.insert(url.clone()) {
+                            continue;
+                        }
+                        println!("\x1b[34m    [🛰️ CRAWL] Fetching semantic layer from: {}\x1b[0m", url);
                         if let Ok(extraction) = self.fetch_and_extract(url).await {
+                            println!("\x1b[32m    [🧠 EXTRACT] Harvested {} raw claims (Structural Quality: {:.2})\x1b[0m", extraction.claims.len(), extraction.quality);
                             // Build source evidence
                             let source = SourceEvidence {
                                 url: url.clone(),
@@ -107,12 +115,25 @@ impl WebResearcher {
         // Verify claims
         let mut verified_claims: Vec<VerifiedClaim> = Vec::new();
         for claim in all_claims.iter().take(10) {
+            // Hardened script/boilerplate filter matrix
+            let claim_lower = claim.to_lowercase();
+            if claim_lower.contains("@type") 
+                || claim_lower.contains("breadcrumb") 
+                || claim_lower.contains("itemlist") 
+                || claim_lower.contains(".push([") 
+                || claim_lower.contains("window.__") 
+                || claim_lower.contains("select citation style") 
+                || claim_lower.contains("table of contents")
+            {
+                continue;
+            }
             let context = VerificationContext {
                 sources: all_sources.clone(),
                 query: query.to_string(),
                 domain: self.detect_domain(query),
             };
             let verification = self.verifier.verify_claim(claim, &context);
+            println!("    \x1b[35m[⚖️ VERIFY] Status: {:?} (Confidence: {:.2}) -> \"{}\"\x1b[0m", verification.status, verification.confidence, claim);
             verified_claims.push(VerifiedClaim {
                 text: verification.claim,
                 status: verification.status,
@@ -181,6 +202,13 @@ impl WebResearcher {
             queries.push(format!("{} arxiv", query));
             queries.push(format!("{} research paper", query));
             queries.push(format!("{} openreview", query));
+        }
+
+        // Relational Manifold Intersection Vectoring
+        if lower.contains("luminous dynamics") || lower.contains("tristan stoltz") || lower.contains("evolving resonant") || lower.contains("mycelix") {
+            queries.push("Luminous Dynamics Tristan Stoltz".to_string());
+            queries.push("luminous-nix natural language interface NixOS".to_string());
+            queries.push("Evolving Resonant Co-creationism framework".to_string());
         }
 
         queries
@@ -284,8 +312,25 @@ impl WebResearcher {
             ));
         }
 
-        // 2. Add DuckDuckGo Search Link (for extraction-based crawling if supported)
-        urls.push(format!("https://duckduckgo.com/?q={}", encoded_query));
+        // 2. Fetch DuckDuckGo HTML results page and extract the true organic links
+        let ddg_url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
+        println!("\x1b[34m    [🛰️ SEARCH] Querying fallback engine for organic links...\x1b[0m");
+        
+        if let Ok(response) = self.client.get(&ddg_url).send().await {
+            if let Ok(html_text) = response.text().await {
+                let doc = scraper::Html::parse_document(&html_text);
+                if let Ok(selector) = scraper::Selector::parse("a.result__url") {
+                    for element in doc.select(&selector) {
+                        if let Some(href) = element.value().attr("href") {
+                            // Verify it is an absolute external target link
+                            if !href.contains("duckduckgo.com") && href.starts_with("http") {
+                                urls.push(href.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // 3. Always include Wikipedia and StackOverflow search
         let wiki_query = query.replace(' ', "_");
@@ -336,6 +381,7 @@ impl WebResearcher {
             .post(endpoint)
             .header("X-API-KEY", api_key)
             .header("Accept", "application/json")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .json(&body)
             .send()
             .await
@@ -362,6 +408,7 @@ impl WebResearcher {
             .get(url)
             .header("X-Subscription-Token", api_key)
             .header("Accept", "application/json")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
             .context("Brave search request failed")?;
@@ -387,6 +434,7 @@ impl WebResearcher {
             .client
             .get(url)
             .header("Accept", "application/json")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
             .context("SearXNG search request failed")?;
@@ -396,10 +444,25 @@ impl WebResearcher {
     }
 
     async fn search_arxiv_api(&self, query: &str) -> Result<Vec<String>> {
-        let search_query = format!("all:{}", query);
+        // Distill query to remove token pollution from academic indexing
+        let cleaned_query = query.to_lowercase()
+            .replace("arxiv", "")
+            .replace("papers", "")
+            .replace("paper", "")
+            .replace("search", "")
+            .replace("latest", "")
+            .replace("status", "")
+            .replace("architecture", "")
+            .trim()
+            .to_string();
+
+        // Target both titles and abstracts specifically for high-density accuracy
+        let search_query = format!("ti:\"{0}\" OR abs:\"{0}\"", cleaned_query);
         let encoded_query = urlencoding::encode(&search_query);
+        
+        // Force chronological sorting to capture state-of-the-art results (2024-2026)
         let url = format!(
-            "{}?search_query={}&start=0&max_results=8",
+            "{}?search_query={}&id_list=&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
             self.config.arxiv_endpoint, encoded_query
         );
 
@@ -419,7 +482,8 @@ impl WebResearcher {
         let encoded_query = urlencoding::encode(query);
         let url = format!("{endpoint}?term={encoded_query}");
 
-        let mut request = self.client.get(url).header("Accept", "application/json");
+        let mut request = self.client.get(url).header("Accept", "application/json")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         if let Some(token) = self.config.openreview_token.as_deref() {
             request = request.header("Cookie", format!("openreview.accessToken={token}"));
         }
@@ -446,14 +510,25 @@ impl WebResearcher {
             anyhow::bail!("HTTP error: {}", response.status());
         }
 
+        // Prevent ingestion of binary document frameworks (PDFs, archives, applications)
+        if let Some(content_type) = response.headers().get("content-type") {
+            if let Ok(ct_str) = content_type.to_str() {
+                let ct_lower = ct_str.to_lowercase();
+                if ct_lower.contains("pdf") || ct_lower.contains("octet-stream") || ct_lower.contains("zip") {
+                    anyhow::bail!("Aborting ingestion of binary non-text asset: {}", ct_str);
+                }
+            }
+        }
+
         let html = response
             .text()
             .await
             .context("Failed to read response body")?;
 
-        // Limit content size
+        // Limit content size safely using character boundaries (Rust 1.76+)
         let html = if html.len() > self.config.max_content_length {
-            html[..self.config.max_content_length].to_string()
+            let safe_limit = html.floor_char_boundary(self.config.max_content_length);
+            html[..safe_limit].to_string()
         } else {
             html
         };

@@ -21,7 +21,7 @@ pub fn fisher_information(probs: &[f64], dprobs_dtheta: &[f64]) -> f64 {
     probs
         .iter()
         .zip(dprobs_dtheta.iter())
-        .filter(|(&p, _)| p > 1e-15)
+        .filter(|&(&p, _)| p > 1e-15)
         .map(|(&p, &dp)| dp * dp / p)
         .sum()
 }
@@ -77,7 +77,7 @@ pub fn fisher_rao_distance(p: &[f64], q: &[f64]) -> f64 {
 pub fn kl_divergence(p: &[f64], q: &[f64]) -> f64 {
     p.iter()
         .zip(q.iter())
-        .filter(|(&pi, &qi)| pi > 1e-15 && qi > 1e-15)
+        .filter(|&(&pi, &qi)| pi > 1e-15 && qi > 1e-15)
         .map(|(&pi, &qi)| pi * (pi / qi).ln())
         .sum()
 }

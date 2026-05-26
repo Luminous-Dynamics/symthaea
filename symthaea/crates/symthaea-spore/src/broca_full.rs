@@ -2336,9 +2336,9 @@ mod tests {
     fn test_full_generation_produces_text() {
         let genesis = test_genesis();
         let config = small_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut b_gen = BrocaGenerator::new(&genesis, config);
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = b_gen.generate(&channels);
 
         assert!(
             result.num_tokens > 0,
@@ -2356,12 +2356,12 @@ mod tests {
     fn test_generation_with_epistemic_gating() {
         let genesis = test_genesis();
         let config = small_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut b_gen = BrocaGenerator::new(&genesis, config);
 
         let mut channels = ThoughtChannels::default();
         channels.set_epistemic(3.0); // Unknown
 
-        let result = gen.generate(&channels);
+        let result = b_gen.generate(&channels);
 
         // Verify gating trace shows epistemic boost was applied
         assert!(
@@ -2379,13 +2379,13 @@ mod tests {
     fn test_generation_with_emotional_modulation() {
         let genesis = test_genesis();
         let config = small_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut b_gen = BrocaGenerator::new(&genesis, config);
 
         // High arousal negative valence
         let mut channels = ThoughtChannels::default();
         channels.set_emotion(-0.8, 0.95, 0.1);
 
-        let result = gen.generate(&channels);
+        let result = b_gen.generate(&channels);
 
         // At least some gating trace entries should show emotional boost
         // (after position threshold)

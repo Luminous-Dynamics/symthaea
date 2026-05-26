@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-attribution-stark-common"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Shared AIR definition for Mycelix Attribution ZK-STARK proofs"
 
 [dependencies]

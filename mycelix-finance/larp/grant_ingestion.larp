@@ -1,0 +1,34 @@
+// Mycelix Finance - Grant Ingestion Pact v1.0
+// The "Metabolic Air-Lock" for Fiat Grants.
+
+pact GrantIngestion {
+    // 1. One-Way Metabolic Air-Lock
+    // Fiat enters as a Grant, stripping it of all governance power.
+    on fiat_grant_received(deposit: FiatBridgeDeposit) {
+        execute convert_to_restricted_sap(deposit);
+    }
+
+    // 2. Converstion Logic
+    action convert_to_restricted_sap(deposit: FiatBridgeDeposit) {
+        let sap_amount = deposit.fiat_amount * deposit.exchange_rate;
+        
+        // Mint SAP to the Treasury, but tag it as "Grant-Restricted"
+        mint Treasury, sap_amount, tag: "GrantRestricted";
+        
+        // Ensure this capital cannot be used to buy governance credentials.
+        // The 8D Sovereign Profile explicitly excludes capital tagged as GrantRestricted.
+        lock_governance_power Treasury, sap_amount;
+        
+        log "METABOLIC AIR-LOCK: Ingested {} {} as restricted SAP. Governance power: 0.", 
+            deposit.fiat_amount, deposit.fiat_currency;
+    }
+
+    // 3. Proof-of-Restoration Link (Phase 11)
+    // Escrow grant funds for specific bioregional healing.
+    on grant_allocated(grant_id: Uuid, bioregion_id: Uuid) {
+        let grant_pact = ProofOfRestoration.attach(bioregion_id);
+        
+        // Grant funds are only streamed if the Biome Tensor proves healing.
+        execute grant_pact.initiate_streamed_bounty(stewards: get_stewards(bioregion_id), amount: get_grant_amount(grant_id));
+    }
+}

@@ -11,6 +11,7 @@ use symthaea_muse::{MuseConfig, MusicalState};
 #[derive(Component, Debug, Clone, Default, Reflect)]
 #[reflect(Component)]
 pub struct AudioEmitter {
+    #[reflect(ignore)]
     pub config: MuseConfig,
 }
 

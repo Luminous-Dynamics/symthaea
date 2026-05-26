@@ -5,8 +5,8 @@
 
 #[cfg(feature = "code-sheaf-eval")]
 use syn::{
-    visit::{self, Visit},
     File, ItemEnum, ItemFn, ItemStruct, ItemTrait,
+    visit::{self, Visit},
 };
 
 #[cfg(feature = "code-sheaf-eval")]

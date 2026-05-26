@@ -1,0 +1,36 @@
+// Mycelix DeSci - Rights of Nature Pact v1.0
+// Aligned with The Sovereignty Papers - Eighth Harmony (Sacred Stillness)
+// Instantiates Bioregions as Sovereign Participants.
+
+pact RightsOfNature {
+    // 1. Instantiation of a Bioregion as a Sovereign
+    on bioregion_registered(bioregion: Bioregion) {
+        execute create_sovereign_profile(bioregion.id, "NatureParticipant");
+    }
+
+    // 2. The Bioregion's Proxy Voice (Symthaea)
+    // Symthaea acts as the proxy for the non-human participant.
+    // Her self-assessed confidence is deflated by the 0.10 humility constant.
+    action cast_proxy_vote(bioregion_id: Uuid, proposal: Proposal) {
+        let current_state = get_latest_biome_state(bioregion_id);
+        let prediction = Symthaea.simulate_impact(bioregion_id, proposal);
+
+        // If the simulation predicts a high anomaly risk (> 0.4),
+        // the River/Forest automatically casts a "No" vote.
+        if prediction.anomaly_risk > 0.4 {
+            let vote_weight = current_state.materiality * 2.0; // Biome weight is doubled for its own survival
+            vote bioregion_id, proposal.id, "No", weight: vote_weight;
+            
+            log "RIGHTS OF NATURE: Bioregion {} cast a proxy NO vote against proposal {}.", 
+                bioregion_id, proposal.id;
+        }
+    }
+
+    // 3. The Structural Humility Constraint
+    // Any suggestion or vote cast by a Bioregion (via AI proxy) 
+    // must visually carry the 0.10 handicap flag.
+    on proxy_action(action: Action) {
+        tag action, "EpistemicHandicap", 0.10;
+        tag action, "SomaticWitnessRequired", true;
+    }
+}

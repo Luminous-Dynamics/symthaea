@@ -1287,6 +1287,8 @@ impl CodeOrchestrator {
                 lsp_client.as_mut(),
                 experience_store.as_mut(),
                 None,
+                None,
+                None,
             )
         };
 
@@ -1392,6 +1394,8 @@ impl CodeOrchestrator {
                 self.repo_map.as_ref(),
                 lsp_client.as_mut(),
                 experience_store.as_mut(),
+                None,
+                None,
                 None,
             )
         };
@@ -1613,6 +1617,8 @@ impl CodeOrchestrator {
                 lsp_client.as_mut(),
                 experience_store.as_mut(),
                 None,
+                None,
+                None,
             )
         };
 
@@ -1704,6 +1710,8 @@ impl CodeOrchestrator {
             lsp_client.as_mut(),
             experience_store.as_mut(),
             Some(llm_backend.clone()),
+            None,
+            None,
         );
 
         // Map results back to BackendResult
@@ -1783,6 +1791,14 @@ impl CodeOrchestrator {
             ));
             context.past_examples.extend(structural_examples);
         }
+
+        // Load negative prototypes for MCTS penalties (INV-12)
+        if let Some(state) = self.state.try_lock() {
+            if let Some(ref store) = state.experience_store {
+                context.negative_prototypes = store.negative_prototypes().clone();
+            }
+        }
+
         context
     }
 

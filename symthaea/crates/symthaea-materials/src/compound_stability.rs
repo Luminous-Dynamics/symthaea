@@ -56,7 +56,11 @@ pub fn predict_stability(
 
     // Total free energy
     let free_energy = formation_energy - temperature_k * mixing_entropy;
-    let is_stable = free_energy < 0.0;
+    let is_stable = if elements.len() < 2 {
+        true // Pure elements are stable by definition
+    } else {
+        free_energy < 0.0
+    };
 
     // Confidence based on how many elements and how well-characterized
     let confidence = if elements.len() <= 3 {
@@ -65,18 +69,22 @@ pub fn predict_stability(
         0.3 // Complex: lower confidence
     };
 
-    let formula = elements
-        .iter()
-        .map(|(z, x)| {
-            let sym = element_symbol(*z);
-            if (*x - 1.0).abs() < 0.01 {
-                sym.to_string()
-            } else {
-                format!("{}{:.1}", sym, x)
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("");
+    let formula = if elements.is_empty() {
+        "Pure Preset".to_string()
+    } else {
+        elements
+            .iter()
+            .map(|(z, x)| {
+                let sym = element_symbol(*z);
+                if (*x - 1.0).abs() < 0.01 {
+                    sym.to_string()
+                } else {
+                    format!("{}{:.1}", sym, x)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    };
 
     StabilityPrediction {
         formation_energy,

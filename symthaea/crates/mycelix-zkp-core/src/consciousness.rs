@@ -15,10 +15,7 @@
 //! Domain tag: `ZTML:Consciousness:TierProof:v1`
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
-use crate::domain::tag_consciousness_tier;
-use crate::error::{ZkpError, ZkpResult};
 
 /// Well-known consciousness gate thresholds (from bridge-common).
 pub mod thresholds {

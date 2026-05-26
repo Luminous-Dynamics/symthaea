@@ -2,7 +2,7 @@
 name = "mycelix-zkp-core"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 license = "AGPL-3.0-or-later"
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Shared dual-backend ZKP verification library for Mycelix — RISC0 + Winterfell + Dilithium5"

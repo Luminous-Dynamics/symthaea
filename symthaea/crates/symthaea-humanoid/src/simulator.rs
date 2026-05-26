@@ -1298,7 +1298,7 @@ impl MuJoCoHumanoidSimulator {
             qvel,
             head_height,
             torso_vertical,
-            extremities,
+            &extremities,
             com_velocity,
             t,
         );

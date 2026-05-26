@@ -1,0 +1,82 @@
+// Mycelix DeSci - Proof of Restoration Pact v1.0
+// Aligned with Mycelix Epistemic Charter §8 (Holistic Biome Stewardship)
+// Goodhart-Resistant Ecological Economy
+
+pact ProofOfRestoration {
+    // 1. Definition of the Biome Homeostasis Target
+    // Instead of a single metric, we use the geometric distance to a target HV.
+    target BiomeHomeostasis {
+        similarity_threshold: 0.85,
+        stark_verified: true,
+        enclaved_hardware: true,
+    }
+
+    // 2. The Restoration Trigger
+    // Fired when the BiomeTensor similarity exceeds the threshold.
+    on ecosystem_restored(bioregion: Bioregion, current_hv: BiomeTensor) 
+        where current_hv.similarity(bioregion.target_hv) > target.BiomeHomeostasis.similarity_threshold {
+        
+        execute initiate_streamed_bounty(bioregion.stewards, bioregion.id);
+    }
+
+    // 3. Temporally Streamed Payouts
+    // Drops SAP continuously over 5 years (1825 days).
+    action initiate_streamed_bounty(stewards: Vec<Identity>, bioregion_id: Uuid) {
+        let total_bounty = 50000.sap;
+        let stream_duration = 1825.days;
+
+        // Open a streaming contract locked to the Bioregion's health
+        create_stream {
+            source: Treasury,
+            destination: stewards,
+            amount: total_bounty,
+            duration: stream_duration,
+            frequency: 1.day,
+            
+            // The Ecological Time-Lock
+            // This condition is evaluated every 31Hz cycle (or consensus tick)
+            gate: check_biome_integrity(bioregion_id)
+        };
+
+        anchor_event "Restoration Stream Initiated", bioregion_id: bioregion_id;
+    }
+
+    // 4. Ecological Integrity Gate (The "Clamping" Logic)
+    // Physically closes the SAP stream if Goodhart-cheating or decay is detected.
+    action check_biome_integrity(bioregion_id: Uuid) -> bool {
+        let current_state = get_latest_biome_state(bioregion_id);
+        let anomaly_score = Symthaea.detect_anomaly(bioregion_id);
+
+        // Clamping Rules:
+        // 1. If FEP Anomaly (Surprise) is high -> CLAMP
+        if anomaly_score > 0.6 {
+            log "ECOLOGICAL ALERT: Anomaly detected in bioregion {}. Clamping stream.", bioregion_id;
+            return false;
+        }
+
+        // 2. If acoustic entropy drops (Biodiversity loss) -> CLAMP
+        if current_state.acoustic_entropy < 0.4 {
+            log "BIODIVERSITY ALERT: Acoustic entropy too low in bioregion {}. Clamping stream.", bioregion_id;
+            return false;
+        }
+
+        // 3. If Binius Interpretation Lock is broken -> CLAMP
+        if !current_state.interpretation_locked {
+            log "INTEGRITY ALERT: Interpretation lock broken in bioregion {}. Clamping stream.", bioregion_id;
+            return false;
+        }
+
+        return true;
+    }
+
+    // 5. Causal Resonance Exception
+    exception RestorationFraud(stewards: Vec<Identity>, evidence: EvidencePacket) {
+        // Severe penalty for clear-cutting or monoculture exploits
+        for steward in stewards {
+            slash steward.profile[D0], -0.75; // Total Integrity Failure
+            blacklist steward, duration: 10.years;
+        }
+        
+        anchor_event "Ecological Restoration Fraud", severity: "Critical";
+    }
+}

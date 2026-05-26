@@ -199,4 +199,3 @@ impl From<&mycelix_desci_core::claims::DesciClaim> for ClaimResponse {
         }
     }
 }
-

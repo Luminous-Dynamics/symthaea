@@ -7,6 +7,7 @@ description = "P2P swarm protocol for collective consciousness and distributed P
 license = "AGPL-3.0-or-later"
 
 [dependencies]
+yrs.workspace = true
 symthaea-core = { path = "../../symthaea-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }

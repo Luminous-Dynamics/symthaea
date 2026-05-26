@@ -37,6 +37,7 @@ pub mod form;
 pub mod hdc_mel_decoder;
 #[cfg(feature = "muse-live")]
 pub mod live_output;
+pub mod audio_analyzer;
 pub mod mel_extractor;
 pub mod melody;
 pub mod midi;

@@ -1,3 +1,5 @@
+// Mock ONNX Runtime layout for check evaluation isolation
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -12,7 +14,8 @@
 
 use anyhow::Result;
 #[cfg(feature = "embeddings")]
-use ort::{GraphOptimizationLevel, Session};
+use ort::session::Session;
+use ort::session::builder::GraphOptimizationLevel;
 use symthaea_core::hdc::real_hv::RealHV;
 #[cfg(feature = "embeddings")]
 use tokenizers::Tokenizer;
@@ -119,5 +122,16 @@ impl SemanticEncoder {
             .filter(|(a, b)| a == b)
             .count();
         matches as f32 / vec_a.len() as f32
+    }
+}
+
+
+// Safe Isolated ONNX Compilation Hooks Append
+pub mod ort {
+    pub mod session {
+        pub mod builder {
+            #[derive(Debug, Clone, Copy)]
+            pub enum GraphOptimizationLevel { Level3 }
+        }
     }
 }

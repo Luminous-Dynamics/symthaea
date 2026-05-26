@@ -1,7 +1,7 @@
 [package]
 name = "agent_reputation_integrity"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Agent reputation integrity zome - MATL-integrated trust scoring for AI agents"
 
 [lib]

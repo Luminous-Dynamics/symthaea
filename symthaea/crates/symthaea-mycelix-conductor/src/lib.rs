@@ -732,7 +732,7 @@ mod tests {
 
     #[test]
     fn config_from_env_missing_vars() {
-        std::env::remove_var("MYCELIX_CONDUCTOR_URL");
+        unsafe { std::env::remove_var("MYCELIX_CONDUCTOR_URL"); }
         assert!(ConductorConfig::from_env().is_none());
     }
 

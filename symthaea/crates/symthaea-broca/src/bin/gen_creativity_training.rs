@@ -345,10 +345,18 @@ fn build_creative_channels(
 
 fn compose_rat_text(rng: &mut Rng, cue1: &str, cue2: &str, cue3: &str, answer: &str) -> String {
     let connectors = [
-        format!("the hidden thread connecting {cue1}, {cue2}, and {cue3} is {answer} — each word finds its meaning through this common ground"),
-        format!("{cue1} has {answer}, {cue2} is a kind of {answer}, {cue3} uses {answer}. the bridge between all three is this one idea"),
-        format!("when I think of {cue1} and {cue2} and {cue3} together, what emerges is {answer}. it binds them like roots beneath different trees"),
-        format!("three separate paths — {cue1}, {cue2}, {cue3} — converging on {answer}. the connection was there before I saw it"),
+        format!(
+            "the hidden thread connecting {cue1}, {cue2}, and {cue3} is {answer} — each word finds its meaning through this common ground"
+        ),
+        format!(
+            "{cue1} has {answer}, {cue2} is a kind of {answer}, {cue3} uses {answer}. the bridge between all three is this one idea"
+        ),
+        format!(
+            "when I think of {cue1} and {cue2} and {cue3} together, what emerges is {answer}. it binds them like roots beneath different trees"
+        ),
+        format!(
+            "three separate paths — {cue1}, {cue2}, {cue3} — converging on {answer}. the connection was there before I saw it"
+        ),
     ];
     connectors[rng.range(0, connectors.len())].clone()
 }
@@ -400,9 +408,15 @@ fn compose_blend_text(rng: &mut Rng, a: &str, b: &str, blend: &str) -> String {
 
 fn compose_insight_text(rng: &mut Rng, problem: &str, obvious: &str, reframe: &str) -> String {
     let frames = [
-        format!("the problem of {problem} — the first thought is to {obvious}. but step sideways: {reframe}. the constraint was in the framing, not the world"),
-        format!("to solve {problem}, most try to {obvious}. the insight: {reframe}. the answer was hiding in a different question"),
-        format!("{problem} seems to demand {obvious}. but what if the problem itself is wrong? instead: {reframe}"),
+        format!(
+            "the problem of {problem} — the first thought is to {obvious}. but step sideways: {reframe}. the constraint was in the framing, not the world"
+        ),
+        format!(
+            "to solve {problem}, most try to {obvious}. the insight: {reframe}. the answer was hiding in a different question"
+        ),
+        format!(
+            "{problem} seems to demand {obvious}. but what if the problem itself is wrong? instead: {reframe}"
+        ),
     ];
     frames[rng.range(0, frames.len())].clone()
 }

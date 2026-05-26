@@ -152,6 +152,46 @@ impl FreeEnergyCalculator {
 }
 
 // =============================================================================
+// LEVIN MORPHOSPACE REMAPPING CONTROLLER
+// =============================================================================
+
+/// Tracks persistent unresolvable surprise to trigger representational remapping.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LevinRemappingController {
+    pub persistent_error_ticks: usize,
+    pub stall_threshold_ticks: usize,
+    pub remapping_trigger_count: u64,
+}
+
+impl LevinRemappingController {
+    pub fn new(stall_threshold_ticks: usize) -> Self {
+        Self {
+            persistent_error_ticks: 0,
+            stall_threshold_ticks,
+            remapping_trigger_count: 0,
+        }
+    }
+
+    /// Evaluates if high-dimensional variational free energy spikes require
+    /// an algebraic rotation/remapping of the underlying embedding space.
+    pub fn evaluate_remapping_necessity(&mut self, components: &FreeEnergyComponents, running_avg: f64) -> bool {
+        if components.surprise > (running_avg * 2.5).max(5.0) {
+            self.persistent_error_ticks += 1;
+        } else {
+            self.persistent_error_ticks = self.persistent_error_ticks.saturating_sub(1);
+        }
+
+        if self.persistent_error_ticks >= self.stall_threshold_ticks {
+            self.persistent_error_ticks = 0;
+            self.remapping_trigger_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// =============================================================================
 // PRECISION ESTIMATOR
 // =============================================================================
 

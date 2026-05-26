@@ -7,6 +7,7 @@
 
 use crate::{DesciClaim, Error, Result};
 use async_trait::async_trait;
+use chrono::Utc;
 
 /// Storage backend trait
 #[async_trait]
@@ -22,6 +23,12 @@ pub trait StorageBackend: Send + Sync {
 
     /// Delete a claim (if supported)
     async fn delete(&self, cid: &str) -> Result<()>;
+
+    /// Retrieve the full authenticated proof package for a claim.
+    async fn get_full_proof(&self, id: uuid::Uuid) -> Result<mycelix_zkp_core::AuthenticatedProof>;
+
+    /// Update a claim with its permanent Arweave Quantum Anchor CID.
+    async fn update_quantum_anchor_pointer(&self, id: uuid::Uuid, cid: &str) -> Result<()>;
 }
 
 /// In-memory storage for testing
@@ -72,6 +79,32 @@ impl StorageBackend for MemoryStorage {
         claims.remove(cid);
         Ok(())
     }
+
+    async fn get_full_proof(
+        &self,
+        _id: uuid::Uuid,
+    ) -> Result<mycelix_zkp_core::AuthenticatedProof> {
+        // Mock implementation for simulation
+        Ok(mycelix_zkp_core::AuthenticatedProof {
+            proof: vec![0; 64],
+            signature: vec![0; 3300],
+            metadata: mycelix_zkp_core::ProofMetadata {
+                domain_tag: mycelix_zkp_core::DomainTag::new("Mycelix", "DeSci", 1),
+                protocol_version: 1,
+                client_id: [0xAA; 32],
+                timestamp: Utc::now().timestamp() as u64,
+                nonce: [0xBB; 32],
+                backend: mycelix_zkp_core::types::BackendId::Winterfell,
+            },
+            public_inputs_hash: [0; 32],
+            joules_consumed: 0.0,
+        })
+    }
+
+    async fn update_quantum_anchor_pointer(&self, _id: uuid::Uuid, _cid: &str) -> Result<()> {
+        // Mock implementation for simulation
+        Ok(())
+    }
 }
 
 /// IPFS storage backend (placeholder)
@@ -91,19 +124,42 @@ impl IpfsStorage {
 impl StorageBackend for IpfsStorage {
     async fn store(&self, _claim: &DesciClaim) -> Result<String> {
         // TODO: Implement IPFS upload
-        Err(Error::Storage("IPFS storage not yet implemented".to_string()))
+        Err(Error::Storage(
+            "IPFS storage not yet implemented".to_string(),
+        ))
     }
 
     async fn retrieve(&self, _cid: &str) -> Result<DesciClaim> {
-        Err(Error::Storage("IPFS storage not yet implemented".to_string()))
+        Err(Error::Storage(
+            "IPFS storage not yet implemented".to_string(),
+        ))
     }
 
     async fn exists(&self, _cid: &str) -> Result<bool> {
-        Err(Error::Storage("IPFS storage not yet implemented".to_string()))
+        Err(Error::Storage(
+            "IPFS storage not yet implemented".to_string(),
+        ))
     }
 
     async fn delete(&self, _cid: &str) -> Result<()> {
-        Err(Error::Storage("IPFS storage not yet implemented".to_string()))
+        Err(Error::Storage(
+            "IPFS storage not yet implemented".to_string(),
+        ))
+    }
+
+    async fn get_full_proof(
+        &self,
+        _id: uuid::Uuid,
+    ) -> Result<mycelix_zkp_core::AuthenticatedProof> {
+        Err(Error::Storage(
+            "IPFS storage not yet implemented".to_string(),
+        ))
+    }
+
+    async fn update_quantum_anchor_pointer(&self, _id: uuid::Uuid, _cid: &str) -> Result<()> {
+        Err(Error::Storage(
+            "IPFS storage not yet implemented".to_string(),
+        ))
     }
 }
 
@@ -126,11 +182,7 @@ mod tests {
             license: None,
         };
 
-        let claim = DesciClaim::new(
-            EpistemicTier::E0,
-            content,
-            "test_creator".to_string(),
-        );
+        let claim = DesciClaim::new(EpistemicTier::E0, content, "test_creator".to_string());
 
         // Store
         let cid = storage.store(&claim).await.unwrap();

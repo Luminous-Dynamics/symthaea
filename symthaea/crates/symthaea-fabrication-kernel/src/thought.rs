@@ -65,6 +65,56 @@ impl GeometricThought {
             true // No constraints = always fits
         }
     }
+
+    /// Autonomously derive symbolic SMT safety invariants from the CSG tree.
+    ///
+    /// These invariants ensure the geometry is physically realizable
+    /// (e.g., positive scale, within build volume, no self-intersection hazards).
+    pub fn derive_invariants(&self) -> Vec<String> {
+        let mut invariants = Vec::new();
+        
+        // 1. Global Build Volume Invariants
+        if let Some(ref c) = self.printer_constraints {
+            invariants.push(format!("(assert (<= total_width {:.1}))", c.max_build_volume[0]));
+            invariants.push(format!("(assert (<= total_height {:.1}))", c.max_build_volume[1]));
+            invariants.push(format!("(assert (<= total_depth {:.1}))", c.max_build_volume[2]));
+        }
+
+        // 2. Local Geometric Invariants (Recursive traversal)
+        derive_node_invariants(&self.operation_tree, &mut invariants, "root");
+
+        invariants
+    }
+}
+
+/// Recursively derive invariants for a CSG node.
+fn derive_node_invariants(node: &CSGNode, invariants: &mut Vec<String>, path: &str) {
+    match node {
+        CSGNode::Primitive(p) => {
+            match p {
+                Primitive::Cylinder | Primitive::Sphere | Primitive::Torus => {
+                    invariants.push(format!("(assert (> {}_{:?}_radius 0.0))", path, p));
+                }
+                _ => {}
+            }
+        }
+        CSGNode::Transform { node, transform } => {
+            // Safety: Scale must be positive to prevent inverted geometry (broken meshes)
+            invariants.push(format!("(assert (> {}_{:.4}_scale_x 0.0))", path, transform.scale[0]));
+            invariants.push(format!("(assert (> {}_{:.4}_scale_y 0.0))", path, transform.scale[1]));
+            invariants.push(format!("(assert (> {}_{:.4}_scale_z 0.0))", path, transform.scale[2]));
+            
+            derive_node_invariants(node, invariants, &format!("{}_t", path));
+        }
+        CSGNode::Boolean { op, left, right } => {
+            if *op == BooleanOp::Subtract {
+                // Heuristic: Subtraction should not completely consume the source
+                invariants.push(format!("(assert (not (= {path}_left {path}_right)))"));
+            }
+            derive_node_invariants(left, invariants, &format!("{}_l", path));
+            derive_node_invariants(right, invariants, &format!("{}_r", path));
+        }
+    }
 }
 
 /// Recursively encode a CSG tree as an HDC hypervector

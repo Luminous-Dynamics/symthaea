@@ -43,9 +43,23 @@ fn main() {
     // Handle --curriculum: generate curriculum JSONL and exit
     if let Some(ref curriculum_path) = opts.generate_curriculum {
         let tokenizer = symthaea_broca::BpeTokenizer::default_minimal();
-        match symthaea_broca::training::write_curriculum_jsonl(curriculum_path, &tokenizer) {
+        let style = match symthaea_broca::training::CurriculumStyle::parse(&opts.curriculum_style) {
+            Ok(style) => style,
+            Err(e) => {
+                eprintln!("Invalid --curriculum-style: {e}");
+                process::exit(2);
+            }
+        };
+        match symthaea_broca::training::write_curriculum_jsonl_with_style(
+            curriculum_path,
+            &tokenizer,
+            style,
+        ) {
             Ok(count) => {
-                println!("Generated curriculum with {count} pairs → {curriculum_path}");
+                println!(
+                    "Generated {} curriculum with {count} pairs → {curriculum_path}",
+                    opts.curriculum_style
+                );
                 process::exit(0);
             }
             Err(e) => {
@@ -165,6 +179,7 @@ fn main() {
         scheduled_sampling_max: opts.scheduled_sampling,
         label_smoothing: opts.label_smoothing,
         thought_logit_aux_weight: opts.thought_logit_aux_weight,
+        logit_anchor_weight: opts.logit_anchor_weight,
         best_checkpoint_path: best_path,
         hidden_dropout: opts.hidden_dropout,
         adaptive_veto_target: opts.adaptive_veto_target,
@@ -356,6 +371,8 @@ struct TrainOpts {
     genesis_phrase: String,
     /// Generate a curriculum JSONL and exit (no training).
     generate_curriculum: Option<String>,
+    /// Curriculum target style for --curriculum (structured or prose).
+    curriculum_style: String,
     /// After training, generate sample text from N random thoughts.
     sample_count: usize,
     /// Train CfC network weights via BPTT (default: true).
@@ -401,6 +418,8 @@ struct TrainOpts {
     label_smoothing: f32,
     /// Thought-to-logit auxiliary loss weight (default: 0.0 = disabled).
     thought_logit_aux_weight: f32,
+    /// KL-style logit distribution anchor weight (default: 0.0 = disabled).
+    logit_anchor_weight: f32,
     /// Direct thought-logit residual blend during decoding (default: 0.0).
     thought_logit_residual_weight: f32,
     /// Save best checkpoint path (auto-generated from output if not specified).
@@ -439,6 +458,7 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         diagnostics: false,
         genesis_phrase: "broca-training-default".to_string(),
         generate_curriculum: None,
+        curriculum_style: "structured".to_string(),
         sample_count: 0,
         train_network: true,
         network_lr_scale: 0.3,
@@ -461,6 +481,7 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         scheduled_sampling: 0.0,
         label_smoothing: 0.0,
         thought_logit_aux_weight: 0.0,
+        logit_anchor_weight: 0.0,
         thought_logit_residual_weight: 0.0,
         best_checkpoint_path: String::new(),
         no_save_adam: false,
@@ -543,6 +564,13 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                 i += 1;
                 opts.generate_curriculum =
                     Some(args.get(i).cloned().ok_or("--curriculum requires a path")?);
+            }
+            "--curriculum-style" => {
+                i += 1;
+                opts.curriculum_style = args
+                    .get(i)
+                    .cloned()
+                    .ok_or("--curriculum-style requires structured or prose")?;
             }
             "--samples" => {
                 i += 1;
@@ -687,6 +715,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--thought-logit-aux must be a float")?;
             }
+            "--logit-anchor" => {
+                i += 1;
+                opts.logit_anchor_weight = args
+                    .get(i)
+                    .ok_or("--logit-anchor requires a number")?
+                    .parse()
+                    .map_err(|_| "--logit-anchor must be a float")?;
+            }
             "--thought-logit-residual" => {
                 i += 1;
                 opts.thought_logit_residual_weight = args
@@ -786,6 +822,9 @@ fn print_usage() {
     eprintln!("  --diagnostics        Enable gradient flow diagnostics");
     eprintln!("  --genesis PHRASE     Genesis seed phrase (default: broca-training-default)");
     eprintln!("  --curriculum PATH    Generate curriculum JSONL (1800 diverse pairs) and exit");
+    eprintln!(
+        "  --curriculum-style S Target style for --curriculum: structured or prose (default: structured)"
+    );
     eprintln!("  --samples N          Generate N sample outputs after training");
     eprintln!("  --no-network-train   Only train embeddings, not CfC network weights");
     eprintln!("  --network-lr-scale F CfC network LR scale (default: 0.3)");
@@ -813,6 +852,7 @@ fn print_usage() {
     eprintln!(
         "  --thought-logit-aux F  Thought-to-logit auxiliary loss weight (default: 0.0 = off)"
     );
+    eprintln!("  --logit-anchor F     KL-style logit anchor weight (default: 0.0 = off)");
     eprintln!(
         "  --thought-logit-residual F  Blend direct thought logits into decoder logits (default: 0.0 = off)"
     );

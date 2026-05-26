@@ -7,7 +7,6 @@
 use crate::emotional_gating_integration::{apply_frustration_trigger, modulate_by_emotion};
 use crate::encoder::ThoughtChannels; // Assume exists
 use crate::language_gates::LanguageGateRegistry;
-use std::process::Command;
 
 /// Real IaC verifier using actual CLI tool calls via std::process::Command + output parsing.
 /// Falls back to heuristic if tool not available or for unsupported intents.
@@ -86,7 +85,7 @@ fn run_validator(
 }
 
 pub fn verify_iac(code: &str, intent: &str) -> IaCVerifierVerdict {
-    let code_lower = code.to_lowercase();
+    let _code_lower = code.to_lowercase();
     let intent_lower = intent.to_lowercase();
 
     if intent_lower.contains("kubernetes") || intent_lower.contains("k8s") {
@@ -298,7 +297,7 @@ pub fn generate_iac_with_self_repair(
                 );
 
                 // Modulate generation params for next try (creative mode if frustrated)
-                let (temp, top_p, gate_strength) = modulate_by_emotion(channels, 0.85, 0.88, 2.0);
+                let (temp, _top_p, gate_strength) = modulate_by_emotion(channels, 0.85, 0.88, 2.0);
                 println!(
                     "   -> Emotional state: arousal={:.2}, valence={:.2} | temp={:.2}, gate_boost={:.2}",
                     channels.arousal(),

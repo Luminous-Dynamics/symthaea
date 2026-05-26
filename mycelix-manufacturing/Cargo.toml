@@ -18,7 +18,7 @@ members = [
 
 [workspace.package]
 license = "AGPL-3.0-or-later"
-edition = "2021"
+edition = "2024"
 
 [workspace.dependencies]
 hdi = "0.5"

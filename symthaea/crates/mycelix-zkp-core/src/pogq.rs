@@ -28,7 +28,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::fixed_point::{FixedPoint, Q16_16_SCALE};
+use crate::fixed_point::FixedPoint;
 
 /// PoGQ public parameters — shared between both backends.
 #[derive(Clone, Debug, Serialize, Deserialize)]

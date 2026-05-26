@@ -1,8 +1,8 @@
 [package]
 name = "mycelix-leptos-client"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.85"
+edition = "2024"
+rust-version = "1.94"
 license = "AGPL-3.0-or-later"
 description = "Browser-compatible Holochain client for Leptos frontends. Pure-Rust replacement for @holochain/client using web-sys::WebSocket + rmp-serde."
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]

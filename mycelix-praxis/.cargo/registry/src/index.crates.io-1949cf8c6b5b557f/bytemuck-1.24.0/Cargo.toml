@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "bytemuck"
 version = "1.24.0"
 authors = ["Lokathor <zefria@gmail.com>"]

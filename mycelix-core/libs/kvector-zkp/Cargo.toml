@@ -1,7 +1,7 @@
 [package]
 name = "kvector-zkp"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <contact@luminous-dynamics.org>"]
 description = "Zero-knowledge STARK proofs for K-Vector validation in Mycelix"
 license = "AGPL-3.0-or-later"

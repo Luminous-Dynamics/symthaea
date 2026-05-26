@@ -11,7 +11,7 @@
 # will likely look very different (and much more reasonable)
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "proc-macro-error"
 version = "1.0.4"
 authors = ["CreepySkeleton <creepy-skeleton@yandex.ru>"]

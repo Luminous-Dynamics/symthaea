@@ -1,7 +1,7 @@
 [package]
 name = "mycelix_rate_limiter"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Rate limiting utilities for Mycelix Mail zomes"
 license = "AGPL-3.0-or-later"
 

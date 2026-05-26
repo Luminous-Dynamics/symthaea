@@ -154,7 +154,9 @@ fn main() -> Result<()> {
                     }
 
                     "help" | "h" | "?" => {
-                        println!("Available commands: step, viz, nodes, status, save, load, clear, help, exit");
+                        println!(
+                            "Available commands: step, viz, nodes, status, save, load, clear, help, exit"
+                        );
                     }
 
                     "exit" | "quit" | "q" => break,

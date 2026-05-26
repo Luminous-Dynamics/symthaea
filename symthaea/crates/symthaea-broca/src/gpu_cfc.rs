@@ -143,7 +143,7 @@ impl GpuCfcLayer {
         // ── 3. Gating: sigma per neuron ─────────────────────────────────
         // bundle_si = (state + input) * 0.5
         let bundle_si = ((&self.states + &input_bc)? * 0.5)?; // [N, D]
-                                                              // gate_activation = cosine_sim(bundle_si, gate_weight) + mean(gate_bias)
+        // gate_activation = cosine_sim(bundle_si, gate_weight) + mean(gate_bias)
         let dot_sg = (&bundle_si * &self.gate_weight)?.sum(1)?; // [N]
         let bundle_norms = bundle_si.sqr()?.sum(1)?.sqrt()?; // [N]
         let gw_norms = self.gate_weight.sqr()?.sum(1)?.sqrt()?; // [N]
@@ -1057,6 +1057,85 @@ impl GpuTrainer {
         self.renormalize_embeddings()?;
 
         Ok(weight * loss)
+    }
+
+    /// Apply KL-style distribution anchoring against cached reference logits.
+    ///
+    /// Computes the gradient of KL(reference || current) w.r.t. the output
+    /// embedding matrix using `error = p_current - p_reference`, then applies
+    /// the same outer-product update as the CE embedding gradient. This keeps
+    /// the trained distribution tethered to its initial language prior while
+    /// CE and thought-logit losses still steer target tokens upward.
+    pub fn gpu_distribution_anchor_gradient(
+        &mut self,
+        current_logits: &[f32],
+        reference_logits: &[f32],
+        lr: f32,
+        grad_clip: f32,
+        weight: f32,
+    ) -> Result<f32> {
+        if weight <= 0.0 {
+            return Ok(0.0);
+        }
+        let n = current_logits.len().min(reference_logits.len());
+        if n == 0 {
+            return Ok(0.0);
+        }
+
+        let current_probs = softmax_prefix(&current_logits[..n]);
+        let reference_probs = softmax_prefix(&reference_logits[..n]);
+        let mut loss = 0.0f32;
+        let errors: Vec<f32> = (0..n)
+            .map(|i| {
+                let q = reference_probs[i].max(1e-12);
+                let p = current_probs[i].max(1e-12);
+                loss += q * (q.ln() - p.ln());
+                let error = p - q;
+                (self.logit_scale * error * lr * weight).clamp(-grad_clip, grad_clip)
+            })
+            .collect();
+
+        let raw_output = self.network.output()?;
+        let raw_norm = raw_output.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?;
+        let output_hat = (&raw_output / &norm_bc)?;
+
+        let error_tensor = Tensor::from_vec(errors, (n, 1), &self.device)?;
+        let grad_matrix = error_tensor.matmul(&output_hat)?;
+        self.embeddings = (&self.embeddings - &grad_matrix)?;
+        self.renormalize_embeddings()?;
+
+        Ok(weight * loss.max(0.0))
+    }
+}
+
+fn softmax_prefix(logits: &[f32]) -> Vec<f32> {
+    if logits.is_empty() {
+        return Vec::new();
+    }
+    let max_logit = logits
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .fold(f32::NEG_INFINITY, f32::max);
+    if !max_logit.is_finite() {
+        return vec![1.0 / logits.len() as f32; logits.len()];
+    }
+    let exps: Vec<f32> = logits
+        .iter()
+        .map(|&logit| {
+            if logit.is_finite() {
+                (logit - max_logit).exp()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let sum: f32 = exps.iter().sum();
+    if sum <= 1e-12 {
+        vec![1.0 / logits.len() as f32; logits.len()]
+    } else {
+        exps.into_iter().map(|exp| exp / sum).collect()
     }
 }
 

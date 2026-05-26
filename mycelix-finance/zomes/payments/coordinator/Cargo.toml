@@ -1,7 +1,7 @@
 [package]
 name = "payments"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license.workspace = true
 description = "Payments coordinator zome — SAP currency, demurrage, escrow, payment channels"
 

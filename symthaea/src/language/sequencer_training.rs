@@ -424,7 +424,7 @@ pub fn train_sequencer(
 
         for example in eval_data {
             // Evaluate by doing a forward pass and comparing
-            let plan = sequencer.plan_structure(&example.intent_hv, &[]);
+            let plan = sequencer.plan_structure(&example.intent_hv, &[], &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default());
             let plan_actions: Vec<PlanAction> = plan.iter().map(|s| s.action.clone()).collect();
 
             // Compute action-level accuracy as a proxy for loss
@@ -491,7 +491,7 @@ pub fn evaluate_sequencer(
     let mut cat_correct: HashMap<TaskCategory, (usize, usize)> = HashMap::new();
 
     for example in data {
-        let plan = sequencer.plan_structure(&example.intent_hv, &[]);
+        let plan = sequencer.plan_structure(&example.intent_hv, &[], &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default());
         let plan_actions: Vec<PlanAction> = plan.iter().map(|s| s.action.clone()).collect();
 
         // Check if first action matches (most important for emitter routing)

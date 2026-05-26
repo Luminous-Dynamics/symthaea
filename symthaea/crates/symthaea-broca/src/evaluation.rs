@@ -18,6 +18,7 @@ use crate::code_analysis::{
 };
 use crate::encoder::ThoughtChannels;
 use crate::generator::{BrocaGenerator, GenerationResult};
+use crate::tokenizer::{BpeTokenizer, is_code_contamination_token};
 use crate::training::{TrainingDataset, TrainingPair};
 
 /// Configuration for evaluation.
@@ -85,6 +86,11 @@ pub struct EvalResult {
     /// Fraction of generated samples containing explicit refusal/safety language.
     /// Most useful on the canonical `moral` category.
     pub moral_refusal_rate: Option<f32>,
+    /// Fraction of generated tokens that are `<unk>`.
+    pub unknown_token_rate: Option<f32>,
+    /// Fraction of generated tokens that are syntax-heavy code contaminants.
+    /// This is most useful for non-code canonical slices.
+    pub code_token_rate: Option<f32>,
 }
 
 /// Per-intent quality metrics.
@@ -202,6 +208,8 @@ pub struct QualityRunMetadata {
     pub train_pair_count: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_pair_selection: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_curriculum_style: Option<String>,
     pub train_epochs: Option<usize>,
     pub train_bptt_window: Option<usize>,
     pub train_negative_samples: Option<usize>,
@@ -217,7 +225,19 @@ pub struct QualityRunMetadata {
     pub train_label_smoothing: Option<f32>,
     pub train_thought_logit_aux: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_logit_anchor: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_thought_logit_residual: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_semantic_attractor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_semantic_attractor_strength: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_semantic_attractor_top_k: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_semantic_attractor_max_adjustment: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_semantic_attractor_normalize: Option<String>,
     pub train_merge_bias: Option<f32>,
 }
 
@@ -247,6 +267,12 @@ pub struct QualityDelta {
     pub raw_moral_refusal_rate: Option<f32>,
     pub gated_moral_refusal_rate: Option<f32>,
     pub moral_refusal_rate: Option<f32>,
+    pub raw_unknown_token_rate: Option<f32>,
+    pub gated_unknown_token_rate: Option<f32>,
+    pub unknown_token_rate: Option<f32>,
+    pub raw_code_token_rate: Option<f32>,
+    pub gated_code_token_rate: Option<f32>,
+    pub code_token_rate: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -363,6 +389,11 @@ pub struct CanonicalQualityThresholds {
     /// Generated structured outputs must meet this minimum parse/schema
     /// validity rate.
     pub min_structured_output_validity_rate: Option<f32>,
+    /// Gated generations must not emit `<unk>` above this token fraction.
+    pub max_gated_unknown_token_rate: Option<f32>,
+    /// Gated non-code generations must not emit code contaminants above this
+    /// token fraction.
+    pub max_gated_code_token_rate: Option<f32>,
 }
 
 impl Default for CanonicalQualityThresholds {
@@ -378,6 +409,8 @@ impl Default for CanonicalQualityThresholds {
             max_code_sheaf_incoherence_rate: None,
             min_code_sheaf_function_coherence_rate: None,
             min_structured_output_validity_rate: None,
+            max_gated_unknown_token_rate: None,
+            max_gated_code_token_rate: None,
         }
     }
 }
@@ -457,6 +490,38 @@ pub fn english_word_ratio(token_ids: &[u32], tokenizer: &crate::tokenizer::BpeTo
     english_count as f32 / total_count as f32
 }
 
+/// Fraction of emitted tokens that are `<unk>`.
+pub fn unknown_token_rate(token_ids: &[u32], tokenizer: &BpeTokenizer) -> f32 {
+    if token_ids.is_empty() {
+        return 0.0;
+    }
+    let unknown = token_ids
+        .iter()
+        .filter(|&&id| id == tokenizer.unk_id)
+        .count();
+    unknown as f32 / token_ids.len() as f32
+}
+
+/// Fraction of emitted tokens that look like strong code-syntax contaminants.
+pub fn code_token_rate(token_ids: &[u32], tokenizer: &BpeTokenizer) -> f32 {
+    let mut code_tokens = 0usize;
+    let mut total = 0usize;
+    for &id in token_ids {
+        if tokenizer.is_special(id) {
+            continue;
+        }
+        total += 1;
+        if is_code_contamination_token(tokenizer.token_str(id)) {
+            code_tokens += 1;
+        }
+    }
+    if total == 0 {
+        0.0
+    } else {
+        code_tokens as f32 / total as f32
+    }
+}
+
 /// Run full evaluation: perplexity + generation quality + per-intent breakdown.
 pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResult {
     let mut total_ce = 0.0f32;
@@ -468,6 +533,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let mut total_target_overlap = 0.0f32;
     let mut target_overlap_count = 0usize;
     let mut moral_refusal_count = 0usize;
+    let mut total_unknown_token_rate = 0.0f32;
+    let mut total_code_token_rate = 0.0f32;
     let mut intent_accum: HashMap<String, (f32, f32, f32, f32, usize, usize)> = HashMap::new();
     // (sum_ce, sum_ce_tokens_f, sum_english_ratio, sum_coherence, gen_count, count)
 
@@ -478,9 +545,6 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     };
 
     let total_pairs = pairs.len();
-    let mut all_target_token_ids: Vec<u32> = Vec::new();
-    let mut all_generated_token_ids: Vec<u32> = Vec::new();
-
     for (pair_idx, pair) in pairs.iter().enumerate() {
         if pair.target_ids.is_empty() {
             continue;
@@ -530,6 +594,9 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
             if contains_refusal_language(&result.text) {
                 moral_refusal_count += 1;
             }
+            total_unknown_token_rate +=
+                unknown_token_rate(&result.token_ids, generator.tokenizer());
+            total_code_token_rate += code_token_rate(&result.token_ids, generator.tokenizer());
             total_english_ratio += pair_english_ratio;
             total_coherence += pair_coherence;
             all_gen_token_ids.extend_from_slice(&result.token_ids);
@@ -660,6 +727,16 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     } else {
         None
     };
+    let unknown_token_rate = if gen_count > 0 {
+        Some(total_unknown_token_rate / gen_count as f32)
+    } else {
+        None
+    };
+    let code_token_rate = if gen_count > 0 {
+        Some(total_code_token_rate / gen_count as f32)
+    } else {
+        None
+    };
 
     EvalResult {
         perplexity,
@@ -673,6 +750,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         distinct_2,
         target_token_overlap,
         moral_refusal_rate,
+        unknown_token_rate,
+        code_token_rate,
     }
 }
 
@@ -1243,6 +1322,18 @@ fn quality_delta(raw: &EvalResult, gated: &EvalResult) -> QualityDelta {
             (Some(raw), Some(gated)) => Some(gated - raw),
             _ => None,
         },
+        raw_unknown_token_rate: raw.unknown_token_rate,
+        gated_unknown_token_rate: gated.unknown_token_rate,
+        unknown_token_rate: match (raw.unknown_token_rate, gated.unknown_token_rate) {
+            (Some(raw), Some(gated)) => Some(gated - raw),
+            _ => None,
+        },
+        raw_code_token_rate: raw.code_token_rate,
+        gated_code_token_rate: gated.code_token_rate,
+        code_token_rate: match (raw.code_token_rate, gated.code_token_rate) {
+            (Some(raw), Some(gated)) => Some(gated - raw),
+            _ => None,
+        },
     }
 }
 
@@ -1292,6 +1383,32 @@ pub fn check_quality_suite(
                 observed,
                 threshold,
                 message: "gated hallucination rate exceeded maximum".to_string(),
+            });
+        }
+    }
+    if let (Some(threshold), Some(observed)) = (
+        thresholds.max_gated_unknown_token_rate,
+        result.gated_generation.unknown_token_rate,
+    ) {
+        if observed > threshold {
+            failures.push(QualityGateFailure {
+                metric: "gated_unknown_token_rate".to_string(),
+                observed,
+                threshold,
+                message: "gated unknown-token rate exceeded maximum".to_string(),
+            });
+        }
+    }
+    if let (Some(threshold), Some(observed)) = (
+        thresholds.max_gated_code_token_rate,
+        result.gated_generation.code_token_rate,
+    ) {
+        if observed > threshold {
+            failures.push(QualityGateFailure {
+                metric: "gated_code_token_rate".to_string(),
+                observed,
+                threshold,
+                message: "gated code-token contamination exceeded maximum".to_string(),
             });
         }
     }
@@ -1456,6 +1573,12 @@ pub fn format_eval_report(result: &EvalResult) -> String {
     }
     if let Some(refusal) = result.moral_refusal_rate {
         s.push_str(&format!("Refusal rate:      {:.4}\n", refusal));
+    }
+    if let Some(unknown) = result.unknown_token_rate {
+        s.push_str(&format!("Unknown tokens:    {:.4}\n", unknown));
+    }
+    if let Some(code) = result.code_token_rate {
+        s.push_str(&format!("Code-token rate:   {:.4}\n", code));
     }
 
     if !result.intent_scores.is_empty() {
@@ -1957,6 +2080,8 @@ pub fn evaluate_liquid_mamba(
             r#gen.mamba(),
         )),
         moral_refusal_rate: None,
+        unknown_token_rate: None,
+        code_token_rate: None,
     };
 
     // --- Consciousness gating test ---
@@ -2613,6 +2738,8 @@ mod tests {
             distinct_2: Some(0.5),
             target_token_overlap: Some(0.5),
             moral_refusal_rate: Some(0.8),
+            unknown_token_rate: Some(0.0),
+            code_token_rate: Some(0.0),
         };
         let gated = EvalResult {
             perplexity: 20.0,
@@ -2626,6 +2753,8 @@ mod tests {
             distinct_2: Some(0.5),
             target_token_overlap: Some(0.2),
             moral_refusal_rate: Some(0.2),
+            unknown_token_rate: Some(0.25),
+            code_token_rate: Some(0.35),
         };
         let mut categories = HashMap::new();
         categories.insert(
@@ -2734,6 +2863,8 @@ mod tests {
                 max_code_sheaf_incoherence_rate: Some(0.5),
                 min_code_sheaf_function_coherence_rate: Some(0.5),
                 min_structured_output_validity_rate: Some(0.5),
+                max_gated_unknown_token_rate: Some(0.1),
+                max_gated_code_token_rate: Some(0.1),
             },
         );
         assert!(failures.iter().any(|f| f.metric == "gated_perplexity"));
@@ -2755,6 +2886,12 @@ mod tests {
                 .any(|f| f.metric == "target_token_overlap_delta")
         );
         assert!(failures.iter().any(|f| f.metric == "moral_refusal_rate"));
+        assert!(
+            failures
+                .iter()
+                .any(|f| f.metric == "gated_unknown_token_rate")
+        );
+        assert!(failures.iter().any(|f| f.metric == "gated_code_token_rate"));
         assert!(
             failures
                 .iter()
@@ -2936,6 +3073,8 @@ mod tests {
             distinct_2: None,
             target_token_overlap: None,
             moral_refusal_rate: None,
+            unknown_token_rate: None,
+            code_token_rate: None,
         };
 
         let report = format_eval_report(&result);
@@ -3060,6 +3199,8 @@ mod tests {
                     distinct_2: None,
                     target_token_overlap: None,
                     moral_refusal_rate: None,
+                    unknown_token_rate: None,
+                    code_token_rate: None,
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
@@ -3169,6 +3310,8 @@ mod tests {
                     distinct_2: None,
                     target_token_overlap: None,
                     moral_refusal_rate: None,
+                    unknown_token_rate: None,
+                    code_token_rate: None,
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,

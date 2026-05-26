@@ -297,7 +297,9 @@ mod tests {
         assert_eq!(classify_intent("What is this?"), 2); // Question
         assert_eq!(classify_intent("Okay."), 0); // Short acknowledge
         assert_eq!(
-            classify_intent("The quick brown fox jumps over the lazy dog and then does many other things across the wide open field under a bright blue sky on a warm summer day"),
+            classify_intent(
+                "The quick brown fox jumps over the lazy dog and then does many other things across the wide open field under a bright blue sky on a warm summer day"
+            ),
             5
         ); // Long → reflect
         assert_eq!(classify_intent("Let us try a different approach"), 3); // Propose

@@ -4,15 +4,15 @@
 //! API route definitions
 
 use axum::{
-    routing::{get, post, put},
     Router,
+    routing::{get, post, put},
 };
 use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{handlers, models::*, state::AppState};
 use crate::error::ApiError;
+use crate::{handlers, models::*, state::AppState};
 
 /// API routes
 pub fn api_routes() -> Router<Arc<AppState>> {

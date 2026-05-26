@@ -4,7 +4,7 @@
 [package]
 name = "mycelix-music-desktop"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Mycelix Music Desktop — consciousness instrument with native audio and GPU visualization"
 

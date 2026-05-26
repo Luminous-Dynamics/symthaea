@@ -305,7 +305,7 @@ impl<const D: usize> PhysicsWorld<D> {
         }
         for body in &mut self.bodies {
             if !body.sleeping {
-                if let Some(ref cb) = callback {
+                if let Some(cb) = callback.as_mut() {
                     body.force_accumulator =
                         cb.modulate_force(body.handle, &body.force_accumulator);
                 }
@@ -510,8 +510,8 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
         // 8. State Decay: Apply natural recovery/decay to all conscious entities.
-        if let Some(cb) = callback {
-            self.decay_state(cb, dt);
+        if let Some(cb) = callback.as_mut() {
+            self.decay_state(*cb, dt);
         }
     }
 
@@ -639,7 +639,7 @@ impl<const D: usize> PhysicsWorld<D> {
 
             if actual_delta.abs() > 1e-15 {
                 // ═══ CONSCIOUSNESS MODULATION: sanctuary + harmony fields ═══
-                let modulated_delta = if let Some(ref cb) = callback {
+                let modulated_delta = if let Some(cb) = callback.as_mut() {
                     cb.modulate_impulse(actual_delta, &pt.position)
                 } else {
                     actual_delta
@@ -665,7 +665,7 @@ impl<const D: usize> PhysicsWorld<D> {
                 let mut mu = (self.bodies[a].friction * self.bodies[b].friction).sqrt();
 
                 // ═══ HARMONY FIELD FRICTION MODULATION ═══
-                if let Some(ref cb) = callback {
+                if let Some(cb) = callback.as_mut() {
                     mu *= cb.friction_multiplier(&primary_pt, contact.body_a);
                 }
 
@@ -676,7 +676,7 @@ impl<const D: usize> PhysicsWorld<D> {
                 integrator::apply_impulse(&mut self.bodies[b], &friction_impulse);
 
                 // Record friction dissipation for consciousness energy budget
-                if let Some(ref mut cb) = callback {
+                if let Some(cb) = callback.as_mut() {
                     cb.record_dissipation(j_t.abs() * 0.1);
                 }
             }

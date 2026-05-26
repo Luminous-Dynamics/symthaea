@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "sha2"
 version = "0.10.9"
 authors = ["RustCrypto Developers"]

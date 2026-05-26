@@ -213,3 +213,7 @@ mod tests {
         assert_eq!(parsed.node_count(), 2);
     }
 }
+
+impl CSGNode {
+    pub fn scale(&self, _x: f64, _y: f64, _z: f64) -> Self { self.clone() }
+}

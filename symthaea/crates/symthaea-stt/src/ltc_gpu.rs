@@ -20,11 +20,11 @@ use candle_core::{DType, Device, Result as CandleResult, Tensor};
 pub fn best_device() -> Device {
     if let Ok(device) = Device::cuda_if_available(0) {
         if matches!(device, Device::Cuda(_)) {
-            tracing::info!("GPU device: {:?}", device);
+            println!("GPU device: {:?}", device);
             return device;
         }
     }
-    tracing::info!("Using CPU device (CUDA not available)");
+    println!("Using CPU device (CUDA not available)");
     Device::Cpu
 }
 
@@ -165,7 +165,12 @@ impl GpuLtcTrainer {
                 let logits_scaled = logits.affine(1.0 / self.temperature as f64, 0.0)?;
 
                 // Softmax + cross-entropy
-                let log_probs = candle_core::ops::log_softmax(&logits_scaled, 0)?;
+                let max_logits = logits_scaled.max(0)?;
+            let diff_logits = logits_scaled.broadcast_sub(&max_logits)?;
+            let exp_logits = diff_logits.exp()?;
+            let sum_exp = exp_logits.sum(0)?;
+            let log_sum_exp = sum_exp.log()?;
+            let log_probs = diff_logits.broadcast_sub(&log_sum_exp)?;
 
                 // Find label index
                 let label_idx = self

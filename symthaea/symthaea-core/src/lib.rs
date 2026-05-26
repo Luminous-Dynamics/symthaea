@@ -83,3 +83,5 @@ pub mod physics;
 pub mod synthesis_trait;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+
+pub mod rt;

@@ -25,7 +25,7 @@
         };
 
         # Full Python/ML stack used by the GPU shell.
-        pythonMlEnv = pkgs.python311.withPackages (ps: with ps; [
+        pythonMlEnv = pkgs.python3.withPackages (ps: with ps; [
           numpy
           scipy
           networkx
@@ -42,7 +42,7 @@
         ]);
 
         # Lightweight Python lane for package/lint/test smoke checks.
-        pythonResearchEnv = pkgs.python311.withPackages (ps: with ps; [
+        pythonResearchEnv = pkgs.python3.withPackages (ps: with ps; [
           pytest
         ]);
 
@@ -62,14 +62,15 @@
             cp -r bin $out/ 2>/dev/null || true
           '';
           fixupPhase = ''
-            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.libGL pkgs.xorg.libX11 ]}" $out/lib/libmujoco.so* 2>/dev/null || true
+            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.libGL pkgs.libx11 ]}" $out/lib/libmujoco.so* 2>/dev/null || true
           '';
         };
 
         rustBuildInputs = with pkgs; [
           # Rust toolchain
           rustToolchain
-          cargo-watch
+          z3
+                    cargo-watch
           cargo-edit
           cargo-expand
           cargo-nextest
@@ -120,10 +121,10 @@
           wayland
           libxkbcommon
           libGL
-          xorg.libX11
-          xorg.libXcursor
-          xorg.libXi
-          xorg.libXrandr
+          libx11
+          libxcursor
+          libxi
+          libxrandr
 
           # SQLite (bundled in rusqlite, but system lib can help)
           sqlite
@@ -175,13 +176,10 @@
           onnxruntime
 
           # Formal verification and Lean proof tooling
-          z3
-          elan
-
+          
           # MuJoCo 3.3.7 physics engine (for symthaea-multirotor mujoco feature)
           mujoco337
           glfw
-          libGL
 
           # C++ standard library (libstdc++.so.6 for neural bridge tests)
           stdenv.cc.cc.lib
@@ -452,9 +450,24 @@ EOF
 
             # CUDA for candle GPU training
             export CUDA_PATH="${pkgs.cudaPackages.cudatoolkit}"
+            
+            # Persistent driver JIT cache to prevent micro-stuttering and speed up runtime model launch
+            export CUDA_CACHE_DISABLE=0
+            export CUDA_CACHE_PATH="$PWD/.cuda_cache"
+            export CUDA_CACHE_MAXSIZE=2147483648 # 2GB limit
             export CUDA_ROOT="${pkgs.cudaPackages.cudatoolkit}"
             export CUDA_TOOLKIT_ROOT_DIR="${pkgs.cudaPackages.cudatoolkit}"
-            export CUDA_COMPUTE_CAP=75
+            # Bare-metal CPU SIMD vectorization optimizations for HDC math loops
+              export RUSTFLAGS="-C target-cpu=native"
+              
+              # Dynamic GPU micro-architecture auto-detection
+              if command -v nvidia-smi >/dev/null 2>&1; then
+                DETECTED_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d ".")
+                export CUDA_COMPUTE_CAP="''${DETECTED_CAP:-75}"
+                export TORCH_CUDA_ARCH_LIST="''${CUDA_COMPUTE_CAP:0:1}.''${CUDA_COMPUTE_CAP:1:1}"
+              else
+                export CUDA_COMPUTE_CAP=75
+              fi
             export PATH="${pkgs.cudaPackages.cuda_nvcc}/bin:${pkgs.cudaPackages.cudatoolkit}/bin:$PATH"
 
             # Python path for PyPhi
@@ -523,9 +536,24 @@ EOF
 
             # CUDA for candle GPU training on the RTX 2070-class host.
             export CUDA_PATH="${pkgs.cudaPackages.cudatoolkit}"
+            
+            # Persistent driver JIT cache to prevent micro-stuttering and speed up runtime model launch
+            export CUDA_CACHE_DISABLE=0
+            export CUDA_CACHE_PATH="$PWD/.cuda_cache"
+            export CUDA_CACHE_MAXSIZE=2147483648 # 2GB limit
             export CUDA_ROOT="${pkgs.cudaPackages.cudatoolkit}"
             export CUDA_TOOLKIT_ROOT_DIR="${pkgs.cudaPackages.cudatoolkit}"
-            export CUDA_COMPUTE_CAP=75
+            # Bare-metal CPU SIMD vectorization optimizations for HDC math loops
+              export RUSTFLAGS="-C target-cpu=native"
+              
+              # Dynamic GPU micro-architecture auto-detection
+              if command -v nvidia-smi >/dev/null 2>&1; then
+                DETECTED_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d ".")
+                export CUDA_COMPUTE_CAP="''${DETECTED_CAP:-75}"
+                export TORCH_CUDA_ARCH_LIST="''${CUDA_COMPUTE_CAP:0:1}.''${CUDA_COMPUTE_CAP:1:1}"
+              else
+                export CUDA_COMPUTE_CAP=75
+              fi
             export PATH="${pkgs.cudaPackages.cuda_nvcc}/bin:${pkgs.cudaPackages.cudatoolkit}/bin:$PATH"
 
             echo ""
@@ -783,9 +811,24 @@ EOF
               export MUJOCO_DYNAMIC_LINK_DIR="${mujoco337}/lib"
               export ORT_DYLIB_PATH="${onnxPath}/libonnxruntime.so"
               export CUDA_PATH="${pkgs.cudaPackages.cudatoolkit}"
+            
+            # Persistent driver JIT cache to prevent micro-stuttering and speed up runtime model launch
+            export CUDA_CACHE_DISABLE=0
+            export CUDA_CACHE_PATH="$PWD/.cuda_cache"
+            export CUDA_CACHE_MAXSIZE=2147483648 # 2GB limit
               export CUDA_ROOT="${pkgs.cudaPackages.cudatoolkit}"
               export CUDA_TOOLKIT_ROOT_DIR="${pkgs.cudaPackages.cudatoolkit}"
-              export CUDA_COMPUTE_CAP=75
+              # Bare-metal CPU SIMD vectorization optimizations for HDC math loops
+              export RUSTFLAGS="-C target-cpu=native"
+              
+              # Dynamic GPU micro-architecture auto-detection
+              if command -v nvidia-smi >/dev/null 2>&1; then
+                DETECTED_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -n1 | tr -d ".")
+                export CUDA_COMPUTE_CAP="''${DETECTED_CAP:-75}"
+                export TORCH_CUDA_ARCH_LIST="''${CUDA_COMPUTE_CAP:0:1}.''${CUDA_COMPUTE_CAP:1:1}"
+              else
+                export CUDA_COMPUTE_CAP=75
+              fi
               export OPENSSL_DIR="${pkgs.openssl.dev}"
               export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
               export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"

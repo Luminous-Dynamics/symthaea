@@ -331,7 +331,7 @@ impl HdcVector {
             .bits
             .iter()
             .zip(other.bits.iter())
-            .filter(|(&a, &b)| a == b)
+            .filter(|&(&a, &b)| a == b)
             .count();
         matching as f32 / HDC_DIM as f32
     }
@@ -341,7 +341,7 @@ impl HdcVector {
         self.bits
             .iter()
             .zip(other.bits.iter())
-            .filter(|(&a, &b)| a != b)
+            .filter(|&(&a, &b)| a != b)
             .count()
     }
 

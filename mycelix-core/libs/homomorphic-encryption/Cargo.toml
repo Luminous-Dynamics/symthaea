@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-homomorphic"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Pure Rust homomorphic encryption for Mycelix Federated Learning"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"

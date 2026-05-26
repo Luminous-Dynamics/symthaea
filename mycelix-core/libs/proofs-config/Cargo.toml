@@ -1,7 +1,7 @@
 [package]
 name = "proofs-config"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Mycelix Network"]
 description = "Centralized configuration for Mycelix ZK proof systems"
 license = "AGPL-3.0-or-later"

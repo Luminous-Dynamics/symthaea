@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "convert_case"
 version = "0.10.0"
 authors = ["rutrum <dave@rutrum.net>"]

@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-differential-privacy"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Differential Privacy primitives for Mycelix Federated Learning"
 license = "AGPL-3.0-or-later"
 authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]

@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "holochain_wasmer_guest"
 version = "0.0.101"
 authors = [

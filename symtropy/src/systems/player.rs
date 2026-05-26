@@ -94,18 +94,18 @@ pub fn extraction_system(
 
             // Extraction speed penalized by mouse jitter (the biometric mechanic!)
             // Calm hands = fast extraction. Shaky hands = slow and noisy.
-            let surprise = biometrics.encoder.velocity_surprise();
-            let steadiness = (1.0 - surprise).max(0.1);
-            let stress_penalty = 1.0 - biometrics.model.allostatic_load * 0.5;
+            let surprise = biometrics.encoder.velocity_surprise() as f64;
+            let steadiness = (1.0f64 - surprise).max(0.1f64);
+            let stress_penalty = 1.0f64 - biometrics.model.allostatic_load as f64 * 0.5f64;
             // Fragments boost: up to 50% faster with all 48 collected
-            let fragment_bonus = 1.0 + (collected.total() as f32 / 48.0) * 0.5;
-            let rate = 0.12 * steadiness * stress_penalty * fragment_bonus;
+            let fragment_bonus = 1.0f64 + (collected.total() as f64 / 48.0f64) * 0.5f64;
+            let rate = 0.12f64 * steadiness * stress_penalty * fragment_bonus;
 
-            core.extraction_progress += rate * time.delta_secs();
+            core.extraction_progress += (rate * time.delta_secs() as f64) as f32;
 
             // Extraction generates noise — more with jittery hands
             if let Ok(mut noise) = noise_query.single_mut() {
-                noise.level = 0.2 + surprise * 0.8;
+                noise.level = (0.2 + surprise * 0.8) as f32;
             }
 
             // Core pulses faster as extraction progresses

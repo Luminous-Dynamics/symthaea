@@ -2368,7 +2368,7 @@ mod tests {
             let log_data: Vec<(f64, f64)> = seq
                 .iter()
                 .enumerate()
-                .filter(|(_, &y)| y > 0.0)
+                .filter(|(_, y)| **y > 0.0)
                 .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
                 .collect();
             let (slope, intercept, _) = super::linear_regression(&log_data);
@@ -2523,7 +2523,7 @@ mod tests {
             let log_data: Vec<(f64, f64)> = seq
                 .iter()
                 .enumerate()
-                .filter(|(_, &y)| y > 0.0)
+                .filter(|(_, y)| **y > 0.0)
                 .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
                 .collect();
             if log_data.len() < 3 {
@@ -2658,7 +2658,7 @@ mod tests {
             let log_data: Vec<(f64, f64)> = seq
                 .iter()
                 .enumerate()
-                .filter(|(_, &y)| y > 0.0)
+                .filter(|(_, y)| **y > 0.0)
                 .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
                 .collect();
             if log_data.len() < 3 {

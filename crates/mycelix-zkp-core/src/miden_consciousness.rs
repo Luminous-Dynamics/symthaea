@@ -211,7 +211,7 @@ pub fn prove_consciousness_tier_miden(
     threshold_permille: u32,
 ) -> MidenResult<MidenConsciousnessProof> {
     use miden_core::Felt;
-    use miden_vm::{advice::AdviceInputs, Assembler, DefaultHost, ProvingOptions, StackInputs};
+    use miden_vm::{Assembler, DefaultHost, ProvingOptions, StackInputs, advice::AdviceInputs};
 
     // Validate inputs
     if phi_permille > 1000 {

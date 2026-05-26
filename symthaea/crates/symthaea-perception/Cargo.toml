@@ -5,6 +5,10 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
+parry3d.workspace = true
+wgpu.workspace = true
+
+
 symthaea-core = { path = "../../symthaea-core" }
 anyhow = { workspace = true }
 tokio = { workspace = true }

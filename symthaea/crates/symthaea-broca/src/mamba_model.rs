@@ -13,7 +13,7 @@
 //!
 //! See ["Mamba: Linear-Time Sequence Modeling with Selective State Spaces"](https://arxiv.org/abs/2312.00752)
 
-use candle_core::{DType, Device, IndexOp, Module, Result, Tensor, D};
+use candle_core::{D, DType, Device, IndexOp, Module, Result, Tensor};
 use candle_nn::VarBuilder;
 
 /// Manual RMSNorm implementation using primitive tensor ops.
@@ -125,6 +125,9 @@ pub struct State {
     /// Per-token CfC modulation signal. Applied to all layers.
     /// Reset to None after each forward pass.
     pub cfc_modulation: Option<CfcModulation>,
+    /// Optional per-layer Δ scales. Applied in addition to global CfC modulation.
+    /// Reset to None after each forward pass.
+    pub per_layer_delta_modulation: Option<Vec<f32>>,
 }
 
 impl Clone for State {
@@ -140,6 +143,7 @@ impl Clone for State {
             prev_xs,
             pos: self.pos,
             cfc_modulation: self.cfc_modulation.clone(),
+            per_layer_delta_modulation: self.per_layer_delta_modulation.clone(),
         }
     }
 }
@@ -159,6 +163,7 @@ impl State {
             prev_xs,
             pos: 0,
             cfc_modulation: None,
+            per_layer_delta_modulation: None,
         })
     }
 
@@ -336,6 +341,14 @@ impl MambaBlock {
 
         // Apply CfC modulation: scale Δ and B based on cognitive state
         let mut b = b;
+        if let Some(ref layer_modulation) = state.per_layer_delta_modulation {
+            if let Some(&layer_delta_scale) = layer_modulation.get(li) {
+                let ds = layer_delta_scale.clamp(0.1, 10.0) as f64;
+                if (ds - 1.0).abs() > 1e-6 {
+                    delta = (delta * ds)?;
+                }
+            }
+        }
         if let Some(ref modulation) = state.cfc_modulation {
             let ds = modulation.delta_scale.clamp(0.1, 10.0) as f64;
             if (ds - 1.0).abs() > 1e-6 {
@@ -430,6 +443,7 @@ impl Model {
         }
         state.pos += 1;
         state.cfc_modulation = None; // Consume per-token modulation
+        state.per_layer_delta_modulation = None;
         xs.apply(&self.norm_f)?.apply(&self.lm_head)
     }
 
@@ -449,6 +463,7 @@ impl Model {
         }
         state.pos += 1;
         state.cfc_modulation = None; // Consume per-token modulation
+        state.per_layer_delta_modulation = None;
         xs.apply(&self.norm_f)?.apply(&self.lm_head)
     }
 
@@ -464,6 +479,7 @@ impl Model {
         }
         state.pos += 1;
         state.cfc_modulation = None; // Consume per-token modulation
+        state.per_layer_delta_modulation = None;
         Ok(xs)
     }
 
@@ -501,7 +517,7 @@ impl Model {
             let proj = layer.mixer.in_proj.forward(summary)?;
             let chunks = proj.chunk(2, D::Minus1)?;
             let x_proj = &chunks[0]; // (1, d_inner)
-                                     // Fill all D_CONV history slots with this projection
+            // Fill all D_CONV history slots with this projection
             for slot in 0..D_CONV {
                 state.prev_xs[li][slot] = x_proj.clone();
             }
@@ -536,7 +552,7 @@ impl Model {
         for layer in &mut self.layers {
             let d_inner = layer.mixer.d_inner;
             let d_model = d_inner / 2; // d_inner = d_model * 2
-                                       // in_proj: [d_model] → [d_inner * 2]
+            // in_proj: [d_model] → [d_inner * 2]
             layer.mixer.lora_in_proj =
                 Some(LoraAdapter::new(d_model, d_inner * 2, rank, alpha, device)?);
             // out_proj: [d_inner] → [d_model]

@@ -275,10 +275,11 @@ mod tests {
         let poem = "Just one line";
         let v = validate_poem(poem, &PoeticForm::Haiku);
         assert!(!v.valid);
-        assert!(v
-            .errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::TooFewLines { .. })));
+        assert!(
+            v.errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::TooFewLines { .. }))
+        );
     }
 
     #[test]
@@ -286,10 +287,11 @@ mod tests {
         let poem = "Line one\nLine two\nLine three\nLine four";
         let v = validate_poem(poem, &PoeticForm::Haiku);
         assert!(!v.valid);
-        assert!(v
-            .errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::TooManyLines { .. })));
+        assert!(
+            v.errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::TooManyLines { .. }))
+        );
     }
 
     #[test]
@@ -298,10 +300,11 @@ mod tests {
         let poem = "A very very very long line indeed here\nShort\nShort";
         let v = validate_poem(poem, &PoeticForm::Haiku);
         assert!(!v.valid);
-        assert!(v
-            .errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::WrongSyllableCount { line: 0, .. })));
+        assert!(
+            v.errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::WrongSyllableCount { line: 0, .. }))
+        );
     }
 
     #[test]

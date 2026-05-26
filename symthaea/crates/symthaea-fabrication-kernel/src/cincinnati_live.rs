@@ -67,6 +67,7 @@ pub struct SensorReading {
 /// Classification of detected anomalies.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AnomalyType {
+    Warping,
     /// Unexpected temperature spike or drop.
     TemperatureSpike,
     /// Inter-layer adhesion failure signature.
@@ -282,6 +283,16 @@ impl CincinnatiMonitor {
     /// Total number of anomalies detected since creation.
     pub fn anomaly_count(&self) -> u64 {
         self.anomaly_count
+    }
+
+    /// Simulate a real-time hardware failure (e.g., extruder slip detected via acoustic entropy).
+    pub fn simulate_acoustic_failure(&self) -> AnomalyAlert {
+        AnomalyAlert {
+            channel: "acoustic_emission".into(),
+            anomaly_type: AnomalyType::Warping, // Proxy for delamination
+            severity: 0.95,
+            z_score: 15.0,
+        }
     }
 
     /// Current history length.

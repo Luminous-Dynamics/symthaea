@@ -17,6 +17,7 @@ pub mod input;
 pub mod leviathan;
 pub mod living_dungeon;
 pub mod menu;
+pub mod muse;
 pub mod minimap;
 pub mod phi_pcg;
 pub mod player;

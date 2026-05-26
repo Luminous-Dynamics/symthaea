@@ -113,6 +113,15 @@ pub struct VisionManifold {
     last_frame_channels: usize,
     /// Latest intent/goal vector (for swarm broadcast).
     last_intent_hv: ContinuousHV,
+    /// Subcortical generative bridge for neural hallucination (HDC -> Pixels).
+    generative_bridge: Option<GenerativeBridge>,
+}
+
+/// The Neural Bridge: Translates mathematical hypervectors into visual hallucinations.
+pub struct GenerativeBridge {
+    pub device: candle_core::Device,
+    pub projector: candle_nn::Linear,
+    pub latent_dim: usize,
 }
 
 /// Dynamic transition model for the latent manifold.
@@ -326,6 +335,7 @@ impl VisionManifold {
             last_frame_height: 0,
             last_frame_channels: 0,
             last_intent_hv: ContinuousHV::zero(dim),
+            generative_bridge: None,
         }
     }
 
@@ -511,7 +521,7 @@ impl VisionManifold {
                 //  consolidated into long-term episodic memory for later recognition)
                 if let Some(ref mut mem) = self.scene_memory {
                     for hv in &evicted {
-                        mem.remember(hv, self.frame_count);
+                        mem.remember(hv, self.frame_count, pixels.to_vec());
                     }
                 }
             }
@@ -788,7 +798,11 @@ impl VisionManifold {
             if self.coherence > self.scene_store_coherence_threshold
                 && self.prediction_error < self.scene_store_error_threshold
             {
-                memory.remember(&self.state, self.frame_count);
+                memory.remember(
+                    &self.state,
+                    self.frame_count,
+                    self.last_observed_frame.clone().unwrap_or_default(),
+                );
             }
         }
 
@@ -1898,7 +1912,7 @@ impl VisionManifold {
         let landmarks: Vec<ContinuousHV> = self.scene_memory.as_ref().map_or(Vec::new(), |mem| {
             mem.export_landmarks()
                 .iter()
-                .map(|(hv, _)| hv.clone())
+                .map(|(hv, _)| (*hv).clone())
                 .collect()
         });
 
@@ -2136,7 +2150,8 @@ pub struct HorizonAccuracy {
 /// the current state is stored as a landmark. On new frames, the memory
 /// can be queried for scene recognition ("I've been here before").
 pub struct SceneMemory {
-    landmarks: Vec<(ContinuousHV, u64)>, // (state_hv, stored_at_frame)
+    /// Stored landmarks: (State HV, Frame number, Raw pixels)
+    landmarks: Vec<(ContinuousHV, u64, Vec<u8>)>,
     capacity: usize,
     recognition_threshold: f32,
 }
@@ -2158,18 +2173,18 @@ impl SceneMemory {
 
     /// Scale all landmarks to a new HDC dimensionality.
     pub fn dilate(&mut self, target_dim: usize) {
-        for (hv, _) in &mut self.landmarks {
+        for (hv, _, _) in &mut self.landmarks {
             *hv = hv.dilate(target_dim);
         }
     }
 
     /// Store a scene landmark. Uses ring-buffer eviction when full.
-    pub fn remember(&mut self, state: &ContinuousHV, frame: u64) {
+    pub fn remember(&mut self, state: &ContinuousHV, frame: u64, pixels: Vec<u8>) {
         // Don't store near-duplicates
         if self
             .landmarks
             .iter()
-            .any(|(hv, _)| state.similarity(hv) > 0.98)
+            .any(|(hv, _, _)| state.similarity(hv) > 0.98)
         {
             return;
         }
@@ -2177,7 +2192,7 @@ impl SceneMemory {
             // Evict oldest
             self.landmarks.remove(0);
         }
-        self.landmarks.push((state.clone(), frame));
+        self.landmarks.push((state.clone(), frame, pixels));
     }
 
     /// Recognize the current state against stored landmarks.
@@ -2186,7 +2201,7 @@ impl SceneMemory {
     pub fn recognize(&self, state: &ContinuousHV, current_frame: u64) -> Option<SceneMatch> {
         let mut best: Option<(usize, f32, u64)> = None;
 
-        for (idx, (landmark, stored_frame)) in self.landmarks.iter().enumerate() {
+        for (idx, (landmark, stored_frame, _)) in self.landmarks.iter().enumerate() {
             let sim = state.similarity(landmark);
             if sim >= self.recognition_threshold {
                 match best {
@@ -2202,6 +2217,11 @@ impl SceneMemory {
             stored_at_frame,
             frames_since_stored: current_frame.saturating_sub(stored_at_frame),
         })
+    }
+
+    /// Access the raw pixels of a specific stored scene.
+    pub fn get_pixels(&self, scene_id: usize) -> Option<&[u8]> {
+        self.landmarks.get(scene_id).map(|(_, _, p)| p.as_slice())
     }
 
     /// Number of stored landmarks.
@@ -2220,13 +2240,13 @@ impl SceneMemory {
     }
 
     /// Read-only access to stored landmarks as `(hv, stored_at_frame)` pairs.
-    pub fn export_landmarks(&self) -> &[(ContinuousHV, u64)] {
-        &self.landmarks
+    pub fn export_landmarks(&self) -> Vec<(&ContinuousHV, u64)> {
+        self.landmarks.iter().map(|(hv, f, _)| (hv, *f)).collect()
     }
 
     /// Get a specific landmark by index.
     pub fn get_landmark(&self, idx: usize) -> Option<&ContinuousHV> {
-        self.landmarks.get(idx).map(|(hv, _)| hv)
+        self.landmarks.get(idx).map(|(hv, _, _)| hv)
     }
 
     /// Remove a specific landmark by index. Returns `true` if removed.
@@ -2245,7 +2265,7 @@ impl SceneMemory {
             landmarks: self
                 .landmarks
                 .iter()
-                .map(|(hv, frame)| (hv.as_slice().to_vec(), *frame))
+                .map(|(hv, frame, _)| (hv.as_slice().to_vec(), *frame))
                 .collect(),
             capacity: self.capacity,
             threshold: self.recognition_threshold,
@@ -2259,7 +2279,7 @@ impl SceneMemory {
         self.landmarks = state
             .landmarks
             .iter()
-            .map(|(vals, frame)| (ContinuousHV::from_vec(vals.clone()), *frame))
+            .map(|(vals, frame)| (ContinuousHV::from_vec(vals.clone()), *frame, Vec::new()))
             .collect();
     }
 }

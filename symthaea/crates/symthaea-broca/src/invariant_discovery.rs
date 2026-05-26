@@ -7,9 +7,9 @@
 
 use crate::formal_logic_scorer::FormalLogicScorer;
 use crate::substrate_binding::SubstrateBindingEngine;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
 use symthaea_core::hdc::logic_engine::Proposition;
-use symthaea_core::hdc::ContinuousHV;
 
 pub struct InvariantDiscovery {
     discovered_theorems: Vec<String>,
@@ -49,7 +49,7 @@ impl InvariantDiscovery {
         }
 
         // Propose theorems for highly frequent clusters (> 5 occurrences)
-        for (i, (center, count)) in clusters.iter().enumerate() {
+        for (i, (_center, count)) in clusters.iter().enumerate() {
             if *count > 5 {
                 let proposed = format!("∀ x ∈ cluster_{}, x.structural_invariant == true", i);
                 self.discovered_theorems.push(proposed.clone());

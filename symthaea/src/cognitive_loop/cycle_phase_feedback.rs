@@ -1811,8 +1811,8 @@ impl CognitiveLoopService {
                             channels: bridge.manifold().last_frame_channels(),
                             path_length: path.len(),
                             semantic_coherence: 0.0, // can be enhanced later
-                        })
-                    } else {
+                            trajectory: path.to_vec(),
+                            })                    } else {
                         None
                     }
                 } else {

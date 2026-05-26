@@ -27,6 +27,7 @@ pub struct ConsciousnessQuadrupedCallback {
 }
 
 impl PhysicsCallback<3> for ConsciousnessQuadrupedCallback {
+    fn apply_trauma(&mut self, _event: &CollisionEvent<3>) {}
     fn modulate_force(
         &self,
         _body: BodyHandle,

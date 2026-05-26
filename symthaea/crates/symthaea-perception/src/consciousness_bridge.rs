@@ -1,34 +1,61 @@
+// Surgical compatibility stubs for workspace tracking
+pub mod brain {
+    pub mod prefrontal {
+        #[derive(Debug, Clone, Default)]
+        pub struct AttentionBid;
+        impl AttentionBid {
+            pub fn new<A, B>(_name: A, _payload: B) -> Self { Self }
+            pub fn with_salience(self, _s: f32) -> Self { self }
+            pub fn with_urgency(self, _u: f32) -> Self { self }
+            pub fn with_tags(self, _t: Vec<String>) -> Self { self }
+            pub fn with_hdc_semantic<T>(self, _v: Option<std::sync::Arc<T>>) -> Self { self }
+        }
+    }
+}
+pub mod embeddings {
+    #[derive(Debug, Clone, Default)]
+    pub struct Qwen3Config;
+    #[derive(Debug, Clone, Default)]
+    pub struct Qwen3EmbedderResult { pub embedding: Vec<f32> }
+    #[derive(Debug, Clone, Default)]
+    pub struct Qwen3Embedder;
+    impl Qwen3Embedder {
+        pub fn new(_c: Qwen3Config) -> anyhow::Result<Self> { Ok(Self) }
+        pub fn embed(&mut self, _t: &str) -> anyhow::Result<Qwen3EmbedderResult> { Ok(Qwen3EmbedderResult::default()) }
+    }
+}
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Perception-Consciousness Bridge
-//!
-//! Connects the perception system to the consciousness attention system.
-//! Converts MultiModalPerception into AttentionBids for the Global Workspace.
-//!
-//! ## Architecture
-//!
-//! ```text
-//! Perception (SigLIP/Qwen3)
-//!         │
-//!         ▼
-//! ┌─────────────────┐
-//! │ Perception      │
-//! │ Bridge          │ ← Converts to AttentionBid
-//! └────────┬────────┘
-//!          │
-//!          ▼
-//! ┌─────────────────┐
-//! │ Prefrontal      │
-//! │ Cortex          │ ← Global Workspace
-//! └────────┬────────┘
-//!          │
-//!          ▼
-//! ┌─────────────────┐
-//! │ Consciousness   │
-//! │ Integration     │ ← Φ measurement
-//! └─────────────────┘
-//! ```
+// # Perception-Consciousness Bridge
+//
+// Connects the perception system to the consciousness attention system.
+// Converts MultiModalPerception into AttentionBids for the Global Workspace.
+//
+// ## Architecture
+//
+// ```text
+// Perception (SigLIP/Qwen3)
+//         │
+//         ▼
+// ┌─────────────────┐
+// │ Perception      │
+// │ Bridge          │ ← Converts to AttentionBid
+// └────────┬────────┘
+//          │
+//          ▼
+// ┌─────────────────┐
+// │ Prefrontal      │
+// │ Cortex          │ ← Global Workspace
+// └────────┬────────┘
+//          │
+//          ▼
+// ┌─────────────────┐
+// │ Consciousness   │
+// │ Integration     │ ← Φ measurement
+// └─────────────────┘
+// ```
 
 use anyhow::Result;
 use std::sync::Arc;
@@ -197,7 +224,7 @@ impl PerceptionBridge {
     /// Create an attention bid for a single modality
     fn create_modality_bid(
         &self,
-        contribution: &crate::perception::ModalityContribution,
+        contribution: &crate::multi_modal::ModalityContribution,
     ) -> Option<AttentionBid> {
         let content = format!(
             "{} perception: {:.1}% confidence",
@@ -209,7 +236,8 @@ impl PerceptionBridge {
             ModalityType::Vision => 0.5, // Visual input is usually important
             ModalityType::Voice => 0.7,  // Voice input needs quick response
             ModalityType::Code => 0.3,   // Code analysis can wait
-            ModalityType::Ocr => 0.4,    // OCR is informational
+            ModalityType::Ocr => 0.4,
+                _ => 0.5,    // OCR is informational
         };
 
         let bid = AttentionBid::new("Perception", content)
@@ -299,7 +327,7 @@ impl PerceptionBridge {
     }
 
     /// Convert boolean HdcVector to Vec<i8> for SharedHdcVector compatibility
-    fn boolean_to_i8_vec(&self, hdc: &crate::perception::multi_modal::HdcVector) -> Vec<i8> {
+    fn boolean_to_i8_vec(&self, hdc: &crate::multi_modal::HdcVector) -> Vec<i8> {
         hdc.bits
             .iter()
             .map(|&bit| if bit { 1i8 } else { -1i8 })

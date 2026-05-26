@@ -85,8 +85,8 @@ pub fn generate(
         }
 
         // Position: spread across viewport with some randomness
-        let x = rng.gen::<f32>() * config.width * 0.4;
-        let y = rng.gen::<f32>() * config.height * 0.4;
+        let x = rng.r#gen::<f32>() * config.width * 0.4;
+        let y = rng.r#gen::<f32>() * config.height * 0.4;
         let w = config.width * (0.4 + nc.level * 0.5);
         let h = config.height * (0.4 + nc.level * 0.5);
 
@@ -100,7 +100,7 @@ pub fn generate(
                 ..Style::default()
             })
             .with_transform(Transform {
-                rotate_deg: rng.gen::<f32>() * 30.0 - 15.0,
+                rotate_deg: rng.r#gen::<f32>() * 30.0 - 15.0,
                 ..Transform::identity()
             });
 

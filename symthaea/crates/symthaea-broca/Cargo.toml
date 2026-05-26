@@ -7,9 +7,12 @@ license = "AGPL-3.0-or-later"
 autobins = false
 
 [dependencies]
+chumsky.workspace = true
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-geodesic = { path = "../symthaea-geodesic", optional = true }
 symthaea-fep = { path = "../symthaea-fep" }
+symthaea-hodge = { path = "../symthaea-hodge" }
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 symthaea-hdc-store = { path = "../symthaea-hdc-store" }
 symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
 serde = { workspace = true }
@@ -92,6 +95,21 @@ path = "src/bin/broca_compare.rs"
 required-features = ["mamba-cpu"]
 
 [[bin]]
+name = "broca-liquid-eval"
+path = "src/bin/broca_liquid_eval.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-attractor-calibrate"
+path = "src/bin/broca_attractor_calibrate.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-decoder-ab"
+path = "src/bin/broca_decoder_ab.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
 name = "broca-embedding-stats"
 path = "src/bin/broca_embedding_stats.rs"
 required-features = ["mamba-cpu"]
@@ -134,6 +152,21 @@ required-features = ["mamba-cpu"]
 name = "demo-ecological-closure"
 path = "src/bin/demo_ecological_closure.rs"
 
+[[bin]]
+name = "broca-dreamer"
+path = "src/bin/broca_dreamer.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-benchmark-suite"
+path = "src/bin/broca_benchmark_suite.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-validator"
+path = "src/bin/broca_validator.rs"
+required-features = ["mamba-cpu"]
+
 [features]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
@@ -154,3 +187,7 @@ test-helpers = ["mamba-cpu"]
 therapeutic = []
 speech-data = ["dep:symthaea-stt"]
 code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
+
+[[bin]]
+name = "fused_cognitive_node"
+path = "src/bin/fused_cognitive_node.rs"

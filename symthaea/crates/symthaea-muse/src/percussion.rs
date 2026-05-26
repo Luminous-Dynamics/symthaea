@@ -538,7 +538,7 @@ mod tests {
         let diffs: usize = original_times
             .iter()
             .zip(&jittered_times)
-            .filter(|(&a, &b)| (a - b).abs() > 0.0001)
+            .filter(|&(&a, &b)| (a - b).abs() > 0.0001)
             .count();
         assert!(diffs > 0, "humanize should jitter at least some hit times");
     }

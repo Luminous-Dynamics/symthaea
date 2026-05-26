@@ -11,7 +11,7 @@
 
 use std::process;
 
-use symthaea_broca::mamba::{best_device, MambaWrapper};
+use symthaea_broca::mamba::{MambaWrapper, best_device};
 use symthaea_broca::temporal_projection::EmbeddingStats;
 
 fn main() {

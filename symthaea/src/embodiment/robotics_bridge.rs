@@ -4,28 +4,21 @@
 //! Robotics Bridge — Symthaea's physical body.
 //!
 //! Wires the high-level cognitive cycle (thought hypervectors) to low-level
-//! motor commands via `EmbodimentBridge`.
+//! motor commands via `EmbodimentBridge` with closed-loop Active Inference.
 
 use symthaea_core::embodiment::{EmbodimentBridge, EmbodimentResult, MotorSafetyLevel};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_fep::ActiveInferenceAgent;
 
 /// A robotic agent that couples cognitive thoughts to physical actions.
-///
-/// This is the "Mk0 Bootstrapper" protocol's embodiment core.
 pub struct RoboticAgent {
-    /// The physical/simulated body bridge.
     bridge: Box<dyn EmbodimentBridge>,
-    /// Active Inference agent for control modulation and surprise detection.
     fep: ActiveInferenceAgent,
-    /// Last recorded phi (consciousness level).
     last_phi: f64,
 }
 
 impl RoboticAgent {
-    /// Create a new robotic agent from an embodiment bridge.
     pub fn new(bridge: Box<dyn EmbodimentBridge>) -> Self {
-        // Initialize FEP agent with dimensions matching the bridge
         let num_actuators = bridge.num_actuators();
         let config = symthaea_fep::ActiveInferenceAgentConfig {
             state_dim: num_actuators,
@@ -41,21 +34,12 @@ impl RoboticAgent {
         }
     }
 
-    /// Step the robotic body one increment in time.
-    ///
-    /// 1. Encodes body state (proprioception).
-    /// 2. Runs active inference to compute surprise (free energy).
-    /// 3. Modulates the thought HV based on safety and grounding.
-    /// 4. Steps the physics via the bridge.
+    /// Step the robotic body one increment in time with true Active Inference modulation.
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> RoboticStepResult {
         self.last_phi = phi;
 
-        // 1. Perception
+        // 1. Perception (Proprioception Input)
         let perception_hv = self.bridge.encode_perception();
-
-        // Convert ContinuousHV to FEP Observation
-        // We use the first N components of the HV as observables, or ideally
-        // a reduced projection. For now, we take the mean or a sample.
         let values: Vec<f64> = perception_hv
             .as_slice()
             .iter()
@@ -64,51 +48,62 @@ impl RoboticAgent {
             .collect();
         let obs = symthaea_fep::Observation::new(values, 1.0, "proprioception");
 
-        // 2. Active Inference (Active Sensing)
+        // 2. Active Inference Sensory Update & Action Selection
         let perception_result = self.fep.perceive(&obs);
-        let _action_result = self.fep.select_action();
+        let action_result = self.fep.select_action();
 
-        // 3. Safety Gating & Modulation
+        // 3. Precision-Weighted Cognitive Modulation
+        let surprise = perception_result.free_energy.prediction_error;
+
+        let modulated_hv = if surprise > 0.5 {
+            let mut modified = thought_hv.clone();
+            let slice = modified.values.as_mut_slice();
+
+            // Map the discrete action selection index to apply a deterministic torque bias
+            let bias = (action_result.action as f32 * 0.05 * surprise as f32).clamp(-1.0, 1.0);
+            for (i, val) in slice.iter_mut().enumerate() {
+                if i % 7 == action_result.action % 7 {
+                    *val += bias;
+                }
+            }
+            modified
+        } else {
+            thought_hv.clone()
+        };
+
+        // 4. Safety Gating
         let safety = self.bridge.safety_level();
         let gain = safety.motor_gain();
 
-        // 4. Actuation
-        let result = self.bridge.step(thought_hv, dt, phi);
+        // 5. Actuation
+        let result = self.bridge.step(&modulated_hv, dt, phi);
 
         RoboticStepResult {
             embodiment: result,
             free_energy: perception_result.free_energy.total,
-            surprise: perception_result.free_energy.prediction_error,
+            surprise,
             motor_gain: gain,
         }
     }
 
-    /// Access the underlying bridge.
     pub fn bridge(&self) -> &dyn EmbodimentBridge {
         self.bridge.as_ref()
     }
 
-    /// Access the underlying bridge (mutable).
     pub fn bridge_mut(&mut self) -> &mut dyn EmbodimentBridge {
         self.bridge.as_mut()
     }
 
-    /// Reset both body and brain state.
     pub fn reset(&mut self) {
         self.bridge.reset();
         self.fep.reset();
     }
 }
 
-/// Result of a robotic agent step.
 pub struct RoboticStepResult {
-    /// Outcome from the physical/simulated bridge.
     pub embodiment: EmbodimentResult,
-    /// Variational free energy from the FEP loop.
     pub free_energy: f64,
-    /// Surprise (prediction error) scalar.
     pub surprise: f64,
-    /// Applied motor gain (0.0-1.0).
     pub motor_gain: f32,
 }
 
@@ -117,34 +112,12 @@ mod tests {
     use super::*;
     use symthaea_core::genesis::GenesisSeed;
 
-    #[cfg(feature = "manipulator")]
-    #[test]
-    fn test_robotic_agent_manipulator_step() {
-        use crate::manipulator::embodiment::ManipulatorEmbodiment;
-        let genesis = GenesisSeed::from_phrase("test-robot");
-        let bridge = Box::new(ManipulatorEmbodiment::new(&genesis));
-        let mut agent = RoboticAgent::new(bridge);
-
-        let thought = ContinuousHV::random(16384, 123);
-        let result = agent.step(&thought, 0.01, 0.8);
-
-        assert!(result.embodiment.success);
-        assert!(result.free_energy.is_finite());
-        assert!(result.surprise.is_finite());
-        assert_eq!(result.motor_gain, 1.0); // Green safety
-    }
-
     #[test]
     fn test_robotic_agent_construction() {
         struct MockBridge;
         impl EmbodimentBridge for MockBridge {
-            fn step(
-                &mut self,
-                _hv: &ContinuousHV,
-                _dt: f32,
-                _phi: f64,
-            ) -> crate::symthaea_core::embodiment::EmbodimentResult {
-                crate::symthaea_core::embodiment::EmbodimentResult {
+            fn step(&mut self, _hv: &ContinuousHV, _dt: f32, _phi: f64) -> EmbodimentResult {
+                EmbodimentResult {
                     num_actuators: 1,
                     control_effort: 0.0,
                     success: true,

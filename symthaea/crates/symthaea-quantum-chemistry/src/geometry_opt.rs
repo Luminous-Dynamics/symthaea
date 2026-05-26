@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Molecular geometry optimization.
 //!
 //! Finds equilibrium structures by minimizing the total energy as a function
@@ -9,6 +6,12 @@
 //!
 //! The potential energy surface (PES) is the total energy E(R) where R is
 //! the set of all nuclear coordinates.
+
+use crate::Atom;
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 use crate::basis::sto3g::Sto3g;
 use crate::basis::BasisSetProvider;

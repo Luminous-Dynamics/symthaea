@@ -7,7 +7,7 @@
 //! into the current thought stream.
 
 use anyhow::Result;
-use symthaea_core::hdc::{ContinuousHV, HV};
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_hdc_store::store::HdcStore;
 
 /// Bridge between Broca and the long-term HDC store.
@@ -54,11 +54,30 @@ impl MemoryBridge {
         }
 
         // 4. Bundle past experiences into a single "memory vector"
-        let refs: Vec<&ContinuousHV> = retrieved_hvs.iter().collect();
-        let memory_hv = ContinuousHV::bundle(&refs);
+        // IMPROVEMENT: Use permutation-based bundling to preserve temporal order.
+        // The first (most similar) memory is not shifted, subsequent ones are
+        // permuted increasingly to represent their relative 'distance' in search space
+        // or implicitly their chronological order if they were stored sequentially.
+        let mut bundled_values = vec![0.0f32; current_thought.dim()];
+        let n = retrieved_hvs.len() as f32;
 
-        // 5. Blend into current thought: self = (1-alpha)*self + alpha*memory
-        current_thought.lerp_in_place(&memory_hv, 1.0 - self.blend_alpha, self.blend_alpha);
+        for (i, hv) in retrieved_hvs.iter().enumerate() {
+            // Permute to avoid collapsing into a simple average (Sequence-Aware Bundling)
+            let shifted = hv.permute(i);
+            for (b, &s) in bundled_values.iter_mut().zip(shifted.as_slice().iter()) {
+                *b += s / n;
+            }
+        }
+        let memory_hv = ContinuousHV::from_vec(bundled_values);
+
+        // 5. IMPROVEMENT: Holographic Resonance Blending
+        // Instead of fixed lerp, we compute the "Resonance" (inner product alignment).
+        // High resonance (familiarity) triggers deeper integration of past experiences.
+        let resonance = current_thought.similarity(&memory_hv).max(0.1);
+        let dynamic_alpha = (self.blend_alpha * (1.0 + resonance)).clamp(0.05, 0.95);
+
+        // Blend into current thought: self = (1-alpha)*self + alpha*memory
+        current_thought.lerp_in_place(&memory_hv, 1.0 - dynamic_alpha, dynamic_alpha);
 
         Ok(retrieved_hvs.len())
     }

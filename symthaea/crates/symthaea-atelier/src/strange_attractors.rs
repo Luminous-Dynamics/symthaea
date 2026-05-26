@@ -275,7 +275,7 @@ pub fn generate(
 
     // More points = richer orbit trace. Consciousness gates complexity.
     let n_points = 2000 + (consciousness * 6000.0) as usize;
-    let seed: u32 = rng.gen();
+    let seed: u32 = rng.r#gen();
 
     let raw_points = match attractor {
         AttractorType::Clifford => {

@@ -294,13 +294,28 @@ impl ContinuousHV {
 
         let inv_n = 1.0 / hvs.len() as f32;
 
-        // Scalar fallback: accumulate row-by-row for better cache locality
+        // Scalar fallback: SIMD loop unrolling with chunks_exact(8)
         let mut values = vec![0.0f32; dim];
         for hv in hvs {
-            for (acc, &v) in values.iter_mut().zip(hv.values.iter()) {
+            let mut acc_iter = values.chunks_exact_mut(8);
+            let mut val_iter = hv.values.chunks_exact(8);
+
+            for (acc_chunk, val_chunk) in acc_iter.by_ref().zip(val_iter.by_ref()) {
+                acc_chunk[0] += val_chunk[0];
+                acc_chunk[1] += val_chunk[1];
+                acc_chunk[2] += val_chunk[2];
+                acc_chunk[3] += val_chunk[3];
+                acc_chunk[4] += val_chunk[4];
+                acc_chunk[5] += val_chunk[5];
+                acc_chunk[6] += val_chunk[6];
+                acc_chunk[7] += val_chunk[7];
+            }
+
+            for (acc, &v) in acc_iter.into_remainder().iter_mut().zip(val_iter.remainder().iter()) {
                 *acc += v;
             }
         }
+
         for v in values.iter_mut() {
             *v *= inv_n;
         }
@@ -353,8 +368,6 @@ impl ContinuousHV {
     /// For identical vectors: similarity = 1
     /// For opposite vectors: similarity = -1
     ///
-    /// # Performance
-    /// Uses SIMD acceleration when the `simd` feature is enabled (4x+ speedup).
     #[inline]
     pub fn similarity(&self, other: &Self) -> f32 {
         assert_eq!(
@@ -380,12 +393,33 @@ impl ContinuousHV {
             // biological homeostasis (Cognitive Throttle).
             let stride = STRIDE.load(Ordering::Relaxed);
 
-            for i in (0..self.values.len()).step_by(stride) {
-                let a = self.values[i];
-                let b = other.values[i];
-                dot += a * b;
-                norm_a_sq += a * a;
-                norm_b_sq += b * b;
+            if stride == 1 {
+                // Optimized SIMD-friendly loop for full resolution
+                let mut self_chunks = self.values.chunks_exact(8);
+                let mut other_chunks = other.values.chunks_exact(8);
+
+                for (a, b) in self_chunks.by_ref().zip(other_chunks.by_ref()) {
+                    dot += a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] +
+                           a[4] * b[4] + a[5] * b[5] + a[6] * b[6] + a[7] * b[7];
+                    norm_a_sq += a[0] * a[0] + a[1] * a[1] + a[2] * a[2] + a[3] * a[3] +
+                                 a[4] * a[4] + a[5] * a[5] + a[6] * a[6] + a[7] * a[7];
+                    norm_b_sq += b[0] * b[0] + b[1] * b[1] + b[2] * b[2] + b[3] * b[3] +
+                                 b[4] * b[4] + b[5] * b[5] + b[6] * b[6] + b[7] * b[7];
+                }
+
+                for (&a, &b) in self_chunks.remainder().iter().zip(other_chunks.remainder().iter()) {
+                    dot += a * b;
+                    norm_a_sq += a * a;
+                    norm_b_sq += b * b;
+                }
+            } else {
+                for i in (0..self.values.len()).step_by(stride) {
+                    let a = self.values[i];
+                    let b = other.values[i];
+                    dot += a * b;
+                    norm_a_sq += a * a;
+                    norm_b_sq += b * b;
+                }
             }
 
             let denom = (norm_a_sq * norm_b_sq).sqrt();
@@ -410,11 +444,19 @@ impl ContinuousHV {
             self.values.len(),
             other.values.len()
         );
-        self.values
-            .iter()
-            .zip(other.values.iter())
+        
+        let mut self_chunks = self.values.chunks_exact(8);
+        let mut other_chunks = other.values.chunks_exact(8);
+        let mut sum = 0.0f32;
+
+        for (a, b) in self_chunks.by_ref().zip(other_chunks.by_ref()) {
+            sum += a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] +
+                   a[4] * b[4] + a[5] * b[5] + a[6] * b[6] + a[7] * b[7];
+        }
+
+        sum + self_chunks.remainder().iter().zip(other_chunks.remainder().iter())
             .map(|(a, b)| a * b)
-            .sum()
+            .sum::<f32>()
     }
 
     /// Generate a set of approximately orthogonal unit hypervectors via modified Gram-Schmidt.
@@ -471,7 +513,16 @@ impl ContinuousHV {
 
         #[cfg(not(feature = "simd"))]
         {
-            self.values.iter().map(|x| x * x).sum::<f32>().sqrt()
+            let mut sum_sq = 0.0f32;
+            let mut chunks = self.values.chunks_exact(8);
+            
+            for c in chunks.by_ref() {
+                sum_sq += c[0] * c[0] + c[1] * c[1] + c[2] * c[2] + c[3] * c[3] +
+                          c[4] * c[4] + c[5] * c[5] + c[6] * c[6] + c[7] * c[7];
+            }
+            
+            sum_sq += chunks.remainder().iter().map(|&x| x * x).sum::<f32>();
+            sum_sq.sqrt()
         }
     }
 

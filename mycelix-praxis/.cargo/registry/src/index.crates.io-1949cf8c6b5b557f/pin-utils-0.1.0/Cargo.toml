@@ -11,7 +11,7 @@
 # will likely look very different (and much more reasonable)
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "pin-utils"
 version = "0.1.0"
 authors = ["Josef Brandl <mail@josefbrandl.de>"]

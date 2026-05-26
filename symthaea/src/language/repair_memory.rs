@@ -13,6 +13,8 @@ use std::path::Path;
 use serde::Deserialize;
 use symthaea_core::synthesis_trait::SynthesisRequest;
 
+use super::code_intent::CodeSpec;
+
 pub const REPAIR_MEMORY_JSONL_ENV: &str = "SYMTHAEA_REPAIR_MEMORY_JSONL";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -70,6 +72,53 @@ pub fn repair_priors_for_request(
         .collect()
 }
 
+pub fn repair_priors_for_spec_diagnostics(
+    spec: &CodeSpec,
+    diagnostics: &[String],
+    categories: &[String],
+    limit: usize,
+) -> Vec<(String, String)> {
+    let Some(path) = std::env::var_os(REPAIR_MEMORY_JSONL_ENV) else {
+        return Vec::new();
+    };
+    let Ok(records) = load_repair_memory(Path::new(&path)) else {
+        return Vec::new();
+    };
+    let mut scored = records
+        .into_iter()
+        .filter(|record| record.broca_training_record || record.fixed_source_preview.is_some())
+        .filter_map(|record| {
+            let score = score_record_fields(
+                &spec.name,
+                &spec.purpose,
+                spec.signature.as_deref().unwrap_or_default(),
+                &record,
+            ) + score_diagnostic_match(diagnostics, categories, &record);
+            (score > 0).then_some((score, record))
+        })
+        .collect::<Vec<_>>();
+
+    scored.sort_by(|(a, _), (b, _)| b.cmp(a));
+    scored
+        .into_iter()
+        .take(limit)
+        .enumerate()
+        .map(|(idx, (_, record))| {
+            (
+                format!(
+                    "repair_memory_diagnostic_{}_{}",
+                    idx,
+                    sanitize_label(&record.category)
+                ),
+                format!(
+                    "Past repair for similar prediction error `{}` on `{}`: {} Diagnostic: {}",
+                    record.category, record.signature, record.hint, record.diagnostic
+                ),
+            )
+        })
+        .collect()
+}
+
 pub fn load_repair_memory(path: &Path) -> Result<Vec<RepairMemoryRecord>, String> {
     let text = std::fs::read_to_string(path)
         .map_err(|error| format!("failed to read repair memory {}: {error}", path.display()))?;
@@ -93,10 +142,19 @@ pub fn load_repair_memory(path: &Path) -> Result<Vec<RepairMemoryRecord>, String
 
 fn score_record(request: &SynthesisRequest, record: &RepairMemoryRecord) -> usize {
     let request_signature = request.signature.as_deref().unwrap_or_default();
+    score_record_fields(&request.name, &request.purpose, request_signature, record)
+}
+
+fn score_record_fields(
+    request_name: &str,
+    request_purpose: &str,
+    request_signature: &str,
+    record: &RepairMemoryRecord,
+) -> usize {
     let request_haystack = format!(
         "{} {} {}",
-        request.name.to_ascii_lowercase(),
-        request.purpose.to_ascii_lowercase(),
+        request_name.to_ascii_lowercase(),
+        request_purpose.to_ascii_lowercase(),
         request_signature.to_ascii_lowercase()
     );
     let record_haystack = format!(
@@ -108,7 +166,7 @@ fn score_record(request: &SynthesisRequest, record: &RepairMemoryRecord) -> usiz
     );
 
     let mut score = 0;
-    if !request.name.is_empty() && record.task_name == request.name {
+    if !request_name.is_empty() && record.task_name == request_name {
         score += 6;
     }
     if !request_signature.is_empty() && record.signature == request_signature {
@@ -138,6 +196,44 @@ fn score_record(request: &SynthesisRequest, record: &RepairMemoryRecord) -> usiz
             score += 1;
         }
     }
+    score
+}
+
+fn score_diagnostic_match(
+    diagnostics: &[String],
+    categories: &[String],
+    record: &RepairMemoryRecord,
+) -> usize {
+    let mut score = 0;
+    if categories
+        .iter()
+        .any(|category| category == &record.category)
+    {
+        score += 8;
+    }
+
+    let record_text = format!("{} {}", record.category, record.diagnostic).to_ascii_lowercase();
+    for diagnostic in diagnostics {
+        let diagnostic_lower = diagnostic.to_ascii_lowercase();
+        if let Some(code) = diagnostic_lower
+            .split(|ch: char| !(ch.is_ascii_alphanumeric()))
+            .find(|token| token.starts_with('e') && token.len() == 5)
+        {
+            if record_text.contains(code) {
+                score += 6;
+            }
+        }
+        for token in diagnostic_lower
+            .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
+            .filter(|token| token.len() >= 5)
+            .take(16)
+        {
+            if record_text.contains(token) {
+                score += 1;
+            }
+        }
+    }
+
     score
 }
 
@@ -253,5 +349,35 @@ mod tests {
         };
 
         assert!(score_record(&request, &close) > score_record(&request, &distant));
+    }
+
+    #[test]
+    fn retrieves_repair_memory_by_diagnostic_category() {
+        let file = NamedTempFile::new().unwrap();
+        std::fs::write(
+            file.path(),
+            r#"{"task_name":"different","signature":"fn different(raw: &str) -> i32","category":"type_mismatch","diagnostic":"error[E0308]: mismatched types expected `i32`, found `&str`","hint":"return an i32 expression instead of a string literal","fixed_source_preview":"fn different(raw: &str) -> i32 { raw.len() as i32 }","final_backend":"GeodesicSkeleton","broca_training_record":true}"#,
+        )
+        .unwrap();
+        unsafe {
+            std::env::set_var(REPAIR_MEMORY_JSONL_ENV, file.path());
+        }
+
+        let spec = CodeSpec::new("rust", "answer", "Return the integer answer")
+            .with_signature("fn answer() -> i32");
+        let priors = repair_priors_for_spec_diagnostics(
+            &spec,
+            &["error[E0308]: mismatched types expected `i32`, found `&str`".to_string()],
+            &["type_mismatch".to_string()],
+            2,
+        );
+
+        unsafe {
+            std::env::remove_var(REPAIR_MEMORY_JSONL_ENV);
+        }
+
+        assert_eq!(priors.len(), 1);
+        assert!(priors[0].0.contains("type_mismatch"));
+        assert!(priors[0].1.contains("return an i32"));
     }
 }

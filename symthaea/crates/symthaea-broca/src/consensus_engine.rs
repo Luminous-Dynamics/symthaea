@@ -95,7 +95,7 @@ impl ConsensusEngine {
                     agreed_hv: None,
                     disagreement_nodes: vec![],
                     confidence: 0.0,
-                }
+                };
             }
         };
 

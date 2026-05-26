@@ -1,0 +1,117 @@
+// Mycelix DeSci - Epistemic Bounty Pact v1.1
+// Aligned with Mycelix Epistemic Charter §7 (Resonance & Reward)
+// Integrated with MATL Cartel Immunity & Thermodynamic Quarantine
+
+pact EpistemicBounty {
+    // 1. Definition of the Epistemic Threshold
+    threshold E4_N3 {
+        empirical: 4,      // LEM E4: Publicly Reproducible
+        normative: 3,      // LEM N3: Network/Axiomatic Consensus
+        materiality: >= 2, // M2+: Persistent or Foundational
+    }
+
+    // 2. The Resonance Trigger
+    on consensus_reached(claim: DesciClaim) where claim.lem == threshold.E4_N3 {
+        // CROSS-CLUSTER SECURITY CHECK
+        // Query the MATL CartelDetector from the Praxis/Learning cluster
+        let reviewers = get_claim_reviewers(claim.id);
+        
+        // 1. Semantic Immunity Check (Anti-Lazy Science)
+        // Verify that reviews are not just "Semantic Echoes" of the claim.
+        for reviewer in &reviewers {
+            let similarity = get_semantic_similarity(claim.id, reviewer.id);
+            if similarity > 0.90 {
+                execute penalize_laziness(reviewer, similarity);
+                throw LazinessDetected(reviewer, similarity);
+            }
+        }
+
+        // 2. CROSS-CLUSTER SECURITY CHECK
+        let suspicion_score = Praxis.detect_cartel_signatures(reviewers);
+
+        if suspicion_score > 0.7 {
+            // Trigger Thermodynamic Quarantine instead of Reward
+            execute thermodynamic_quarantine(reviewers, suspicion_score);
+            throw DissonanceDetected(claim.creator, suspicion_score);
+        } else {
+            execute reward_resonance(claim.creator, claim.materiality);
+        }
+    }
+
+    // 3. Thermodynamic Quarantine (The "Physics" Penalty)
+    action thermodynamic_quarantine(agents: Vec<Identity>, confidence: f64) {
+        // Call MATL's global slashing logic
+        MATL.apply_cartel_slash(agents, confidence);
+
+        for agent in agents {
+            // Drop D0 (Integrity) to zero
+            reset agent.profile[D0], 0.0;
+            
+            // Initiate Thermodynamic Quarantine: disable consensus write-privileges
+            // This is a time-bound metabolic penalty, not permanent exile.
+            quarantine agent, duration: 1.cycle; 
+            
+            log "Agent {} placed in Thermodynamic Quarantine due to Cartel Detection.", agent.id;
+        }
+    }
+
+    // 4. The Reward Logic (Execute only if Immune)
+    action reward_resonance(researcher: Identity, materiality: u8) {
+        let bounty_amount = match materiality {
+            2 => 1000.sap, 
+            3 => 5000.sap,
+            _ => 100.sap,
+        };
+
+        if Treasury.saturation < 0.85 {
+            mint researcher.wallet, bounty_amount;
+        } else {
+            route Treasury.yield, researcher.wallet, bounty_amount;
+        }
+
+        boost researcher.profile[D7], +0.15; // Competence
+        boost researcher.profile[D0], +0.10; // Integrity
+        
+        anchor_event "Epistemic Breakthrough", claim_id: claim.id;
+    }
+
+    // 5. Honest Retraction Clause
+    on retraction_initiated(evolution: ClaimEvolution) {
+        let original_claim = get_claim(evolution.parent_id);
+        let grace_period = 180.days;
+
+        if evolution.evolved_at - original_claim.created_at < grace_period {
+            if evolution.reason == "FEP Anomaly Detection" {
+                protect researcher.profile[D7];
+                log "Honest Retraction Accepted: FEP Anomaly reported within grace period.";
+            } else {
+                decay researcher.profile[D7], -0.05;
+            }
+        }
+    }
+
+    // 6. Dissonance Exception (Security Layer)
+    exception DissonanceDetected(researcher: Identity, anomaly_score: f64) {
+        if anomaly_score > 0.85 {
+            slash researcher.profile[D0], -0.50;
+            revoke researcher.grants;
+            
+            anchor_event "Epistemic Dissonance Slashing", 
+                         reason: "Cartel anomaly detected by MATL quorum",
+                         severity: "High";
+        }
+    }
+}
+
+    // 7. Laziness Penalty (The "Anti-Echo" Protocol)
+    action penalize_laziness(reviewer: Identity, similarity: f64) {
+        // High similarity = low effort = reputation decay
+        decay reviewer.profile[D7], -0.10; // Competence Decay
+        
+        anchor_event "Laziness Anomaly", 
+                     reviewer_id: reviewer.id, 
+                     similarity: similarity;
+                     
+        log "Reviewer {} penalized for Semantic Echo (Similarity: {:.2}).", reviewer.id, similarity;
+    }
+}

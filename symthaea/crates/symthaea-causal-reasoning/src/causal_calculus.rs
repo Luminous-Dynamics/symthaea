@@ -409,7 +409,7 @@ impl CausalDAG {
 /// a neural population (do(neuron_state = x)), what would happen to the
 /// conscious state?" This is precisely the kind of interventionist reasoning
 /// needed to establish whether consciousness has genuine causal power.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuralCausalModel {
     /// The causal DAG
     pub dag: CausalDAG,

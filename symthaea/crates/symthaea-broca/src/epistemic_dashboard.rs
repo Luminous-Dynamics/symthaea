@@ -53,7 +53,7 @@ impl EpistemicDashboard {
     }
 
     /// Render an ASCII heatmap of architectural integrity.
-    pub fn render_blueprint_status(&self, engine: &SubstrateBindingEngine) {
+    pub fn render_blueprint_status(&self, _engine: &SubstrateBindingEngine) {
         println!("\n🌐 SYMTHAEA ARCHITECTURAL INTEGRITY HEATMAP");
         println!("═════════════════════════════════════════════");
 

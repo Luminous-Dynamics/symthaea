@@ -1,7 +1,7 @@
 [package]
 name = "binius-zome-verifier"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Proof of concept: Binius STARK verifier inside a Holochain integrity zome"
 

@@ -4,13 +4,17 @@
 //! Trust API handlers
 
 use axum::{
-    extract::{Path, State},
     Json,
+    extract::{Path, State},
 };
 use std::sync::Arc;
 use tracing::info;
 
-use crate::{error::{ApiError, Result}, models::*, state::AppState};
+use crate::{
+    error::{ApiError, Result},
+    models::*,
+    state::AppState,
+};
 
 /// Get trust score for a participant
 #[utoipa::path(

@@ -2,7 +2,7 @@
 name = "symthaea-browser"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Consciousness-driven browser agent: CDP observation + HDC encoding + Phi-gated actions"
 license = "AGPL-3.0-or-later"

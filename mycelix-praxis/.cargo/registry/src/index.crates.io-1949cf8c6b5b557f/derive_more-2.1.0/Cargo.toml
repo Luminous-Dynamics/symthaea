@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 rust-version = "1.81.0"
 name = "derive_more"
 version = "2.1.0"

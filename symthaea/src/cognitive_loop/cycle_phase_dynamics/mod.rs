@@ -2748,6 +2748,7 @@ impl CognitiveLoopService {
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
                     code_context: self.carryover.injected_code_context.take(),
+                    negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);

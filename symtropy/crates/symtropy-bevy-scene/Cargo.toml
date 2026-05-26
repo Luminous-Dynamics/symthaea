@@ -1,7 +1,7 @@
 [package]
 name = "symtropy-bevy-scene"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 OR MIT"
 description = "Opinionated scene/camera/light scaffolding for Bevy applications. Eliminates the camera-light-clearcolor boilerplate every Symtropy demo and game otherwise repeats. Permissive sibling to symtropy-bevy."
 repository = "https://github.com/luminous-dynamics/symtropy"

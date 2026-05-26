@@ -322,7 +322,7 @@ impl FormantToMelConverter {
     ) -> Vec<Vec<f32>> {
         // 1. Synthesize audio: optionally interpolate with previous frame
         if self.config.interpolation {
-            if let (Some(ref prev), Some(ref prev_vq)) = (&self.prev_frame, &self.prev_vq) {
+            if let (Some(prev), Some(prev_vq)) = (&self.prev_frame, &self.prev_vq) {
                 // Synthesize first half from interpolated frame (prev→current midpoint)
                 let interp = interpolate_frames(prev, frame, 0.5);
                 let interp_vq = MelVoiceQuality {

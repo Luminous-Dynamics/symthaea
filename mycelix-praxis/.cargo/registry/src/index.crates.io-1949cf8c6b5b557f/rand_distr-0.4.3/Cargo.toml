@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "rand_distr"
 version = "0.4.3"
 authors = ["The Rand Project Developers"]

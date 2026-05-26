@@ -3,7 +3,7 @@
 [package]
 name = "mycelix-commons-resource-sim"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Commons resource sustainability simulation with Ostrom's framework and consciousness gating"
 
 [[bin]]

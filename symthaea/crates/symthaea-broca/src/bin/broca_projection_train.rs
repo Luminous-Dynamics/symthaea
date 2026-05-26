@@ -91,6 +91,11 @@ fn main() {
         gating_config,
         temperature: opts.temperature.unwrap_or(0.8),
         top_k: opts.top_k.unwrap_or(40),
+        enable_semantic_attractor: opts.semantic_attractor,
+        semantic_attractor_strength: opts.semantic_attractor_strength,
+        semantic_attractor_top_k: opts.semantic_attractor_top_k,
+        semantic_attractor_max_adjustment: opts.semantic_attractor_max_adjustment,
+        semantic_attractor_normalize: true,
         // Disable runtime safety features during batch training:
         // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
         //   gradient flow when projection is untrained (PE ≈ 1.0 always).
@@ -102,7 +107,7 @@ fn main() {
     };
 
     tracing::info!(model = %opts.model_id, "Loading Mamba model (this may download ~500MB on first run)");
-    let mut gen = match LiquidMambaGenerator::new(&genesis, lm_config) {
+    let mut r#gen = match LiquidMambaGenerator::new(&genesis, lm_config) {
         Ok(g) => g,
         Err(e) => {
             eprintln!("Failed to create LiquidMambaGenerator: {e}");
@@ -116,11 +121,13 @@ fn main() {
         tracing::info!(path = %resume_path, "Loading existing projection checkpoint");
         match ProjectionCheckpoint::load_from_file(resume_path) {
             Ok(ckpt) => {
-                gen.projection_mut().load_weights(&ckpt.projection_weights);
+                r#gen
+                    .projection_mut()
+                    .load_weights(&ckpt.projection_weights);
                 // Load temporal weights if present
                 if ckpt.temporal {
-                    if let (Some(ref tw), Some(tp)) =
-                        (&ckpt.temporal_weights, gen.temporal_proj_mut())
+                    if let (Some(tw), Some(tp)) =
+                        (&ckpt.temporal_weights, r#gen.temporal_proj_mut())
                     {
                         tp.load_weights(tw);
                         tracing::info!(
@@ -156,11 +163,11 @@ fn main() {
 
     // Enable gradient diagnostics if requested
     if opts.diagnostics {
-        gen.enable_diagnostics();
+        r#gen.enable_diagnostics();
         // Restore cumulative counters from checkpoint so resumed training
         // reports cumulative total_steps and clip_count
         if let Some(ref snap) = resumed_diagnostics_snapshot {
-            if let Some(diag) = gen.projection_diagnostics_mut() {
+            if let Some(diag) = r#gen.projection_diagnostics_mut() {
                 diag.restore_from_snapshot(snap);
                 tracing::info!(
                     total_steps = snap.total_steps,
@@ -174,7 +181,7 @@ fn main() {
     // ─── Eval-only mode: skip training, jump straight to evaluation ───
     if opts.eval_only {
         let eval_path = opts.eval_path.as_ref().unwrap(); // validated in parse_args
-        run_evaluation(&mut gen, eval_path);
+        run_evaluation(&mut r#gen, eval_path);
         return;
     }
 
@@ -201,12 +208,12 @@ fn main() {
             .take(200) // Use up to 200 samples for covariance
             .map(|pair| {
                 let channels = pair.to_thought_channels();
-                gen.encoder().encode(&channels)
+                r#gen.encoder().encode(&channels)
             })
             .collect();
 
         // Warm-start temporal projection if active
-        if let Some(tp) = gen.temporal_proj_mut() {
+        if let Some(tp) = r#gen.temporal_proj_mut() {
             tracing::info!("Warm-starting temporal projection from training data PCA");
             tp.warm_start_from_samples(&sample_hvs);
         }
@@ -214,10 +221,10 @@ fn main() {
         // Also warm-start spatial projection
         if opts.warm_start_bidirectional {
             tracing::info!("Bidirectional warm-starting projection from training data");
-            gen.projection_mut().warm_start_bidirectional(&sample_hvs);
+            r#gen.projection_mut().warm_start_bidirectional(&sample_hvs);
         } else {
             tracing::info!("Warm-starting projection from training data covariance");
-            gen.projection_mut().warm_start_from_samples(&sample_hvs);
+            r#gen.projection_mut().warm_start_from_samples(&sample_hvs);
         }
     }
 
@@ -233,10 +240,10 @@ fn main() {
             .take(50) // Diverse subset — 50 thoughts → 1,225 pairs
             .map(|pair| {
                 let channels = pair.to_thought_channels();
-                gen.encoder().encode(&channels)
+                r#gen.encoder().encode(&channels)
             })
             .collect();
-        let (avg_dist, recon_err) = gen.projection_mut().contrastive_pretrain(
+        let (avg_dist, recon_err) = r#gen.projection_mut().contrastive_pretrain(
             &sample_hvs,
             opts.contrastive_pretrain_epochs,
             opts.learning_rate * 0.5, // Lower LR for pretraining
@@ -277,7 +284,7 @@ fn main() {
     for epoch in 0..opts.epochs {
         // Pos enc curriculum: unfreeze learned pos_enc after N epochs
         if opts.pos_enc_unfreeze_epoch > 0 && opts.learned_pos_enc {
-            if let Some(tp) = gen.temporal_proj_mut() {
+            if let Some(tp) = r#gen.temporal_proj_mut() {
                 if epoch < opts.pos_enc_unfreeze_epoch {
                     tp.set_learned_pos_enc(false);
                     if epoch == 0 {
@@ -305,12 +312,13 @@ fn main() {
             let channels = pair.to_thought_channels();
 
             // Generate through full Mamba inference
-            let result = gen.generate(&channels);
+            let result = r#gen.generate(&channels);
 
             // Distill step: update projection using Local FEP (Predictive Coding)
-            let lr = gen.compute_lr();
-            let thought_hv = gen.encoder().encode(&channels);
-            gen.local_fep_distill(&thought_hv, &result.token_ids, lr)
+            let lr = r#gen.compute_lr();
+            let thought_hv = r#gen.encoder().encode(&channels);
+            r#gen
+                .local_fep_distill(&thought_hv, &result.token_ids, lr)
                 .unwrap();
 
             if (i + 1) % 10 == 0 {
@@ -319,10 +327,10 @@ fn main() {
 
             epoch_semantic_pe += result.semantic_pe;
             epoch_coherence += result.final_coherence;
-            let rank = if let Some(tp) = gen.temporal_proj() {
+            let rank = if let Some(tp) = r#gen.temporal_proj() {
                 tp.effective_rank(&result.output_hvs)
             } else {
-                gen.projection.effective_rank(&result.output_hvs)
+                r#gen.projection.effective_rank(&result.output_hvs)
             };
             epoch_effective_rank += rank;
 
@@ -349,7 +357,9 @@ fn main() {
                 let _ = writeln!(
                     std::io::stderr(),
                     "[progress] epoch={epoch} sample={}/{num_samples} pe={:.4} rank={rank:.1} coh={:.4} phase={phase}",
-                    i + 1, result.semantic_pe, result.final_coherence,
+                    i + 1,
+                    result.semantic_pe,
+                    result.final_coherence,
                 );
                 std::io::stderr().flush().ok();
             }
@@ -376,12 +386,12 @@ fn main() {
             .pairs
             .iter()
             .take(10)
-            .map(|p| gen.encoder().encode(&p.to_thought_channels()))
+            .map(|p| r#gen.encoder().encode(&p.to_thought_channels()))
             .collect();
-        let final_rank = if let Some(tp) = gen.temporal_proj() {
+        let final_rank = if let Some(tp) = r#gen.temporal_proj() {
             tp.effective_rank(&rank_samples)
         } else {
-            gen.projection.effective_rank(&rank_samples)
+            r#gen.projection.effective_rank(&rank_samples)
         };
 
         let metrics = ProjectionEpochMetrics {
@@ -401,7 +411,7 @@ fn main() {
             "Epoch complete"
         );
         // Unbuffered epoch summary with gradient norms
-        let grad_info = if let Some(diag) = gen.projection_diagnostics() {
+        let grad_info = if let Some(diag) = r#gen.projection_diagnostics() {
             let snap = diag.snapshot();
             let clip_rate = if snap.total_steps > 0 {
                 snap.clip_count as f32 / snap.total_steps as f32 * 100.0
@@ -427,17 +437,17 @@ fn main() {
             best_pe = avg_pe;
             patience_counter = 0;
             let best_path = format!("{}.best", opts.output_path);
-            let weights = gen.projection.flatten_weights();
-            let mut ckpt = if let Some(tp) = gen.temporal_proj() {
+            let weights = r#gen.projection.flatten_weights();
+            let mut ckpt = if let Some(tp) = r#gen.temporal_proj() {
                 let num_groups = tp.num_groups();
                 let has_adapter = tp.has_adapter();
                 if num_groups > 1 || has_adapter {
                     ProjectionCheckpoint::new_temporal_with_groups(
                         weights,
                         tp.flatten_weights(),
-                        gen.config.hdc_dim,
-                        gen.config.bottleneck_dim,
-                        gen.config.ssm_dim,
+                        r#gen.config.hdc_dim,
+                        r#gen.config.bottleneck_dim,
+                        r#gen.config.ssm_dim,
                         epoch,
                         tp.chunk_size(),
                         tp.num_chunks(),
@@ -448,9 +458,9 @@ fn main() {
                     ProjectionCheckpoint::new_temporal(
                         weights,
                         tp.flatten_weights(),
-                        gen.config.hdc_dim,
-                        gen.config.bottleneck_dim,
-                        gen.config.ssm_dim,
+                        r#gen.config.hdc_dim,
+                        r#gen.config.bottleneck_dim,
+                        r#gen.config.ssm_dim,
                         epoch,
                         tp.chunk_size(),
                         tp.num_chunks(),
@@ -459,15 +469,15 @@ fn main() {
             } else {
                 ProjectionCheckpoint::new(
                     weights,
-                    gen.config.hdc_dim,
-                    gen.config.bottleneck_dim,
-                    gen.config.ssm_dim,
+                    r#gen.config.hdc_dim,
+                    r#gen.config.bottleneck_dim,
+                    r#gen.config.ssm_dim,
                     epoch,
-                    gen.projection.is_deep(),
-                    gen.projection.inner_dim(),
+                    r#gen.projection.is_deep(),
+                    r#gen.projection.inner_dim(),
                 )
             };
-            if let Some(diag) = gen.projection_diagnostics() {
+            if let Some(diag) = r#gen.projection_diagnostics() {
                 ckpt.diagnostics_snapshot = Some(diag.snapshot());
             }
             if let Err(e) = ckpt.save_to_file(&best_path) {
@@ -511,25 +521,25 @@ fn main() {
     }
 
     // Print gradient diagnostics if enabled
-    if let Some(diag) = gen.projection_diagnostics() {
+    if let Some(diag) = r#gen.projection_diagnostics() {
         println!();
         println!("{}", diag.format_summary());
     }
 
     // Save projection checkpoint
     let final_epoch = all_epoch_metrics.last().map(|m| m.epoch).unwrap_or(0);
-    let weights = gen.projection.flatten_weights();
+    let weights = r#gen.projection.flatten_weights();
 
-    let mut checkpoint = if let Some(tp) = gen.temporal_proj() {
+    let mut checkpoint = if let Some(tp) = r#gen.temporal_proj() {
         let num_groups = tp.num_groups();
         let has_adapter = tp.has_adapter();
         if num_groups > 1 || has_adapter {
             ProjectionCheckpoint::new_temporal_with_groups(
                 weights.clone(),
                 tp.flatten_weights(),
-                gen.config.hdc_dim,
-                gen.config.bottleneck_dim,
-                gen.config.ssm_dim,
+                r#gen.config.hdc_dim,
+                r#gen.config.bottleneck_dim,
+                r#gen.config.ssm_dim,
                 final_epoch,
                 tp.chunk_size(),
                 tp.num_chunks(),
@@ -540,9 +550,9 @@ fn main() {
             ProjectionCheckpoint::new_temporal(
                 weights.clone(),
                 tp.flatten_weights(),
-                gen.config.hdc_dim,
-                gen.config.bottleneck_dim,
-                gen.config.ssm_dim,
+                r#gen.config.hdc_dim,
+                r#gen.config.bottleneck_dim,
+                r#gen.config.ssm_dim,
                 final_epoch,
                 tp.chunk_size(),
                 tp.num_chunks(),
@@ -551,32 +561,33 @@ fn main() {
     } else {
         ProjectionCheckpoint::new(
             weights.clone(),
-            gen.config.hdc_dim,
-            gen.config.bottleneck_dim,
-            gen.config.ssm_dim,
+            r#gen.config.hdc_dim,
+            r#gen.config.bottleneck_dim,
+            r#gen.config.ssm_dim,
             final_epoch,
-            gen.projection.is_deep(),
-            gen.projection.inner_dim(),
+            r#gen.projection.is_deep(),
+            r#gen.projection.inner_dim(),
         )
     };
 
     // Include full Broca state in the final optimized checkpoint
     let full_path = std::path::PathBuf::from("/tmp/broca-diag/temp-full.bin");
-    gen.save_checkpoint(
-        &full_path,
-        final_epoch,
-        0.0,
-        None::<AdamState>,
-        Some(weights.clone()),
-        None,
-    )
-    .unwrap();
+    r#gen
+        .save_checkpoint(
+            &full_path,
+            final_epoch,
+            0.0,
+            None::<AdamState>,
+            Some(weights.clone()),
+            None,
+        )
+        .unwrap();
     let full_snapshot = BrocaCheckpoint::load_from_file(&full_path).unwrap();
     checkpoint.full_snapshot = Some(Box::new(full_snapshot));
     let _ = std::fs::remove_file(&full_path);
 
     // Persist gradient diagnostics snapshot if enabled
-    if let Some(diag) = gen.projection_diagnostics() {
+    if let Some(diag) = r#gen.projection_diagnostics() {
         checkpoint.diagnostics_snapshot = Some(diag.snapshot());
     }
 
@@ -595,12 +606,12 @@ fn main() {
 
     // Run evaluation if --eval provided
     if let Some(ref eval_path) = opts.eval_path {
-        run_evaluation(&mut gen, eval_path);
+        run_evaluation(&mut r#gen, eval_path);
     }
 }
 
 /// Run evaluation and print the formatted report.
-fn run_evaluation(gen: &mut LiquidMambaGenerator, eval_path: &str) {
+fn run_evaluation(r#gen: &mut LiquidMambaGenerator, eval_path: &str) {
     tracing::info!(path = %eval_path, "Loading evaluation data");
     let eval_dataset = match TrainingDataset::from_jsonl(eval_path) {
         Ok(d) => d,
@@ -620,7 +631,7 @@ fn run_evaluation(gen: &mut LiquidMambaGenerator, eval_path: &str) {
     };
 
     tracing::info!("Running evaluation");
-    let result = symthaea_broca::evaluation::evaluate_liquid_mamba(gen, &eval_config);
+    let result = symthaea_broca::evaluation::evaluate_liquid_mamba(r#gen, &eval_config);
     println!();
     println!(
         "{}",
@@ -686,6 +697,10 @@ struct ProjectionTrainOpts {
     hedging_boost: Option<f32>,
     temperature: Option<f32>,
     top_k: Option<usize>,
+    semantic_attractor: bool,
+    semantic_attractor_strength: f32,
+    semantic_attractor_top_k: usize,
+    semantic_attractor_max_adjustment: f32,
     /// Early stopping patience: stop if PE doesn't improve for this many epochs (0=disabled).
     patience: usize,
 }
@@ -735,6 +750,10 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         hedging_boost: None,
         temperature: None,
         top_k: None,
+        semantic_attractor: true,
+        semantic_attractor_strength: 0.5,
+        semantic_attractor_top_k: 128,
+        semantic_attractor_max_adjustment: 1.5,
         patience: 3,
     };
 
@@ -993,6 +1012,33 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                         .map_err(|_| "--top-k must be a positive integer")?,
                 );
             }
+            "--no-semantic-attractor" => {
+                opts.semantic_attractor = false;
+            }
+            "--semantic-attractor-strength" => {
+                i += 1;
+                opts.semantic_attractor_strength = args
+                    .get(i)
+                    .ok_or("--semantic-attractor-strength requires a number")?
+                    .parse()
+                    .map_err(|_| "--semantic-attractor-strength must be a float")?;
+            }
+            "--semantic-attractor-top-k" => {
+                i += 1;
+                opts.semantic_attractor_top_k = args
+                    .get(i)
+                    .ok_or("--semantic-attractor-top-k requires a number")?
+                    .parse()
+                    .map_err(|_| "--semantic-attractor-top-k must be a positive integer")?;
+            }
+            "--semantic-attractor-max-adjustment" => {
+                i += 1;
+                opts.semantic_attractor_max_adjustment = args
+                    .get(i)
+                    .ok_or("--semantic-attractor-max-adjustment requires a number")?
+                    .parse()
+                    .map_err(|_| "--semantic-attractor-max-adjustment must be a float")?;
+            }
             "--patience" => {
                 i += 1;
                 opts.patience = args
@@ -1068,36 +1114,80 @@ fn print_usage() {
     eprintln!(
         "  --deep-projection           Use deep double-bottleneck projection (256->128->256)"
     );
-    eprintln!("  --temporal                  Use temporal projection (64×256D chunks → continuous latent prompting)");
-    eprintln!("  --learned-pos-enc           Use learned (trainable) positional encoding (requires --temporal)");
-    eprintln!("  --stride N                  Chunk stride for temporal overlap (default: chunk_size=256, no overlap)");
-    eprintln!("  --directional-loss          Use directional cosine loss instead of roundtrip (requires --temporal)");
-    eprintln!("  --smoothness W              Temporal smoothness regularization weight (default: 0, try 0.01-0.1)");
-    eprintln!("  --rank-reg W                Rank regularization weight for W_up decorrelation (default: 0, try 0.001-0.01)");
-    eprintln!("  --learned-attention          Enable learned chunk attention weighting (requires --temporal)");
-    eprintln!("  --pos-enc-unfreeze N        Epoch to unfreeze learned pos_enc (0 = always learned, requires --learned-pos-enc)");
+    eprintln!(
+        "  --temporal                  Use temporal projection (64×256D chunks → continuous latent prompting)"
+    );
+    eprintln!(
+        "  --learned-pos-enc           Use learned (trainable) positional encoding (requires --temporal)"
+    );
+    eprintln!(
+        "  --stride N                  Chunk stride for temporal overlap (default: chunk_size=256, no overlap)"
+    );
+    eprintln!(
+        "  --directional-loss          Use directional cosine loss instead of roundtrip (requires --temporal)"
+    );
+    eprintln!(
+        "  --smoothness W              Temporal smoothness regularization weight (default: 0, try 0.01-0.1)"
+    );
+    eprintln!(
+        "  --rank-reg W                Rank regularization weight for W_up decorrelation (default: 0, try 0.001-0.01)"
+    );
+    eprintln!(
+        "  --learned-attention          Enable learned chunk attention weighting (requires --temporal)"
+    );
+    eprintln!(
+        "  --pos-enc-unfreeze N        Epoch to unfreeze learned pos_enc (0 = always learned, requires --learned-pos-enc)"
+    );
     eprintln!(
         "  --max-gen-tokens N          Max tokens per generation during training (default: 16)"
     );
     eprintln!();
     eprintln!("Architecture improvements (A-F):");
-    eprintln!("  --chunk-size N              Override chunk dimension for temporal projection (default: bottleneck_dim=256)");
-    eprintln!("  --num-groups N              Number of per-group up-projection matrices (default: 1 = shared)");
-    eprintln!("  --anticollapse W            Anti-collapse regularization weight (default: 0 = disabled, try 0.01-0.1)");
-    eprintln!("  --anticollapse-threshold T  Cosine similarity threshold for anti-collapse (default: 0.9)");
+    eprintln!(
+        "  --chunk-size N              Override chunk dimension for temporal projection (default: bottleneck_dim=256)"
+    );
+    eprintln!(
+        "  --num-groups N              Number of per-group up-projection matrices (default: 1 = shared)"
+    );
+    eprintln!(
+        "  --anticollapse W            Anti-collapse regularization weight (default: 0 = disabled, try 0.01-0.1)"
+    );
+    eprintln!(
+        "  --anticollapse-threshold T  Cosine similarity threshold for anti-collapse (default: 0.9)"
+    );
     eprintln!("  --adapter                   Enable adapter MLP after temporal up-projection");
-    eprintln!("  --no-rotate-grad            Disable rotating grad-chunk position (use all chunks for E2E)");
+    eprintln!(
+        "  --no-rotate-grad            Disable rotating grad-chunk position (use all chunks for E2E)"
+    );
     eprintln!("  --lora-rank N               LoRA rank for Mamba layer adaptation (0 = disabled)");
     eprintln!("  --lora-alpha A              LoRA alpha scaling factor (default: 1.0)");
     eprintln!("  --lora-lr LR                LoRA learning rate (default: 0.0001)");
-    eprintln!("  --embedding-stats PATH      Pre-computed embedding stats for manifold moment matching adapter init");
-    eprintln!("  --e2e-grad-chunks K         Simultaneous E2E gradient positions per step (default: 1 = legacy rotating)");
+    eprintln!(
+        "  --embedding-stats PATH      Pre-computed embedding stats for manifold moment matching adapter init"
+    );
+    eprintln!(
+        "  --e2e-grad-chunks K         Simultaneous E2E gradient positions per step (default: 1 = legacy rotating)"
+    );
     eprintln!();
     eprintln!("Gate + sampling overrides:");
-    eprintln!("  --hedging-boost N      Override epistemic hedging boost (default: 5.0, Unknown=N, Uncertain=N/2)");
+    eprintln!(
+        "  --hedging-boost N      Override epistemic hedging boost (default: 5.0, Unknown=N, Uncertain=N/2)"
+    );
     eprintln!("  --temperature T        Sampling temperature (default: 0.8)");
     eprintln!("  --top-k K              Top-k sampling (default: 40)");
-    eprintln!("  --patience N           Early stopping: stop if PE doesn't improve for N epochs (default: 3, 0=disabled)");
+    eprintln!(
+        "  --no-semantic-attractor              Disable HDC semantic attractor during generation"
+    );
+    eprintln!(
+        "  --semantic-attractor-strength F      Semantic attractor logit strength (default: 0.5)"
+    );
+    eprintln!("  --semantic-attractor-top-k K         Candidate count to inspect (default: 128)");
+    eprintln!(
+        "  --semantic-attractor-max-adjustment F  Max absolute logit adjustment (default: 1.5)"
+    );
+    eprintln!(
+        "  --patience N           Early stopping: stop if PE doesn't improve for N epochs (default: 3, 0=disabled)"
+    );
     eprintln!();
     eprintln!("Evaluation options:");
     eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");

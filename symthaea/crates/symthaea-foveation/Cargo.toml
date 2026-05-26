@@ -2,7 +2,7 @@
 name = "symthaea-foveation"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Dual-stream foveation bridge: dorsal surprise → ventral recognition via background dispatch"
 license = "AGPL-3.0-or-later"
@@ -12,6 +12,8 @@ keywords = ["vision", "foveation", "hdc", "attention", "ventral-stream"]
 categories = ["science", "algorithms", "multimedia::video"]
 
 [dependencies]
+image = "0.24"
+
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-perception = { path = "../symthaea-perception", optional = true }
 serde = { workspace = true }

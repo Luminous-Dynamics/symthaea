@@ -6,8 +6,10 @@ use bevy::prelude::*;
 
 use crate::components::*;
 use crate::resources::{
-    BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes, SleepPhase, TileGrid,
+    BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes,
+    SleepPhase, TileGrid,
 };
+use crate::systems::consciousness::PlayerConsciousness;
 // TODO: re-enable when Mycelix integration stabilizes
 // use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
 
@@ -537,9 +539,9 @@ pub fn visual_stress_system(
     };
 
     // Background shifts from dark blue → dark red with stress/danger
-    let stress_red = (0.02 + load * 0.1 + danger * 0.15).min(0.3);
-    let base_blue = (0.04 - danger * 0.03).max(0.01);
-    clear_color.0 = Color::srgb(stress_red, 0.02, base_blue);
+    let stress_red = (0.02f64 + load as f64 * 0.1f64 + danger as f64 * 0.15f64).min(0.3f64);
+    let base_blue = (0.04f64 - danger as f64 * 0.03f64).max(0.01f64);
+    clear_color.0 = Color::srgb(stress_red as f32, 0.02f32, base_blue as f32);
 }
 
 /// Camera follows player smoothly.

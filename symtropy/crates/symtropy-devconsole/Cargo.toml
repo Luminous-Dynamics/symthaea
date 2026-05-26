@@ -1,9 +1,9 @@
 [package]
 name = "symtropy-devconsole"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 OR MIT"
-description = "Drop-in Bevy dev console: bevy-inspector-egui's world inspector + a Symtropy-specific Phi/scene-control panel. Toggle with F1. The differentiation moment for Symtropy: see consciousness coupling at runtime."
+description = "Drop-in Bevy dev console: bevy-inspector-egui's world inspector + a Symtropy-specific Phi/scene-control panel. Toggle with F1."
 repository = "https://github.com/luminous-dynamics/symtropy"
 keywords = ["bevy", "inspector", "editor", "dev-tools", "symtropy"]
 categories = ["game-engines", "development-tools"]
@@ -18,19 +18,13 @@ bevy = { version = "0.18", default-features = false, features = [
 ] }
 bevy_egui = { version = "0.39", default-features = false, features = [
     "render",
-    "default_fonts", # ProggyClean fallback so text renders out of the box
+    "default_fonts", 
 ] }
-
-# Optional Phi-panel integration. Pulls in symtropy-bevy (AGPL via
-# symtropy-consciousness-physics) so the panel can read EntityConsciousness
-# state. Default-off keeps the base crate Apache/MIT.
-symtropy-bevy = { version = "0.2.0", path = "../symtropy-bevy", optional = true }
+symtropy-bevy-core = { path = "../symtropy-bevy-core" }
 
 [features]
 default = []
-# Enable the Φ Inspector panel (entities with PhysicsBody → list with current Phi).
-# Requires symtropy-bevy (AGPL transitively).
-phi-panel = ["dep:symtropy-bevy"]
+phi-panel = []
 
 [dev-dependencies]
 bevy = { version = "0.18", default-features = false, features = ["x11"] }

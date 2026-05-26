@@ -433,12 +433,12 @@ fn main() -> Result<()> {
                 println!("\n  Learning '{}' ({:?})...", name, category);
                 sentinel.start_learning(name, category);
 
-                let mut gen = SyntheticAudioGenerator::new(pattern);
+                let mut audio_gen = SyntheticAudioGenerator::new(pattern);
                 let start = Instant::now();
                 let duration = Duration::from_secs(4);
 
                 while start.elapsed() < duration {
-                    let features = gen.next_features();
+                    let features = audio_gen.next_features();
                     let result = sentinel.process(&features);
 
                     let progress = start.elapsed().as_secs_f32() / duration.as_secs_f32();
@@ -494,11 +494,11 @@ fn main() -> Result<()> {
                         .copied()
                         .unwrap_or(SyntheticPattern::Quiet);
 
-                    let mut gen = SyntheticAudioGenerator::new(syn_pattern);
+                    let mut audio_gen = SyntheticAudioGenerator::new(syn_pattern);
 
                     // Process a few frames
                     for _ in 0..5 {
-                        let features = gen.next_features();
+                        let features = audio_gen.next_features();
                         let result = sentinel.process(&features);
 
                         // Build similarity display

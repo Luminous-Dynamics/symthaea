@@ -80,7 +80,7 @@ fn main() {
                             "Detected ProjectionCheckpoint (v{}); instantiating Mamba-130M base",
                             ckpt.version
                         );
-                        let mamba_config = LiquidMambaConfig::default();
+                        let mamba_config = liquid_mamba_config_from_env();
                         let device = symthaea_broca::mamba::best_device();
                         let mamba_backend = symthaea_broca::mamba::MambaWrapper::load(
                             "state-spaces/mamba-130m",
@@ -132,6 +132,14 @@ fn main() {
             .controller_mut()
             .config_mut()
             .thought_logit_residual_weight = opts.thought_logit_residual_weight.clamp(0.0, 1.0);
+    }
+    if opts.allow_unknown_tokens {
+        generator.config_mut().suppress_unknown_tokens = false;
+    }
+    if opts.allow_code_tokens_without_code_intent {
+        generator
+            .config_mut()
+            .suppress_code_tokens_without_code_intent = false;
     }
 
     // Override sampling strategy
@@ -319,7 +327,9 @@ fn main() {
             && !opts.samples_requested)
     {
         println!("\n=== Interactive Mode ===");
-        println!("Enter thought channels as: intent(0-7) epistemic(0-4) valence(-1..1) arousal(0..1) psi(0..1)");
+        println!(
+            "Enter thought channels as: intent(0-7) epistemic(0-4) valence(-1..1) arousal(0..1) psi(0..1)"
+        );
         println!("Example: 1 0 0.5 0.3 0.7  (Answer, Certain, positive, calm, aware)");
         println!("Or just press Enter for defaults. Type 'quit' to exit.\n");
 
@@ -386,6 +396,7 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_recipe: std::env::var("BROCA_TRAIN_RECIPE").ok(),
         train_pair_count: parse_env_usize("BROCA_TRAIN_PAIR_COUNT"),
         train_pair_selection: std::env::var("BROCA_TRAIN_PAIR_SELECTION").ok(),
+        train_curriculum_style: std::env::var("BROCA_TRAIN_CURRICULUM_STYLE").ok(),
         train_epochs: parse_env_usize("BROCA_TRAIN_EPOCHS"),
         train_bptt_window: parse_env_usize("BROCA_TRAIN_BPTT_WINDOW"),
         train_negative_samples: parse_env_usize("BROCA_TRAIN_NEGATIVE_SAMPLES"),
@@ -400,7 +411,18 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_scheduled_sampling: parse_env_f32("BROCA_TRAIN_SCHEDULED_SAMPLING"),
         train_label_smoothing: parse_env_f32("BROCA_TRAIN_LABEL_SMOOTHING"),
         train_thought_logit_aux: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_AUX"),
+        train_logit_anchor: parse_env_f32("BROCA_TRAIN_LOGIT_ANCHOR"),
         train_thought_logit_residual: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_RESIDUAL"),
+        train_semantic_attractor: std::env::var("BROCA_TRAIN_SEMANTIC_ATTRACTOR").ok(),
+        train_semantic_attractor_strength: parse_env_f32("BROCA_TRAIN_SEMANTIC_ATTRACTOR_STRENGTH"),
+        train_semantic_attractor_top_k: parse_env_usize("BROCA_TRAIN_SEMANTIC_ATTRACTOR_TOP_K"),
+        train_semantic_attractor_max_adjustment: parse_env_f32(
+            "BROCA_TRAIN_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT",
+        ),
+        train_semantic_attractor_normalize: std::env::var(
+            "BROCA_TRAIN_SEMANTIC_ATTRACTOR_NORMALIZE",
+        )
+        .ok(),
         train_merge_bias: parse_env_f32("BROCA_TRAIN_MERGE_BIAS"),
     }
 }
@@ -432,6 +454,51 @@ fn parse_env_f32(name: &str) -> Option<f32> {
     std::env::var(name).ok()?.parse().ok()
 }
 
+#[cfg(feature = "mamba-cpu")]
+fn parse_env_bool(name: &str) -> Option<bool> {
+    match std::env::var(name)
+        .ok()?
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "mamba-cpu")]
+fn liquid_mamba_config_from_env() -> LiquidMambaConfig {
+    let mut config = LiquidMambaConfig::default();
+    if let Some(enabled) = parse_env_bool("BROCA_EVAL_SEMANTIC_ATTRACTOR")
+        .or_else(|| parse_env_bool("BROCA_TRAIN_SEMANTIC_ATTRACTOR"))
+    {
+        config.enable_semantic_attractor = enabled;
+    }
+    if let Some(strength) = parse_env_f32("BROCA_EVAL_SEMANTIC_ATTRACTOR_STRENGTH")
+        .or_else(|| parse_env_f32("BROCA_TRAIN_SEMANTIC_ATTRACTOR_STRENGTH"))
+    {
+        config.semantic_attractor_strength = strength;
+    }
+    if let Some(top_k) = parse_env_usize("BROCA_EVAL_SEMANTIC_ATTRACTOR_TOP_K")
+        .or_else(|| parse_env_usize("BROCA_TRAIN_SEMANTIC_ATTRACTOR_TOP_K"))
+    {
+        config.semantic_attractor_top_k = top_k;
+    }
+    if let Some(max_adjustment) = parse_env_f32("BROCA_EVAL_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT")
+        .or_else(|| parse_env_f32("BROCA_TRAIN_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT"))
+    {
+        config.semantic_attractor_max_adjustment = max_adjustment;
+    }
+    if let Some(normalize) = parse_env_bool("BROCA_EVAL_SEMANTIC_ATTRACTOR_NORMALIZE")
+        .or_else(|| parse_env_bool("BROCA_TRAIN_SEMANTIC_ATTRACTOR_NORMALIZE"))
+    {
+        config.semantic_attractor_normalize = normalize;
+    }
+    config
+}
+
 #[derive(Debug, Serialize)]
 struct CanonicalGenerationDumpRecord {
     checkpoint_path: String,
@@ -450,6 +517,8 @@ struct GenerationDump {
     text: String,
     token_ids: Vec<u32>,
     token_count: usize,
+    unknown_token_rate: f32,
+    code_token_rate: f32,
     eos_terminated: bool,
     veto_triggered: bool,
     final_coherence: f32,
@@ -468,6 +537,13 @@ struct GenerationStepLogitDump {
     selected_token: String,
     entropy: f32,
     max_probability: f32,
+    pre_attractor_entropy: Option<f32>,
+    pre_attractor_max_probability: Option<f32>,
+    cfc_delta_scale: Option<f32>,
+    cfc_b_scale: Option<f32>,
+    semantic_attractor_mean_adjustment: Option<f32>,
+    semantic_attractor_max_adjustment: Option<f32>,
+    selected_semantic_alignment: Option<f32>,
     top_k: Vec<GenerationTopLogitDump>,
 }
 
@@ -571,9 +647,15 @@ fn generate_for_dump(
 }
 
 fn generation_dump(generator: &BrocaGenerator, result: GenerationResult) -> GenerationDump {
+    let repeated_tokens = repeated_tokens(generator, &result.token_ids, 8);
+    let unknown_token_rate =
+        evaluation::unknown_token_rate(&result.token_ids, generator.tokenizer());
+    let code_token_rate = evaluation::code_token_rate(&result.token_ids, generator.tokenizer());
     GenerationDump {
-        repeated_tokens: repeated_tokens(generator, &result.token_ids, 8),
+        repeated_tokens,
         text: result.text,
+        unknown_token_rate,
+        code_token_rate,
         token_ids: result.token_ids,
         token_count: result.num_tokens,
         eos_terminated: result.eos_terminated,
@@ -602,6 +684,13 @@ fn logit_diagnostics_dump(
                 .to_string(),
             entropy: step.entropy,
             max_probability: step.max_probability,
+            pre_attractor_entropy: step.pre_attractor_entropy,
+            pre_attractor_max_probability: step.pre_attractor_max_probability,
+            cfc_delta_scale: step.cfc_delta_scale,
+            cfc_b_scale: step.cfc_b_scale,
+            semantic_attractor_mean_adjustment: step.semantic_attractor_mean_adjustment,
+            semantic_attractor_max_adjustment: step.semantic_attractor_max_adjustment,
+            selected_semantic_alignment: step.selected_semantic_alignment,
             top_k: step
                 .top_k
                 .iter()
@@ -683,6 +772,8 @@ struct EvalOpts {
     teacher_forced_only: bool,
     allow_checkpoint_recovery: bool,
     thought_logit_residual_weight: f32,
+    allow_unknown_tokens: bool,
+    allow_code_tokens_without_code_intent: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
@@ -706,6 +797,8 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
         teacher_forced_only: false,
         allow_checkpoint_recovery: false,
         thought_logit_residual_weight: 0.0,
+        allow_unknown_tokens: false,
+        allow_code_tokens_without_code_intent: false,
     };
 
     let mut i = 1;
@@ -793,6 +886,12 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                     .ok_or("--thought-logit-residual requires a number")?
                     .parse()
                     .map_err(|_| "--thought-logit-residual must be a float")?;
+            }
+            "--allow-unk" => {
+                opts.allow_unknown_tokens = true;
+            }
+            "--allow-code-tokens-without-code-intent" => {
+                opts.allow_code_tokens_without_code_intent = true;
             }
             "--report-only" => {
                 opts.report_only = true;
@@ -907,6 +1006,24 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                         .map_err(|_| "--min-structured-output-validity-rate must be a float")?,
                 );
             }
+            "--max-gated-unknown-token-rate" => {
+                i += 1;
+                opts.quality_thresholds.max_gated_unknown_token_rate = Some(
+                    args.get(i)
+                        .ok_or("--max-gated-unknown-token-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-gated-unknown-token-rate must be a float")?,
+                );
+            }
+            "--max-gated-code-token-rate" => {
+                i += 1;
+                opts.quality_thresholds.max_gated_code_token_rate = Some(
+                    args.get(i)
+                        .ok_or("--max-gated-code-token-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-gated-code-token-rate must be a float")?,
+                );
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -971,6 +1088,14 @@ fn print_usage() {
     eprintln!(
         "  --thought-logit-residual F  Blend direct thought logits into decoder logits (default: 0.0)"
     );
-    eprintln!("  --allow-checkpoint-recovery  Load legacy/recovery checkpoints with explicit compatibility bypass");
+    eprintln!("  --allow-unk          Do not suppress <unk> during generation");
+    eprintln!(
+        "  --allow-code-tokens-without-code-intent  Do not suppress syntax-heavy code tokens in prose"
+    );
+    eprintln!("  --max-gated-unknown-token-rate F  Fail if gated <unk> token fraction exceeds F");
+    eprintln!("  --max-gated-code-token-rate F  Fail if gated code-token contamination exceeds F");
+    eprintln!(
+        "  --allow-checkpoint-recovery  Load legacy/recovery checkpoints with explicit compatibility bypass"
+    );
     eprintln!("  --help, -h             Show this help message");
 }

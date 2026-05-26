@@ -1019,7 +1019,7 @@ mod stdp_tests {
         let nonzero_changes: Vec<f32> = timings
             .iter()
             .zip(changes.iter())
-            .filter(|(&dt, _)| dt != 0.0)
+            .filter(|(dt, _)| **dt != 0.0)
             .map(|(_, &c)| c)
             .collect();
         assert!(

@@ -24,7 +24,7 @@
 
 use std::io::Write;
 use symthaea_broca::encoder::{
-    ThoughtChannels, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, NUM_CHANNELS,
+    EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, NUM_CHANNELS, ThoughtChannels,
 };
 
 // ============================================================================

@@ -34,6 +34,7 @@ pub struct ConsciousnessCallback {
 }
 
 impl PhysicsCallback<3> for ConsciousnessCallback {
+    fn apply_trauma(&mut self, _event: &CollisionEvent<3>) {}
     fn modulate_force(
         &self,
         _handle: BodyHandle,

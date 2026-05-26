@@ -1,7 +1,7 @@
 [package]
 name = "prism-knowledge-bridge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Bidirectional bridge between Prism HDC search and Knowledge DHT"
 

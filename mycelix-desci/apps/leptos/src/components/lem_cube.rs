@@ -16,9 +16,25 @@ pub fn LemCube(
     let n_pct = (normative as f32 / 3.0 * 100.0) as u32;
     let m_pct = (materiality as f32 / 3.0 * 100.0) as u32;
 
-    let e_labels = ["E0: Null", "E1: Testimonial", "E2: Verifiable", "E3: Cryptographic", "E4: Reproducible"];
-    let n_labels = ["N0: Personal", "N1: Communal", "N2: Network", "N3: Axiomatic"];
-    let m_labels = ["M0: Ephemeral", "M1: Temporal", "M2: Persistent", "M3: Foundational"];
+    let e_labels = [
+        "E0: Null",
+        "E1: Testimonial",
+        "E2: Verifiable",
+        "E3: Cryptographic",
+        "E4: Reproducible",
+    ];
+    let n_labels = [
+        "N0: Personal",
+        "N1: Communal",
+        "N2: Network",
+        "N3: Axiomatic",
+    ];
+    let m_labels = [
+        "M0: Ephemeral",
+        "M1: Temporal",
+        "M2: Persistent",
+        "M3: Foundational",
+    ];
 
     let e_label = e_labels.get(empirical as usize).unwrap_or(&"?");
     let n_label = n_labels.get(normative as usize).unwrap_or(&"?");
@@ -37,7 +53,15 @@ pub fn LemCube(
 
     view! {
         <div class="glass-panel" style=format!("padding: 1rem; border-left: 4px solid {};", domain_color)>
-            <h4 style="font-size: 0.875rem; margin-bottom: 0.75rem; color: var(--accent-indigo);">"LEM Cube Classification"</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <h4 style="font-size: 0.875rem; margin: 0; color: var(--accent-indigo);">"LEM Cube Classification"</h4>
+                <Show when=move || normative >= 2>
+                    <div class="pulse-indicator" title="Somatic Witness Verified">
+                        <span class="pulse-dot"></span>
+                        <span style="font-size: 0.65rem; color: #DC143C; font-weight: bold; margin-left: 4px;">"SOMATIC PULSE"</span>
+                    </div>
+                </Show>
+            </div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                 <div>
                     <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">

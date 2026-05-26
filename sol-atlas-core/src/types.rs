@@ -29,6 +29,7 @@ pub enum Layer {
     Volcanoes,
     Infrastructure,
     Chokepoints,
+    DeSciEvidence,
 }
 
 impl Layer {
@@ -53,6 +54,7 @@ impl Layer {
             Self::Volcanoes,
             Self::Infrastructure,
             Self::Chokepoints,
+            Self::DeSciEvidence,
         ]
         .into_iter()
         .collect()
@@ -79,6 +81,7 @@ impl Layer {
             Self::Volcanoes => "Volcanoes",
             Self::Infrastructure => "Critical Infrastructure",
             Self::Chokepoints => "Maritime Chokepoints",
+            Self::DeSciEvidence => "DeSci Evidence Mesh",
         }
     }
 
@@ -100,9 +103,10 @@ impl Layer {
             Self::Earthquakes => "#e53e3e",
             Self::Fires => "#ed8936",
             Self::Storms => "#4299e1",
-            Self::Volcanoes => "#e53e3e",
+            Self::Volcanos => "#e53e3e",
             Self::Infrastructure => "#9f7aea",
             Self::Chokepoints => "#ed8936",
+            Self::DeSciEvidence => "#0066CC",
         }
     }
 
@@ -128,6 +132,7 @@ impl Layer {
             Self::Volcanoes => [0.9, 0.3, 0.05],
             Self::Infrastructure => [0.62, 0.48, 0.92],
             Self::Chokepoints => [0.93, 0.54, 0.21],
+            Self::DeSciEvidence => [0.0, 0.4, 0.8],
         }
     }
 }

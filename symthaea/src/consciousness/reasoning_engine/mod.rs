@@ -51,7 +51,7 @@ use crate::consciousness::epistemic_conflict::{
     ConflictDetector, TheoryCalibrator,
 };
 use crate::consciousness::temporal_planning::{
-    mcts::{evs, MctsPlanner},
+    mcts::{evs, MctsPlanner, NegativePrototypeBank},
     types::{BudgetTier, ForkedState, MctsConfig, ReasoningBudget},
 };
 use crate::consciousness::tool_gate::classifier;
@@ -77,6 +77,8 @@ pub struct ConsciousReasoningEngine {
     pending_posthoc: Option<PosthocOutcome>,
     /// Simulation state for MCTS (updated externally or from defaults).
     simulation_state: Option<ForkedState>,
+    /// Bank of disproven logical structures to penalize during planning.
+    negative_bank: NegativePrototypeBank,
 }
 
 impl ConsciousReasoningEngine {
@@ -91,6 +93,7 @@ impl ConsciousReasoningEngine {
             max_events: 100,
             pending_posthoc: None,
             simulation_state: None,
+            negative_bank: NegativePrototypeBank::default(),
         }
     }
 
@@ -245,7 +248,7 @@ impl ConsciousReasoningEngine {
                     }
                 }
                 event.did_simulate = true;
-                MctsPlanner::plan(&sim_state, &ctx.available_actions, &config, &budget)
+                MctsPlanner::plan(&sim_state, &ctx.available_actions, &config, &budget, &self.negative_bank)
             } else if r >= thresholds::R_EPISTEMIC_MIN {
                 // Epistemic rollouts only
                 event.did_simulate = true;
@@ -521,7 +524,8 @@ mod tests {
                     embedding: vec![0.5; 4],
                     prior: 0.5,
                     is_epistemic: true,
-                },
+                
+        },
                 PlannedAction {
                     id: "execute".to_string(),
                     description: "Execute action".to_string(),

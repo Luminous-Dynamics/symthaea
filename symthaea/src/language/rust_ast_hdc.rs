@@ -18,6 +18,17 @@ use crate::hdc::code_encoder::CodeHDEncoder;
 pub struct RustAstHdcEncoding {
     pub hv: ContinuousHV,
     pub features: BTreeMap<String, usize>,
+    /// Automatically extracted symbolic invariants (e.g. for Z3 gating).
+    pub structural_invariants: Vec<String>,
+}
+
+impl RustAstHdcEncoding {
+    /// Autonomously synthesize SMT safety gates for this code.
+    pub fn derive_code_invariants(&self) -> Vec<String> {
+        self.structural_invariants.iter().map(|inv| {
+            format!("(assert {})", inv)
+        }).collect()
+    }
 }
 
 pub fn encode_rust_ast_hdc(source: &str, dim: usize) -> Result<RustAstHdcEncoding, syn::Error> {
@@ -42,6 +53,7 @@ pub fn encode_rust_ast_hdc(source: &str, dim: usize) -> Result<RustAstHdcEncodin
     Ok(RustAstHdcEncoding {
         hv,
         features: visitor.features,
+        structural_invariants: visitor.invariants,
     })
 }
 
@@ -114,6 +126,7 @@ struct AstFeatureVisitor {
     scopes: Vec<BTreeSet<String>>,
     mutable_bindings: BTreeSet<String>,
     moved_bindings: BTreeSet<String>,
+    invariants: Vec<String>,
 }
 
 impl AstFeatureVisitor {
@@ -195,6 +208,12 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
         if item_fn.sig.asyncness.is_some() {
             self.bump("modifier:async");
         }
+        if item_fn.sig.constness.is_some() {
+            self.bump("modifier:const");
+        }
+        if item_fn.sig.unsafety.is_some() {
+            self.bump("modifier:unsafe");
+        }
         if item_fn.sig.generics.lt_token.is_some() {
             self.bump("function:generic");
         }
@@ -206,16 +225,61 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
                     self.bump("semantic:param");
                     self.define_binding(name, mutable, type_name);
                 }
+                let type_str = quote::ToTokens::to_token_stream(&pat_type.ty).to_string();
                 self.bump(format!(
                     "semantic:param_type:{}",
-                    normalize_token_text(
-                        &quote::ToTokens::to_token_stream(&pat_type.ty).to_string()
-                    )
+                    normalize_token_text(&type_str)
                 ));
+                if type_str.contains('&') {
+                    self.bump("semantic:param_is_reference");
+                }
+                if type_str.contains('\'') {
+                    self.bump("semantic:param_has_lifetime");
+                }
             }
         }
         visit::visit_item_fn(self, item_fn);
         self.exit_scope();
+    }
+
+    fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
+        self.bump("semantic:lifetime");
+        self.bump(format!("semantic:lifetime_name:{}", i.ident));
+        visit::visit_lifetime(self, i);
+    }
+
+    fn visit_generics(&mut self, i: &'ast syn::Generics) {
+        if !i.params.is_empty() {
+            self.bump("semantic:generics");
+            for param in &i.params {
+                match param {
+                    syn::GenericParam::Lifetime(_) => self.bump("semantic:generic:lifetime"),
+                    syn::GenericParam::Type(t) => {
+                        self.bump("semantic:generic:type");
+                        if !t.bounds.is_empty() {
+                            self.bump("semantic:generic:type_bounded");
+                        }
+                    }
+                    syn::GenericParam::Const(_) => self.bump("semantic:generic:const"),
+                }
+            }
+        }
+        if i.where_clause.is_some() {
+            self.bump("semantic:where_clause");
+        }
+        visit::visit_generics(self, i);
+    }
+
+    fn visit_type_reference(&mut self, i: &'ast syn::TypeReference) {
+        if i.mutability.is_some() {
+            self.bump("semantic:type_ref_mut");
+        } else {
+            self.bump("semantic:type_ref_shared");
+        }
+        if i.lifetime.is_some() {
+            self.bump("semantic:type_ref_with_lifetime");
+        }
+        visit::visit_type_reference(self, i);
     }
 
     fn visit_item_struct(&mut self, item_struct: &'ast syn::ItemStruct) {
@@ -360,6 +424,35 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
     fn visit_lit(&mut self, lit: &'ast syn::Lit) {
         self.bump(format!("semantic:literal:{}", literal_kind(lit)));
         visit::visit_lit(self, lit);
+    }
+
+    fn visit_expr(&mut self, expr: &'ast syn::Expr) {
+        match expr {
+            syn::Expr::Index(index) => {
+                self.bump("semantic:indexing");
+                let obj = quote::ToTokens::to_token_stream(&index.expr).to_string();
+                let idx = quote::ToTokens::to_token_stream(&index.index).to_string();
+                // Automated SMT invariant: (assert (< index array_length))
+                self.invariants.push(format!(
+                    "(< {} (length {}))",
+                    normalize_token_text(&idx),
+                    normalize_token_text(&obj)
+                ));
+            }
+            syn::Expr::Binary(binary) => {
+                if let syn::BinOp::Div(_) | syn::BinOp::Rem(_) = binary.op {
+                    self.bump("semantic:division");
+                    let divisor = quote::ToTokens::to_token_stream(&binary.right).to_string();
+                    // Automated SMT invariant: (assert (not (= divisor 0)))
+                    self.invariants.push(format!(
+                        "(not (= {} 0))",
+                        normalize_token_text(&divisor)
+                    ));
+                }
+            }
+            _ => {}
+        }
+        visit::visit_expr(self, expr);
     }
 }
 
@@ -587,6 +680,21 @@ mod tests {
     }
 
     #[test]
+    fn semantic_features_capture_lifetimes_and_generics() {
+        let encoded = encode_rust_ast_hdc(
+            "pub fn transform<'a, T: Clone>(input: &'a T) -> T { input.clone() }",
+            512,
+        )
+        .unwrap();
+
+        assert!(encoded.features.contains_key("semantic:lifetime"));
+        assert!(encoded.features.contains_key("semantic:generic:lifetime"));
+        assert!(encoded.features.contains_key("semantic:generic:type_bounded"));
+        assert!(encoded.features.contains_key("semantic:param_has_lifetime"));
+        assert!(encoded.features.contains_key("semantic:type_ref_shared"));
+    }
+
+    #[test]
     fn merges_and_scores_ast_feature_prototypes() {
         let a = encode_rust_ast_hdc("pub fn add(a: i32, b: i32) -> i32 { a + b }", 512)
             .unwrap()
@@ -605,5 +713,19 @@ mod tests {
         );
         let score = ast_feature_similarity_to_any(&a, [&prototype]).unwrap();
         assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_extracts_automated_invariants() {
+        let source = r#"
+            fn process(data: &[f32], i: usize) -> f32 {
+                let divisor = 2.0;
+                data[i] / divisor
+            }
+        "#;
+        let encoded = encode_rust_ast_hdc(source, 512).unwrap();
+        
+        assert!(encoded.structural_invariants.iter().any(|inv| inv.contains("< i (length data)")));
+        assert!(encoded.structural_invariants.iter().any(|inv| inv.contains("not (= divisor 0)")));
     }
 }

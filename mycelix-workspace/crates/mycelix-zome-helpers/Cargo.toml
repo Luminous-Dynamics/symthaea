@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-zome-helpers"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Shared helper functions for Mycelix zome coordinators (anchor hashing, link resolution, consciousness gating)"
 license = "AGPL-3.0-or-later"
 

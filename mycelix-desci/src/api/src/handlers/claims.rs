@@ -4,9 +4,9 @@
 //! Claims API handlers
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
 use mycelix_desci_core::claims::{ClaimContent, DesciClaim, Provenance, Verification};
 use mycelix_desci_core::storage::StorageBackend;
@@ -14,7 +14,12 @@ use std::sync::Arc;
 use tracing::{info, instrument};
 use uuid::Uuid;
 
-use crate::{error::{ApiError, Result}, metrics, models::*, state::AppState};
+use crate::{
+    error::{ApiError, Result},
+    metrics,
+    models::*,
+    state::AppState,
+};
 
 /// Create a new claim
 #[utoipa::path(

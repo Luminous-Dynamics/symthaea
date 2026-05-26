@@ -323,6 +323,31 @@ impl MarkovBoundaryOperator {
         self
     }
 
+    /// Levin-Friston Invariant: Dynamically modulates neuromodulatory permeability inputs
+    /// based on changes in global Integrated Information (Phi). A sudden drop in Phi
+    /// indicates a loss of structural integrity, forcing the boundary membrane to constrict.
+    pub fn modulate_inputs_via_phi_telemetry(
+        &self,
+        inputs: &mut PermeabilityInputs,
+        current_phi: f64,
+        historical_phi_baseline: f64,
+    ) {
+        if historical_phi_baseline <= 1e-5 {
+            return;
+        }
+
+        // Calculate the percentage drop in integrated information
+        let phi_drop = (historical_phi_baseline - current_phi) / historical_phi_baseline;
+
+        if phi_drop > 0.15 {
+            // Catastrophic structural desynchronization detected!
+            // Force-clamp the sensory membrane to prevent entropic noise from corrupting internal models.
+            inputs.noradrenaline = (inputs.noradrenaline + phi_drop).clamp(0.0, 1.0);
+            inputs.threat_level = (inputs.threat_level + (phi_drop * 1.5)).clamp(0.0, 1.0);
+            inputs.serotonin = (inputs.serotonin - phi_drop).clamp(0.0, 1.0);
+        }
+    }
+
     /// Compute instantaneous permeability from neuromodulator state.
     ///
     /// **Sensory permeability** (how much environment enters):
@@ -600,8 +625,241 @@ impl SwarmCoalition {
     /// When boundary permeability is low, the coalition is isolated and
     /// `collective_phi ≈ internal_phi` (sovereign sub-swarm).
     /// When high, external information integrates into the collective.
+
+    /// Levin Endosymbiotic Assimilation: Absorbs an entire independent swarm coalition
+    /// as a nested, specialized "cognitive organelle". Instead of breaking down the sub-swarm's
+    /// internal structures via flat fusion, the parent boundary encapsulates it, scaling the
+    /// global macro-integration metric (Phi) by the sub-swarm's internal coherence.
+    pub fn assimilate_endosymbiotic_organelle(&mut self, organelle_swarm: &Self) -> f64 {
+        // Ensure there is a valid permeability pathway for structural internalization
+        if self.mean_internal_permeability < 0.55 || organelle_swarm.cohesion < 0.6 {
+            return self.collective_phi();
+        }
+
+        // Incorporate the organelle's member handles safely into our macro-boundary registry
+        for peer in &organelle_swarm.members {
+            if !self.members.contains(peer) {
+                self.members.push(peer.clone());
+            }
+        }
+
+        // Metabolic Symbiosis: The parent inherits an escalated integration capacity
+        // fueled by the highly coherent internal processing of the absorbed organelle
+        self.internal_phi += organelle_swarm.internal_phi * 1.35;
+        self.boundary_phi = (self.boundary_phi + organelle_swarm.boundary_phi) * 0.5;
+
+        // Return our newly scaled, nested integration value
+        self.collective_phi()
+    }
+
+    /// Levin Immunological Invariant: Audits a candidate peer's hidden state vector against
+    /// the collective consensus. If the node displays informational oncogenesis (diverging
+    /// past critical surprise thresholds), it actively projects an allostatic realignment vector
+    /// to force-clamp the deviant node's registers back into geometric synchronization.
+    pub fn suppress_informational_oncogene(
+        &self,
+        rogue_belief: &mut super::types::HiddenState,
+        consensus_belief: &super::types::HiddenState,
+        state_dim: usize,
+    ) -> bool {
+        if self.mean_internal_permeability < 0.5 {
+            return false; // Collective boundary linkage is too weak to enforce immunity
+        }
+
+        // 1. Calculate the exact Kullback-Leibler Divergence between Variational Distributions
+        let mut accumulated_kl = 0.0;
+        for i in 0..state_dim {
+            if i < rogue_belief.mean.len() && i < consensus_belief.mean.len() {
+                let mu_r = rogue_belief.mean[i];
+                let mu_c = consensus_belief.mean[i];
+
+                // Extract precisions (clamped to prevent divide-by-zero or log of negative numbers)
+                let tau_r = rogue_belief
+                    .precision
+                    .get(i)
+                    .cloned()
+                    .unwrap_or(1.0)
+                    .max(1e-5);
+                let tau_c = consensus_belief
+                    .precision
+                    .get(i)
+                    .cloned()
+                    .unwrap_or(1.0)
+                    .max(1e-5);
+
+                // Variational closed-form KL Divergence for diagonal Gaussian channels
+                let precision_ratio = tau_c / tau_r;
+                let mean_delta = mu_r - mu_c;
+                let squared_error_term = tau_c * mean_delta * mean_delta;
+                let log_determinant = (tau_r / tau_c).ln();
+
+                accumulated_kl +=
+                    0.5 * (precision_ratio + squared_error_term - 1.0 + log_determinant);
+            }
+        }
+
+        // 2. Thermodynamic Clamping: If the information-theoretic surprise breaches homeostatic limits
+        if accumulated_kl > 12.5 {
+            let reeducation_factor = 0.35; // Bioelectric forced-alignment strength
+
+            for i in 0..state_dim {
+                if i < rogue_belief.mean.len() && i < consensus_belief.mean.len() {
+                    // Force the rogue node's internal world-model back into alignment
+                    rogue_belief.mean[i] = rogue_belief.mean[i] * (1.0 - reeducation_factor)
+                        + consensus_belief.mean[i] * reeducation_factor;
+
+                    // Collapse its prior confidence to make it highly receptive to collective feedback
+                    rogue_belief.precision[i] = rogue_belief.precision[i] * 0.5;
+                }
+            }
+            return true; // Informational cancer successfully clamped and suppressed
+        }
+
+        false // Node is performing within safe homeostatic boundaries
+    }
+
+    /// Levin Agential Mitosis: Dynamically cleaves a fractured swarm coalition into
+    /// two independent, sovereign sub-coalitions if internal cohesion falls below
+    /// safe homeostatic thresholds, isolating regional entropic trauma.
+    pub fn execute_blanket_fission(&self) -> Option<(Self, Self)> {
+        if self.members.len() < 4 || self.cohesion >= 0.45 {
+            return None; // Cohesion is stable, or the coalition is too small to divide
+        }
+
+        let midpoint = self.members.len() / 2;
+        let (left_peers, right_peers) = self.members.split_at(midpoint);
+
+        let left_coalition = SwarmCoalition {
+            members: left_peers.to_vec(),
+            internal_phi: self.internal_phi * 1.2, // Splitting increases localized integration
+            boundary_phi: self.boundary_phi * 0.5,
+            cohesion: 0.85, // Restored sub-group cohesion
+            mean_internal_permeability: self.mean_internal_permeability,
+            mean_external_permeability: self.mean_external_permeability,
+        };
+
+        let right_coalition = SwarmCoalition {
+            members: right_peers.to_vec(),
+            internal_phi: self.internal_phi * 1.1,
+            boundary_phi: self.boundary_phi * 0.5,
+            cohesion: 0.80,
+            mean_internal_permeability: self.mean_internal_permeability,
+            mean_external_permeability: self.mean_external_permeability,
+        };
+
+        Some((left_coalition, right_coalition))
+    }
+
+    /// Friston Agential Fusion: Dissolves the separating boundaries between two
+    /// distinct swarm coalitions, merging them into a single macro-identity
+    /// when their internal tracking variables achieve complete structural alignment.
+    pub fn execute_blanket_fusion(&self, other: &Self) -> Option<Self> {
+        if self.mean_external_permeability < 0.85 {
+            return None; // Mutual boundary permeability is too low to permit fusion
+        }
+
+        let mut unified_members = self.members.clone();
+        for member in &other.members {
+            if !unified_members.contains(member) {
+                unified_members.push(member.clone());
+            }
+        }
+
+        Some(SwarmCoalition {
+            members: unified_members,
+            internal_phi: (self.internal_phi + other.internal_phi) * 1.15, // Expanded integration capacity
+            boundary_phi: (self.boundary_phi + other.boundary_phi) * 0.5,
+            cohesion: (self.cohesion + other.cohesion) * 0.5,
+            mean_internal_permeability: self.mean_internal_permeability,
+            mean_external_permeability: self.mean_external_permeability,
+        })
+    }
+
+    /// Levin Xenobot Grafting Invariant: Computes an algebraic translation hypervector
+    /// that maps a foreign node's coordinate system directly into the native basis.
+    /// Accepts a slice of paired anchor hypervectors exchanged during a coalition handshake
+    /// and bundles their cross-bound inverses into a single universal translation operator.
+    pub fn compute_xenobot_graft_transform(
+        &self,
+        native_anchors: &[symthaea_core::hdc::ContinuousHV],
+        foreign_anchors: &[symthaea_core::hdc::ContinuousHV],
+    ) -> Option<symthaea_core::hdc::ContinuousHV> {
+        if native_anchors.is_empty() || native_anchors.len() != foreign_anchors.len() {
+            return None;
+        }
+
+        let mut bound_pairs = Vec::with_capacity(native_anchors.len());
+
+        for i in 0..native_anchors.len() {
+            // Compute the algebraic inverse of the foreign coordinate anchor
+            let foreign_inverse = foreign_anchors[i].inverse();
+            // Bind the native anchor with the foreign inverse to capture the coordinate rotation delta
+            bound_pairs.push(native_anchors[i].bind(&foreign_inverse));
+        }
+
+        // Bundle all coordinate deltas into a single composite Translation Operator Hypervector
+        let pair_refs: Vec<&symthaea_core::hdc::ContinuousHV> = bound_pairs.iter().collect();
+        Some(symthaea_core::hdc::ContinuousHV::bundle(&pair_refs))
+    }
+
+    /// Translates an incoming foreign hypervector into the native coordinate space
+    /// using a pre-computed Xenobot Translation Operator via a single binding pass.
+    pub fn translate_foreign_hypervector(
+        &self,
+        foreign_vector: &symthaea_core::hdc::ContinuousHV,
+        graft_transform: &symthaea_core::hdc::ContinuousHV,
+    ) -> symthaea_core::hdc::ContinuousHV {
+        foreign_vector.bind(graft_transform)
+    }
+
+    /// Collective Φ = internal + permeability-weighted boundary.
+
     pub fn collective_phi(&self) -> f64 {
         self.internal_phi + self.mean_external_permeability * self.boundary_phi
+    }
+
+    /// Levin Swarm Invariant: Uses gap-junction transduction principles to sync a confused node's
+    /// world-model with the collective consensus of its sovereign swarm coalition.
+    pub fn transduce_gap_junction_alignment(
+        &self,
+        peer_beliefs: &[super::types::HiddenState],
+        peer_models: &[super::generative_model::GenerativeModel],
+        state_dim: usize,
+    ) -> Option<(
+        super::types::HiddenState,
+        super::generative_model::GenerativeModel,
+    )> {
+        // Only allow gap-junction pooling if the coalition has achieved high internal boundary integration
+        if self.members.len() < 2 || self.mean_internal_permeability < 0.6 {
+            return None;
+        }
+
+        if peer_beliefs.is_empty() || peer_models.is_empty() {
+            return None;
+        }
+
+        // 1. Average the consensus hidden belief states of uncorrupted neighboring peers
+        let mut consensus_mean = vec![0.0; state_dim];
+        let mut consensus_precision = vec![0.0; state_dim];
+        let weight = 1.0 / peer_beliefs.len() as f64;
+
+        for belief in peer_beliefs {
+            for i in 0..state_dim {
+                if i < belief.mean.len() && i < belief.precision.len() {
+                    consensus_mean[i] += belief.mean[i] * weight;
+                    consensus_precision[i] += belief.precision[i] * weight;
+                }
+            }
+        }
+
+        let mut hybrid_belief = super::types::HiddenState::new(state_dim);
+        hybrid_belief.mean = consensus_mean;
+        hybrid_belief.precision = consensus_precision;
+
+        // 2. Clone a stable, healthy ancestral generative model from the peer pool cluster
+        let consensus_model = peer_models[0].clone();
+
+        Some((hybrid_belief, consensus_model))
     }
 
     /// Is this coalition conscious as a collective?

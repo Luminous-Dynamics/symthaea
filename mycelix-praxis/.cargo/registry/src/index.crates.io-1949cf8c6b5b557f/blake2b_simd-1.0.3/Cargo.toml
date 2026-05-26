@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "blake2b_simd"
 version = "1.0.3"
 authors = ["Jack O'Connor"]

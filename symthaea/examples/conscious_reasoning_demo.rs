@@ -30,6 +30,7 @@ fn main() {
     // ── Scenario 1: High consensus, full budget ──────────────────────
     println!("── Scenario 1: Theories in consensus ──");
     let ctx1 = ReasoningContext {
+    negative_prototypes: Default::default(),
         theory_metrics: MultiTheoryMetrics {
             phi: 0.85,
             gwt: 0.82,
@@ -98,6 +99,7 @@ fn main() {
     // ── Scenario 2: Theories disagree, risky action ──────────────────
     println!("── Scenario 2: Theories in conflict ──");
     let ctx2 = ReasoningContext {
+    negative_prototypes: Default::default(),
         theory_metrics: MultiTheoryMetrics {
             phi: 0.90,
             gwt: 0.15,
@@ -164,6 +166,7 @@ fn main() {
     // ── Scenario 3: Tight budget (Tier 0) ────────────────────────────
     println!("── Scenario 3: Tight budget (Tier 0) ──");
     let ctx3 = ReasoningContext {
+    negative_prototypes: Default::default(),
         theory_metrics: MultiTheoryMetrics {
             phi: 0.75,
             gwt: 0.70,

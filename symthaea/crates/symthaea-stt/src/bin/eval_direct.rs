@@ -849,7 +849,7 @@ fn main() {
         // Collapse stress variants if requested
         let decode_logits: Vec<Vec<f32>>;
         let logits_ref =
-            if let (Some(ref cm), Some(ref cp)) = (&collapse_mapping, &collapsed_phonemes) {
+            if let (Some(cm), Some(cp)) = (&collapse_mapping, &collapsed_phonemes) {
                 decode_logits = collapse_logits(&all_logits, cm, cp.len());
                 &decode_logits
             } else {

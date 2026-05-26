@@ -31,12 +31,12 @@ fn default_config() -> LiquidMambaConfig {
 /// 10 generate+distill rounds — all PE values must be finite and in [0, 2].
 #[test]
 fn test_generate_distill_pe_finite() {
-    let mut gen = mock_gen(default_config());
+    let mut gen_obj = mock_gen(default_config());
     let channels = ThoughtChannels::with_intent(1);
 
     for _ in 0..10 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
 
         assert!(
             result.semantic_pe.is_finite(),
@@ -62,17 +62,17 @@ fn test_distillation_modifies_weights() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
-    let initial_weights = gen.projection().flatten_weights();
+    let initial_weights = gen_obj.projection().flatten_weights();
 
     for _ in 0..6 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let final_weights = gen.projection().flatten_weights();
+    let final_weights = gen_obj.projection().flatten_weights();
     assert_eq!(initial_weights.len(), final_weights.len());
 
     // At least some weights should have changed
@@ -92,15 +92,15 @@ fn test_distillation_modifies_weights() {
 /// After 20 rounds, pe_stats() returns finite values.
 #[test]
 fn test_pe_trend_after_distillation() {
-    let mut gen = mock_gen(default_config());
+    let mut gen_obj = mock_gen(default_config());
     let channels = ThoughtChannels::with_intent(2);
 
     for _ in 0..20 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let (mean, std_dev, trend) = gen.pe_stats();
+    let (mean, std_dev, trend) = gen_obj.pe_stats();
     assert!(mean.is_finite(), "PE mean should be finite: {mean}");
     assert!(
         std_dev.is_finite(),
@@ -123,10 +123,10 @@ fn test_coherence_monitoring_works() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(0);
 
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
     assert!(
         result.final_coherence.is_finite(),
         "final_coherence should be finite: {}",
@@ -138,16 +138,16 @@ fn test_coherence_monitoring_works() {
 /// and current_lr() should remain finite.
 #[test]
 fn test_fep_modulation_no_panic() {
-    let mut gen = mock_gen(default_config());
+    let mut gen_obj = mock_gen(default_config());
 
     for &fep in &[0.0, 0.3, 0.5, 0.7, 1.0] {
-        gen.set_fep_modulation(fep);
-        let lr = gen.current_lr();
+        gen_obj.set_fep_modulation(fep);
+        let lr = gen_obj.current_lr();
         assert!(lr.is_finite(), "LR should be finite for fep={fep}: {lr}");
     }
 }
 
-/// 55 rounds triggers check_projection_health at gen 50.
+/// 55 rounds triggers check_projection_health at gen_obj 50.
 /// last_cached_rank() should be finite and positive afterward.
 /// Requires enable_consciousness_gating=true (recovery noise is gated).
 #[test]
@@ -156,18 +156,18 @@ fn test_collapse_recovery_health_check() {
         max_tokens: 8,
         warmup_steps: 0,
         accumulation_steps: 1,
-        enable_consciousness_gating: true, // Required: health check at gen 50 is gated
+        enable_consciousness_gating: true, // Required: health check at gen_obj 50 is gated
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
     for _ in 0..55 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let rank = gen.last_cached_rank();
+    let rank = gen_obj.last_cached_rank();
     assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
     assert!(rank > 0.0, "Cached rank should be positive: {rank}");
 }
@@ -183,10 +183,10 @@ fn test_consciousness_gating_high_low_psi() {
     };
 
     // High psi
-    let mut gen = mock_gen(config.clone());
+    let mut gen_obj = mock_gen(config.clone());
     let mut channels = ThoughtChannels::with_intent(0);
     channels.channels[12] = 0.95; // psi = high
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
     assert!(
         result.semantic_pe.is_finite(),
         "PE should be finite with high psi: {}",
@@ -194,10 +194,10 @@ fn test_consciousness_gating_high_low_psi() {
     );
 
     // Low psi
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let mut channels = ThoughtChannels::with_intent(0);
     channels.channels[12] = 0.05; // psi = low
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
     assert!(
         result.semantic_pe.is_finite(),
         "PE should be finite with low psi: {}",
@@ -208,47 +208,47 @@ fn test_consciousness_gating_high_low_psi() {
 /// Warm-start bidirectional → generate → distill pipeline should work end to end.
 #[test]
 fn test_warm_start_then_generate_distill() {
-    let mut gen = mock_gen(default_config());
+    let mut gen_obj = mock_gen(default_config());
     let channels = ThoughtChannels::with_intent(1);
 
     // Collect sample HVs
     let samples: Vec<symthaea_core::hdc::ContinuousHV> = (0..10)
         .map(|i| {
             let ch = ThoughtChannels::with_intent(i % 4);
-            gen.encoder().encode(&ch)
+            gen_obj.encoder().encode(&ch)
         })
         .collect();
 
     // Warm-start projection
-    gen.projection_mut().warm_start_bidirectional(&samples);
+    gen_obj.projection_mut().warm_start_bidirectional(&samples);
 
     // Generate + distill should still work
     for _ in 0..5 {
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
         assert!(
             result.semantic_pe.is_finite(),
             "PE should be finite after warm-start: {}",
             result.semantic_pe
         );
-        gen.distill_step(&channels, &result);
+        gen_obj.distill_step(&channels, &result);
     }
 }
 
 /// Contrastive pretrain → generate pipeline should produce finite results.
 #[test]
 fn test_contrastive_pretrain_then_generate() {
-    let mut gen = mock_gen(default_config());
+    let mut gen_obj = mock_gen(default_config());
 
     // Build thought HVs from different intents
     let thought_hvs: Vec<symthaea_core::hdc::ContinuousHV> = (0..8)
         .map(|i| {
             let ch = ThoughtChannels::with_intent(i % 4);
-            gen.encoder().encode(&ch)
+            gen_obj.encoder().encode(&ch)
         })
         .collect();
 
     // Contrastive pretrain
-    let (avg_dist, avg_recon) = gen
+    let (avg_dist, avg_recon) = gen_obj
         .projection_mut()
         .contrastive_pretrain(&thought_hvs, 5, 0.01);
     assert!(
@@ -262,7 +262,7 @@ fn test_contrastive_pretrain_then_generate() {
 
     // Generate should still produce finite results
     let channels = ThoughtChannels::with_intent(2);
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
     assert!(
         result.semantic_pe.is_finite(),
         "PE should be finite after contrastive pretrain: {}",
@@ -281,16 +281,16 @@ fn test_surprise_gradient_amplifies() {
         surprise_gradient_alpha: 1.0, // Strong surprise weighting
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
-    let initial_weights = gen.projection().flatten_weights();
+    let initial_weights = gen_obj.projection().flatten_weights();
 
     // Run generate + distill
-    let result = gen.generate(&channels);
-    gen.distill_step(&channels, &result);
+    let result = gen_obj.generate(&channels);
+    gen_obj.distill_step(&channels, &result);
 
-    let after_weights = gen.projection().flatten_weights();
+    let after_weights = gen_obj.projection().flatten_weights();
 
     // Weights should have changed (non-zero PE → amplified gradients)
     let changed = initial_weights
@@ -308,7 +308,7 @@ fn test_surprise_gradient_amplifies() {
 /// Eval-only workflow: train → save checkpoint → load → evaluate.
 ///
 /// Tests the same code path the binary's --eval-only mode exercises:
-/// generate+distill → ProjectionCheckpoint save → fresh gen with loaded weights → evaluate.
+/// generate+distill → ProjectionCheckpoint save → fresh gen_obj with loaded weights → evaluate.
 #[test]
 fn test_eval_only_workflow() {
     use symthaea_broca::checkpoint::ProjectionCheckpoint;
@@ -325,31 +325,31 @@ fn test_eval_only_workflow() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config.clone());
+    let mut gen_obj = mock_gen(config.clone());
     let channels = ThoughtChannels::with_intent(1);
 
     // 1. Train for 5 rounds
     for _ in 0..5 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
     // 2. Save projection checkpoint to tempfile
     let dir = std::env::temp_dir();
     let path = dir.join("test_eval_only_workflow.bin");
-    let weights = gen.projection().flatten_weights();
+    let weights = gen_obj.projection().flatten_weights();
     let mut ckpt = ProjectionCheckpoint::new(
         weights,
-        gen.config().hdc_dim,
-        gen.config().bottleneck_dim,
-        gen.config().ssm_dim,
+        gen_obj.config().hdc_dim,
+        gen_obj.config().bottleneck_dim,
+        gen_obj.config().ssm_dim,
         5,
-        gen.projection().is_deep(),
-        gen.projection().inner_dim(),
+        gen_obj.projection().is_deep(),
+        gen_obj.projection().inner_dim(),
     );
     ckpt.save_to_file(&path).unwrap();
 
-    // 3. Load fresh gen from checkpoint (simulating --resume)
+    // 3. Load fresh gen_obj from checkpoint (simulating --resume)
     let mut fresh_gen = mock_gen(config);
     let loaded_ckpt = ProjectionCheckpoint::load_from_file(&path).unwrap();
     fresh_gen
@@ -411,18 +411,18 @@ fn test_diagnostics_across_training() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
-    gen.enable_diagnostics();
+    let mut gen_obj = mock_gen(config);
+    gen_obj.enable_diagnostics();
 
     let channels = ThoughtChannels::with_intent(1);
 
     // Train 10 rounds (warmup=0, accum=1 so every step applies)
     for _ in 0..10 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let diag = gen
+    let diag = gen_obj
         .projection_diagnostics()
         .expect("diagnostics should be enabled");
     assert!(
@@ -453,18 +453,18 @@ fn test_diagnostics_restore_from_checkpoint() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config.clone());
-    gen.enable_diagnostics();
+    let mut gen_obj = mock_gen(config.clone());
+    gen_obj.enable_diagnostics();
 
     let channels = ThoughtChannels::with_intent(1);
 
     // Train 10 rounds
     for _ in 0..10 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let diag = gen
+    let diag = gen_obj
         .projection_diagnostics()
         .expect("diagnostics should be enabled");
     let original_steps = diag.total_steps;
@@ -475,22 +475,22 @@ fn test_diagnostics_restore_from_checkpoint() {
 
     // Take snapshot and save checkpoint
     let snap = diag.snapshot();
-    let weights = gen.projection().flatten_weights();
+    let weights = gen_obj.projection().flatten_weights();
     let mut ckpt = ProjectionCheckpoint::new(
         weights,
-        gen.config().hdc_dim,
-        gen.config().bottleneck_dim,
-        gen.config().ssm_dim,
+        gen_obj.config().hdc_dim,
+        gen_obj.config().bottleneck_dim,
+        gen_obj.config().ssm_dim,
         10,
-        gen.projection().is_deep(),
-        gen.projection().inner_dim(),
+        gen_obj.projection().is_deep(),
+        gen_obj.projection().inner_dim(),
     );
     ckpt.diagnostics_snapshot = Some(snap);
     let dir = std::env::temp_dir();
     let path = dir.join("test_diagnostics_restore.bin");
     ckpt.save_to_file(&path).unwrap();
 
-    // Create fresh gen, enable diagnostics, restore from snapshot
+    // Create fresh gen_obj, enable diagnostics, restore from snapshot
     let mut fresh_gen = mock_gen(config);
     fresh_gen.enable_diagnostics();
     let loaded_ckpt = ProjectionCheckpoint::load_from_file(&path).unwrap();
@@ -544,18 +544,18 @@ fn test_diagnostics_triggered_collapse_recovery() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
-    gen.enable_diagnostics();
+    let mut gen_obj = mock_gen(config);
+    gen_obj.enable_diagnostics();
 
     let channels = ThoughtChannels::with_intent(1);
 
     // Phase 1: Train normally to accumulate healthy diagnostics baselines
     for _ in 0..10 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let diag = gen
+    let diag = gen_obj
         .projection_diagnostics()
         .expect("diagnostics should be enabled");
     assert!(
@@ -569,18 +569,18 @@ fn test_diagnostics_triggered_collapse_recovery() {
     );
 
     // Phase 2: Inject uniform weights to induce dimensional collapse
-    let initial_weights = gen.projection().flatten_weights();
+    let initial_weights = gen_obj.projection().flatten_weights();
     let uniform: Vec<f32> = initial_weights.iter().map(|_| 0.001).collect();
-    gen.projection_mut().load_weights(&uniform);
+    gen_obj.projection_mut().load_weights(&uniform);
 
     // Run more rounds: distill_step records bottleneck variance after each
     // gradient application. With uniform weights, variance should be near-zero.
     for _ in 0..10 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    let diag = gen
+    let diag = gen_obj
         .projection_diagnostics()
         .expect("diagnostics should be enabled");
 
@@ -598,18 +598,18 @@ fn test_diagnostics_triggered_collapse_recovery() {
     let sample_hvs: Vec<symthaea_core::hdc::ContinuousHV> = (0..5)
         .map(|i| {
             let ch = ThoughtChannels::with_intent(i % 4);
-            gen.encoder().encode(&ch)
+            gen_obj.encoder().encode(&ch)
         })
         .collect();
-    gen.check_projection_health(&sample_hvs);
+    gen_obj.check_projection_health(&sample_hvs);
 
     // After health check, rank should be finite and positive
-    let rank = gen.last_cached_rank();
+    let rank = gen_obj.last_cached_rank();
     assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
     assert!(rank > 0.0, "Cached rank should be positive: {rank}");
 
     // Weights should have changed from the uniform injection
-    let final_weights = gen.projection().flatten_weights();
+    let final_weights = gen_obj.projection().flatten_weights();
     let changed = uniform
         .iter()
         .zip(final_weights.iter())
@@ -640,8 +640,8 @@ fn test_full_training_pipeline_smoke() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config.clone());
-    gen.enable_diagnostics();
+    let mut gen_obj = mock_gen(config.clone());
+    gen_obj.enable_diagnostics();
 
     // 1. Build a small training dataset (5 pairs, diverse intents)
     let mut dataset = TrainingDataset::default();
@@ -658,46 +658,46 @@ fn test_full_training_pipeline_smoke() {
     let samples: Vec<symthaea_core::hdc::ContinuousHV> = (0..10)
         .map(|i| {
             let ch = ThoughtChannels::with_intent(i % 4);
-            gen.encoder().encode(&ch)
+            gen_obj.encoder().encode(&ch)
         })
         .collect();
-    gen.projection_mut().warm_start_bidirectional(&samples);
+    gen_obj.projection_mut().warm_start_bidirectional(&samples);
 
     // 3. Run 2 epochs over the dataset
     for _epoch in 0..2 {
         for pair in &dataset.pairs {
             let ch = pair.to_thought_channels();
-            let result = gen.generate(&ch);
-            gen.distill_step(&ch, &result);
+            let result = gen_obj.generate(&ch);
+            gen_obj.distill_step(&ch, &result);
         }
     }
 
     // 4. Compute effective rank
-    let rank = gen.last_cached_rank();
+    let rank = gen_obj.last_cached_rank();
     assert!(
         rank.is_finite(),
         "Rank should be finite after training: {rank}"
     );
 
     // 5. Save checkpoint with diagnostics snapshot
-    let weights = gen.projection().flatten_weights();
-    let diag = gen.projection_diagnostics().expect("diagnostics enabled");
+    let weights = gen_obj.projection().flatten_weights();
+    let diag = gen_obj.projection_diagnostics().expect("diagnostics enabled");
     let snap = diag.snapshot();
     let mut ckpt = ProjectionCheckpoint::new(
         weights.clone(),
-        gen.config().hdc_dim,
-        gen.config().bottleneck_dim,
-        gen.config().ssm_dim,
+        gen_obj.config().hdc_dim,
+        gen_obj.config().bottleneck_dim,
+        gen_obj.config().ssm_dim,
         10,
-        gen.projection().is_deep(),
-        gen.projection().inner_dim(),
+        gen_obj.projection().is_deep(),
+        gen_obj.projection().inner_dim(),
     );
     ckpt.diagnostics_snapshot = Some(snap);
     let dir = std::env::temp_dir();
     let path = dir.join("test_full_pipeline_smoke.bin");
     ckpt.save_to_file(&path).unwrap();
 
-    // 6. Load checkpoint into fresh gen
+    // 6. Load checkpoint into fresh gen_obj
     let mut fresh_gen = mock_gen(config);
     let loaded_ckpt = ProjectionCheckpoint::load_from_file(&path).unwrap();
     fresh_gen
@@ -770,17 +770,17 @@ fn test_ema_inference_swap() {
         enable_consciousness_gating: false,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
     for _ in 0..10 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
-    assert!(gen.projection().has_ema(), "EMA should be active");
+    assert!(gen_obj.projection().has_ema(), "EMA should be active");
 
-    let weights = gen.projection().flatten_weights();
+    let weights = gen_obj.projection().flatten_weights();
     assert!(
         weights.iter().all(|w| w.is_finite()),
         "All projection weights should be finite after EMA inference cycles"
@@ -800,16 +800,16 @@ fn test_temporal_generation_pipeline() {
         temporal_projection: true,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
     // Temporal projection should be initialized
     assert!(
-        gen.temporal_proj().is_some(),
+        gen_obj.temporal_proj().is_some(),
         "temporal_proj should be Some when temporal_projection=true"
     );
 
-    let initial_weights = gen.temporal_proj().unwrap().flatten_weights();
+    let initial_weights = gen_obj.temporal_proj().unwrap().flatten_weights();
     assert!(
         !initial_weights.is_empty(),
         "Temporal projection should have weights"
@@ -817,7 +817,7 @@ fn test_temporal_generation_pipeline() {
 
     // Run 10 generate+distill rounds
     for i in 0..10 {
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
         assert!(
             result.semantic_pe.is_finite(),
             "PE should be finite at round {i}, got: {}",
@@ -828,11 +828,11 @@ fn test_temporal_generation_pipeline() {
             "PE should be in [0, 2] at round {i}, got: {}",
             result.semantic_pe
         );
-        gen.distill_step(&channels, &result);
+        gen_obj.distill_step(&channels, &result);
     }
 
     // Temporal weights should have changed
-    let final_weights = gen.temporal_proj().unwrap().flatten_weights();
+    let final_weights = gen_obj.temporal_proj().unwrap().flatten_weights();
     assert_eq!(initial_weights.len(), final_weights.len());
     let changed = initial_weights
         .iter()
@@ -846,7 +846,7 @@ fn test_temporal_generation_pipeline() {
     );
 
     // PE stats should be finite
-    let (mean, std_dev, trend) = gen.pe_stats();
+    let (mean, std_dev, trend) = gen_obj.pe_stats();
     assert!(mean.is_finite(), "PE mean should be finite: {mean}");
     assert!(
         std_dev.is_finite(),
@@ -855,7 +855,7 @@ fn test_temporal_generation_pipeline() {
     assert!(trend.is_finite(), "PE trend should be finite: {trend}");
 }
 
-/// Temporal checkpoint round-trip: save temporal weights, load into fresh gen,
+/// Temporal checkpoint round-trip: save temporal weights, load into fresh gen_obj,
 /// verify weights match and generation still works.
 #[test]
 fn test_temporal_checkpoint_roundtrip() {
@@ -869,26 +869,26 @@ fn test_temporal_checkpoint_roundtrip() {
         temporal_projection: true,
         ..Default::default()
     };
-    let mut gen = mock_gen(config.clone());
+    let mut gen_obj = mock_gen(config.clone());
     let channels = ThoughtChannels::with_intent(2);
 
     // Train for 5 rounds
     for _ in 0..5 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
     // Save temporal checkpoint
-    let tp = gen.temporal_proj().unwrap();
+    let tp = gen_obj.temporal_proj().unwrap();
     let temporal_weights = tp.flatten_weights();
-    let spatial_weights = gen.projection().flatten_weights();
+    let spatial_weights = gen_obj.projection().flatten_weights();
 
     let mut ckpt = ProjectionCheckpoint::new_temporal(
         spatial_weights.clone(),
         temporal_weights.clone(),
-        gen.config().hdc_dim,
-        gen.config().bottleneck_dim,
-        gen.config().ssm_dim,
+        gen_obj.config().hdc_dim,
+        gen_obj.config().bottleneck_dim,
+        gen_obj.config().ssm_dim,
         5,
         tp.chunk_size(),
         tp.num_chunks(),
@@ -897,7 +897,7 @@ fn test_temporal_checkpoint_roundtrip() {
     let path = dir.join("test_temporal_ckpt_roundtrip.bin");
     ckpt.save_to_file(&path).unwrap();
 
-    // Load into fresh gen
+    // Load into fresh gen_obj
     let mut fresh_gen = mock_gen(config);
     let loaded_ckpt = ProjectionCheckpoint::load_from_file(&path).unwrap();
     assert!(loaded_ckpt.temporal, "Checkpoint should have temporal=true");
@@ -946,37 +946,37 @@ fn test_temporal_collapse_recovery_health_check() {
         temporal_projection: true,
         ..Default::default()
     };
-    let mut gen = mock_gen(config);
+    let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
     // Phase 1: Train normally to get baseline
     for _ in 0..5 {
-        let result = gen.generate(&channels);
-        gen.distill_step(&channels, &result);
+        let result = gen_obj.generate(&channels);
+        gen_obj.distill_step(&channels, &result);
     }
 
     // Phase 2: Inject uniform weights to induce collapse
-    let tp = gen.temporal_proj().unwrap();
+    let tp = gen_obj.temporal_proj().unwrap();
     let original_weights = tp.flatten_weights();
     let uniform: Vec<f32> = original_weights.iter().map(|_| 0.001).collect();
-    gen.temporal_proj_mut().unwrap().load_weights(&uniform);
+    gen_obj.temporal_proj_mut().unwrap().load_weights(&uniform);
 
     // Phase 3: Trigger health check
     let sample_hvs: Vec<symthaea_core::hdc::ContinuousHV> = (0..5)
         .map(|i| {
             let ch = ThoughtChannels::with_intent(i % 4);
-            gen.encoder().encode(&ch)
+            gen_obj.encoder().encode(&ch)
         })
         .collect();
-    gen.check_projection_health(&sample_hvs);
+    gen_obj.check_projection_health(&sample_hvs);
 
     // Rank should be finite and positive
-    let rank = gen.last_cached_rank();
+    let rank = gen_obj.last_cached_rank();
     assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
     assert!(rank > 0.0, "Cached rank should be positive: {rank}");
 
     // Weights should have changed from uniform (recovery noise applied)
-    let final_weights = gen.temporal_proj().unwrap().flatten_weights();
+    let final_weights = gen_obj.temporal_proj().unwrap().flatten_weights();
     let changed = uniform
         .iter()
         .zip(final_weights.iter())

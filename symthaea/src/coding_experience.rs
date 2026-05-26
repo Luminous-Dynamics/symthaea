@@ -61,6 +61,9 @@ pub struct CodingExperienceStore {
     error_hints_cache: Vec<(String, String)>,
     /// In-memory cache of recent successful generations: (task, code_summary).
     success_cache: Vec<(String, String)>,
+    /// In-memory cache of negative prototypes (disproven logic) for MCTS (INV-12).
+    #[cfg(feature = "reasoning_engine")]
+    pub negative_prototypes_cache: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     /// Maximum cache size (oldest entries evicted).
     max_cache_size: usize,
     /// Records queued for DB persistence (flushed on next async call or explicit flush).
@@ -76,6 +79,8 @@ impl CodingExperienceStore {
             db,
             error_hints_cache: Vec::new(),
             success_cache: Vec::new(),
+            #[cfg(feature = "reasoning_engine")]
+            negative_prototypes_cache: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
             max_cache_size: 128,
             pending_writes: Vec::new(),
         })
@@ -93,6 +98,8 @@ impl CodingExperienceStore {
             db,
             error_hints_cache: Vec::new(),
             success_cache: Vec::new(),
+            #[cfg(feature = "reasoning_engine")]
+            negative_prototypes_cache: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
             max_cache_size: 128,
             pending_writes: Vec::new(),
         };
@@ -186,6 +193,19 @@ impl CodingExperienceStore {
                         self.success_cache[pos].1 = code;
                     } else {
                         self.success_cache.push((record.content.clone(), code));
+                    }
+                } else if record.content.starts_with("negative:") {
+                    // Negative prototype: metadata contains embedding as comma-separated f32
+                    #[cfg(feature = "reasoning_engine")]
+                    if let Ok(embedding) = record
+                        .metadata
+                        .split(',')
+                        .map(|s| s.parse::<f32>())
+                        .collect::<Result<Vec<f32>, _>>()
+                    {
+                        self.negative_prototypes_cache
+                            .prototypes
+                            .push((embedding, 1.0));
                     }
                 } else if record.valence < 0.0 {
                     // Generic error experience: content = error pattern, metadata = fix hint
@@ -599,6 +619,49 @@ impl CodingExperienceStore {
     /// Total number of stored experiences.
     pub async fn count(&self) -> usize {
         self.db.count().await.unwrap_or(0)
+    }
+
+    /// Store a negative prototype (disproven logical structure) for MCTS penalties (INV-12).
+    #[cfg(feature = "reasoning_engine")]
+    pub fn store_negative_prototype(&mut self, label: &str, embedding: Vec<f32>) {
+        let key = format!("negative:{}", label);
+        self.negative_prototypes_cache
+            .prototypes
+            .push((embedding.clone(), 1.0));
+
+        // Persist to DB
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let seq = EXPERIENCE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let embedding_str = embedding
+            .iter()
+            .map(|f| f.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let record = MemoryRecord {
+            id: format!("neg_{}_{}", now_ms, seq),
+            memory_type: MemoryType::Procedural,
+            encoding: BinaryHV::random(now_ms), // Placeholder encoding
+            content: key,
+            timestamp_ms: now_ms,
+            valence: -1.0, // strongly negative (disproven)
+            arousal: 0.9,
+            psi: 0.5,
+            topics: vec!["negative_prototype".to_string()],
+            metadata: embedding_str,
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        self.queue_persist(record);
+    }
+
+    /// Get the current negative prototypes bank for MCTS.
+    #[cfg(feature = "reasoning_engine")]
+    pub fn negative_prototypes(&self) -> &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank {
+        &self.negative_prototypes_cache
     }
 }
 

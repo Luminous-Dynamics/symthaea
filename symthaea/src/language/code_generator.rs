@@ -551,6 +551,8 @@ pub struct CodeContext<'a> {
     /// When > 0, modulates the CfC sequencer's completion threshold —
     /// higher MCTS confidence means more ambitious plans.
     pub mcts_plan_confidence: f32,
+    /// Negative prototypes bank for penalizing disproven approaches (INV-12).
+    pub negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     /// Error hints from the CodingExperienceStore: (error_pattern, fix_hint).
     /// Populated by callers who have access to the experience store.
     /// Used during auto-fix retry and to inform native generation.
@@ -574,6 +576,7 @@ impl<'a> Default for CodeContext<'a> {
             source_files: Vec::new(),
             past_examples: Vec::new(),
             mcts_plan_confidence: 0.0,
+            negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
             error_hints: Vec::new(),
             diagnostic_hvs: Vec::new(),
             issue_text: None,
@@ -1240,15 +1243,16 @@ impl CodeGenerator {
         // 3. CfC plan (informed by primitive composition + MCTS confidence)
         // Use purpose text for direct keyword-based pattern detection (more reliable
         // than HDC similarity with byte-hash encoding)
-        let mut plan =
-            self.sequencer
-                .plan_structure_with_purpose(&intent_hv, &similar_refs, &spec.purpose);
+        let mut plan_steps = self
+            .sequencer
+            .plan_structure_with_purpose(&intent_hv, &similar_refs, &spec.purpose, &context.negative_prototypes);
+
 
         // If MCTS confidence is high, boost low-confidence plan steps
         // (the reasoning engine has already vetted this direction)
         if context.mcts_plan_confidence > 0.5 {
             let boost = (context.mcts_plan_confidence - 0.5) * 0.4; // up to 0.2 boost
-            for step in &mut plan {
+            for step in &mut plan_steps {
                 step.confidence = (step.confidence + boost).min(1.0);
             }
         }
@@ -1260,12 +1264,12 @@ impl CodeGenerator {
             template.clone()
         } else {
             // 4. Emit code using language-specific emitter
-            self.emit_from_plan(&plan, spec, &spec.language)
+            self.emit_from_plan(&plan_steps, spec, &spec.language)
         };
 
         // 5. Compute intent similarity (combine plan coverage + primitive phi + MCTS)
         let intent_similarity = if !source.is_empty() {
-            let coverage = plan.len() as f32 / 5.0;
+            let coverage = plan_steps.len() as f32 / 5.0;
             let mcts_bonus = context.mcts_plan_confidence * 0.1; // up to 0.1 bonus
             // Weight: 60% plan coverage, 30% primitive phi, 10% MCTS confidence
             (coverage * 0.6 + primitive_result.phi * 0.3 + mcts_bonus).min(1.0)
@@ -1331,11 +1335,11 @@ impl CodeGenerator {
         // Compute plan coverage: how many plan steps produced visible code artifacts.
         // A DefineFunction step that results in a fn declaration counts; a DefineStruct
         // step that doesn't produce struct code doesn't count.
-        let plan_coverage = if plan.is_empty() {
+        let plan_coverage = if plan_steps.is_empty() {
             0.0
         } else {
             use crate::dynamics::cfc_code_sequencer::PlanAction;
-            let covered = plan
+            let covered = plan_steps
                 .iter()
                 .filter(|step| match step.action {
                     PlanAction::DefineFunction => source.contains("fn "),
@@ -1353,13 +1357,13 @@ impl CodeGenerator {
                     _ => !source.is_empty(),      // conservative: if we have code, count it
                 })
                 .count();
-            covered as f32 / plan.len() as f32
+            covered as f32 / plan_steps.len() as f32
         };
 
         GeneratedCode {
             source,
             language: spec.language.clone(),
-            plan_steps: plan,
+            plan_steps,
             epistemic_status: spec.epistemic_status,
             intent_similarity,
             notes,

@@ -1,0 +1,15 @@
+[package]
+name = "desci_claim_coordinator"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+desci_claim_integrity = { path = "../integrity" }
+mycelix-desci-core = { path = "../../../src/core" }
+mycelix-zkp-core = { path = "../../../../crates/mycelix-zkp-core", default-features = false, features = ["backend-winterfell"] }

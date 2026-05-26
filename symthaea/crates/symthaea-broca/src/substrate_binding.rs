@@ -8,8 +8,8 @@
 
 use crate::rust_walker::StructuralElement;
 use std::collections::HashMap;
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 pub struct SubstrateBindingEngine {
     /// Maps dotted paths to their canonical blueprint vectors
@@ -92,7 +92,7 @@ impl SubstrateBindingEngine {
         self.blueprints.values().collect()
     }
 
-    fn project_ghost_intent(&self, intent: &str) -> ContinuousHV {
+    fn project_ghost_intent(&self, _intent: &str) -> ContinuousHV {
         // Project the natural language intent into architectural HV space
         ContinuousHV::random(self.dim, 12345) // placeholder
     }

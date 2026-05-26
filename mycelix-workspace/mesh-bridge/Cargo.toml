@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-mesh-bridge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Offline mesh bridge for Mycelix — relays TEND, food, and emergency entries over LoRa/WiFi-direct when internet is down"
 
 [lib]

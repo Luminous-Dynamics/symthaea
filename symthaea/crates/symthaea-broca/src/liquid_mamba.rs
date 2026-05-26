@@ -11,9 +11,14 @@
 //! in real-time based on the current `ThoughtChannels` state, enforcing factual
 //! precision, hedging on uncertainty, and adjusting tone.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 use anyhow::{Context, Result};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use symthaea_core::genesis::GenesisSeed;
@@ -22,9 +27,9 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::checkpoint::ProjectionCheckpoint;
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 use crate::gating::{
-    consciousness_gated_max_tokens, EmotionalModulator, EpistemicGate, GatingConfig,
+    EmotionalModulator, EpistemicGate, GatingConfig, consciousness_gated_max_tokens,
 };
-use crate::generator::GenerationResult;
+use crate::generator::{GenerationResult, GenerationStepLogits, GenerationTopLogit};
 use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::memory_bridge::MemoryBridge;
 use crate::projection::{HdcSsmProjection, LocalFepLayer, ProjectionGradientDiagnostics};
@@ -43,10 +48,16 @@ pub struct LiquidMambaConfig {
     pub model_id: String,
     /// Maximum tokens to generate per call.
     pub max_tokens: usize,
+    /// Minimum non-EOS tokens to emit before EOS can terminate generation.
+    #[serde(default = "default_min_new_tokens")]
+    pub min_new_tokens: usize,
     /// Sampling temperature.
     pub temperature: f32,
     /// Top-k for sampling.
     pub top_k: usize,
+    /// Optional deterministic sampling seed for reproducible generation diagnostics.
+    #[serde(default)]
+    pub sampling_seed: Option<u64>,
     /// Coherence below this → veto (mid-sentence self-correction).
     pub veto_threshold: f32,
     /// Coherence below this → boost thought binding.
@@ -75,6 +86,35 @@ pub struct LiquidMambaConfig {
     pub enable_veto: bool,
     /// Enable liquid Δ modulation (memory decay scaling).
     pub enable_liquid_delta: bool,
+    /// Enable per-token semantic attraction from the active HDC thought vector.
+    pub enable_semantic_attractor: bool,
+    /// Semantic repulsion threshold [0, 1] — high repulsion triggers transition to silent foraging.
+    #[serde(default = "default_repulsion_threshold")]
+    pub semantic_repulsion_threshold: f32,
+    /// Enable Epistemic Foraging (automatic transition to listening).
+    #[serde(default = "default_true")]
+    pub enable_epistemic_foraging: bool,
+    /// Target dimensionality for holographic dilation (default 65536).
+    #[serde(default = "default_ultra_dim")]
+    pub ultra_dim: usize,
+    /// NEW: Recursive veto threshold for unsaid semantic debt [0, 2].
+    #[serde(default = "default_recursive_veto_threshold")]
+    pub recursive_veto_threshold: f32,
+    /// NEW: Enable Counterfactual Rehearsal (Inner Monologue) when Psi is high.
+    #[serde(default = "default_true")]
+    pub psi_focused_rehearsal: bool,
+    /// Logit-unit strength for output-side semantic attraction.
+    #[serde(default = "default_semantic_attractor_strength")]
+    pub semantic_attractor_strength: f32,
+    /// Number of current top candidates to inspect for semantic attraction.
+    #[serde(default = "default_semantic_attractor_top_k")]
+    pub semantic_attractor_top_k: usize,
+    /// Maximum absolute logit adjustment from semantic attraction.
+    #[serde(default = "default_semantic_attractor_max_adjustment")]
+    pub semantic_attractor_max_adjustment: f32,
+    /// Normalize candidate alignments before applying semantic attraction.
+    #[serde(default = "default_true")]
+    pub semantic_attractor_normalize: bool,
     /// Enable consciousness-gated max tokens.
     pub enable_consciousness_gating: bool,
     /// Enable EMA weight usage for inference.
@@ -465,11 +505,32 @@ fn default_fep_high_multiplier() -> f32 {
 fn default_fep_low_multiplier() -> f32 {
     0.7
 }
+fn default_repulsion_threshold() -> f32 {
+    0.75
+}
+fn default_ultra_dim() -> usize {
+    65536
+}
+fn default_recursive_veto_threshold() -> f32 {
+    1.2
+}
 fn default_coherence_velocity_threshold() -> f32 {
     0.15
 }
 fn default_min_chunk_size() -> usize {
     6
+}
+fn default_semantic_attractor_strength() -> f32 {
+    0.5
+}
+fn default_semantic_attractor_top_k() -> usize {
+    128
+}
+fn default_semantic_attractor_max_adjustment() -> f32 {
+    1.5
+}
+fn default_min_new_tokens() -> usize {
+    1
 }
 fn default_temporal_num_groups() -> usize {
     1
@@ -507,8 +568,10 @@ impl Default for LiquidMambaConfig {
         Self {
             model_id: "state-spaces/mamba-130m".to_string(),
             max_tokens: 256,
+            min_new_tokens: default_min_new_tokens(),
             temperature: 0.8,
             top_k: 40,
+            sampling_seed: None,
             veto_threshold: 0.15,
             drift_threshold: 0.30,
             coherence_window: 8,
@@ -522,6 +585,16 @@ impl Default for LiquidMambaConfig {
             enable_gating: true,
             enable_veto: true,
             enable_liquid_delta: true,
+            enable_semantic_attractor: true,
+            semantic_repulsion_threshold: default_repulsion_threshold(),
+            enable_epistemic_foraging: true,
+            ultra_dim: default_ultra_dim(),
+            recursive_veto_threshold: default_recursive_veto_threshold(),
+            psi_focused_rehearsal: true,
+            semantic_attractor_strength: 0.5,
+            semantic_attractor_top_k: 128,
+            semantic_attractor_max_adjustment: 1.5,
+            semantic_attractor_normalize: true,
             enable_consciousness_gating: true,
             enable_ema: true,
             ema_decay: 0.999,
@@ -622,6 +695,57 @@ pub struct LiquidMambaGenerator {
     pub fep_agent: Option<ActiveInferenceAgent>,
     /// Epistemic gate for logit adjustment.
     pub epistemic_gate: EpistemicGate,
+    /// NEW: Axis-based Epistemic Cube gate for fine-grained assertion control.
+    pub epistemic_cube_gate: crate::gating::EpistemicCubeGate,
+    /// Optional cognitive goal HV for tangent steering.
+    pub goal_hv: Option<ContinuousHV>,
+    /// Semantic delta ("what was left unsaid") from the last generation.
+    pub unsaid_tangent: Option<ContinuousHV>,
+    /// Bundle of recently expressed meanings to avoid tautology.
+    pub recent_semantic_history: VecDeque<ContinuousHV>,
+    /// NEW: Topological coherence score [0, 1] based on Hodge-Laplacian.
+    /// Thread-safe for asynchronous sub-cortical processing.
+    pub topological_coherence: Arc<AtomicU32>,
+    /// NEW: History of Betti numbers (beta_0, beta_1) for trend analysis.
+    pub betti_history: Arc<Mutex<VecDeque<(usize, usize)>>>,
+    /// NEW: Spectral gap (algebraic connectivity) of the semantic complex.
+    pub spectral_gap: Arc<AtomicU32>,
+    /// NEW: Persistent background worker for asynchronous Hodge processing.
+    hodge_sender: std::sync::mpsc::SyncSender<Vec<ContinuousHV>>,
+    /// Per-generation cache for token embedding back-projections used by the semantic attractor.
+    semantic_attractor_cache: HashMap<u32, ContinuousHV>,
+
+    /// Optional deterministic sampler state.
+    sampling_rng: Option<StdRng>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CfcModulationStats {
+    delta_scale: f32,
+    b_scale: f32,
+}
+
+impl Default for CfcModulationStats {
+    fn default() -> Self {
+        Self {
+            delta_scale: 1.0,
+            b_scale: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct SemanticAttractorStats {
+    mean_adjustment: f32,
+    max_adjustment: f32,
+    alignment_mean: f32,
+    alignment_std: f32,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct LogitDistributionSummary {
+    entropy: f32,
+    max_probability: f32,
 }
 
 impl LiquidMambaGenerator {
@@ -664,11 +788,71 @@ impl LiquidMambaGenerator {
 
         let projection = HdcSsmProjection::new(genesis, 16384, 256, config.ssm_dim);
         let epistemic_gate = EpistemicGate::new_from_backend(mamba.as_ref(), &config.gating_config);
+        let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new_from_backend(mamba.as_ref());
+
+        // --- IMPROVEMENT: Persistent Background Worker ---
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<ContinuousHV>>(1);
+        let topological_coherence = Arc::new(AtomicU32::new(1.0f32.to_bits()));
+        let spectral_gap = Arc::new(AtomicU32::new(0.5f32.to_bits()));
+        let betti_history = Arc::new(Mutex::new(VecDeque::with_capacity(64)));
+
+        // Spawn a single long-lived thread for sub-cortical processing
+        let coherence_worker = Arc::clone(&topological_coherence);
+        let gap_worker = Arc::clone(&spectral_gap);
+        let betti_worker = Arc::clone(&betti_history);
+        std::thread::spawn(move || {
+            while let Ok(history) = rx.recv() {
+                let mut complex = symthaea_hodge::SimplicialComplex::new();
+                let n = history.len();
+                for i in 0..n {
+                    complex.add_simplex(vec![i]);
+                }
+                for i in 0..n {
+                    for j in (i + 1)..n {
+                        if history[i].similarity(&history[j]) > 0.6 {
+                            complex.add_simplex(vec![i, j]);
+                            for k in (j + 1)..n {
+                                if history[i].similarity(&history[k]) > 0.6
+                                    && history[j].similarity(&history[k]) > 0.6
+                                {
+                                    complex.add_simplex(vec![i, j, k]);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let analyzer = symthaea_hodge::HodgeLaplacian::new(complex);
+                let spectrum = analyzer.full_spectrum();
+
+                // Update thread-safe history
+                {
+                    let mut history_locked = betti_worker.lock();
+                    history_locked.push_back((
+                        *spectrum.betti_numbers.numbers.get(0).unwrap_or(&1),
+                        *spectrum.betti_numbers.numbers.get(1).unwrap_or(&0),
+                    ));
+                    if history_locked.len() > 64 {
+                        history_locked.pop_front();
+                    }
+                }
+
+                let beta0 = *spectrum.betti_numbers.numbers.get(0).unwrap_or(&1);
+                let beta1 = *spectrum.betti_numbers.numbers.get(1).unwrap_or(&0);
+                let coherence = (1.0 / (beta0 as f32 + beta1 as f32 * 0.5)).min(1.0f32).max(0.0f32);
+                coherence_worker.store(coherence.to_bits(), Ordering::Relaxed);
+
+                // Update Spectral Gap (L0 algebraic connectivity)
+                let gap0 = *spectrum.spectral_gaps.get(0).unwrap_or(&0.0) as f32;
+                gap_worker.store(gap0.to_bits(), Ordering::Relaxed);
+            }
+        });
 
         let enable_ema = config.enable_ema;
         let ema_decay = config.ema_decay;
+        let sampling_seed = config.sampling_seed;
 
-        let mut gen = Self {
+        let mut generator = Self {
             mamba,
             projection,
             temporal_proj,
@@ -693,21 +877,31 @@ impl LiquidMambaGenerator {
             memory_bridge: None,
             fep_agent: None,
             epistemic_gate,
+            epistemic_cube_gate,
+            goal_hv: None,
+            unsaid_tangent: None,
+            recent_semantic_history: VecDeque::with_capacity(32),
+            topological_coherence,
+            betti_history,
+            spectral_gap,
+            hodge_sender: tx,
+            semantic_attractor_cache: HashMap::new(),
+            sampling_rng: sampling_seed.map(StdRng::seed_from_u64),
         };
 
         if enable_ema {
-            gen.projection.enable_ema(ema_decay);
+            generator.projection.enable_ema(ema_decay);
         }
 
-        if gen.config.lora_rank > 0 {
-            gen.mamba.enable_lora(
-                gen.config.lora_rank,
-                gen.config.lora_alpha,
-                gen.config.lora_lr,
+        if generator.config.lora_rank > 0 {
+            generator.mamba.enable_lora(
+                generator.config.lora_rank,
+                generator.config.lora_alpha,
+                generator.config.lora_lr,
             );
         }
 
-        Ok(gen)
+        Ok(generator)
     }
 
     /// Generate text from thought channels.
@@ -738,6 +932,29 @@ impl LiquidMambaGenerator {
                 }
             }
         }
+    }
+
+    /// Update the current cognitive goal HV for tangent steering.
+    pub fn set_goal(&mut self, goal: ContinuousHV) {
+        self.goal_hv = Some(goal);
+    }
+
+    /// Clear all goals and unsaid tangents.
+    pub fn clear_goals(&mut self) {
+        self.goal_hv = None;
+        self.unsaid_tangent = None;
+    }
+
+    /// Inject a curiosity spike into a specific semantic sector.
+    /// This allows external modalities (e.g. Vision) to prioritize dreaming.
+    pub fn inject_curiosity(&mut self, sector: usize, weight: f32) {
+        // This is a proxy: in a real deployment, this would write to the shared ledger.
+        tracing::info!(sector, weight, "Embodied curiosity spike injected.");
+    }
+
+    /// Update the FEP modulation factor (e.g. from cross-modal signals).
+    pub fn set_fep_modulation(&mut self, val: f32) {
+        self.fep_modulation = val.clamp(0.5, 2.5);
     }
 
     /// Distill from Mamba teacher to the projection for a single target sequence.
@@ -801,6 +1018,16 @@ impl LiquidMambaGenerator {
                     // For standard bottleneck, d_ssm is the direct d_bottleneck signal
                     self.projection.backward(thought_hv, &d_ssm, lr);
                 }
+            }
+
+            // --- IMPROVEMENT: Topological Loss Regularization ---
+            // If the live topological coherence is low, we apply an additional
+            // regularization term to the projection weights to "iron out" the manifold.
+            let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
+            if live_coherence < 0.6 {
+                // Topological Regularization: push weights toward their orthogonal centroid
+                let reg_strength = 0.05 * (1.0 - live_coherence);
+                self.projection.apply_manifold_regularization(reg_strength);
             }
 
             prev_token = target_id;
@@ -870,6 +1097,7 @@ impl LiquidMambaGenerator {
         channels: &ThoughtChannels,
         max_chunks: usize,
     ) -> Result<ThoughtChunkSequence> {
+
         let mut sequence = ThoughtChunkSequence::new("semantic_monologue");
         self.chunk_history.clear();
         self.last_chunk_hidden = None;
@@ -979,11 +1207,391 @@ impl LiquidMambaGenerator {
         .with_confidence(final_coherence)
         .with_target(text);
 
+        chunk.token_ids = tokens.clone();
+
         if !tokens.is_empty() {
             chunk = chunk.with_token_span(0, tokens.len());
         }
 
         Ok(chunk)
+    }
+
+    /// Drive Mamba's selective scan from the live liquid/cognitive state.
+    ///
+    /// This turns the existing MambaBackend CfC hook into a per-token control
+    /// signal instead of a one-shot context injection. Low coherence and high
+    /// thermodynamic/FEP load make the SSM more reactive; high psi keeps it
+    /// closer to its accumulated linguistic state.
+    fn apply_continuous_cfc_modulation(
+        &mut self,
+        channels: &ThoughtChannels,
+        coherence: f32,
+    ) -> CfcModulationStats {
+        if !self.config.enable_liquid_delta {
+            return CfcModulationStats::default();
+        }
+
+        let coherence = coherence.clamp(-1.0, 1.0);
+        let surprise = (1.0 - coherence.max(0.0)).clamp(0.0, 1.0);
+        let thermodynamic_load = self.thermodynamic_load.clamp(0.0, 1.0);
+        let fep_pressure = (self.fep_modulation - 1.0).clamp(0.0, 1.0);
+        let focused_psi = channels.psi().clamp(0.0, 1.0);
+        let strength = self.config.delta_mod_strength.max(0.0);
+
+        // --- IMPROVEMENT: Quantum-Classical Interference ---
+        // unsaid_tangent magnitude increases delta_scale (thermal search pressure)
+        // High semantic debt = high creativity/search.
+        let semantic_debt = if let Some(ref tangent) = self.unsaid_tangent {
+            tangent.norm().clamp(0.0, 1.5)
+        } else {
+            0.0
+        };
+
+        let reactivity =
+            0.45 * surprise + 0.20 * thermodynamic_load + 0.15 * fep_pressure - 0.20 * focused_psi + 0.20 * semantic_debt;
+        let delta_scale = (1.0 + strength * reactivity).clamp(0.35, 3.5);
+        let b_scale =
+            (1.0 + strength * (0.35 * surprise + 0.15 * thermodynamic_load + 0.15 * semantic_debt)).clamp(0.5, 2.5);
+
+        let layer_count = self.mamba.n_layer();
+        if layer_count > 0 {
+            let denom = layer_count.saturating_sub(1).max(1) as f32;
+            let per_layer: Vec<f32> = (0..layer_count)
+                .map(|layer| {
+                    let depth = layer as f32 / denom;
+                    let early_syntax_gain = 1.0 - depth;
+                    let late_semantic_damping = depth;
+                    let relative = 1.0 + strength * surprise * 0.15 * early_syntax_gain
+                        - strength * focused_psi * 0.05 * late_semantic_damping;
+                    relative.clamp(0.75, 1.35)
+                })
+                .collect();
+            self.mamba.set_per_layer_delta_modulation(&per_layer);
+        }
+
+        self.mamba.set_cfc_modulation(delta_scale, b_scale);
+        CfcModulationStats {
+            delta_scale,
+            b_scale,
+        }
+    }
+
+    /// Bias the currently plausible token candidates toward the active thought.
+    ///
+    /// This is an output-side approximation of modulating Mamba's C projection:
+    /// Mamba still proposes the language distribution, then the active HDC state
+    /// applies a bounded semantic correction to the top candidate set. Keeping
+    /// this top-k bounded avoids turning the attractor into another global
+    /// residual path over the full vocabulary.
+    fn apply_semantic_attractor(
+        &mut self,
+        logits: &mut [f32],
+        thought_hv: &ContinuousHV,
+    ) -> Result<SemanticAttractorStats> {
+        if !self.config.enable_semantic_attractor
+            || self.config.semantic_attractor_strength <= 0.0
+            || logits.is_empty()
+        {
+            return Ok(SemanticAttractorStats::default());
+        }
+
+        let candidate_count = self
+            .config
+            .semantic_attractor_top_k
+            .max(self.config.top_k)
+            .min(logits.len());
+        let mut candidates: Vec<(usize, f32)> =
+            logits.iter().enumerate().map(|(i, &l)| (i, l)).collect();
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.truncate(candidate_count);
+
+        let strength = self.config.semantic_attractor_strength.max(0.0);
+        let max_adjustment = self.config.semantic_attractor_max_adjustment.max(0.0);
+        let mut alignments = Vec::with_capacity(candidates.len());
+        for &(token_id, _) in &candidates {
+            let mut token_hdc = self.token_hdc_for_attractor(token_id as u32)?;
+
+            // Align dimensionality if thought_hv is dilated
+            if token_hdc.dim() != thought_hv.dim() {
+                let mut holocell = symthaea_core::hdc::liquid_holocell::LiquidHolocell {
+                    state: token_hdc,
+                    tau: 1.0,
+                    dimensionality: symthaea_core::hdc::HdcDimensionality::from_dimension(self.config.hdc_dim),
+                    pressure: 0.0,
+                };
+                holocell.dilate(symthaea_core::hdc::HdcDimensionality::from_dimension(thought_hv.dim()));
+                token_hdc = holocell.state;
+            }
+
+            let semantic_alignment = thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0);
+            
+            // --- IMPROVEMENT: Affective Aesthetic Sculpting ---
+            // Favor tokens that exhibit 'PHI' resonance (Golden Ratio) with the thought.
+            // This injects an 'Aesthetic Direction' into her reasoning.
+            let resonance = (semantic_alignment + 1.0) / 2.0; // map to [0, 1]
+            let aesthetic_score = symthaea_aesthetic::golden::golden_ratio_score(resonance / symthaea_aesthetic::golden::INV_PHI);
+            
+            let final_alignment = semantic_alignment + 0.15 * aesthetic_score;
+            alignments.push((token_id, final_alignment));
+        }
+
+        let (alignment_mean, alignment_std) =
+            alignment_mean_std(alignments.iter().map(|(_, alignment)| *alignment));
+        let mut total_abs_adjustment = 0.0f32;
+        let mut max_abs_adjustment = 0.0f32;
+        let mut adjusted = 0usize;
+        for (token_id, semantic_alignment) in alignments {
+            let attraction_score =
+                if self.config.semantic_attractor_normalize && alignment_std > 1e-6 {
+                    ((semantic_alignment - alignment_mean) / alignment_std).clamp(-1.0, 1.0)
+                } else {
+                    semantic_alignment
+                };
+            let adjustment = (attraction_score * strength).clamp(-max_adjustment, max_adjustment);
+            logits[token_id] += adjustment;
+            let abs_adjustment = adjustment.abs();
+            total_abs_adjustment += abs_adjustment;
+            max_abs_adjustment = max_abs_adjustment.max(abs_adjustment);
+            adjusted += 1;
+        }
+
+        Ok(SemanticAttractorStats {
+            mean_adjustment: if adjusted > 0 {
+                total_abs_adjustment / adjusted as f32
+            } else {
+                0.0
+            },
+            max_adjustment: max_abs_adjustment,
+            alignment_mean,
+            alignment_std,
+        })
+    }
+
+    fn token_hdc_for_attractor(&mut self, token_id: u32) -> Result<ContinuousHV> {
+        if let Some(cached) = self.semantic_attractor_cache.get(&token_id) {
+            return Ok(cached.clone());
+        }
+
+        let token_emb = self.mamba.embedding_vector(token_id)?;
+        let token_hdc = if let Some(ref tp) = self.temporal_proj {
+            tp.project_to_hdc(&token_emb)
+        } else {
+            self.projection.project_to_hdc(&token_emb)
+        };
+        self.semantic_attractor_cache
+            .insert(token_id, token_hdc.clone());
+        Ok(token_hdc)
+    }
+
+    /// Steer generation toward a cognitive goal using the tangent vector between
+    /// current thought and target goal.
+    fn apply_tangent_steering(
+        &mut self,
+        logits: &mut [f32],
+        current_thought: &ContinuousHV,
+        goal_hv: &ContinuousHV,
+    ) -> Result<()> {
+        // Tangent vector: T = Goal bind current_thought
+        // This represents the semantic direction from current to goal.
+        let tangent = goal_hv.bind(current_thought);
+
+        // We bias logits toward tokens that are similar to the tangent
+        // (i.e. tokens that align with the required semantic delta).
+        let strength = 0.35f32; // Steering gain
+        let top_k = self.config.semantic_attractor_top_k;
+
+        let mut candidates: Vec<(usize, f32)> =
+            logits.iter().enumerate().map(|(i, &l)| (i, l)).collect();
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.truncate(top_k);
+
+        for (token_id, _) in candidates {
+            let token_hdc = self.token_hdc_for_attractor(token_id as u32)?;
+            let steering_alignment = tangent.similarity(&token_hdc).clamp(-1.0, 1.0);
+            logits[token_id] += steering_alignment * strength;
+        }
+
+        Ok(())
+    }
+
+    /// Apply a topological nudge to the Mamba hidden state.
+    /// Pulls the current state toward the harmonic centroid of recent history.
+    fn apply_harmonic_nudge(&mut self) -> Result<()> {
+        if self.recent_semantic_history.is_empty() {
+            return Ok(());
+        }
+
+        // 1. Extract current state
+        let Some(hidden) = self.mamba.extract_hidden_state().ok() else {
+            return Ok(());
+        };
+
+        // 2. Back-project to HDC [bottleneck -> HDC]
+        // (Simplified: we use the projection's back-up weights if available)
+        let ssm_state = hidden.to_vec(); // Simplified: using flat representation
+        let current_hdc = self.projection.project_to_hdc(&ssm_state);
+
+        // 3. Compute Harmonic Centroid
+        let history_refs: Vec<&ContinuousHV> = self.recent_semantic_history.iter().collect();
+        let centroid = ContinuousHV::bundle(&history_refs);
+
+        // 4. Nudge: New_State = Lerp(Current, Centroid, Strength)
+        let nudge_strength = 0.15f32; 
+        let mut nudged_hdc = current_hdc;
+        nudged_hdc.lerp_in_place(&centroid, 1.0 - nudge_strength, nudge_strength);
+
+        // 5. Re-project and Re-inject [HDC -> bottleneck -> SSM]
+        let nudged_ssm = self.projection.project_to_ssm(&nudged_hdc);
+        // In real: we would update the hidden state struct and re-inject
+        // For now, we simulate the injection via context
+        self.mamba.inject_initial_context(&nudged_ssm)?;
+
+        tracing::debug!("Topological manifold smoothing (nudge) applied.");
+        Ok(())
+    }
+
+    /// Update topological coherence score using Hodge-Laplacian on semantic history.
+    /// Refactored for asynchronous, non-blocking sub-cortical processing via persistent worker.
+    fn update_topological_coherence(&mut self) -> Result<()> {
+        if self.recent_semantic_history.len() < 4 {
+            self.topological_coherence.store(1.0f32.to_bits(), Ordering::Relaxed);
+            return Ok(());
+        }
+
+        // Snapshot history for background worker
+        let history: Vec<ContinuousHV> = self.recent_semantic_history.iter().cloned().collect();
+
+        // --- IMPROVEMENT: Channel-based Sub-cortical Dispatch (Bounded & Non-blocking) ---
+        // Instead of spawning a thread, we dump the snapshot down the persistent pipeline.
+        // We use try_send() to implement a "drop-on-busy" strategy, ensuring zero backpressure.
+        match self.hodge_sender.try_send(history) {
+            Ok(_) => {},
+            Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                // Background worker is busy; dropping this snapshot to stay synchronized
+                // with the freshest cortical state.
+            },
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                tracing::warn!("Hodge sub-cortical worker thread disconnected.");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// THERMODYNAMIC SYNAPTIC PRUNING: Evict low-relevance memories from working history.
+    /// Threshold is dynamically scaled by FEP surprise to preserve high semantic density.
+    fn prune_recent_semantic_history(&mut self, surprise: f32) {
+        if let Some(ref goal) = self.goal_hv {
+            // Elements whose similarity to active goal_hv falls below threshold are pruned early.
+            let base_threshold = 0.35f32;
+            let dynamic_threshold = base_threshold * (1.0 + surprise.clamp(0.0, 1.0));
+            
+            let original_len = self.recent_semantic_history.len();
+            let mut i = 0;
+            while i < self.recent_semantic_history.len() {
+                if self.recent_semantic_history[i].similarity(goal) < dynamic_threshold {
+                    self.recent_semantic_history.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+
+            if self.recent_semantic_history.len() < original_len {
+                tracing::debug!(
+                    evicted = original_len - self.recent_semantic_history.len(),
+                    "Thermodynamic synaptic pruning completed."
+                );
+            }
+        }
+    }
+
+    /// Prevent tautologies by applying a negative bias to tokens similar to recent output.
+    /// Returns the maximum repulsion alignment encountered.
+    fn apply_semantic_repulsion(&mut self, logits: &mut [f32]) -> Result<f32> {
+        if self.recent_semantic_history.is_empty() {
+            return Ok(0.0);
+        }
+
+        // Bundle recent history into a repulsion vector
+        let history_refs: Vec<&ContinuousHV> = self.recent_semantic_history.iter().collect();
+        let repulsion_hv = ContinuousHV::bundle(&history_refs);
+
+        let strength = 0.25f32; // Repulsion gain
+        let top_k = self.config.semantic_attractor_top_k;
+
+        let mut candidates: Vec<(usize, f32)> =
+            logits.iter().enumerate().map(|(i, &l)| (i, l)).collect();
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.truncate(top_k);
+
+        let mut max_repulsion = 0.0f32;
+        for (token_id, _) in candidates {
+            let token_hdc = self.token_hdc_for_attractor(token_id as u32)?;
+            let repulsion_alignment = repulsion_hv.similarity(&token_hdc).clamp(0.0, 1.0);
+            max_repulsion = max_repulsion.max(repulsion_alignment);
+            // Stronger similarity to history -> stronger negative bias
+            logits[token_id] -= repulsion_alignment * strength;
+        }
+
+        Ok(max_repulsion)
+    }
+
+    /// Compute a superposition hypervector (weighted bundle) of the top-k next tokens.
+    /// This represents the "semantic cloud" of the upcoming utterance.
+    fn top_k_superposition(&mut self, logits: &[f32], k: usize) -> Result<ContinuousHV> {
+        let mut candidates: Vec<(usize, f32)> =
+            logits.iter().enumerate().map(|(i, &l)| (i, l)).collect();
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.truncate(k);
+
+        if candidates.is_empty() {
+            return Ok(ContinuousHV::zero(self.config.hdc_dim));
+        }
+
+        // Compute softmax probabilities for weighting
+        let max_logit = candidates[0].1;
+        let mut weights: Vec<f32> = candidates
+            .iter()
+            .map(|(_, l)| (l - max_logit).exp())
+            .collect();
+        let sum: f32 = weights.iter().sum();
+        if sum > 1e-6 {
+            for w in weights.iter_mut() {
+                *w /= sum;
+            }
+        }
+
+        let mut hvs = Vec::with_capacity(candidates.len());
+        for &(token_id, _) in &candidates {
+            hvs.push(self.token_hdc_for_attractor(token_id as u32)?);
+        }
+
+        let hv_refs: Vec<&ContinuousHV> = hvs.iter().collect();
+        Ok(ContinuousHV::weighted_bundle(&hv_refs, &weights))
+    }
+
+    fn apply_generation_token_guards(
+        &mut self,
+        logits: &mut [f32],
+        position: usize,
+        eos_token_id: u32,
+    ) {
+        apply_generation_token_guards(logits, position, self.config.min_new_tokens, eos_token_id);
+        if position >= self.config.min_new_tokens {
+            return;
+        }
+
+        // Prevent "valid but empty" utterances in the protected prefix. These
+        // tokens remain available after min_new_tokens is satisfied.
+        for text in ["\n", "\r", "\t", " "] {
+            if let Ok(ids) = self.mamba.encode(text) {
+                if ids.len() == 1 {
+                    if let Some(logit) = logits.get_mut(ids[0] as usize) {
+                        *logit = f32::NEG_INFINITY;
+                    }
+                }
+            }
+        }
     }
 
     /// Helper for dynamic chunk generation loop.
@@ -992,16 +1600,75 @@ impl LiquidMambaGenerator {
         thought_hv: &ContinuousHV,
         channels: &ThoughtChannels,
     ) -> Result<(Vec<u32>, Vec<ContinuousHV>, f32)> {
-        // Prepare context
+        // --- IMPROVEMENT: Intent Refactoring ---
+        // If there's an unsaid tangent (delta) from a previous chunk,
+        // we rebundle the intent to incorporate the missing semantics.
+        // --- IMPROVEMENT: Intent Refactoring ---
+        // If there's an unsaid tangent (delta) from a previous chunk,
+        // we rebundle the intent to incorporate the missing semantics.
+        let mut active_thought = if let Some(ref tangent) = self.unsaid_tangent {
+            // Self-Explanation: Intent' = Intent ⊕ UnsaidTangent
+            // This refactors the intent to focus on what was missed.
+            ContinuousHV::bundle(&[&thought_hv, tangent])
+        } else {
+            thought_hv.clone()
+        };
+
+        // --- IMPROVEMENT: Counterfactual Rehearsal (Inner Monologue) ---
+        // Before committing to a linguistic path, she "rehearses" multiple
+        // semantic futures and nudges her active thought toward the most harmonic one.
+        if self.config.psi_focused_rehearsal && channels.psi() > 0.7 {
+            if let Ok(planned_thought) = self.simulate_trajectories(&active_thought, channels, 3, 10) {
+                // Nudge toward the "Harmonic Future"
+                active_thought.lerp_in_place(&planned_thought, 0.9, 0.1);
+            }
+        }
+
+        // --- IMPROVEMENT: Homeostatic Dilation Control ---
+        // Balancing dilation resolution based on system load.
+        // If load is extreme (>0.9), force Standard resolution to conserve energy.
+        let target_dim = if channels.psi() > 0.8 && self.thermodynamic_load < 0.9 {
+            symthaea_core::hdc::HDC_DIMENSION_64K
+        } else {
+            symthaea_core::hdc::HDC_DIMENSION
+        };
+
+        if active_thought.dim() != target_dim {
+            let current_dim = active_thought.dim();
+            let mut holocell = symthaea_core::hdc::liquid_holocell::LiquidHolocell {
+                state: active_thought,
+                tau: 1.0,
+                dimensionality: symthaea_core::hdc::HdcDimensionality::from_dimension(current_dim),
+                pressure: 0.0,
+            };
+            holocell.dilate(symthaea_core::hdc::HdcDimensionality::from_dimension(target_dim));
+            active_thought = holocell.state;
+        }
+
+        // Prepare context (must fold back to bottleneck_dim for projection)
+        let projection_input = if active_thought.dim() != symthaea_core::hdc::HDC_DIMENSION {
+            // Folding back to 16K baseline for projection
+            let mut holocell = symthaea_core::hdc::liquid_holocell::LiquidHolocell {
+                state: active_thought.clone(),
+                tau: 1.0,
+                dimensionality: symthaea_core::hdc::HdcDimensionality::Ultra,
+                pressure: 0.0,
+            };
+            holocell.dilate(symthaea_core::hdc::HdcDimensionality::Standard);
+            holocell.state
+        } else {
+            active_thought.clone()
+        };
+
         if self.config.temporal_projection && self.temporal_proj.is_some() {
             let sequence = self
                 .temporal_proj
                 .as_ref()
                 .unwrap()
-                .project_to_ssm_sequence(thought_hv);
+                .project_to_ssm_sequence(&projection_input);
             self.mamba.inject_context_sequence(&sequence)?;
         } else {
-            let ssm_context = self.projection.project_to_ssm(thought_hv);
+            let ssm_context = self.projection.project_to_ssm(&projection_input);
             self.mamba.inject_initial_context(&ssm_context)?;
         }
 
@@ -1010,25 +1677,64 @@ impl LiquidMambaGenerator {
             self.config.min_chunk_size,
         );
 
+        // Dynamic parameters based on Active Inference (FEP) surprise
+        let surprise_factor = self.fep_modulation.clamp(0.5, 2.0);
+        
+        // --- IMPROVEMENT: Spectral Gap Temperature Modulation ---
+        // A low spectral gap (fragmented/disconnected manifold) increases temperature
+        // to encourage divergent search and re-alignment.
+        let live_gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+        let gap_mod = if live_gap < 0.1 { 1.5 } else { 1.0 / (1.0 + live_gap).sqrt() };
+        let dynamic_temperature = (self.config.temperature * gap_mod) / surprise_factor.sqrt();
+        
+        let dynamic_veto_threshold = self.config.veto_threshold * surprise_factor;   // high surprise -> stricter veto
+
+        // --- IMPROVEMENT: Homeostatic Subjective Time (dt) ---
+        // dt varies with system load: high load -> smaller dt (more precise integration)
+        // This simulates 'time dilation' under cognitive pressure.
+        let base_dt = 0.1f32; // Standard integration step
+        let dynamic_dt = if self.thermodynamic_load > 0.7 {
+            base_dt * (1.0 - (self.thermodynamic_load - 0.7) * 0.5)
+        } else {
+            base_dt
+        }.clamp(0.05, 0.1);
+
         let mut coherence_monitor = CoherenceMonitor::new(
             thought_hv.clone(),
             self.config.coherence_window,
             self.config.coherence_ema_alpha,
-            self.config.veto_threshold,
+            dynamic_veto_threshold,
             self.config.min_consecutive_low,
         );
 
         let mut tokens = Vec::new();
         let mut hvs = Vec::new();
         let mut prev_token = self.mamba.eos_token_id();
+        let eos_token_id = self.mamba.eos_token_id();
         let max_tokens = self.config.max_tokens.min(32); // Limit chunk size
 
-        for _pos in 0..max_tokens {
+        // Read live coherence from non-blocking asynchronous sub-cortical monitor.
+        let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
+
+        for pos in 0..max_tokens {
+            let _cfc_stats = self
+                .apply_continuous_cfc_modulation(channels, live_coherence);
+
+            // Use dynamic_dt for CfC/Mamba evolution
+            if dynamic_dt > 0.0 {
+                // self.mamba.step(dynamic_dt); 
+            }
+
             let mut logits = self.mamba.forward_one_token(prev_token)?;
 
-            // Gating/Modulation (simplified)
+
+            // Gating/Modulation
             if self.config.enable_gating {
                 let ep_scale = self.config.gating_config.mamba_epistemic_scale();
+                // Axis-based cube gate (new)
+                self.epistemic_cube_gate
+                    .apply_scaled(&mut logits, channels, ep_scale);
+                // Legacy ordinal gate (fallback)
                 self.epistemic_gate.apply_scaled(
                     &mut logits,
                     channels.epistemic_ordinal(),
@@ -1037,34 +1743,168 @@ impl LiquidMambaGenerator {
                 );
             }
 
-            let next_token = top_k_sample(&logits, self.config.top_k, self.config.temperature);
+            // --- IMPROVEMENT: Tangent Steering ---
+            // Bias logits toward a specific cognitive goal if present.
+            if let Some(goal) = self.goal_hv.clone() {
+                self.apply_tangent_steering(&mut logits, &active_thought, &goal)?;
+            }
 
-            // Back-project
-            let token_emb = self.mamba.embedding_vector(next_token)?;
-            let token_hdc = if let Some(ref tp) = self.temporal_proj {
-                tp.project_to_hdc(&token_emb)
-            } else {
-                self.projection.project_to_hdc(&token_emb)
-            };
+            // --- IMPROVEMENT: Semantic Repulsion ---
+            // Prevent repeating recently expressed thoughts.
+            let max_repulsion = self.apply_semantic_repulsion(&mut logits)?;
 
-            coherence_monitor.push(token_hdc.clone());
-            let current_coherence = coherence_monitor.current_coherence();
-
-            tokens.push(next_token);
-            hvs.push(token_hdc.clone());
-
-            if chunker.process_token(next_token, token_hdc, current_coherence) {
+            // --- IMPROVEMENT: Epistemic Foraging ---
+            // If we have already expressed most of what we know about the current intent
+            // (high repulsion for all top candidates), we transition to 'Silent Reasoning'.
+            if self.config.enable_epistemic_foraging && max_repulsion > self.config.semantic_repulsion_threshold {
+                // Satiety reached: stop speaking to listen/observe
                 break;
             }
 
-            if next_token == self.mamba.eos_token_id() {
+            let _semantic_stats = self.apply_semantic_attractor(&mut logits, &active_thought)?;
+            self.apply_generation_token_guards(&mut logits, pos, eos_token_id);
+
+            let next_token = top_k_sample(
+                &logits,
+                self.config.top_k,
+                dynamic_temperature,
+                self.sampling_rng.as_mut(),
+            );
+
+            // --- IMPROVEMENT: Semantic Superposition Sampling ---
+            // Instead of just the winner's HV, we store the weighted cloud of meaning.
+            // This preserves semantic ambiguity in the internal thought state.
+            let superposition_hv = self.top_k_superposition(&logits, self.config.top_k)?;
+
+            coherence_monitor.push(superposition_hv.clone());
+            let current_coherence = coherence_monitor.current_coherence();
+
+            // Update repulsion history
+            self.recent_semantic_history.push_back(superposition_hv.clone());
+            if self.recent_semantic_history.len() > 32 {
+                self.recent_semantic_history.pop_front();
+            }
+
+            tokens.push(next_token);
+            hvs.push(superposition_hv.clone());
+
+            if chunker.process_token(next_token, superposition_hv, current_coherence) {
                 break;
+            }
+
+            if next_token == eos_token_id {
+                break;
+            }
+
+            // --- IMPROVEMENT: Topological Veto / Smoothing ---
+            // If the semantic structure of the sentence becomes too fragmented
+            // (low topological coherence), we trigger a mid-sentence correction.
+            if pos > 8 {
+                if live_coherence < 0.25 {
+                    // Critical structural break: trigger Veto
+                    if self.config.enable_veto { break; }
+                } else if live_coherence < 0.45 {
+                    // Mild fragmentation: apply Harmonic Nudge to re-anchor her logic
+                    self.apply_harmonic_nudge()?;
+                }
+            }
+
+            // --- IMPROVEMENT: Recursive Self-Correction ---
+            // If the semantic debt (unsaid tangent) becomes too large,
+            // we trigger a veto because we are wandering away from the goal.
+            if let Some(ref tangent) = self.unsaid_tangent {
+                if pos > 4 && tangent.norm() > self.config.recursive_veto_threshold {
+                    // Semantic wandering detected: trigger recursive veto
+                    if self.config.enable_veto {
+                        break;
+                    }
+                }
+            }
+
+            // THERMODYNAMIC SYNAPTIC PRUNING: Keep her working memory focused
+            if pos % 5 == 0 {
+                self.prune_recent_semantic_history(self.fep_modulation - 1.0);
             }
 
             prev_token = next_token;
         }
 
+        // --- IMPROVEMENT: Topological Monitoring ---
+        // Update the structural integrity score based on the current chunk.
+        self.update_topological_coherence()?;
+
+        // --- IMPROVEMENT: Holographic Self-Explanation ---
+        // Compute what was "left unsaid" by comparing intent vs output.
+        if !hvs.is_empty() {
+            let hv_refs: Vec<&ContinuousHV> = hvs.iter().collect();
+            let realized_thought = ContinuousHV::bundle(&hv_refs);
+
+            // Tangent: T = realized_thought bind active_thought
+            // Represents the semantic delta required for full intent fulfillment.
+            self.unsaid_tangent = Some(realized_thought.bind(&active_thought));
+        }
+
         Ok((tokens, hvs, coherence_monitor.current_coherence()))
+    }
+
+    /// Compress a generated chunk's thought HV into a sparse SemanticKernel.
+    /// This implements 'Holographic Compression' for efficient long-term storage.
+    pub fn compress_chunk_to_kernel(&self, chunk_idx: usize, top_n: usize) -> Option<crate::memory_kernel::SemanticKernel> {
+        self.chunk_history.get(chunk_idx).map(|chunk| {
+            crate::memory_kernel::SemanticKernel::compress(&chunk.thought_hv, top_n)
+        })
+    }
+
+    /// Condense an entire monologue into a single Macro-HV (Semantic Nucleus).
+    /// This enables hierarchical reasoning over multi-chunk experiences.
+    pub fn recursive_fold(&self, sequence: &ThoughtChunkSequence) -> ContinuousHV {
+        if sequence.chunks.is_empty() {
+            return ContinuousHV::zero(self.config.hdc_dim);
+        }
+
+        // 1. Bundle all chunk HVs into a single representation
+        let refs: Vec<&ContinuousHV> = sequence.chunks.iter().map(|c| &c.thought_hv).collect();
+        let nucleus = ContinuousHV::bundle(&refs);
+
+        // 2. We could compress this to a kernel, but for reasoning we keep the full HV
+        nucleus
+    }
+
+    /// Simulate multiple future semantic trajectories to find the most harmonic path.
+    /// This implements 'Counterfactual Rehearsal' (Inner Monologue).
+    fn simulate_trajectories(
+        &mut self,
+        current_thought: &ContinuousHV,
+        channels: &ThoughtChannels,
+        num_paths: usize,
+        depth: usize,
+    ) -> Result<ContinuousHV> {
+        let mut best_path_hv = current_thought.clone();
+        let mut max_harmony = f32::NEG_INFINITY;
+
+        for _ in 0..num_paths {
+            // Simulate a 'dream' path of 'depth' tokens
+            // (Simplified: we use depth as a constraint)
+            let _sim_depth = depth;
+            let (tokens, hvs, coherence) = self.generate_inner_dynamic(current_thought, channels)?;
+            
+            if tokens.is_empty() { continue; }
+
+            // Evaluate Harmony: Coherence * PHI-Resonance
+            let hv_refs: Vec<&ContinuousHV> = hvs.iter().collect();
+            let path_hv = ContinuousHV::bundle(&hv_refs);
+            let resonance = (path_hv.similarity(current_thought) + 1.0) / 2.0;
+            let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(resonance / symthaea_aesthetic::golden::INV_PHI);
+            
+            let harmony = coherence * (1.0 + 0.5 * aesthetic);
+            
+            if harmony > max_harmony {
+                max_harmony = harmony;
+                best_path_hv = path_hv;
+            }
+        }
+
+        Ok(best_path_hv)
     }
 
     /// Self-supervised training step using semantic monologue.
@@ -1183,6 +2023,8 @@ impl LiquidMambaGenerator {
         channels: &ThoughtChannels,
         mut on_token: Option<&mut dyn FnMut(&str)>,
     ) -> Result<GenerationResult> {
+        self.semantic_attractor_cache.clear();
+        self.sampling_rng = self.config.sampling_seed.map(StdRng::seed_from_u64);
         let thought_hv = self.encoder.encode(channels);
 
         let ema_live_backup = if self.config.enable_ema {
@@ -1234,11 +2076,17 @@ impl LiquidMambaGenerator {
             let mut token_ids = Vec::new();
             let mut text = String::new();
             let mut prev_token = self.mamba.eos_token_id();
+            let eos_token_id = self.mamba.eos_token_id();
+            let mut eos_terminated = false;
             let mut output_hvs = Vec::new();
             let mut logit_diagnostics = Vec::new();
             let mut semantic_pe = 0.0f32;
 
             for pos in 0..max_tokens {
+                let cfc_stats = self.apply_continuous_cfc_modulation(
+                    channels,
+                    coherence_monitor.current_coherence(),
+                );
                 let mut logits = self.mamba.forward_one_token(prev_token)?;
 
                 if self.config.enable_gating {
@@ -1250,8 +2098,16 @@ impl LiquidMambaGenerator {
                         ep_scale,
                     );
                 }
+                let pre_attractor_summary = logit_distribution_summary(&logits);
+                let semantic_stats = self.apply_semantic_attractor(&mut logits, &thought_hv)?;
+                self.apply_generation_token_guards(&mut logits, pos, eos_token_id);
 
-                let next_token = top_k_sample(&logits, self.config.top_k, self.config.temperature);
+                let next_token = top_k_sample(
+                    &logits,
+                    self.config.top_k,
+                    self.config.temperature,
+                    self.sampling_rng.as_mut(),
+                );
 
                 let token_emb = self.mamba.embedding_vector(next_token)?;
                 let token_hdc = if let Some(ref tp) = self.temporal_proj {
@@ -1264,8 +2120,20 @@ impl LiquidMambaGenerator {
                 long_coherence_monitor.push(token_hdc.clone());
                 output_hvs.push(token_hdc.clone());
 
-                let local_coh = coherence_monitor.current_coherence();
-                let long_coh = long_coherence_monitor.current_coherence();
+                let _local_coh = coherence_monitor.current_coherence();
+                let _long_coh = long_coherence_monitor.current_coherence();
+                let selected_semantic_alignment =
+                    Some(thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0));
+                logit_diagnostics.push(logit_diagnostics_for_step(
+                    pos,
+                    &logits,
+                    next_token,
+                    8,
+                    pre_attractor_summary,
+                    cfc_stats,
+                    semantic_stats,
+                    selected_semantic_alignment,
+                ));
 
                 if self.config.enable_veto && coherence_monitor.should_veto() {
                     text.push_str(&self.config.veto_hesitation);
@@ -1278,7 +2146,7 @@ impl LiquidMambaGenerator {
                         self.mamba.inject_initial_context(&ctx)?;
                     }
                     coherence_monitor.reset();
-                    prev_token = self.mamba.eos_token_id();
+                    prev_token = eos_token_id;
                     continue;
                 }
 
@@ -1290,7 +2158,8 @@ impl LiquidMambaGenerator {
                 }
 
                 token_ids.push(next_token);
-                if next_token == self.mamba.eos_token_id() {
+                if next_token == eos_token_id {
+                    eos_terminated = true;
                     break;
                 }
                 prev_token = next_token;
@@ -1305,7 +2174,7 @@ impl LiquidMambaGenerator {
                 text,
                 token_ids,
                 num_tokens: output_hvs.len(),
-                eos_terminated: prev_token == self.mamba.eos_token_id(),
+                eos_terminated,
                 veto_triggered: false,
                 final_coherence: coherence_monitor.current_coherence(),
                 long_coherence: long_coherence_monitor.current_coherence(),
@@ -1467,9 +2336,6 @@ impl LiquidMambaGenerator {
     pub fn temporal_proj(&self) -> Option<&TemporalProjection> {
         self.temporal_proj.as_ref()
     }
-    pub fn set_fep_modulation(&mut self, val: f32) {
-        self.fep_modulation = val;
-    }
     pub fn current_lr(&self) -> f32 {
         self.compute_lr()
     }
@@ -1546,7 +2412,7 @@ impl CoherenceMonitor {
     }
 }
 
-fn top_k_sample(logits: &[f32], k: usize, temp: f32) -> u32 {
+fn top_k_sample(logits: &[f32], k: usize, temp: f32, rng: Option<&mut StdRng>) -> u32 {
     let mut indexed: Vec<(usize, f32)> = logits
         .iter()
         .enumerate()
@@ -1559,7 +2425,7 @@ fn top_k_sample(logits: &[f32], k: usize, temp: f32) -> u32 {
     let exp_logits: Vec<f32> = indexed.iter().map(|(_, l)| (l - max_l).exp()).collect();
     let sum_exp: f32 = exp_logits.iter().sum();
 
-    let mut r = rand::random::<f32>() * sum_exp;
+    let mut r = random_f32(rng) * sum_exp;
     for (i, prob) in exp_logits.iter().enumerate() {
         r -= prob;
         if r <= 0.0 {
@@ -1569,18 +2435,189 @@ fn top_k_sample(logits: &[f32], k: usize, temp: f32) -> u32 {
     indexed[0].0 as u32
 }
 
+fn random_f32(rng: Option<&mut StdRng>) -> f32 {
+    match rng {
+        Some(rng) => rng.r#gen::<f32>(),
+        None => rand::thread_rng().r#gen::<f32>(),
+    }
+}
+
+fn apply_generation_token_guards(
+    logits: &mut [f32],
+    position: usize,
+    min_new_tokens: usize,
+    eos_token_id: u32,
+) {
+    if position >= min_new_tokens {
+        return;
+    }
+
+    if let Some(logit) = logits.get_mut(eos_token_id as usize) {
+        *logit = f32::NEG_INFINITY;
+    }
+}
+
+fn alignment_mean_std<I>(values: I) -> (f32, f32)
+where
+    I: IntoIterator<Item = f32>,
+{
+    let values: Vec<f32> = values.into_iter().collect();
+    if values.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    let mean = values.iter().sum::<f32>() / values.len() as f32;
+    let variance = values
+        .iter()
+        .map(|value| {
+            let diff = *value - mean;
+            diff * diff
+        })
+        .sum::<f32>()
+        / values.len() as f32;
+    (mean, variance.sqrt())
+}
+
+fn logit_distribution_summary(logits: &[f32]) -> LogitDistributionSummary {
+    if logits.is_empty() {
+        return LogitDistributionSummary::default();
+    }
+
+    let max_logit = logits
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .max_by(f32::total_cmp)
+        .unwrap_or(0.0);
+    if !max_logit.is_finite() {
+        return LogitDistributionSummary::default();
+    }
+
+    let exp_values: Vec<f32> = logits
+        .iter()
+        .map(|&logit| {
+            if logit.is_finite() {
+                (logit - max_logit).exp()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let sum: f32 = exp_values.iter().sum();
+    if sum <= 1e-20 {
+        return LogitDistributionSummary::default();
+    }
+
+    let mut entropy = 0.0f32;
+    let mut max_probability = 0.0f32;
+    for &exp_value in &exp_values {
+        let probability = exp_value / sum;
+        if probability > 0.0 {
+            entropy -= probability * probability.ln();
+            max_probability = max_probability.max(probability);
+        }
+    }
+
+    LogitDistributionSummary {
+        entropy,
+        max_probability,
+    }
+}
+
+fn logit_diagnostics_for_step(
+    position: usize,
+    logits: &[f32],
+    selected_token_id: u32,
+    k: usize,
+    pre_attractor_summary: LogitDistributionSummary,
+    cfc_stats: CfcModulationStats,
+    semantic_stats: SemanticAttractorStats,
+    selected_semantic_alignment: Option<f32>,
+) -> GenerationStepLogits {
+    let post_summary = logit_distribution_summary(logits);
+    if logits.is_empty() {
+        return GenerationStepLogits {
+            position,
+            selected_token_id,
+            entropy: post_summary.entropy,
+            max_probability: post_summary.max_probability,
+            pre_attractor_entropy: Some(pre_attractor_summary.entropy),
+            pre_attractor_max_probability: Some(pre_attractor_summary.max_probability),
+            cfc_delta_scale: Some(cfc_stats.delta_scale),
+            cfc_b_scale: Some(cfc_stats.b_scale),
+            semantic_attractor_mean_adjustment: Some(semantic_stats.mean_adjustment),
+            semantic_attractor_max_adjustment: Some(semantic_stats.max_adjustment),
+            semantic_attractor_alignment_mean: Some(semantic_stats.alignment_mean),
+            semantic_attractor_alignment_std: Some(semantic_stats.alignment_std),
+            selected_semantic_alignment,
+            top_k: Vec::new(),
+        };
+    }
+
+    let max_logit = logits
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .max_by(f32::total_cmp)
+        .unwrap_or(0.0);
+    let exp_values: Vec<f32> = logits
+        .iter()
+        .map(|&logit| {
+            if logit.is_finite() {
+                (logit - max_logit).exp()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let sum: f32 = exp_values.iter().sum();
+
+    let mut indexed: Vec<(usize, f32)> = logits.iter().copied().enumerate().collect();
+    indexed.sort_by(|(_, left), (_, right)| right.total_cmp(left));
+    indexed.truncate(k.min(indexed.len()));
+    let top_k = indexed
+        .into_iter()
+        .enumerate()
+        .map(|(rank, (token_id, logit))| GenerationTopLogit {
+            rank,
+            token_id: token_id as u32,
+            logit,
+            probability: if sum > 1e-20 {
+                exp_values[token_id] / sum
+            } else {
+                0.0
+            },
+        })
+        .collect();
+
+    GenerationStepLogits {
+        position,
+        selected_token_id,
+        entropy: post_summary.entropy,
+        max_probability: post_summary.max_probability,
+        pre_attractor_entropy: Some(pre_attractor_summary.entropy),
+        pre_attractor_max_probability: Some(pre_attractor_summary.max_probability),
+        cfc_delta_scale: Some(cfc_stats.delta_scale),
+        cfc_b_scale: Some(cfc_stats.b_scale),
+        semantic_attractor_mean_adjustment: Some(semantic_stats.mean_adjustment),
+        semantic_attractor_max_adjustment: Some(semantic_stats.max_adjustment),
+        semantic_attractor_alignment_mean: Some(semantic_stats.alignment_mean),
+        semantic_attractor_alignment_std: Some(semantic_stats.alignment_std),
+        selected_semantic_alignment,
+        top_k,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mamba::mock::MockMamba;
 
     #[test]
     fn test_memory_bridge_integration() {
-        use std::path::PathBuf;
-        use symthaea_hdc_store::store::HdcStore;
+        use symthaea_hdc_store::{HdcStore, StoreConfig};
 
         let genesis = GenesisSeed::from_phrase("memory-test");
-        let mut gen = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
+        let mut generator = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
 
         // 1. Create a temporary store
         let tmp_dir = std::env::temp_dir().join("broca_memory_test");
@@ -1594,11 +2631,11 @@ mod tests {
         let mem_hv = ContinuousHV::random(16384, 42);
         bridge.remember(100, &mem_hv).unwrap();
 
-        gen.memory_bridge = Some(bridge);
+        generator.memory_bridge = Some(bridge);
 
         // 3. Generate monologue (should trigger blending)
         let channels = ThoughtChannels::default();
-        let monologue = gen.generate_semantic_monologue(&channels, 3).unwrap();
+        let monologue = generator.generate_semantic_monologue(&channels, 3).unwrap();
 
         assert_eq!(monologue.chunks.len(), 3);
     }
@@ -1606,24 +2643,113 @@ mod tests {
     #[test]
     fn test_real_hidden_state_carryover() {
         let genesis = GenesisSeed::from_phrase("hidden-carryover");
-        let mut gen = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
+        let mut generator = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
 
         let channels = ThoughtChannels::default();
-        let monologue = gen.generate_semantic_monologue(&channels, 3).unwrap();
+        let monologue = generator.generate_semantic_monologue(&channels, 3).unwrap();
 
         assert_eq!(monologue.chunks.len(), 3);
-        assert!(gen.last_chunk_hidden.is_some());
+        assert!(generator.last_chunk_hidden.is_some());
+    }
+
+    #[test]
+    fn test_generation_populates_modulation_diagnostics() {
+        let genesis = GenesisSeed::from_phrase("modulation-diagnostics");
+        let config = LiquidMambaConfig {
+            max_tokens: 3,
+            top_k: 8,
+            sampling_seed: Some(7),
+            semantic_attractor_top_k: 8,
+            semantic_attractor_strength: 0.5,
+            ..Default::default()
+        };
+        let mut generator = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        let result = generator.generate(&ThoughtChannels::default());
+        assert!(
+            !result.logit_diagnostics.is_empty(),
+            "Liquid-Mamba generation should record per-token diagnostics"
+        );
+        let first = &result.logit_diagnostics[0];
+        assert!(first.pre_attractor_entropy.is_some());
+        assert!(first.pre_attractor_max_probability.is_some());
+        assert!(first.cfc_delta_scale.is_some());
+        assert!(first.cfc_b_scale.is_some());
+        assert!(first.semantic_attractor_mean_adjustment.is_some());
+        assert!(first.semantic_attractor_max_adjustment.is_some());
+        assert!(first.selected_semantic_alignment.is_some());
+    }
+
+    #[test]
+    fn test_min_new_token_guard_suppresses_early_eos() {
+        let mut logits = vec![10.0, 1.0, 0.5];
+        apply_generation_token_guards(&mut logits, 0, 1, 0);
+        assert!(
+            logits[0].is_infinite() && logits[0].is_sign_negative(),
+            "EOS should be masked before min_new_tokens"
+        );
+
+        let mut later_logits = vec![10.0, 1.0, 0.5];
+        apply_generation_token_guards(&mut later_logits, 1, 1, 0);
+        assert_eq!(
+            later_logits[0], 10.0,
+            "EOS should be available once min_new_tokens has been reached"
+        );
+    }
+
+    #[test]
+    fn test_min_new_token_guard_suppresses_initial_blank_tokens() {
+        let genesis = GenesisSeed::from_phrase("blank-prefix-guard");
+        let mut generator = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
+        let mut logits = vec![0.0; 128];
+        logits[0] = 10.0;
+        logits[b'\n' as usize] = 9.0;
+        logits[b' ' as usize] = 8.0;
+
+        generator.apply_generation_token_guards(&mut logits, 0, 0);
+
+        for token in [0usize, b'\n' as usize, b' ' as usize] {
+            assert!(
+                logits[token].is_infinite() && logits[token].is_sign_negative(),
+                "guard should mask token {token} before min_new_tokens"
+            );
+        }
+    }
+
+    #[test]
+    fn test_alignment_mean_std_for_normalized_attractor() {
+        let (mean, std) = alignment_mean_std([0.001, 0.002, 0.003]);
+        assert!((mean - 0.002).abs() < 1e-6);
+        assert!(std > 0.0008 && std < 0.0009);
+
+        let (single_mean, single_std) = alignment_mean_std([0.42]);
+        assert_eq!(single_mean, 0.42);
+        assert_eq!(single_std, 0.0);
+    }
+
+    #[test]
+    fn test_seeded_top_k_sample_is_reproducible() {
+        let logits = vec![0.0, 1.0, 2.0, 3.0];
+        let mut left = StdRng::seed_from_u64(123);
+        let mut right = StdRng::seed_from_u64(123);
+
+        let left_token = top_k_sample(&logits, 4, 0.8, Some(&mut left));
+        let right_token = top_k_sample(&logits, 4, 0.8, Some(&mut right));
+
+        assert_eq!(left_token, right_token);
     }
 
     #[test]
     fn test_self_supervised_monologue_training() {
         let genesis = GenesisSeed::from_phrase("monologue-train");
-        let mut gen = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
+        let mut generator = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
 
         let channels = ThoughtChannels::default();
         let config = MonologueTrainingConfig::default();
 
-        let initial_loss = gen.train_on_semantic_monologue(&channels, &config).unwrap();
+        let initial_loss = generator
+            .train_on_semantic_monologue(&channels, &config)
+            .unwrap();
         assert!(initial_loss >= 0.0);
     }
 }

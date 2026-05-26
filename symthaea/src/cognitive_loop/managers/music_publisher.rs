@@ -20,6 +20,7 @@
 //! The server returns JSON `{ "cid": "Qm…", "entry_hash": "…" }` on success.
 
 use std::sync::mpsc;
+use std::sync::Mutex;
 use std::thread;
 
 use crate::cognitive_loop::managers::muse_manager::CompositionExport;
@@ -56,7 +57,7 @@ pub struct UploadResult {
 /// Results accumulate in `take_results()`.
 pub struct MusicPublisher {
     sender: mpsc::Sender<CompositionExport>,
-    result_receiver: mpsc::Receiver<UploadResult>,
+    result_receiver: Mutex<mpsc::Receiver<UploadResult>>,
     upload_url: String,
     submitted: u64,
     succeeded: u64,
@@ -85,7 +86,7 @@ impl MusicPublisher {
 
         Self {
             sender: tx,
-            result_receiver: result_rx,
+            result_receiver: Mutex::new(result_rx),
             upload_url,
             submitted: 0,
             succeeded: 0,
@@ -111,13 +112,15 @@ impl MusicPublisher {
     /// Returns the results since the last call.
     pub fn drain_results(&mut self) -> Vec<UploadResult> {
         let mut results = Vec::new();
-        while let Ok(r) = self.result_receiver.try_recv() {
-            if r.success {
-                self.succeeded += 1;
-            } else {
-                self.failed += 1;
+        if let Ok(receiver) = self.result_receiver.lock() {
+            while let Ok(r) = receiver.try_recv() {
+                if r.success {
+                    self.succeeded += 1;
+                } else {
+                    self.failed += 1;
+                }
+                results.push(r);
             }
-            results.push(r);
         }
         results
     }
@@ -153,7 +156,7 @@ fn run_publisher_thread(
     {
         Ok(c) => c,
         Err(e) => {
-            log::error!("[music-publisher] failed to build HTTP client: {e}");
+            tracing::error!("[music-publisher] failed to build HTTP client: {e}");
             return;
         }
     };
@@ -163,12 +166,12 @@ fn run_publisher_thread(
         // This creates a DHT entry and emits a signal to connected UIs.
         let trigger_result = post_consciousness_trigger(&client, DEFAULT_TRIGGER_URL, &export);
         if trigger_result.success {
-            log::debug!(
+            tracing::debug!(
                 "[music-publisher] consciousness trigger posted → {:?}",
                 trigger_result.cid
             );
         } else {
-            log::trace!(
+            tracing::trace!(
                 "[music-publisher] trigger endpoint unavailable (expected in dev): {:?}",
                 trigger_result.error
             );
@@ -220,7 +223,8 @@ fn post_consciousness_trigger(
     let payload = ConsciousnessTriggerPayload::from_export(export);
     let title = export.title.clone();
 
-    match client.post(url).json(&payload).send() {
+    let res: reqwest::Result<reqwest::blocking::Response> = client.post(url).json(&payload).send();
+    match res {
         Ok(resp) if resp.status().is_success() => {
             let cid = resp
                 .json::<serde_json::Value>()
@@ -282,7 +286,8 @@ fn upload_composition(
         .text("title", export.title.clone())
         .text("duration_secs", duration_str);
 
-    match client.post(url).multipart(form).send() {
+    let res: reqwest::Result<reqwest::blocking::Response> = client.post(url).multipart(form).send();
+    match res {
         Ok(resp) if resp.status().is_success() => {
             // Try to extract CID from JSON body; tolerate non-JSON responses.
             let cid = resp

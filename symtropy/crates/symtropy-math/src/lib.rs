@@ -34,6 +34,7 @@ pub mod point;
 pub mod rotor;
 pub mod shape;
 pub mod sphere;
+pub mod sphere_utils;
 pub mod transform;
 
 pub use bivector::Bivector;
@@ -47,6 +48,7 @@ pub use point::Point;
 pub use rotor::Rotor;
 pub use shape::Shape;
 pub use sphere::Sphere;
+pub use sphere_utils::SphereUtils;
 pub use transform::Transform;
 
 /// Type alias for common dimension specializations.

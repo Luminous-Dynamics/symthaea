@@ -47,6 +47,9 @@ pub mod pogq;
 pub mod sovereign;
 pub mod types;
 
+#[cfg(feature = "backend-winterfell")]
+pub use winterfell;
+
 // Re-exports
 pub use backend::ProofBackend;
 pub use consciousness::{CivicTier, ConsciousnessProofRequest, ConsciousnessProofResult};
@@ -55,7 +58,7 @@ pub use dilithium::DilithiumKeypair;
 pub use domain::DomainTag;
 pub use error::{ZkpError, ZkpResult};
 pub use fixed_point::{FixedPoint, Q16_16_SCALE};
-pub use pogq::{simulate_pogq, DualBackendComparison, PoGQPublicInputs, PoGQResult, PoGQWitness};
+pub use pogq::{DualBackendComparison, PoGQPublicInputs, PoGQResult, PoGQWitness, simulate_pogq};
 pub use types::{AuthenticatedProof, ProofBytes, ProofMetadata, ProofResult, VerificationResult};
 
 // Re-export shared ecosystem types

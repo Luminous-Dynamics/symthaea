@@ -75,7 +75,7 @@ fn get_tv(tv: &[f32], idx: usize, rng: &mut StdRng) -> f32 {
     if idx < tv.len() {
         (tv[idx] + 1.0) / 2.0 // normalize from [-1,1] to [0,1]
     } else {
-        rng.gen::<f32>()
+        rng.r#gen::<f32>()
     }
 }
 

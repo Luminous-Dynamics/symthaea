@@ -1,7 +1,7 @@
 [package]
 name = "symtropy-mycelix-bridge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Bevy plugin: NPCs and game systems call Mycelix Holochain zomes by spawning mycelix-conductor-bridge as a subprocess and piping JSON. Zero Holochain deps in-crate — no serde conflicts with Bevy."
 repository = "https://github.com/luminous-dynamics/symtropy"

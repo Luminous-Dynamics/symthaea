@@ -294,7 +294,7 @@ mod real {
     impl RealVentralPipeline {
         /// Create a new real ventral pipeline. Initializes the SemanticVision model.
         pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-            let mut vision = SemanticVision::new();
+            let mut vision = SemanticVision::new(1000);
             vision.initialize()?;
             Ok(Self {
                 vision,
@@ -310,7 +310,7 @@ mod real {
                 if let Some(image) = Self::pixels_to_image(request) {
                     match self.vision.embed_image(&image) {
                         Ok(embedding) => {
-                            let raw = embedding.as_slice();
+                            let raw = embedding.vector.as_slice();
                             let hv = self.projector.project_embedding(raw);
                             let content = RecognizedContent::Object {
                                 label: "real_embed".to_string(),
@@ -349,7 +349,7 @@ mod real {
                 request.crop_height as u32,
                 request.crop_pixels.clone(),
             )?;
-            Some(image::DynamicImage::Luma8(gray))
+            Some(image::DynamicImage::ImageLuma8(gray))
         }
 
         fn fallback(request: &FoveationRequest) -> (RecognizedContent, f32, ContinuousHV) {

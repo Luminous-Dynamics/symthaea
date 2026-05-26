@@ -1,7 +1,7 @@
 [package]
 name = "symtropy-symthaea-adapter"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Adapter that lets a Symtropy RoboticAgent drive a real Symthaea EmbodimentBridge. Implements MotorPlanner by encoding observation → thought HV, stepping the bridge, and translating the result into per-joint motor commands."
 repository = "https://github.com/luminous-dynamics/symtropy"

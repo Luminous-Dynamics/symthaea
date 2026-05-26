@@ -1,7 +1,7 @@
 [package]
 name = "symtropy-math"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 OR MIT"
 description = "N-dimensional geometric algebra: const-generic points, bivectors, rotors, and collision shapes (2D/3D/4D+). Stack-allocated, zero-heap physics primitives."
 repository = "https://github.com/luminous-dynamics/symtropy"

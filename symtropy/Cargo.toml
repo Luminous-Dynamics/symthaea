@@ -1,17 +1,16 @@
 [package]
 # Renamed 2026-04-18 from `symtropy` → `symtropy-launcher` to free up the
 # `symtropy` name for the new meta-crate at `crates/symtropy/`. The launcher
-# is genuinely a launcher (multi-experience: The Room + Sol Atlas), so the
-# new name is more accurate. Desktop brand `Name=Symtropy` is unchanged.
+# is genuinely a launcher (multi-experience: The Room + Sol Atlas), so
+# this makes semantic sense.
 name = "symtropy-launcher"
 version = "0.1.0"
-edition = "2021"
-description = "Symtropy Launcher — host application for The Room That Remembers You and Sol Atlas experiences"
+edition = "2024"
+authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 license = "AGPL-3.0-or-later"
-publish = false # application crate, not for crates.io
+publish = false
 
 [dependencies]
-# Game engine — disable wayland for now (X11 only on NixOS dev)
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset", "bevy_core_pipeline", "bevy_render",
     "bevy_sprite", "bevy_sprite_render",
@@ -19,102 +18,56 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_winit", "bevy_color", "bevy_state",
     "bevy_log", "bevy_post_process", "bevy_shader",
     "bevy_gizmos", "bevy_gizmos_render",
-    "multi_threaded", "x11",
+    "multi_threaded", "x11", # Explicitly include X11, exclude Wayland
     "default_font", "png",
 ] }
-
-# Consciousness engine
-symthaea-fep = { path = "../symthaea/crates/symthaea-fep" }
-symthaea-biometrics = { path = "../symthaea/crates/symthaea-biometrics", features = ["muse-bridge"] }
-symthaea-muse = { path = "../symthaea/crates/symthaea-muse" }
-
-# Mycelix integration — the game IS the integration test
-# Enable with: cargo build --features mycelix
-symtropy-sim-bridge = { path = "crates/symtropy-sim-bridge", optional = true }
-mycelix-bridge-common = { path = "../crates/mycelix-bridge-common", default-features = false, optional = true }
-mycelix-core-types = { path = "../mycelix-core/libs/mycelix-core-types", default-features = false, optional = true }
-
-# Symthaea consciousness — the Master Equation (7-theory synthesis)
-symthaea-consciousness-equation = { path = "../symthaea/crates/symthaea-consciousness-equation" }
-
-# Symtropy engine crates — consciousness-physics runtime
-symtropy-math = { path = "crates/symtropy-math" }
+symthaea = { path = "../symthaea", default-features = false, features = ["vision-manifold", "muse", "reasoning_engine"] }
+symthaea-muse = { path = "../symthaea/crates/symthaea-muse", features = ["muse-live"] }
+symtropy-bevy = { path = "crates/symtropy-bevy" }
+symtropy-bevy-core = { path = "crates/symtropy-bevy-core" }
+symtropy-bevy-scene = { path = "crates/symtropy-bevy-scene" }
 symtropy-physics = { path = "crates/symtropy-physics" }
+symtropy-rapier3d-bridge = { path = "crates/symtropy-rapier3d-bridge" }
+symtropy-physics-gpu = { path = "crates/symtropy-physics-gpu" }
+symtropy-core = { path = "crates/symtropy-core" }
+symtropy-math = { path = "crates/symtropy-math" }
+symtropy-mycelix-village = { path = "crates/symtropy-mycelix-village" }
+symtropy-terrain = { path = "crates/symtropy-terrain" }
 symtropy-consciousness-physics = { path = "crates/symtropy-consciousness-physics" }
 symtropy-render-bridge = { path = "crates/symtropy-render-bridge" }
-symtropy-robotics-bridge = { path = "crates/symtropy-robotics-bridge" }
-
-# Terra Atlas globe view — enable with: cargo run --features atlas
-sol-atlas-bevy = { path = "../sol-atlas-bevy", optional = true }
-sol-atlas-core = { path = "../sol-atlas-core", optional = true }
-
-# Optional advanced features
-symtropy-world = { path = "crates/symtropy-world", optional = true }
-symtropy-net = { path = "crates/symtropy-net", optional = true }
-
-# Utilities
-rand = "0.8"
+symthaea-fep = { path = "../symthaea/crates/symthaea-fep" }
+symthaea-biometrics = { path = "../symthaea/crates/symthaea-biometrics" }
+symthaea-consciousness-equation = { path = "../symthaea/crates/symthaea-consciousness-equation" }
 nalgebra = "0.34"
-
-[dev-dependencies]
-symtropy-bevy-core = { path = "crates/symtropy-bevy-core" }
-symtropy-physics-gpu = { path = "crates/symtropy-physics-gpu" }
-symtropy-physics = { path = "crates/symtropy-physics" }
-
-[features]
-default = []
-# Mycelix governance/economy/crypto integration — physicalized cryptography
-# Enable to turn the game into a direct Mycelix integration test.
-# All Mycelix modules (governance, economy, factions, FL, DKG, epistemics) activate.
-# Run headless tests: cargo run -p symtropy-sim-bridge --bin headless_test -- --ticks 300
-# Real-time consciousness-driven music synthesis (requires ALSA dev headers on Linux)
-# Enable with: cargo build --features live-audio
-live-audio = ["symthaea-muse/muse-live"]
-mycelix = ["dep:symtropy-sim-bridge", "dep:mycelix-bridge-common", "dep:mycelix-core-types"]
-atlas = ["dep:sol-atlas-bevy", "dep:sol-atlas-core"]
-world = ["dep:symtropy-world"]
-net = ["world", "dep:symtropy-net"]
+rand = "0.8"
+hound = "3.5"
+image = { version = "0.24", features = ["png"] }
+cpal = "0.17"
+symthaea-core = { path = "../symthaea/symthaea-core" }
 
 [workspace]
-# Core engine crates — testable with `cargo test --workspace --exclude symtropy`
+resolver = "2"
 members = [
     ".",
-    "crates/symtropy-math",
-    "crates/symtropy-physics",
-    "crates/symtropy-consciousness-physics",
-    "crates/symtropy-render-bridge",
-    "crates/symtropy-robotics-bridge",
-    "crates/symtropy-mesh",
-    "crates/symtropy-terrain",
-    "crates/symtropy-soft",
-    "crates/symtropy-fluid",
-    "crates/symtropy-physics-gpu",
-    "crates/symtropy-holochain-relay",
     "crates/symtropy-bevy",
     "crates/symtropy-bevy-core",
     "crates/symtropy-bevy-scene",
     "crates/symthaea-bevy-brain",
     "crates/symtropy-mycelix-village",
-    "crates/symtropy-net-core",
+    "crates/symtropy-oceanic",
+    "crates/symtropy-net",
+
     "crates/symtropy-robotics-bridge-core",
     "crates/symtropy-rapier3d-bridge",
+    "crates/symtropy-physics-gpu",
     "crates/symtropy-core",
     "crates/symtropy-devconsole",
-    "crates/symtropy-cli",
-    "crates/symtropy",
-]
-# Excluded: depend on Mycelix, Holochain, Lightyear, or require Bevy runtime
-exclude = [
-    "crates/symtropy-world",
-    "crates/symtropy-net",
-    "crates/symtropy-sim-bridge",
-    "crates/symtropy-manipulator-demo",
-    "crates/symtropy-gravcraft-demo",
+    "crates/symtropy-math",
+    "crates/symtropy-physics",
+    "crates/symtropy-render-bridge",
+    "crates/symtropy-terrain",
     "crates/symtropy-lightyear",
     "crates/symtropy-multiplayer-demo",
-    "crates/symtropy-mycelix-village",
-    "crates/symtropy-web-gallery",
-    "crates/symtropy-xr-showcase",
 ]
 
 [lints.clippy]

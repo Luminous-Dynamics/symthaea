@@ -2,7 +2,7 @@
 name = "symthaea-fep"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Free Energy Principle active inference — generative models, precision-weighted prediction errors, and motor control"
 license = "AGPL-3.0-or-later"
@@ -16,7 +16,9 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
+argmin.workspace = true
 serde = { workspace = true }
+symthaea-core = { version = "0.5.0", path = "../../symthaea-core" }
 
 [dev-dependencies]
 proptest = "1"

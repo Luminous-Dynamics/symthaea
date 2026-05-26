@@ -1,7 +1,7 @@
 [package]
 name = "winterfell-pogq"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Winterfell STARK prover for PoGQ federated learning validation"
 license = "AGPL-3.0-or-later"
 authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]

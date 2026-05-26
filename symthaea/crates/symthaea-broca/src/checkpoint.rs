@@ -9,18 +9,15 @@
 //! Uses MessagePack via `rmp-serde` for efficient binary storage with
 //! named-map support (enabling forward compatibility when fields are added).
 
-use crate::controller::LanguageControllerConfig;
 use crate::encoder::NUM_CHANNELS;
-use crate::gating::GatingConfig;
 use crate::generator::BrocaConfig;
 #[cfg(feature = "mamba-cpu")]
 use crate::projection::GradientDiagnosticsSnapshot;
-use crate::tokenizer::{MergePair, VocabFile};
+use crate::tokenizer::VocabFile;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::Path;
-use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -217,7 +214,7 @@ impl BrocaCheckpoint {
         }
 
         // Try direct MessagePack
-        let mut checkpoint: Self = match rmp_serde::from_slice(&buffer) {
+        let checkpoint: Self = match rmp_serde::from_slice(&buffer) {
             Ok(ckpt) => ckpt,
             Err(e) => {
                 // Fallback to bincode

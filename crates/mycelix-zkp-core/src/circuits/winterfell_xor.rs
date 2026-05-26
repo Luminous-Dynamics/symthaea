@@ -14,13 +14,13 @@
 //! - Col 4: running_xor_count (increments by c_bit each step)
 
 use winterfell::{
-    crypto::{hashers::Blake3_256, DefaultRandomCoin, MerkleTree},
-    math::{fields::f128::BaseElement, FieldElement, StarkField, ToElements},
-    matrix::ColMatrix,
     AcceptableOptions, Air, AirContext, Assertion, BatchingMethod, CompositionPoly,
     CompositionPolyTrace, DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde,
     EvaluationFrame, PartitionOptions, Proof, ProofOptions, Prover as WinterfellProver,
     StarkDomain, Trace, TraceInfo, TracePolyTable, TransitionConstraintDegree,
+    crypto::{DefaultRandomCoin, MerkleTree, hashers::Blake3_256},
+    math::{FieldElement, StarkField, ToElements, fields::f128::BaseElement},
+    matrix::ColMatrix,
 };
 
 type Hasher = Blake3_256<BaseElement>;

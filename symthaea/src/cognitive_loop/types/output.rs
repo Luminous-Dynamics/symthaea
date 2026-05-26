@@ -69,6 +69,8 @@ pub struct MentalMovie {
     pub channels: usize,
     pub path_length: usize,
     pub semantic_coherence: f32,
+    /// Raw mathematical trajectory (HDC vectors) used to generate the frames.
+    pub trajectory: Vec<symthaea_core::core::ContinuousHV>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

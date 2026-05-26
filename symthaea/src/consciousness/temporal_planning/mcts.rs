@@ -62,16 +62,53 @@ impl MctsNode {
         }
     }
 
-    /// UCB1 + prior: balances exploration and exploitation.
-    fn ucb1(&self, parent_visits: u32, c: f64) -> f64 {
+    /// UCB1 + prior - penalty: balances exploration, exploitation, and negative knowledge.
+    fn ucb1(&self, parent_visits: u32, c: f64, negative_penalty: f64) -> f64 {
         if self.visits == 0 {
             f64::MAX // unexplored nodes get priority
         } else {
             let exploitation = self.avg_reward();
             let exploration = c * ((parent_visits as f64).ln() / self.visits as f64).sqrt();
             let prior_bonus = self.prior / (1.0 + self.visits as f64);
-            exploitation + exploration + prior_bonus
+            // Apply severe penalty for similarity to disproven approaches (INV-12)
+            exploitation + exploration + prior_bonus - negative_penalty
         }
+    }
+}
+
+/// A bank of negative prototypes (disproven logical structures) used for MCTS penalties.
+#[derive(Debug, Clone, Default)]
+pub struct NegativePrototypeBank {
+    pub prototypes: Vec<(Vec<f32>, f64)>, // (embedding, penalty_weight)
+}
+
+impl NegativePrototypeBank {
+    pub fn compute_penalty(&self, action_embedding: &[f32]) -> f64 {
+        let mut total_penalty = 0.0;
+        for (proto, weight) in &self.prototypes {
+            let sim = cosine_similarity(action_embedding, proto);
+            if sim > 0.8 {
+                // Severe exponential penalty for high similarity to disproven paths
+                total_penalty += weight * (sim - 0.8).exp() * 5.0;
+            }
+        }
+        total_penalty
+    }
+}
+
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    let mut dot = 0.0;
+    let mut mag_a = 0.0;
+    let mut mag_b = 0.0;
+    for i in 0..a.len().min(b.len()) {
+        dot += a[i] as f64 * b[i] as f64;
+        mag_a += a[i] as f64 * a[i] as f64;
+        mag_b += b[i] as f64 * b[i] as f64;
+    }
+    if mag_a > 0.0 && mag_b > 0.0 {
+        dot / (mag_a.sqrt() * mag_b.sqrt())
+    } else {
+        0.0
     }
 }
 
@@ -79,7 +116,7 @@ impl MctsNode {
 pub struct MctsPlanner;
 
 impl MctsPlanner {
-    /// Run MCTS with budget enforcement (INV-6).
+    /// Run MCTS with budget enforcement (INV-6) and negative feedback (INV-12).
     ///
     /// Returns best action + confidence. Guaranteed to return
     /// within `budget.remaining_us()` or `config.max_iterations`,
@@ -89,6 +126,7 @@ impl MctsPlanner {
         actions: &[PlannedAction],
         config: &MctsConfig,
         budget: &ReasoningBudget,
+        negatives: &NegativePrototypeBank,
     ) -> MctsResult {
         if actions.is_empty() {
             return MctsResult::no_plan();
@@ -96,6 +134,12 @@ impl MctsPlanner {
 
         let k = actions.len().min(config.max_actions);
         let mut root = MctsNode::new(None, 1.0);
+
+        // Precompute negative penalties for top-level actions
+        let mut penalties = Vec::with_capacity(k);
+        for action in actions.iter().take(k) {
+            penalties.push(negatives.compute_penalty(&action.embedding));
+        }
 
         // Initialize children with priors
         for (i, action) in actions.iter().take(k).enumerate() {
@@ -106,11 +150,11 @@ impl MctsPlanner {
 
         // Main MCTS loop with budget check
         while iterations < config.max_iterations as u32 && !budget.exceeded() {
-            // Select: UCB1
-            let child_idx = Self::select(&root, config.exploration_constant);
+            // Select: UCB1 with negative penalties
+            let child_idx = Self::select(&root, config.exploration_constant, &penalties);
 
             // Simulate: rollout from this action
-            let reward = Self::simulate(state, actions, child_idx, config.max_depth);
+            let reward = Self::simulate(state, actions, child_idx, config.max_depth, negatives);
 
             // Backpropagate
             root.children[child_idx].visits += 1;
@@ -147,13 +191,15 @@ impl MctsPlanner {
     }
 
     /// Select child with highest UCB1 score.
-    fn select(node: &MctsNode, c: f64) -> usize {
+    fn select(node: &MctsNode, c: f64, penalties: &[f64]) -> usize {
         node.children
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| {
-                let ucb_a = a.ucb1(node.visits, c);
-                let ucb_b = b.ucb1(node.visits, c);
+            .max_by(|(i, a), (j, b)| {
+                let p_a = penalties.get(*i).copied().unwrap_or(0.0);
+                let p_b = penalties.get(*j).copied().unwrap_or(0.0);
+                let ucb_a = a.ucb1(node.visits, c, p_a);
+                let ucb_b = b.ucb1(node.visits, c, p_b);
                 ucb_a.total_cmp(&ucb_b)
             })
             .map(|(i, _)| i)
@@ -168,6 +214,7 @@ impl MctsPlanner {
         actions: &[PlannedAction],
         action_idx: usize,
         _max_depth: usize,
+        negatives: &NegativePrototypeBank,
     ) -> f64 {
         let mut forked = state.fork();
         let action = &actions[action_idx];
@@ -184,10 +231,13 @@ impl MctsPlanner {
             .sum::<f64>()
             / forked.states.iter().map(|s| s.len()).sum::<usize>().max(1) as f64;
 
+        // Negative feedback: penalize reward based on similarity to disproven paths
+        let penalty = negatives.compute_penalty(&action.embedding);
+
         // Epistemic bonus: prefer info-gathering actions
         let epistemic_bonus = if action.is_epistemic { 0.2 } else { 0.0 };
 
-        (reward + epistemic_bonus).clamp(0.0, 1.0)
+        (reward + epistemic_bonus - penalty).clamp(0.0, 1.0)
     }
 
     /// Epistemic-only rollout: minimize uncertainty rather than maximize reward.
@@ -295,7 +345,7 @@ mod tests {
         let config = MctsConfig::tier1();
         let budget = ReasoningBudget::new(10_000, 0.8);
 
-        let result = MctsPlanner::plan(&state, &actions, &config, &budget);
+        let result = MctsPlanner::plan(&state, &actions, &config, &budget, &Default::default());
         assert!(result.did_plan);
         assert!(result.best_action_idx.is_some());
         assert!(result.iterations > 0);
@@ -307,7 +357,7 @@ mod tests {
         let config = MctsConfig::tier1();
         let budget = ReasoningBudget::new(10_000, 0.8);
 
-        let result = MctsPlanner::plan(&state, &[], &config, &budget);
+        let result = MctsPlanner::plan(&state, &[], &config, &budget, &Default::default());
         assert!(!result.did_plan);
     }
 
@@ -324,7 +374,7 @@ mod tests {
         let budget = ReasoningBudget::new(1_000, 0.8);
 
         let start = std::time::Instant::now();
-        let result = MctsPlanner::plan(&state, &actions, &config, &budget);
+        let result = MctsPlanner::plan(&state, &actions, &config, &budget, &Default::default());
         let elapsed = start.elapsed();
 
         // Should complete within a reasonable time (Tier0 budget is 2ms)

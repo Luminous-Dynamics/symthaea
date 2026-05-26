@@ -1,48 +1,29 @@
 [package]
 name = "symtropy-bevy"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Drop-in Bevy plugin for Phi-coupled N-dimensional physics. Builds on the permissive symtropy-bevy-core plugin, adding ConsciousnessField, biometric coupling, and macro-world modifiers."
-repository = "https://github.com/luminous-dynamics/symtropy"
-keywords = ["bevy", "physics", "n-dimensional", "phi", "game-engine"]
-categories = ["game-engines", "simulation"]
-readme = "README.md"
+description = "Drop-in Bevy plugin for Phi-coupled N-dimensional physics. Builds on the permissive symtropy-bevy-core plugin."
 
 [dependencies]
-symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
-symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
-symtropy-bevy-core = { version = "0.1.0", path = "../symtropy-bevy-core" }
-symtropy-consciousness-physics = { version = "0.2.0", path = "../symtropy-consciousness-physics" }
-symthaea-bevy-brain = { version = "0.1.0", path = "../symthaea-bevy-brain" }
-symtropy-robotics-bridge-core = { version = "0.1.0", path = "../symtropy-robotics-bridge-core", features = ["bevy"] }
-symtropy-rapier3d-bridge = { version = "0.1.0", path = "../symtropy-rapier3d-bridge", optional = true }
-symthaea-muse = { path = "../../../symthaea/crates/symthaea-muse", features = ["bevy"] }
-rapier3d = { version = "0.22", optional = true }
-bevy_inspector_egui = { package = "bevy-inspector-egui", version = "0.36", optional = true }
-rhai = { version = "1.20", features = ["sync"] }
-bevy = { version = "0.18", default-features = false, features = [
-    "bevy_core_pipeline", "bevy_render", "bevy_sprite", "bevy_sprite_render",
-    "bevy_pbr",
-    "bevy_winit", "bevy_color", "bevy_state", "bevy_log",
-    "bevy_gizmos", "bevy_gizmos_render",
-    "multi_threaded", "x11",
-] }
-nalgebra = "0.34"
-
-[features]
-default = ["debug-gizmos", "inspector"]
-debug-gizmos = []
-inspector = ["dep:bevy_inspector_egui"]
-rapier3d = ["dep:symtropy-rapier3d-bridge", "dep:rapier3d"]
-
-[dev-dependencies]
-symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
-symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
-symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
-symtropy-render-bridge = { version = "0.1.0", path = "../symtropy-render-bridge" }
+symtropy-bevy-core = { path = "../symtropy-bevy-core" }
+symthaea-bevy-brain = { path = "../symthaea-bevy-brain" }
+symtropy-physics = { path = "../symtropy-physics" }
+symtropy-rapier3d-bridge = { path = "../symtropy-rapier3d-bridge", optional = true }
+symtropy-math = { path = "../symtropy-math" }
+symtropy-robotics-bridge-core = { path = "../symtropy-robotics-bridge-core" }
+symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
+symthaea-muse = { path = "../../../symthaea/crates/symthaea-muse" }
 symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole", features = ["phi-panel"] }
 bevy = { version = "0.18", default-features = false, features = [
     "png",
     "bevy_ui", "bevy_ui_render", "bevy_text", "default_font",
 ] }
+nalgebra = "0.34"
+rhai = { version = "1.19", features = ["sync"] }
+serde = { version = "1.0", features = ["derive"] }
+
+[features]
+default = []
+debug-gizmos = []
+rapier3d = ["dep:symtropy-rapier3d-bridge"]

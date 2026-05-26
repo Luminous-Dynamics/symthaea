@@ -6,7 +6,7 @@
 //! Uses the StructuralScorer to ensure mutated code remains syntactically and
 //! structurally sound.
 
-use crate::structural_scorer::{NixStructuralScorer, StructuralVerdict};
+use crate::structural_scorer::NixStructuralScorer;
 use crate::training::TrainingPair;
 use rand::Rng;
 use serde::{Deserialize, Serialize};

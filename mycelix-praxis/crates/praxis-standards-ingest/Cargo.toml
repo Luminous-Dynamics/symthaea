@@ -1,7 +1,7 @@
 [package]
 name = "edunet-standards-ingest"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "CLI tool to fetch K-12 standards from the Common Standards Project API and output EduNet curriculum JSON"
 

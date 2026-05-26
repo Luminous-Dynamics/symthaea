@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
 use symthaea_lean_bridge::{
     fol_ext_bridge::render_fol_ext_file,
-    runner::{check_with_lean4, CheckOutcome},
+    runner::{CheckOutcome, check_with_lean4},
     z3_to_lean::lean_from_z3,
 };
 use tempfile::NamedTempFile;
@@ -56,7 +56,7 @@ impl FormalLogicScorer {
         let lean_source = render_fol_ext_file(theorem_name, spec);
 
         // 2. Write to temp file and run lean check
-        let mut tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
+        let tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
         std::fs::write(tmp.path(), &lean_source).unwrap();
 
         let outcome = check_with_lean4(tmp.path());
@@ -86,7 +86,7 @@ impl FormalLogicScorer {
         let script = lean_from_z3(theorem_name, lean_statement, smtlib);
         let lean_source = script.to_lean();
 
-        let mut tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
+        let tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
         std::fs::write(tmp.path(), &lean_source).unwrap();
 
         let outcome = check_with_lean4(tmp.path());

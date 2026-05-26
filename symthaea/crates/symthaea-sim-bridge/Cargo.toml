@@ -2,7 +2,7 @@
 name = "symthaea-sim-bridge"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Simulator-agnostic engineering bridge traits for FEA, CFD, multibody, process, and circuit solvers"
 license = "AGPL-3.0-or-later"
@@ -12,10 +12,13 @@ keywords = ["engineering", "simulation", "fea", "cfd", "digital-twin"]
 categories = ["science", "simulation"]
 
 [dependencies]
+iceoryx2.workspace = true
+
 symthaea-core = { path = "../../symthaea-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+
 

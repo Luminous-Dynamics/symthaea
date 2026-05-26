@@ -7,7 +7,6 @@
 
 use crate::encoder::ThoughtChannels;
 use crate::evolutionary_scaffolder::EvolutionResult;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

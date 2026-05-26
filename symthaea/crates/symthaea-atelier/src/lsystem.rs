@@ -93,7 +93,7 @@ fn build_rules(harmonies: &[f32; 8], rng: &mut StdRng) -> Vec<Rule> {
     };
 
     // Add slight randomness
-    if rng.gen::<f32>() < harmonies[2] {
+    if rng.r#gen::<f32>() < harmonies[2] {
         // IntegralWisdom: systematic structure
         base.push_str("[+F]");
     }

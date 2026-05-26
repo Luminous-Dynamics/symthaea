@@ -5,11 +5,7 @@
 //!
 //! Tracks HTTP request metrics for Prometheus
 
-use axum::{
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, middleware::Next, response::Response};
 use std::time::Instant;
 
 use crate::metrics;

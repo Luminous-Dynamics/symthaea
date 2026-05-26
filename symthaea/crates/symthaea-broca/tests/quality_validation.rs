@@ -55,8 +55,8 @@ fn quality_config() -> BrocaConfig {
 }
 
 /// Build a small training dataset from (channels, target_text) pairs.
-fn make_dataset(gen: &BrocaGenerator, pairs: &[(ThoughtChannels, &str)]) -> TrainingDataset {
-    let tok = gen.tokenizer().clone();
+fn make_dataset(gen_obj: &BrocaGenerator, pairs: &[(ThoughtChannels, &str)]) -> TrainingDataset {
+    let tok = gen_obj.tokenizer().clone();
     let mut dataset = TrainingDataset::default();
     for (channels, text) in pairs {
         dataset.push(TrainingPair::new(*channels, text.to_string(), &tok));
@@ -75,9 +75,9 @@ fn test_no_excessive_repetition() {
 
     // Generate 10 sequences with varying intents
     for intent_idx in 0..8 {
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
         let channels = ThoughtChannels::with_intent(intent_idx);
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
 
         // Check no single token ID appears more than 5 consecutive times
         let mut max_consecutive = 1usize;
@@ -116,9 +116,9 @@ fn test_no_excessive_repetition() {
     // Also generate two more with default channels to reach 10
     for seed_phrase in &["broca-test-quality-extra-a", "broca-test-quality-extra-b"] {
         let gen_seed = GenesisSeed::from_phrase(seed_phrase);
-        let mut gen = BrocaGenerator::new(&gen_seed, config.clone());
+        let mut gen_obj = BrocaGenerator::new(&gen_seed, config.clone());
         let channels = ThoughtChannels::default();
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
 
         let mut max_consecutive = 1usize;
         let mut current_run = 1usize;
@@ -147,7 +147,7 @@ fn test_no_excessive_repetition() {
 fn test_training_convergence_trajectory() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
 
     // Build a 5-pair dataset
     let pairs: Vec<(ThoughtChannels, &str)> = vec![
@@ -157,7 +157,7 @@ fn test_training_convergence_trajectory() {
         (ThoughtChannels::with_intent(3), "I think so"),
         (ThoughtChannels::with_intent(4), "not sure"),
     ];
-    let dataset = make_dataset(&gen, &pairs);
+    let dataset = make_dataset(&gen_obj, &pairs);
 
     let train_cfg = TrainingConfig {
         epochs: 30,
@@ -175,7 +175,7 @@ fn test_training_convergence_trajectory() {
         ..Default::default()
     };
 
-    let (metrics, _, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, _, _, _, _) = train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
     assert_eq!(metrics.len(), 30, "Should complete all 30 epochs");
 
     // Verify no NaN or Inf in any epoch
@@ -222,15 +222,15 @@ fn test_training_convergence_trajectory() {
 fn test_checkpoint_generation_determinism() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
 
     let channels = ThoughtChannels::with_intent(1);
-    let result_before = gen.generate(&channels);
+    let result_before = gen_obj.generate(&channels);
 
     // Save checkpoint
     let dir = std::env::temp_dir();
     let path = dir.join("broca_quality_determinism.bin");
-    gen.save_checkpoint(&path, 0, 0.0, None, None, None)
+    gen_obj.save_checkpoint(&path, 0, 0.0, None, None, None)
         .expect("checkpoint save should succeed");
 
     // Load checkpoint
@@ -261,9 +261,9 @@ fn test_checkpoint_generation_determinism() {
 fn test_checkpoint_training_resume() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config.clone());
+    let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
 
-    let tok = gen.tokenizer().clone();
+    let tok = gen_obj.tokenizer().clone();
     let mut dataset = TrainingDataset::default();
     let channels = ThoughtChannels::default();
     for _ in 0..5 {
@@ -288,14 +288,14 @@ fn test_checkpoint_training_resume() {
 
     // Phase 1: train 10 epochs
     let (metrics_phase1, adam_state, _, _, _) =
-        train_with_adam(&mut gen, &dataset, &train_cfg, None);
+        train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
     assert_eq!(metrics_phase1.len(), 10);
     let loss_at_10 = metrics_phase1.last().unwrap().avg_loss;
 
     // Save checkpoint
     let dir = std::env::temp_dir();
     let path = dir.join("broca_quality_resume.bin");
-    gen.save_checkpoint(&path, 10, loss_at_10, adam_state.clone(), None, None)
+    gen_obj.save_checkpoint(&path, 10, loss_at_10, adam_state.clone(), None, None)
         .expect("checkpoint save should succeed");
 
     // Load and resume training
@@ -365,7 +365,7 @@ fn test_combined_gating_effects() {
     config.enable_semantic_veto = true;
     config.gating.base_max_tokens = 40;
 
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
 
     // High epistemic uncertainty (Unknown) + high arousal
     let mut channels = ThoughtChannels::with_intent(4); // Uncertainty intent
@@ -373,7 +373,7 @@ fn test_combined_gating_effects() {
     channels.set_emotion(0.0, 0.95, 0.2); // neutral valence, very high arousal, low warmth
     channels.set_consciousness(0.7, 0.5, 0.5);
 
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
 
     // All numeric fields should be finite
     assert!(
@@ -423,9 +423,9 @@ fn test_intent_discrimination_quality() {
     for intent_idx in 0..8 {
         let mut intent_outputs = Vec::new();
         for seed in &seeds {
-            let mut gen = BrocaGenerator::new(seed, config.clone());
+            let mut gen_obj = BrocaGenerator::new(seed, config.clone());
             let channels = ThoughtChannels::with_intent(intent_idx);
-            let result = gen.generate(&channels);
+            let result = gen_obj.generate(&channels);
             intent_outputs.push(result.token_ids);
         }
         outputs_by_intent.push(intent_outputs);
@@ -471,10 +471,10 @@ fn test_channel_sensitivity_gradient() {
     let mut results = Vec::new();
 
     for &valence in &valence_levels {
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
         let mut channels = ThoughtChannels::with_intent(1); // Answer
         channels.channels[9] = valence; // Set valence directly
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
 
         assert!(
             result.final_coherence.is_finite(),
@@ -519,10 +519,10 @@ fn test_nan_inf_channel_handling() {
 
     // Test with NaN in a channel
     {
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
         let mut channels = ThoughtChannels::default();
         channels.channels[9] = f32::NAN; // NaN valence
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
 
         // Should not panic. Check that numeric outputs are consistent.
         assert!(
@@ -541,10 +541,10 @@ fn test_nan_inf_channel_handling() {
 
     // Test with Inf in a channel
     {
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
         let mut channels = ThoughtChannels::default();
         channels.channels[10] = f32::INFINITY; // Inf arousal
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
 
         assert!(
             result.num_tokens == result.token_ids.len(),
@@ -560,12 +560,12 @@ fn test_nan_inf_channel_handling() {
 
     // Test with very large values in multiple channels
     {
-        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+        let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
         let mut channels = ThoughtChannels::default();
         channels.channels[9] = 1e30;
         channels.channels[15] = -1e30;
         channels.channels[19] = 1e38;
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
 
         assert!(
             result.num_tokens == result.token_ids.len(),
@@ -608,9 +608,9 @@ fn test_minimal_config_generation() {
         ..Default::default()
     };
 
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
 
     // Generation should complete without panic
     assert!(
@@ -632,7 +632,7 @@ fn test_minimal_config_generation() {
 fn test_training_with_diverse_thoughts() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config.clone());
+    let mut gen_obj = BrocaGenerator::new(&genesis, config.clone());
 
     // Use generate_diverse_thoughts() to get a broad set of channel configurations
     let all_thoughts = generate_diverse_thoughts();
@@ -645,7 +645,7 @@ fn test_training_with_diverse_thoughts() {
     );
 
     // Create training dataset with these diverse thoughts
-    let tok = gen.tokenizer().clone();
+    let tok = gen_obj.tokenizer().clone();
     let target_texts = [
         "hello",
         "the world",
@@ -691,7 +691,7 @@ fn test_training_with_diverse_thoughts() {
         ..Default::default()
     };
 
-    let (metrics, _, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, _, _, _, _) = train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
 
     // Loss should decrease
     let first_loss = metrics[0].avg_loss;
@@ -706,7 +706,7 @@ fn test_training_with_diverse_thoughts() {
     let mut post_train_outputs = Vec::new();
     for intent in 0..5 {
         let channels = ThoughtChannels::with_intent(intent);
-        let result = gen.generate(&channels);
+        let result = gen_obj.generate(&channels);
         post_train_outputs.push(result.token_ids);
     }
 
@@ -839,8 +839,8 @@ fn test_generation_all_finite_outputs() {
 
     for (i, channels) in channel_configs.iter().enumerate() {
         // Fresh generator for each config to ensure clean state
-        let mut gen = BrocaGenerator::new(&genesis, quality_config());
-        let result = gen.generate(channels);
+        let mut gen_obj = BrocaGenerator::new(&genesis, quality_config());
+        let result = gen_obj.generate(channels);
 
         // final_coherence should be finite (it's initialized to 1.0 and updated via cosine similarity)
         // With coherence feedback disabled, it stays at 1.0
@@ -851,7 +851,7 @@ fn test_generation_all_finite_outputs() {
         );
 
         // All token IDs should be within vocab range
-        let vocab_size = gen.tokenizer().vocab_size();
+        let vocab_size = gen_obj.tokenizer().vocab_size();
         for &tid in &result.token_ids {
             assert!(
                 (tid as usize) < vocab_size,
@@ -891,9 +891,9 @@ fn test_generation_with_coherence_feedback() {
     config.enable_semantic_veto = true;
     config.gating.base_max_tokens = 32;
 
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
     let channels = ThoughtChannels::with_intent(1);
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
 
     // Should still produce output
     assert!(
@@ -925,9 +925,9 @@ fn test_topk_sampling_valid_output() {
     };
     config.gating.base_max_tokens = 20;
 
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
     let channels = ThoughtChannels::with_intent(1);
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
 
     assert!(result.num_tokens > 0, "TopK sampling should produce tokens");
     assert!(
@@ -936,7 +936,7 @@ fn test_topk_sampling_valid_output() {
     );
     for &tid in &result.token_ids {
         assert!(
-            (tid as usize) < gen.tokenizer().vocab_size(),
+            (tid as usize) < gen_obj.tokenizer().vocab_size(),
             "TopK token ID {tid} should be within vocab range",
         );
     }
@@ -952,9 +952,9 @@ fn test_topp_sampling_valid_output() {
     };
     config.gating.base_max_tokens = 20;
 
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
     let channels = ThoughtChannels::with_intent(2);
-    let result = gen.generate(&channels);
+    let result = gen_obj.generate(&channels);
 
     assert!(result.num_tokens > 0, "TopP sampling should produce tokens");
     assert!(
@@ -963,7 +963,7 @@ fn test_topp_sampling_valid_output() {
     );
     for &tid in &result.token_ids {
         assert!(
-            (tid as usize) < gen.tokenizer().vocab_size(),
+            (tid as usize) < gen_obj.tokenizer().vocab_size(),
             "TopP token ID {tid} should be within vocab range",
         );
     }
@@ -977,13 +977,13 @@ fn test_topp_sampling_valid_output() {
 fn test_streaming_callback_fires() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
 
     let channels = ThoughtChannels::with_intent(1); // Answer
     let mut streamed = String::new();
     let mut callback_count = 0usize;
 
-    let result = gen.generate_with_callback(&channels, &mut |token| {
+    let result = gen_obj.generate_with_callback(&channels, &mut |token| {
         streamed.push_str(token);
         callback_count += 1;
     });
@@ -1016,18 +1016,18 @@ fn test_streaming_callback_fires() {
 fn test_generate_then_train_no_corruption() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
 
     let channels = ThoughtChannels::with_intent(1);
 
     // Generate with streaming callback
     let mut streamed = String::new();
-    let result1 = gen.generate_with_callback(&channels, &mut |token| {
+    let result1 = gen_obj.generate_with_callback(&channels, &mut |token| {
         streamed.push_str(token);
     });
 
     // Train on the generated output
-    let tok = gen.tokenizer().clone();
+    let tok = gen_obj.tokenizer().clone();
     let mut dataset = TrainingDataset::default();
     if !result1.text.is_empty() {
         dataset.push(TrainingPair::new(channels, result1.text.clone(), &tok));
@@ -1051,7 +1051,7 @@ fn test_generate_then_train_no_corruption() {
         ..Default::default()
     };
 
-    let (metrics, _, _, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, _, _, _, _) = train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
     assert_eq!(
         metrics.len(),
         3,
@@ -1059,7 +1059,7 @@ fn test_generate_then_train_no_corruption() {
     );
 
     // Generate again — should not crash
-    let result2 = gen.generate(&channels);
+    let result2 = gen_obj.generate(&channels);
     assert!(
         result2.final_coherence.is_finite(),
         "Post-training generation should produce finite coherence"
@@ -1117,9 +1117,9 @@ fn test_emotional_modulation_via_channels() {
 fn test_training_gradient_health_after_diverse_training() {
     let genesis = quality_genesis();
     let config = quality_config();
-    let mut gen = BrocaGenerator::new(&genesis, config);
+    let mut gen_obj = BrocaGenerator::new(&genesis, config);
 
-    let tok = gen.tokenizer().clone();
+    let tok = gen_obj.tokenizer().clone();
     let mut dataset = TrainingDataset::default();
     let intents_and_texts = [
         (0, "hello"),
@@ -1149,7 +1149,7 @@ fn test_training_gradient_health_after_diverse_training() {
         ..Default::default()
     };
 
-    let (metrics, adam_state, diag, _, _) = train_with_adam(&mut gen, &dataset, &train_cfg, None);
+    let (metrics, adam_state, diag, _, _) = train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
     assert_eq!(metrics.len(), 10);
 
     // All losses must be finite and non-negative

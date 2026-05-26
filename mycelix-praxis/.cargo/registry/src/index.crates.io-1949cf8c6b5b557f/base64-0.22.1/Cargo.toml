@@ -10,7 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2024"
 rust-version = "1.48.0"
 name = "base64"
 version = "0.22.1"

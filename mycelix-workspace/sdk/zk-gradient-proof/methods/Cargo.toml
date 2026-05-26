@@ -1,7 +1,7 @@
 [package]
 name = "zk-gradient-methods"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "RISC-0 guest methods for gradient quality proofs"
 
 [build-dependencies]

@@ -1,14 +1,2 @@
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-
-[env]
-RUST_TEST_THREADS = "2"  # 4+ OOMs with concurrent sessions; raise when running solo
-RUST_MIN_STACK = "33554432"  # 32MB thread stacks — prevents SIGSTKFLT (exit 144) during symthaea v2.0.0 codegen
-# Disable incremental — incompatible with sccache (causes 98% cache misses).
-# sccache's cross-worktree caching is far more valuable than incremental's
-# within-session speedup for our multi-session workflow.
-CARGO_INCREMENTAL = "0"
-
-[profile.dev]
-# "packed" = single .dwp file vs "unpacked" = thousands of .dwo files (~80GB savings)
-split-debuginfo = "packed"
+[build]
+rustflags = ["-C", "target-cpu=native"]

@@ -47,6 +47,8 @@ pub struct ReasoningContext {
     /// When present, enables code-aware conflict detection, type safety gating,
     /// and code-specific MCTS action selection.
     pub code_context: Option<CodeReasoningContext>,
+    /// Negative prototypes bank for penalizing disproven approaches in MCTS (INV-12).
+    pub negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
 }
 
 /// Code-specific reasoning context for the consciousness engine.
@@ -116,6 +118,7 @@ pub struct ReasoningContextBuilder {
     cycle_id: u64,
     epistemic_quality: f64,
     code_context: Option<CodeReasoningContext>,
+    negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
 }
 
 impl ReasoningContextBuilder {
@@ -131,6 +134,7 @@ impl ReasoningContextBuilder {
             cycle_id: 0,
             epistemic_quality: 0.5,
             code_context: None,
+            negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
         }
     }
 
@@ -188,6 +192,15 @@ impl ReasoningContextBuilder {
         self
     }
 
+    /// Set the negative prototypes bank.
+    pub fn with_negative_prototypes(
+        mut self,
+        negatives: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
+    ) -> Self {
+        self.negative_prototypes = negatives;
+        self
+    }
+
     /// Build the ReasoningContext.
     ///
     /// If theory_metrics was not set, creates default metrics based on phi.
@@ -216,6 +229,7 @@ impl ReasoningContextBuilder {
             neuromod_exploration_mod: 1.0,
             epistemic_quality: self.epistemic_quality,
             code_context: self.code_context,
+            negative_prototypes: self.negative_prototypes,
         }
     }
 }

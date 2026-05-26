@@ -6,10 +6,10 @@
 //! Self-Optimization → Formal Proof → Physiological Feedback → Consensus → Living Manifest → Affective Sculpting → Secure Dreaming
 
 use symthaea_broca::*;
+use symthaea_core::hdc::HDC_DIMENSION;
 use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
 use symthaea_core::hdc::logic_engine::Proposition;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::HDC_DIMENSION;
 
 fn main() -> anyhow::Result<()> {
     println!("\n🌟 SYMBTHAEA GRAND UNIFIED DEMO: ECOLOGICAL CLOSURE");

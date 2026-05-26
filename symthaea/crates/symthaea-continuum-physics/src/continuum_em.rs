@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_skin_depth_copper() {
         // Copper at 1 GHz: δ ≈ 2.1 μm
-        let omega = 2.0 * PI * 1e9;
+        let omega = 2.0 * std::f64::consts::PI * 1e9;
         let sigma = 5.96e7; // S/m
         let delta = skin_depth(omega, MU_0, sigma);
         assert!(

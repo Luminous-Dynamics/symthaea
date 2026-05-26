@@ -12,13 +12,13 @@
 //! Trace: 4 columns × 32 rows (2 phases × 16 bits, padded to power of 2).
 
 use winterfell::{
-    crypto::{hashers::Blake3_256, DefaultRandomCoin, MerkleTree},
-    math::{fields::f128::BaseElement, FieldElement, StarkField, ToElements},
-    matrix::ColMatrix,
     AcceptableOptions, Air, AirContext, Assertion, BatchingMethod, CompositionPoly,
     CompositionPolyTrace, DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde,
     EvaluationFrame, PartitionOptions, Proof, ProofOptions, Prover as WinterfellProver,
     StarkDomain, Trace, TraceInfo, TracePolyTable, TransitionConstraintDegree,
+    crypto::{DefaultRandomCoin, MerkleTree, hashers::Blake3_256},
+    math::{FieldElement, StarkField, ToElements, fields::f128::BaseElement},
+    matrix::ColMatrix,
 };
 
 const TRACE_WIDTH: usize = 4;

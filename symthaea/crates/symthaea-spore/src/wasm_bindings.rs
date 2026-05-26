@@ -662,8 +662,8 @@ pub fn generate_sovereign_config(
     let migration: symthaea_nix::sovereign_config::MigrationData =
         serde_json::from_str(migration_json).unwrap_or_default();
 
-    let mut gen = symthaea_nix::sovereign_config::SovereignConfigGenerator::new();
-    let config = gen.generate(&hardware, &choices, &migration);
+    let mut b_gen = symthaea_nix::sovereign_config::SovereignConfigGenerator::new();
+    let config = b_gen.generate(&hardware, &choices, &migration);
 
     let json = serde_json::json!({
         "configuration_nix": config.configuration_nix,

@@ -6,6 +6,7 @@
 //! If a Rust struct changes a field, the system generates a Cross-Language
 //! Proof that must be satisfied in the Nix module (and vice versa).
 
+use crate::rust_walker::{LanguageWalker, RustWalker};
 use crate::substrate_binding::SubstrateBindingEngine;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
@@ -19,7 +20,6 @@ pub struct CrossLanguageInvariant {
 }
 
 pub struct TransSubstrateInvariantEngine {
-    #[allow(dead_code)]
     binding_engine: SubstrateBindingEngine,
     invariants: HashMap<String, CrossLanguageInvariant>,
 }
@@ -32,25 +32,31 @@ impl TransSubstrateInvariantEngine {
         }
     }
 
-    /// Lock a shared invariant between Rust and Nix.
-    pub fn lock_invariant(
-        &mut self,
-        name: &str,
-        _rust_path: &str,
-        _nix_path: &str,
-    ) -> CrossLanguageInvariant {
-        let rust_hv = ContinuousHV::random(1024, 42);
-        let nix_hv = ContinuousHV::random(1024, 43);
+    /// Automatically lock structural elements in a Rust file as invariants.
+    pub fn lock_rust_file(&mut self, substrate_name: &str, code: &str) -> usize {
+        let mut walker = RustWalker::new();
+        let elements = walker.extract_elements(code);
+        let count = elements.len();
 
-        let invariant = CrossLanguageInvariant {
-            name: name.to_string(),
-            rust_hv,
-            nix_hv,
-            locked: true,
-        };
+        for element in elements {
+            self.binding_engine.bind_element(substrate_name, &element);
+            
+            // For now, we use a synthetic "nix_hv" to satisfy the CrossLanguageInvariant struct
+            // In a real system, this would be retrieved from the Nix Knowledge Graph
+            let rust_hv = self.binding_engine.list_blueprints().last().unwrap().clone();
+            let nix_hv = rust_hv.clone(); // locked alignment
 
-        self.invariants.insert(name.to_string(), invariant.clone());
-        invariant
+            self.invariants.insert(
+                element.dotted_path.clone(),
+                CrossLanguageInvariant {
+                    name: element.dotted_path,
+                    rust_hv: rust_hv.clone(),
+                    nix_hv,
+                    locked: true,
+                },
+            );
+        }
+        count
     }
 
     /// Check if a proposed change violates a locked invariant.

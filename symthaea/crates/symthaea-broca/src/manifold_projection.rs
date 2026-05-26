@@ -5,8 +5,8 @@
 //! Projects 16,384D architectural hypervectors into a navigable
 //! 3D space for real-time visualization of the system's "mind".
 
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 pub struct ManifoldProjection {
     // Semantic axis anchors for projection

@@ -1,7 +1,7 @@
 [package]
 name = "symthaea-mycelix-bridge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
 description = "Bridge crate between Symthaea-HLB and Mycelix SDK for consciousness-guided federated learning"
 license = "AGPL-3.0-or-later"

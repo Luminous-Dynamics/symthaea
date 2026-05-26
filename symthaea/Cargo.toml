@@ -63,6 +63,8 @@ members = [
     "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
+    "crates/symthaea-runtime",
+    "crates/symthaea-lab",
     "crates/symthaea-zkproof",
     "crates/symthaea-zkproof/core",
     "crates/symthaea-broca",
@@ -172,6 +174,19 @@ nonsensical_open_options = "deny"
 unused_io_amount = "deny"
 
 [workspace.dependencies]
+no-panic = "0.1"
+parry3d = "0.17"
+uom = { version = "0.36", features = ["f64", "si"] }
+fixed = "1.27"
+statig = "0.3"
+tracing-chrome = "0.7"
+yrs = "0.17"
+chumsky = "0.9"
+argmin = { version = "0.10", features = ["serde"] }
+wgpu = "27.0"
+faer = "0.21"
+iceoryx2 = "0.9"
+z3 = { version = "0.12", features = ["static-link-z3"] }
 candle-core = { version = "0.8", default-features = false }
 candle-nn = "0.8"
 arrow-array = "56"
@@ -186,6 +201,7 @@ thiserror = "1.0"
 rand = "0.8"
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 blake3 = "1.5"
 uuid = { version = "1.6", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -203,6 +219,7 @@ strsim = "0.11"
 tree-sitter = "0.24"
 tree-sitter-nix = "0.3"
 hex = "0.4"
+ed25519-dalek = "=2.1.0"
 syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
@@ -465,8 +482,10 @@ prism-common = { path = "../prism/prism-common", optional = true }
 prism-search = { path = "../prism/prism-search", optional = true }
 
 # Web Research & Epistemic Verification (Track 6)
-reqwest = { version = "0.13", features = ["json", "multipart", "rustls"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "multipart", "rustls", "blocking"], default-features = false }
 scraper = "0.25"
+log = "0.4"
+hound = { workspace = true, optional = true }
 # html2text removed: scraper is used for HTML parsing, html2text never imported
 
 # API server (optional)
@@ -511,7 +530,7 @@ rand = { workspace = true }
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
 blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
-ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"], optional = true }  # MFDI identity signatures
+ed25519-dalek = { workspace = true, optional = true }  # MFDI identity signatures
 sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
 chrono = { workspace = true }
 regex = { workspace = true }
@@ -545,7 +564,6 @@ ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"]
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
 cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
 ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
-hound = { workspace = true, optional = true }
 rubato = { workspace = true }
 lz4_flex = { version = "0.11", default-features = false, optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
@@ -610,6 +628,7 @@ default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm"]  # P2P collective consciousness
+
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
@@ -962,6 +981,9 @@ symthaea-broca = { path = "crates/symthaea-broca", default-features = false }
 symthaea-engineering = { path = "crates/symthaea-engineering" }
 symthaea-sim-bridge = { path = "crates/symthaea-sim-bridge" }
 symthaea-mujoco-bridge = { path = "crates/symthaea-mujoco-bridge" }
+symthaea-openfoam-bridge = { path = "crates/symthaea-openfoam-bridge" }
+symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel" }
+symthaea-materials = { path = "crates/symthaea-materials" }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
 symthaea-psych-bench = { path = "crates/symthaea-psych-bench" }
 symthaea-humanoid = { path = "crates/symthaea-humanoid" }
@@ -1078,6 +1100,10 @@ required-features = ["multirotor"]
 [[example]]
 name = "mujoco_vs_simple_benchmark"
 required-features = ["multirotor-mujoco"]
+
+[[example]]
+name = "engineering_school_benchmarks"
+path = "examples/engineering_school_benchmarks.rs"
 
 [[example]]
 name = "sovereign_design_loop"
@@ -1967,7 +1993,3 @@ required-features = ["unstable-examples"]
 # CUDA 12.x is ABI-backward-compatible, so the vendored copy just adds
 # `"12.9" => (12, 9)` to the match arm and reuses the 12.x library-path
 # resolution. Unblocks Broca's `gpu` feature (and therefore Phase 2 M7
-# distillation training) without waiting on upstream cudarc or candle-core.
-# Remove this patch once candle-core bumps to cudarc 0.18+.
-[patch.crates-io]
-cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }

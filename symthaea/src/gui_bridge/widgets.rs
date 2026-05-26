@@ -383,8 +383,8 @@ impl GenerationTimeline {
                 .split('-')
                 .find_map(|s| s.parse::<u32>().ok())
             {
-                if let Some(gen) = self.generations.iter_mut().find(|g| g.number == num) {
-                    gen.is_booted = true;
+                if let Some(generation) = self.generations.iter_mut().find(|g| g.number == num) {
+                    generation.is_booted = true;
                 }
             }
         }

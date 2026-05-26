@@ -105,6 +105,7 @@ impl CognitiveLoopService {
                 channels: bridge.manifold().last_frame_channels(),
                 path_length: path.len(),
                 semantic_coherence: 0.5, // Collaborative dreams are inherently uncertain
+                trajectory: path,
             })
         }
     }
@@ -174,6 +175,7 @@ impl CognitiveLoopService {
             channels: bridge.manifold().last_frame_channels(),
             path_length: path.len(),
             semantic_coherence: 0.0, // TODO: Compute from score_path_with_fep results if needed
+            trajectory: path,
         };
 
         Ok(movie)

@@ -11,7 +11,7 @@
 # will likely look very different (and much more reasonable)
 
 [package]
-edition = "2018"
+edition = "2024"
 name = "must_future"
 version = "0.1.2"
 authors = ["neonphog <neonphog@gmail.com>"]

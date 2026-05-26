@@ -160,6 +160,7 @@ pub struct FullFrameCallback {
 }
 
 impl PhysicsCallback<3> for FullFrameCallback {
+    fn apply_trauma(&mut self, _event: &CollisionEvent<3>) {}
     fn modulate_force(
         &self,
         _body: BodyHandle,

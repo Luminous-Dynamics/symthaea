@@ -1009,6 +1009,95 @@ impl EpistemicCubeGate {
         }
     }
 
+    /// Create from a Mamba backend's tokenizer.
+    #[cfg(feature = "mamba-cpu")]
+    pub fn new_from_backend(backend: &dyn MambaBackend) -> Self {
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| backend.encode(w).ok().and_then(|ids| ids.first().copied()))
+                .collect()
+        };
+        Self {
+            hedging_ids: resolve(E_AXIS_HEDGING),
+            assertion_ids: resolve(E_AXIS_ASSERTION),
+            testimonial_ids: resolve(E_AXIS_TESTIMONIAL),
+            personal_ids: resolve(N_AXIS_PERSONAL),
+            communal_ids: resolve(N_AXIS_COMMUNAL),
+            network_ids: resolve(N_AXIS_NETWORK),
+            axiomatic_ids: resolve(N_AXIS_AXIOMATIC),
+            ephemeral_ids: resolve(M_AXIS_EPHEMERAL),
+            persistent_ids: resolve(M_AXIS_PERSISTENT),
+            foundational_ids: resolve(M_AXIS_FOUNDATIONAL),
+        }
+    }
+
+    /// Apply per-axis gating with a backend-specific scale factor.
+    pub fn apply_scaled(&self, logits: &mut [f32], channels: &ThoughtChannels, scale: f32) {
+        if scale == 1.0 {
+            self.apply(logits, channels);
+            return;
+        }
+
+        // Only apply if cube channels are populated
+        if !channels.has_epistemic_cube() {
+            return;
+        }
+
+        // ── E-axis: Assertion Control ────────────────────────────────────
+        let e = channels.e_tier().unwrap_or(1);
+        match e {
+            0 => {
+                Self::boost_ids(logits, &self.hedging_ids, 0.5 * scale);
+                Self::penalize_ids(logits, &self.assertion_ids, -0.8 * scale);
+            }
+            1 => {
+                Self::boost_ids(logits, &self.testimonial_ids, 0.4 * scale);
+                Self::boost_ids(logits, &self.hedging_ids, 0.2 * scale);
+                Self::penalize_ids(logits, &self.assertion_ids, -0.3 * scale);
+            }
+            2 => {
+                Self::boost_ids(logits, &self.hedging_ids, 0.1 * scale);
+            }
+            3 => {
+                Self::boost_ids(logits, &self.assertion_ids, 0.2 * scale);
+            }
+            4 => {
+                Self::boost_ids(logits, &self.assertion_ids, 0.4 * scale);
+                Self::penalize_ids(logits, &self.hedging_ids, -0.3 * scale);
+            }
+            _ => {}
+        }
+
+        // ── N-axis: Social Framing ──────────────────────────────────────
+        let n = channels.n_tier().unwrap_or(0);
+        match n {
+            0 => Self::boost_ids(logits, &self.personal_ids, 0.4 * scale),
+            1 => Self::boost_ids(logits, &self.communal_ids, 0.3 * scale),
+            2 => Self::boost_ids(logits, &self.network_ids, 0.3 * scale),
+            3 => Self::boost_ids(logits, &self.axiomatic_ids, 0.4 * scale),
+            _ => {}
+        }
+
+        // ── M-axis: Temporal Framing ────────────────────────────────────
+        let m = channels.m_tier().unwrap_or(1);
+        match m {
+            0 => Self::boost_ids(logits, &self.ephemeral_ids, 0.3 * scale),
+            2 => Self::boost_ids(logits, &self.persistent_ids, 0.3 * scale),
+            3 => Self::boost_ids(logits, &self.foundational_ids, 0.4 * scale),
+            _ => {}
+        }
+
+        // ── H-axis: Coherence Depth ────────────────────────────────────
+        let h = channels.h_tier();
+        if h < 0.25 {
+            let dampen = 1.0 - (0.15 * scale);
+            for l in logits.iter_mut() {
+                *l *= dampen;
+            }
+        }
+    }
+
     /// Apply per-axis gating to logits based on epistemic cube channels.
     ///
     /// `channels` must be the ThoughtChannels from the current generation.

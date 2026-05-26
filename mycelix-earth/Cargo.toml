@@ -1,0 +1,35 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[package]
+name = "mycelix-earth"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence, provenance, and stewardship claims from Earth-observation data"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+anyhow = "1"
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+md5 = "0.7"
+async-trait = "0.1"
+hdi = "0.7"
+sol-atlas-core = { path = "../sol-atlas-core" }
+mycelix-desci-core = { path = "../mycelix-desci/src/core" }
+mycelix-zkp-core = { path = "../crates/mycelix-zkp-core", features = ["backend-winterfell"] }
+symthaea-core = { path = "../symthaea/symthaea-core" }
+
+# Binius (Binary-Field STARKs)
+binius-core = { path = "../.deps/binius64/crates/core" }
+binius-frontend = { path = "../.deps/binius64/crates/frontend" }
+binius-prover = { path = "../.deps/binius64/crates/prover" }
+binius-verifier = { path = "../.deps/binius64/crates/verifier" }
+binius-transcript = { path = "../.deps/binius64/crates/transcript" }
+binius-hash = { path = "../.deps/binius64/crates/hash" }

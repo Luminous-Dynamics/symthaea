@@ -3,13 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Query API handlers
 
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{Json, extract::State};
 use mycelix_desci_core::query::{QueryFilter, SortBy};
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::{error::Result, models::*, state::AppState};
@@ -38,15 +35,13 @@ pub async fn execute_query(
     let page_size = req.page_size.unwrap_or(20).clamp(1, 100);
     let offset = (page - 1) * page_size;
 
-    let sort_by = req.sort.as_ref().map(|s| {
-        match s.field.as_str() {
-            "created_at" => SortBy::CreatedAt,
-            "tier" => SortBy::EpistemicTier,
-            "updated_at" => SortBy::UpdatedAt,
-            "verification_count" => SortBy::VerificationCount,
-            "category" => SortBy::Category,
-            _ => SortBy::CreatedAt,
-        }
+    let sort_by = req.sort.as_ref().map(|s| match s.field.as_str() {
+        "created_at" => SortBy::CreatedAt,
+        "tier" => SortBy::EpistemicTier,
+        "updated_at" => SortBy::UpdatedAt,
+        "verification_count" => SortBy::VerificationCount,
+        "category" => SortBy::Category,
+        _ => SortBy::CreatedAt,
     });
 
     let filter = QueryFilter {
@@ -69,7 +64,11 @@ pub async fn execute_query(
     let result = query_engine.query(&filter).await?;
 
     let response = QueryResponse {
-        results: result.claims.iter().map(|c| ClaimResponse::from(c)).collect(),
+        results: result
+            .claims
+            .iter()
+            .map(|c| ClaimResponse::from(c))
+            .collect(),
         total_count: result.total_count,
         page,
         page_size,
@@ -117,9 +116,7 @@ pub async fn get_categories(
     ),
     tag = "query"
 )]
-pub async fn get_stats(
-    State(_state): State<Arc<AppState>>,
-) -> Result<Json<QueryStatsResponse>> {
+pub async fn get_stats(State(_state): State<Arc<AppState>>) -> Result<Json<QueryStatsResponse>> {
     info!("Retrieving query statistics");
 
     // TODO: Implement stats calculation from index

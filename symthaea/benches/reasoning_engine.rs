@@ -86,6 +86,7 @@ mod benches {
     pub fn bench_tier0_cycle(c: &mut Criterion) {
         let mut engine = ConsciousReasoningEngine::new();
         let ctx = ReasoningContext {
+    negative_prototypes: Default::default(),
             theory_metrics: make_metrics(0.8),
             phi: 0.8,
             available_budget_us: 1_000, // force Tier 0
@@ -108,6 +109,7 @@ mod benches {
     pub fn bench_tier1_cycle(c: &mut Criterion) {
         let mut engine = ConsciousReasoningEngine::new();
         let ctx = ReasoningContext {
+    negative_prototypes: Default::default(),
             theory_metrics: make_metrics(0.7),
             phi: 0.8,
             available_budget_us: 8_000, // Tier 1
@@ -130,6 +132,7 @@ mod benches {
     pub fn bench_tier2_cycle(c: &mut Criterion) {
         let mut engine = ConsciousReasoningEngine::new();
         let ctx = ReasoningContext {
+    negative_prototypes: Default::default(),
             theory_metrics: make_metrics(0.8),
             phi: 0.8,
             available_budget_us: 25_000, // Tier 2
@@ -169,6 +172,7 @@ mod benches {
                 for i in 0..50 {
                     let consensus = 0.5 + 0.3 * ((i as f64 * 0.1).sin());
                     let ctx = ReasoningContext {
+    negative_prototypes: Default::default(),
                         theory_metrics: MultiTheoryMetrics {
                             phi: 0.8,
                             gwt: consensus,

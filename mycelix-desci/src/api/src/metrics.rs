@@ -7,8 +7,8 @@
 
 use lazy_static::lazy_static;
 use prometheus::{
-    register_counter_vec, register_histogram_vec, register_int_counter_vec,
-    register_int_gauge, CounterVec, Encoder, HistogramVec, IntCounterVec, IntGauge, TextEncoder,
+    CounterVec, Encoder, HistogramVec, IntCounterVec, IntGauge, TextEncoder, register_counter_vec,
+    register_histogram_vec, register_int_counter_vec, register_int_gauge,
 };
 
 lazy_static! {
@@ -100,9 +100,8 @@ pub fn encode_metrics() -> Result<String, prometheus::Error> {
     let metric_families = prometheus::gather();
     let mut buffer = Vec::new();
     encoder.encode(&metric_families, &mut buffer)?;
-    String::from_utf8(buffer).map_err(|e| {
-        prometheus::Error::Msg(format!("Failed to convert metrics to UTF-8: {}", e))
-    })
+    String::from_utf8(buffer)
+        .map_err(|e| prometheus::Error::Msg(format!("Failed to convert metrics to UTF-8: {}", e)))
 }
 
 /// Track HTTP request
@@ -120,9 +119,7 @@ pub fn track_claim_creation(tier: &str) {
 
 /// Track verification addition
 pub fn track_verification(claim_tier: &str) {
-    VERIFICATIONS_ADDED
-        .with_label_values(&[claim_tier])
-        .inc();
+    VERIFICATIONS_ADDED.with_label_values(&[claim_tier]).inc();
 }
 
 /// Track query operation
@@ -148,9 +145,7 @@ pub fn track_storage_operation(operation: &str, success: bool) {
 
 /// Track API error
 pub fn track_api_error(endpoint: &str, error_type: &str) {
-    API_ERRORS
-        .with_label_values(&[endpoint, error_type])
-        .inc();
+    API_ERRORS.with_label_values(&[endpoint, error_type]).inc();
 }
 
 #[cfg(test)]

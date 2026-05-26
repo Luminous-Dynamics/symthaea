@@ -1,7 +1,7 @@
 [package]
 name = "mycelix-wasm"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
 license = "AGPL-3.0-or-later"
 description = "Mycelix SDK for WebAssembly - MATL, Epistemic, and Bridge in the browser"

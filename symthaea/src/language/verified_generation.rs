@@ -108,6 +108,8 @@ pub struct AstHdcTrace {
     pub best_structural_prior_score: Option<f32>,
     pub structural_prior_delta: Option<f32>,
     pub geodesic_rejection_shadow_hits: usize,
+    pub geodesic_rejection_shadow_true_positives: usize,
+    pub geodesic_rejection_shadow_false_positives: usize,
     pub hard_geodesic_rejections: usize,
 }
 
@@ -219,9 +221,15 @@ pub fn generate_verified(
     generator: &CodeGenerator,
     executor: &mut CodeExecutor,
     intent: &CodeIntent,
-    context: &CodeContext,
+    context: &CodeContext<'_>,
 ) -> VerifiedCode {
-    generate_verified_inner(generator, executor, intent, context, None, None, None, None)
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(generate_verified_inner(
+        generator, executor, intent, context, None, None, None, None, None, None,
+    ))
 }
 
 /// Generate and verify code with AST/HDC repository context available for
@@ -233,7 +241,11 @@ pub fn generate_verified_with_repo_map<'a>(
     context: &CodeContext<'a>,
     repo_map: &'a RepoMap,
 ) -> VerifiedCode {
-    generate_verified_inner(
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(generate_verified_inner(
         generator,
         executor,
         intent,
@@ -242,7 +254,9 @@ pub fn generate_verified_with_repo_map<'a>(
         None,
         None,
         None,
-    )
+        None,
+        None,
+    ))
 }
 
 /// Generate and verify code with both RepoMap and LSP client available for
@@ -256,8 +270,20 @@ pub fn generate_verified_full<'a>(
     mut lsp_client: Option<&mut RustAnalyzerClient>,
     experience_store: Option<&mut CodingExperienceStore>,
     llm_backend: Option<Arc<dyn LLMBackend>>,
+    #[cfg(feature = "swarm")]
+    swarm_tx: Option<tokio::sync::mpsc::Sender<symthaea_swarm::SwarmMessage>>,
+    #[cfg(not(feature = "swarm"))]
+    _swarm_tx: Option<()>,
+    #[cfg(feature = "swarm")]
+    swarm_proofs: Option<&[symthaea_swarm::SwarmProofMsg]>,
+    #[cfg(not(feature = "swarm"))]
+    _swarm_proofs: Option<()>,
 ) -> VerifiedCode {
-    generate_verified_inner(
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(generate_verified_inner(
         generator,
         executor,
         intent,
@@ -266,10 +292,18 @@ pub fn generate_verified_full<'a>(
         lsp_client.as_deref_mut(),
         experience_store,
         llm_backend,
-    )
+        #[cfg(feature = "swarm")]
+        swarm_tx.as_ref(),
+        #[cfg(not(feature = "swarm"))]
+        None,
+        #[cfg(feature = "swarm")]
+        swarm_proofs,
+        #[cfg(not(feature = "swarm"))]
+        None,
+    ))
 }
 
-fn generate_verified_inner<'a>(
+async fn generate_verified_inner<'a>(
     generator: &CodeGenerator,
     executor: &mut CodeExecutor,
     intent: &CodeIntent,
@@ -278,6 +312,14 @@ fn generate_verified_inner<'a>(
     mut lsp_client: Option<&mut RustAnalyzerClient>,
     mut experience_store: Option<&mut CodingExperienceStore>,
     llm_backend: Option<Arc<dyn LLMBackend>>,
+    #[cfg(feature = "swarm")]
+    swarm_tx: Option<&tokio::sync::mpsc::Sender<symthaea_swarm::SwarmMessage>>,
+    #[cfg(not(feature = "swarm"))]
+    _swarm_tx: Option<()>,
+    #[cfg(feature = "swarm")]
+    swarm_proofs: Option<&[symthaea_swarm::SwarmProofMsg]>,
+    #[cfg(not(feature = "swarm"))]
+    _swarm_proofs: Option<()>,
 ) -> VerifiedCode {
     let temp_spec;
     let spec = match intent {
@@ -316,7 +358,7 @@ fn generate_verified_inner<'a>(
     let generated_source = if let Some(llm) = llm_backend.as_ref() {
         let prompt = build_llm_repair_prompt(intent, context, &[]);
         let params = GenerationParams::default();
-        let res = generate_llm_blocking(llm.as_ref(), &prompt, &params);
+        let res = llm.generate(&prompt, &params).await;
         match res {
             Ok(src) => {
                 let stripped = strip_markdown(&src);
@@ -376,6 +418,9 @@ fn generate_verified_inner<'a>(
             &structural_prototypes,
             &structural_labels,
         );
+        let shadow_hit = ast_observation.prediction_error.is_some()
+            && std::env::var_os("SYMTHAEA_GEODESIC_REJECTION_SHADOW").is_some();
+
         if let Some(hv) = ast_observation.hv {
             last_ast_hv = Some(hv);
         }
@@ -446,6 +491,18 @@ fn generate_verified_inner<'a>(
             }
             _ => executor.execute_rust_with_inline_tests(&full_source),
         };
+
+        // Evaluate shadow rejection accuracy
+        if shadow_hit {
+            if result.compiled {
+                ast_hdc.geodesic_rejection_shadow_false_positives += 1;
+                warn!("GEODESIC SHADOW FALSE POSITIVE: Candidate would have been rejected but it COMPILED.");
+            } else {
+                ast_hdc.geodesic_rejection_shadow_true_positives += 1;
+                info!("GEODESIC SHADOW TRUE POSITIVE: Candidate would have been rejected and it FAILED to compile.");
+            }
+        }
+
         result.parse_test_failures();
 
         if result.simulated {
@@ -455,6 +512,62 @@ fn generate_verified_inner<'a>(
         if result.compiled {
             // Compiled! Check tests
             if result.tests_failed == 0 {
+                let mut formally_verified = None;
+                if let Some(smtlib2_query) = spec.metadata.get("smtlib2") {
+                    info!(
+                        "Executing neuro-symbolic proof lookup and lemma chaining for {}",
+                        spec.name
+                    );
+                    let bridge = crate::z3_bridge::Z3Bridge::new();
+                    let memory = super::proof_memory::ProofMemory::default();
+                    let mut engine = super::proof_memory::CachedProofEngine::new(bridge, memory);
+
+                    #[cfg(feature = "swarm")]
+                    let proofs_slice = swarm_proofs.unwrap_or(&[]);
+                    #[cfg(not(feature = "swarm"))]
+                    let proofs_slice: &[()] = &[];
+                    let (verdict, details) = engine.verify_with_cache(
+                        &spec.name,
+                        &source,
+                        smtlib2_query,
+                        0.85,
+                        proofs_slice,
+                    );
+                    let is_proven = verdict == super::proof_memory::ProofVerdict::Proven;
+                    let is_refuted = verdict == super::proof_memory::ProofVerdict::Refuted;
+                    formally_verified = Some(is_proven);
+
+                    if is_refuted {
+                        if let (Some(store), Some(hv)) = (experience_store, &last_ast_hv) {
+                            info!("LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.", spec.name);
+                            store.store_negative_prototype(&spec.name, hv.values.clone());
+                        }
+                    }
+
+                    if is_proven && engine.solver_calls > 0 {
+                        #[cfg(feature = "swarm")]
+                        if let Some(tx) = swarm_tx {
+                            let gossip_msg = symthaea_swarm::SwarmProofMsg {
+                                node_id: uuid::Uuid::new_v4(),
+                                label: format!("{}_proof", spec.name),
+                                smtlib2: smtlib2_query.clone(),
+                                proof_hv: last_ast_hv.clone().unwrap_or_else(|| {
+                                    symthaea_core::hdc::ContinuousHV::zero(16384)
+                                }),
+                                verified: true,
+                                timestamp: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_millis() as u64,
+                            };
+                            let _ =
+                                tx.try_send(symthaea_swarm::SwarmMessage::ProofGossip(gossip_msg));
+                        }
+                    }
+                    info!("Formal verification outcome: {}", details);
+                }
+
+                let is_proven = formally_verified.unwrap_or(false);
                 return VerifiedCode {
                     source,
                     compiled: true,
@@ -463,8 +576,8 @@ fn generate_verified_inner<'a>(
                     test_count_failed: 0,
                     compile_retries,
                     test_retries: 0,
-                    formally_verified: None,
-                    confidence: VerificationConfidence::compute(true, true, false, 1.0),
+                    formally_verified,
+                    confidence: VerificationConfidence::compute(true, true, is_proven, 1.0),
                     compile_errors: Vec::new(),
                     test_failures: Vec::new(),
                     diagnostic_hvs: all_diagnostic_hvs.clone(),
@@ -529,7 +642,7 @@ fn generate_verified_inner<'a>(
                         // retry_context.error_hints contains the test failures
                         let prompt = build_llm_repair_prompt(&retry_intent, &retry_context, &[]);
                         let params = GenerationParams::default();
-                        let res = generate_llm_blocking(llm.as_ref(), &prompt, &params);
+                        let res = llm.generate(&prompt, &params).await;
                         match res {
                             Ok(src) => strip_markdown(&src),
                             Err(e) => {
@@ -607,6 +720,57 @@ fn generate_verified_inner<'a>(
                     }
 
                     if retry_result.compiled && retry_result.tests_failed == 0 {
+                        let mut formally_verified = None;
+                        if let Some(smtlib2_query) = spec.metadata.get("smtlib2") {
+                            info!(
+                                "Executing neuro-symbolic proof lookup on test-repair path for {}",
+                                spec.name
+                            );
+                            let bridge = crate::z3_bridge::Z3Bridge::new();
+                            let memory = super::proof_memory::ProofMemory::default();
+                            let mut engine =
+                                super::proof_memory::CachedProofEngine::new(bridge, memory);
+
+                            #[cfg(feature = "swarm")]
+                    let proofs_slice = swarm_proofs.unwrap_or(&[]);
+                    #[cfg(not(feature = "swarm"))]
+                    let proofs_slice: &[()] = &[];
+                            let (verdict, details) = engine.verify_with_cache(
+                                &spec.name,
+                                &source,
+                                smtlib2_query,
+                                0.85,
+                                proofs_slice,
+                            );
+                            let is_proven = verdict == super::proof_memory::ProofVerdict::Proven;
+                            formally_verified = Some(is_proven);
+
+                            if is_proven && engine.solver_calls > 0 {
+                                #[cfg(feature = "swarm")]
+                                if let Some(tx) = swarm_tx {
+                                    let gossip_msg = symthaea_swarm::SwarmProofMsg {
+                                        node_id: uuid::Uuid::new_v4(),
+                                        label: format!("{}_proof", spec.name),
+                                        smtlib2: smtlib2_query.clone(),
+                                        proof_hv: last_ast_hv.clone().unwrap_or_else(|| {
+                                            symthaea_core::hdc::ContinuousHV::zero(16384)
+                                        }),
+                                        verified: true,
+                                        timestamp: std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_millis()
+                                            as u64,
+                                    };
+                                    let _ = tx.try_send(symthaea_swarm::SwarmMessage::ProofGossip(
+                                        gossip_msg,
+                                    ));
+                                }
+                            }
+                            info!("Formal verification outcome (retry lane): {}", details);
+                        }
+
+                        let is_proven = formally_verified.unwrap_or(false);
                         return VerifiedCode {
                             source,
                             compiled: true,
@@ -615,8 +779,8 @@ fn generate_verified_inner<'a>(
                             test_count_failed: 0,
                             compile_retries,
                             test_retries: 0,
-                            formally_verified: None,
-                            confidence: VerificationConfidence::compute(true, true, false, 1.0),
+                            formally_verified,
+                            confidence: VerificationConfidence::compute(true, true, is_proven, 1.0),
                             compile_errors: Vec::new(),
                             test_failures: Vec::new(),
                             diagnostic_hvs: all_diagnostic_hvs.clone(),
@@ -764,7 +928,7 @@ fn generate_verified_inner<'a>(
                     build_llm_repair_prompt(&retry_intent, &retry_context, &result.compile_errors);
                 let params = GenerationParams::default();
 
-                let res = generate_llm_blocking(llm.as_ref(), &prompt, &params);
+                let res = llm.generate(&prompt, &params).await;
 
                 match res {
                     Ok(src) => strip_markdown(&src),
@@ -1209,6 +1373,7 @@ fn build_compile_retry_context<'a>(
         source_files,
         past_examples: context.past_examples.clone(),
         mcts_plan_confidence: context.mcts_plan_confidence,
+        negative_prototypes: context.negative_prototypes.clone(),
         error_hints,
         diagnostic_hvs,
         issue_text: context.issue_text.clone(),
@@ -1337,6 +1502,7 @@ fn build_test_retry_context<'a>(
         source_files: context.source_files.clone(),
         past_examples: context.past_examples.clone(),
         mcts_plan_confidence: context.mcts_plan_confidence,
+        negative_prototypes: context.negative_prototypes.clone(),
         error_hints,
         diagnostic_hvs: {
             let mut diagnostic_hvs = context.diagnostic_hvs.clone();
@@ -1420,6 +1586,80 @@ mod tests {
 
     fn make_generator() -> CodeGenerator {
         CodeGenerator::new(CodeHDEncoder::new(512))
+    }
+
+    #[test]
+    fn test_geodesic_rejection_shadow_mode() {
+        let generator = make_generator();
+        let mut executor = CodeExecutor::with_real_execution();
+        
+        // Enable shadow mode
+        unsafe {
+            std::env::set_var("SYMTHAEA_GEODESIC_REJECTION_SHADOW", "1");
+            // Set a high threshold to trigger a "shadow hit" (since the prototype bank will be dissimilar)
+            std::env::set_var("SYMTHAEA_STRUCTURAL_PRIOR_SURPRISE_THRESHOLD", "0.99");
+        }
+
+        // Seed context with a past example to ensure StructuralPrototypeBank is NOT empty
+        let mut context = CodeContext::default();
+        context.past_examples.push((
+            "add_one".to_string(),
+            "pub fn add_one(x: i32) -> i32 { x + 1 }".to_string(),
+        ));
+
+        let result = generate_verified_function_with_context(
+            &generator,
+            &mut executor,
+            "add",
+            "Add two integers",
+            "fn add(a: i32, b: i32) -> i32",
+            &[("add(2, 3)", "5")],
+            &context,
+        );
+
+        // We expect at least one shadow hit because the candidate "add(a, b)" 
+        // will be dissimilar enough from "add_one(x)" to fall below 0.99
+        assert!(result.ast_hdc.geodesic_rejection_shadow_hits > 0);
+        
+        // Since it actually compiled, it should be a false positive
+        assert!(result.ast_hdc.geodesic_rejection_shadow_false_positives > 0);
+        
+        unsafe {
+            std::env::remove_var("SYMTHAEA_GEODESIC_REJECTION_SHADOW");
+            std::env::remove_var("SYMTHAEA_STRUCTURAL_PRIOR_SURPRISE_THRESHOLD");
+        }
+    }
+
+    /// Helper for testing with custom context
+    fn generate_verified_function_with_context(
+        generator: &CodeGenerator,
+        executor: &mut CodeExecutor,
+        name: &str,
+        purpose: &str,
+        signature: &str,
+        examples: &[(&str, &str)],
+        context: &CodeContext<'_>,
+    ) -> VerifiedCode {
+        let spec = CodeSpec {
+            language: "rust".into(),
+            name: name.into(),
+            purpose: purpose.into(),
+            purpose_hv: None,
+            signature: Some(signature.into()),
+            constraints: Vec::new(),
+            examples: examples
+                .iter()
+                .map(|(i, o)| (i.to_string(), o.to_string()))
+                .collect(),
+            epistemic_status: EpistemicStatus::Certain,
+            metadata: HashMap::new(),
+        };
+
+        let target =
+            CodeTarget::new(spec.name.clone(), EntityKind::Function).with_language(&spec.language);
+        let intent = CodeIntent::Create { target, spec };
+
+        generate_verified(generator, executor, &intent, context)
     }
 
     #[test]
@@ -1591,7 +1831,7 @@ mod tests {
 /// Build a comprehensive prompt for the LLM to perform a surgical code fix.
 pub fn build_llm_repair_prompt(
     intent: &CodeIntent,
-    context: &CodeContext,
+    context: &CodeContext<'_>,
     errors: &[String],
 ) -> String {
     let mut prompt = String::new();

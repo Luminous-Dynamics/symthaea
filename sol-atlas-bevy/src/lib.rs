@@ -9,6 +9,7 @@
 
 pub mod camera;
 pub mod data;
+pub mod desci_evidence;
 pub mod frame_capture;
 pub mod globe;
 pub mod holographic_material;
@@ -24,6 +25,8 @@ pub struct TerraAtlasPlugin;
 impl Plugin for TerraAtlasPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<camera::OrbitalCameraConfig>()
+            .add_plugins(holographic_material::HolographicMaterialPlugin)
+            .add_plugins(desci_evidence::DeSciEvidencePlugin)
             .add_systems(Startup, (globe::spawn_globe, camera::spawn_camera))
             .add_systems(Update, camera::orbital_camera_system);
     }

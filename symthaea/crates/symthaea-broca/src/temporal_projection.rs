@@ -2683,7 +2683,7 @@ mod tests {
         let thought = ContinuousHV::random_default(42).normalize();
 
         tp.compute_anticollapse_gradients(&thought, 0.1, 0.0); // threshold=0 → all pairs counted
-                                                               // Check that some gradients are non-zero
+        // Check that some gradients are non-zero
         let grad_norm = l2_norm(&tp.grad_group_up[0]);
         assert!(grad_norm > 0.0, "Anti-collapse should produce gradients");
     }

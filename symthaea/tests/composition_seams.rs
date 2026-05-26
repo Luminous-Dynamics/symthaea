@@ -177,7 +177,7 @@ fn seam_evs_gates_mcts() {
 
     let budget = ReasoningBudget::new(10_000, 0.8);
     let config = MctsConfig::tier1();
-    let result = MctsPlanner::plan(&state, &actions, &config, &budget);
+    let result = MctsPlanner::plan(&state, &actions, &config, &budget, &Default::default());
     assert!(result.did_plan);
     assert!(result.iterations > 0);
     assert!(result.confidence > 0.0);
@@ -213,7 +213,7 @@ fn seam_dream_priors_bias_mcts() {
 
     let budget = ReasoningBudget::new(20_000, 0.9);
     let config = MctsConfig::tier2();
-    let result = MctsPlanner::plan(&state, &actions, &config, &budget);
+    let result = MctsPlanner::plan(&state, &actions, &config, &budget, &Default::default());
 
     // With identical embeddings but different priors, the dream-favored
     // action should win due to prior bonus in UCB1

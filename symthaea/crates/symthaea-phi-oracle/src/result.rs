@@ -39,8 +39,30 @@ pub struct IntegrationReport {
     /// overall integration.
     pub variable_contributions: Vec<f64>,
 
+    /// Topological Betti numbers [beta_0, beta_1, beta_2].
+    /// beta_0: number of connected components.
+    /// beta_1: number of one-dimensional holes (cycles).
+    pub betti_numbers: [usize; 3],
+
+    /// Deeply persistent topological cycles discovered via filtration.
+    pub persistent_cycles: Vec<PersistentCycle>,
+
     /// Number of observations used to compute this report.
     pub num_observations: usize,
+}
+
+/// A topological cycle discovered across a correlation filtration.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PersistentCycle {
+    /// Threshold at which this cycle was born.
+    pub birth: f64,
+    /// Threshold at which this cycle died (collapsed).
+    pub death: f64,
+    /// Normalized lifespan (birth - death). Higher = stronger signal.
+    pub lifespan: f64,
+    /// Indices of nodes involved in this cycle (heuristic approximation).
+    pub participants: Vec<usize>,
 }
 
 impl fmt::Display for IntegrationReport {

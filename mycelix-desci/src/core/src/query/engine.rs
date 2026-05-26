@@ -6,14 +6,14 @@
 //! Main query interface with filtering, sorting, and pagination
 
 use crate::{
+    Result,
     claims::DesciClaim,
     query::{ClaimIndex, QueryFilter, SortBy, SortOrder},
     storage::StorageBackend,
-    Result,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, warn, instrument};
+use tracing::{debug, instrument, warn};
 use uuid::Uuid;
 
 /// Query result
@@ -82,7 +82,10 @@ impl QueryEngine {
 
         // Get candidate claim IDs from index
         let candidate_ids = self.get_candidate_ids(filter).await?;
-        debug!(candidate_count = candidate_ids.len(), "Retrieved candidate IDs from index");
+        debug!(
+            candidate_count = candidate_ids.len(),
+            "Retrieved candidate IDs from index"
+        );
 
         // Retrieve claims from storage
         let mut claims = Vec::new();
@@ -132,11 +135,7 @@ impl QueryEngine {
         let offset = filter.offset.unwrap_or(0);
         let limit = filter.limit.unwrap_or(usize::MAX);
 
-        let paginated_claims: Vec<_> = claims
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let paginated_claims: Vec<_> = claims.into_iter().skip(offset).take(limit).collect();
 
         let execution_time_ms = start.elapsed().as_millis() as u64;
 
@@ -292,6 +291,14 @@ impl QueryEngine {
         let index = self.index.read().await;
         index.stats()
     }
+
+    /// Identify claims that hit E4/M3 status and need Quantum Archival.
+    pub fn get_foundational_pending_anchors(&self) -> Result<Vec<Uuid>> {
+        // Mock implementation: return a list of foundational IDs
+        // In production, this would query the index for E4/M3 claims
+        // that don't have a 'quantum_anchor_cid' yet.
+        Ok(Vec::new())
+    }
 }
 
 #[cfg(test)]
@@ -388,8 +395,7 @@ mod tests {
         engine.add_claim(&claim2).await;
         engine.add_claim(&claim3).await;
 
-        let filter = QueryFilter::new()
-            .with_sort(SortBy::EpistemicTier, SortOrder::Ascending);
+        let filter = QueryFilter::new().with_sort(SortBy::EpistemicTier, SortOrder::Ascending);
         let result = engine.query(&filter).await.unwrap();
 
         assert_eq!(result.claims[0].epistemic_tier, EpistemicTier::E1);

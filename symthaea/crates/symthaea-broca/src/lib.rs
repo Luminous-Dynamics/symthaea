@@ -22,6 +22,7 @@ pub mod cognitive_loop;
 pub mod compiler_trainer;
 pub mod consensus_engine;
 pub mod controller;
+pub mod decoder;
 pub mod dreaming;
 pub mod encoder;
 pub mod epistemic_dashboard;
@@ -94,14 +95,15 @@ pub use architectural_memory::ArchitecturalMemory;
 pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
 #[cfg(feature = "code-sheaf-eval")]
 pub use code_analysis::{
-    categorize_code_sheaf_diagnostic, extract_rust_functions, repair_hint_for_code_sheaf_category,
-    RustFunctionExtraction,
+    RustFunctionExtraction, categorize_code_sheaf_diagnostic, extract_rust_functions,
+    repair_hint_for_code_sheaf_category,
 };
 pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
+pub use decoder::{StructuredDecoder, StructuredReadout, StructuredRoleFill};
 pub use dreaming::DreamingService;
 pub use encoder::{
-    ThoughtChannels, ThoughtLanguageEncoder, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS,
+    EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, ThoughtChannels, ThoughtLanguageEncoder,
 };
 pub use epistemic_dashboard::{CognitiveStyle, EpistemicDashboard};
 pub use epistemic_scorers::{compute_epistemic_reward, compute_idiomaticity};
@@ -114,7 +116,9 @@ pub use formal_logic_scorer::{FormalLogicScorer, FormalVerificationResult};
 pub use gating::{
     CodeGate, CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
 };
-pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
+pub use generator::{
+    BrocaConfig, BrocaDecoderKind, BrocaGenerator, GenerationResult, SamplingStrategy,
+};
 pub use generic_structural_scorer_integration::{
     GenericStructuralScorer, StructuralVerdict as GenericStructuralVerdict,
 };
@@ -165,3 +169,7 @@ pub use projection::{
 };
 #[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;
+pub mod cross_modal_bridge;
+pub mod memory_ring;
+pub mod memory_kernel;
+pub mod invariant_guard;

@@ -14,6 +14,9 @@ pub mod jurisdiction_proof;
 #[cfg(feature = "backend-winterfell")]
 pub mod review_integrity;
 
+#[cfg(feature = "backend-winterfell")]
+pub mod recursive_aggregation;
+
 pub mod merkle_membership;
 pub mod nullifier;
 

@@ -241,7 +241,14 @@ impl Default for NpcTrust {
     }
 }
 
-/// Epistemic tag on a scavenged item — wraps REAL `mycelix-core-types::u8`.
+#[derive(Component, Debug, Clone, Default)]
+pub struct HarmonyComponent {
+    /// Activation levels for the Eight Harmonies [0, 1].
+    pub activations: [f32; 8],
+}
+
+/// Epistemic tag on a scavenged item
+/// - wraps REAL mycelix-core-types::u8.
 /// E0=Unverifiable, E1=Anecdotal, E2=Observable, E3=Measurable, E4=CryptographicallyVerifiable.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EpistemicTag(pub u8);

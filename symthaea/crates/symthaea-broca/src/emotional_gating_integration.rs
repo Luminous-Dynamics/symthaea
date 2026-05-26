@@ -70,7 +70,7 @@ pub fn modulate_by_emotion(
         temperature = (base_temperature * 1.38).min(1.35);
         top_p = 0.93;
         gate_strength *= 0.55; // Relax language gates → allow more diverse syntax
-                               // This helps escape local minima when stuck on one language's patterns
+    // This helps escape local minima when stuck on one language's patterns
     }
     // === FOCUSED + POSITIVE STATE (high arousal + positive valence) ===
     // → Precise, high-quality exploitation

@@ -248,6 +248,91 @@ pub const CODE_TOKENS: &[&str] = &[
     "HashSet::new()",
 ];
 
+/// Returns true for tokens that are strong code-syntax contaminants in prose.
+///
+/// This intentionally does not mark every programming keyword as code. Words
+/// like "if", "for", "return", or "class" are valid prose in some contexts;
+/// this helper targets tokens that strongly poison open-loop natural-language
+/// generation when emitted outside an explicit code-intent channel.
+pub fn is_code_contamination_token(token: &str) -> bool {
+    let trimmed = token.trim();
+    if trimmed.is_empty() || trimmed.starts_with("<0x") {
+        return false;
+    }
+
+    const EXACT_SYNTAX: &[&str] = &[
+        "->", "=>", "::", "..=", "&mut", "&str", "&self", "#[", "()", "{}", "[]", ";", "@@", "|>",
+        "<|", "\"\"", "''", "r#\"", "\"#", "//", "///", "//!", "/*", "*/", "# ", "'a", "'static",
+        "<T>", "<T, E>", "<'a>",
+    ];
+    if EXACT_SYNTAX.contains(&trimmed) {
+        return true;
+    }
+
+    const EXACT_CODE_WORDS: &[&str] = &[
+        "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "crate", "super", "async",
+        "await", "unsafe", "dyn", "lambda", "None", "True", "False", "Vec", "HashMap", "HashSet",
+        "Option", "Result", "String", "Box", "Arc", "Mutex", "Rc", "RefCell", "i32", "i64", "u32",
+        "u64", "f32", "f64", "usize", "bool",
+    ];
+    if EXACT_CODE_WORDS.contains(&trimmed) {
+        return true;
+    }
+
+    const CODE_PATTERNS: &[&str] = &[
+        "fn ",
+        "pub ",
+        "impl ",
+        "#[",
+        "::<",
+        ">::",
+        "Result<",
+        "Option<",
+        "Vec<",
+        "Box<",
+        "Arc<",
+        "-> Self",
+        "-> Result",
+        "-> Option",
+        "-> bool",
+        "-> usize",
+        "&self,",
+        "&mut self",
+        "self,",
+        "mut self",
+        "self.",
+        ".unwrap()",
+        ".expect(",
+        ".map(",
+        ".filter(",
+        ".collect()",
+        ".iter()",
+        ".into_iter()",
+        ".enumerate()",
+        ".zip(",
+        ".ok_or(",
+        ".unwrap_or(",
+        "use std::",
+        "use crate::",
+        "use super::",
+        "String::",
+        "Vec::",
+        "HashMap::",
+        "HashSet::",
+        "Default::",
+        "__name__",
+        "__main__",
+        "if __name__",
+        "where T:",
+        "where Self:",
+        "impl<T>",
+        "fn<T>",
+    ];
+    CODE_PATTERNS
+        .iter()
+        .any(|pattern| trimmed.contains(pattern))
+}
+
 /// Nix-specific tokens for structured NixOS-module generation (Phase 2 M5
 /// of the coding-AI roadmap). Distinct from the general `CODE_TOKENS` list
 /// because Nix's syntax + module-system vocabulary is large enough to

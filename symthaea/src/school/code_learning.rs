@@ -1133,7 +1133,7 @@ impl CodeLearningEngine {
             if let Some(ref mut store) = self.experience_store {
                 let error_sig = exec_result.compile_errors.join("; ");
                 if let Some(ref _fixed) = fix_applied {
-                    store.store_fix_strategy(&error_sig, "auto-fix applied");
+                    store.store_fix_strategy(&error_sig, "auto-fix applied", None);
                 }
             }
 
@@ -1441,6 +1441,7 @@ impl CodeLearningEngine {
                 } else {
                     None
                 },
+                diagnostic_hv: None,
             };
             store.store(experience).await;
         }

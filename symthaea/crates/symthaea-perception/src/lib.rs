@@ -127,3 +127,37 @@ pub use resilience::{
     ResilienceStats,
     ResilientResult,
 };
+
+// Surgical compatibility modules for local cross-crate simulation tracking
+pub mod brain {
+    pub mod prefrontal {
+        use std::sync::Arc;
+        #[derive(Debug, Clone, Default)]
+        pub struct AttentionBid;
+        impl AttentionBid {
+            pub fn new<A, B>(_name: A, _payload: B) -> Self { Self }
+            pub fn with_salience(self, _salience: f32) -> Self { self }
+            pub fn with_urgency(self, _urgency: f32) -> Self { self }
+            pub fn with_tags(self, _tags: Vec<String>) -> Self { self }
+            pub fn with_hdc_semantic<T>(self, _val: Option<Arc<T>>) -> Self { self }
+        }
+    }
+}
+
+pub mod embeddings {
+    #[derive(Debug, Clone, Default)]
+    pub struct Qwen3Config;
+    #[derive(Debug, Clone, Default)]
+    pub struct Qwen3EmbedderResult { pub embedding: Vec<f32> }
+    #[derive(Debug, Clone, Default)]
+    pub struct Qwen3Embedder;
+    impl Qwen3Embedder {
+        pub fn new(_cfg: Qwen3Config) -> anyhow::Result<Self> { Ok(Self) }
+        pub fn embed(&mut self, _text: &str) -> anyhow::Result<Qwen3EmbedderResult> { Ok(Qwen3EmbedderResult::default()) }
+    }
+}
+
+pub mod perception {
+    pub use crate::multi_modal::*;
+    pub use crate::semantic_vision::SemanticVision;
+}

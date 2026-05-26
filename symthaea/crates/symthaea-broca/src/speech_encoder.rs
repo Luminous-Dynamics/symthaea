@@ -19,7 +19,7 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
-use crate::encoder::{ThoughtChannels, NUM_CHANNELS};
+use crate::encoder::{NUM_CHANNELS, ThoughtChannels};
 
 /// Number of mel spectrogram bins (standard for 16kHz audio).
 const MEL_BINS: usize = 40;

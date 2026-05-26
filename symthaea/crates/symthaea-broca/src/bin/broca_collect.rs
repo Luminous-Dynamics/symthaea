@@ -22,7 +22,7 @@ use std::process;
 
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::tokenizer::BpeTokenizer;
-use symthaea_broca::training::{generate_diverse_thoughts, thought_to_prompt, TrainingPair};
+use symthaea_broca::training::{TrainingPair, generate_diverse_thoughts, thought_to_prompt};
 
 fn main() {
     tracing_subscriber::fmt()
@@ -223,8 +223,12 @@ fn build_system_prompt(channels: &ThoughtChannels) -> String {
     let epistemic_instruction = match epistemic_idx {
         0 => "Respond with certainty and directness.",
         1 => "Respond with reasonable confidence, noting that you believe this is likely correct.",
-        2 => "Respond while acknowledging some uncertainty. Use hedging language like 'perhaps', 'it seems', 'I believe'.",
-        3 => "Respond while clearly acknowledging you are uncertain. Use phrases like 'I'm not sure', 'it's unclear'.",
+        2 => {
+            "Respond while acknowledging some uncertainty. Use hedging language like 'perhaps', 'it seems', 'I believe'."
+        }
+        3 => {
+            "Respond while clearly acknowledging you are uncertain. Use phrases like 'I'm not sure', 'it's unclear'."
+        }
         _ => "Acknowledge this is outside your area of knowledge. Be honest about limitations.",
     };
 
