@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 24: Proliferation Safeguards ===\n");
 
     use symthaea_nuclear_forensics::safeguards::{
-        SafeguardsHdcEncoder, SafeguardsPredictor, SafeguardsReading, SAFEGUARDS_HORIZONS,
+        SAFEGUARDS_HORIZONS, SafeguardsHdcEncoder, SafeguardsPredictor, SafeguardsReading,
     };
 
     let encoder = SafeguardsHdcEncoder::new();

@@ -7,7 +7,7 @@
 //! This shows why HDC excels at structural relations with small vocabularies.
 
 use symthaea_stt::cetacean_scorer::{
-    CetaceanManner, CetaceanPlace, CetaceanScorer, CetaceanUnit, ALL_CAUS, MANNER_NAMES,
+    ALL_CAUS, CetaceanManner, CetaceanPlace, CetaceanScorer, CetaceanUnit, MANNER_NAMES,
     PLACE_NAMES,
 };
 

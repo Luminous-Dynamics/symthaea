@@ -10,7 +10,7 @@
 
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 use std::path::Path;
 use std::sync::Arc;

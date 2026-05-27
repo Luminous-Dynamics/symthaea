@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Quick test of principled causal primitives (skips slow unified method)
 use symthaea::benchmarks::{
-    discover_by_phi, discover_by_principled_hdc, discover_information_theoretic,
-    discover_majority_voting, TuebingenAdapter,
+    TuebingenAdapter, discover_by_phi, discover_by_principled_hdc, discover_information_theoretic,
+    discover_majority_voting,
 };
 
 fn main() {

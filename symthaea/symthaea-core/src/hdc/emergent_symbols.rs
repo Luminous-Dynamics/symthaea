@@ -271,7 +271,10 @@ impl SymbolGrounder {
                 members: cluster.len(),
                 crispness,
                 variance,
-                detection_count: self.symbols.get(&symbol_id).map_or(1, |s| s.detection_count + 1),
+                detection_count: self
+                    .symbols
+                    .get(&symbol_id)
+                    .map_or(1, |s| s.detection_count + 1),
                 isolation: 0.0, // Will compute after all symbols detected
             };
 
@@ -325,12 +328,17 @@ impl SymbolGrounder {
         let average_crispness = if detected_symbols.is_empty() {
             0.0
         } else {
-            detected_symbols.iter().map(|s| s.crispness).sum::<f32>() / detected_symbols.len() as f32
+            detected_symbols.iter().map(|s| s.crispness).sum::<f32>()
+                / detected_symbols.len() as f32
         };
 
-        let max_crispness = detected_symbols.iter().map(|s| s.crispness).fold(0.0f32, f32::max);
+        let max_crispness = detected_symbols
+            .iter()
+            .map(|s| s.crispness)
+            .fold(0.0f32, f32::max);
 
-        let stable_symbols = detected_symbols.iter()
+        let stable_symbols = detected_symbols
+            .iter()
             .filter(|s| s.detection_count >= 5 && s.crispness >= self.config.crispness_threshold)
             .count();
 
@@ -399,7 +407,8 @@ impl SymbolGrounder {
             return 0.0;
         }
 
-        let sum: f32 = cluster.iter()
+        let sum: f32 = cluster
+            .iter()
             .map(|hv| prototype.similarity(hv).max(0.0)) // Only positive similarity
             .sum();
 
@@ -414,7 +423,8 @@ impl SymbolGrounder {
 
         let mean_sim = self.compute_crispness(cluster, prototype);
 
-        let sum_sq: f32 = cluster.iter()
+        let sum_sq: f32 = cluster
+            .iter()
             .map(|hv| {
                 let sim = prototype.similarity(hv);
                 (sim - mean_sim).powi(2)
@@ -451,10 +461,7 @@ impl SymbolGrounder {
         symbols.sort_by(|a, b| a.1.detection_count.cmp(&b.1.detection_count));
 
         let to_remove = self.symbols.len() - self.config.max_symbols;
-        let ids_to_remove: Vec<u64> = symbols.iter()
-            .take(to_remove)
-            .map(|(id, _)| **id)
-            .collect();
+        let ids_to_remove: Vec<u64> = symbols.iter().take(to_remove).map(|(id, _)| **id).collect();
 
         for id in ids_to_remove {
             self.symbols.remove(&id);
@@ -468,14 +475,16 @@ impl SymbolGrounder {
 
     /// Get crystallized symbols only
     pub fn crystallized_symbols(&self) -> Vec<&Symbol> {
-        self.symbols.values()
+        self.symbols
+            .values()
             .filter(|s| s.crispness >= self.config.crispness_threshold)
             .collect()
     }
 
     /// Get stable symbols (high detection count + crystallized)
     pub fn stable_symbols(&self) -> Vec<&Symbol> {
-        self.symbols.values()
+        self.symbols
+            .values()
             .filter(|s| s.detection_count >= 5 && s.crispness >= self.config.crispness_threshold)
             .collect()
     }
@@ -620,15 +629,16 @@ mod tests {
         assert!(crispness > 0.9, "Crisp cluster should have high crispness");
 
         // Create a fuzzy cluster (less similar)
-        let fuzzy: Vec<ContinuousHV> = (0..5)
-            .map(|i| ContinuousHV::random(dim, i))
-            .collect();
+        let fuzzy: Vec<ContinuousHV> = (0..5).map(|i| ContinuousHV::random(dim, i)).collect();
 
         let fuzzy_prototype = grounder.compute_centroid(&fuzzy);
         let fuzzy_crispness = grounder.compute_crispness(&fuzzy, &fuzzy_prototype);
 
         println!("Fuzzy cluster crispness: {:.3}", fuzzy_crispness);
-        assert!(fuzzy_crispness < crispness, "Fuzzy cluster should have lower crispness");
+        assert!(
+            fuzzy_crispness < crispness,
+            "Fuzzy cluster should have lower crispness"
+        );
     }
 
     #[test]
@@ -646,18 +656,29 @@ mod tests {
             .collect();
 
         let result1 = grounder.detect_symbols(&cluster);
-        println!("Round 1: {} symbols, {} new", result1.symbols.len(), result1.new_symbols);
+        println!(
+            "Round 1: {} symbols, {} new",
+            result1.symbols.len(),
+            result1.new_symbols
+        );
 
         // Second round: same cluster should be stable
         let result2 = grounder.detect_symbols(&cluster);
-        println!("Round 2: {} symbols, {} new", result2.symbols.len(), result2.new_symbols);
+        println!(
+            "Round 2: {} symbols, {} new",
+            result2.symbols.len(),
+            result2.new_symbols
+        );
 
         // New symbols should be 0 in second round
         assert_eq!(result2.new_symbols, 0, "Should recognize existing symbol");
 
         // Detection count should increase
         if let Some(symbol) = result2.symbols.first() {
-            assert!(symbol.detection_count >= 2, "Detection count should increase");
+            assert!(
+                symbol.detection_count >= 2,
+                "Detection count should increase"
+            );
         }
     }
 

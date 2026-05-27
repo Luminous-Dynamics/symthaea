@@ -15,8 +15,8 @@
 use symthaea::hdc::code_encoder::CodeHDEncoder;
 use symthaea::language::code_generator::CodeGenerator;
 use symthaea::school::code_learning::{
-    build_lesson_bank, default_llm_prompt, CodeLearningEngine, MetabolicBudget, TIER1_OBJECTIVES,
-    TIER2_OBJECTIVES, TIER3_OBJECTIVES,
+    CodeLearningEngine, MetabolicBudget, TIER1_OBJECTIVES, TIER2_OBJECTIVES, TIER3_OBJECTIVES,
+    build_lesson_bank, default_llm_prompt,
 };
 
 fn make_real_engine() -> CodeLearningEngine {

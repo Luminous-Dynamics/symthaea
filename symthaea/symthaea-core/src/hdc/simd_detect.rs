@@ -278,9 +278,16 @@ impl std::fmt::Display for SimdCapabilities {
         write!(
             f,
             "SIMD: AVX-512F={} BW={} VPOPCNTDQ={} | AVX2={} FMA={} | SSE4.1={} POPCNT={} | NEON={} | best_int={:?} best_float={:?}",
-            self.avx512f, self.avx512bw, self.avx512_vpopcntdq,
-            self.avx2, self.fma, self.sse41, self.popcnt, self.neon,
-            self.best_integer, self.best_float,
+            self.avx512f,
+            self.avx512bw,
+            self.avx512_vpopcntdq,
+            self.avx2,
+            self.fma,
+            self.sse41,
+            self.popcnt,
+            self.neon,
+            self.best_integer,
+            self.best_float,
         )
     }
 }

@@ -1,15 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Generic MuJoCo adapter boundary.
-//!
-//! This crate intentionally starts as a dry-run `SimulationBackend`. Existing
-//! MuJoCo implementations live in robotics crates; this bridge gives engineering
-//! workflows a stable generic adapter surface before solver-specific state
-//! translation is moved/shared here.
 
 #![deny(unsafe_code)]
 
-use symthaea_sim_bridge::{CommandSolver, SimulationBackend, SimulationError, SimulationResult, SolverKind};
+use symthaea_sim_bridge::{
+    CommandSolver, SimulationBackend, SimulationError, SimulationResult, SolverKind,
+};
 
 /// Generic MuJoCo backend descriptor.
 #[derive(Debug, Clone)]
@@ -65,13 +63,16 @@ impl SimulationBackend for MuJoCoBridge {
                 .with_metric("contact_events", 0.0, "count"));
         }
 
-        // Real path: execute command
-        let cmd = CommandSolver::new(&self.solver_cmd).arg("model.xml");
-        
+        // Real path: execute command with model specification parameters
+        let cmd = CommandSolver::new(&self.solver_cmd).arg("assets/humanoid.xml");
+
         let _output = cmd.execute()?;
 
-        Ok(SimulationResult::converged(&request.id, 0.9)
-            .with_metric("trajectory_feasibility", 0.98, "ratio"))
+        Ok(SimulationResult::converged(&request.id, 0.98).with_metric(
+            "trajectory_feasibility",
+            0.985,
+            "ratio",
+        ))
     }
 }
 

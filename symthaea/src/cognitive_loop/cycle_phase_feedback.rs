@@ -1812,7 +1812,8 @@ impl CognitiveLoopService {
                             path_length: path.len(),
                             semantic_coherence: 0.0, // can be enhanced later
                             trajectory: path.to_vec(),
-                            })                    } else {
+                        })
+                    } else {
                         None
                     }
                 } else {

@@ -13,10 +13,10 @@
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 
-use crate::encoding::codebook::{NixCodebook, NIX_HDC_DIM};
+use crate::encoding::codebook::{NIX_HDC_DIM, NixCodebook};
 
 /// System telemetry sample for prediction input.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

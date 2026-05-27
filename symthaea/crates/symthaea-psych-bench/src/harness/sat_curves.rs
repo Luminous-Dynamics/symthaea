@@ -12,9 +12,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::PsychBenchmark;
 use super::config::BenchmarkConfig;
 use super::report::BenchmarkResult;
-use super::PsychBenchmark;
 
 /// A single point on the SAT curve: one (time_pressure, accuracy, mean_rt) triple.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -452,11 +452,7 @@ pub fn fit_sat(points: &[SatPoint]) -> SatFit {
         (1.0 - best_sse / ss_tot).clamp(0.0, 1.0)
     } else {
         // All accuracies are (nearly) equal; any constant model is perfect.
-        if best_sse < 1e-15 {
-            1.0
-        } else {
-            0.0
-        }
+        if best_sse < 1e-15 { 1.0 } else { 0.0 }
     };
 
     SatFit {

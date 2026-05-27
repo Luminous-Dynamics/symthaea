@@ -473,11 +473,7 @@ impl TemporalSynchronizationAnalyzer {
             }
         }
 
-        if count > 0 {
-            total / count as f64
-        } else {
-            0.5
-        }
+        if count > 0 { total / count as f64 } else { 0.5 }
     }
 
     /// Compute phenomenal binding strength (Ψ)
@@ -842,11 +838,7 @@ impl TemporalSynchronizationAnalyzer {
             .unwrap_or(0.0);
 
         let diff = (phase_a - phase_b).abs();
-        if diff > PI {
-            2.0 * PI - diff
-        } else {
-            diff
-        }
+        if diff > PI { 2.0 * PI - diff } else { diff }
     }
 }
 

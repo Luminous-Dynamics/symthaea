@@ -92,7 +92,7 @@ fn estimate_mean_from_hv(
     let sim_high = encoded.similarity(high_hv) as f64;
     let total = (sim_low + sim_high).max(1e-9);
     let t = sim_high / total; // weight toward high anchor → higher mean
-                              // Map t ∈ [0,1] → [center-spread, center+spread]
+    // Map t ∈ [0,1] → [center-spread, center+spread]
     (center - spread) + t * 2.0 * spread
 }
 
@@ -358,9 +358,11 @@ mod tests {
         let result = StatisticalInferenceBenchmark.run(&test_config());
         assert!(result.metrics.contains_key("mean_estimation_error"));
         assert!(result.metrics.contains_key("variance_estimation_accuracy"));
-        assert!(result
-            .metrics
-            .contains_key("distribution_classification_accuracy"));
+        assert!(
+            result
+                .metrics
+                .contains_key("distribution_classification_accuracy")
+        );
     }
 
     #[test]

@@ -23,7 +23,7 @@ use symthaea_psych_bench::benchmarks::social::*;
 use symthaea_psych_bench::benchmarks::sustained_attention::*;
 use symthaea_psych_bench::benchmarks::tombench::*;
 use symthaea_psych_bench::benchmarks::worm::*;
-use symthaea_psych_bench::harness::{key_metric_for_benchmark, BenchmarkConfig, PsychBenchmark};
+use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark, key_metric_for_benchmark};
 
 #[test]
 fn test_key_metric_exists_in_output() {

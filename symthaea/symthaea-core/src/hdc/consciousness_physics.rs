@@ -547,7 +547,7 @@ mod tests {
     ) -> (Vec<Vec<f64>>, Vec<f64>) {
         // n oscillators with nearest-neighbor coupling
         let mut state = vec![0.0; 2 * n]; // [x0, v0, x1, v1, ...]
-                                          // Initial conditions: spread out phases
+        // Initial conditions: spread out phases
         for i in 0..n {
             state[2 * i] = (i as f64 * std::f64::consts::PI / n as f64).sin();
             state[2 * i + 1] = (i as f64 * std::f64::consts::PI / n as f64).cos();

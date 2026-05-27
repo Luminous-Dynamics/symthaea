@@ -1184,7 +1184,7 @@ fn test_mesh_stats_default_aimd_counters() {
 
 #[test]
 fn test_compress_fragment_reassemble_roundtrip() {
-    use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+    use super::lora_fragment::{FragmentAssembler, LoRaFragment, fragment};
 
     let packet = WisdomPacket {
         source_id: [0xAA; 8],
@@ -1230,7 +1230,7 @@ fn test_compress_fragment_reassemble_roundtrip() {
 
 #[test]
 fn test_compress_fragment_reassemble_with_fec_loss() {
-    use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+    use super::lora_fragment::{FragmentAssembler, LoRaFragment, fragment};
 
     let packet = WisdomPacket {
         source_id: [0xCC; 8],
@@ -1281,7 +1281,7 @@ fn test_compress_fragment_reassemble_with_fec_loss() {
 
 #[test]
 fn test_compress_fragment_reassemble_heartbeat() {
-    use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+    use super::lora_fragment::{FragmentAssembler, LoRaFragment, fragment};
 
     let packet = WisdomPacket {
         source_id: [0xEE; 8],

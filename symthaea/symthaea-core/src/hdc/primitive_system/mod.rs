@@ -254,7 +254,9 @@ impl PrimitiveSystem {
                     #[cfg(debug_assertions)]
                     eprintln!(
                         "derive_encoding: '{}' parent '{}' not found (primitives count: {}), using seeded fallback",
-                        name, parent_name, self.primitives.len()
+                        name,
+                        parent_name,
+                        self.primitives.len()
                     );
                     return domain.embed(BinaryHV::random(seed_from_name(name)));
                 }

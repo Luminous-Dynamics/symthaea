@@ -852,6 +852,6 @@ mod tests {
         let mut engine = make_engine(); // state_dim = 4
         let updates = engine.update_beliefs(&[1.0, 2.0]); // only 2 elements
         assert_eq!(updates.len(), 3); // one per level
-                                      // No panic means padding worked.
+        // No panic means padding worked.
     }
 }

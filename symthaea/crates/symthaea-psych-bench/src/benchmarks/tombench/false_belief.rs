@@ -14,9 +14,9 @@
 //! character's belief rather than reality.
 
 #[cfg(not(feature = "symthaea-backend"))]
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
-#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::harness::difficulty::difficulty_model_for;
@@ -218,11 +218,7 @@ impl FalseBeliefBenchmark {
 
         // --- Combined: structural + HDC geometry equally weighted ---
         let combined = structural_score * 0.4 + geo_signal * 0.6;
-        if combined > 0.0 {
-            1.0
-        } else {
-            0.0
-        }
+        if combined > 0.0 { 1.0 } else { 0.0 }
     }
 
     /// Full trial: FEP behavioral prediction from false beliefs.

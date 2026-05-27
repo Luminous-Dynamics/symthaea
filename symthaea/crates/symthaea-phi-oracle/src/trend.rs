@@ -290,6 +290,8 @@ mod tests {
     #[test]
     fn test_record_from_report() {
         let report = IntegrationReport {
+            betti_numbers: Default::default(),
+            persistent_cycles: Default::default(),
             integration_index: 0.42,
             total_mutual_information: 0.68,
             minimum_information_partition: (vec![0, 1], vec![2, 3]),

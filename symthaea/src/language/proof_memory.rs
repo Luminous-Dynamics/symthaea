@@ -108,19 +108,24 @@ impl CachedProofEngine {
         source: &str,
         smtlib2: &str,
         min_similarity: f32,
-        #[cfg(feature = "swarm")]
-        swarm_proofs: &[symthaea_swarm::SwarmProofMsg],
-        #[cfg(not(feature = "swarm"))]
-        _swarm_proofs: &[()],
+        #[cfg(feature = "swarm")] swarm_proofs: &[symthaea_swarm::SwarmProofMsg],
+        #[cfg(not(feature = "swarm"))] _swarm_proofs: &[()],
     ) -> (ProofVerdict, String) {
         // 1. Distributed SMT Short-Circuit (Read Path Interception)
         #[cfg(feature = "swarm")]
         if let Some(peer_proof) = swarm_proofs.iter().find(|p| p.smtlib2 == smtlib2) {
             self.cache_hits += 1;
-            let verdict = if peer_proof.verified { ProofVerdict::Proven } else { ProofVerdict::Refuted };
+            let verdict = if peer_proof.verified {
+                ProofVerdict::Proven
+            } else {
+                ProofVerdict::Refuted
+            };
             return (
                 verdict,
-                format!("SWARM SHORT-CIRCUIT HIT: Found exact match in peer mesh registry for `{}`.", peer_proof.label),
+                format!(
+                    "SWARM SHORT-CIRCUIT HIT: Found exact match in peer mesh registry for `{}`.",
+                    peer_proof.label
+                ),
             );
         }
 
@@ -156,7 +161,11 @@ impl CachedProofEngine {
 
                 if let Some((peer_proof, score)) = best_swarm_match {
                     self.cache_hits += 1;
-                    let verdict = if peer_proof.verified { ProofVerdict::Proven } else { ProofVerdict::Refuted };
+                    let verdict = if peer_proof.verified {
+                        ProofVerdict::Proven
+                    } else {
+                        ProofVerdict::Refuted
+                    };
                     return (
                         verdict,
                         format!(
@@ -193,19 +202,25 @@ impl CachedProofEngine {
         &self,
         dim: usize,
     ) -> crate::consciousness::temporal_planning::mcts::NegativePrototypeBank {
-        let mut bank = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let mut bank =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
         for record in &self.memory.records {
             if record.verdict == ProofVerdict::Refuted {
                 // Convert AST features to a dense embedding vector
                 let mut embedding = vec![0.0f32; dim];
                 for (feature, count) in &record.ast_features {
-                    let idx = (feature.bytes().fold(0usize, |a, b| a.wrapping_mul(31).wrapping_add(b as usize))) % dim;
+                    let idx = (feature
+                        .bytes()
+                        .fold(0usize, |a, b| a.wrapping_mul(31).wrapping_add(b as usize)))
+                        % dim;
                     embedding[idx] += *count as f32;
                 }
                 // Normalize
                 let mag: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
                 if mag > 0.0 {
-                    for x in &mut embedding { *x /= mag; }
+                    for x in &mut embedding {
+                        *x /= mag;
+                    }
                 }
                 bank.prototypes.push((embedding, 1.0)); // Default penalty weight 1.0
             }
@@ -233,18 +248,29 @@ impl CachedProofEngine {
 
         let smt_a = match smt_serializer::expr_to_smtlib2(&expr_a) {
             Some(s) => s,
-            None => return (ProofVerdict::Unknown, "Expression A is not loop-free arithmetic".to_string()),
+            None => {
+                return (
+                    ProofVerdict::Unknown,
+                    "Expression A is not loop-free arithmetic".to_string(),
+                );
+            }
         };
         let smt_b = match smt_serializer::expr_to_smtlib2(&expr_b) {
             Some(s) => s,
-            None => return (ProofVerdict::Unknown, "Expression B is not loop-free arithmetic".to_string()),
+            None => {
+                return (
+                    ProofVerdict::Unknown,
+                    "Expression B is not loop-free arithmetic".to_string(),
+                );
+            }
         };
 
         let decls_a = smt_serializer::get_smt_declarations(&expr_a, "Int");
         let decls_b = smt_serializer::get_smt_declarations(&expr_b, "Int");
-        
+
         // Merge declarations
-        let mut decls_set: std::collections::HashSet<String> = decls_a.lines().map(|s| s.to_string()).collect();
+        let mut decls_set: std::collections::HashSet<String> =
+            decls_a.lines().map(|s| s.to_string()).collect();
         decls_set.extend(decls_b.lines().map(|s| s.to_string()));
         let mut decls_vec: Vec<_> = decls_set.into_iter().collect();
         decls_vec.sort();
@@ -273,14 +299,20 @@ mod tests {
 
         // a + b + c == c + b + a
         let (verdict, details) = engine.verify_arithmetic_equivalence("a + b + c", "c + b + a");
-        
+
         // If Z3 is available, it should be Proven. If not, it depends on fallback.
         if engine.bridge.z3_available {
             assert_eq!(verdict, ProofVerdict::Proven);
         } else {
-            assert!(matches!(verdict, ProofVerdict::Proven | ProofVerdict::Unknown));
+            assert!(matches!(
+                verdict,
+                ProofVerdict::Proven | ProofVerdict::Unknown
+            ));
         }
-        assert!(details.contains("Evaluated via structural Z3 SMT") || details.contains("LOCAL CACHE HIT"));
+        assert!(
+            details.contains("Evaluated via structural Z3 SMT")
+                || details.contains("LOCAL CACHE HIT")
+        );
     }
 
     #[test]
@@ -291,7 +323,7 @@ mod tests {
 
         // a + 1 == a + 2 (False)
         let (verdict, _) = engine.verify_arithmetic_equivalence("a + 1", "a + 2");
-        
+
         if engine.bridge.z3_available {
             assert_eq!(verdict, ProofVerdict::Refuted);
         }
@@ -322,9 +354,11 @@ mod tests {
         let smt = "(assert (= y (+ x 1)))";
 
         #[cfg(feature = "swarm")]
-        let (verdict, details) = engine.verify_with_cache("bump_check", query_source, smt, 0.85, &[]);
+        let (verdict, details) =
+            engine.verify_with_cache("bump_check", query_source, smt, 0.85, &[]);
         #[cfg(not(feature = "swarm"))]
-        let (verdict, details) = engine.verify_with_cache("bump_check", query_source, smt, 0.85, &[]);
+        let (verdict, details) =
+            engine.verify_with_cache("bump_check", query_source, smt, 0.85, &[]);
         assert_eq!(verdict, ProofVerdict::Proven);
         assert_eq!(engine.cache_hits, 1);
         assert_eq!(engine.solver_calls, 0);
@@ -332,6 +366,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "swarm")]
     fn test_swarm_short_circuit_hit() {
         let memory = ProofMemory::default();
         let bridge = Z3Bridge {
@@ -380,14 +415,16 @@ mod demo_tests {
             "(assert (not (= (+ n 1) (+ n 1))))",
             ProofVerdict::Proven,
             "Identity verified via Z3 integer math constraints.",
-        ).unwrap();
+        )
+        .unwrap();
         memory.observe(record1);
 
         let mut engine = CachedProofEngine::new(bridge, memory);
         let candidate_code = "pub fn execute_accumulation_step(n: i32) -> i32 { n + 1 }";
         let smt_query = "(assert (not (= (+ n 1) (+ n 1))))";
 
-        let (verdict, log) = engine.verify_with_cache("accumulate_task", candidate_code, smt_query, 0.90, &[]);
+        let (verdict, log) =
+            engine.verify_with_cache("accumulate_task", candidate_code, smt_query, 0.90, &[]);
         assert_eq!(verdict, ProofVerdict::Proven);
         assert_eq!(engine.cache_hits, 1);
     }

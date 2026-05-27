@@ -20,8 +20,8 @@
 use symthaea_canvas::CognitiveSnapshot;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
-use crate::neural_canvas::NeuralCanvas;
 use crate::AtelierConfig;
+use crate::neural_canvas::NeuralCanvas;
 
 /// Configuration for projection training.
 pub struct TrainingConfig {
@@ -102,7 +102,11 @@ pub fn train_projections(
             // Evaluate perturbations
             for sample in 0..config.population_size {
                 // Generate Gaussian noise perturbation
-                let noise = gaussian_noise(dim, config.noise_sigma, _epoch as u64 * 1000 + proj_idx as u64 * 100 + sample as u64);
+                let noise = gaussian_noise(
+                    dim,
+                    config.noise_sigma,
+                    _epoch as u64 * 1000 + proj_idx as u64 * 100 + sample as u64,
+                );
 
                 // Apply perturbation
                 let perturbed = perturb_hv(&original, &noise);
@@ -124,7 +128,10 @@ pub fn train_projections(
 
             // Update projection in the direction of best improvement
             if best_delta_score > 0.0 {
-                let updated = perturb_hv(&original, &scale_vec(&best_perturbation, config.learning_rate));
+                let updated = perturb_hv(
+                    &original,
+                    &scale_vec(&best_perturbation, config.learning_rate),
+                );
                 canvas.set_projection(proj_idx, updated);
             }
         }
@@ -183,12 +190,16 @@ fn score_visual_content(canvas: &mut NeuralCanvas, snapshot: &CognitiveSnapshot)
     let polygons = svg.matches("<polygon").count() as f32;
     let total = (circles + ellipses + paths + polygons).max(1.0);
 
-    let type_counts = [circles / total, ellipses / total, paths / total, polygons / total];
+    let type_counts = [
+        circles / total,
+        ellipses / total,
+        paths / total,
+        polygons / total,
+    ];
     let element_entropy = symthaea_aesthetic::information::shannon_entropy_normalized(&type_counts);
 
     // 2. Color diversity: count distinct colors in SVG
-    let color_count = svg.matches("fill=\"#").count()
-        + svg.matches("stroke=\"#").count();
+    let color_count = svg.matches("fill=\"#").count() + svg.matches("stroke=\"#").count();
     let color_diversity = (color_count as f32 / 20.0).min(1.0);
 
     // 3. Spatial distribution: SVG size as proxy for spread
@@ -204,9 +215,9 @@ fn score_visual_content(canvas: &mut NeuralCanvas, snapshot: &CognitiveSnapshot)
     // Composite: weighted combination
     let mut score = symthaea_aesthetic::AestheticScore {
         order: (0.4 * psi + 0.3 * harmony_mean + 0.3 * (1.0 - element_entropy)).clamp(0.0, 1.0),
-        complexity: symthaea_aesthetic::information::information_balance(
-            &[circles, ellipses, paths, polygons],
-        ),
+        complexity: symthaea_aesthetic::information::information_balance(&[
+            circles, ellipses, paths, polygons,
+        ]),
         surprise: element_entropy, // diversity of shapes = visual surprise
         harmony: harmony_mean,
         birkhoff: 0.0,
@@ -254,7 +265,12 @@ fn gaussian_noise(dim: usize, sigma: f32, seed: u64) -> Vec<f32> {
 
 /// Perturb a ContinuousHV by adding noise to its values.
 fn perturb_hv(hv: &ContinuousHV, noise: &[f32]) -> ContinuousHV {
-    let values: Vec<f32> = hv.values.iter().zip(noise.iter()).map(|(v, n)| v + n).collect();
+    let values: Vec<f32> = hv
+        .values
+        .iter()
+        .zip(noise.iter())
+        .map(|(v, n)| v + n)
+        .collect();
     ContinuousHV::from_values(values).normalize()
 }
 
@@ -310,7 +326,8 @@ mod tests {
     fn gaussian_noise_distribution() {
         let noise = gaussian_noise(1000, 1.0, 42);
         let mean: f32 = noise.iter().sum::<f32>() / noise.len() as f32;
-        let variance: f32 = noise.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / noise.len() as f32;
+        let variance: f32 =
+            noise.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / noise.len() as f32;
 
         // Mean should be near 0, variance near 1
         assert!(mean.abs() < 0.2, "mean = {mean}");

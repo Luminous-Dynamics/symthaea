@@ -4,7 +4,7 @@
 //! Analyze spectral characteristics of test sounds
 
 use symthaea_sentinel::{
-    compute_spectral_centroid, compute_spectral_flatness, FileAudioConfig, FileAudioPump,
+    FileAudioConfig, FileAudioPump, compute_spectral_centroid, compute_spectral_flatness,
 };
 
 fn analyze_file(path: &str) {

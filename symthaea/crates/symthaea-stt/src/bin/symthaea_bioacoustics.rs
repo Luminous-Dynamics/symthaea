@@ -18,13 +18,13 @@
 //! ```
 
 use clap::{Parser, Subcommand};
-use console::{style, Emoji};
+use console::{Emoji, style};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::f32::consts::PI;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use symthaea_stt::{batch::find_audio_files, BatchConfig, BatchDiscovery, DiscoveryConfig};
+use symthaea_stt::{BatchConfig, BatchDiscovery, DiscoveryConfig, batch::find_audio_files};
 
 #[allow(dead_code)]
 static DOWNLOAD: Emoji<'_, '_> = Emoji("📥 ", "");

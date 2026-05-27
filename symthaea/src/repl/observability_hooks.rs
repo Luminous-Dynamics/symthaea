@@ -11,7 +11,7 @@ use std::time::{Instant, SystemTime};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn, Level};
+use tracing::{Level, debug, info, warn};
 
 use crate::cognitive_loop::ConsciousnessSnapshot;
 

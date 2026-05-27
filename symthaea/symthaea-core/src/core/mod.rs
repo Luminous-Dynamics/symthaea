@@ -83,8 +83,8 @@ pub use crate::hdc::phi_feedback::{FeedbackModulation, PhiFeedbackConfig, PhiFee
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub use crate::hdc::consciousness_perf::{
-    batch_find_similar, batch_similarity_matrix, cluster_by_similarity, find_similar,
-    simd_capabilities, SimdCapabilities,
+    SimdCapabilities, batch_find_similar, batch_similarity_matrix, cluster_by_similarity,
+    find_similar, simd_capabilities,
 };
 
 pub use crate::observability::{DataPoint, MetricsCollector, MetricsSnapshot};

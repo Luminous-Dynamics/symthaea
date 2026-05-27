@@ -6,8 +6,8 @@
 //! Each harmony influences branching angle, recursion depth, and production rules,
 //! creating fractal structures that reflect the system's value basis.
 
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use std::fmt::Write;
 use symthaea_canvas::scene_graph::Style;
 use symthaea_canvas::{CognitiveSnapshot, Color, SceneNode};

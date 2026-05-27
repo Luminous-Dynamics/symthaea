@@ -731,7 +731,7 @@ impl EpistemicAuditor {
             other => {
                 return Err(format!(
                     "Unsupported export format: {other}. Use parquet, csv, or json."
-                ))
+                ));
             }
         };
 

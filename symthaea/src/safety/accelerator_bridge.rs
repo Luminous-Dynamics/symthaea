@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `accelerator` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 #[cfg(test)]
 use symthaea_physics::accelerator::AcceleratorFepAction;
 use symthaea_physics::accelerator::{AcceleratorOutput, AcceleratorSafetyLevel};

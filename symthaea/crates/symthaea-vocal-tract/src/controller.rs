@@ -24,7 +24,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
-    ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
+    ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
 use crate::types::{FormantFrame, SourceType};

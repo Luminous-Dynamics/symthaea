@@ -22,11 +22,11 @@
 
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 
+use super::CognitiveLoopConfig;
 use super::consciousness_engine;
 use super::consciousness_monitor_tier;
 use super::gwt_manager;
 use super::self_model_tier;
-use super::CognitiveLoopConfig;
 
 /// Groups 5 consciousness measurement and self-model subsystems.
 ///

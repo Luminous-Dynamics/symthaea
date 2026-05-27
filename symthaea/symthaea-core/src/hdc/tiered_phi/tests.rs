@@ -603,7 +603,8 @@ mod tests {
         assert!(
             stats.0 > 0,
             "Should have some incremental updates for single-component changes, got {} incremental / {} full",
-            stats.0, stats.1
+            stats.0,
+            stats.1
         );
 
         // Benchmark full computations with the same component sequence
@@ -3160,18 +3161,26 @@ mod tests {
 
     #[test]
     fn test_module_detection_method_descriptions() {
-        assert!(ModuleDetectionMethod::Spectral
-            .description()
-            .contains("Spectral"));
-        assert!(ModuleDetectionMethod::Agglomerative
-            .description()
-            .contains("agglomerative"));
-        assert!(ModuleDetectionMethod::Greedy
-            .description()
-            .contains("Greedy"));
-        assert!(ModuleDetectionMethod::KMeans
-            .description()
-            .contains("K-means"));
+        assert!(
+            ModuleDetectionMethod::Spectral
+                .description()
+                .contains("Spectral")
+        );
+        assert!(
+            ModuleDetectionMethod::Agglomerative
+                .description()
+                .contains("agglomerative")
+        );
+        assert!(
+            ModuleDetectionMethod::Greedy
+                .description()
+                .contains("Greedy")
+        );
+        assert!(
+            ModuleDetectionMethod::KMeans
+                .description()
+                .contains("K-means")
+        );
     }
 
     #[test]

@@ -18,8 +18,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_nix::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use symthaea_nix::ipc::{
-    default_snapshot_path, AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry,
-    DaemonConfig, DaemonSnapshot,
+    AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry, DaemonConfig,
+    DaemonSnapshot, default_snapshot_path,
 };
 use symthaea_nix::mind::active_inference::NixActiveInference;
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
@@ -27,8 +27,8 @@ use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, Sys
 use symthaea_nix::mind::ollama_bridge::{OllamaBridge, OllamaBridgeConfig};
 use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
 use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
-use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
+use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::plugin::domain_plugin::NixOsPlugin;
 use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
 use symthaea_nix::support::knowledge::{DynamicKnowledgeArticle, KnowledgeBase, KnowledgeCategory};
@@ -39,7 +39,7 @@ use symthaea_nix::support::predictive::{
 use symthaea_nix::traits::DomainPlugin;
 
 #[cfg(feature = "observability")]
-use symthaea_nix::observability::{init_tracing, Metrics, PhaseTimer};
+use symthaea_nix::observability::{Metrics, PhaseTimer, init_tracing};
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {

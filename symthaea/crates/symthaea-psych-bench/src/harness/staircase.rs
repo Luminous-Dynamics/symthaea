@@ -14,11 +14,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::PsychBenchmark;
 use super::config::BenchmarkConfig;
 use super::report::BenchmarkResult;
 #[cfg(test)]
 use super::report::MetricValue;
-use super::PsychBenchmark;
 
 /// Staircase rule determining convergence target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

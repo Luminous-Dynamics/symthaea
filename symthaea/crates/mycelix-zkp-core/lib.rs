@@ -31,10 +31,7 @@
 ///
 /// For this proof-of-concept, we verify that the Binius types
 /// are accessible and the crate compiles to wasm32-unknown-unknown.
-pub fn verify_hdc_proof(
-    _proof_bytes: &[u8],
-    _public_words: &[u64],
-) -> Result<bool, String> {
+pub fn verify_hdc_proof(_proof_bytes: &[u8], _public_words: &[u64]) -> Result<bool, String> {
     // Type-check: ensure binius-core types are accessible in WASM
     let _word = binius_core::word::Word(42);
 

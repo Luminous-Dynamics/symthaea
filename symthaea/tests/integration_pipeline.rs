@@ -12,8 +12,8 @@
 //! are written against the structural guarantees of the pipeline rather
 //! than the quality of LLM output.
 
-use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea::Symthaea;
+use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea_core::hdc::real_hv::RealHV;
 
 // ---------------------------------------------------------------------------

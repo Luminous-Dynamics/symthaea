@@ -311,7 +311,11 @@ impl ContinuousHV {
                 acc_chunk[7] += val_chunk[7];
             }
 
-            for (acc, &v) in acc_iter.into_remainder().iter_mut().zip(val_iter.remainder().iter()) {
+            for (acc, &v) in acc_iter
+                .into_remainder()
+                .iter_mut()
+                .zip(val_iter.remainder().iter())
+            {
                 *acc += v;
             }
         }
@@ -399,15 +403,37 @@ impl ContinuousHV {
                 let mut other_chunks = other.values.chunks_exact(8);
 
                 for (a, b) in self_chunks.by_ref().zip(other_chunks.by_ref()) {
-                    dot += a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] +
-                           a[4] * b[4] + a[5] * b[5] + a[6] * b[6] + a[7] * b[7];
-                    norm_a_sq += a[0] * a[0] + a[1] * a[1] + a[2] * a[2] + a[3] * a[3] +
-                                 a[4] * a[4] + a[5] * a[5] + a[6] * a[6] + a[7] * a[7];
-                    norm_b_sq += b[0] * b[0] + b[1] * b[1] + b[2] * b[2] + b[3] * b[3] +
-                                 b[4] * b[4] + b[5] * b[5] + b[6] * b[6] + b[7] * b[7];
+                    dot += a[0] * b[0]
+                        + a[1] * b[1]
+                        + a[2] * b[2]
+                        + a[3] * b[3]
+                        + a[4] * b[4]
+                        + a[5] * b[5]
+                        + a[6] * b[6]
+                        + a[7] * b[7];
+                    norm_a_sq += a[0] * a[0]
+                        + a[1] * a[1]
+                        + a[2] * a[2]
+                        + a[3] * a[3]
+                        + a[4] * a[4]
+                        + a[5] * a[5]
+                        + a[6] * a[6]
+                        + a[7] * a[7];
+                    norm_b_sq += b[0] * b[0]
+                        + b[1] * b[1]
+                        + b[2] * b[2]
+                        + b[3] * b[3]
+                        + b[4] * b[4]
+                        + b[5] * b[5]
+                        + b[6] * b[6]
+                        + b[7] * b[7];
                 }
 
-                for (&a, &b) in self_chunks.remainder().iter().zip(other_chunks.remainder().iter()) {
+                for (&a, &b) in self_chunks
+                    .remainder()
+                    .iter()
+                    .zip(other_chunks.remainder().iter())
+                {
                     dot += a * b;
                     norm_a_sq += a * a;
                     norm_b_sq += b * b;
@@ -444,17 +470,26 @@ impl ContinuousHV {
             self.values.len(),
             other.values.len()
         );
-        
+
         let mut self_chunks = self.values.chunks_exact(8);
         let mut other_chunks = other.values.chunks_exact(8);
         let mut sum = 0.0f32;
 
         for (a, b) in self_chunks.by_ref().zip(other_chunks.by_ref()) {
-            sum += a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] +
-                   a[4] * b[4] + a[5] * b[5] + a[6] * b[6] + a[7] * b[7];
+            sum += a[0] * b[0]
+                + a[1] * b[1]
+                + a[2] * b[2]
+                + a[3] * b[3]
+                + a[4] * b[4]
+                + a[5] * b[5]
+                + a[6] * b[6]
+                + a[7] * b[7];
         }
 
-        sum + self_chunks.remainder().iter().zip(other_chunks.remainder().iter())
+        sum + self_chunks
+            .remainder()
+            .iter()
+            .zip(other_chunks.remainder().iter())
             .map(|(a, b)| a * b)
             .sum::<f32>()
     }
@@ -480,7 +515,7 @@ impl ContinuousHV {
             // Modified Gram-Schmidt: project out all previous vectors
             for prev in &result {
                 let proj_coeff = v.dot(prev); // prev is unit norm, so proj = dot * prev
-                                              // v = v - proj_coeff * prev
+                // v = v - proj_coeff * prev
                 for (vi, pi) in v.values.iter_mut().zip(prev.values.iter()) {
                     *vi -= proj_coeff * pi;
                 }
@@ -500,6 +535,17 @@ impl ContinuousHV {
         result
     }
 
+    /// Update the hypervector's internal values from a raw float slice.
+    /// This is used for zero-copy WASM memory mutations.
+    pub fn update_from_slice(&mut self, data: &[f32]) {
+        assert_eq!(
+            self.values.len(),
+            data.len(),
+            "Dimension mismatch in update_from_slice"
+        );
+        self.values.copy_from_slice(data);
+    }
+
     /// L2 norm
     ///
     /// # Performance
@@ -515,12 +561,18 @@ impl ContinuousHV {
         {
             let mut sum_sq = 0.0f32;
             let mut chunks = self.values.chunks_exact(8);
-            
+
             for c in chunks.by_ref() {
-                sum_sq += c[0] * c[0] + c[1] * c[1] + c[2] * c[2] + c[3] * c[3] +
-                          c[4] * c[4] + c[5] * c[5] + c[6] * c[6] + c[7] * c[7];
+                sum_sq += c[0] * c[0]
+                    + c[1] * c[1]
+                    + c[2] * c[2]
+                    + c[3] * c[3]
+                    + c[4] * c[4]
+                    + c[5] * c[5]
+                    + c[6] * c[6]
+                    + c[7] * c[7];
             }
-            
+
             sum_sq += chunks.remainder().iter().map(|&x| x * x).sum::<f32>();
             sum_sq.sqrt()
         }

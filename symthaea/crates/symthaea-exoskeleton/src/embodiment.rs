@@ -5,8 +5,8 @@ use crate::encoder::ExoskeletonHdcEncoder;
 use crate::simulator::{ExoskeletonPhysicsSimulator, SimpleExoskeletonSimulator};
 use crate::types::{AssistanceMode, ExoskeletonConfig, NUM_ACTUATORS};
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;

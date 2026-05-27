@@ -47,11 +47,11 @@ use crate::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
 use crate::consciousness::epistemic_conflict::{
-    phi_integration::{effective_phi, thresholds},
     ConflictDetector, TheoryCalibrator,
+    phi_integration::{effective_phi, thresholds},
 };
 use crate::consciousness::temporal_planning::{
-    mcts::{evs, MctsPlanner, NegativePrototypeBank},
+    mcts::{MctsPlanner, NegativePrototypeBank, evs},
     types::{BudgetTier, ForkedState, MctsConfig, ReasoningBudget},
 };
 use crate::consciousness::tool_gate::classifier;
@@ -248,7 +248,13 @@ impl ConsciousReasoningEngine {
                     }
                 }
                 event.did_simulate = true;
-                MctsPlanner::plan(&sim_state, &ctx.available_actions, &config, &budget, &self.negative_bank)
+                MctsPlanner::plan(
+                    &sim_state,
+                    &ctx.available_actions,
+                    &config,
+                    &budget,
+                    &self.negative_bank,
+                )
             } else if r >= thresholds::R_EPISTEMIC_MIN {
                 // Epistemic rollouts only
                 event.did_simulate = true;
@@ -372,7 +378,7 @@ impl ConsciousReasoningEngine {
         task_complexity: f64,
     ) -> ReasoningResult {
         let mut ctx = base_ctx.clone();
-        ctx.code_context = Some(types::CodeReasoningContext {
+        ctx.code_context = Some(CodeReasoningContext {
             type_confidence,
             involves_unsafe,
             recent_compile_rate: compile_rate,
@@ -514,6 +520,7 @@ mod tests {
 
     fn make_context(phi: f64, consensus: f64, budget_us: u64) -> ReasoningContext {
         ReasoningContext {
+            negative_prototypes: Default::default(),
             theory_metrics: make_metrics(phi, consensus),
             phi,
             available_budget_us: budget_us,
@@ -524,8 +531,7 @@ mod tests {
                     embedding: vec![0.5; 4],
                     prior: 0.5,
                     is_epistemic: true,
-                
-        },
+                },
                 PlannedAction {
                     id: "execute".to_string(),
                     description: "Execute action".to_string(),

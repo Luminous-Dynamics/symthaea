@@ -36,7 +36,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use symthaea::language::nix_kg::{NixKg, NixKgFile, ServiceKeyword, SCHEMA_VERSION};
+use symthaea::language::nix_kg::{NixKg, NixKgFile, SCHEMA_VERSION, ServiceKeyword};
 
 /// Roots whose second segment is a service-name candidate.
 const SERVICE_LIKE_ROOTS: &[&str] = &[

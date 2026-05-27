@@ -22,7 +22,7 @@
 use crate::audio::AudioFrontend;
 use crate::cetacean_scorer::{CetaceanManner, CetaceanPlace, CetaceanUnit};
 use crate::ltc::{LtcCell, LtcConfig};
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -292,11 +292,7 @@ impl CetaceanClassifier {
             .zip(self.prev_spectrum.iter())
             .map(|(curr, prev)| {
                 let diff = curr - prev;
-                if diff > 0.0 {
-                    diff * diff
-                } else {
-                    0.0
-                }
+                if diff > 0.0 { diff * diff } else { 0.0 }
             })
             .sum::<f32>()
             .sqrt()

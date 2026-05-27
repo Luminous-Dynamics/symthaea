@@ -59,8 +59,8 @@ pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
 pub use multimodal_manager::{MultimodalManager, MultimodalTelemetry};
 pub use network_service_bridge::{
-    forward_affective_state, forward_federated_round, NetworkServiceBridge,
-    NetworkServiceBridgeHandle,
+    NetworkServiceBridge, NetworkServiceBridgeHandle, forward_affective_state,
+    forward_federated_round,
 };
 pub use perception_manager::PerceptionManager;
 pub use soul_manager::{SoulManager, SoulTelemetry};

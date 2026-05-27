@@ -27,7 +27,7 @@
 
 use std::time::Duration;
 
-use symthaea::mind::{connect_social, AsyncMind, MindConfig, MindState};
+use symthaea::mind::{AsyncMind, MindConfig, MindState, connect_social};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Compute pairwise cosine similarities between three agents' current thoughts.
@@ -92,8 +92,13 @@ async fn main() {
             println!(
                 "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 i + 1,
-                a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                ab, bc, ac, mean,
+                a.consciousness_level,
+                b.consciousness_level,
+                c.consciousness_level,
+                ab,
+                bc,
+                ac,
+                mean,
             );
         }
     }
@@ -124,8 +129,13 @@ async fn main() {
             println!(
                 "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 30 + i + 1,
-                a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                ab, bc, ac, mean,
+                a.consciousness_level,
+                b.consciousness_level,
+                c.consciousness_level,
+                ab,
+                bc,
+                ac,
+                mean,
             );
         }
     }
@@ -169,8 +179,13 @@ async fn main() {
             println!(
                 "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 60 + i + 1,
-                a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                ab, bc, ac, mean,
+                a.consciousness_level,
+                b.consciousness_level,
+                c.consciousness_level,
+                ab,
+                bc,
+                ac,
+                mean,
             );
         }
     }
@@ -233,8 +248,13 @@ async fn main() {
             println!(
                 "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 90 + i + 1,
-                a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                ab, bc, ac, mean_sim,
+                a.consciousness_level,
+                b.consciousness_level,
+                c.consciousness_level,
+                ab,
+                bc,
+                ac,
+                mean_sim,
             );
         }
     }
@@ -269,8 +289,7 @@ async fn main() {
     let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
     println!(
         "  Baseline (tick 140): consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim mean={:.3} [AB={:.3}, BC={:.3}, AC={:.3}]",
-        a.consciousness_level, b.consciousness_level, c.consciousness_level,
-        mean, ab, bc, ac,
+        a.consciousness_level, b.consciousness_level, c.consciousness_level, mean, ab, bc, ac,
     );
 
     // Sub-phase B: disrupt Bob (10 ticks)
@@ -294,8 +313,7 @@ async fn main() {
     let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
     println!(
         "  Disrupted (tick 150): consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim mean={:.3} [AB={:.3}, BC={:.3}, AC={:.3}]  (Bob noise)",
-        a.consciousness_level, b.consciousness_level, c.consciousness_level,
-        mean, ab, bc, ac,
+        a.consciousness_level, b.consciousness_level, c.consciousness_level, mean, ab, bc, ac,
     );
 
     // Sub-phase C: recovery (10 ticks — Bob returns to shared signal)

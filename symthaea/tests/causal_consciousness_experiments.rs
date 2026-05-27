@@ -205,7 +205,9 @@ fn test_c2_temporal_structure_of_phi() {
     if forward_stronger {
         eprintln!("  VERDICT: Temporal structure matters — real order has strongest correlation.");
     } else {
-        eprintln!("  FINDING: Temporal structure may not matter — disrupted order has similar correlation.");
+        eprintln!(
+            "  FINDING: Temporal structure may not matter — disrupted order has similar correlation."
+        );
     }
     eprintln!("═════════════════════════════════════\n");
 }
@@ -464,7 +466,9 @@ fn test_c5_multi_seed_phi_correlation() {
 
     eprintln!("\n═══ C5: MULTI-SEED PHI CORRELATION ═══");
     for (seed, phi_mean, r_proxy, r_error, count) in &seed_results {
-        eprintln!("  {seed:15} | Phi={phi_mean:7.2} | r(proxy)={r_proxy:.4} | r(error)={r_error:.4} | n={count}");
+        eprintln!(
+            "  {seed:15} | Phi={phi_mean:7.2} | r(proxy)={r_proxy:.4} | r(error)={r_error:.4} | n={count}"
+        );
     }
     eprintln!("  r(proxy) mean: {r_proxy_mean:.4} ± {r_proxy_std:.4}");
     if r_proxy_std < 0.15 {

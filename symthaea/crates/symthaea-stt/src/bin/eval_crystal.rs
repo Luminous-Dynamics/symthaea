@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    eval::phoneme_error_rate_detailed, id_to_audio_path, load_alignments, AudioConfig,
-    AudioFrontend, CrystalReservoir, OnlinePrototypeClassifier,
+    AudioConfig, AudioFrontend, CrystalReservoir, OnlinePrototypeClassifier,
+    eval::phoneme_error_rate_detailed, id_to_audio_path, load_alignments,
 };
 
 #[derive(Parser)]

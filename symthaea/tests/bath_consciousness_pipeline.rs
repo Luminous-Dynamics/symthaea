@@ -64,11 +64,13 @@ fn test_bath_consciousness_pipeline() {
     service.clear_pharmacological();
     for _ in 0..50 {
         let result = service.cycle("high stress emergency urgent danger");
-        assert!(result
-            .metadata
-            .neuromod
-            .neuromod_allostatic_load
-            .is_finite());
+        assert!(
+            result
+                .metadata
+                .neuromod
+                .neuromod_allostatic_load
+                .is_finite()
+        );
     }
 
     // Phase 6: Recovery → 50 cycles

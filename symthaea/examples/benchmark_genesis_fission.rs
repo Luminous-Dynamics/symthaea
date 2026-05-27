@@ -9,7 +9,7 @@
 fn main() {
     println!("=== Genesis Mission Challenge 2: Fission Reactor Safety ===\n");
 
-    use symthaea::physics::fission::{FissionReading, FissionTwin, FISSION_HORIZONS};
+    use symthaea::physics::fission::{FISSION_HORIZONS, FissionReading, FissionTwin};
 
     let healthy = FissionReading {
         power_output: 0.8,

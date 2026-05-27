@@ -43,7 +43,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use symthaea::language::nix_broca_bridge::broca_channels_for_nix_prompt;
-use symthaea::language::nix_codegen::{classify_nix_intent, NixIntent};
+use symthaea::language::nix_codegen::{NixIntent, classify_nix_intent};
 use symthaea::language::nix_scorer::attrpath_set_of;
 
 /// Scraper output shape — kept in sync manually with nix_corpus_scrape's

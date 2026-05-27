@@ -11,7 +11,7 @@ use super::hadrons::{Baryon, Meson};
 use super::nuclear::EnergyScale;
 use super::physics_test_helpers::{assert_relative_eq, particle_physics_setup};
 use super::qft::{DivergenceType, ElectroweakEncoder, QCDEncoder, QEDEncoder};
-use super::standard_model::{GaugeBoson, LeptonFlavor, QuarkFlavor, PHYSICS_DIM};
+use super::standard_model::{GaugeBoson, LeptonFlavor, PHYSICS_DIM, QuarkFlavor};
 use crate::genesis::GenesisSeed;
 
 // =========================================================================
@@ -92,12 +92,12 @@ fn sm_quark_mass_bottom() {
 
 #[test]
 fn sm_quark_generations() {
-    assert_eq!(QuarkFlavor::Up.generation(), 1, "Up gen");
-    assert_eq!(QuarkFlavor::Down.generation(), 1, "Down gen");
-    assert_eq!(QuarkFlavor::Charm.generation(), 2, "Charm gen");
-    assert_eq!(QuarkFlavor::Strange.generation(), 2, "Strange gen");
-    assert_eq!(QuarkFlavor::Top.generation(), 3, "Top gen");
-    assert_eq!(QuarkFlavor::Bottom.generation(), 3, "Bottom gen");
+    assert_eq!(QuarkFlavor::Up.generation(), 1, "Up r#gen");
+    assert_eq!(QuarkFlavor::Down.generation(), 1, "Down r#gen");
+    assert_eq!(QuarkFlavor::Charm.generation(), 2, "Charm r#gen");
+    assert_eq!(QuarkFlavor::Strange.generation(), 2, "Strange r#gen");
+    assert_eq!(QuarkFlavor::Top.generation(), 3, "Top r#gen");
+    assert_eq!(QuarkFlavor::Bottom.generation(), 3, "Bottom r#gen");
 }
 
 #[test]

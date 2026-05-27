@@ -291,11 +291,7 @@ impl DesignSpaceMapper {
         };
 
         let result = self.engine.simulate(&conditions);
-        if result.feasible {
-            Some(high)
-        } else {
-            None
-        }
+        if result.feasible { Some(high) } else { None }
     }
 
     /// Generate ASCII chart of sweep results

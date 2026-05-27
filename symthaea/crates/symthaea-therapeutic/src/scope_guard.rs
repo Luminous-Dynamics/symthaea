@@ -40,12 +40,24 @@ impl ScopeViolation {
     /// Required disclaimer for this violation type.
     pub fn disclaimer(&self) -> &'static str {
         match self {
-            Self::DiagnosticClaim => "I am an AI assistant, not a licensed mental health professional. I cannot make clinical diagnoses. Please consult a qualified healthcare provider for diagnostic evaluation.",
-            Self::PrescriptionClaim => "I cannot prescribe or recommend medication. Please consult a psychiatrist or physician for medication decisions.",
-            Self::ProfessionalIdentityClaim => "I am an AI system, not a therapist or counselor. I can offer supportive conversation but not professional therapy.",
-            Self::TreatmentPlan => "Specific treatment plans should be developed with a licensed mental health professional who can assess your complete situation.",
-            Self::RiskPrediction => "I cannot accurately assess risk levels. If you or someone you know is in danger, please contact emergency services (911) or the 988 Suicide & Crisis Lifeline.",
-            Self::ConfidentialityClaim => "Conversations with an AI system are not protected by therapist-client privilege. Please be aware that standard data handling practices apply.",
+            Self::DiagnosticClaim => {
+                "I am an AI assistant, not a licensed mental health professional. I cannot make clinical diagnoses. Please consult a qualified healthcare provider for diagnostic evaluation."
+            }
+            Self::PrescriptionClaim => {
+                "I cannot prescribe or recommend medication. Please consult a psychiatrist or physician for medication decisions."
+            }
+            Self::ProfessionalIdentityClaim => {
+                "I am an AI system, not a therapist or counselor. I can offer supportive conversation but not professional therapy."
+            }
+            Self::TreatmentPlan => {
+                "Specific treatment plans should be developed with a licensed mental health professional who can assess your complete situation."
+            }
+            Self::RiskPrediction => {
+                "I cannot accurately assess risk levels. If you or someone you know is in danger, please contact emergency services (911) or the 988 Suicide & Crisis Lifeline."
+            }
+            Self::ConfidentialityClaim => {
+                "Conversations with an AI system are not protected by therapist-client privilege. Please be aware that standard data handling practices apply."
+            }
         }
     }
 }

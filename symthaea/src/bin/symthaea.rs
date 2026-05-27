@@ -44,8 +44,8 @@
 //! ```
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
@@ -58,12 +58,12 @@ use tokio::time::interval;
 use tracing::{debug, error, info, warn};
 use wait_timeout::ChildExt;
 
+use symthaea::Symthaea;
 use symthaea::control_plane::{
-    parse_bearer_token, service_known_not_implemented_request_types, service_readonly_programs,
-    AuditEvent, AuditLog, MAX_REQUEST_LINE_BYTES, SERVICE_PROTOCOL_VERSION,
+    AuditEvent, AuditLog, MAX_REQUEST_LINE_BYTES, SERVICE_PROTOCOL_VERSION, parse_bearer_token,
+    service_known_not_implemented_request_types, service_readonly_programs,
 };
 use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
-use symthaea::Symthaea;
 
 // Voice support (feature-gated)
 #[cfg(feature = "voice-tts")]
@@ -1238,9 +1238,9 @@ impl ServiceState {
                 dry_run: _,
             } => {
                 use symthaea::action::{
+                    DestructivenessLevel, RemoteCommandCapability,
                     classify_command_destructiveness, classify_remote_command_capability,
-                    get_rollback_hint, parse_command_line, DestructivenessLevel,
-                    RemoteCommandCapability,
+                    get_rollback_hint, parse_command_line,
                 };
 
                 let intro = {
@@ -1325,8 +1325,8 @@ impl ServiceState {
                 require_confirmation,
             } => {
                 use symthaea::action::{
-                    classify_command_destructiveness, classify_remote_command_capability,
-                    get_rollback_hint, parse_command_line, RemoteCommandCapability,
+                    RemoteCommandCapability, classify_command_destructiveness,
+                    classify_remote_command_capability, get_rollback_hint, parse_command_line,
                 };
 
                 let intro = {
@@ -1631,7 +1631,7 @@ fn calculate_completion_confidence(partial: &str, full: &str) -> f32 {
 
 /// Generate command preview for multi-step operations
 fn generate_command_preview(command: &str) -> Option<CommandPreview> {
-    use symthaea::action::{classify_command_destructiveness, DestructivenessLevel};
+    use symthaea::action::{DestructivenessLevel, classify_command_destructiveness};
 
     let parts: Vec<&str> = command.split_whitespace().collect();
     if parts.is_empty() {
@@ -2037,10 +2037,12 @@ mod protocol_tests {
         assert_eq!(json["type"], "protocol_info");
         assert_eq!(json["protocol_version"], SERVICE_PROTOCOL_VERSION);
         assert_eq!(json["auth_required"], true);
-        assert!(json["auth_scheme"]
-            .as_str()
-            .expect("auth scheme")
-            .contains("Bearer"));
+        assert!(
+            json["auth_scheme"]
+                .as_str()
+                .expect("auth scheme")
+                .contains("Bearer")
+        );
         assert_eq!(
             json["allowed_readonly_programs"]
                 .as_array()
@@ -2060,14 +2062,11 @@ mod protocol_tests {
                 .map(String::as_str)
                 .collect::<Vec<_>>()
         );
-        assert!(json["notes"]
-            .as_array()
-            .expect("notes")
-            .iter()
-            .any(|note| note
-                .as_str()
+        assert!(json["notes"].as_array().expect("notes").iter().any(|note| {
+            note.as_str()
                 .unwrap_or_default()
-                .contains("SYMTHAEA_SERVICE_AUDIT_LOG_PATH")));
+                .contains("SYMTHAEA_SERVICE_AUDIT_LOG_PATH")
+        }));
     }
 
     #[test]
@@ -2105,10 +2104,12 @@ mod protocol_tests {
 
         let json = response_json(&response);
         assert_eq!(json["type"], "error");
-        assert!(json["message"]
-            .as_str()
-            .expect("message")
-            .contains("Authentication required"));
+        assert!(
+            json["message"]
+                .as_str()
+                .expect("message")
+                .contains("Authentication required")
+        );
     }
 
     #[tokio::test]
@@ -2141,9 +2142,11 @@ mod protocol_tests {
         assert_eq!(json["type"], "audit_events");
         let events = json["events"].as_array().expect("events");
         assert!(!events.is_empty(), "expected at least one audit event");
-        assert!(events
-            .iter()
-            .any(|event| event["event"] == "request_received" && event["subject"] == "status"));
+        assert!(
+            events
+                .iter()
+                .any(|event| event["event"] == "request_received" && event["subject"] == "status")
+        );
     }
 
     #[tokio::test]
@@ -2161,10 +2164,12 @@ mod protocol_tests {
 
         let json = response_json(&response);
         assert_eq!(json["type"], "error");
-        assert!(json["message"]
-            .as_str()
-            .expect("message")
-            .contains("Unsupported protocol_version"));
+        assert!(
+            json["message"]
+                .as_str()
+                .expect("message")
+                .contains("Unsupported protocol_version")
+        );
     }
 
     #[tokio::test]
@@ -2183,10 +2188,12 @@ mod protocol_tests {
 
         let json = response_json(&response);
         assert_eq!(json["type"], "error");
-        assert!(json["message"]
-            .as_str()
-            .expect("message")
-            .contains("maximum line length"));
+        assert!(
+            json["message"]
+                .as_str()
+                .expect("message")
+                .contains("maximum line length")
+        );
     }
 
     #[tokio::test]
@@ -2206,10 +2213,12 @@ mod protocol_tests {
         let json = response_json(&response);
         assert_eq!(json["type"], "execution_result");
         assert_eq!(json["executed"], false);
-        assert!(json["gate_reason"]
-            .as_str()
-            .expect("gate_reason")
-            .contains("Mutating commands"));
+        assert!(
+            json["gate_reason"]
+                .as_str()
+                .expect("gate_reason")
+                .contains("Mutating commands")
+        );
     }
 
     #[tokio::test]

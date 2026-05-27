@@ -12,8 +12,8 @@
 #[cfg(any(feature = "multirotor-swarm", feature = "flight-swarm"))]
 fn main() {
     use symthaea::multirotor::{
-        swarm::{train_swarm, SwarmConfig},
         FlightConfig,
+        swarm::{SwarmConfig, train_swarm},
     };
 
     println!("Swarm Training — Parallel MuJoCo Drones");

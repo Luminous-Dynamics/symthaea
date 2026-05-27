@@ -170,6 +170,9 @@ pub use projection::{
 #[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;
 pub mod cross_modal_bridge;
-pub mod memory_ring;
-pub mod memory_kernel;
+pub mod geodesic_bridge;
 pub mod invariant_guard;
+pub mod memory_kernel;
+pub mod memory_ring;
+pub mod sovereignty_bridge;
+pub mod wasm_architect;

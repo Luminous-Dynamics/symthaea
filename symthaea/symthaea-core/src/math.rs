@@ -108,11 +108,7 @@ pub fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f32 {
     }
 
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 0.0 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 0.0 { dot / denom } else { 0.0 }
 }
 
 /// Cosine similarity between two `f64` slices.
@@ -147,11 +143,7 @@ pub fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
     }
 
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 0.0 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 0.0 { dot / denom } else { 0.0 }
 }
 
 /// Exponential moving average (EMA) update.

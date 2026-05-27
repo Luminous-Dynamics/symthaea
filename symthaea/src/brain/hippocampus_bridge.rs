@@ -38,13 +38,11 @@
 //! 3. **Storage**: Hippocampus stores with holographic compression
 //! 4. **Recall**: Later, concepts can be recalled by similarity or context
 
-use crate::memory::{HippocampusActor, EmotionalValence, RecallQuery, RecallResult};
-use crate::consciousness::recursive_improvement::{
-    ConsciousnessWorldModel, WorldModelStats,
-};
+use crate::consciousness::recursive_improvement::{ConsciousnessWorldModel, WorldModelStats};
 use crate::dynamics::CrystalizedConcept;
-use std::collections::HashMap;
+use crate::memory::{EmotionalValence, HippocampusActor, RecallQuery, RecallResult};
 use anyhow::Result;
+use std::collections::HashMap;
 
 /// Bridge between ConsciousnessWorldModel and HippocampusActor
 pub struct HippocampusBridge {
@@ -155,7 +153,8 @@ impl HippocampusBridge {
 
                 match self.encode_concept_as_memory(concept, &stats, hippocampus) {
                     Ok(memory_id) => {
-                        self.concept_to_memory.insert(concept.uid.clone(), memory_id);
+                        self.concept_to_memory
+                            .insert(concept.uid.clone(), memory_id);
                         new_memory_ids.push(memory_id);
                         self.stats.concepts_encoded += 1;
                     }
@@ -188,7 +187,10 @@ impl HippocampusBridge {
             name_str,
             concept.uid,
             stats.consciousness_level * 100.0,
-            concept.description.as_deref().unwrap_or("A newly discovered pattern.")
+            concept
+                .description
+                .as_deref()
+                .unwrap_or("A newly discovered pattern.")
         );
 
         // Build context tags
@@ -209,7 +211,11 @@ impl HippocampusBridge {
     }
 
     /// Determine emotional valence for a concept
-    fn determine_emotion(&self, concept: &CrystalizedConcept, stats: &WorldModelStats) -> EmotionalValence {
+    fn determine_emotion(
+        &self,
+        concept: &CrystalizedConcept,
+        stats: &WorldModelStats,
+    ) -> EmotionalValence {
         // New concepts with high consciousness = positive (discovery!)
         if concept.activation_count <= 1 && stats.consciousness_level > 0.5 {
             return EmotionalValence::Positive;
@@ -347,7 +353,7 @@ impl StoreInHippocampus for ConsciousnessWorldModel {
 mod tests {
     use super::*;
     use crate::consciousness::recursive_improvement::{
-        WorldModelConfig, ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
+        ConsciousnessAction, ConsciousnessTransition, LatentConsciousnessState, WorldModelConfig,
     };
 
     #[test]

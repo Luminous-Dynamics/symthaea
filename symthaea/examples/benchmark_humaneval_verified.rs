@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use symthaea::language::code_orchestrator::CodeOrchestrator;
 use symthaea_core::synthesis_trait::SynthesisRequest;

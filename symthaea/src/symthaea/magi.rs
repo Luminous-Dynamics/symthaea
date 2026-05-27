@@ -6,8 +6,8 @@
 //! All items in this module are gated behind `#[cfg(feature = "magi_loop")]`.
 
 use crate::consciousness::recursive_improvement::{CalibrationSummary, PredictionDomain};
-use crate::mind::structured_thought::EpistemicStatus;
 use crate::mind::SemanticIntent;
+use crate::mind::structured_thought::EpistemicStatus;
 
 use super::Symthaea;
 

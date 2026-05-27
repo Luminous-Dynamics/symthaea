@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(d.lem.normative, 3); // N3: 0.915 ≈ axiomatic (it IS a waveguide)
         assert_eq!(d.lem.materiality, 1); // M1: optics = temporal
         assert!(!d.is_novel); // 0.915 >> 0.5
-                              // Key insight: the PHYSICS is known (N3), but the CLAIM is unverified (E0)
+        // Key insight: the PHYSICS is known (N3), but the CLAIM is unverified (E0)
     }
 
     #[test]

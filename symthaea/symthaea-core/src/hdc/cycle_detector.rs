@@ -28,8 +28,8 @@
 //! }
 //! ```
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::HDC_DIMENSION;
+use crate::hdc::unified_hv::ContinuousHV;
 use std::collections::VecDeque;
 
 /// Cycle detection and phase encoding for periodic patterns

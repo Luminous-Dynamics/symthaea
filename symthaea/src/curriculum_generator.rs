@@ -715,13 +715,17 @@ mod tests {
         assert!(LemmaVerdict::Valid.is_proved());
         assert!(LemmaVerdict::Sat { witness: None }.is_proved());
         assert!(!LemmaVerdict::Invalid.is_proved());
-        assert!(!LemmaVerdict::Inconclusive {
-            reason: "test".into()
-        }
-        .is_proved());
-        assert!(!LemmaVerdict::Skipped {
-            reason: "test".into()
-        }
-        .is_proved());
+        assert!(
+            !LemmaVerdict::Inconclusive {
+                reason: "test".into()
+            }
+            .is_proved()
+        );
+        assert!(
+            !LemmaVerdict::Skipped {
+                reason: "test".into()
+            }
+            .is_proved()
+        );
     }
 }

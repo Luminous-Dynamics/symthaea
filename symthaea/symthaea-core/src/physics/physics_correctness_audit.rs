@@ -143,7 +143,7 @@ fn audit_energy_units_dimensional() {
     // Verify units: [MeV] × [J/MeV] × [1/mol] / [g/mol] = [J/g]
     // Just check that MEV_TO_J × N_AVOGADRO gives a sensible J/mol
     let j_per_mol_per_mev = MEV_TO_J * N_AVOGADRO; // J/mol per MeV
-                                                   // 1 MeV × N_A = ~9.65×10¹⁰ J/mol
+    // 1 MeV × N_A = ~9.65×10¹⁰ J/mol
     assert_relative_eq(
         j_per_mol_per_mev,
         9.65e10,

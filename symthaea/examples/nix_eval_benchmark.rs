@@ -21,10 +21,10 @@
 //!   cargo run --example nix_eval_benchmark --features code_generation
 //!   cargo run --example nix_eval_benchmark --features code_generation -- --structural
 
-use symthaea::language::nix_codegen::{generate_nix, NixIntent};
-use symthaea::language::nix_eval_corpus::{problems, NixProblem};
+use symthaea::language::nix_codegen::{NixIntent, generate_nix};
+use symthaea::language::nix_eval_corpus::{NixProblem, problems};
 use symthaea::language::nix_eval_goldens::{golden_count, golden_for, score_all_goldens};
-use symthaea::language::nix_repair::{generate_nix_with_scorer_repair, RepairStep};
+use symthaea::language::nix_repair::{RepairStep, generate_nix_with_scorer_repair};
 use symthaea::language::nix_scorer::score as structural_score;
 #[derive(Default)]
 struct ScoreCard {

@@ -412,7 +412,8 @@ fn genesis_determinism_reproducible() {
         assert!(
             err_diff <= tolerance,
             "Cycle {i}: prediction_error diverged: A={:.6} B={:.6} diff={err_diff:.6} tol={tolerance:.6}",
-            a.prediction_error, b.prediction_error
+            a.prediction_error,
+            b.prediction_error
         );
     }
 }

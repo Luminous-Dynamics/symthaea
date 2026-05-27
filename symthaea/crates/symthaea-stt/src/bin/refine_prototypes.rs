@@ -18,7 +18,7 @@ use clap::Parser;
 use console::style;
 use std::path::PathBuf;
 
-use symthaea_stt::{TrainedPrototypes, HV16};
+use symthaea_stt::{HV16, TrainedPrototypes};
 
 #[derive(Parser)]
 #[command(

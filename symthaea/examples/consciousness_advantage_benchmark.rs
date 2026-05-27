@@ -536,7 +536,7 @@ fn print_depth_table(results: &[DepthResult]) {
     }
 }
 
-fn print_summary(shift: &[ShiftResult], gen: &[GenResult], depth: &[DepthResult]) {
+fn print_summary(shift: &[ShiftResult], r#gen: &[GenResult], depth: &[DepthResult]) {
     println!("\n═══════════════════════════════════════════════════════════════════");
     println!("  CONSCIOUSNESS ADVANTAGE SUMMARY");
     println!("═══════════════════════════════════════════════════════════════════\n");
@@ -575,11 +575,11 @@ fn print_summary(shift: &[ShiftResult], gen: &[GenResult], depth: &[DepthResult]
     }
 
     // Generalization advantage
-    if gen.len() >= 2 {
-        let full = &gen[0];
+    if r#gen.len() >= 2 {
+        let full = &r#gen[0];
         println!("\n  Multi-Pattern Generalization (error reduction %):");
         println!("    Full Consciousness:  {:.1}%", full.reduction_pct);
-        for r in &gen[1..] {
+        for r in &r#gen[1..] {
             let diff = full.reduction_pct - r.reduction_pct;
             println!(
                 "    {:<20} {:.1}% ({:+.1}pp)",

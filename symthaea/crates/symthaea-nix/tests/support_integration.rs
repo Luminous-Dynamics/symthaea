@@ -40,9 +40,11 @@ reading file /home/tristan/.config/nixpkgs/config.nix";
 
     // Non-PII should be preserved
     assert!(result.scrubbed_text.contains("nginx.service"));
-    assert!(result
-        .scrubbed_text
-        .contains("/nix/store/abc123-glibc-2.38.drv"));
+    assert!(
+        result
+            .scrubbed_text
+            .contains("/nix/store/abc123-glibc-2.38.drv")
+    );
     assert!(result.scrubbed_text.contains("exit code 1"));
 
     assert!(result.redaction_count >= 4);

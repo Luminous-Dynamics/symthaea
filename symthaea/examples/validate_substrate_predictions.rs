@@ -12,9 +12,9 @@
 
 use symthaea_core::hdc::substrate_validation::SubstrateValidationFramework;
 use symthaea_psych_bench::benchmarks::substrate::validation::SubstrateValidationBenchmark;
+use symthaea_psych_bench::harness::PsychBenchmark;
 use symthaea_psych_bench::harness::config::BenchmarkConfig;
 use symthaea_psych_bench::harness::report::MetricValue;
-use symthaea_psych_bench::harness::PsychBenchmark;
 
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");

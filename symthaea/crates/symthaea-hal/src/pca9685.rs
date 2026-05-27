@@ -16,7 +16,7 @@
 use embedded_hal::i2c::I2c;
 use tracing::{debug, warn};
 
-use crate::error::{i2c_error_detail, HalError, HalResult};
+use crate::error::{HalError, HalResult, i2c_error_detail};
 
 // ============================================================================
 // PCA9685 REGISTER MAP

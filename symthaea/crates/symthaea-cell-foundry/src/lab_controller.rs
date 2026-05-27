@@ -475,11 +475,13 @@ mod tests {
 
         let result = controller.execute_step(&step, 0);
         assert!(!result.action_executed);
-        assert!(result
-            .failure_reason
-            .as_ref()
-            .unwrap()
-            .contains("Ethics gate"));
+        assert!(
+            result
+                .failure_reason
+                .as_ref()
+                .unwrap()
+                .contains("Ethics gate")
+        );
     }
 
     #[test]
@@ -500,11 +502,13 @@ mod tests {
 
         let result = controller.execute_step(&step, 0);
         assert!(!result.action_executed);
-        assert!(result
-            .failure_reason
-            .as_ref()
-            .unwrap()
-            .contains("Viability"));
+        assert!(
+            result
+                .failure_reason
+                .as_ref()
+                .unwrap()
+                .contains("Viability")
+        );
     }
 
     #[test]
@@ -634,11 +638,13 @@ mod tests {
 
         let result = controller.run_protocol(&protocol);
         assert!(!result.success);
-        assert!(result
-            .failure_reason
-            .as_ref()
-            .unwrap()
-            .contains("max duration"));
+        assert!(
+            result
+                .failure_reason
+                .as_ref()
+                .unwrap()
+                .contains("max duration")
+        );
         // Steps 0 and 1 complete (elapsed = 200 > 150), step 2 is blocked
         assert_eq!(result.steps_completed, 2);
     }
@@ -667,11 +673,13 @@ mod tests {
 
         let result = controller.run_protocol(&protocol);
         assert!(!result.success);
-        assert!(result
-            .failure_reason
-            .as_ref()
-            .unwrap()
-            .contains("safety floor"));
+        assert!(
+            result
+                .failure_reason
+                .as_ref()
+                .unwrap()
+                .contains("safety floor")
+        );
     }
 
     #[test]

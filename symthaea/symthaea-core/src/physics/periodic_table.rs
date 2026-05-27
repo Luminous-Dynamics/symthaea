@@ -40,7 +40,7 @@
 //! ```
 
 use super::hadrons::Hadrons;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
+use super::standard_model::{PHYSICS_DIM, StandardModel};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::Serialize;
@@ -2190,11 +2190,7 @@ impl PeriodicTable {
             }
         }
 
-        if count > 0 {
-            sum / count as f32
-        } else {
-            0.0
-        }
+        if count > 0 { sum / count as f32 } else { 0.0 }
     }
 
     /// Get number of elements defined
@@ -3682,15 +3678,23 @@ mod tests {
         // W should be more similar to thermal_stable than He, or both near zero
         // HDC encoding has limited precision for thermal property discrimination
         let stable_diff = w_thermal_stable - he_thermal_stable;
-        assert!(stable_diff > -0.01,
+        assert!(
+            stable_diff > -0.01,
             "W-He thermal_stable difference should not be strongly negative: W={:.4}, He={:.4}, diff={:.4}",
-            w_thermal_stable, he_thermal_stable, stable_diff);
+            w_thermal_stable,
+            he_thermal_stable,
+            stable_diff
+        );
 
         // He should be more similar to thermal_volatile than W
         let volatile_diff = he_thermal_volatile - w_thermal_volatile;
-        assert!(volatile_diff > -0.01,
+        assert!(
+            volatile_diff > -0.01,
             "He-W thermal_volatile difference should not be strongly negative: He={:.4}, W={:.4}, diff={:.4}",
-            he_thermal_volatile, w_thermal_volatile, volatile_diff);
+            he_thermal_volatile,
+            w_thermal_volatile,
+            volatile_diff
+        );
     }
 
     #[test]
@@ -3728,9 +3732,13 @@ mod tests {
         // HDC encoding has limited precision for light-density discrimination;
         // both values are near zero, so check they are within encoding noise.
         let light_diff = (li_light - os_light).abs();
-        assert!(light_diff < 0.05,
+        assert!(
+            light_diff < 0.05,
             "Li and Os density_light should be within encoding noise: Li={:.4}, Os={:.4}, diff={:.4}",
-            li_light, os_light, light_diff);
+            li_light,
+            os_light,
+            light_diff
+        );
     }
 
     #[test]
@@ -3805,9 +3813,14 @@ mod tests {
             // Noble gases should be more volatile than stable, or both near zero
             // (HDC encoding has limited precision for heavier noble gases)
             let diff = volatile - stable;
-            assert!(diff > -0.01,
+            assert!(
+                diff > -0.01,
                 "{} volatile-stable difference should not be strongly negative: volatile={:.4}, stable={:.4}, diff={:.4}",
-                symbol, volatile, stable, diff);
+                symbol,
+                volatile,
+                stable,
+                diff
+            );
         }
     }
 
@@ -3834,16 +3847,25 @@ mod tests {
             // Refractory metals should be more stable than volatile, or both near zero
             // (HDC encoding has limited precision for thermal property discrimination)
             let diff = stable - volatile;
-            assert!(diff > -0.01,
+            assert!(
+                diff > -0.01,
                 "{} stable-volatile difference should not be strongly negative: stable={:.4}, volatile={:.4}, diff={:.4}",
-                symbol, stable, volatile, diff);
+                symbol,
+                stable,
+                volatile,
+                diff
+            );
 
             // They should all be solid at STP, or both near zero
             let liquid_char = vec.similarity(&table.phase_liquid);
             let solid_liquid_diff = solid_char - liquid_char;
-            assert!(solid_liquid_diff > -0.01,
+            assert!(
+                solid_liquid_diff > -0.01,
                 "{} solid-liquid difference should not be strongly negative: solid={:.4}, liquid={:.4}",
-                symbol, solid_char, liquid_char);
+                symbol,
+                solid_char,
+                liquid_char
+            );
         }
     }
 
@@ -3867,9 +3889,13 @@ mod tests {
         // Check that the similarities are in a reasonable range (near zero for weak signal)
         // and that at least the liquid/solid difference is within encoding noise (~0.01).
         let liquid_solid_diff = (br_liquid - br_solid).abs();
-        assert!(liquid_solid_diff < 0.05,
+        assert!(
+            liquid_solid_diff < 0.05,
             "Br liquid vs solid should be within encoding noise: liquid={:.4}, solid={:.4}, diff={:.4}",
-            br_liquid, br_solid, liquid_solid_diff);
+            br_liquid,
+            br_solid,
+            liquid_solid_diff
+        );
 
         // Gas character should not dominate (Br is not a gas at STP)
         // Br gas value should not be significantly positive
@@ -4186,9 +4212,13 @@ mod tests {
         // He should be more volatile than W, or both near zero
         // HDC encoding has limited precision for thermal property discrimination
         let volatile_diff = he_volatile - w_volatile;
-        assert!(volatile_diff > -0.01,
+        assert!(
+            volatile_diff > -0.01,
             "He-W volatile difference should not be strongly negative: He={:.4}, W={:.4}, diff={:.4}",
-            he_volatile, w_volatile, volatile_diff);
+            he_volatile,
+            w_volatile,
+            volatile_diff
+        );
 
         // W should be more thermally stable than He, or both near zero
         let stable_diff = w_stable - he_stable;
@@ -4259,12 +4289,18 @@ mod tests {
         // Na should be reducing, Cl should be oxidizing
         // HDC encoding has limited precision; check values are within noise
         let na_diff = (na_reducing - na_oxidizing).abs();
-        assert!(na_diff < 0.05,
+        assert!(
+            na_diff < 0.05,
             "Na reducing/oxidizing should be within encoding noise: reducing={:.4}, oxidizing={:.4}",
-            na_reducing, na_oxidizing);
+            na_reducing,
+            na_oxidizing
+        );
         let cl_diff = (cl_oxidizing - cl_reducing).abs();
-        assert!(cl_diff < 0.05,
+        assert!(
+            cl_diff < 0.05,
             "Cl oxidizing/reducing should be within encoding noise: oxidizing={:.4}, reducing={:.4}",
-            cl_oxidizing, cl_reducing);
+            cl_oxidizing,
+            cl_reducing
+        );
     }
 }

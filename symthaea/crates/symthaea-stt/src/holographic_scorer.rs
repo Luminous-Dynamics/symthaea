@@ -16,7 +16,7 @@
 //! This allows "soft matching" - similar sequences have similar resonance scores,
 //! unlike traditional n-grams which return 0 for unseen sequences.
 
-use crate::hdc::{bundle, HDC_DIM, HDC_WORDS, HV16};
+use crate::hdc::{HDC_DIM, HDC_WORDS, HV16, bundle};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read};

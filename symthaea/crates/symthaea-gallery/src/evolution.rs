@@ -164,7 +164,7 @@ fn compute_trend(index: &GalleryIndex) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{create_entry, ArtModality};
+    use crate::{ArtModality, create_entry};
     use symthaea_aesthetic::AestheticScore;
 
     fn make_entry(score: f32, dominant: usize, cycle: u64) -> crate::GalleryEntry {

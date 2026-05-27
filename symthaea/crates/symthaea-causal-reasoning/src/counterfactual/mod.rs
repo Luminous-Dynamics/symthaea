@@ -23,6 +23,7 @@ pub mod semantic_roles;
 
 // Re-export key types
 pub use identification::{
+    CPDAG,
     CausalAssumption,
     CausalDAG,
     CausalEstimand,
@@ -62,7 +63,6 @@ pub use identification::{
     TransportabilityAnalyzer,
     TransportabilityResult,
     UnidentifiedReason,
-    CPDAG,
 };
 
 // Note: IdentificationMethod now includes:

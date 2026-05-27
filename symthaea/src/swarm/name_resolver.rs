@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn test_cache_lru_eviction() {
         let mut resolver = NameResolver::new(16); // minimum is 16
-                                                  // Fill cache to capacity
+        // Fill cache to capacity
         for i in 0..16 {
             let n = MeshName::parse(&format!("node-{}", i)).unwrap();
             resolver.cache_resolution(
@@ -547,26 +547,38 @@ mod tests {
 
     #[test]
     fn test_endpoint_display() {
-        assert!(ResolvedEndpoint::IrohAddr("abc".to_string())
+        assert!(
+            ResolvedEndpoint::IrohAddr("abc".to_string())
+                .display()
+                .starts_with("iroh:")
+        );
+        assert!(
+            ResolvedEndpoint::LoRaId([0; 8])
+                .display()
+                .starts_with("lora:")
+        );
+        assert!(
+            ResolvedEndpoint::HolochainAgent("xyz".to_string())
+                .display()
+                .starts_with("hc:")
+        );
+        assert!(
+            ResolvedEndpoint::IpAddr("1.2.3.4".to_string())
+                .display()
+                .starts_with("ip:")
+        );
+        assert!(
+            ResolvedEndpoint::EnsName("mycelix.eth".to_string())
+                .display()
+                .starts_with("ens:")
+        );
+        assert!(
+            ResolvedEndpoint::ContentAddress(
+                "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string()
+            )
             .display()
-            .starts_with("iroh:"));
-        assert!(ResolvedEndpoint::LoRaId([0; 8])
-            .display()
-            .starts_with("lora:"));
-        assert!(ResolvedEndpoint::HolochainAgent("xyz".to_string())
-            .display()
-            .starts_with("hc:"));
-        assert!(ResolvedEndpoint::IpAddr("1.2.3.4".to_string())
-            .display()
-            .starts_with("ip:"));
-        assert!(ResolvedEndpoint::EnsName("mycelix.eth".to_string())
-            .display()
-            .starts_with("ens:"));
-        assert!(ResolvedEndpoint::ContentAddress(
-            "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string()
-        )
-        .display()
-        .starts_with("cid:"));
+            .starts_with("cid:")
+        );
     }
 
     #[test]

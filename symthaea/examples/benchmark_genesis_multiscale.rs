@@ -13,7 +13,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 14: Multi-Scale Physics ===\n");
 
     use symthaea::physics::multiscale::{
-        demonstrate_o1_property, MultiScaleUnifier, PhysicalScale,
+        MultiScaleUnifier, PhysicalScale, demonstrate_o1_property,
     };
 
     let unifier = MultiScaleUnifier::new();

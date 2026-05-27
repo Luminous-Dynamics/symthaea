@@ -61,19 +61,19 @@ pub mod temporal;
 // Re-exports for convenient access
 pub use encoding::{AudioHdcEncoder, AudioHdcVectors, EncoderMode, PremiumHdcEncoder};
 pub use features::{
-    compute_mfcc, compute_mfcc_delta, compute_power_spectrum, compute_temporal_regularity,
-    AudioFeatures, FeatureExtractor, MelFilterbank, CONTROL_RATE, FFT_SIZE, FREQ_BINS, HOP_SIZE,
-    MEL_BANDS, NUM_MFCC, SAMPLE_RATE,
+    AudioFeatures, CONTROL_RATE, FFT_SIZE, FREQ_BINS, FeatureExtractor, HOP_SIZE, MEL_BANDS,
+    MelFilterbank, NUM_MFCC, SAMPLE_RATE, compute_mfcc, compute_mfcc_delta, compute_power_spectrum,
+    compute_temporal_regularity,
 };
-pub use hdc::{RffProjector, SparseProjector, HDC_DIM, HV};
+pub use hdc::{HDC_DIM, HV, RffProjector, SparseProjector};
 pub use io::{
+    AudioConfig, DatasetProcessor, FileAudioConfig, FileAudioPump, FileProcessingResult,
     compute_burst_density, compute_ioi_variance, compute_onset_strength, compute_spectral_centroid,
     compute_spectral_flatness, compute_temporal_regularity as io_compute_temporal_regularity,
-    spectrum_to_mel_bands, AudioConfig, DatasetProcessor, FileAudioConfig, FileAudioPump,
-    FileProcessingResult,
+    spectrum_to_mel_bands,
 };
 pub use patterns::{
-    AmbientContexts, AudioCategory, AudioPattern, PatternSimilarity, MAX_EXEMPLARS, NUM_LTC_LEVELS,
+    AmbientContexts, AudioCategory, AudioPattern, MAX_EXEMPLARS, NUM_LTC_LEVELS, PatternSimilarity,
 };
 pub use sentinel::{AudioDetectionResult, AudioSentinel};
 pub use temporal::{CfcCell, HierarchicalCfc, HierarchicalLtc, LtcPreset, TemporalWindow};

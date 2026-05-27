@@ -152,13 +152,22 @@ fn main() {
         // Print every 10 frames
         if frame_idx % 10 == 1 || frame_idx == max_frames {
             // Count GT objects in this frame
-            let gt_objects = gt_entries.iter().filter(|e| e.frame == frame_idx as u32 && e.conf > 0.0).count();
+            let gt_objects = gt_entries
+                .iter()
+                .filter(|e| e.frame == frame_idx as u32 && e.conf > 0.0)
+                .count();
             println!(
                 "  Frame {:4} | {:.1}ms | PE={:.3} | ImgSurp={:.3} | Obj={:2} | WM={}/{} | SG={:2}e | GT={:2} | motion={:.3}",
-                frame_idx, frame_ms,
-                tel.prediction_error, tel.imagination_surprise,
-                obj_count, wm_load, 4, sg_edge_count,
-                gt_objects, tel.motion_surprise,
+                frame_idx,
+                frame_ms,
+                tel.prediction_error,
+                tel.imagination_surprise,
+                obj_count,
+                wm_load,
+                4,
+                sg_edge_count,
+                gt_objects,
+                tel.motion_surprise,
             );
         }
     }
@@ -187,7 +196,11 @@ fn main() {
 
     // Imagination accuracy: ratio of max to min surprise (novelty detection)
     let max_surp = img_surp_values.iter().copied().fold(0.0f32, f32::max);
-    let min_surp = img_surp_values.iter().copied().filter(|s| *s > 0.0).fold(f32::MAX, f32::min);
+    let min_surp = img_surp_values
+        .iter()
+        .copied()
+        .filter(|s| *s > 0.0)
+        .fold(f32::MAX, f32::min);
     let novelty_ratio = if min_surp > 0.0 && min_surp < f32::MAX {
         max_surp / min_surp
     } else {
@@ -202,18 +215,35 @@ fn main() {
     println!("Frames: {frames_processed}");
     println!();
     println!("--- Performance ---");
-    println!("  Average:   {:.1}ms/frame ({:.0} Hz)", avg_ms, 1000.0 / avg_ms);
-    println!("  Budget:    {}", if avg_ms < 50.0 { "FITS 20Hz ✓" } else { "EXCEEDS 20Hz ✗" });
+    println!(
+        "  Average:   {:.1}ms/frame ({:.0} Hz)",
+        avg_ms,
+        1000.0 / avg_ms
+    );
+    println!(
+        "  Budget:    {}",
+        if avg_ms < 50.0 {
+            "FITS 20Hz ✓"
+        } else {
+            "EXCEEDS 20Hz ✗"
+        }
+    );
     println!();
     println!("--- Object Tracking ---");
     println!("  Avg objects tracked: {:.1}", avg_obj);
     println!("  Max objects tracked: {}", max_obj);
-    println!("  Track persistence:   {:.1} frames/track", track_persistence);
+    println!(
+        "  Track persistence:   {:.1} frames/track",
+        track_persistence
+    );
     println!();
     println!("--- Working Memory (Cowan 2001) ---");
     println!("  Avg WM load: {:.1}/{}", avg_wm, 4);
     println!("  Max WM load: {}/{}", max_wm, 4);
-    println!("  Capacity saturated: {}", if max_wm >= 4 { "YES ✓" } else { "no" });
+    println!(
+        "  Capacity saturated: {}",
+        if max_wm >= 4 { "YES ✓" } else { "no" }
+    );
     println!();
     println!("--- Active Inference ---");
     println!("  Avg prediction error:     {:.4}", avg_pe);
@@ -222,7 +252,10 @@ fn main() {
     println!();
     println!("--- Scene Understanding ---");
     println!("  Avg scene graph edges: {:.1}", avg_sg);
-    println!("  Scene descriptions:    {} relational triples", descriptions.len());
+    println!(
+        "  Scene descriptions:    {} relational triples",
+        descriptions.len()
+    );
     if !descriptions.is_empty() {
         for (s, r, o) in descriptions.iter().take(5) {
             println!("    \"{s}\" {r} \"{o}\"");
@@ -237,13 +270,15 @@ fn main() {
         let gt_total_objects = gt_unique_ids.len();
         let gt_frames: std::collections::HashSet<u32> =
             gt_entries.iter().map(|e| e.frame).collect();
-        let gt_avg_objects_per_frame =
-            gt_entries.len() as f32 / gt_frames.len().max(1) as f32;
+        let gt_avg_objects_per_frame = gt_entries.len() as f32 / gt_frames.len().max(1) as f32;
         println!("--- Ground Truth Comparison ---");
         println!("  GT unique objects:       {}", gt_total_objects);
         println!("  GT avg objects/frame:    {:.1}", gt_avg_objects_per_frame);
         println!("  Manifold avg objects:    {:.1}", avg_obj);
-        println!("  Coverage ratio:          {:.1}%", avg_obj / gt_avg_objects_per_frame * 100.0);
+        println!(
+            "  Coverage ratio:          {:.1}%",
+            avg_obj / gt_avg_objects_per_frame * 100.0
+        );
     }
 
     // Dream replay consolidation

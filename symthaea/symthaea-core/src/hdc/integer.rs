@@ -20,7 +20,7 @@
 
 use crate::hdc::arithmetic_engine::HybridArithmeticEngine;
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================

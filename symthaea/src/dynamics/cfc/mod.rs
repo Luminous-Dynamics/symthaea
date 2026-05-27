@@ -49,6 +49,6 @@ pub use gradients::{AdamState, CfCCellCache, CfCGradients, OutputAdamState};
 pub use network::{CfCNetwork, CfCNetworkConfig};
 
 // Phi-gated attention
-pub use phi_gated::{compute_phi_attention_weights, PhiGatedConfig};
+pub use phi_gated::{PhiGatedConfig, compute_phi_attention_weights};
 // weighted_array_bundle is pub(crate) in phi_gated.rs and accessed
 // by network.rs via `use super::phi_gated::weighted_array_bundle`.

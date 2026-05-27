@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 pub const Q16_16_SCALE: u64 = 65_536;
 
 /// A Q16.16 fixed-point value (16 integer bits, 16 fractional bits).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct FixedPoint(pub i64);
 
 impl FixedPoint {
@@ -98,7 +100,13 @@ mod tests {
         let v = 0.85f32;
         let fp = FixedPoint::from_f32(v);
         let back = fp.to_f32();
-        assert!((v - back).abs() < 0.001, "roundtrip: {} -> {} -> {}", v, fp.0, back);
+        assert!(
+            (v - back).abs() < 0.001,
+            "roundtrip: {} -> {} -> {}",
+            v,
+            fp.0,
+            back
+        );
     }
 
     #[test]

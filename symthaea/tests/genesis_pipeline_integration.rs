@@ -10,8 +10,8 @@
 //! Each test verifies that types and data flow correctly across crate boundaries,
 //! ensuring the full DNA-to-human pipeline is API-compatible.
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_neuromodulators::NeuromodulatorBath;
@@ -21,14 +21,14 @@ use symthaea_genomics::{DamageModel, HdcAssembler, MockSequencer, QualityAssesso
 
 // ─── Cell Foundry ────────────────────────────────────────────────────────────
 use symthaea_cell_foundry::{
-    encode_cell_state, CellState, CellType, CultureEnvironment, EthicsGate, GermCellStage,
-    IvgProtocol,
+    CellState, CellType, CultureEnvironment, EthicsGate, GermCellStage, IvgProtocol,
+    encode_cell_state,
 };
 
 // ─── Ectogenesis ─────────────────────────────────────────────────────────────
 use symthaea_ectogenesis::{
-    encode_fetal_state, ConsentProxy, EctogenesisEthicsGate, FetalMetrics, FetalMonitor,
-    GestationalWeek,
+    ConsentProxy, EctogenesisEthicsGate, FetalMetrics, FetalMonitor, GestationalWeek,
+    encode_fetal_state,
 };
 
 // ─── Nurture ─────────────────────────────────────────────────────────────────
@@ -38,10 +38,10 @@ use symthaea_nurture::{
 
 // ─── Population ──────────────────────────────────────────────────────────────
 use symthaea_population::{
-    encode_individual, encode_locus, heterozygosity_after_generations, observed_heterozygosity,
     Allele, BiologicalSex, BreedingStrategy, EthicalTension, Genotype, GovernanceTier, Individual,
     Locus, MatingPair, Pedigree, PedigreeEntry, Population, PopulationDecision,
-    PopulationSimulator,
+    PopulationSimulator, encode_individual, encode_locus, heterozygosity_after_generations,
+    observed_heterozygosity,
 };
 
 // =============================================================================
@@ -217,26 +217,32 @@ fn test_ectogenesis_consent_proxy_escalation() {
     let gate = EctogenesisEthicsGate::fully_approved();
 
     // PreSentient: low bar (0.3)
-    assert!(gate
-        .check_intervention(GestationalWeek::new(4), "test", 0.4)
-        .is_ok());
-    assert!(gate
-        .check_intervention(GestationalWeek::new(4), "test", 0.1)
-        .is_err());
+    assert!(
+        gate.check_intervention(GestationalWeek::new(4), "test", 0.4)
+            .is_ok()
+    );
+    assert!(
+        gate.check_intervention(GestationalWeek::new(4), "test", 0.1)
+            .is_err()
+    );
 
     // Sentient: high bar (0.7) + all approvals required
-    assert!(gate
-        .check_intervention(GestationalWeek::new(30), "test", 0.8)
-        .is_ok());
-    assert!(gate
-        .check_intervention(GestationalWeek::new(30), "test", 0.5)
-        .is_err());
+    assert!(
+        gate.check_intervention(GestationalWeek::new(30), "test", 0.8)
+            .is_ok()
+    );
+    assert!(
+        gate.check_intervention(GestationalWeek::new(30), "test", 0.5)
+            .is_err()
+    );
 
     // Unapproved gate fails for sentient even with high benefit
     let unapproved = EctogenesisEthicsGate::unapproved();
-    assert!(unapproved
-        .check_intervention(GestationalWeek::new(30), "test", 0.9)
-        .is_err());
+    assert!(
+        unapproved
+            .check_intervention(GestationalWeek::new(30), "test", 0.9)
+            .is_err()
+    );
 }
 
 // =============================================================================
@@ -686,17 +692,23 @@ fn test_ethics_gates_present_at_each_stage() {
     // Ectogenesis ethics gate: graduated consent proxy
     let ecto_gate = EctogenesisEthicsGate::fully_approved();
     // PreSentient: benefit >= 0.3
-    assert!(ecto_gate
-        .check_intervention(GestationalWeek::new(3), "nutrient", 0.4)
-        .is_ok());
+    assert!(
+        ecto_gate
+            .check_intervention(GestationalWeek::new(3), "nutrient", 0.4)
+            .is_ok()
+    );
     // EmergingSentience: guardian + benefit >= 0.5
-    assert!(ecto_gate
-        .check_intervention(GestationalWeek::new(15), "hormone", 0.6)
-        .is_ok());
+    assert!(
+        ecto_gate
+            .check_intervention(GestationalWeek::new(15), "hormone", 0.6)
+            .is_ok()
+    );
     // Sentient: guardian + ethics board + benefit >= 0.7
-    assert!(ecto_gate
-        .check_intervention(GestationalWeek::new(30), "steroid", 0.8)
-        .is_ok());
+    assert!(
+        ecto_gate
+            .check_intervention(GestationalWeek::new(30), "steroid", 0.8)
+            .is_ok()
+    );
     // Minimum benefit increases with developmental stage
     let min_pre = ecto_gate.minimum_benefit(GestationalWeek::new(3));
     let min_em = ecto_gate.minimum_benefit(GestationalWeek::new(15));

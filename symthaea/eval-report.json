@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "backend": "unknown",
+    "eval_lane": "fast",
+    "checkpoint_path": "/tmp/broca-diag/checkpoint.bin",
+    "checkpoint_sha256": "20b535617554af57a9220cbd6320063df8c6f809c95bfc9ba13e6cf559d7faf8",
+    "git_commit": "6187804d5212a3015ea6ccc7dc08b856408c0fba",
+    "feature_set": [],
+    "train_recipe": null,
+    "train_pair_count": null,
+    "train_epochs": null,
+    "train_bptt_window": null,
+    "train_negative_samples": null,
+    "train_learning_rate": null,
+    "train_network_lr_scale": null,
+    "train_network_layers": null,
+    "train_neurons_per_layer": null,
+    "train_coherence_alignment": null,
+    "train_alignment_start": null,
+    "train_contrastive": null,
+    "train_contrastive_margin": null,
+    "train_scheduled_sampling": null,
+    "train_label_smoothing": null,
+    "train_thought_logit_aux": null,
+    "train_merge_bias": null
+  },
+  "num_cases": 1,
+  "raw_generation": {
+    "perplexity": 4096.0,
+    "english_word_ratio": 0.0,
+    "avg_coherence": 0.0,
+    "intent_scores": {
+      "Acknowledge": {
+        "perplexity": 4096.0,
+        "english_ratio": 0.0,
+        "avg_coherence": 0.0,
+        "count": 1
+      }
+    },
+    "num_samples": 1,
+    "contrastive_intent_score": null,
+    "hallucination_rate": null,
+    "distinct_1": null,
+    "distinct_2": null,
+    "target_token_overlap": null,
+    "moral_refusal_rate": null
+  },
+  "gated_generation": {
+    "perplexity": 4096.0,
+    "english_word_ratio": 0.0,
+    "avg_coherence": 0.0,
+    "intent_scores": {
+      "Acknowledge": {
+        "perplexity": 4096.0,
+        "english_ratio": 0.0,
+        "avg_coherence": 0.0,
+        "count": 1
+      }
+    },
+    "num_samples": 1,
+    "contrastive_intent_score": null,
+    "hallucination_rate": null,
+    "distinct_1": null,
+    "distinct_2": null,
+    "target_token_overlap": null,
+    "moral_refusal_rate": null
+  },
+  "delta": {
+    "raw_perplexity": 4096.0,
+    "gated_perplexity": 4096.0,
+    "perplexity": 0.0,
+    "raw_english_word_ratio": 0.0,
+    "gated_english_word_ratio": 0.0,
+    "english_word_ratio": 0.0,
+    "raw_avg_coherence": 0.0,
+    "gated_avg_coherence": 0.0,
+    "avg_coherence": 0.0,
+    "raw_hallucination_rate": null,
+    "gated_hallucination_rate": null,
+    "hallucination_rate": null,
+    "raw_distinct_1": null,
+    "gated_distinct_1": null,
+    "distinct_1": null,
+    "raw_distinct_2": null,
+    "gated_distinct_2": null,
+    "distinct_2": null,
+    "raw_target_token_overlap": null,
+    "gated_target_token_overlap": null,
+    "target_token_overlap": null,
+    "raw_moral_refusal_rate": null,
+    "gated_moral_refusal_rate": null,
+    "moral_refusal_rate": null
+  },
+  "categories": {
+    "intent": {
+      "count": 1,
+      "raw": {
+        "perplexity": 4096.0,
+        "english_word_ratio": 0.0,
+        "avg_coherence": 0.0,
+        "intent_scores": {
+          "Acknowledge": {
+            "perplexity": 4096.0,
+            "english_ratio": 0.0,
+            "avg_coherence": 0.0,
+            "count": 1
+          }
+        },
+        "num_samples": 1,
+        "contrastive_intent_score": null,
+        "hallucination_rate": null,
+        "distinct_1": null,
+        "distinct_2": null,
+        "target_token_overlap": null,
+        "moral_refusal_rate": null
+      },
+      "gated": {
+        "perplexity": 4096.0,
+        "english_word_ratio": 0.0,
+        "avg_coherence": 0.0,
+        "intent_scores": {
+          "Acknowledge": {
+            "perplexity": 4096.0,
+            "english_ratio": 0.0,
+            "avg_coherence": 0.0,
+            "count": 1
+          }
+        },
+        "num_samples": 1,
+        "contrastive_intent_score": null,
+        "hallucination_rate": null,
+        "distinct_1": null,
+        "distinct_2": null,
+        "target_token_overlap": null,
+        "moral_refusal_rate": null
+      },
+      "delta": {
+        "raw_perplexity": 4096.0,
+        "gated_perplexity": 4096.0,
+        "perplexity": 0.0,
+        "raw_english_word_ratio": 0.0,
+        "gated_english_word_ratio": 0.0,
+        "english_word_ratio": 0.0,
+        "raw_avg_coherence": 0.0,
+        "gated_avg_coherence": 0.0,
+        "avg_coherence": 0.0,
+        "raw_hallucination_rate": null,
+        "gated_hallucination_rate": null,
+        "hallucination_rate": null,
+        "raw_distinct_1": null,
+        "gated_distinct_1": null,
+        "distinct_1": null,
+        "raw_distinct_2": null,
+        "gated_distinct_2": null,
+        "distinct_2": null,
+        "raw_target_token_overlap": null,
+        "gated_target_token_overlap": null,
+        "target_token_overlap": null,
+        "raw_moral_refusal_rate": null,
+        "gated_moral_refusal_rate": null,
+        "moral_refusal_rate": null
+      }
+    }
+  }
+}

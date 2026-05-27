@@ -493,7 +493,7 @@ mod tests {
     fn test_canary_runner_skips_non_due() {
         let mut runner = CanaryRunner::new();
         runner.register(Box::new(FpuSanityCanary)); // interval 109
-                                                    // Cycle 50 should not fire FpuSanity
+        // Cycle 50 should not fire FpuSanity
         assert!(runner.run_due(50).is_empty());
     }
 

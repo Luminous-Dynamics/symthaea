@@ -712,8 +712,8 @@ impl<I: I2c> HalRuntime<I> {
     where
         F: FnMut(&[Option<Vec<f32>>]) -> HumanoidCommand,
     {
-        use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
 
         let shutdown = Arc::new(AtomicBool::new(false));
         let shutdown_clone = Arc::clone(&shutdown);

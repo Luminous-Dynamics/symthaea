@@ -21,7 +21,7 @@
 //! `SubsystemOutput` which the `OutputCollector` integrates via consensus averaging.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
 use std::collections::VecDeque;
@@ -1516,11 +1516,7 @@ mod tests {
     }
 
     fn gcd(a: u32, b: u32) -> u32 {
-        if b == 0 {
-            a
-        } else {
-            gcd(b, a % b)
-        }
+        if b == 0 { a } else { gcd(b, a % b) }
     }
 
     #[test]

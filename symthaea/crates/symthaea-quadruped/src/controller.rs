@@ -1,4 +1,4 @@
-use crate::types::{QuadrupedCommand, QuadrupedConfig, NUM_ACTUATORS};
+use crate::types::{NUM_ACTUATORS, QuadrupedCommand, QuadrupedConfig};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 const HDC_DIM: usize = symthaea_core::hdc::HDC_DIMENSION;

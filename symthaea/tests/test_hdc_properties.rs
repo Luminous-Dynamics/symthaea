@@ -6,7 +6,7 @@
 //! Property-based tests for hyperdimensional computing operations to ensure
 //! mathematical invariants hold across random inputs.
 
-use symthaea::hdc::{BinaryHV, HdcContext, HDC_DIMENSION};
+use symthaea::hdc::{BinaryHV, HDC_DIMENSION, HdcContext};
 
 /// Test: Binding is its own inverse (XOR property)
 /// bind(bind(a, b), b) ≈ a (within similarity threshold)

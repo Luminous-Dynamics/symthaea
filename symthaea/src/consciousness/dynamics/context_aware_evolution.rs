@@ -546,7 +546,6 @@ impl ContextAwareOptimizer {
     /// Detect context from query and task type
     /// (Simplified - real implementation would use NLP/ML)
     pub fn detect_context(&self, query: &str, task_type: Option<&str>) -> ReasoningContext {
-    
         let query_lower = query.to_lowercase();
 
         // Safety keywords

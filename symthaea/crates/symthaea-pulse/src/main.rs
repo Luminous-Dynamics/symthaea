@@ -13,7 +13,7 @@
 //!   cargo run -p symthaea-pulse -- --cycles 200 --output pulse.html
 //!   cargo run -p symthaea-pulse -- --json pulse.json --compare previous.json
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use chrono::Local;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -39,8 +39,8 @@ use symthaea_psych_bench::benchmarks::{
     worm::NBackBenchmark,
 };
 use symthaea_psych_bench::harness::{
-    cognitive_profile::CognitiveProfile, config::BenchmarkConfig, report::BenchmarkReport,
-    PsychBenchmark,
+    PsychBenchmark, cognitive_profile::CognitiveProfile, config::BenchmarkConfig,
+    report::BenchmarkReport,
 };
 
 mod html;

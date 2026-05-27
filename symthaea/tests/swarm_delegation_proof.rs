@@ -30,7 +30,13 @@ fn proof4_cognitive_loop_swarm_integration() {
 
     for i in 0..5 {
         let result = service.cycle(&format!("test input {i}"));
-        assert!(result.metadata.consciousness.consciousness_level.is_finite());
+        assert!(
+            result
+                .metadata
+                .consciousness
+                .consciousness_level
+                .is_finite()
+        );
     }
     println!("  5 cognitive cycles executed: ✓");
     println!();

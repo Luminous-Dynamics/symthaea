@@ -14,7 +14,7 @@
 //! 4. Runs N cognitive cycles with natural language input
 //! 5. Measures 5 objectives: Phi, FE-reduction, pred-acc, stability, consistency
 //!
-//! Default: 10 pop × 8 gen × 30 cycles = 2,400 CLS cycles (~40 min)
+//! Default: 10 pop × 8 r#gen × 30 cycles = 2,400 CLS cycles (~40 min)
 //! Scale up with env vars: POP_SIZE, GENERATIONS, EVAL_CYCLES
 //!
 //! Usage: cargo run --release --features neuroevolution --example evolve_cls
@@ -52,7 +52,7 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════");
     println!("  CLS-in-the-Loop Threshold Evolution");
     println!(
-        "  {} pop × {} gen × {} cycles = {} total (~{} min)",
+        "  {} pop × {} r#gen × {} cycles = {} total (~{} min)",
         pop_size, generations, eval_cycles, total_cls_cycles, est_minutes
     );
     println!("  Override: POP_SIZE, GENERATIONS, EVAL_CYCLES env vars");
@@ -104,7 +104,7 @@ fn main() {
 
     let mut rng_state: u64 = 42;
 
-    for gen in 0..generations {
+    for r#gen in 0..generations {
         // Evaluate each organism via CLS
         for (genome, fitness) in population.iter_mut() {
             let phenotype = decode_thresholds(&genome.hv);
@@ -124,7 +124,7 @@ fn main() {
 
         println!(
             "{:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
-            gen,
+            r#gen,
             best.mean_phi,
             mean_phi,
             best.fe_reduction,

@@ -89,8 +89,8 @@ fn home_path() -> PathBuf {
 /// Set all gating flags on the loaded generator. Mutates in place;
 /// caller can flip between calls with the same generator instance so
 /// the weights stay constant.
-fn set_gates(gen: &mut BrocaGenerator, enable: bool) {
-    let cfg = gen.config_mut();
+fn set_gates(r#gen: &mut BrocaGenerator, enable: bool) {
+    let cfg = r#gen.config_mut();
     cfg.enable_epistemic_gate = enable;
     cfg.enable_emotional_modulation = enable;
     cfg.enable_coherence_feedback = enable;

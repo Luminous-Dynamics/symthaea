@@ -31,7 +31,7 @@ use crate::quantum_info::{
     bipartition_entanglement, orbital_mutual_information, von_neumann_entropy,
 };
 use crate::scf::rhf::RhfResult;
-use crate::stat_mech::{entropy as thermal_entropy, K_BOLTZMANN_HARTREE};
+use crate::stat_mech::{K_BOLTZMANN_HARTREE, entropy as thermal_entropy};
 
 /// Complete consciousness profile derived from first principles.
 #[derive(Debug, Clone)]
@@ -235,10 +235,10 @@ pub fn consciousness_from_first_principles(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::basis::sto3g::Sto3g;
     use crate::basis::BasisSetProvider;
+    use crate::basis::sto3g::Sto3g;
     use crate::molecule::Molecule;
-    use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+    use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
     #[test]
     fn test_consciousness_h2() {

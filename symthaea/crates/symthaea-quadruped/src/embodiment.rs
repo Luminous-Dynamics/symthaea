@@ -1,10 +1,10 @@
 use crate::controller::QuadrupedController;
 use crate::encoder::QuadrupedHdcEncoder;
 use crate::simulator::{QuadrupedPhysicsSimulator, SimpleQuadrupedSimulator};
-use crate::types::{GaitType, QuadrupedConfig, NUM_ACTUATORS};
+use crate::types::{GaitType, NUM_ACTUATORS, QuadrupedConfig};
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;

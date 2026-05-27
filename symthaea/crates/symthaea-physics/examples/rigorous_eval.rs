@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use rand::seq::SliceRandom;
 use rand::SeedableRng;
+use rand::seq::SliceRandom;
 use rand_chacha::ChaCha8Rng;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -632,8 +632,15 @@ fn load_power_grid() -> anyhow::Result<Option<DomainData>> {
         .collect();
 
     let n_anom = data.iter().filter(|(_, a)| *a).count();
-    eprintln!("  Power Grid: {} samples ({} anomalous, {} normal), {} features (V: mean={:.1}, std={:.1})",
-        data.len(), n_anom, data.len() - n_anom, n_features, mean_v, std_v);
+    eprintln!(
+        "  Power Grid: {} samples ({} anomalous, {} normal), {} features (V: mean={:.1}, std={:.1})",
+        data.len(),
+        n_anom,
+        data.len() - n_anom,
+        n_features,
+        mean_v,
+        std_v
+    );
 
     Ok(Some(DomainData {
         name: "Power Grid",

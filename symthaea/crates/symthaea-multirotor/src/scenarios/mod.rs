@@ -9,5 +9,5 @@
 pub mod kinetic_sacrifice;
 
 pub use kinetic_sacrifice::{
-    run_kinetic_sacrifice, KineticSacrificeConfig, KineticSacrificeResult, SacrificeEvent,
+    KineticSacrificeConfig, KineticSacrificeResult, SacrificeEvent, run_kinetic_sacrifice,
 };

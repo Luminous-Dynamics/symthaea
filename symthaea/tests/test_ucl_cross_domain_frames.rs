@@ -12,7 +12,7 @@
 //! - ADAPTATION
 
 use std::collections::HashMap;
-use symthaea_core::hdc::ucl_cross_domain_frames::{concept_hv, UCLFrameSystem};
+use symthaea_core::hdc::ucl_cross_domain_frames::{UCLFrameSystem, concept_hv};
 
 /// Test that all 6 UCL frames exist
 #[test]

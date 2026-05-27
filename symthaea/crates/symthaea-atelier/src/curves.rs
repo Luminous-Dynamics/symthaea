@@ -6,8 +6,8 @@
 //! The 32D thought_vector maps to Lissajous and rose curve parameters,
 //! creating flowing, organic compositions. Neuromodulators affect stroke style.
 
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use std::fmt::Write;
 use symthaea_canvas::scene_graph::Style;
 use symthaea_canvas::{CognitiveSnapshot, Color, SceneNode};

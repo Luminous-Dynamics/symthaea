@@ -35,7 +35,7 @@
 //! ]);
 //! ```
 
-use symthaea_core::hdc::{PackedBipolar, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar};
 
 /// Sources of uncertainty in semantic encoding
 #[derive(Debug, Clone)]

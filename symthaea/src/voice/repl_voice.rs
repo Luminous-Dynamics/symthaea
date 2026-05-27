@@ -3060,8 +3060,8 @@ mod tests {
     #[cfg(feature = "vocal-tract")]
     #[test]
     fn test_f0_resets_after_pause() {
-        use crate::voice::vocal_tract_fep::ProsodyContext;
         use crate::voice::FormantFrame;
+        use crate::voice::vocal_tract_fep::ProsodyContext;
 
         let base_f0 = 150.0;
 

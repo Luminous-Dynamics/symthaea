@@ -25,11 +25,13 @@ fn dream_phase_safe_on_first_cycle() {
     let result = svc.cycle("dream first cycle");
     // Dream fields should be finite defaults
     assert!(result.prediction_error.is_finite());
-    assert!(result
-        .metadata
-        .consciousness
-        .consciousness_level
-        .is_finite());
+    assert!(
+        result
+            .metadata
+            .consciousness
+            .consciousness_level
+            .is_finite()
+    );
 }
 
 #[test]

@@ -433,11 +433,7 @@ impl AttractorAnalyzer {
             den += dx * dx;
         }
 
-        if den.abs() > 1e-15 {
-            num / den
-        } else {
-            0.0
-        }
+        if den.abs() > 1e-15 { num / den } else { 0.0 }
     }
 }
 

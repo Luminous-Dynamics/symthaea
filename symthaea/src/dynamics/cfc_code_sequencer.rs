@@ -1330,7 +1330,8 @@ mod tests {
     fn test_plan_produces_steps() {
         let sequencer = CfCCodeSequencer::default();
         let intent = ContinuousHV::random(512, 42);
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         let plan = sequencer.plan_structure(&intent, &[], &negatives);
         assert!(!plan.is_empty());
@@ -1347,7 +1348,8 @@ mod tests {
         let intent = ContinuousHV::random(512, 42);
         let ctx1 = ContinuousHV::random(512, 43);
         let ctx2 = ContinuousHV::random(512, 44);
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         let plan = sequencer.plan_structure(&intent, &[&ctx1, &ctx2], &negatives);
         assert!(!plan.is_empty());
@@ -1357,7 +1359,8 @@ mod tests {
     fn test_no_consecutive_duplicates() {
         let sequencer = CfCCodeSequencer::default();
         let intent = ContinuousHV::random(512, 42);
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         let plan = sequencer.plan_structure(&intent, &[], &negatives);
         for i in 1..plan.len() {
@@ -1422,21 +1425,32 @@ mod tests {
         let initial_loss = sequencer.train_step(&intent, &action, 0.0).unwrap();
 
         // Apply RLCF Success
-        sequencer.apply_online_rlcf_update(&intent, &actions, true).unwrap();
+        sequencer
+            .apply_online_rlcf_update(&intent, &actions, true)
+            .unwrap();
         let success_loss = sequencer.train_step(&intent, &action, 0.0).unwrap();
-        assert!(success_loss < initial_loss, "Success RLCF should reduce loss for the path");
+        assert!(
+            success_loss < initial_loss,
+            "Success RLCF should reduce loss for the path"
+        );
 
         // Apply RLCF Failure (aggressive)
-        sequencer.apply_online_rlcf_update(&intent, &actions, false).unwrap();
+        sequencer
+            .apply_online_rlcf_update(&intent, &actions, false)
+            .unwrap();
         let failure_loss = sequencer.train_step(&intent, &action, 0.0).unwrap();
-        assert!(failure_loss > success_loss, "Failure RLCF should increase loss for the path");
+        assert!(
+            failure_loss > success_loss,
+            "Failure RLCF should increase loss for the path"
+        );
     }
 
     #[test]
     fn test_weight_export_import_roundtrip() {
         let sequencer = CfCCodeSequencer::default();
         let intent = ContinuousHV::random(512, 42);
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // Get plan before
         let plan_before = sequencer.plan_structure(&intent, &[], &negatives);
@@ -1571,7 +1585,8 @@ mod tests {
             hdc_dim: dim,
             ..Default::default()
         });
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // A random HV with no algorithm-specific keywords should still produce a plan
         let intent = ContinuousHV::random(dim, 9999);
@@ -1613,7 +1628,8 @@ mod tests {
             hdc_dim: dim,
             ..Default::default()
         });
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // Create a sorting-flavored intent HV
         let intent = make_keyword_hv(dim, &["sort", "compare", "swap", "order", "ascending"]);
@@ -1719,7 +1735,8 @@ mod tests {
             hdc_dim: dim,
             ..Default::default()
         });
-        let negatives = crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
+        let negatives =
+            crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default();
 
         // Random HV that wouldn't match any HV-based pattern, but purpose text is clear
         let random_hv = ContinuousHV::random(dim, 12345);

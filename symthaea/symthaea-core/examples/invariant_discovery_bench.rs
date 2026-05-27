@@ -34,15 +34,15 @@
 use std::time::Instant;
 
 use symthaea_core::hdc::conjecture_engine::{
-    observe_balmer_series, observe_bell_numbers, observe_bell_stirling_residual,
-    observe_blackbody_peak, observe_catalan, observe_central_binomial_limit,
-    observe_derangement_ratio, observe_derangements, observe_fibonacci_ratios, observe_fubini,
-    observe_gr_correction, observe_hydrogen_energy_levels, observe_inverse_square_law,
-    observe_kepler_third_law, observe_maximal_prime_gap, observe_motzkin,
-    observe_nuclear_binding_energy, observe_partitions, observe_perm_det_ratio,
-    observe_prime_counting, observe_prime_gaps, observe_quantum_harmonic_oscillator,
-    observe_relativistic_kinetic_energy, observe_stefan_boltzmann, observe_stirling_sum, Expr,
-    ObservedSequence, RegressorConfig, SymbolicRegressor,
+    Expr, ObservedSequence, RegressorConfig, SymbolicRegressor, observe_balmer_series,
+    observe_bell_numbers, observe_bell_stirling_residual, observe_blackbody_peak, observe_catalan,
+    observe_central_binomial_limit, observe_derangement_ratio, observe_derangements,
+    observe_fibonacci_ratios, observe_fubini, observe_gr_correction,
+    observe_hydrogen_energy_levels, observe_inverse_square_law, observe_kepler_third_law,
+    observe_maximal_prime_gap, observe_motzkin, observe_nuclear_binding_energy, observe_partitions,
+    observe_perm_det_ratio, observe_prime_counting, observe_prime_gaps,
+    observe_quantum_harmonic_oscillator, observe_relativistic_kinetic_energy,
+    observe_stefan_boltzmann, observe_stirling_sum,
 };
 
 /// One benchmark row: (sequence, expected-shape description).
@@ -190,7 +190,7 @@ fn main() {
     ];
 
     eprintln!("Invariant-discovery benchmark");
-    eprintln!("  regressor: SymbolicRegressor, default config (pop=200 gen=100 seed=42)");
+    eprintln!("  regressor: SymbolicRegressor, default config (pop=200 r#gen=100 seed=42)");
     eprintln!("  measure: test-split MSE of top-1 conjecture");
     eprintln!("  problems: {}", problems.len());
     eprintln!();

@@ -20,8 +20,8 @@ mod tests {
     use crate::hdc::foundations::InductionEngine;
     use crate::hdc::integer::IntegerArithmeticEngine;
     use crate::hdc::number_theory::{ModularRing, NumberTheoryEngine};
-    use crate::hdc::primitive_system::seed_from_name;
     use crate::hdc::primitive_system::PrimitiveSystem;
+    use crate::hdc::primitive_system::seed_from_name;
     use crate::hdc::rational::RationalArithmeticEngine;
     use crate::hdc::real_arithmetic::{MathConstants, PeanoPhysicsBridge};
 

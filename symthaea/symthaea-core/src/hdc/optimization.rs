@@ -698,22 +698,14 @@ impl OptimizationEngine {
                         .iter()
                         .map(|c| {
                             let cv = c(&xp_plus);
-                            if cv > 0.0 {
-                                penalty * cv * cv
-                            } else {
-                                0.0
-                            }
+                            if cv > 0.0 { penalty * cv * cv } else { 0.0 }
                         })
                         .sum();
                     let pen_minus: f64 = constraints
                         .iter()
                         .map(|c| {
                             let cv = c(&xp_minus);
-                            if cv > 0.0 {
-                                penalty * cv * cv
-                            } else {
-                                0.0
-                            }
+                            if cv > 0.0 { penalty * cv * cv } else { 0.0 }
                         })
                         .sum();
                     g[i] += (pen_plus - pen_minus) / (2.0 * eps);

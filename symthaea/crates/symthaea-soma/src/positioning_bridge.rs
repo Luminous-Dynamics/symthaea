@@ -21,9 +21,9 @@
 //! - Known safe location → serotonin (calm)
 
 use positioning::{
-    gdop, CelestialBody, Earth, FilterConfig, GaussianEstimate3D, Measurement,
-    MeasurementProvenance, PdrConfig, PedestrianDeadReckoning, PeerEstimate3D, PositionFilter,
-    PublishableEstimate3D, RangeEstimate, ReferenceFrame,
+    CelestialBody, Earth, FilterConfig, GaussianEstimate3D, Measurement, MeasurementProvenance,
+    PdrConfig, PedestrianDeadReckoning, PeerEstimate3D, PositionFilter, PublishableEstimate3D,
+    RangeEstimate, ReferenceFrame, gdop,
 };
 use serde::{Deserialize, Serialize};
 

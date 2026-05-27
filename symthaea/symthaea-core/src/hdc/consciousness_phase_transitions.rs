@@ -426,11 +426,7 @@ impl ConsciousnessPhaseTransitions {
         let slope = cov / var_idx;
 
         // Positive slope = slowing down = approaching transition
-        if slope > 0.0 {
-            Some(slope)
-        } else {
-            None
-        }
+        if slope > 0.0 { Some(slope) } else { None }
     }
 
     /// Predict time to phase transition

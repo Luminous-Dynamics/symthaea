@@ -6,8 +6,8 @@
 //! Demonstrates Symthaea sensing her own power via INA219
 //! and adjusting her cognitive 'throttle' to maintain the 6-Watt limit.
 
-use symthaea::action::PolicyBundle;
 use symthaea::Symthaea;
+use symthaea::action::PolicyBundle;
 use tracing::Level;
 
 #[tokio::main]

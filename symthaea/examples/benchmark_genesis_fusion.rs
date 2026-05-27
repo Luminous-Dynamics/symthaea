@@ -12,7 +12,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 3: Fusion Digital Twin ===\n");
 
     use symthaea::physics::fusion_twin::{
-        synthetic_disruption_scenario, FusionDigitalTwin, PLASMA_HORIZONS,
+        FusionDigitalTwin, PLASMA_HORIZONS, synthetic_disruption_scenario,
     };
 
     // 1. Create a synthetic disruption scenario (100 healthy + 50 disruption steps)

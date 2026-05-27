@@ -11,11 +11,11 @@
 //! Each benchmark molecule has known HF and MP2 energies at STO-3G and 6-31G
 //! that have been independently computed by multiple groups over 50+ years.
 
+use crate::basis::BasisSetProvider;
 use crate::basis::basis_631g::Basis631G;
 use crate::basis::sto3g::Sto3g;
-use crate::basis::BasisSetProvider;
 use crate::molecule::{Atom, Molecule};
-use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
 /// A benchmark reference value.
 #[derive(Debug, Clone)]
@@ -181,7 +181,7 @@ pub fn validate_hf_631g() -> Vec<ValidationResult> {
 /// different normalization schemes?
 pub fn normalization_sensitivity() -> NormalizationSensitivityResult {
     use crate::multi_theory::{
-        compute_theory_scores, theory_correlation_matrix, TheoryScores, N_THEORIES,
+        N_THEORIES, TheoryScores, compute_theory_scores, theory_correlation_matrix,
     };
 
     let molecules = benchmark_molecules();

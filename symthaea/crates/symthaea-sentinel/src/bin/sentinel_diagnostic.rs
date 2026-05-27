@@ -5,9 +5,9 @@
 
 use std::collections::HashMap;
 use symthaea_sentinel::{
+    AudioCategory, AudioFeatures, AudioSentinel, FileAudioConfig, FileAudioPump, MEL_BANDS,
     compute_mfcc, compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
-    compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory, AudioFeatures,
-    AudioSentinel, FileAudioConfig, FileAudioPump, MEL_BANDS,
+    compute_temporal_regularity, spectrum_to_mel_bands,
 };
 
 /// State for feature extraction with envelope tracking

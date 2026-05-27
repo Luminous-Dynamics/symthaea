@@ -200,11 +200,7 @@ fn pearson_r(x: &[f32], y: &[f32]) -> f32 {
     }
 
     let denom = (var_x * var_y).sqrt();
-    if denom < 1e-10 {
-        0.0
-    } else {
-        cov / denom
-    }
+    if denom < 1e-10 { 0.0 } else { cov / denom }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

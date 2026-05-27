@@ -696,9 +696,10 @@ mod tests {
         let values = [1.0f32, 2.0, 3.0];
         mgr.register_safety_thresholds(&values);
         let live_hash = attestation::blake3_hash_f32_slice(&values);
-        assert!(mgr
-            .verify_live_thresholds("safety_thresholds", live_hash)
-            .is_none());
+        assert!(
+            mgr.verify_live_thresholds("safety_thresholds", live_hash)
+                .is_none()
+        );
     }
 
     #[test]
@@ -706,9 +707,10 @@ mod tests {
         let mut mgr = IntegrityManager::new();
         mgr.register_safety_thresholds(&[1.0, 2.0, 3.0]);
         let tampered_hash = attestation::blake3_hash_f32_slice(&[1.0, 2.0, 999.0]);
-        assert!(mgr
-            .verify_live_thresholds("safety_thresholds", tampered_hash)
-            .is_some());
+        assert!(
+            mgr.verify_live_thresholds("safety_thresholds", tampered_hash)
+                .is_some()
+        );
     }
 
     #[test]
@@ -754,10 +756,11 @@ mod tests {
         }
         assert_eq!(mgr.confidence_history.len(), 5);
         // All values should be valid confidence levels (may include 0.5 if temporal fires)
-        assert!(mgr
-            .confidence_history
-            .iter()
-            .all(|&c| c == 1.0 || c == 0.5 || c == 0.1));
+        assert!(
+            mgr.confidence_history
+                .iter()
+                .all(|&c| c == 1.0 || c == 0.5 || c == 0.1)
+        );
     }
 
     #[test]

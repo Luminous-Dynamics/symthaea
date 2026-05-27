@@ -18,11 +18,13 @@ fn moral_modulation_safe_on_first_cycle() {
     let mut svc = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let result = svc.cycle("moral test first cycle");
     assert!(result.prediction_error.is_finite());
-    assert!(result
-        .metadata
-        .consciousness
-        .consciousness_level
-        .is_finite());
+    assert!(
+        result
+            .metadata
+            .consciousness
+            .consciousness_level
+            .is_finite()
+    );
 }
 
 #[test]

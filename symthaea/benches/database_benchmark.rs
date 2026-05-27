@@ -16,7 +16,7 @@
 //! cargo bench --bench database_benchmark --features lancedb-backend  # Include Lance
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType, SqliteMemory};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 

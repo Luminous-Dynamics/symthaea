@@ -19,7 +19,7 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
-use crate::types::{VehicleState, NUM_STATE_CHANNELS};
+use crate::types::{NUM_STATE_CHANNELS, VehicleState};
 
 /// Semantic channel groups for weighted encoding.
 #[derive(Debug, Clone, Copy)]

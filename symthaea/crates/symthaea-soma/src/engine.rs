@@ -731,8 +731,8 @@ impl SomaEngine {
     #[cfg(feature = "litert")]
     pub fn litert_generate_with_tools(&mut self, prompt: &str, max_tokens: u32) -> Option<String> {
         use crate::tool_use::{
-            execute_calculate, execute_get_time, format_tool_results, parse_tool_calls,
-            ToolRegistry, ToolResult,
+            ToolRegistry, ToolResult, execute_calculate, execute_get_time, format_tool_results,
+            parse_tool_calls,
         };
 
         let litert = self.litert.as_ref()?;

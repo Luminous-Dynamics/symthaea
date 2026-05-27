@@ -836,7 +836,7 @@ mod tests {
         let mut engine = RegulationEngine::new();
         engine.incorporate_dream_wisdom(4, 0.5); // Validation
         engine.incorporate_dream_wisdom(4, 0.0); // Low improvement
-                                                 // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
+        // EMA should decay: 0.5*0.9 + 0.0*0.1 = 0.45
         let pref = engine.dream_preferred_strategy();
         assert_eq!(pref, Some(RegulationStrategy::Validation));
     }

@@ -37,9 +37,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::BinaryHV;
 
 /// ARC scaling benchmark: grid size × HDC dimension.
 pub struct ArcScalingBenchmark;
@@ -218,11 +218,7 @@ fn linear_slope(xs: &[f64], ys: &[f64]) -> f64 {
         num += (x - mean_x) * (y - mean_y);
         den += (x - mean_x) * (x - mean_x);
     }
-    if den.abs() > 1e-10 {
-        num / den
-    } else {
-        0.0
-    }
+    if den.abs() > 1e-10 { num / den } else { 0.0 }
 }
 
 impl PsychBenchmark for ArcScalingBenchmark {

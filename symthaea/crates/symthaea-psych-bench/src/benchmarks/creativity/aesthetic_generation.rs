@@ -140,10 +140,7 @@ impl PsychBenchmark for AestheticGenerationBenchmark {
             MetricValue::from_samples(&improvement_ratios),
         );
         result.insert("monotonicity", MetricValue::from_samples(&monotonicities));
-        result.insert(
-            "final_quality",
-            MetricValue::from_samples(&final_qualities),
-        );
+        result.insert("final_quality", MetricValue::from_samples(&final_qualities));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

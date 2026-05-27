@@ -634,11 +634,7 @@ impl PatchHdcEncoder {
                 }
             }
         }
-        if count > 0.0 {
-            sum / count
-        } else {
-            0.0
-        }
+        if count > 0.0 { sum / count } else { 0.0 }
     }
 
     pub fn max_rows(&self) -> usize {

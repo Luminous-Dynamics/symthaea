@@ -526,7 +526,10 @@ mod vision_cognitive_integration {
                 .as_ref()
                 .expect("vision telemetry should be present");
 
-            assert!(vt.vision_active, "Vision should remain active across cycles");
+            assert!(
+                vt.vision_active,
+                "Vision should remain active across cycles"
+            );
             assert!(
                 vt.prediction_error.is_finite(),
                 "Prediction error must be finite after goal signal wiring"
@@ -692,10 +695,7 @@ mod vision_cognitive_integration {
         assert_eq!(dreams.len(), 5, "Should produce exactly 5 dream steps");
 
         for (i, dream_hv) in dreams.iter().enumerate() {
-            assert!(
-                dream_hv.norm() > 0.0,
-                "Dream step {i} should be non-zero"
-            );
+            assert!(dream_hv.norm() > 0.0, "Dream step {i} should be non-zero");
             assert!(
                 dream_hv.as_slice().iter().all(|x| x.is_finite()),
                 "Dream step {i} must be finite"
@@ -748,7 +748,11 @@ mod vision_cognitive_integration {
         );
 
         // Tracks should have length > 1 (persisted across frames)
-        let long_tracks = obj_mem.tracks().iter().filter(|t| t.track_length > 1).count();
+        let long_tracks = obj_mem
+            .tracks()
+            .iter()
+            .filter(|t| t.track_length > 1)
+            .count();
         assert!(
             long_tracks > 0,
             "At least one object should persist across multiple frames"
@@ -769,7 +773,10 @@ mod vision_cognitive_integration {
             .with_layer(SpectrumBand::ThermalIR, vec![200u8; 64 * 64]);
 
         let (hv, tel) = bridge.process_multiband_frame(&frame, 0.033);
-        assert!(hv.norm() > 0.0, "Multiband bridge should produce non-zero HV");
+        assert!(
+            hv.norm() > 0.0,
+            "Multiband bridge should produce non-zero HV"
+        );
         assert!(tel.encode_time_us > 0, "Encoding time should be measured");
         assert_eq!(tel.frame_sequence, 1, "Frame sequence should be 1");
 
@@ -846,7 +853,9 @@ mod vision_cognitive_integration {
             m.observe_frame(&pixels, 64, 64, 3, 0.033);
         }
 
-        let wm = m.working_memory().expect("working memory should be enabled");
+        let wm = m
+            .working_memory()
+            .expect("working memory should be enabled");
         assert!(
             wm.load() <= 4,
             "Working memory should hold ≤ 4 objects, got {}",

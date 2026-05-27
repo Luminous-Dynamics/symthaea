@@ -134,7 +134,8 @@ impl ReasoningContextBuilder {
             cycle_id: 0,
             epistemic_quality: 0.5,
             code_context: None,
-            negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
+            negative_prototypes:
+                crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
         }
     }
 

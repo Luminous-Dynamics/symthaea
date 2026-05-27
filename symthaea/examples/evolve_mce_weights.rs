@@ -324,7 +324,7 @@ fn main() {
 
     let elite_count = (POPULATION_SIZE as f64 * ELITE_FRACTION).max(1.0) as usize;
 
-    for gen in 1..=NUM_GENERATIONS {
+    for r#gen in 1..=NUM_GENERATIONS {
         pop.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let mut next: Vec<(Genome, f64)> = pop[..elite_count].to_vec();
         while next.len() < POPULATION_SIZE {
@@ -339,11 +339,11 @@ fn main() {
             next.push((child, f));
         }
         pop = next;
-        if gen % 10 == 0 || gen == NUM_GENERATIONS {
+        if r#gen % 10 == 0 || r#gen == NUM_GENERATIONS {
             pop.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
             println!(
                 "Gen {:2}: best={:.4}  mean={:.4}",
-                gen,
+                r#gen,
                 pop[0].1,
                 pop.iter().map(|p| p.1).sum::<f64>() / POPULATION_SIZE as f64
             );

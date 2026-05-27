@@ -287,7 +287,11 @@ fn format_experiment_result(name: &str, result: &wasm_bindgen::JsValue) -> Strin
                 baseline,
                 min,
                 recovered,
-                if baseline > 0.0 { (1.0 - min / baseline) * 100.0 } else { 0.0 }
+                if baseline > 0.0 {
+                    (1.0 - min / baseline) * 100.0
+                } else {
+                    0.0
+                }
             )
         }
         "split_brain" => {

@@ -12,7 +12,7 @@
 //! - Pattern completion accuracy vs speed
 //! - Sequence learning convergence
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 

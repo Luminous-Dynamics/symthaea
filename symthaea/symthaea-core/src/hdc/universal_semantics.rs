@@ -155,9 +155,9 @@
 //
 // ==================================================================================
 
+use super::HDC_DIMENSION;
 use super::binary_hv::BinaryHV;
 use super::unified_hv::ContinuousHV;
-use super::HDC_DIMENSION;
 use crate::genesis::GenesisSeed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

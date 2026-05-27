@@ -166,7 +166,7 @@ impl DemandForecaster {
                     confidence: 0.0,
                     time_to_exhaustion_hours: None,
                     generated_at: now_secs,
-                }
+                };
             }
         };
 

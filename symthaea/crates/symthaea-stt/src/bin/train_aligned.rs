@@ -25,8 +25,8 @@ use std::path::PathBuf;
 
 use symthaea_stt::hdc::BundleAccumulator;
 use symthaea_stt::{
-    id_to_audio_path, load_alignments, AudioFrontend, AudioProjector, BootstrapConfig,
-    TrainedPrototypes, HV16,
+    AudioFrontend, AudioProjector, BootstrapConfig, HV16, TrainedPrototypes, id_to_audio_path,
+    load_alignments,
 };
 
 #[derive(Parser)]

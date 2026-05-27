@@ -33,8 +33,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::conjecture_engine::{
-    conjecture_has_verified_eml_backend, BinOp, Conjecture, ConjectureEngine, ConjectureStatus,
-    Expr, MacroPromotionTier, PreferredEmlBackend,
+    BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier,
+    PreferredEmlBackend, conjecture_has_verified_eml_backend,
 };
 use crate::hdc::deterministic_seeds::seed_from_name;
 use crate::hdc::eml;
@@ -783,7 +783,7 @@ mod tests {
     use super::*;
     use crate::hdc::abstract_thought::normalize_expr;
     use crate::hdc::conjecture_engine::{
-        attach_eml_metadata, BinOp, Conjecture, MathDomain, UnaryFn,
+        BinOp, Conjecture, MathDomain, UnaryFn, attach_eml_metadata,
     };
     use crate::hdc::eml::{EmlExpr, EmlRealDomainAssumption};
 
@@ -904,9 +904,11 @@ mod tests {
 
         assert_eq!(grammar.candidates.len(), 1);
         assert_eq!(grammar.candidates[0].occurrences.len(), 2);
-        assert!(grammar.candidates[0]
-            .canonical
-            .starts_with("eml:constructive:"));
+        assert!(
+            grammar.candidates[0]
+                .canonical
+                .starts_with("eml:constructive:")
+        );
     }
 
     #[test]
@@ -1327,9 +1329,11 @@ mod tests {
                 unconstrained.preferred_eml_backend(),
                 Some(PreferredEmlBackend::StrictRealAndComplex)
             );
-            assert!(unconstrained
-                .eml_real_domain
-                .is_some_and(|d| d.is_unconstrained()));
+            assert!(
+                unconstrained
+                    .eml_real_domain
+                    .is_some_and(|d| d.is_unconstrained())
+            );
             engine.conjectures.push(unconstrained);
         }
         for i in 0..3 {
@@ -1352,9 +1356,11 @@ mod tests {
                 constrained.preferred_eml_backend(),
                 Some(PreferredEmlBackend::StrictRealAndComplex)
             );
-            assert!(constrained
-                .eml_real_domain
-                .is_some_and(|d| !d.is_unconstrained()));
+            assert!(
+                constrained
+                    .eml_real_domain
+                    .is_some_and(|d| !d.is_unconstrained())
+            );
             engine.conjectures.push(constrained);
         }
 

@@ -3,11 +3,11 @@
 
 //! 32-DOF Humanoid Active Curriculum Optimizer Calibration Runner
 
+use std::time::Instant;
 use symthaea_humanoid::training::HumanoidTrainer;
 use symthaea_humanoid::types::{HumanoidConfig, HumanoidTask};
-use std::time::Instant;
 use tracing::info;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter, filter::LevelFilter};
+use tracing_subscriber::{EnvFilter, filter::LevelFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     info!("📂 Telemetry telemetry matrices routing to: {}", output_dir);
 
     let mut trainer = HumanoidTrainer::new(config);
-    
+
     let start_time = Instant::now();
     let metrics = trainer.train_with_telemetry(output_dir);
     let duration = start_time.elapsed();
@@ -43,11 +43,16 @@ async fn main() -> anyhow::Result<()> {
     info!("---------------------------------------------------------------------------------");
     info!(" EP | Task   | Avg Stand Reward | Avg Ep Reward | Avg Free Energy | Total Steps");
     info!("---------------------------------------------------------------------------------");
-    
+
     for m in metrics {
         info!(
             " {:02} | {:<6?} | {:.4}           | {:.4}         | {:.4}          | {}",
-            m.episode, m.task, m.avg_standing_reward, m.avg_episode_reward, m.avg_free_energy, m.total_steps
+            m.episode,
+            m.task,
+            m.avg_standing_reward,
+            m.avg_episode_reward,
+            m.avg_free_energy,
+            m.total_steps
         );
     }
     info!("---------------------------------------------------------------------------------");

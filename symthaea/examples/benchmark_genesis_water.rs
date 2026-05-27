@@ -12,8 +12,8 @@ fn main() {
     println!("=== Genesis Mission Challenge 8: Water Prediction ===\n");
 
     use symthaea::symthaea_cell_foundry::hydrology::{
-        synthetic_water_scenario, HydrologicalPredictor, WaterFepAgent, WaterHdcEncoder,
-        WaterQualityReading, WATER_HORIZONS,
+        HydrologicalPredictor, WATER_HORIZONS, WaterFepAgent, WaterHdcEncoder, WaterQualityReading,
+        synthetic_water_scenario,
     };
     use symthaea::symthaea_core::hdc::unified_hv::HDC_DIMENSION;
 

@@ -226,11 +226,11 @@ pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, Gov
 
 pub use ethics_engine::EthicalVerdict;
 pub use managers::network_service_bridge::{
-    forward_affective_state, forward_federated_round, FederatedCoordinatorHandle,
-    NetworkServiceBridge, NetworkServiceBridgeHandle,
+    FederatedCoordinatorHandle, NetworkServiceBridge, NetworkServiceBridgeHandle,
+    forward_affective_state, forward_federated_round,
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
-pub use subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
+pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags};
 
 #[cfg(feature = "advanced-manufacturing")]
 pub use managers::fabrication_manager::{
@@ -757,7 +757,7 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     learning_manager: managers::LearningManager,
 
-    /// Multimodal Manager: MCE gating for external gen models, moral action gating.
+    /// Multimodal Manager: MCE gating for external r#gen models, moral action gating.
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     multimodal_manager: managers::MultimodalManager,
 

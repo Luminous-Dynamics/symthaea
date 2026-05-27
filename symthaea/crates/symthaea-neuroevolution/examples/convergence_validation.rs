@@ -71,7 +71,7 @@ fn main() {
 
     println!("\n--- Results ---");
     println!(
-        "  Total time:      {:.1}s ({:.1}s/gen)",
+        "  Total time:      {:.1}s ({:.1}s/r#gen)",
         total.as_secs_f64(),
         total.as_secs_f64() / 50.0
     );

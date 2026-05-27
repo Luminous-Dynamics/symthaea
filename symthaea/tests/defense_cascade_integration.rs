@@ -7,7 +7,7 @@
 //! SafetyAgent → safety_enforcement → defense actions → moral filter
 //! Sentinel → threat memory → collective immunity → guardian posture
 
-use symthaea::cognitive_loop::defense::{moral_filter, propose_defense_actions, DefenseActionKind};
+use symthaea::cognitive_loop::defense::{DefenseActionKind, moral_filter, propose_defense_actions};
 use symthaea::cognitive_loop::guardian::{GuardianPosture, GuardianState};
 use symthaea::cognitive_loop::safety_enforcement::compute_enforcement;
 use symthaea::safety::{SafetyAgent, SafetyLevel};
@@ -70,17 +70,21 @@ fn test_defense_cascade_green_to_red() {
         || matches!(a.kind, DefenseActionKind::IncreasePeerScoring { .. })));
 
     let orange = propose_defense_actions(SafetyLevel::Orange, 200);
-    assert!(orange
-        .iter()
-        .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals)));
+    assert!(
+        orange
+            .iter()
+            .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals))
+    );
 
     let red = propose_defense_actions(SafetyLevel::Red, 300);
-    assert!(red
-        .iter()
-        .any(|a| matches!(a.kind, DefenseActionKind::EmergencyGovernanceFreeze)));
-    assert!(red
-        .iter()
-        .any(|a| matches!(a.kind, DefenseActionKind::HaltMotor)));
+    assert!(
+        red.iter()
+            .any(|a| matches!(a.kind, DefenseActionKind::EmergencyGovernanceFreeze))
+    );
+    assert!(
+        red.iter()
+            .any(|a| matches!(a.kind, DefenseActionKind::HaltMotor))
+    );
 }
 
 #[test]
@@ -231,9 +235,11 @@ fn test_full_cascade_safety_to_guardian() {
                 assert!(guardian.posture.locomotion_permitted());
             }
             SafetyLevel::Orange => {
-                assert!(actions
-                    .iter()
-                    .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals)));
+                assert!(
+                    actions
+                        .iter()
+                        .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals))
+                );
                 assert!(!guardian.posture.locomotion_permitted());
             }
             SafetyLevel::Red => {

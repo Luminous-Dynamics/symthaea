@@ -5,4 +5,4 @@
 
 pub mod mp2;
 
-pub use mp2::{mp2_correlation_energy, Mp2Result};
+pub use mp2::{Mp2Result, mp2_correlation_energy};

@@ -309,9 +309,11 @@ mod tests {
         // Should include common options
         assert!(schemas.iter().any(|s| s.name == "services.nginx.enable"));
         assert!(schemas.iter().any(|s| s.name == "boot.loader.grub.enable"));
-        assert!(schemas
-            .iter()
-            .any(|s| s.name == "networking.firewall.enable"));
+        assert!(
+            schemas
+                .iter()
+                .any(|s| s.name == "networking.firewall.enable")
+        );
     }
 
     #[test]

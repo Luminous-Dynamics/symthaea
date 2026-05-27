@@ -45,10 +45,10 @@ use symthaea::action::nixos_patterns::{ExecutionResult, NixOSCommand, NixOSExecu
 use symthaea::consciousness::phi_attention::{
     ActionType, ConfidenceLevel, ConsciousnessThresholds, PhiAwareScoring,
 };
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 use symthaea::language::llm_organ::{
     ConsciousLlmOrgan, LlmConfig, LlmOrgan, LlmProvider, LlmRequest,
 };
@@ -310,12 +310,16 @@ Example: [COMMAND]: search markdown editor"#
                     )
                 }
                 ExecutionResult::PendingConfirmation { required_phi, .. } => {
-                    format!("\n\n⚠️ **Confirmation required**\nYour Φ={:.2} < required {:.2}\nType 'yes' to confirm, or rephrase your request.",
+                    format!(
+                        "\n\n⚠️ **Confirmation required**\nYour Φ={:.2} < required {:.2}\nType 'yes' to confirm, or rephrase your request.",
                         self.current_phi, required_phi
                     )
                 }
                 ExecutionResult::RolledBack { error, .. } => {
-                    format!("\n\n🔄 **Rolled back** due to error:\n{}\nSystem restored to previous state.", error)
+                    format!(
+                        "\n\n🔄 **Rolled back** due to error:\n{}\nSystem restored to previous state.",
+                        error
+                    )
                 }
                 ExecutionResult::FailedNoRollback { error, .. } => {
                     format!("\n\n❌ **Failed**: {}", error)

@@ -12,8 +12,8 @@
 //! When beauty is low, the listener attenuates parameters that cause harshness:
 //! reduces FM depth, lowers master gain, widens note spacing.
 
-use crate::audio_feedback::AudioFeatures;
 use crate::MusicalState;
+use crate::audio_feedback::AudioFeatures;
 
 /// Aesthetic quality assessment of generated audio.
 #[derive(Debug, Clone, Copy, Default)]

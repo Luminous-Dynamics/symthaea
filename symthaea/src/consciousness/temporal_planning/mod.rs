@@ -17,6 +17,6 @@ pub mod types;
 
 // Re-export key types
 pub use dream_integration::uniform_priors;
-pub use mcts::{evs, MctsPlanner};
+pub use mcts::{MctsPlanner, evs};
 pub use snapshot::SnapshotManager;
 pub use types::{BudgetTier, ForkedState, MctsConfig, MctsResult, PlannedAction, ReasoningBudget};

@@ -238,7 +238,7 @@ mod tests {
         let sine_val = bank.read(0.25, 0.0); // pure sine
         let tri_val = bank.read(0.25, 0.25); // 50% sine + 50% triangle
         let saw_val = bank.read(0.25, 0.5); // pure triangle (table index 1→2 midpoint)
-                                            // Values should differ across morph positions
+        // Values should differ across morph positions
         assert!(
             (sine_val - saw_val).abs() > 0.01,
             "morph should change output"

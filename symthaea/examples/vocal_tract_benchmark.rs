@@ -25,7 +25,7 @@ fn main() {
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::vocal_tract_controller::{VocalTractConfig, VocalTractController};
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
-    use symthaea::voice::vocal_tract_fep::{populate_manner_map, VocalTractPipeline};
+    use symthaea::voice::vocal_tract_fep::{VocalTractPipeline, populate_manner_map};
     use symthaea::voice::{ArticulatoryConfig, ArticulatorySynthesizer, LTCPacing, TimedPhoneme};
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
@@ -351,8 +351,16 @@ fn main() {
             let manner_str = format!("{:?}", target.manner);
             println!(
                 "  {:>6} | {:>10.1} {:>10.1} {:>10.1} | {:>10.1} {:>10.1} {:>10.1} | {:>8.1} {:>8.1} | {:>10}",
-                consonant, ltc_f1, ltc_f2, ltc_f3, target.f1, target.f2, target.f3,
-                ltc_err, rule_err, manner_str
+                consonant,
+                ltc_f1,
+                ltc_f2,
+                ltc_f3,
+                target.f1,
+                target.f2,
+                target.f3,
+                ltc_err,
+                rule_err,
+                manner_str
             );
 
             cons_ltc_total_err += ltc_err;

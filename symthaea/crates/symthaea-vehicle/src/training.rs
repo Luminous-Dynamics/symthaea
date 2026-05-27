@@ -20,7 +20,7 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::controller::VehicleController;
 use crate::encoder::VehicleHdcEncoder;
 use crate::fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig};
-use crate::perturbations::{is_critical_failure, PerturbationSchedule};
+use crate::perturbations::{PerturbationSchedule, is_critical_failure};
 use crate::reward;
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
@@ -1513,7 +1513,8 @@ mod tests {
         let lk_last = metrics_lk[9].avg_episode_reward;
         let follow_last = metrics_follow[9].avg_episode_reward;
         assert!(
-            (lk_last - follow_last).abs() > 1e-10 || (lk_last.is_finite() && follow_last.is_finite()),
+            (lk_last - follow_last).abs() > 1e-10
+                || (lk_last.is_finite() && follow_last.is_finite()),
             "Follow and LaneKeep should have different reward profiles: lk={lk_last}, follow={follow_last}"
         );
     }

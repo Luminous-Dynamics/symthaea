@@ -27,7 +27,7 @@
 //! | forward_batch_32 | 1500-2000 | 50-100 | 20-40x |
 //! | train_step | 500-1000 | 50-100 | 10-20x |
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use ndarray::Array1;
 use std::time::Duration;
 use symthaea::dynamics::{

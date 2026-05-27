@@ -4,7 +4,7 @@
 //! Radio tier abstractions, spectrum manager, and related types.
 
 use super::super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::hardware::RegulatoryDatabase;
 use super::transport::{

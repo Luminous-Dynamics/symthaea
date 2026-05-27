@@ -6,8 +6,8 @@
 //! Present a fact (A), then a correction (B), and verify that
 //! querying retrieves B (the correction) rather than A.
 
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;

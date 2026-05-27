@@ -122,7 +122,9 @@ fn try_gpu() -> Option<Backend> {
     // Check for NVIDIA device without cuda feature
     if std::path::Path::new("/dev/nvidia0").exists() {
         println!("  NVIDIA GPU detected but 'cuda' feature not enabled");
-        println!("  Rebuild with: cargo run -p symthaea-muse --features cuda --bin train_spectral_vocoder");
+        println!(
+            "  Rebuild with: cargo run -p symthaea-muse --features cuda --bin train_spectral_vocoder"
+        );
         println!("  (Requires nix develop for CUDA libraries)");
     }
 
@@ -137,7 +139,7 @@ struct TrainingPair {
 }
 
 fn generate_training_data() -> Vec<TrainingPair> {
-    use symthaea_muse::{compose, AudioData, MuseConfig, MusicalState};
+    use symthaea_muse::{AudioData, MuseConfig, MusicalState, compose};
 
     let config = MuseConfig {
         duration_secs: 2.0,
@@ -223,7 +225,7 @@ fn extract_mel_frame(samples: &[f32]) -> Vec<f32> {
 fn predict_mel(state: &symthaea_muse::MusicalState, _backend: &Backend) -> Vec<f32> {
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-    use symthaea_muse::spectral_vocoder::{MelDecoder, MEL_BINS};
+    use symthaea_muse::spectral_vocoder::{MEL_BINS, MelDecoder};
 
     let genesis = GenesisSeed::from_phrase("spectral-vocoder-v1");
     let decoder = MelDecoder::new(MEL_BINS, &genesis);

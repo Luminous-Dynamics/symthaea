@@ -20,8 +20,8 @@
 //! → Feed into existing procedural generators with these params
 //! ```
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use symthaea_canvas::scene_graph::{Style, Transform};
 use symthaea_canvas::{CognitiveSnapshot, SceneNode};
 use symthaea_core::genesis::GenesisSeed;
@@ -110,13 +110,18 @@ impl HybridController {
     }
 
     fn decode_params(&self, output: &ContinuousHV) -> HybridParams {
-        let v: Vec<f32> = self.projections.iter()
+        let v: Vec<f32> = self
+            .projections
+            .iter()
             .map(|p| (output.similarity(p) + 1.0) / 2.0)
             .collect();
 
         // Softmax the first 5 for generator selection
         let raw_weights = [v[0], v[1], v[2], v[3], v[4]];
-        let max_w = raw_weights.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_w = raw_weights
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let exp_weights: Vec<f32> = raw_weights.iter().map(|w| (w - max_w).exp()).collect();
         let sum_exp: f32 = exp_weights.iter().sum();
         let mut generator_weights = [0.0f32; 5];
@@ -126,24 +131,20 @@ impl HybridController {
 
         HybridParams {
             generator_weights,
-            lsystem_depth_mod: 0.5 + v[5] * 1.0,    // 0.5-1.5x
-            lsystem_angle_mod: 0.7 + v[6] * 0.6,    // 0.7-1.3x
-            curve_freq_mod: 0.5 + v[7] * 1.5,        // 0.5-2.0x
-            curve_amp_mod: 0.5 + v[8] * 1.0,         // 0.5-1.5x
-            color_warmth: v[9] * 2.0 - 1.0,          // -1 to 1
-            shape_scale: 0.5 + v[10] * 1.0,          // 0.5-1.5x
-            layout_x: v[11] * 0.6 - 0.3,             // -0.3 to 0.3
-            layout_y: v[12] * 0.6 - 0.3,             // -0.3 to 0.3
-            opacity_mod: 0.6 + v[13] * 0.4,          // 0.6-1.0
+            lsystem_depth_mod: 0.5 + v[5] * 1.0, // 0.5-1.5x
+            lsystem_angle_mod: 0.7 + v[6] * 0.6, // 0.7-1.3x
+            curve_freq_mod: 0.5 + v[7] * 1.5,    // 0.5-2.0x
+            curve_amp_mod: 0.5 + v[8] * 1.0,     // 0.5-1.5x
+            color_warmth: v[9] * 2.0 - 1.0,      // -1 to 1
+            shape_scale: 0.5 + v[10] * 1.0,      // 0.5-1.5x
+            layout_x: v[11] * 0.6 - 0.3,         // -0.3 to 0.3
+            layout_y: v[12] * 0.6 - 0.3,         // -0.3 to 0.3
+            opacity_mod: 0.6 + v[13] * 0.4,      // 0.6-1.0
         }
     }
 
     /// Generate a hybrid composition: CfC selects and parameterizes procedural generators.
-    pub fn generate(
-        &mut self,
-        config: &AtelierConfig,
-        snapshot: &CognitiveSnapshot,
-    ) -> SceneNode {
+    pub fn generate(&mut self, config: &AtelierConfig, snapshot: &CognitiveSnapshot) -> SceneNode {
         let genesis = GenesisSeed::from_phrase("hybrid-controller");
         let input = Self::encode_snapshot(snapshot, &genesis);
 
@@ -187,56 +188,62 @@ impl HybridController {
             }
             mod_snapshot.arousal *= params.curve_amp_mod;
             let curves = crate::curves::generate(config, &mod_snapshot, &mut rng);
-            let layer = SceneNode::group(None)
-                .with_child(curves)
-                .with_style(Style {
-                    opacity: Some(params.generator_weights[1] * params.opacity_mod),
-                    ..Style::default()
-                });
+            let layer = SceneNode::group(None).with_child(curves).with_style(Style {
+                opacity: Some(params.generator_weights[1] * params.opacity_mod),
+                ..Style::default()
+            });
             root.children.push(layer);
         }
 
         if params.generator_weights[2] > threshold {
             let tex = crate::persistence::generate(config, snapshot, &mut rng);
-            let layer = SceneNode::group(None)
-                .with_child(tex)
-                .with_style(Style {
-                    opacity: Some(params.generator_weights[2] * params.opacity_mod),
-                    ..Style::default()
-                });
+            let layer = SceneNode::group(None).with_child(tex).with_style(Style {
+                opacity: Some(params.generator_weights[2] * params.opacity_mod),
+                ..Style::default()
+            });
             root.children.push(layer);
         }
 
         if params.generator_weights[3] > threshold {
             // Color field: warmth modulation
             let mut mod_snapshot = snapshot.clone();
-            mod_snapshot.valence = (mod_snapshot.valence + params.color_warmth * 0.5).clamp(-1.0, 1.0);
+            mod_snapshot.valence =
+                (mod_snapshot.valence + params.color_warmth * 0.5).clamp(-1.0, 1.0);
             let cf = crate::color_field::generate(config, &mod_snapshot, &mut rng);
-            let layer = SceneNode::group(None)
-                .with_child(cf)
-                .with_style(Style {
-                    opacity: Some(params.generator_weights[3] * params.opacity_mod * 0.7),
-                    ..Style::default()
-                });
+            let layer = SceneNode::group(None).with_child(cf).with_style(Style {
+                opacity: Some(params.generator_weights[3] * params.opacity_mod * 0.7),
+                ..Style::default()
+            });
             root.children.push(layer);
         }
 
         if params.generator_weights[4] > threshold {
             // Harmony shapes: scaled
             let mut harmony_layer = SceneNode::group(Some("hybrid-shapes"));
-            let mut pairs: Vec<(usize, f32)> = snapshot.harmony_activations.iter()
-                .enumerate().map(|(i, &v)| (i, v)).collect();
+            let mut pairs: Vec<(usize, f32)> = snapshot
+                .harmony_activations
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i, v))
+                .collect();
             pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
             for (rank, &(idx, activation)) in pairs.iter().take(3).enumerate() {
-                if activation < 0.3 { break; }
+                if activation < 0.3 {
+                    break;
+                }
                 let angle = rank as f32 * std::f32::consts::TAU * 0.618;
                 let dist = config.width * 0.15 * (rank as f32 + 1.0);
-                let hx = config.width / 2.0 + dist * angle.cos() * 0.3 + config.width * params.layout_x;
-                let hy = config.height / 2.0 + dist * angle.sin() * 0.3 + config.height * params.layout_y;
-                let radius = config.width * 0.06 * params.shape_scale + activation * config.width * 0.04;
+                let hx =
+                    config.width / 2.0 + dist * angle.cos() * 0.3 + config.width * params.layout_x;
+                let hy = config.height / 2.0
+                    + dist * angle.sin() * 0.3
+                    + config.height * params.layout_y;
+                let radius =
+                    config.width * 0.06 * params.shape_scale + activation * config.width * 0.04;
                 let hue = idx as f32 * 45.0;
-                let shape = crate::harmony_shapes::harmony_shape(idx, activation, hx, hy, radius, hue);
+                let shape =
+                    crate::harmony_shapes::harmony_shape(idx, activation, hx, hy, radius, hue);
                 harmony_layer.children.push(shape);
             }
 
@@ -260,8 +267,11 @@ mod tests {
     fn test_snapshot() -> CognitiveSnapshot {
         CognitiveSnapshot {
             consciousness_level: 0.7,
-            valence: 0.3, arousal: 0.5,
-            dopamine: 0.6, serotonin: 0.5, noradrenaline: 0.4,
+            valence: 0.3,
+            arousal: 0.5,
+            dopamine: 0.6,
+            serotonin: 0.5,
+            noradrenaline: 0.4,
             harmony_activations: [0.5, 0.6, 0.4, 0.7, 0.3, 0.5, 0.8, 0.2],
             prediction_error: 0.1,
             thought_vector: vec![0.3, -0.2, 0.5, 0.1],
@@ -276,7 +286,11 @@ mod tests {
         let config = AtelierConfig::default();
         let scene = ctrl.generate(&config, &test_snapshot());
         // Should activate at least 2 generators
-        assert!(scene.children.len() >= 2, "got {} layers", scene.children.len());
+        assert!(
+            scene.children.len() >= 2,
+            "got {} layers",
+            scene.children.len()
+        );
     }
 
     #[test]
@@ -286,7 +300,9 @@ mod tests {
 
         let mut c1 = HybridController::new(&genesis);
         let serene = CognitiveSnapshot {
-            consciousness_level: 0.9, valence: 0.7, arousal: 0.2,
+            consciousness_level: 0.9,
+            valence: 0.7,
+            arousal: 0.2,
             harmony_activations: [0.8, 0.7, 0.6, 0.2, 0.7, 0.6, 0.4, 0.9],
             thought_vector: vec![0.1, 0.0],
             ..CognitiveSnapshot::dormant()
@@ -295,7 +311,9 @@ mod tests {
 
         let mut c2 = HybridController::new(&genesis);
         let turb = CognitiveSnapshot {
-            consciousness_level: 0.5, valence: -0.7, arousal: 0.9,
+            consciousness_level: 0.5,
+            valence: -0.7,
+            arousal: 0.9,
             harmony_activations: [0.2, 0.1, 0.3, 0.9, 0.5, 0.1, 0.8, 0.1],
             noradrenaline: 0.8,
             thought_vector: vec![0.8, -0.7],

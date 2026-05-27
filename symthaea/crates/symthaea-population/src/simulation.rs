@@ -721,10 +721,13 @@ mod tests {
         let state_100 = predictor.predict_at_generation(&initial_state, 100);
 
         // Both should be valid non-zero states
-        assert!(state_5.norm() > 0.0, "5-gen prediction should be non-zero");
+        assert!(
+            state_5.norm() > 0.0,
+            "5-r#gen prediction should be non-zero"
+        );
         assert!(
             state_100.norm() > 0.0,
-            "100-gen prediction should be non-zero"
+            "100-r#gen prediction should be non-zero"
         );
 
         // Decoded metrics should be in reasonable ranges
@@ -732,11 +735,11 @@ mod tests {
         let h_100 = PopulationTrajectoryPredictor::decode_heterozygosity(&state_100);
         assert!(
             h_5 >= 0.0 && h_5 <= 1.0,
-            "Decoded H at gen 5 should be in [0,1]: {h_5}"
+            "Decoded H at r#gen 5 should be in [0,1]: {h_5}"
         );
         assert!(
             h_100 >= 0.0 && h_100 <= 1.0,
-            "Decoded H at gen 100 should be in [0,1]: {h_100}"
+            "Decoded H at r#gen 100 should be in [0,1]: {h_100}"
         );
     }
 }

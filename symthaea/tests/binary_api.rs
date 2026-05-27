@@ -356,7 +356,7 @@ mod api_endpoint_tests {
 mod router_unit_tests {
     //! Unit tests for the API router without starting a full server
 
-    use symthaea::api::{create_router, create_router_with_config, ApiConfig};
+    use symthaea::api::{ApiConfig, create_router, create_router_with_config};
 
     #[test]
     fn test_router_creation() {

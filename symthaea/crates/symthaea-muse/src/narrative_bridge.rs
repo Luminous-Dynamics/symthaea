@@ -28,10 +28,10 @@
 //! - Story2MIDI (2024): emotionally-aligned music generation from narrative text.
 
 use serde::{Deserialize, Serialize};
-use symthaea_aesthetic::{lerp_va, ValenceArousal};
+use symthaea_aesthetic::{ValenceArousal, lerp_va};
 
 use crate::arc::{BarDirective, EmotionalArc};
-use crate::{compose_with_arc, Composition, MuseConfig, MusicalState};
+use crate::{Composition, MuseConfig, MusicalState, compose_with_arc};
 
 // ─── Narrative Episode ────────────────────────────────────────────────────────
 

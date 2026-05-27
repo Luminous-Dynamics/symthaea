@@ -15,7 +15,7 @@
 //!
 //! Run: `cargo test --test kessler_cascade_scenario`
 
-use symthaea::cognitive_loop::defense::{moral_filter, propose_defense_actions, DefenseActionKind};
+use symthaea::cognitive_loop::defense::{DefenseActionKind, moral_filter, propose_defense_actions};
 use symthaea::hdc::moral_algebra::MoralAlgebra;
 use symthaea::manipulator::kinematics::ManipulatorKinematics;
 use symthaea::manipulator::workspace_safety::{ManipulatorSafetyLevel, WorkspaceBoundary};

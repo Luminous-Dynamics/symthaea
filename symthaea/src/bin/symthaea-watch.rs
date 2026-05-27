@@ -31,12 +31,12 @@
 //! WHERE ts > now() - INTERVAL 1 HOUR GROUP BY urgency;
 //! ```
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;

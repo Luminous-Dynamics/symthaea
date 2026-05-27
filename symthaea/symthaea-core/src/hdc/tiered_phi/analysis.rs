@@ -735,11 +735,7 @@ impl PhiEntropyAnalyzer {
         }
 
         let ratio = count_m1 as f64 / count_m as f64;
-        if ratio > 0.0 {
-            -ratio.ln()
-        } else {
-            0.0
-        }
+        if ratio > 0.0 { -ratio.ln() } else { 0.0 }
     }
 
     /// Count template matches for sample entropy

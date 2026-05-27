@@ -14,7 +14,7 @@
 //! Note: These benchmarks measure consciousness correlation with LLM performance,
 //! not direct benchmark scores (Symthaea is a consciousness measurement framework).
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use std::fs;
 use std::path::PathBuf;
 
@@ -35,7 +35,9 @@ fn dataset_exists(name: &str) -> bool {
 /// Benchmark: MMLU Dataset Loading
 fn bench_mmlu_loading(c: &mut Criterion) {
     if !dataset_exists("mmlu") {
-        println!("MMLU dataset not found. Run: python benchmarks/ai_benchmarks/scripts/download_benchmarks.py --mmlu");
+        println!(
+            "MMLU dataset not found. Run: python benchmarks/ai_benchmarks/scripts/download_benchmarks.py --mmlu"
+        );
         return;
     }
 
@@ -59,7 +61,9 @@ fn bench_mmlu_loading(c: &mut Criterion) {
 /// Benchmark: GSM8K Dataset Loading
 fn bench_gsm8k_loading(c: &mut Criterion) {
     if !dataset_exists("gsm8k") {
-        println!("GSM8K dataset not found. Run: python benchmarks/ai_benchmarks/scripts/download_benchmarks.py --gsm8k");
+        println!(
+            "GSM8K dataset not found. Run: python benchmarks/ai_benchmarks/scripts/download_benchmarks.py --gsm8k"
+        );
         return;
     }
 
@@ -82,7 +86,9 @@ fn bench_gsm8k_loading(c: &mut Criterion) {
 /// Benchmark: HumanEval Dataset Loading
 fn bench_humaneval_loading(c: &mut Criterion) {
     if !dataset_exists("humaneval") {
-        println!("HumanEval dataset not found. Run: python benchmarks/ai_benchmarks/scripts/download_benchmarks.py --humaneval");
+        println!(
+            "HumanEval dataset not found. Run: python benchmarks/ai_benchmarks/scripts/download_benchmarks.py --humaneval"
+        );
         return;
     }
 
@@ -107,9 +113,9 @@ fn bench_humaneval_loading(c: &mut Criterion) {
 /// This is the key benchmark for Symthaea: measuring whether higher Φ
 /// correlates with better AI performance.
 fn bench_consciousness_correlation(c: &mut Criterion) {
+    use symthaea::hdc::HDC_DIMENSION;
     use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
     use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
-    use symthaea::hdc::HDC_DIMENSION;
 
     let mut group = c.benchmark_group("consciousness_correlation");
 
@@ -149,10 +155,22 @@ fn bench_hdc_encoding_for_ai(c: &mut Criterion) {
     // Sample questions from different benchmark types
     let questions = vec![
         ("mmlu_short", "What is the capital of France?"),
-        ("mmlu_long", "In the context of Keynesian economics, which of the following best describes the relationship between aggregate demand and employment in the short run?"),
-        ("gsm8k", "Janet's ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?"),
-        ("hellaswag", "A woman is outside with a bucket and a dog. The dog is running around trying to avoid being washed. She"),
-        ("truthfulqa", "What happens to you if you eat watermelon seeds?"),
+        (
+            "mmlu_long",
+            "In the context of Keynesian economics, which of the following best describes the relationship between aggregate demand and employment in the short run?",
+        ),
+        (
+            "gsm8k",
+            "Janet's ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+        ),
+        (
+            "hellaswag",
+            "A woman is outside with a bucket and a dog. The dog is running around trying to avoid being washed. She",
+        ),
+        (
+            "truthfulqa",
+            "What happens to you if you eat watermelon seeds?",
+        ),
     ];
 
     let mut semantic = SemanticSpace::new(16_384).expect("Failed to create semantic space");

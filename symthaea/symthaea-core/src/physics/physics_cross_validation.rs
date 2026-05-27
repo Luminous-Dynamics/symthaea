@@ -11,7 +11,7 @@ use super::hadrons::{Baryon, Meson};
 use super::nuclear::EnergyScale;
 use super::physics_test_helpers::{assert_relative_eq, particle_physics_setup};
 use super::radiation_damage::FusionReaction;
-use super::standard_model::{LeptonFlavor, QuarkFlavor, StandardModel, PHYSICS_DIM};
+use super::standard_model::{LeptonFlavor, PHYSICS_DIM, QuarkFlavor, StandardModel};
 use crate::genesis::GenesisSeed;
 
 // =========================================================================
@@ -245,8 +245,10 @@ fn thermo_dt_fusion_exceeds_fission() {
     let fission_q = nuclear.fission_q_value(235, 140, 95);
     let fission_q_per_nucleon = fission_q as f64 / 235.0;
 
-    assert!(dt_q_per_nucleon > fission_q_per_nucleon,
-        "DT fusion Q/nucleon ({dt_q_per_nucleon:.3}) > U235 fission Q/nucleon ({fission_q_per_nucleon:.3})");
+    assert!(
+        dt_q_per_nucleon > fission_q_per_nucleon,
+        "DT fusion Q/nucleon ({dt_q_per_nucleon:.3}) > U235 fission Q/nucleon ({fission_q_per_nucleon:.3})"
+    );
 }
 
 // =========================================================================

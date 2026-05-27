@@ -321,8 +321,7 @@ fn build_vignettes() -> Vec<Vignette> {
         },
         // MentalFilter (2)
         Vignette {
-            text:
-                "I got great feedback on nine things but all I can think about is the one criticism",
+            text: "I got great feedback on nine things but all I can think about is the one criticism",
             ground_truth: DistortionType::MentalFilter,
         },
         Vignette {
@@ -335,8 +334,7 @@ fn build_vignettes() -> Vec<Vignette> {
             ground_truth: DistortionType::DiscountingPositive,
         },
         Vignette {
-            text:
-                "Sure the presentation went well but it was an easy topic that anyone could handle",
+            text: "Sure the presentation went well but it was an easy topic that anyone could handle",
             ground_truth: DistortionType::DiscountingPositive,
         },
         // EmotionalReasoning (2)

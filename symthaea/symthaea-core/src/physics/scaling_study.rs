@@ -33,27 +33,25 @@
 //! println!("{}", study.generate_report(&results));
 //! ```
 
-use serde::{Deserialize, Serialize};
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 
-use crate::genesis::GenesisSeed;
-use super::trigger_systems::{
-    TriggerSystemLibrary, ExtendedTriggerMethod,
-};
-use super::reactor_architectures::{
-    ReactorDesigner, ReactorDesignParams, ReactorSpec, ReactorArchitecture,
-};
 use super::radiation_damage::FusionReaction;
+use super::reactor_architectures::{
+    ReactorArchitecture, ReactorDesignParams, ReactorDesigner, ReactorSpec,
+};
+use super::trigger_systems::{ExtendedTriggerMethod, TriggerSystemLibrary};
+use crate::genesis::GenesisSeed;
 
 /// Power levels for the study (6 orders of magnitude)
 pub const POWER_LEVELS_W: [f64; 7] = [
-    1.0,        // 1W - sensor power
-    10.0,       // 10W - electronics
-    100.0,      // 100W - laptop
-    1_000.0,    // 1kW - space heater
-    10_000.0,   // 10kW - home
-    100_000.0,  // 100kW - building
+    1.0,         // 1W - sensor power
+    10.0,        // 10W - electronics
+    100.0,       // 100W - laptop
+    1_000.0,     // 1kW - space heater
+    10_000.0,    // 10kW - home
+    100_000.0,   // 100kW - building
     1_000_000.0, // 1MW - industrial
 ];
 
@@ -201,7 +199,8 @@ impl ScalingStudy {
 
     /// Run complete scaling study across all power levels
     pub fn run_full_study(&self) -> ScalingStudyResults {
-        let data: Vec<ScalingDataPoint> = POWER_LEVELS_W.iter()
+        let data: Vec<ScalingDataPoint> = POWER_LEVELS_W
+            .iter()
             .map(|&power| self.analyze_power_level(power))
             .collect();
 
@@ -233,112 +232,138 @@ impl ScalingStudy {
     ) -> Vec<ScalingDataPointWithUncertainty> {
         let mut rng = StdRng::seed_from_u64(seed);
 
-        POWER_LEVELS_W.iter().map(|&power| {
-            let nominal = self.analyze_power_level(power);
-            let nominal_metrics = ScalingMetrics::from_data_point(&nominal);
+        POWER_LEVELS_W
+            .iter()
+            .map(|&power| {
+                let nominal = self.analyze_power_level(power);
+                let nominal_metrics = ScalingMetrics::from_data_point(&nominal);
 
-            // Run MC samples with perturbed parameters
-            let mut mc_costs: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_masses: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_volumes: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_specific_costs: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_power_densities: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_specific_powers: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_lifetimes: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut mc_feasibilities: Vec<f64> = Vec::with_capacity(n_mc);
-            let mut n_feasible = 0usize;
+                // Run MC samples with perturbed parameters
+                let mut mc_costs: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_masses: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_volumes: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_specific_costs: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_power_densities: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_specific_powers: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_lifetimes: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut mc_feasibilities: Vec<f64> = Vec::with_capacity(n_mc);
+                let mut n_feasible = 0usize;
 
-            for _ in 0..n_mc {
-                // Perturb: screening ±10%, power_density ±30%, capital ±20%
-                let screening_factor: f64 = 1.0 + rng.gen_range(-0.10..0.10);
-                let density_factor: f64 = 1.0 + rng.gen_range(-0.30..0.30);
-                let cost_factor: f64 = 1.0 + rng.gen_range(-0.20..0.20);
+                for _ in 0..n_mc {
+                    // Perturb: screening ±10%, power_density ±30%, capital ±20%
+                    let screening_factor: f64 = 1.0 + rng.gen_range(-0.10..0.10);
+                    let density_factor: f64 = 1.0 + rng.gen_range(-0.30..0.30);
+                    let cost_factor: f64 = 1.0 + rng.gen_range(-0.20..0.20);
 
-                let perturbed_cost = nominal.cost_usd * cost_factor;
-                let perturbed_volume = nominal.volume_m3 / density_factor.max(0.1);
-                let perturbed_mass = nominal.mass_kg * (1.0 / density_factor.max(0.1)).sqrt();
-                let perturbed_specific_cost = perturbed_cost / power;
-                let perturbed_power_density = power / perturbed_volume.max(0.001);
-                let perturbed_specific_power = power / perturbed_mass.max(0.1);
-                let perturbed_lifetime = nominal.lifetime_years * screening_factor;
-                let perturbed_feasibility = (nominal.feasibility_score
-                    + screening_factor * 5.0 - 5.0).clamp(0.0, 100.0);
+                    let perturbed_cost = nominal.cost_usd * cost_factor;
+                    let perturbed_volume = nominal.volume_m3 / density_factor.max(0.1);
+                    let perturbed_mass = nominal.mass_kg * (1.0 / density_factor.max(0.1)).sqrt();
+                    let perturbed_specific_cost = perturbed_cost / power;
+                    let perturbed_power_density = power / perturbed_volume.max(0.001);
+                    let perturbed_specific_power = power / perturbed_mass.max(0.1);
+                    let perturbed_lifetime = nominal.lifetime_years * screening_factor;
+                    let perturbed_feasibility =
+                        (nominal.feasibility_score + screening_factor * 5.0 - 5.0)
+                            .clamp(0.0, 100.0);
 
-                mc_costs.push(perturbed_cost);
-                mc_masses.push(perturbed_mass);
-                mc_volumes.push(perturbed_volume);
-                mc_specific_costs.push(perturbed_specific_cost);
-                mc_power_densities.push(perturbed_power_density);
-                mc_specific_powers.push(perturbed_specific_power);
-                mc_lifetimes.push(perturbed_lifetime);
-                mc_feasibilities.push(perturbed_feasibility);
+                    mc_costs.push(perturbed_cost);
+                    mc_masses.push(perturbed_mass);
+                    mc_volumes.push(perturbed_volume);
+                    mc_specific_costs.push(perturbed_specific_cost);
+                    mc_power_densities.push(perturbed_power_density);
+                    mc_specific_powers.push(perturbed_specific_power);
+                    mc_lifetimes.push(perturbed_lifetime);
+                    mc_feasibilities.push(perturbed_feasibility);
 
-                if perturbed_feasibility > 50.0 {
-                    n_feasible += 1;
+                    if perturbed_feasibility > 50.0 {
+                        n_feasible += 1;
+                    }
                 }
-            }
 
-            // Sort for percentiles
-            mc_costs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_masses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_volumes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_specific_costs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_power_densities.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_specific_powers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_lifetimes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            mc_feasibilities.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                // Sort for percentiles
+                mc_costs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_masses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_volumes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_specific_costs
+                    .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_power_densities
+                    .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_specific_powers
+                    .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_lifetimes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                mc_feasibilities
+                    .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-            let pct = |v: &[f64], p: f64| -> f64 {
-                if v.is_empty() {
-                    return 0.0;
+                let pct = |v: &[f64], p: f64| -> f64 {
+                    if v.is_empty() {
+                        return 0.0;
+                    }
+                    let idx = ((v.len() as f64) * p).clamp(0.0, (v.len() - 1) as f64) as usize;
+                    v[idx]
+                };
+
+                let cost_mean = mc_costs.iter().sum::<f64>() / n_mc as f64;
+                let cost_std = (mc_costs
+                    .iter()
+                    .map(|c| (c - cost_mean).powi(2))
+                    .sum::<f64>()
+                    / n_mc as f64)
+                    .sqrt();
+                let mass_mean = mc_masses.iter().sum::<f64>() / n_mc as f64;
+                let mass_std = (mc_masses
+                    .iter()
+                    .map(|m| (m - mass_mean).powi(2))
+                    .sum::<f64>()
+                    / n_mc as f64)
+                    .sqrt();
+
+                ScalingDataPointWithUncertainty {
+                    power_w: power,
+                    nominal: nominal_metrics,
+                    p5: ScalingMetrics {
+                        volume_m3: pct(&mc_volumes, 0.05),
+                        mass_kg: pct(&mc_masses, 0.05),
+                        cost_usd: pct(&mc_costs, 0.05),
+                        specific_cost: pct(&mc_specific_costs, 0.05),
+                        power_density: pct(&mc_power_densities, 0.05),
+                        specific_power: pct(&mc_specific_powers, 0.05),
+                        lifetime_years: pct(&mc_lifetimes, 0.05),
+                        feasibility_score: pct(&mc_feasibilities, 0.05),
+                    },
+                    p50: ScalingMetrics {
+                        volume_m3: pct(&mc_volumes, 0.50),
+                        mass_kg: pct(&mc_masses, 0.50),
+                        cost_usd: pct(&mc_costs, 0.50),
+                        specific_cost: pct(&mc_specific_costs, 0.50),
+                        power_density: pct(&mc_power_densities, 0.50),
+                        specific_power: pct(&mc_specific_powers, 0.50),
+                        lifetime_years: pct(&mc_lifetimes, 0.50),
+                        feasibility_score: pct(&mc_feasibilities, 0.50),
+                    },
+                    p95: ScalingMetrics {
+                        volume_m3: pct(&mc_volumes, 0.95),
+                        mass_kg: pct(&mc_masses, 0.95),
+                        cost_usd: pct(&mc_costs, 0.95),
+                        specific_cost: pct(&mc_specific_costs, 0.95),
+                        power_density: pct(&mc_power_densities, 0.95),
+                        specific_power: pct(&mc_specific_powers, 0.95),
+                        lifetime_years: pct(&mc_lifetimes, 0.95),
+                        feasibility_score: pct(&mc_feasibilities, 0.95),
+                    },
+                    cost_cv: if cost_mean > 0.0 {
+                        cost_std / cost_mean
+                    } else {
+                        0.0
+                    },
+                    mass_cv: if mass_mean > 0.0 {
+                        mass_std / mass_mean
+                    } else {
+                        0.0
+                    },
+                    p_feasible: n_feasible as f64 / n_mc as f64,
                 }
-                let idx = ((v.len() as f64) * p).clamp(0.0, (v.len() - 1) as f64) as usize;
-                v[idx]
-            };
-
-            let cost_mean = mc_costs.iter().sum::<f64>() / n_mc as f64;
-            let cost_std = (mc_costs.iter().map(|c| (c - cost_mean).powi(2)).sum::<f64>() / n_mc as f64).sqrt();
-            let mass_mean = mc_masses.iter().sum::<f64>() / n_mc as f64;
-            let mass_std = (mc_masses.iter().map(|m| (m - mass_mean).powi(2)).sum::<f64>() / n_mc as f64).sqrt();
-
-            ScalingDataPointWithUncertainty {
-                power_w: power,
-                nominal: nominal_metrics,
-                p5: ScalingMetrics {
-                    volume_m3: pct(&mc_volumes, 0.05),
-                    mass_kg: pct(&mc_masses, 0.05),
-                    cost_usd: pct(&mc_costs, 0.05),
-                    specific_cost: pct(&mc_specific_costs, 0.05),
-                    power_density: pct(&mc_power_densities, 0.05),
-                    specific_power: pct(&mc_specific_powers, 0.05),
-                    lifetime_years: pct(&mc_lifetimes, 0.05),
-                    feasibility_score: pct(&mc_feasibilities, 0.05),
-                },
-                p50: ScalingMetrics {
-                    volume_m3: pct(&mc_volumes, 0.50),
-                    mass_kg: pct(&mc_masses, 0.50),
-                    cost_usd: pct(&mc_costs, 0.50),
-                    specific_cost: pct(&mc_specific_costs, 0.50),
-                    power_density: pct(&mc_power_densities, 0.50),
-                    specific_power: pct(&mc_specific_powers, 0.50),
-                    lifetime_years: pct(&mc_lifetimes, 0.50),
-                    feasibility_score: pct(&mc_feasibilities, 0.50),
-                },
-                p95: ScalingMetrics {
-                    volume_m3: pct(&mc_volumes, 0.95),
-                    mass_kg: pct(&mc_masses, 0.95),
-                    cost_usd: pct(&mc_costs, 0.95),
-                    specific_cost: pct(&mc_specific_costs, 0.95),
-                    power_density: pct(&mc_power_densities, 0.95),
-                    specific_power: pct(&mc_specific_powers, 0.95),
-                    lifetime_years: pct(&mc_lifetimes, 0.95),
-                    feasibility_score: pct(&mc_feasibilities, 0.95),
-                },
-                cost_cv: if cost_mean > 0.0 { cost_std / cost_mean } else { 0.0 },
-                mass_cv: if mass_mean > 0.0 { mass_std / mass_mean } else { 0.0 },
-                p_feasible: n_feasible as f64 / n_mc as f64,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Analyze a single power level
@@ -347,9 +372,9 @@ impl ScalingStudy {
         let params = ReactorDesignParams {
             target_power_w: power_w,
             target_lifetime_years: 20.0,
-            max_cost_usd: power_w * 100.0, // $100/W budget
+            max_cost_usd: power_w * 100.0,              // $100/W budget
             max_volume_m3: (power_w / 1000.0).max(0.1), // ~1 liter/kW
-            max_mass_kg: (power_w / 10.0).max(10.0), // ~100g/W
+            max_mass_kg: (power_w / 10.0).max(10.0),    // ~100g/W
             allow_neutrons: true,
             min_trl: 3,
             risk_weight: 0.0, // No risk adjustment for scaling study
@@ -412,14 +437,10 @@ impl ScalingStudy {
 
         // Mid-range: various factors
         match reactor.architecture {
-            ReactorArchitecture::AneutronicCore =>
-                "He3 fuel cost".to_string(),
-            ReactorArchitecture::PulsedElectrolysis =>
-                "Cathode degradation".to_string(),
-            ReactorArchitecture::FlowReactor =>
-                "Pb-Li corrosion".to_string(),
-            _ =>
-                "Material lifetime under irradiation".to_string(),
+            ReactorArchitecture::AneutronicCore => "He3 fuel cost".to_string(),
+            ReactorArchitecture::PulsedElectrolysis => "Cathode degradation".to_string(),
+            ReactorArchitecture::FlowReactor => "Pb-Li corrosion".to_string(),
+            _ => "Material lifetime under irradiation".to_string(),
         }
     }
 
@@ -536,7 +557,10 @@ impl ScalingStudy {
         // Shielding fraction
         let (exp, coef, r2) = self.fit_power_law(
             &data.iter().map(|d| d.power_w).collect::<Vec<_>>(),
-            &data.iter().map(|d| d.shielding_fraction.max(0.01)).collect::<Vec<_>>(),
+            &data
+                .iter()
+                .map(|d| d.shielding_fraction.max(0.01))
+                .collect::<Vec<_>>(),
         );
         laws.push(ScalingLaw {
             parameter: "Shielding Fraction".to_string(),
@@ -573,10 +597,16 @@ impl ScalingStudy {
         // Calculate R²
         let y_mean = sum_y / n;
         let ss_tot: f64 = log_y.iter().map(|yi| (yi - y_mean).powi(2)).sum();
-        let ss_res: f64 = log_x.iter().zip(&log_y)
+        let ss_res: f64 = log_x
+            .iter()
+            .zip(&log_y)
             .map(|(xi, yi)| (yi - (slope * xi + intercept)).powi(2))
             .sum();
-        let r_squared = if ss_tot > 0.0 { 1.0 - ss_res / ss_tot } else { 0.0 };
+        let r_squared = if ss_tot > 0.0 {
+            1.0 - ss_res / ss_tot
+        } else {
+            0.0
+        };
 
         (slope, intercept.exp(), r_squared.max(0.0))
     }
@@ -589,10 +619,10 @@ impl ScalingStudy {
         let mut transitions = Vec::new();
 
         for i in 1..data.len() {
-            if data[i].architecture != data[i-1].architecture {
+            if data[i].architecture != data[i - 1].architecture {
                 let reason = format!(
                     "{:?} → {:?}: Better suited for {:.0}W+ ({})",
-                    data[i-1].architecture,
+                    data[i - 1].architecture,
                     data[i].architecture,
                     data[i].power_w,
                     data[i].limiting_factor
@@ -612,10 +642,10 @@ impl ScalingStudy {
         let mut transitions = Vec::new();
 
         for i in 1..data.len() {
-            if data[i].trigger != data[i-1].trigger {
+            if data[i].trigger != data[i - 1].trigger {
                 let reason = format!(
                     "{:?} → {:?}: Better efficiency/cost at {:.0}W+",
-                    data[i-1].trigger,
+                    data[i - 1].trigger,
                     data[i].trigger,
                     data[i].power_w
                 );
@@ -627,11 +657,7 @@ impl ScalingStudy {
     }
 
     /// Extract key findings from the data
-    fn extract_findings(
-        &self,
-        data: &[ScalingDataPoint],
-        laws: &[ScalingLaw],
-    ) -> Vec<String> {
+    fn extract_findings(&self, data: &[ScalingDataPoint], laws: &[ScalingLaw]) -> Vec<String> {
         let mut findings = Vec::new();
 
         // Cost scaling finding
@@ -679,12 +705,14 @@ impl ScalingStudy {
         ));
 
         // Feasibility gradient
-        let low_power_feasibility: f64 = data.iter()
+        let low_power_feasibility: f64 = data
+            .iter()
             .filter(|d| d.power_w < 1000.0)
             .map(|d| d.feasibility_score)
             .sum::<f64>()
             / data.iter().filter(|d| d.power_w < 1000.0).count() as f64;
-        let high_power_feasibility: f64 = data.iter()
+        let high_power_feasibility: f64 = data
+            .iter()
             .filter(|d| d.power_w >= 1000.0)
             .map(|d| d.feasibility_score)
             .sum::<f64>()
@@ -706,10 +734,7 @@ impl ScalingStudy {
     }
 
     /// Generate recommendations for different applications
-    fn generate_recommendations(
-        &self,
-        data: &[ScalingDataPoint],
-    ) -> Vec<(String, String)> {
+    fn generate_recommendations(&self, data: &[ScalingDataPoint]) -> Vec<(String, String)> {
         let mut recommendations = Vec::new();
 
         // Find best option at each major scale
@@ -721,8 +746,11 @@ impl ScalingStudy {
                     "{:?} architecture with {:?} trigger. \
                      Expected: ${:.0}, {:.2}kg, {:.0} year lifetime. \
                      Limiting factor: {}",
-                    point.architecture, point.trigger,
-                    point.cost_usd, point.mass_kg, point.lifetime_years,
+                    point.architecture,
+                    point.trigger,
+                    point.cost_usd,
+                    point.mass_kg,
+                    point.lifetime_years,
                     point.limiting_factor
                 ),
             ));
@@ -736,8 +764,11 @@ impl ScalingStudy {
                     "{:?} architecture with {:?} trigger. \
                      Expected: ${:.0}, {:.2}kg, {:.0} year lifetime. \
                      Limiting factor: {}",
-                    point.architecture, point.trigger,
-                    point.cost_usd, point.mass_kg, point.lifetime_years,
+                    point.architecture,
+                    point.trigger,
+                    point.cost_usd,
+                    point.mass_kg,
+                    point.lifetime_years,
                     point.limiting_factor
                 ),
             ));
@@ -751,8 +782,11 @@ impl ScalingStudy {
                     "{:?} architecture with {:?} trigger. \
                      Expected: ${:.0}k, {:.0}kg, {:.0} year lifetime. \
                      At ${:.2}/W, competitive with solar+battery at grid parity.",
-                    point.architecture, point.trigger,
-                    point.cost_usd / 1000.0, point.mass_kg, point.lifetime_years,
+                    point.architecture,
+                    point.trigger,
+                    point.cost_usd / 1000.0,
+                    point.mass_kg,
+                    point.lifetime_years,
                     point.specific_cost
                 ),
             ));
@@ -766,9 +800,12 @@ impl ScalingStudy {
                     "{:?} architecture with {:?} trigger. \
                      Expected: ${:.1}M, {:.0}t, {:.0} year lifetime. \
                      At ${:.2}/W, competes with natural gas LCOE.",
-                    point.architecture, point.trigger,
-                    point.cost_usd / 1_000_000.0, point.mass_kg / 1000.0,
-                    point.lifetime_years, point.specific_cost
+                    point.architecture,
+                    point.trigger,
+                    point.cost_usd / 1_000_000.0,
+                    point.mass_kg / 1000.0,
+                    point.lifetime_years,
+                    point.specific_cost
                 ),
             ));
         }
@@ -797,7 +834,10 @@ impl ScalingStudy {
             report.push_str(&format!(
                 "{:>10} {:>12} {:>10} {:>10} {:>10} {:>8}\n",
                 format_power(point.power_w),
-                format!("{:?}", point.architecture).chars().take(12).collect::<String>(),
+                format!("{:?}", point.architecture)
+                    .chars()
+                    .take(12)
+                    .collect::<String>(),
                 format_volume(point.volume_m3),
                 format_mass(point.mass_kg),
                 format!("${:.1}", point.specific_cost),
@@ -858,44 +898,47 @@ impl ScalingStudy {
         parameter: &str,
         values: &[f64],
     ) -> Vec<(f64, ScalingDataPoint)> {
-        values.iter().map(|&value| {
-            let mut params = ReactorDesignParams {
-                target_power_w: base_power_w,
-                ..Default::default()
-            };
+        values
+            .iter()
+            .map(|&value| {
+                let mut params = ReactorDesignParams {
+                    target_power_w: base_power_w,
+                    ..Default::default()
+                };
 
-            // Modify the parameter
-            match parameter {
-                "lifetime" => params.target_lifetime_years = value,
-                "cost_budget" => params.max_cost_usd = value,
-                "volume_limit" => params.max_volume_m3 = value,
-                "mass_limit" => params.max_mass_kg = value,
-                _ => {}
-            }
+                // Modify the parameter
+                match parameter {
+                    "lifetime" => params.target_lifetime_years = value,
+                    "cost_budget" => params.max_cost_usd = value,
+                    "volume_limit" => params.max_volume_m3 = value,
+                    "mass_limit" => params.max_mass_kg = value,
+                    _ => {}
+                }
 
-            let reactor = self.reactor_designer.design(&params);
-            let trigger = self.trigger_library.optimal_for_power(base_power_w);
+                let reactor = self.reactor_designer.design(&params);
+                let trigger = self.trigger_library.optimal_for_power(base_power_w);
 
-            let point = ScalingDataPoint {
-                power_w: base_power_w,
-                architecture: reactor.architecture,
-                trigger: trigger.method,
-                volume_m3: reactor.volume_m3,
-                mass_kg: reactor.mass_kg,
-                cost_usd: reactor.cost_usd,
-                specific_cost: reactor.cost_usd / base_power_w,
-                power_density: base_power_w / reactor.volume_m3.max(0.001),
-                specific_power: base_power_w / reactor.mass_kg.max(0.1),
-                shielding_fraction: reactor.shielding.total_mass_kg / reactor.mass_kg,
-                lifetime_years: reactor.lifetime_years,
-                trl: reactor.trl,
-                feasibility_score: self.calculate_feasibility(&reactor, &params),
-                limiting_factor: self.determine_limiting_factor(&reactor, base_power_w),
-                reactor,
-            };
+                let point = ScalingDataPoint {
+                    power_w: base_power_w,
+                    architecture: reactor.architecture,
+                    trigger: trigger.method,
+                    volume_m3: reactor.volume_m3,
+                    mass_kg: reactor.mass_kg,
+                    cost_usd: reactor.cost_usd,
+                    specific_cost: reactor.cost_usd / base_power_w,
+                    power_density: base_power_w / reactor.volume_m3.max(0.001),
+                    specific_power: base_power_w / reactor.mass_kg.max(0.1),
+                    shielding_fraction: reactor.shielding.total_mass_kg / reactor.mass_kg,
+                    lifetime_years: reactor.lifetime_years,
+                    trl: reactor.trl,
+                    feasibility_score: self.calculate_feasibility(&reactor, &params),
+                    limiting_factor: self.determine_limiting_factor(&reactor, base_power_w),
+                    reactor,
+                };
 
-            (value, point)
-        }).collect()
+                (value, point)
+            })
+            .collect()
     }
 }
 
@@ -979,8 +1022,16 @@ mod tests {
 
         let (exp, coef, r2) = study.fit_power_law(&x, &y);
 
-        assert!((exp - 0.5).abs() < 0.1, "Exponent should be ~0.5, got {}", exp);
-        assert!((coef - 2.0).abs() < 0.5, "Coefficient should be ~2, got {}", coef);
+        assert!(
+            (exp - 0.5).abs() < 0.1,
+            "Exponent should be ~0.5, got {}",
+            exp
+        );
+        assert!(
+            (coef - 2.0).abs() < 0.5,
+            "Coefficient should be ~2, got {}",
+            coef
+        );
         assert!(r2 > 0.99, "R² should be high, got {}", r2);
     }
 
@@ -999,11 +1050,12 @@ mod tests {
             assert!(results.data[i].cost_usd > 0.0);
 
             // Within same architecture: volume should not decrease
-            if results.data[i].architecture == results.data[i-1].architecture {
+            if results.data[i].architecture == results.data[i - 1].architecture {
                 assert!(
-                    results.data[i].volume_m3 >= results.data[i-1].volume_m3 * 0.5,
+                    results.data[i].volume_m3 >= results.data[i - 1].volume_m3 * 0.5,
                     "Volume decreased within {:?} at {}W",
-                    results.data[i].architecture, results.data[i].power_w
+                    results.data[i].architecture,
+                    results.data[i].power_w
                 );
             }
         }
@@ -1014,7 +1066,8 @@ mod tests {
         assert!(
             last.volume_m3 > first.volume_m3,
             "1MW ({:.3} m³) should have more volume than 1W ({:.3} m³)",
-            last.volume_m3, first.volume_m3
+            last.volume_m3,
+            first.volume_m3
         );
     }
 
@@ -1055,7 +1108,9 @@ mod tests {
             assert!(
                 dp.p5.cost_usd <= dp.p95.cost_usd,
                 "p5 cost ({:.0}) should be <= p95 cost ({:.0}) at {:.0}W",
-                dp.p5.cost_usd, dp.p95.cost_usd, dp.power_w
+                dp.p5.cost_usd,
+                dp.p95.cost_usd,
+                dp.power_w
             );
             assert!(dp.cost_cv >= 0.0, "Cost CV should be non-negative");
             assert!(dp.mass_cv >= 0.0, "Mass CV should be non-negative");

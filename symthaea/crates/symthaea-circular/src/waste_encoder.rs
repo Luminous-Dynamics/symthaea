@@ -28,11 +28,7 @@ fn generate_basis(seed: u64, dim: usize) -> Vec<f32> {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
-            if state % 2 == 0 {
-                1.0
-            } else {
-                -1.0
-            }
+            if state % 2 == 0 { 1.0 } else { -1.0 }
         })
         .collect()
 }

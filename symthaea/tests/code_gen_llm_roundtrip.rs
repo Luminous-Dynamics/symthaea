@@ -54,7 +54,7 @@ async fn test_llm_completion_roundtrip() {
         return;
     }
 
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     // Step 1: Generate code that needs LLM (complex algorithm)
@@ -68,7 +68,7 @@ async fn test_llm_completion_roundtrip() {
         .with_signature("fn dijkstra(graph: &[Vec<(usize, u32)>], start: usize) -> Vec<u32>"),
     };
 
-    let generated = gen.generate(&intent, &ctx);
+    let generated = r#gen.generate(&intent, &ctx);
     assert!(
         needs_llm(&generated.source),
         "Complex algo should produce todo!(): {}",
@@ -161,7 +161,7 @@ async fn test_llm_completion_roundtrip() {
 
 #[test]
 fn test_native_emitter_no_llm_needed() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     // These simple patterns should all be handled natively without todo!()
@@ -191,7 +191,7 @@ fn test_native_emitter_no_llm_needed() {
             spec: CodeSpec::new("rust", *name, *purpose).with_signature(*sig),
         };
 
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
 
         assert!(
             !needs_llm(&result.source),
@@ -216,7 +216,7 @@ fn test_native_emitter_no_llm_needed() {
 
 #[test]
 fn test_llm_detection_accuracy() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     // (name, purpose, signature, expect_needs_llm)
@@ -269,7 +269,7 @@ fn test_llm_detection_accuracy() {
             spec: CodeSpec::new("rust", *name, *purpose).with_signature(*sig),
         };
 
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
         let actual_needs_llm = needs_llm(&result.source);
 
         total += 1;
@@ -308,7 +308,7 @@ fn test_llm_detection_accuracy() {
 
 #[test]
 fn test_prompt_construction() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     let intent = CodeIntent::Create {
@@ -320,7 +320,7 @@ fn test_prompt_construction() {
             .with_example("merge_sort(&mut [3,1,2])", "[1,2,3]"),
     };
 
-    let generated = gen.generate(&intent, &ctx);
+    let generated = r#gen.generate(&intent, &ctx);
 
     // Build StructuredThought with full code context
     let mut thought = StructuredThought::default();

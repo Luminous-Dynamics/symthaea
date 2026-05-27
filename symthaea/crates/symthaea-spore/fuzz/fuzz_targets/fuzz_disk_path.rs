@@ -8,11 +8,17 @@ use symthaea_spore::security::validate_disk_path;
 fuzz_target!(|data: &str| {
     match validate_disk_path(data) {
         Ok(path) => {
-            assert!(path.starts_with("/dev/"), "Valid path must start with /dev/");
+            assert!(
+                path.starts_with("/dev/"),
+                "Valid path must start with /dev/"
+            );
             assert!(!path.contains(".."), "Path traversal must be rejected");
             assert!(!path.contains(";"), "Shell metacharacter must be rejected");
             let dev = &path[5..];
-            assert!(dev.chars().all(|c| c.is_alphanumeric()), "Only alphanumeric after /dev/");
+            assert!(
+                dev.chars().all(|c| c.is_alphanumeric()),
+                "Only alphanumeric after /dev/"
+            );
         }
         Err(_) => {} // Rejection is always safe
     }

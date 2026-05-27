@@ -6,8 +6,8 @@
 //! The system sees a stream of items and must identify when the current item
 //! matches the item N positions back. Tests the updating component of WM.
 
-use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

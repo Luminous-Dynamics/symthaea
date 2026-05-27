@@ -9,8 +9,7 @@ pub const NUM_JOINTS: usize = 7;
 pub const NUM_STATE_CHANNELS: usize = 21; // 7 angles + 7 velocities + 3 end-effector + 3 force/torque + 1 gripper
 
 /// Manipulator state (21D).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ManipulatorState {
     pub joint_angles: [f64; NUM_JOINTS],
     pub joint_velocities: [f64; NUM_JOINTS],

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -10,9 +11,9 @@
 //!
 //! Run with: `cargo bench --bench memory_benchmark`
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use symthaea::hdc::unified_hv::ContinuousHV;
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use symthaea::hdc::HDC_DIMENSION;
+use symthaea::hdc::unified_hv::ContinuousHV;
 
 // =============================================================================
 // TEMPORAL HOLOGRAPHIC MEMORY (STUBBED - module not yet implemented)

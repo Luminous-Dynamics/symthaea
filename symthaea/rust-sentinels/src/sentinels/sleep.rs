@@ -8,7 +8,7 @@
 //!
 //! Enhanced version targets 90%+ accuracy on Sleep-EDF dataset.
 
-use crate::signal::{extract_band_powers, BandPowers};
+use crate::signal::{BandPowers, extract_band_powers};
 use crate::types::{SleepScore, SleepStage};
 
 /// Configuration for enhanced sleep detection
@@ -227,7 +227,7 @@ impl SleepSentinel {
 
         // Compute power in sigma band using simple DFT
         let mut sigma_power = 0.0;
-        for k in low_bin.min(n/2)..=high_bin.min(n/2 - 1) {
+        for k in low_bin.min(n / 2)..=high_bin.min(n / 2 - 1) {
             let freq = k as f32 * freq_res;
             let mut real = 0.0;
             let mut imag = 0.0;
@@ -262,7 +262,7 @@ impl SleepSentinel {
 
         // Compute envelope using Hilbert-like transform (simplified)
         let mut envelope = vec![0.0; n];
-        for i in window_size..n-window_size {
+        for i in window_size..n - window_size {
             let mut sum_sq = 0.0;
             for j in 0..window_size {
                 let diff = data[i + j] - data[i - j];
@@ -330,7 +330,8 @@ impl SleepSentinel {
         let mut i = 1;
         while i < n - 1 {
             // Look for negative peak
-            if data[i] < data[i-1] && data[i] < data[i+1] && (data[i] - mean).abs() > threshold {
+            if data[i] < data[i - 1] && data[i] < data[i + 1] && (data[i] - mean).abs() > threshold
+            {
                 let neg_peak = i;
                 let neg_val = data[i];
 
@@ -339,7 +340,7 @@ impl SleepSentinel {
                 let mut pos_peak = None;
 
                 for j in (neg_peak + 1)..search_end {
-                    if j + 1 < n && data[j] > data[j-1] && data[j] > data[j+1] {
+                    if j + 1 < n && data[j] > data[j - 1] && data[j] > data[j + 1] {
                         let amplitude = data[j] - neg_val;
                         if amplitude > 2.0 * threshold {
                             pos_peak = Some((j, amplitude));
@@ -446,7 +447,9 @@ impl SleepSentinel {
         }
 
         // Find winning stage
-        let (max_idx, &max_score) = scores.iter().enumerate()
+        let (max_idx, &max_score) = scores
+            .iter()
+            .enumerate()
             .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap();
 
@@ -476,11 +479,32 @@ impl SleepSentinel {
         // Some transitions are rare (e.g., Wake -> N3 directly)
         let valid_transitions = match self.previous_stage {
             Some(SleepStage::Wake) => vec![SleepStage::Wake, SleepStage::N1],
-            Some(SleepStage::N1) => vec![SleepStage::Wake, SleepStage::N1, SleepStage::N2, SleepStage::Rem],
-            Some(SleepStage::N2) => vec![SleepStage::N1, SleepStage::N2, SleepStage::N3, SleepStage::Rem],
+            Some(SleepStage::N1) => vec![
+                SleepStage::Wake,
+                SleepStage::N1,
+                SleepStage::N2,
+                SleepStage::Rem,
+            ],
+            Some(SleepStage::N2) => vec![
+                SleepStage::N1,
+                SleepStage::N2,
+                SleepStage::N3,
+                SleepStage::Rem,
+            ],
             Some(SleepStage::N3) => vec![SleepStage::N2, SleepStage::N3],
-            Some(SleepStage::Rem) => vec![SleepStage::Wake, SleepStage::N1, SleepStage::N2, SleepStage::Rem],
-            None => vec![SleepStage::Wake, SleepStage::N1, SleepStage::N2, SleepStage::N3, SleepStage::Rem],
+            Some(SleepStage::Rem) => vec![
+                SleepStage::Wake,
+                SleepStage::N1,
+                SleepStage::N2,
+                SleepStage::Rem,
+            ],
+            None => vec![
+                SleepStage::Wake,
+                SleepStage::N1,
+                SleepStage::N2,
+                SleepStage::N3,
+                SleepStage::Rem,
+            ],
         };
 
         // If transition is valid, keep the stage
@@ -673,8 +697,8 @@ mod tests {
         let n2_signal: Vec<f32> = (0..n)
             .map(|i| {
                 let t = i as f32 / sample_rate;
-                0.6 * (2.0 * std::f32::consts::PI * 2.0 * t).sin() +
-                0.4 * (2.0 * std::f32::consts::PI * 13.0 * t).sin()
+                0.6 * (2.0 * std::f32::consts::PI * 2.0 * t).sin()
+                    + 0.4 * (2.0 * std::f32::consts::PI * 13.0 * t).sin()
             })
             .collect();
 

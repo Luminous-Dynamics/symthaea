@@ -1,10 +1,10 @@
 use crate::controller::OrbitalController;
 use crate::encoder::OrbitalHdcEncoder;
 use crate::simulator::{OrbitalPhysicsSimulator, SimpleOrbitalSimulator};
-use crate::types::{OrbitalConfig, NUM_ACTUATORS};
+use crate::types::{NUM_ACTUATORS, OrbitalConfig};
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;

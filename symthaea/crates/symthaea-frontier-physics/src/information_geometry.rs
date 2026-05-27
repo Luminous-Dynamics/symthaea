@@ -210,7 +210,7 @@ mod tests {
     fn test_phi_ig_independent() {
         // Independent: p(a,b) = p(a)*p(b) → Φ = 0
         let joint = vec![0.15, 0.35, 0.1, 0.4]; // p(a) = [0.5, 0.5], p(b) = [0.25, 0.75]
-                                                // Actually: [0.5*0.5, 0.5*0.5, 0.5*0.5, 0.5*0.5] for independence
+        // Actually: [0.5*0.5, 0.5*0.5, 0.5*0.5, 0.5*0.5] for independence
         let independent = vec![0.25, 0.25, 0.25, 0.25];
         let phi = phi_information_geometric(&independent, 2, 2);
         assert!(

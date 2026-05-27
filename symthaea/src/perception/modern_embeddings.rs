@@ -61,7 +61,7 @@ use std::time::Instant;
 use candle_core::Device;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{binary_hv::BinaryHV, PackedBipolar, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar, binary_hv::BinaryHV};
 
 // ============================================================================
 // Core Traits

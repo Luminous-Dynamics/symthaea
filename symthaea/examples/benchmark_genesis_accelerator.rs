@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 13: Particle Accelerator ===\n");
 
     use symthaea::physics::accelerator::{
-        AcceleratorReading, AcceleratorTwin, ACCELERATOR_HORIZONS,
+        ACCELERATOR_HORIZONS, AcceleratorReading, AcceleratorTwin,
     };
 
     let healthy = AcceleratorReading {

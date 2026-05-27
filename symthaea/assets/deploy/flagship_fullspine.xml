@@ -1,0 +1,345 @@
+
+<mujoco model="flagship_humanoid">
+  <compiler angle="radian" inertiafromgeom="true" coordinate="local"/>
+  <option timestep="0.0025" gravity="0 0 -9.81"/>
+  <default>
+    <joint limited="true" damping="35.0" armature="0.08" stiffness="120.0"/>
+    <geom contype="1" conaffinity="1" condim="3" friction="1.6 0.2 0.1" rgba="0.85 0.65 0.45 1"/>
+    <position ctrllimited="true" forcelimited="true" forcerange="-400 400"/>
+  </default>
+  <worldbody>
+    <light pos="0 0 6" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <geom name="floor" type="plane" pos="0 0 0" size="30 30 0.1" rgba="0.15 0.15 0.15 1"/>
+    
+    <geom name="step_1" type="box" pos="1.4 0 0.02" size="0.22 1.2 0.02" rgba="0.35 0.35 0.4 1"/>
+    <geom name="step_2" type="box" pos="1.8 0 0.04" size="0.22 1.2 0.04" rgba="0.40 0.40 0.45 1"/>
+    <geom name="step_3" type="box" pos="2.2 0 0.06" size="0.22 1.2 0.06" rgba="0.45 0.45 0.5 1"/>
+    <geom name="block_left" type="box" pos="3.6 0.22 0.04" size="0.35 0.35 0.04" rgba="0.5 0.35 0.35 1"/>
+    <geom name="block_right" type="box" pos="4.5 -0.22 0.06" size="0.35 0.35 0.06" rgba="0.35 0.5 0.35 1"/>
+    <geom name="ridge_track" type="box" pos="7.5 0 0.03" size="2.0 0.6 0.03" rgba="0.28 0.28 0.32 1"/>
+    <body name="pelvis" pos="0 0 0.74">
+      <freejoint name="root"/>
+      <geom name="pelvis_g" type="sphere" size="0.10" mass="10.0"/>
+      <site name="vestibular_ear" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
+      <body name="r_thigh" pos="0 -0.11 -0.05">
+        <joint name="j_3" type="hinge" axis="1 0 0" range="-0.44 0.09"/>
+        <joint name="j_4" type="hinge" axis="0 0 1" range="-1.05 0.61"/>
+        <joint name="j_5" type="hinge" axis="0 1 0" range="-1.92 0.35"/>
+        <geom name="r_thigh_g" type="capsule" size="0.045" fromto="0 0 0 0 0 -0.34" mass="5.5"/>
+        <body name="r_shin" pos="0 0 -0.34">
+          <joint name="j_6" type="hinge" axis="0 1 0" range="0.15 2.4"/>
+          <geom name="r_shin_g" type="capsule" size="0.038" fromto="0 0 0 0 0 -0.32" mass="4.0"/>
+          <body name="r_foot" pos="0 0 -0.32">
+            <joint name="j_7" type="hinge" axis="0 1 0" range="-0.87 0.87"/>
+            <joint name="j_8" type="hinge" axis="1 0 0" range="-0.87 0.87"/>
+            <geom name="r_foot_g" type="box" size="0.14 0.07 0.025" pos="0.05 0 -0.02" mass="1.8"/>
+            <site name="r_foot_site" type="box" size="0.142 0.072 0.026" pos="0.05 0 -0.02" rgba="1 0 0 0"/>
+          </body></body>
+      </body>
+      <body name="l_thigh" pos="0 0.11 -0.05">
+        <joint name="j_9" type="hinge" axis="1 0 0" range="-0.44 0.09"/>
+        <joint name="j_10" type="hinge" axis="0 0 1" range="-1.05 0.61"/>
+        <joint name="j_11" type="hinge" axis="0 1 0" range="-1.92 0.35"/>
+        <geom name="l_thigh_g" type="capsule" size="0.045" fromto="0 0 0 0 0 -0.34" mass="5.5"/>
+        <body name="l_shin" pos="0 0 -0.34">
+          <joint name="j_12" type="hinge" axis="0 1 0" range="0.15 2.4"/>
+          <geom name="l_shin_g" type="capsule" size="0.038" fromto="0 0 0 0 0 -0.32" mass="4.0"/>
+          <body name="l_foot" pos="0 0 -0.32">
+            <joint name="j_13" type="hinge" axis="0 1 0" range="-0.87 0.87"/>
+            <joint name="j_14" type="hinge" axis="1 0 0" range="-0.87 0.87"/>
+            <geom name="l_foot_g" type="box" size="0.14 0.07 0.025" pos="0.05 0 -0.02" mass="1.8"/>
+            <site name="l_foot_site" type="box" size="0.142 0.072 0.026" pos="0.05 0 -0.02" rgba="1 0 0 0"/>
+          </body></body>
+      </body>
+      <body name="lower_torso" pos="0 0 0.06">
+        <joint name="j_0" type="hinge" axis="0 1 0" range="-1.31 0.52"/>
+        <joint name="j_1" type="hinge" axis="0 0 1" range="-0.79 0.79"/>
+        <joint name="j_2" type="hinge" axis="1 0 0" range="-0.61 0.61"/>
+        <geom name="lower_torso_g" type="capsule" size="0.065" fromto="0 0 0 0 0 0.12" mass="4.0"/>
+        <body name="upper_chest" pos="0 0 0.12">
+          <geom name="chest_g" type="capsule" size="0.08" fromto="0 -0.12 0.08 0 0.12 0.08" mass="8.0"/>
+          <body name="r_upper_arm" pos="0 -0.16 0.08">
+            <joint name="j_15" type="hinge" axis="0 1 0" range="-1.48 1.05"/>
+            <joint name="j_16" type="hinge" axis="1 0 0" range="-1.48 1.05"/>
+            <geom name="r_uarm_g" type="capsule" size="0.035" fromto="0 0 0 0 0 -0.22" mass="1.5"/>
+            <body name="r_forearm" pos="0 0 -0.22">
+              <joint name="j_17" type="hinge" axis="0 1 0" range="-1.57 0.87"/>
+              <geom name="r_farm_g" type="capsule" size="0.028" fromto="0 0 0 0 0 -0.18" mass="1.0"/>
+              <body name="r_hand" pos="0 0 -0.18">
+                <body name="r_finger_0" pos="-0.02 -0.02 -0.01">
+                  <joint name="j_21" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_0" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_1" pos="-0.008 -0.02 -0.01">
+                  <joint name="j_22" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_1" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_2" pos="0.004 -0.02 -0.01">
+                  <joint name="j_23" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_2" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_3" pos="0.016000000000000004 -0.02 -0.01">
+                  <joint name="j_24" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_3" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_4" pos="-0.02 -0.008 -0.01">
+                  <joint name="j_25" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_4" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_5" pos="-0.008 -0.008 -0.01">
+                  <joint name="j_26" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_5" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_6" pos="0.004 -0.008 -0.01">
+                  <joint name="j_27" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_6" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_7" pos="0.016000000000000004 -0.008 -0.01">
+                  <joint name="j_28" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_7" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_8" pos="-0.02 0.004 -0.01">
+                  <joint name="j_29" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_8" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_9" pos="-0.008 0.004 -0.01">
+                  <joint name="j_30" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_9" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_10" pos="0.004 0.004 -0.01">
+                  <joint name="j_31" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_10" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_11" pos="0.016000000000000004 0.004 -0.01">
+                  <joint name="j_32" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_11" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_12" pos="-0.02 0.016000000000000004 -0.01">
+                  <joint name="j_33" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_12" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_13" pos="-0.008 0.016000000000000004 -0.01">
+                  <joint name="j_34" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_13" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_14" pos="0.004 0.016000000000000004 -0.01">
+                  <joint name="j_35" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_14" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="r_finger_15" pos="0.016000000000000004 0.016000000000000004 -0.01">
+                  <joint name="j_36" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="r_fg_15" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+              </body>
+            </body>
+          </body>
+          <body name="l_upper_arm" pos="0 0.16 0.08">
+            <joint name="j_18" type="hinge" axis="0 1 0" range="-1.05 1.48"/>
+            <joint name="j_19" type="hinge" axis="1 0 0" range="-1.05 1.48"/>
+            <geom name="l_uarm_g" type="capsule" size="0.035" fromto="0 0 0 0 0 -0.22" mass="1.5"/>
+            <body name="l_forearm" pos="0 0 -0.22">
+              <joint name="j_20" type="hinge" axis="0 1 0" range="-1.57 0.87"/>
+              <geom name="l_farm_g" type="capsule" size="0.028" fromto="0 0 0 0 0 -0.18" mass="1.0"/>
+              <body name="l_hand" pos="0 0 -0.18">
+                <body name="l_finger_0" pos="-0.02 -0.02 -0.01">
+                  <joint name="j_37" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_0" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_1" pos="-0.008 -0.02 -0.01">
+                  <joint name="j_38" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_1" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_2" pos="0.004 -0.02 -0.01">
+                  <joint name="j_39" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_2" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_3" pos="0.016000000000000004 -0.02 -0.01">
+                  <joint name="j_40" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_3" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_4" pos="-0.02 -0.008 -0.01">
+                  <joint name="j_41" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_4" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_5" pos="-0.008 -0.008 -0.01">
+                  <joint name="j_42" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_5" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_6" pos="0.004 -0.008 -0.01">
+                  <joint name="j_43" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_6" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_7" pos="0.016000000000000004 -0.008 -0.01">
+                  <joint name="j_44" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_7" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_8" pos="-0.02 0.004 -0.01">
+                  <joint name="j_45" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_8" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_9" pos="-0.008 0.004 -0.01">
+                  <joint name="j_46" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_9" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_10" pos="0.004 0.004 -0.01">
+                  <joint name="j_47" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_10" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_11" pos="0.016000000000000004 0.004 -0.01">
+                  <joint name="j_48" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_11" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_12" pos="-0.02 0.016000000000000004 -0.01">
+                  <joint name="j_49" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_12" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_13" pos="-0.008 0.016000000000000004 -0.01">
+                  <joint name="j_50" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_13" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_14" pos="0.004 0.016000000000000004 -0.01">
+                  <joint name="j_51" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_14" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+                <body name="l_finger_15" pos="0.016000000000000004 0.016000000000000004 -0.01">
+                  <joint name="j_52" type="hinge" axis="0 1 0" range="-0.78 0.78" stiffness="10.0" damping="1.0"/>
+                  <geom name="l_fg_15" type="capsule" size="0.005" fromto="0 0 0 0 0 -0.03" mass="0.05"/>
+                </body>
+              </body>
+            </body>
+          </body>
+          <body name="spine_base" pos="0 0 0.14">
+            <body name="v_seg_0" pos="0 0 0.012">
+              <joint name="j_53" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+              <geom name="vg_0" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_1" pos="0 0 0.012">
+                <joint name="j_54" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_1" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_2" pos="0 0 0.012">
+                <joint name="j_55" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_2" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_3" pos="0 0 0.012">
+                <joint name="j_56" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_3" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_4" pos="0 0 0.012">
+                <joint name="j_57" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_4" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_5" pos="0 0 0.012">
+                <joint name="j_58" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_5" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_6" pos="0 0 0.012">
+                <joint name="j_59" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_6" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_7" pos="0 0 0.012">
+                <joint name="j_60" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_7" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_8" pos="0 0 0.012">
+                <joint name="j_61" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_8" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_9" pos="0 0 0.012">
+                <joint name="j_62" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_9" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+              <body name="v_seg_10" pos="0 0 0.012">
+                <joint name="j_63" type="hinge" axis="0 1 0" range="-0.35 0.35" stiffness="60.0"/>
+                <geom name="vg_10" type="capsule" size="0.022" fromto="0 0 0 0 0 0.012" mass="0.2"/>
+                <body name="head" pos="0 0 0.012">
+                  <geom name="head_g" type="sphere" size="0.075" mass="2.5" pos="0 0 0.05" rgba="0.85 0.65 0.45 1"/>
+                  <geom name="visor_g" type="box" size="0.035 0.045 0.02" pos="0.05 0 0.05" rgba="0.15 0.15 0.15 1"/>
+                  <camera name="visor_camera" pos="0.06 0 0.05" euler="0 1.5708 0" fovy="85"/>
+                </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+              </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="upper_chest" body2="r_upper_arm"/>
+    <exclude body1="upper_chest" body2="l_upper_arm"/>
+    <exclude body1="upper_chest" body2="r_forearm"/>
+    <exclude body1="upper_chest" body2="l_forearm"/>
+  </contact>
+  <sensor>
+    <accelerometer name="vestibular_accel" site="vestibular_ear"/>
+    <gyro name="vestibular_gyro" site="vestibular_ear"/>
+    
+    <touch name="r_foot_pressure" site="r_foot_site"/>
+    <touch name="l_foot_pressure" site="l_foot_site"/>
+  </sensor>
+  <actuator>
+    <position name="actuator_0" joint="j_0" kp="650" ctrlrange="-1.31 0.52"/>
+    <position name="actuator_1" joint="j_1" kp="650" ctrlrange="-0.79 0.79"/>
+    <position name="actuator_2" joint="j_2" kp="650" ctrlrange="-0.61 0.61"/>
+    <position name="actuator_3" joint="j_3" kp="650" ctrlrange="-0.44 0.09"/>
+    <position name="actuator_4" joint="j_4" kp="650" ctrlrange="-1.05 0.61"/>
+    <position name="actuator_5" joint="j_5" kp="650" ctrlrange="-1.92 0.35"/>
+    <position name="actuator_6" joint="j_6" kp="650" ctrlrange="0.15 2.4"/>
+    <position name="actuator_7" joint="j_7" kp="650" ctrlrange="-0.87 0.87"/>
+    <position name="actuator_8" joint="j_8" kp="650" ctrlrange="-0.87 0.87"/>
+    <position name="actuator_9" joint="j_9" kp="650" ctrlrange="-0.44 0.09"/>
+    <position name="actuator_10" joint="j_10" kp="650" ctrlrange="-1.05 0.61"/>
+    <position name="actuator_11" joint="j_11" kp="650" ctrlrange="-1.92 0.35"/>
+    <position name="actuator_12" joint="j_12" kp="650" ctrlrange="0.15 2.4"/>
+    <position name="actuator_13" joint="j_13" kp="650" ctrlrange="-0.87 0.87"/>
+    <position name="actuator_14" joint="j_14" kp="650" ctrlrange="-0.87 0.87"/>
+    <position name="actuator_15" joint="j_15" kp="650" ctrlrange="-1.48 1.05"/>
+    <position name="actuator_16" joint="j_16" kp="650" ctrlrange="-1.48 1.05"/>
+    <position name="actuator_17" joint="j_17" kp="650" ctrlrange="-1.57 0.87"/>
+    <position name="actuator_18" joint="j_18" kp="650" ctrlrange="-1.05 1.48"/>
+    <position name="actuator_19" joint="j_19" kp="650" ctrlrange="-1.05 1.48"/>
+    <position name="actuator_20" joint="j_20" kp="650" ctrlrange="-1.57 0.87"/>
+    <position name="actuator_21" joint="j_21" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_22" joint="j_22" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_23" joint="j_23" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_24" joint="j_24" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_25" joint="j_25" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_26" joint="j_26" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_27" joint="j_27" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_28" joint="j_28" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_29" joint="j_29" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_30" joint="j_30" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_31" joint="j_31" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_32" joint="j_32" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_33" joint="j_33" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_34" joint="j_34" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_35" joint="j_35" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_36" joint="j_36" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_37" joint="j_37" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_38" joint="j_38" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_39" joint="j_39" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_40" joint="j_40" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_41" joint="j_41" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_42" joint="j_42" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_43" joint="j_43" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_44" joint="j_44" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_45" joint="j_45" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_46" joint="j_46" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_47" joint="j_47" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_48" joint="j_48" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_49" joint="j_49" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_50" joint="j_50" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_51" joint="j_51" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_52" joint="j_52" kp="150" ctrlrange="-0.78 0.78"/>
+    <position name="actuator_53" joint="j_53" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_54" joint="j_54" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_55" joint="j_55" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_56" joint="j_56" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_57" joint="j_57" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_58" joint="j_58" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_59" joint="j_59" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_60" joint="j_60" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_61" joint="j_61" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_62" joint="j_62" kp="150" ctrlrange="-0.35 0.35"/>
+    <position name="actuator_63" joint="j_63" kp="150" ctrlrange="-0.35 0.35"/>
+  </actuator>
+</mujoco>

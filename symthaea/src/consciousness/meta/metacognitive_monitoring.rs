@@ -627,8 +627,8 @@ pub struct MonitoringStats {
 mod tests {
     use super::*;
     use crate::hdc::{
-        primitive_system::{Primitive, PrimitiveTier},
         BinaryHV,
+        primitive_system::{Primitive, PrimitiveTier},
     };
 
     #[test]

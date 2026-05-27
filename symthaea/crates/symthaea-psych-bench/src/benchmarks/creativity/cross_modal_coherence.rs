@@ -166,10 +166,7 @@ mod tests {
         let result = CrossModalCoherenceBenchmark.run(&config);
         let coherence = result.metrics["cross_modal_coherence"].mean;
         // Same-mood cross-modal should have positive coherence advantage
-        assert!(
-            coherence > 0.0,
-            "coherence advantage = {coherence}"
-        );
+        assert!(coherence > 0.0, "coherence advantage = {coherence}");
     }
 
     #[test]

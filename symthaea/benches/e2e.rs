@@ -13,10 +13,10 @@
 //! cargo bench --bench e2e -- full_pipeline
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator, unified_hv::ContinuousHV, HDC_DIMENSION,
+    HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator, unified_hv::ContinuousHV,
 };
 
 // =============================================================================
@@ -139,10 +139,10 @@ fn bench_latency_breakdown(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_phi_dyad(c: &mut Criterion) {
+    use symthaea::hdc::ContinuousHV;
     use symthaea::hdc::relational_consciousness::{
         RelationMode, RelationalAssessment, RelationshipStage,
     };
-    use symthaea::hdc::ContinuousHV;
     use symthaea::partnership::{DyadInput, DyadWeights, HumanPartnerModel, PhiDyadCalculator};
 
     let mut group = c.benchmark_group("e2e_phi_dyad");

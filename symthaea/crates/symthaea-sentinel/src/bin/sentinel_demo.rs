@@ -10,8 +10,8 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 // =============================================================================
@@ -370,11 +370,7 @@ fn generate_brightness(pattern: MockPattern, frame: u64, fps: f32) -> f32 {
         MockPattern::Blink { bpm } => {
             let frames_per_beat = (fps * 60.0) / bpm as f32;
             let pos = (frame as f32 % frames_per_beat) / frames_per_beat;
-            if pos < 0.5 {
-                1.0
-            } else {
-                0.2
-            }
+            if pos < 0.5 { 1.0 } else { 0.2 }
         }
         MockPattern::Heartbeat { bpm } => {
             let frames_per_beat = (fps * 60.0) / bpm as f32;

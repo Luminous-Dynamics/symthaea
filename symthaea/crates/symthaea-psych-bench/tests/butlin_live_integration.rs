@@ -9,11 +9,11 @@
 #![cfg(feature = "symthaea-backend")]
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, ConsciousnessProfile};
-use symthaea_psych_bench::benchmarks::butlin::report::RuntimeConsciousnessData;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
+use symthaea_psych_bench::benchmarks::butlin::report::RuntimeConsciousnessData;
+use symthaea_psych_bench::harness::PsychBenchmark;
 use symthaea_psych_bench::harness::config::BenchmarkConfig;
 use symthaea_psych_bench::harness::live_runner::CognitiveLoopBenchmarkRunner;
-use symthaea_psych_bench::harness::PsychBenchmark;
 
 fn make_runner() -> CognitiveLoopBenchmarkRunner {
     CognitiveLoopBenchmarkRunner::new("butlin_live_integration_seed")

@@ -1,10 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Performance benchmarks for the Markov Blanket operator.
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_fep::markov_blanket::{
-    identify_coalitions, MarkovBoundaryOperator, MarkovPartition, PermeabilityInputs,
-    TopologyBoundaryInputs,
+    MarkovBoundaryOperator, MarkovPartition, PermeabilityInputs, TopologyBoundaryInputs,
+    identify_coalitions,
 };
 use symthaea_fep::{ActiveInferenceAgentConfig, EnhancedFEPBridge, HiddenState, Observation};
 

@@ -310,21 +310,27 @@ mod tests {
     fn test_ambient_contexts_have_nonzero_signatures() {
         let contexts = AmbientContexts::baseline();
         // All contexts should have some nonzero frequency signature entries
-        assert!(contexts
-            .office
-            .rhythm_freq_signature
-            .iter()
-            .any(|v| *v > 0.0));
-        assert!(contexts
-            .traffic
-            .rhythm_freq_signature
-            .iter()
-            .any(|v| *v > 0.0));
-        assert!(contexts
-            .nature
-            .timbre_freq_signature
-            .iter()
-            .any(|v| *v > 0.0));
+        assert!(
+            contexts
+                .office
+                .rhythm_freq_signature
+                .iter()
+                .any(|v| *v > 0.0)
+        );
+        assert!(
+            contexts
+                .traffic
+                .rhythm_freq_signature
+                .iter()
+                .any(|v| *v > 0.0)
+        );
+        assert!(
+            contexts
+                .nature
+                .timbre_freq_signature
+                .iter()
+                .any(|v| *v > 0.0)
+        );
         assert!(contexts.cafe.rhythm_freq_signature.iter().any(|v| *v > 0.0));
     }
 

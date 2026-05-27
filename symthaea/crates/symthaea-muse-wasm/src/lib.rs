@@ -20,9 +20,9 @@
 //! const pcm = engine.render_chunk(); // Float32Array [L, R, L, R, ...]
 //! ```
 
-use wasm_bindgen::prelude::*;
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
+use wasm_bindgen::prelude::*;
 
 // ─── Logging helper ─────────────────────────────────────────────────────────
 

@@ -605,7 +605,9 @@ mod system_consistency {
             assert!(
                 violation_rate < 0.15,
                 "Mathematical tier should have <15% pairs above 0.65 similarity (got {:.1}%, {} violations out of {} pairs)",
-                violation_rate * 100.0, violations.len(), max_pairs
+                violation_rate * 100.0,
+                violations.len(),
+                max_pairs
             );
         }
     }

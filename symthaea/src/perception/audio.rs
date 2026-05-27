@@ -33,11 +33,11 @@
 //! PerceptionInput(Auditory)
 //! ```
 
-#[cfg(not(feature = "voice-stt"))]
-use anyhow::anyhow;
 #[cfg(feature = "voice-stt")]
 use anyhow::Context as _;
 use anyhow::Result;
+#[cfg(not(feature = "voice-stt"))]
+use anyhow::anyhow;
 use std::path::Path;
 
 // Re-define types locally when full_perception is not available

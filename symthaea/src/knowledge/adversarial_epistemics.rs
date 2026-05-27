@@ -18,8 +18,8 @@
 //! ```rust,ignore
 //! use symthaea::knowledge::adversarial_epistemics::AdversarialGenerator;
 //!
-//! let gen = AdversarialGenerator::new();
-//! let examples = gen.generate_examples(20);
+//! let r#gen = AdversarialGenerator::new();
+//! let examples = r#gen.generate_examples(20);
 //! for ex in &examples {
 //!     assert!(ex.expected_detection, "immune system should catch this");
 //! }
@@ -224,11 +224,11 @@ mod tests {
 
     #[test]
     fn test_generator_produces_correct_count() {
-        let gen = AdversarialGenerator::new();
-        let examples = gen.generate_examples(10);
+        let r#gen = AdversarialGenerator::new();
+        let examples = r#gen.generate_examples(10);
         assert_eq!(examples.len(), 10);
 
-        let examples_zero = gen.generate_examples(0);
+        let examples_zero = r#gen.generate_examples(0);
         assert!(examples_zero.is_empty());
     }
 
@@ -301,10 +301,10 @@ mod tests {
 
     #[test]
     fn test_all_patterns_round_robin() {
-        let gen = AdversarialGenerator::new();
-        assert_eq!(gen.attack_patterns.len(), 5);
+        let r#gen = AdversarialGenerator::new();
+        assert_eq!(r#gen.attack_patterns.len(), 5);
         // 5 examples should cover all patterns once
-        let examples = gen.generate_examples(5);
+        let examples = r#gen.generate_examples(5);
         assert_eq!(examples.len(), 5);
         // First should be circular corroboration
         assert!(matches!(

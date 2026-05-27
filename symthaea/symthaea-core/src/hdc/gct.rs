@@ -29,7 +29,7 @@
 //! - Valiant (1979) — "The complexity of computing the permanent", TCS
 //! - Burgisser (2000) — "Completeness and Reduction in Algebraic Complexity Theory"
 
-use crate::hdc::algebraic_combinatorics::{littlewood_richardson_coeff, Partition};
+use crate::hdc::algebraic_combinatorics::{Partition, littlewood_richardson_coeff};
 use crate::hdc::unified_hv::ContinuousHV;
 
 // ── Polynomial permanent and determinant ────────────────────────────────────
@@ -75,11 +75,7 @@ pub fn permanent(matrix: &[Vec<f64>]) -> f64 {
     }
 
     // Ryser's formula has a leading (-1)^n factor
-    if n % 2 == 1 {
-        -result
-    } else {
-        result
-    }
+    if n % 2 == 1 { -result } else { result }
 }
 
 /// Determinant of an n×n matrix via LU decomposition (O(n³), in P).
@@ -543,11 +539,7 @@ pub fn perm_det_hdc_similarity(n: usize) -> f64 {
                 (0..n)
                     .map(|_| {
                         rng = lcg_step(rng);
-                        if rng & 1 == 0 {
-                            1.0
-                        } else {
-                            -1.0
-                        }
+                        if rng & 1 == 0 { 1.0 } else { -1.0 }
                     })
                     .collect()
             })

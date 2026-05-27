@@ -41,8 +41,8 @@
 //! let result = attention.attend(&query, &memories);
 //! ```
 
-use serde::{Deserialize, Serialize};
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
+use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -143,7 +143,8 @@ impl HdcAttention {
         let q = query.bind(&self.query_transform);
 
         // Compute attention weights via HDC similarity
-        let raw_scores: Vec<f32> = memory.iter()
+        let raw_scores: Vec<f32> = memory
+            .iter()
             .map(|m| {
                 let k = m.bind(&self.key_transform);
                 q.similarity(&k)
@@ -154,7 +155,8 @@ impl HdcAttention {
         let weights = crate::math::softmax_with_temperature(&raw_scores, self.config.temperature);
 
         // Transform values and compute weighted bundle
-        let values: Vec<ContinuousHV> = memory.iter()
+        let values: Vec<ContinuousHV> = memory
+            .iter()
             .map(|m| m.bind(&self.value_transform))
             .collect();
 
@@ -192,14 +194,15 @@ impl HdcAttention {
         let q = query.bind(&self.query_transform);
 
         // Compute masked attention weights
-        let raw_scores: Vec<f32> = memory.iter()
+        let raw_scores: Vec<f32> = memory
+            .iter()
             .zip(mask.iter())
             .map(|(m, &allowed)| {
                 if allowed {
                     let k = m.bind(&self.key_transform);
                     q.similarity(&k)
                 } else {
-                    f32::NEG_INFINITY  // Will become 0 after softmax
+                    f32::NEG_INFINITY // Will become 0 after softmax
                 }
             })
             .collect();
@@ -207,7 +210,8 @@ impl HdcAttention {
         let weights = crate::math::softmax_with_temperature(&raw_scores, self.config.temperature);
 
         // Transform values and bundle
-        let values: Vec<ContinuousHV> = memory.iter()
+        let values: Vec<ContinuousHV> = memory
+            .iter()
             .map(|m| m.bind(&self.value_transform))
             .collect();
 
@@ -231,20 +235,20 @@ impl HdcAttention {
     ///
     /// Each position attends to all positions (including itself).
     pub fn self_attend(&self, sequence: &[ContinuousHV]) -> Vec<AttentionResult> {
-        sequence.iter()
+        sequence
+            .iter()
             .map(|query| self.attend(query, sequence))
             .collect()
     }
 
     /// Causal self-attention (each position only attends to previous positions)
     pub fn causal_self_attend(&self, sequence: &[ContinuousHV]) -> Vec<AttentionResult> {
-        sequence.iter()
+        sequence
+            .iter()
             .enumerate()
             .map(|(i, query)| {
                 // Create causal mask: true for positions <= i
-                let mask: Vec<bool> = (0..sequence.len())
-                    .map(|j| j <= i)
-                    .collect();
+                let mask: Vec<bool> = (0..sequence.len()).map(|j| j <= i).collect();
                 self.attend_masked(query, sequence, &mask)
             })
             .collect()
@@ -296,15 +300,19 @@ impl MultiHeadHdcAttention {
     }
 
     /// Attend using all heads and combine outputs
-    pub fn attend(&self, query: &ContinuousHV, memory: &[ContinuousHV]) -> MultiHeadAttentionResult {
-        let head_results: Vec<AttentionResult> = self.heads.iter()
+    pub fn attend(
+        &self,
+        query: &ContinuousHV,
+        memory: &[ContinuousHV],
+    ) -> MultiHeadAttentionResult {
+        let head_results: Vec<AttentionResult> = self
+            .heads
+            .iter()
             .map(|head| head.attend(query, memory))
             .collect();
 
         // Combine head outputs via bundling
-        let head_outputs: Vec<&ContinuousHV> = head_results.iter()
-            .map(|r| &r.output)
-            .collect();
+        let head_outputs: Vec<&ContinuousHV> = head_results.iter().map(|r| &r.output).collect();
 
         let combined = ContinuousHV::bundle(&head_outputs);
 
@@ -319,14 +327,16 @@ impl MultiHeadHdcAttention {
 
     /// Multi-head self-attention
     pub fn self_attend(&self, sequence: &[ContinuousHV]) -> Vec<MultiHeadAttentionResult> {
-        sequence.iter()
+        sequence
+            .iter()
             .map(|query| self.attend(query, sequence))
             .collect()
     }
 
     /// Causal multi-head self-attention
     pub fn causal_self_attend(&self, sequence: &[ContinuousHV]) -> Vec<MultiHeadAttentionResult> {
-        sequence.iter()
+        sequence
+            .iter()
             .enumerate()
             .map(|(i, query)| {
                 let past = &sequence[..=i];
@@ -369,11 +379,13 @@ impl CrossAttention {
 
     /// Cache encoder outputs for efficient repeated decoding
     pub fn cache_encoder(&mut self, encoder_outputs: &[ContinuousHV]) {
-        let keys: Vec<ContinuousHV> = encoder_outputs.iter()
+        let keys: Vec<ContinuousHV> = encoder_outputs
+            .iter()
             .map(|e| e.bind(&self.attention.key_transform))
             .collect();
 
-        let values: Vec<ContinuousHV> = encoder_outputs.iter()
+        let values: Vec<ContinuousHV> = encoder_outputs
+            .iter()
             .map(|e| e.bind(&self.attention.value_transform))
             .collect();
 
@@ -387,11 +399,10 @@ impl CrossAttention {
         let q = decoder_query.bind(&self.attention.query_transform);
 
         // Compute weights using cached keys
-        let raw_scores: Vec<f32> = cache.keys.iter()
-            .map(|k| q.similarity(k))
-            .collect();
+        let raw_scores: Vec<f32> = cache.keys.iter().map(|k| q.similarity(k)).collect();
 
-        let weights = crate::math::softmax_with_temperature(&raw_scores, self.attention.config.temperature);
+        let weights =
+            crate::math::softmax_with_temperature(&raw_scores, self.attention.config.temperature);
 
         // Weighted bundle of cached values
         let value_refs: Vec<&ContinuousHV> = cache.values.iter().collect();
@@ -436,7 +447,8 @@ pub struct AttentionResult {
 impl AttentionResult {
     /// Get position with highest attention weight
     pub fn argmax(&self) -> Option<usize> {
-        self.weights.iter()
+        self.weights
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
@@ -444,10 +456,7 @@ impl AttentionResult {
 
     /// Get top-k attended positions
     pub fn top_k(&self, k: usize) -> Vec<(usize, f32)> {
-        let mut indexed: Vec<(usize, f32)> = self.weights.iter()
-            .copied()
-            .enumerate()
-            .collect();
+        let mut indexed: Vec<(usize, f32)> = self.weights.iter().copied().enumerate().collect();
 
         indexed.sort_by(|(_, a), (_, b)| b.total_cmp(a));
         indexed.truncate(k);
@@ -456,7 +465,9 @@ impl AttentionResult {
 
     /// Entropy of attention distribution (higher = more diffuse)
     pub fn entropy(&self) -> f32 {
-        -self.weights.iter()
+        -self
+            .weights
+            .iter()
             .filter(|&&w| w > 1e-10)
             .map(|&w| w * w.ln())
             .sum::<f32>()
@@ -485,9 +496,11 @@ impl MultiHeadAttentionResult {
 
         (0..num_positions)
             .map(|i| {
-                self.head_results.iter()
+                self.head_results
+                    .iter()
                     .map(|r| r.weights.get(i).copied().unwrap_or(0.0))
-                    .sum::<f32>() / num_heads
+                    .sum::<f32>()
+                    / num_heads
             })
             .collect()
     }
@@ -504,7 +517,7 @@ mod tests {
     #[test]
     fn test_single_head_attention() {
         let config = AttentionConfig {
-            dim: 1024,  // Smaller for faster tests
+            dim: 1024, // Smaller for faster tests
             temperature: 1.0,
             min_attention: 0.0,
             num_heads: 1,
@@ -535,7 +548,7 @@ mod tests {
     fn test_similar_query_gets_higher_weight() {
         let config = AttentionConfig {
             dim: 1024,
-            temperature: 0.1,  // Sharp attention
+            temperature: 0.1, // Sharp attention
             ..Default::default()
         };
 
@@ -543,12 +556,12 @@ mod tests {
 
         // Create a query similar to one memory item
         let base = ContinuousHV::random(1024, 100);
-        let query = base.clone();  // Query IS the base
+        let query = base.clone(); // Query IS the base
 
         let memories = vec![
-            ContinuousHV::random(1024, 200),  // Random
-            base.clone(),                      // Similar to query
-            ContinuousHV::random(1024, 201),  // Random
+            ContinuousHV::random(1024, 200), // Random
+            base.clone(),                    // Similar to query
+            ContinuousHV::random(1024, 201), // Random
         ];
 
         let result = attention.attend(&query, &memories);
@@ -598,9 +611,8 @@ mod tests {
 
         let attention = HdcAttention::new(config, 42);
 
-        let sequence: Vec<ContinuousHV> = (0..4)
-            .map(|i| ContinuousHV::random(256, 100 + i))
-            .collect();
+        let sequence: Vec<ContinuousHV> =
+            (0..4).map(|i| ContinuousHV::random(256, 100 + i)).collect();
 
         let results = attention.causal_self_attend(&sequence);
 
@@ -648,9 +660,8 @@ mod tests {
 
         let mut cross_attn = CrossAttention::new(config, 42);
 
-        let encoder_outputs: Vec<ContinuousHV> = (0..3)
-            .map(|i| ContinuousHV::random(256, 200 + i))
-            .collect();
+        let encoder_outputs: Vec<ContinuousHV> =
+            (0..3).map(|i| ContinuousHV::random(256, 200 + i)).collect();
 
         cross_attn.cache_encoder(&encoder_outputs);
 
@@ -682,8 +693,10 @@ mod tests {
         };
         let sharp_entropy = result.entropy();
 
-        assert!(uniform_entropy > sharp_entropy,
-            "Uniform attention should have higher entropy");
+        assert!(
+            uniform_entropy > sharp_entropy,
+            "Uniform attention should have higher entropy"
+        );
     }
 
     #[test]
@@ -708,13 +721,16 @@ mod tests {
 
         let scores = vec![1.0, 2.0, 3.0];
 
-        let cold_weights = softmax_with_temperature(&scores, 0.1);  // Sharp
-        let hot_weights = softmax_with_temperature(&scores, 10.0);  // Diffuse
+        let cold_weights = softmax_with_temperature(&scores, 0.1); // Sharp
+        let hot_weights = softmax_with_temperature(&scores, 10.0); // Diffuse
 
         // Cold should be more peaked
         let cold_max = cold_weights.iter().cloned().fold(0.0, f32::max);
         let hot_max = hot_weights.iter().cloned().fold(0.0, f32::max);
 
-        assert!(cold_max > hot_max, "Lower temperature should give sharper distribution");
+        assert!(
+            cold_max > hot_max,
+            "Lower temperature should give sharper distribution"
+        );
     }
 }

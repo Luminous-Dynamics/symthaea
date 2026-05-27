@@ -20,9 +20,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-use symthaea_logparse::encoder::{encode, Hdv};
+use symthaea_logparse::encoder::{Hdv, encode};
 use symthaea_logparse::probe::{LogisticProbe, TrainConfig};
-use symthaea_logparse::{evtx_source, otrf_source, LogEvent};
+use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let evtx_dir = std::env::args().nth(1).ok_or("need evtx corpus dir")?;

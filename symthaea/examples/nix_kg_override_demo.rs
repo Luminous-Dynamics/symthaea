@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use symthaea::language::nix_kg::{NixKg, NixKgFile, ServiceKeyword, SCHEMA_VERSION};
+use symthaea::language::nix_kg::{NixKg, NixKgFile, SCHEMA_VERSION, ServiceKeyword};
 
 fn matches_service_with_kg(kg: &NixKg, prompt: &str) -> bool {
     // Mirrors the gate inside `classify_nix_intent` — true means this

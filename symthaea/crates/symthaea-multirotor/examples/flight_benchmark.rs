@@ -238,7 +238,12 @@ fn main() {
         };
         println!(
             "trial {:>3}: tier mean_thrust={:.3} red_frac={:.2}  |  sprint mean_thrust={:.3} red_frac={:.2}  adv={:+6.1}%",
-            i, tier.mean_thrust, tier.red_fraction, sprint.mean_thrust, sprint.red_fraction, advantage_pct
+            i,
+            tier.mean_thrust,
+            tier.red_fraction,
+            sprint.mean_thrust,
+            sprint.red_fraction,
+            advantage_pct
         );
 
         tier_results.push(tier);

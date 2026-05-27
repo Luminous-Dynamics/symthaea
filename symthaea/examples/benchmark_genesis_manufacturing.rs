@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 15: Advanced Manufacturing ===\n");
 
     use symthaea_fabrication_kernel::manufacturing::{
-        ManufacturingReading, ManufacturingTwin, MANUFACTURING_HORIZONS,
+        MANUFACTURING_HORIZONS, ManufacturingReading, ManufacturingTwin,
     };
 
     let healthy = ManufacturingReading {

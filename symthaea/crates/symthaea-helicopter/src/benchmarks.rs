@@ -287,10 +287,10 @@ mod tests {
         };
         let results = phi_correlation_sweep(&config, 20.0, 100);
         assert_eq!(results.len(), 11); // 11 phi values
-                                       // Higher phi should generally have lower error (consciousness helps)
+        // Higher phi should generally have lower error (consciousness helps)
         let first = &results[0].1; // phi=0.05 (Red)
         let last = &results[10].1; // phi=1.0 (Green)
-                                   // Red has zero effort, Green has positive effort
+        // Red has zero effort, Green has positive effort
         assert!(last.mean_control_effort > first.mean_control_effort);
     }
 }

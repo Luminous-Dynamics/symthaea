@@ -77,7 +77,7 @@ fn main() {
     );
     println!("{}", "-".repeat(70));
 
-    for gen in 0..GENERATIONS {
+    for r#gen in 0..GENERATIONS {
         // Evaluate all organisms
         bridge.evaluate_population(&mut population);
 
@@ -103,7 +103,7 @@ fn main() {
 
         println!(
             "{:>4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
-            gen,
+            r#gen,
             best.phi,
             mean_phi,
             best_fe_red,
@@ -123,7 +123,7 @@ fn main() {
             .collect();
 
         // Fill with offspring from tournament selection
-        let mut child_id = (gen as u64 + 1) * POP_SIZE as u64;
+        let mut child_id = (r#gen as u64 + 1) * POP_SIZE as u64;
         while next_gen.len() < POP_SIZE {
             // Tournament: pick 3, take best composite
             let mut best_idx = 0;

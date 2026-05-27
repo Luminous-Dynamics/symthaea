@@ -66,12 +66,21 @@ async fn main() {
 }
 
 fn print_pretty(result: &scanner::ScanResult) {
-    println!("System: {} {} ({})", result.os.name, result.os.version, result.os.arch);
+    println!(
+        "System: {} {} ({})",
+        result.os.name, result.os.version, result.os.arch
+    );
     println!("Kernel: {}", result.os.kernel);
-    println!("CPU:    {} ({} cores)", result.hardware.cpu_model, result.hardware.cpu_cores);
+    println!(
+        "CPU:    {} ({} cores)",
+        result.hardware.cpu_model, result.hardware.cpu_cores
+    );
     println!("Memory: {:.1} GB", result.hardware.memory_gb);
     println!("GPU:    {}", result.hardware.gpu);
-    println!("Disk:   {:.0} GB total, {:.0} GB free", result.hardware.disk_total_gb, result.hardware.disk_free_gb);
+    println!(
+        "Disk:   {:.0} GB total, {:.0} GB free",
+        result.hardware.disk_total_gb, result.hardware.disk_free_gb
+    );
     println!();
     println!("Apps detected: {}", result.migration.total_detected);
     println!("  Matched to NixOS:  {}", result.migration.matched);
@@ -80,19 +89,28 @@ fn print_pretty(result: &scanner::ScanResult) {
     println!("  No equivalent:     {}", result.migration.no_equivalent);
     println!();
 
-    if result.installed_apps.iter().any(|a| a.canonical_name.is_some()) {
+    if result
+        .installed_apps
+        .iter()
+        .any(|a| a.canonical_name.is_some())
+    {
         println!("Matched apps:");
         for app in &result.installed_apps {
             if let Some(ref canonical) = app.canonical_name {
                 let nix = app.nix_display.as_deref().unwrap_or("?");
                 let quality = app.quality.as_deref().unwrap_or("?");
                 let conf = app.confidence.unwrap_or(0);
-                println!("  {:<25} -> {:<20} [{}, {}%]", canonical, nix, quality, conf);
+                println!(
+                    "  {:<25} -> {:<20} [{}, {}%]",
+                    canonical, nix, quality, conf
+                );
             }
         }
     }
 
-    let unmatched: Vec<_> = result.installed_apps.iter()
+    let unmatched: Vec<_> = result
+        .installed_apps
+        .iter()
         .filter(|a| a.canonical_name.is_none())
         .collect();
     if !unmatched.is_empty() && unmatched.len() <= 50 {
@@ -103,7 +121,10 @@ fn print_pretty(result: &scanner::ScanResult) {
         }
     } else if !unmatched.is_empty() {
         println!();
-        println!("Unmatched: {} apps (system packages, libraries, etc.)", unmatched.len());
+        println!(
+            "Unmatched: {} apps (system packages, libraries, etc.)",
+            unmatched.len()
+        );
     }
 }
 
@@ -141,8 +162,10 @@ async fn serve_websocket(result: scanner::ScanResult, token: String) {
     let json = serde_json::to_string(&result).unwrap();
 
     eprintln!();
-    eprintln!("Scan complete. {} apps detected, {} matched to NixOS.",
-        result.migration.total_detected, result.migration.matched);
+    eprintln!(
+        "Scan complete. {} apps detected, {} matched to NixOS.",
+        result.migration.total_detected, result.migration.matched
+    );
     eprintln!();
     eprintln!("WebSocket server listening on ws://127.0.0.1:{WS_PORT}");
     eprintln!("  Auth token: {token}");
@@ -163,19 +186,24 @@ async fn serve_websocket(result: scanner::ScanResult, token: String) {
                     match accept_async(stream).await {
                         Ok(mut ws) => {
                             // Auth gate: require an explicit token before sending any scan data.
-                            let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), ws.next()).await {
-                                Ok(Some(Ok(tokio_tungstenite::tungstenite::Message::Text(text)))) => {
-                                    serde_json::from_str::<serde_json::Value>(&text)
-                                        .ok()
-                                        .and_then(|v| {
-                                            if v.get("action")?.as_str()? != "auth" {
-                                                return Some(false);
-                                            }
-                                            let t = v.get("token")?.as_str()?;
-                                            Some(t == token.as_str())
-                                        })
-                                        .unwrap_or(false)
-                                }
+                            let authed = match tokio::time::timeout(
+                                std::time::Duration::from_secs(10),
+                                ws.next(),
+                            )
+                            .await
+                            {
+                                Ok(Some(Ok(tokio_tungstenite::tungstenite::Message::Text(
+                                    text,
+                                )))) => serde_json::from_str::<serde_json::Value>(&text)
+                                    .ok()
+                                    .and_then(|v| {
+                                        if v.get("action")?.as_str()? != "auth" {
+                                            return Some(false);
+                                        }
+                                        let t = v.get("token")?.as_str()?;
+                                        Some(t == token.as_str())
+                                    })
+                                    .unwrap_or(false),
                                 _ => false,
                             };
 
@@ -195,7 +223,12 @@ async fn serve_websocket(result: scanner::ScanResult, token: String) {
                                 "type": "scan_result",
                                 "data": serde_json::from_str::<serde_json::Value>(&json).unwrap()
                             });
-                            if let Err(e) = ws.send(tokio_tungstenite::tungstenite::Message::Text(msg.to_string())).await {
+                            if let Err(e) = ws
+                                .send(tokio_tungstenite::tungstenite::Message::Text(
+                                    msg.to_string(),
+                                ))
+                                .await
+                            {
                                 eprintln!("Send error: {e}");
                                 return;
                             }
@@ -203,9 +236,13 @@ async fn serve_websocket(result: scanner::ScanResult, token: String) {
 
                             // Keep connection alive for potential follow-up queries
                             while let Some(Ok(msg)) = ws.next().await {
-                                if msg.is_close() { break; }
+                                if msg.is_close() {
+                                    break;
+                                }
                                 if let tokio_tungstenite::tungstenite::Message::Text(text) = msg {
-                                    if let Ok(cmd) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    if let Ok(cmd) =
+                                        serde_json::from_str::<serde_json::Value>(&text)
+                                    {
                                         match cmd.get("action").and_then(|v| v.as_str()) {
                                             Some("rescan") => {
                                                 eprintln!("Rescanning...");

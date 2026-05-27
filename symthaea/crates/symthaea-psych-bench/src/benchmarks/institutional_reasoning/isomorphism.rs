@@ -268,12 +268,16 @@ mod tests {
         let config = BenchmarkConfig::default();
         let result = InstitutionalIsomorphismBenchmark.run(&config);
         assert!(result.metrics.contains_key("isomorphism_self_similarity"));
-        assert!(result
-            .metrics
-            .contains_key("isomorphism_overlap_correlation"));
-        assert!(result
-            .metrics
-            .contains_key("isomorphism_discrimination_gap"));
+        assert!(
+            result
+                .metrics
+                .contains_key("isomorphism_overlap_correlation")
+        );
+        assert!(
+            result
+                .metrics
+                .contains_key("isomorphism_discrimination_gap")
+        );
         assert!(result.metrics.contains_key("isomorphism_monotonicity"));
     }
 

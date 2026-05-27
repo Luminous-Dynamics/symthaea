@@ -15,10 +15,10 @@
 //! cargo bench --bench stress -- memory
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use symthaea::hdc::{
-    binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator, unified_hv::ContinuousHV, HDC_DIMENSION,
+    HDC_DIMENSION, binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator, unified_hv::ContinuousHV,
 };
 
 // =============================================================================

@@ -18,12 +18,11 @@
 
 use std::time::Instant;
 
-use binius_core::word::Word;
 use binius_core::verify::verify_constraints;
+use binius_core::word::Word;
 use binius_frontend::CircuitBuilder;
 use binius_prover::{
-    OptimalPackedB128, Prover,
-    hash::parallel_compression::ParallelCompressionAdaptor,
+    OptimalPackedB128, Prover, hash::parallel_compression::ParallelCompressionAdaptor,
 };
 use binius_transcript::{ProverTranscript, VerifierTranscript};
 use binius_verifier::{
@@ -54,14 +53,22 @@ pub struct BundlingBenchResult {
 /// Even simpler for Binius: majority(a,b,c) = (a AND b) XOR ((a XOR b) AND c)
 /// This requires exactly 2 AND + 2 XOR per word.
 pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResult {
-    println!("\n=== BINIUS: HDC Bundling ({} vectors × {} words = {} bits) ===\n",
-        num_vectors, dim_words, dim_words * 64);
+    println!(
+        "\n=== BINIUS: HDC Bundling ({} vectors × {} words = {} bits) ===\n",
+        num_vectors,
+        dim_words,
+        dim_words * 64
+    );
 
     let builder = CircuitBuilder::new();
 
     // Input vectors (private witnesses)
     let inputs: Vec<Vec<_>> = (0..num_vectors)
-        .map(|_| (0..dim_words).map(|_| builder.add_witness()).collect::<Vec<_>>())
+        .map(|_| {
+            (0..dim_words)
+                .map(|_| builder.add_witness())
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     // Output vector (public)
@@ -174,7 +181,9 @@ pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResu
         witness[output[w]] = Word(result);
     }
 
-    circuit.populate_wire_witness(&mut witness).expect("witness failed");
+    circuit
+        .populate_wire_witness(&mut witness)
+        .expect("witness failed");
 
     let cs = circuit.constraint_system();
     let witness_vec = witness.into_value_vec();
@@ -198,17 +207,26 @@ pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResu
     let prove_time = prove_start.elapsed();
 
     let proof_size = proof.len();
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
     println!("  Prover time: {:.1} ms", prove_time.as_secs_f64() * 1000.0);
 
     // Verify
     let verify_start = Instant::now();
     let mut vt = VerifierTranscript::new(challenger, proof);
-    verifier.verify(&public_words, &mut vt).expect("verify failed");
+    verifier
+        .verify(&public_words, &mut vt)
+        .expect("verify failed");
     vt.finalize().expect("finalize failed");
     let verify_time = verify_start.elapsed();
 
-    println!("  Verifier time: {:.3} ms", verify_time.as_secs_f64() * 1000.0);
+    println!(
+        "  Verifier time: {:.3} ms",
+        verify_time.as_secs_f64() * 1000.0
+    );
     println!("  Verification: PASSED (real cryptographic proof)");
 
     BundlingBenchResult {

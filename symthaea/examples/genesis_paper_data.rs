@@ -15,9 +15,9 @@ use std::io::Write;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_nurture::{AttachmentSystem, CaregiverAction};
 use symthaea_population::{
-    encode_individual, encode_locus, heterozygosity_after_generations, observed_heterozygosity,
     Allele, BiologicalSex, BreedingStrategy, Genotype, Individual, Locus, Pedigree, PedigreeEntry,
-    Population, PopulationSimulator, PopulationTrajectoryPredictor,
+    Population, PopulationSimulator, PopulationTrajectoryPredictor, encode_individual,
+    encode_locus, heterozygosity_after_generations, observed_heterozygosity,
 };
 
 /// Create a founder population with balanced allelic diversity at each locus.
@@ -190,18 +190,18 @@ fn generate_het_decay_data() {
 
     let ne_values = [50.0, 200.0, 500.0];
 
-    for gen in 0..=generations {
-        let ne50_sim = results[0][gen as usize];
-        let ne200_sim = results[1][gen as usize];
-        let ne500_sim = results[2][gen as usize];
+    for r#gen in 0..=generations {
+        let ne50_sim = results[0][r#gen as usize];
+        let ne200_sim = results[1][r#gen as usize];
+        let ne500_sim = results[2][r#gen as usize];
 
-        let ne50_ana = heterozygosity_after_generations(h0_values[0], ne_values[0], gen);
-        let ne200_ana = heterozygosity_after_generations(h0_values[1], ne_values[1], gen);
-        let ne500_ana = heterozygosity_after_generations(h0_values[2], ne_values[2], gen);
+        let ne50_ana = heterozygosity_after_generations(h0_values[0], ne_values[0], r#gen);
+        let ne200_ana = heterozygosity_after_generations(h0_values[1], ne_values[1], r#gen);
+        let ne500_ana = heterozygosity_after_generations(h0_values[2], ne_values[2], r#gen);
 
         writeln!(
             file,
-            "{gen},{ne50_sim:.6},{ne200_sim:.6},{ne500_sim:.6},{ne50_ana:.6},{ne200_ana:.6},{ne500_ana:.6}"
+            "{r#gen},{ne50_sim:.6},{ne200_sim:.6},{ne500_sim:.6},{ne50_ana:.6},{ne200_ana:.6},{ne500_ana:.6}"
         )
         .unwrap();
     }
@@ -317,21 +317,23 @@ fn generate_cfc_vs_sim() {
     )
     .unwrap();
 
-    for gen in 0..=generations {
-        let sim_het = sim_result.generations[gen as usize].heterozygosity;
+    for r#gen in 0..=generations {
+        let sim_het = sim_result.generations[r#gen as usize].heterozygosity;
 
         // CfC prediction: predict from initial state to this generation
         predictor.reset();
-        let predicted_state = predictor.predict_at_generation(&initial_state, gen);
+        let predicted_state = predictor.predict_at_generation(&initial_state, r#gen);
         let cfc_het = PopulationTrajectoryPredictor::decode_heterozygosity(&predicted_state);
 
         // Analytical prediction
-        let ana_het = heterozygosity_after_generations(h0, ne, gen);
+        let ana_het = heterozygosity_after_generations(h0, ne, r#gen);
 
-        writeln!(file, "{gen},{sim_het:.6},{cfc_het:.6},{ana_het:.6}").unwrap();
+        writeln!(file, "{r#gen},{sim_het:.6},{cfc_het:.6},{ana_het:.6}").unwrap();
 
-        if gen % 10 == 0 {
-            println!("    Gen {gen:3}: sim={sim_het:.4} cfc={cfc_het:.4} analytical={ana_het:.4}");
+        if r#gen % 10 == 0 {
+            println!(
+                "    Gen {r#gen:3}: sim={sim_het:.4} cfc={cfc_het:.4} analytical={ana_het:.4}"
+            );
         }
     }
 

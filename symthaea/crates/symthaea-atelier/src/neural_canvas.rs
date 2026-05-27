@@ -26,7 +26,9 @@ use std::fmt::Write;
 use symthaea_canvas::scene_graph::Style;
 use symthaea_canvas::{CognitiveSnapshot, Color, SceneNode};
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
+use symthaea_core::hdc::hdc_ltc_unified::{
+    HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
+};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 use crate::AtelierConfig;
@@ -175,11 +177,7 @@ impl NeuralCanvas {
     /// Each CfC step evolves the hidden state and produces one visual element.
     /// The temporal dynamics create compositional coherence — later elements
     /// are influenced by the network's memory of earlier ones.
-    pub fn generate(
-        &mut self,
-        config: &AtelierConfig,
-        snapshot: &CognitiveSnapshot,
-    ) -> SceneNode {
+    pub fn generate(&mut self, config: &AtelierConfig, snapshot: &CognitiveSnapshot) -> SceneNode {
         let genesis = GenesisSeed::from_phrase("atelier-neural-canvas");
         let input_hv = Self::encode_snapshot(snapshot, &genesis);
         let dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
@@ -208,7 +206,12 @@ impl NeuralCanvas {
     }
 
     /// Convert a VisualFrame to an SVG scene node.
-    fn frame_to_element(&self, frame: &VisualFrame, config: &AtelierConfig, step: usize) -> SceneNode {
+    fn frame_to_element(
+        &self,
+        frame: &VisualFrame,
+        config: &AtelierConfig,
+        step: usize,
+    ) -> SceneNode {
         let x = frame.cx * config.width;
         let y = frame.cy * config.height;
         let size = frame.size * config.width;
@@ -217,7 +220,11 @@ impl NeuralCanvas {
         let style = Style {
             fill: Some(color),
             opacity: Some(frame.opacity),
-            stroke: Some(Color::from_hsl(frame.hue + 30.0, frame.saturation * 0.8, frame.lightness - 0.1)),
+            stroke: Some(Color::from_hsl(
+                frame.hue + 30.0,
+                frame.saturation * 0.8,
+                frame.lightness - 0.1,
+            )),
             stroke_width: Some(frame.stroke_width),
             ..Style::default()
         };
@@ -246,7 +253,8 @@ impl NeuralCanvas {
             let sides = 3 + (step % 4);
             let points: Vec<(f32, f32)> = (0..sides)
                 .map(|i| {
-                    let angle = (i as f32 / sides as f32) * std::f32::consts::TAU + frame.rotation.to_radians();
+                    let angle = (i as f32 / sides as f32) * std::f32::consts::TAU
+                        + frame.rotation.to_radians();
                     (x + size * angle.cos(), y + size * angle.sin())
                 })
                 .collect();
@@ -277,7 +285,11 @@ impl NeuralCanvas {
             let p0 = if i > 0 { points[i - 1] } else { points[i] };
             let p1 = points[i];
             let p2 = points[i + 1];
-            let p3 = if i + 2 < points.len() { points[i + 2] } else { points[i + 1] };
+            let p3 = if i + 2 < points.len() {
+                points[i + 2]
+            } else {
+                points[i + 1]
+            };
 
             let tension = 6.0;
             let cp1x = p1.0 + (p2.0 - p0.0) / tension;
@@ -328,7 +340,11 @@ mod tests {
 
         let scene = canvas.generate(&config, &snapshot);
         // Should have multiple elements
-        assert!(scene.children.len() >= 5, "got {} elements", scene.children.len());
+        assert!(
+            scene.children.len() >= 5,
+            "got {} elements",
+            scene.children.len()
+        );
     }
 
     #[test]

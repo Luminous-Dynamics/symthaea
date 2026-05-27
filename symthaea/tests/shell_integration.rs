@@ -15,9 +15,9 @@
 
 use symthaea::action::DestructivenessLevel;
 use symthaea::shell::{
-    classify_command_destructiveness, CommandClassification, CommandContext,
-    EpistemicOverlayEngine, ExecutionRequest, GateDecision, IntelliSenseEngine, KnowledgeSource,
-    OverlayType, PhiGate, ShellContext,
+    CommandClassification, CommandContext, EpistemicOverlayEngine, ExecutionRequest, GateDecision,
+    IntelliSenseEngine, KnowledgeSource, OverlayType, PhiGate, ShellContext,
+    classify_command_destructiveness,
 };
 
 mod intellisense_tests {

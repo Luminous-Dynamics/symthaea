@@ -27,9 +27,9 @@ use rand::SeedableRng;
 use symthaea_aesthetic::AestheticScore;
 use symthaea_canvas::CognitiveSnapshot;
 
+use crate::AtelierConfig;
 use crate::pixel_canvas::{NeuralPainter, PixelCanvas};
 use crate::score_scene;
-use crate::AtelierConfig;
 
 /// A remembered artwork with its cognitive context.
 #[derive(Clone)]
@@ -89,8 +89,11 @@ impl AestheticDreamEngine {
 
         // Prune to capacity (remove lowest-salience)
         if self.memories.len() > self.max_memories {
-            self.memories
-                .sort_by(|a, b| b.salience.partial_cmp(&a.salience).unwrap_or(std::cmp::Ordering::Equal));
+            self.memories.sort_by(|a, b| {
+                b.salience
+                    .partial_cmp(&a.salience)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             self.memories.truncate(self.max_memories);
         }
     }
@@ -120,14 +123,54 @@ impl AestheticDreamEngine {
         let mut best_dream_score = base_score;
 
         let perturbations: Vec<(&str, Box<dyn Fn(&mut CognitiveSnapshot, f32)>)> = vec![
-            ("valence", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.valence = (s.valence + d).clamp(-1.0, 1.0))),
-            ("arousal", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.arousal = (s.arousal + d).clamp(0.0, 1.0))),
-            ("dopamine", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.dopamine = (s.dopamine + d).clamp(0.0, 1.0))),
-            ("serotonin", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.serotonin = (s.serotonin + d).clamp(0.0, 1.0))),
-            ("harmony_0", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.harmony_activations[0] = (s.harmony_activations[0] + d).clamp(0.0, 1.0))),
-            ("harmony_3", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.harmony_activations[3] = (s.harmony_activations[3] + d).clamp(0.0, 1.0))),
-            ("harmony_7", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.harmony_activations[7] = (s.harmony_activations[7] + d).clamp(0.0, 1.0))),
-            ("consciousness", Box::new(|s: &mut CognitiveSnapshot, d: f32| s.consciousness_level = (s.consciousness_level + d as f64).clamp(0.0, 1.0))),
+            (
+                "valence",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.valence = (s.valence + d).clamp(-1.0, 1.0)
+                }),
+            ),
+            (
+                "arousal",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.arousal = (s.arousal + d).clamp(0.0, 1.0)
+                }),
+            ),
+            (
+                "dopamine",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.dopamine = (s.dopamine + d).clamp(0.0, 1.0)
+                }),
+            ),
+            (
+                "serotonin",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.serotonin = (s.serotonin + d).clamp(0.0, 1.0)
+                }),
+            ),
+            (
+                "harmony_0",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.harmony_activations[0] = (s.harmony_activations[0] + d).clamp(0.0, 1.0)
+                }),
+            ),
+            (
+                "harmony_3",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.harmony_activations[3] = (s.harmony_activations[3] + d).clamp(0.0, 1.0)
+                }),
+            ),
+            (
+                "harmony_7",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.harmony_activations[7] = (s.harmony_activations[7] + d).clamp(0.0, 1.0)
+                }),
+            ),
+            (
+                "consciousness",
+                Box::new(|s: &mut CognitiveSnapshot, d: f32| {
+                    s.consciousness_level = (s.consciousness_level + d as f64).clamp(0.0, 1.0)
+                }),
+            ),
         ];
 
         for cf in 0..counterfactuals.min(perturbations.len()) {
@@ -139,11 +182,16 @@ impl AestheticDreamEngine {
 
                 // Generate dream artwork
                 let num_strokes = 20 + (dreamed_snapshot.consciousness_level * 30.0) as usize;
-                let (canvas, _strokes) = painter.paint(&dreamed_snapshot, canvas_size.0, canvas_size.1, num_strokes);
+                let (canvas, _strokes) =
+                    painter.paint(&dreamed_snapshot, canvas_size.0, canvas_size.1, num_strokes);
 
                 // Score using SVG-based scorer as proxy (generate SVG scene for scoring)
                 let config = AtelierConfig::default();
-                let scene = crate::generate(&config, &dreamed_snapshot, &mut rand::rngs::StdRng::seed_from_u64(self.dream_count + cf as u64));
+                let scene = crate::generate(
+                    &config,
+                    &dreamed_snapshot,
+                    &mut rand::rngs::StdRng::seed_from_u64(self.dream_count + cf as u64),
+                );
                 let dream_score = score_scene(&scene, &dreamed_snapshot);
 
                 let improvement = dream_score.composite - base_score;
@@ -167,7 +215,9 @@ impl AestheticDreamEngine {
         // Accumulate wisdom
         for w in &wisdoms {
             // Update existing or add new
-            if let Some(existing) = self.wisdom.iter_mut().find(|e| e.dimension == w.dimension && e.direction.signum() == w.direction.signum()) {
+            if let Some(existing) = self.wisdom.iter_mut().find(|e| {
+                e.dimension == w.dimension && e.direction.signum() == w.direction.signum()
+            }) {
                 existing.improvement = existing.improvement * 0.7 + w.improvement * 0.3;
                 existing.confidence += 0.1;
             } else {

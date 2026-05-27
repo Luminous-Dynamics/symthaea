@@ -10,11 +10,11 @@
 
 use symthaea::humanoid::transfer::{ChannelMapping, MorphologicalTransfer};
 use symthaea::humanoid::{
-    clearance_reward, cot_efficiency_reward, episode_reward, pd_standing_baseline,
-    pd_walking_baseline, standing_reward, ActiveInferenceHumanoidAgent, HumanoidCommand,
-    HumanoidConfig, HumanoidController, HumanoidFepConfig, HumanoidHdcEncoder, HumanoidPdGains,
-    HumanoidPerturbation, HumanoidPhysicsSimulator, HumanoidState, HumanoidTask, HumanoidTrainer,
-    PerturbationSchedule, SimpleHumanoidSimulator, NUM_ACTUATORS,
+    ActiveInferenceHumanoidAgent, HumanoidCommand, HumanoidConfig, HumanoidController,
+    HumanoidFepConfig, HumanoidHdcEncoder, HumanoidPdGains, HumanoidPerturbation,
+    HumanoidPhysicsSimulator, HumanoidState, HumanoidTask, HumanoidTrainer, NUM_ACTUATORS,
+    PerturbationSchedule, SimpleHumanoidSimulator, clearance_reward, cot_efficiency_reward,
+    episode_reward, pd_standing_baseline, pd_walking_baseline, standing_reward,
 };
 use symthaea::symthaea_core::genesis::GenesisSeed;
 use symthaea::symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};

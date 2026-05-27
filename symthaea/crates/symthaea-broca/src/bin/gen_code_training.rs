@@ -16,7 +16,7 @@
 //! - 28-42: epistemic cube (E3, N2, M2, H2 for verified code)
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --bin gen-code-training
+//!   cargo run --release -p symthaea-broca --bin r#gen-code-training
 //!
 //! Outputs:
 //!   data/train-code-v1.jsonl  (80%)

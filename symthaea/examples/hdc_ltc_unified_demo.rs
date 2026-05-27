@@ -12,8 +12,8 @@
 
 use std::time::Instant;
 use symthaea::hdc::{
-    ContinuousHV, HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
-    UnifiedNetworkConfig, HDC_DIMENSION,
+    ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation,
+    UnifiedConfig, UnifiedNetworkConfig,
 };
 
 fn main() {

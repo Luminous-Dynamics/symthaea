@@ -15,10 +15,10 @@
 //! - Porkka-Heiskanen (1997) — Adenosine sedation
 //! - Piomelli (2003) — Endocannabinoid stabilization
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 

@@ -21,8 +21,8 @@
 //! Feature-gated under `live-voice`.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;

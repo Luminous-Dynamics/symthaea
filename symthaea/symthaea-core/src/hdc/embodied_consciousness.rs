@@ -227,8 +227,8 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
 use super::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
+use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -314,12 +314,18 @@ impl EmbodimentLevel {
     /// Get description
     pub fn description(&self) -> &'static str {
         match self {
-            EmbodimentLevel::Disembodied => "No body, pure information processing, not truly conscious",
+            EmbodimentLevel::Disembodied => {
+                "No body, pure information processing, not truly conscious"
+            }
             EmbodimentLevel::MinimallyEmbodied => "Single modality, weak coupling, reactive only",
-            EmbodimentLevel::ReactivelyEmbodied => "Sensorimotor loop, multiple modalities, reactive",
+            EmbodimentLevel::ReactivelyEmbodied => {
+                "Sensorimotor loop, multiple modalities, reactive"
+            }
             EmbodimentLevel::ActivelyEmbodied => "Active sensing, body schema, affordances",
             EmbodimentLevel::AdaptivelyEmbodied => "Learning body schema, sensorimotor mastery",
-            EmbodimentLevel::ExtendedEmbodied => "Tool integration, extended mind, environmental structuring",
+            EmbodimentLevel::ExtendedEmbodied => {
+                "Tool integration, extended mind, environmental structuring"
+            }
         }
     }
 }
@@ -367,9 +373,8 @@ impl Sensor {
         }
 
         let mean = self.history.iter().sum::<f64>() / self.history.len() as f64;
-        let var = self.history.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / self.history.len() as f64;
+        let var = self.history.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+            / self.history.len() as f64;
 
         var
     }
@@ -422,7 +427,7 @@ pub struct BodySchema {
     pub actuators: HashMap<String, Actuator>,
 
     /// Sensorimotor contingency map (how sensors change with actuators)
-    pub contingency_map: HashMap<(String, String), f64>,  // (sensor, actuator) -> correlation
+    pub contingency_map: HashMap<(String, String), f64>, // (sensor, actuator) -> correlation
 
     /// Schema accuracy (how well does model match reality?)
     pub accuracy: f64,
@@ -435,7 +440,7 @@ impl BodySchema {
             sensors: HashMap::new(),
             actuators: HashMap::new(),
             contingency_map: HashMap::new(),
-            accuracy: 0.5,  // Start with medium accuracy
+            accuracy: 0.5, // Start with medium accuracy
         }
     }
 
@@ -454,15 +459,10 @@ impl BodySchema {
         // Compute correlations between sensor changes and actuator commands
         for (sensor_name, sensor) in &self.sensors {
             for (actuator_name, actuator) in &self.actuators {
-                let correlation = self.compute_correlation(
-                    &sensor.history,
-                    &actuator.history,
-                );
+                let correlation = self.compute_correlation(&sensor.history, &actuator.history);
 
-                self.contingency_map.insert(
-                    (sensor_name.clone(), actuator_name.clone()),
-                    correlation,
-                );
+                self.contingency_map
+                    .insert((sensor_name.clone(), actuator_name.clone()), correlation);
             }
         }
 
@@ -483,12 +483,28 @@ impl BodySchema {
         let mean1 = series1.iter().take(n).sum::<f64>() / n as f64;
         let mean2 = series2.iter().take(n).sum::<f64>() / n as f64;
 
-        let cov: f64 = series1.iter().take(n).zip(series2.iter().take(n))
+        let cov: f64 = series1
+            .iter()
+            .take(n)
+            .zip(series2.iter().take(n))
             .map(|(x, y)| (x - mean1) * (y - mean2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
-        let std1 = (series1.iter().take(n).map(|x| (x - mean1).powi(2)).sum::<f64>() / n as f64).sqrt();
-        let std2 = (series2.iter().take(n).map(|x| (x - mean2).powi(2)).sum::<f64>() / n as f64).sqrt();
+        let std1 = (series1
+            .iter()
+            .take(n)
+            .map(|x| (x - mean1).powi(2))
+            .sum::<f64>()
+            / n as f64)
+            .sqrt();
+        let std2 = (series2
+            .iter()
+            .take(n)
+            .map(|x| (x - mean2).powi(2))
+            .sum::<f64>()
+            / n as f64)
+            .sqrt();
 
         if std1 * std2 < 1e-10 {
             0.0
@@ -740,7 +756,10 @@ impl EmbodiedConsciousness {
         }
 
         // Check for active sensing (sensor variance indicates active exploration)
-        let active_sensing = self.body_schema.sensors.values()
+        let active_sensing = self
+            .body_schema
+            .sensors
+            .values()
             .any(|s| s.variance() > 0.1);
 
         if !active_sensing {
@@ -775,7 +794,10 @@ impl EmbodiedConsciousness {
         parts.push(format!("Embodiment Level: {:?}", level));
         parts.push(level.description().to_string());
 
-        parts.push(format!("Sensors: {}, Actuators: {}", num_sensors, num_actuators));
+        parts.push(format!(
+            "Sensors: {}, Actuators: {}",
+            num_sensors, num_actuators
+        ));
 
         if has_loop {
             parts.push("✓ Sensorimotor loop present".to_string());
@@ -792,7 +814,10 @@ impl EmbodiedConsciousness {
             0.0
         };
 
-        parts.push(format!("Embodiment amplifies consciousness by {:.1}x", amplification));
+        parts.push(format!(
+            "Embodiment amplifies consciousness by {:.1}x",
+            amplification
+        ));
 
         parts.join(". ")
     }

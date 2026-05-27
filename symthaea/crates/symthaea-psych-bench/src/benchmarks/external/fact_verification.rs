@@ -6,9 +6,9 @@
 //! Binary true/false fact verification. Tests whether HDC-encoded
 //! knowledge can distinguish factual claims from false ones.
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 
 pub struct FactVerificationAdapter;

@@ -22,14 +22,14 @@ mod parallel;
 
 // Re-export Phase 5 items so cycle.rs can use `helpers::run_stability_regime` etc.
 pub(super) use parallel::{
-    parallel_episodic_learning, parallel_semantic_causal, run_stability_regime,
-    EpisodicLearningContext,
+    EpisodicLearningContext, parallel_episodic_learning, parallel_semantic_causal,
+    run_stability_regime,
 };
 
 // Re-export consciousness metrics parallel branch items (Phase "consciousness metrics").
 pub(in crate::cognitive_loop) use parallel::{
-    parallel_consciousness_branch_a, parallel_consciousness_branch_b, ConsciousnessMetricsBranchA,
-    ConsciousnessMetricsBranchB, DeferredFeedback,
+    ConsciousnessMetricsBranchA, ConsciousnessMetricsBranchB, DeferredFeedback,
+    parallel_consciousness_branch_a, parallel_consciousness_branch_b,
 };
 
 // Re-export Phase 7 result structs so cycle.rs can destructure them
@@ -45,14 +45,14 @@ use anyhow::Result;
 use ndarray::Array1;
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "neural-bridge")]
+use super::CycleResult;
 use super::thresholds::{
     ERROR_EMA_ALPHA, EXPERIENCE_BASE_IMPORTANCE, PRED_COHERENCE_HIGH_BOOST_SCALE,
     PRED_COHERENCE_HIGH_THRESHOLD, PRED_COHERENCE_LOW_DAMPEN_SCALE, PRED_COHERENCE_LOW_THRESHOLD,
     PREFRONTAL_FLOOR, PREFRONTAL_GRADUATION_WEIGHT, PREFRONTAL_UTILIZATION_WEIGHT,
     TIMING_EMA_ALPHA,
 };
-#[cfg(feature = "neural-bridge")]
-use super::CycleResult;
 use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 
 /// Cosine similarity between two f32 slices.
@@ -832,11 +832,7 @@ impl CognitiveLoopService {
 
         if denominator.abs() > 0.0001 {
             let slope = numerator / denominator;
-            if slope.is_finite() {
-                slope
-            } else {
-                0.0
-            }
+            if slope.is_finite() { slope } else { 0.0 }
         } else {
             0.0
         }

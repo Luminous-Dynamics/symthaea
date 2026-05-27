@@ -281,13 +281,15 @@ impl IntegrationOracle {
     /// beta_0: number of connected components.
     /// beta_1: number of cycles (Euler characteristic approach).
     fn compute_betti_numbers(&self, cov: &[f64], n: usize) -> [usize; 3] {
-        if n == 0 { return [0, 0, 0]; }
-        
+        if n == 0 {
+            return [0, 0, 0];
+        }
+
         // Build adjacency matrix based on significant correlation
         let mut adj = vec![vec![false; n]; n];
         let threshold = 0.3; // Minimum correlation to consider an edge
         let mut edge_count = 0;
-        
+
         for i in 0..n {
             for j in (i + 1)..n {
                 let var_i = cov[i * n + i];
@@ -302,7 +304,7 @@ impl IntegrationOracle {
                 }
             }
         }
-        
+
         // beta_0: Connected Components (BFS)
         let mut visited = vec![false; n];
         let mut beta_0 = 0;
@@ -322,7 +324,7 @@ impl IntegrationOracle {
                 }
             }
         }
-        
+
         // beta_1: number of cycles in the graph
         // For a general graph, beta_1 = edges - nodes + beta_0
         let beta_1 = if edge_count + beta_0 >= n {
@@ -330,7 +332,7 @@ impl IntegrationOracle {
         } else {
             0
         };
-        
+
         [beta_0, beta_1, 0]
     }
 
@@ -340,7 +342,9 @@ impl IntegrationOracle {
     /// the 'lifespan' of one-dimensional holes (beta_1 cycles).
     fn compute_persistence(&self, cov: &[f64], n: usize) -> Vec<crate::result::PersistentCycle> {
         use crate::result::PersistentCycle;
-        if n < 3 { return Vec::new(); }
+        if n < 3 {
+            return Vec::new();
+        }
 
         let mut results = Vec::new();
         let steps = 20;

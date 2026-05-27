@@ -366,10 +366,12 @@ mod tests {
         let mut discovery = CausalDiscovery::new();
         discovery.observe(&[("consciousness", 0.5), ("dopamine", 0.6)]);
         assert_eq!(discovery.graph().variables.len(), 2);
-        assert!(discovery
-            .graph()
-            .variables
-            .contains(&"consciousness".to_string()));
+        assert!(
+            discovery
+                .graph()
+                .variables
+                .contains(&"consciousness".to_string())
+        );
     }
 
     #[test]

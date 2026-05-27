@@ -213,11 +213,7 @@ impl MasterConsciousnessEquation {
         let softmin = if weight_sum > epsilon {
             let raw = weighted_sum / weight_sum;
             // Fall back to hard-min if val*weight overflowed
-            if raw.is_finite() {
-                raw
-            } else {
-                min_val
-            }
+            if raw.is_finite() { raw } else { min_val }
         } else {
             min_val
         };

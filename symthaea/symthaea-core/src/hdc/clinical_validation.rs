@@ -135,10 +135,10 @@ impl Dataset {
             Self::PsiConnect => 62,
             Self::DmtEegFmri => 20,
             Self::OpenNeuroSleep => 33,
-            Self::ContentFreeAwareness => 1,  // Single expert meditator
+            Self::ContentFreeAwareness => 1, // Single expert meditator
             Self::PsilocybinRetreat => 36,
-            Self::Anesthesia => 0,  // Variable
-            Self::DisordersOfConsciousness => 0,  // Variable
+            Self::Anesthesia => 0,               // Variable
+            Self::DisordersOfConsciousness => 0, // Variable
         }
     }
 
@@ -223,22 +223,22 @@ impl NeuralModality {
     /// Temporal resolution in milliseconds
     pub fn temporal_resolution_ms(&self) -> f64 {
         match self {
-            Self::Eeg => 1.0,      // ~1000 Hz sampling
-            Self::Fmri => 2000.0,  // TR ~2s, hemodynamic delay
-            Self::Meg => 1.0,      // ~1000 Hz sampling
-            Self::Ieeg => 0.5,     // ~2000 Hz sampling
-            Self::TmsEeg => 1.0,   // EEG resolution
+            Self::Eeg => 1.0,     // ~1000 Hz sampling
+            Self::Fmri => 2000.0, // TR ~2s, hemodynamic delay
+            Self::Meg => 1.0,     // ~1000 Hz sampling
+            Self::Ieeg => 0.5,    // ~2000 Hz sampling
+            Self::TmsEeg => 1.0,  // EEG resolution
         }
     }
 
     /// Spatial resolution in millimeters
     pub fn spatial_resolution_mm(&self) -> f64 {
         match self {
-            Self::Eeg => 10.0,     // Poor spatial resolution
-            Self::Fmri => 2.0,     // ~2mm voxels
-            Self::Meg => 5.0,      // Better than EEG
-            Self::Ieeg => 1.0,     // Electrode spacing
-            Self::TmsEeg => 10.0,  // Limited by EEG
+            Self::Eeg => 10.0,    // Poor spatial resolution
+            Self::Fmri => 2.0,    // ~2mm voxels
+            Self::Meg => 5.0,     // Better than EEG
+            Self::Ieeg => 1.0,    // Electrode spacing
+            Self::TmsEeg => 10.0, // Limited by EEG
         }
     }
 }
@@ -338,10 +338,9 @@ impl FrameworkComponent {
                 NeuralMetric::LempelZivComplexity,
                 NeuralMetric::EntropyIncrease,
             ],
-            Self::DmnSuppression => vec![
-                NeuralMetric::DmnDeactivation,
-                NeuralMetric::TpnActivation,
-            ],
+            Self::DmnSuppression => {
+                vec![NeuralMetric::DmnDeactivation, NeuralMetric::TpnActivation]
+            }
             Self::Entropy => vec![
                 NeuralMetric::LempelZivComplexity,
                 NeuralMetric::EntropyIncrease,
@@ -351,10 +350,7 @@ impl FrameworkComponent {
                 NeuralMetric::PrefrontalActivation,
                 NeuralMetric::FrontalMidlineTheta,
             ],
-            Self::CausalEfficacy => vec![
-                NeuralMetric::Pci,
-                NeuralMetric::TmsEvokedPotential,
-            ],
+            Self::CausalEfficacy => vec![NeuralMetric::Pci, NeuralMetric::TmsEvokedPotential],
         }
     }
 }
@@ -475,12 +471,20 @@ impl NeuralMetric {
     pub fn compatible_modalities(&self) -> Vec<NeuralModality> {
         match self {
             Self::Pci | Self::TmsEvokedPotential => vec![NeuralModality::TmsEeg],
-            Self::GlobalSignalCorrelation | Self::FunctionalConnectivity |
-            Self::DmnDeactivation | Self::TpnActivation |
-            Self::FrontalActivation | Self::PrefrontalActivation => vec![NeuralModality::Fmri],
-            Self::SlowWaveActivity | Self::SleepSpindles | Self::RemActivity =>
-                vec![NeuralModality::Eeg, NeuralModality::Meg],
-            _ => vec![NeuralModality::Eeg, NeuralModality::Meg, NeuralModality::Ieeg],
+            Self::GlobalSignalCorrelation
+            | Self::FunctionalConnectivity
+            | Self::DmnDeactivation
+            | Self::TpnActivation
+            | Self::FrontalActivation
+            | Self::PrefrontalActivation => vec![NeuralModality::Fmri],
+            Self::SlowWaveActivity | Self::SleepSpindles | Self::RemActivity => {
+                vec![NeuralModality::Eeg, NeuralModality::Meg]
+            }
+            _ => vec![
+                NeuralModality::Eeg,
+                NeuralModality::Meg,
+                NeuralModality::Ieeg,
+            ],
         }
     }
 }
@@ -664,7 +668,10 @@ impl ClinicalValidation {
         dataset_status.insert(Dataset::ContentFreeAwareness, DatasetStatus::Available);
         dataset_status.insert(Dataset::PsilocybinRetreat, DatasetStatus::Available);
         dataset_status.insert(Dataset::Anesthesia, DatasetStatus::RequiresAccess);
-        dataset_status.insert(Dataset::DisordersOfConsciousness, DatasetStatus::RequiresAccess);
+        dataset_status.insert(
+            Dataset::DisordersOfConsciousness,
+            DatasetStatus::RequiresAccess,
+        );
 
         Self {
             observations: Vec::new(),
@@ -676,7 +683,10 @@ impl ClinicalValidation {
 
     /// Get dataset status
     pub fn dataset_status(&self, dataset: Dataset) -> DatasetStatus {
-        self.dataset_status.get(&dataset).copied().unwrap_or(DatasetStatus::NotAvailable)
+        self.dataset_status
+            .get(&dataset)
+            .copied()
+            .unwrap_or(DatasetStatus::NotAvailable)
     }
 
     /// Add a neural observation
@@ -703,11 +713,8 @@ impl ClinicalValidation {
 
         for i in 0..n_participants {
             for condition in &conditions {
-                let mut obs = NeuralObservation::new(
-                    dataset,
-                    &format!("sub-{:03}", i + 1),
-                    condition,
-                );
+                let mut obs =
+                    NeuralObservation::new(dataset, &format!("sub-{:03}", i + 1), condition);
 
                 // Add simulated metrics based on condition
                 self.add_simulated_metrics(&mut obs, condition);
@@ -730,11 +737,11 @@ impl ClinicalValidation {
                 obs.add_metric(NeuralMetric::P300Amplitude, 8.0);
             }
             "psilocybin" | "dmt" => {
-                obs.add_metric(NeuralMetric::Pci, 0.55);  // Higher complexity
-                obs.add_metric(NeuralMetric::LempelZivComplexity, 0.85);  // Much higher
+                obs.add_metric(NeuralMetric::Pci, 0.55); // Higher complexity
+                obs.add_metric(NeuralMetric::LempelZivComplexity, 0.85); // Much higher
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.45);
-                obs.add_metric(NeuralMetric::DmnDeactivation, 0.65);  // Strong suppression
-                obs.add_metric(NeuralMetric::EntropyIncrease, 25.0);  // 25% increase
+                obs.add_metric(NeuralMetric::DmnDeactivation, 0.65); // Strong suppression
+                obs.add_metric(NeuralMetric::EntropyIncrease, 25.0); // 25% increase
                 obs.add_metric(NeuralMetric::GammaPower, 15.0);
             }
             "placebo" => {
@@ -745,8 +752,8 @@ impl ClinicalValidation {
             }
             "meditation" | "content_free" | "post_retreat" => {
                 obs.add_metric(NeuralMetric::Pci, 0.50);
-                obs.add_metric(NeuralMetric::LempelZivComplexity, 0.60);  // Slightly lower (focused)
-                obs.add_metric(NeuralMetric::GammaSynchrony, 0.55);  // Higher synchrony
+                obs.add_metric(NeuralMetric::LempelZivComplexity, 0.60); // Slightly lower (focused)
+                obs.add_metric(NeuralMetric::GammaSynchrony, 0.55); // Higher synchrony
                 obs.add_metric(NeuralMetric::DmnDeactivation, 0.45);
                 obs.add_metric(NeuralMetric::FrontalMidlineTheta, 12.0);
                 obs.add_metric(NeuralMetric::GammaPower, 18.0);
@@ -763,12 +770,12 @@ impl ClinicalValidation {
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.15);
             }
             "n3" => {
-                obs.add_metric(NeuralMetric::Pci, 0.15);  // Low complexity
-                obs.add_metric(NeuralMetric::SlowWaveActivity, 80.0);  // High SWA
+                obs.add_metric(NeuralMetric::Pci, 0.15); // Low complexity
+                obs.add_metric(NeuralMetric::SlowWaveActivity, 80.0); // High SWA
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.10);
             }
             "rem" => {
-                obs.add_metric(NeuralMetric::Pci, 0.40);  // Higher than N3
+                obs.add_metric(NeuralMetric::Pci, 0.40); // Higher than N3
                 obs.add_metric(NeuralMetric::RemActivity, 0.8);
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.30);
             }
@@ -777,7 +784,7 @@ impl ClinicalValidation {
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.20);
             }
             "anesthetized" => {
-                obs.add_metric(NeuralMetric::Pci, 0.10);  // Very low
+                obs.add_metric(NeuralMetric::Pci, 0.10); // Very low
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.05);
                 obs.add_metric(NeuralMetric::GlobalSignalCorrelation, 0.1);
             }
@@ -785,12 +792,14 @@ impl ClinicalValidation {
                 obs.add_metric(NeuralMetric::Pci, 0.40);
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.30);
             }
-            "mcs" => {  // Minimally conscious state
-                obs.add_metric(NeuralMetric::Pci, 0.32);  // Above VS
+            "mcs" => {
+                // Minimally conscious state
+                obs.add_metric(NeuralMetric::Pci, 0.32); // Above VS
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.20);
             }
-            "vs" => {  // Vegetative state
-                obs.add_metric(NeuralMetric::Pci, 0.18);  // Very low
+            "vs" => {
+                // Vegetative state
+                obs.add_metric(NeuralMetric::Pci, 0.18); // Very low
                 obs.add_metric(NeuralMetric::GammaSynchrony, 0.08);
             }
             _ => {}
@@ -817,13 +826,13 @@ impl ClinicalValidation {
             // Entropy predictions
             (FrameworkComponent::Entropy, "baseline") => 0.50,
             (FrameworkComponent::Entropy, "psilocybin" | "dmt") => 0.90,
-            (FrameworkComponent::Entropy, "meditation") => 0.45,  // Slightly lower (focused)
+            (FrameworkComponent::Entropy, "meditation") => 0.45, // Slightly lower (focused)
             (FrameworkComponent::Entropy, "n3") => 0.20,
             (FrameworkComponent::Entropy, "anesthetized") => 0.15,
 
             // Binding predictions
             (FrameworkComponent::Binding, "baseline") => 0.50,
-            (FrameworkComponent::Binding, "meditation") => 0.70,  // Enhanced
+            (FrameworkComponent::Binding, "meditation") => 0.70, // Enhanced
             (FrameworkComponent::Binding, "n3") => 0.20,
             (FrameworkComponent::Binding, "anesthetized") => 0.10,
 
@@ -851,7 +860,9 @@ impl ClinicalValidation {
         neural_metric: NeuralMetric,
     ) -> Option<ValidationResult> {
         // Get predictions for this component
-        let component_predictions: Vec<&FrameworkPrediction> = self.predictions.iter()
+        let component_predictions: Vec<&FrameworkPrediction> = self
+            .predictions
+            .iter()
             .filter(|p| p.component == component)
             .collect();
 
@@ -876,7 +887,7 @@ impl ClinicalValidation {
         }
 
         if predicted_values.len() < 3 {
-            return None;  // Need at least 3 points
+            return None; // Need at least 3 points
         }
 
         // Compute correlation
@@ -890,7 +901,7 @@ impl ClinicalValidation {
             neural_metric,
             n_observations: predicted_values.len(),
             correlation,
-            p_value: None,  // Would need proper stats library
+            p_value: None, // Would need proper stats library
             effect_size,
             interpretation: ValidationStrength::from_correlation(correlation),
         };
@@ -988,11 +999,31 @@ impl ClinicalValidation {
     /// Get validation summary
     pub fn get_summary(&self) -> ValidationSummary {
         let total = self.results.len();
-        let strong = self.results.iter().filter(|r| r.interpretation == ValidationStrength::Strong).count();
-        let moderate = self.results.iter().filter(|r| r.interpretation == ValidationStrength::Moderate).count();
-        let weak = self.results.iter().filter(|r| r.interpretation == ValidationStrength::Weak).count();
-        let no_support = self.results.iter().filter(|r| r.interpretation == ValidationStrength::NoSupport).count();
-        let contradicted = self.results.iter().filter(|r| r.interpretation == ValidationStrength::Contradicted).count();
+        let strong = self
+            .results
+            .iter()
+            .filter(|r| r.interpretation == ValidationStrength::Strong)
+            .count();
+        let moderate = self
+            .results
+            .iter()
+            .filter(|r| r.interpretation == ValidationStrength::Moderate)
+            .count();
+        let weak = self
+            .results
+            .iter()
+            .filter(|r| r.interpretation == ValidationStrength::Weak)
+            .count();
+        let no_support = self
+            .results
+            .iter()
+            .filter(|r| r.interpretation == ValidationStrength::NoSupport)
+            .count();
+        let contradicted = self
+            .results
+            .iter()
+            .filter(|r| r.interpretation == ValidationStrength::Contradicted)
+            .count();
 
         let mean_correlation = if total > 0 {
             self.results.iter().map(|r| r.correlation).sum::<f64>() / total as f64
@@ -1008,7 +1039,11 @@ impl ClinicalValidation {
             no_support: no_support,
             contradictions: contradicted,
             mean_correlation,
-            datasets_loaded: self.dataset_status.iter().filter(|(_, s)| **s == DatasetStatus::Loaded).count(),
+            datasets_loaded: self
+                .dataset_status
+                .iter()
+                .filter(|(_, s)| **s == DatasetStatus::Loaded)
+                .count(),
             observations_count: self.observations.len(),
         }
     }
@@ -1020,15 +1055,30 @@ impl ClinicalValidation {
         let mut report = String::new();
         report.push_str("# Clinical Validation Report\n\n");
         report.push_str("## Summary\n\n");
-        report.push_str(&format!("- Total validations: {}\n", summary.total_validations));
-        report.push_str(&format!("- Strong (r > 0.7): {}\n", summary.strong_validations));
-        report.push_str(&format!("- Moderate (r > 0.5): {}\n", summary.moderate_validations));
+        report.push_str(&format!(
+            "- Total validations: {}\n",
+            summary.total_validations
+        ));
+        report.push_str(&format!(
+            "- Strong (r > 0.7): {}\n",
+            summary.strong_validations
+        ));
+        report.push_str(&format!(
+            "- Moderate (r > 0.5): {}\n",
+            summary.moderate_validations
+        ));
         report.push_str(&format!("- Weak (r > 0.3): {}\n", summary.weak_validations));
         report.push_str(&format!("- No support: {}\n", summary.no_support));
         report.push_str(&format!("- Contradicted: {}\n", summary.contradictions));
-        report.push_str(&format!("- Mean correlation: {:.3}\n", summary.mean_correlation));
+        report.push_str(&format!(
+            "- Mean correlation: {:.3}\n",
+            summary.mean_correlation
+        ));
         report.push_str(&format!("- Datasets loaded: {}\n", summary.datasets_loaded));
-        report.push_str(&format!("- Total observations: {}\n\n", summary.observations_count));
+        report.push_str(&format!(
+            "- Total observations: {}\n\n",
+            summary.observations_count
+        ));
 
         report.push_str("## Detailed Results\n\n");
         for result in &self.results {
@@ -1093,14 +1143,28 @@ mod tests {
     #[test]
     fn test_dataset_properties() {
         assert_eq!(Dataset::PsiConnect.participant_count(), 62);
-        assert!(Dataset::PsiConnect.modalities().contains(&NeuralModality::Eeg));
-        assert!(Dataset::PsiConnect.modalities().contains(&NeuralModality::Fmri));
+        assert!(
+            Dataset::PsiConnect
+                .modalities()
+                .contains(&NeuralModality::Eeg)
+        );
+        assert!(
+            Dataset::PsiConnect
+                .modalities()
+                .contains(&NeuralModality::Fmri)
+        );
     }
 
     #[test]
     fn test_neural_modality_resolution() {
-        assert!(NeuralModality::Eeg.temporal_resolution_ms() < NeuralModality::Fmri.temporal_resolution_ms());
-        assert!(NeuralModality::Fmri.spatial_resolution_mm() < NeuralModality::Eeg.spatial_resolution_mm());
+        assert!(
+            NeuralModality::Eeg.temporal_resolution_ms()
+                < NeuralModality::Fmri.temporal_resolution_ms()
+        );
+        assert!(
+            NeuralModality::Fmri.spatial_resolution_mm()
+                < NeuralModality::Eeg.spatial_resolution_mm()
+        );
     }
 
     #[test]
@@ -1123,18 +1187,36 @@ mod tests {
 
     #[test]
     fn test_validation_strength() {
-        assert_eq!(ValidationStrength::from_correlation(0.8), ValidationStrength::Strong);
-        assert_eq!(ValidationStrength::from_correlation(0.6), ValidationStrength::Moderate);
-        assert_eq!(ValidationStrength::from_correlation(0.4), ValidationStrength::Weak);
-        assert_eq!(ValidationStrength::from_correlation(0.1), ValidationStrength::NoSupport);
-        assert_eq!(ValidationStrength::from_correlation(-0.5), ValidationStrength::Contradicted);
+        assert_eq!(
+            ValidationStrength::from_correlation(0.8),
+            ValidationStrength::Strong
+        );
+        assert_eq!(
+            ValidationStrength::from_correlation(0.6),
+            ValidationStrength::Moderate
+        );
+        assert_eq!(
+            ValidationStrength::from_correlation(0.4),
+            ValidationStrength::Weak
+        );
+        assert_eq!(
+            ValidationStrength::from_correlation(0.1),
+            ValidationStrength::NoSupport
+        );
+        assert_eq!(
+            ValidationStrength::from_correlation(-0.5),
+            ValidationStrength::Contradicted
+        );
     }
 
     #[test]
     fn test_clinical_validation_creation() {
         let cv = ClinicalValidation::new();
         assert_eq!(cv.num_observations(), 0);
-        assert_eq!(cv.dataset_status(Dataset::PsiConnect), DatasetStatus::Available);
+        assert_eq!(
+            cv.dataset_status(Dataset::PsiConnect),
+            DatasetStatus::Available
+        );
     }
 
     #[test]
@@ -1143,7 +1225,10 @@ mod tests {
         cv.load_simulated_data(Dataset::PsiConnect, 10);
 
         assert!(cv.num_observations() > 0);
-        assert_eq!(cv.dataset_status(Dataset::PsiConnect), DatasetStatus::Loaded);
+        assert_eq!(
+            cv.dataset_status(Dataset::PsiConnect),
+            DatasetStatus::Loaded
+        );
     }
 
     #[test]
@@ -1221,10 +1306,7 @@ mod tests {
         cv.generate_predictions(FrameworkComponent::Phi, "n3");
 
         // Validate Phi vs PCI
-        let result = cv.validate_component(
-            FrameworkComponent::Phi,
-            NeuralMetric::Pci,
-        );
+        let result = cv.validate_component(FrameworkComponent::Phi, NeuralMetric::Pci);
 
         assert!(result.is_some());
     }

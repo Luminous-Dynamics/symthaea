@@ -192,7 +192,7 @@ mod causal_calculus_tests {
 
 mod causal_emergence_tests {
     use symthaea_causal_reasoning::causal_emergence::{
-        degeneracy, determinism, effective_information, CausalEmergenceAnalyzer, StateDiscretizer,
+        CausalEmergenceAnalyzer, StateDiscretizer, degeneracy, determinism, effective_information,
     };
 
     #[test]

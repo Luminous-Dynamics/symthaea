@@ -21,7 +21,7 @@ use console::style;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use symthaea_stt::{AudioConfig, AudioFrontend, TrainedPrototypes, HV16};
+use symthaea_stt::{AudioConfig, AudioFrontend, HV16, TrainedPrototypes};
 
 #[derive(Parser)]
 #[command(name = "symthaea-viz")]

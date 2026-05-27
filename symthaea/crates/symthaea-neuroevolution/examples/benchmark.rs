@@ -61,8 +61,8 @@ fn main() {
 
     println!("\n--- Summary ---");
     println!("  Total:     {:.1}s", total.as_secs_f64());
-    println!("  Mean/gen:  {:.0}ms", mean_ms);
-    println!("  Max/gen:   {}ms", max_ms);
+    println!("  Mean/r#gen:  {:.0}ms", mean_ms);
+    println!("  Max/r#gen:   {}ms", max_ms);
     println!(
         "  Genome mem: {}KB ({} organisms x 2KB)",
         genome_kb,

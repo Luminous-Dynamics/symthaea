@@ -46,8 +46,8 @@ use std::time::Duration;
 use super::decoder::{DecodeError, DecodedFrame, HevcDecoder};
 use super::wire::{self, FrameHeader, WireCodec, WireError};
 use super::{
-    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyError, ScrcpyHandle, ScrcpyOptions,
-    VideoCodec,
+    ScrcpyError, ScrcpyHandle, ScrcpyOptions, VideoCodec, accept_from_server, bind_host_listener,
+    start_scrcpy,
 };
 
 /// Default read timeout for [`ScrcpyCaptureStream::next_frame`].

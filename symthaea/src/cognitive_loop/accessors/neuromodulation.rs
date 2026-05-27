@@ -91,11 +91,7 @@ impl CognitiveLoopService {
             neuromod_derived_cortisol: self.neuromod.bath.to_hormone_state().cortisol as f32,
             ne_ach_suppression: {
                 let ne_ph = self.neuromod.bath.ne_phasic();
-                if ne_ph > 0.3 {
-                    ne_ph * 0.15
-                } else {
-                    0.0
-                }
+                if ne_ph > 0.3 { ne_ph * 0.15 } else { 0.0 }
             },
             ach_ne_suppression: {
                 let ach_eff = self.neuromod.bath.acetylcholine.effective();

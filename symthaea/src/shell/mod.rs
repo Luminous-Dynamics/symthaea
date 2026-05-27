@@ -37,7 +37,6 @@ pub mod whatif;
 // Re-export commonly used types
 pub use aliases::{Alias, AliasManager};
 pub use context::{
-    classify_command_destructiveness,
     CommandClassification,
     CommandContext as ShellCommandContext, // Renamed to avoid conflict
     Completion,
@@ -49,6 +48,7 @@ pub use context::{
     PhiGate,
     PreviewStep,
     ShellContext,
+    classify_command_destructiveness,
 };
 pub use epistemic_overlay::{
     CommandContext, // Epistemic command context (with k_index, etc.)
@@ -59,10 +59,9 @@ pub use epistemic_overlay::{
     OverlayPosition,
     OverlayType,
 };
-pub use error_explainer::{quick_error_check, ErrorExplainer, ErrorExplanation};
+pub use error_explainer::{ErrorExplainer, ErrorExplanation, quick_error_check};
 pub use flake_context::{ContextualSuggestion, FlakeContext, SuggestionSource};
 pub use ipc_client::{
-    discover_socket,
     ConnectionState,
     IpcClientConfig,
     IpcRequest,
@@ -77,6 +76,7 @@ pub use ipc_client::{
     ShellContextData,
     ShellIpcClient,
     WireProtocol,
+    discover_socket,
 };
 pub use ipc_server::{
     CommandExecutor, ExecutionResult, IpcServer, IpcServerConfig, MetricsProvider,

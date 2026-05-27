@@ -37,7 +37,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use tracing::{info, warn};
 
-use symthaea::api::holon::{holon_router, HolonHttpState};
+use symthaea::api::holon::{HolonHttpState, holon_router};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 #[cfg(feature = "holon-quic")]
 use symthaea::swarm::quic_transport::{default_quic_port, spawn_holon_quic_server};
@@ -100,13 +100,9 @@ async fn main() -> Result<()> {
         .unwrap_or(20);
     let listen = std::env::var("HOLON_LISTEN").unwrap_or_else(|_| "127.0.0.1".into());
     let insecure_allow_unauth = env_truthy("HOLON_INSECURE_ALLOW_UNAUTH");
-    let configured_token = std::env::var("HOLON_TOKEN").ok().and_then(|t| {
-        if t.trim().is_empty() {
-            None
-        } else {
-            Some(t)
-        }
-    });
+    let configured_token = std::env::var("HOLON_TOKEN")
+        .ok()
+        .and_then(|t| if t.trim().is_empty() { None } else { Some(t) });
 
     let addr = format!("{}:{}", listen, port);
     let cycle_interval = std::time::Duration::from_micros(1_000_000 / cycle_hz as u64);

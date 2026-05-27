@@ -23,7 +23,7 @@
 //! rest-phase recovery.
 
 use std::collections::VecDeque;
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 use tracing::warn;
 
 /// Infrastructure errors that the organism can feel as somatic signals.

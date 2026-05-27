@@ -29,7 +29,7 @@
 
 use std::time::Duration;
 
-use symthaea::mind::{connect_social, AsyncMind, MindConfig, MindState};
+use symthaea::mind::{AsyncMind, MindConfig, MindState, connect_social};
 use symthaea_core::hdc::ContinuousHV;
 
 // ============================================================================
@@ -453,7 +453,7 @@ async fn run_partial_experiment(n_agents: usize, n_ticks: usize, seed: u64) -> (
 
     let phase1_end = n_ticks / 4; // 25% fragment-only perception
     let phase2_end = n_ticks * 3 / 4; // 50% social integration
-                                      // remaining 25% = convergence measurement
+    // remaining 25% = convergence measurement
 
     // CSV header
     println!("tick,n_agents,phase,mean_consciousness,mean_coherence,emergence_ratio");

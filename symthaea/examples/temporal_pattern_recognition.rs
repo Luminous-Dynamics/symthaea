@@ -18,9 +18,9 @@
 //! cargo run --example temporal_pattern_recognition --release
 //! ```
 
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::cincinnati_ltc::{BuddingEvent, CincinnatiLtcEngine};
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 
 use std::collections::VecDeque;
 

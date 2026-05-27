@@ -943,7 +943,7 @@ fn test_semantic_prosody_affects_effective_pacing() {
 // Voice Pipeline Orchestrator Tests
 // ==================================================================================
 
-use symthaea::voice::{aggregate_audio_hvs, binary_to_continuous, VoiceOrchestrator};
+use symthaea::voice::{VoiceOrchestrator, aggregate_audio_hvs, binary_to_continuous};
 use symthaea_core::hdc::BinaryHV;
 
 // ── Test: aggregate_audio_hvs produces valid ContinuousHV ─────────────────────

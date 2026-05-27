@@ -329,11 +329,7 @@ fn pearson_signed(x: &[f64], y: &[f64]) -> f64 {
         return 0.0;
     }
     let r = cov / (vx * vy).sqrt();
-    if r.is_nan() {
-        0.0
-    } else {
-        r.clamp(-1.0, 1.0)
-    }
+    if r.is_nan() { 0.0 } else { r.clamp(-1.0, 1.0) }
 }
 
 fn autocorrelation(x: &[f64], lag: usize) -> f64 {

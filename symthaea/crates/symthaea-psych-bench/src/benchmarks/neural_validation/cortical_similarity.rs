@@ -27,7 +27,7 @@ use std::collections::{BTreeMap, HashMap};
 use symthaea_core::hdc::cortical_activation::{
     ActivationSource, CorticalActivationMap, CorticalActivationTimeseries,
 };
-use symthaea_core::hdc::hemodynamic::{convolve_timeseries, HrfConfig};
+use symthaea_core::hdc::hemodynamic::{HrfConfig, convolve_timeseries};
 use symthaea_core::hdc::substrate_independence::CorticalRegion;
 
 /// A single TRIBE v2 prediction loaded from JSON.
@@ -702,7 +702,7 @@ impl PsychBenchmark for EegValidationBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-        use symthaea_core::hdc::cortical_activation::{activations_to_eeg, EegBand};
+        use symthaea_core::hdc::cortical_activation::{EegBand, activations_to_eeg};
 
         let start = std::time::Instant::now();
         let predictions = load_or_generate_predictions(config);

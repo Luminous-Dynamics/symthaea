@@ -58,7 +58,7 @@ pub use agent::{
 #[cfg(feature = "safety-agents")]
 pub use audit::SafetyAuditReport;
 #[cfg(feature = "safety-agents")]
-pub use gate::{consciousness_gate, safety_gate, SafetyGateResult};
+pub use gate::{SafetyGateResult, consciousness_gate, safety_gate};
 
 #[cfg(all(feature = "safety-agents", feature = "accelerator"))]
 pub use accelerator_bridge::AcceleratorSafetyAdapter;

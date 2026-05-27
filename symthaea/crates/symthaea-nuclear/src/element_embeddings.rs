@@ -1155,11 +1155,7 @@ fn unfilled_orbitals(z: u8) -> u8 {
         0 => {
             // s-block: max 1 orbital (2 electrons)
             let s = s_electrons(z);
-            if s < 2 {
-                1
-            } else {
-                0
-            }
+            if s < 2 { 1 } else { 0 }
         }
         1 => {
             // p-block: 3 orbitals (6 electrons)
@@ -1397,9 +1393,15 @@ mod tests {
         let sim_he_na = cosine_similarity(&he, &na);
 
         eprintln!("=== Similarity Structure ===");
-        eprintln!("Noble gases:  He-Ne={sim_he_ne:.4}, Ne-Ar={sim_ne_ar:.4}, He-Ar={sim_he_ar:.4}  (min={noble_min:.4})");
-        eprintln!("Alkali metals: Li-Na={sim_li_na:.4}, Na-K={sim_na_k:.4}, Li-K={sim_li_k:.4}  (min={alkali_min:.4})");
-        eprintln!("Halogens:     F-Cl={sim_f_cl:.4}, Cl-Br={sim_cl_br:.4}, F-Br={sim_f_br:.4}  (min={halogen_min:.4})");
+        eprintln!(
+            "Noble gases:  He-Ne={sim_he_ne:.4}, Ne-Ar={sim_ne_ar:.4}, He-Ar={sim_he_ar:.4}  (min={noble_min:.4})"
+        );
+        eprintln!(
+            "Alkali metals: Li-Na={sim_li_na:.4}, Na-K={sim_na_k:.4}, Li-K={sim_li_k:.4}  (min={alkali_min:.4})"
+        );
+        eprintln!(
+            "Halogens:     F-Cl={sim_f_cl:.4}, Cl-Br={sim_cl_br:.4}, F-Br={sim_f_br:.4}  (min={halogen_min:.4})"
+        );
         eprintln!("Cross-group:  Na-Cl={sim_na_cl:.4}, Li-F={sim_li_f:.4}, He-Na={sim_he_na:.4}");
 
         // Within-group minimum should exceed 0.85 (they share many features)

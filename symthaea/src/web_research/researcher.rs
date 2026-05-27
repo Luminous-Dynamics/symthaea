@@ -78,9 +78,16 @@ impl WebResearcher {
                         if !visited_urls.insert(url.clone()) {
                             continue;
                         }
-                        println!("\x1b[34m    [🛰️ CRAWL] Fetching semantic layer from: {}\x1b[0m", url);
+                        println!(
+                            "\x1b[34m    [🛰️ CRAWL] Fetching semantic layer from: {}\x1b[0m",
+                            url
+                        );
                         if let Ok(extraction) = self.fetch_and_extract(url).await {
-                            println!("\x1b[32m    [🧠 EXTRACT] Harvested {} raw claims (Structural Quality: {:.2})\x1b[0m", extraction.claims.len(), extraction.quality);
+                            println!(
+                                "\x1b[32m    [🧠 EXTRACT] Harvested {} raw claims (Structural Quality: {:.2})\x1b[0m",
+                                extraction.claims.len(),
+                                extraction.quality
+                            );
                             // Build source evidence
                             let source = SourceEvidence {
                                 url: url.clone(),
@@ -117,12 +124,12 @@ impl WebResearcher {
         for claim in all_claims.iter().take(10) {
             // Hardened script/boilerplate filter matrix
             let claim_lower = claim.to_lowercase();
-            if claim_lower.contains("@type") 
-                || claim_lower.contains("breadcrumb") 
-                || claim_lower.contains("itemlist") 
-                || claim_lower.contains(".push([") 
-                || claim_lower.contains("window.__") 
-                || claim_lower.contains("select citation style") 
+            if claim_lower.contains("@type")
+                || claim_lower.contains("breadcrumb")
+                || claim_lower.contains("itemlist")
+                || claim_lower.contains(".push([")
+                || claim_lower.contains("window.__")
+                || claim_lower.contains("select citation style")
                 || claim_lower.contains("table of contents")
             {
                 continue;
@@ -133,7 +140,10 @@ impl WebResearcher {
                 domain: self.detect_domain(query),
             };
             let verification = self.verifier.verify_claim(claim, &context);
-            println!("    \x1b[35m[⚖️ VERIFY] Status: {:?} (Confidence: {:.2}) -> \"{}\"\x1b[0m", verification.status, verification.confidence, claim);
+            println!(
+                "    \x1b[35m[⚖️ VERIFY] Status: {:?} (Confidence: {:.2}) -> \"{}\"\x1b[0m",
+                verification.status, verification.confidence, claim
+            );
             verified_claims.push(VerifiedClaim {
                 text: verification.claim,
                 status: verification.status,
@@ -205,7 +215,11 @@ impl WebResearcher {
         }
 
         // Relational Manifold Intersection Vectoring
-        if lower.contains("luminous dynamics") || lower.contains("tristan stoltz") || lower.contains("evolving resonant") || lower.contains("mycelix") {
+        if lower.contains("luminous dynamics")
+            || lower.contains("tristan stoltz")
+            || lower.contains("evolving resonant")
+            || lower.contains("mycelix")
+        {
             queries.push("Luminous Dynamics Tristan Stoltz".to_string());
             queries.push("luminous-nix natural language interface NixOS".to_string());
             queries.push("Evolving Resonant Co-creationism framework".to_string());
@@ -315,7 +329,7 @@ impl WebResearcher {
         // 2. Fetch DuckDuckGo HTML results page and extract the true organic links
         let ddg_url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
         println!("\x1b[34m    [🛰️ SEARCH] Querying fallback engine for organic links...\x1b[0m");
-        
+
         if let Ok(response) = self.client.get(&ddg_url).send().await {
             if let Ok(html_text) = response.text().await {
                 let doc = scraper::Html::parse_document(&html_text);
@@ -445,7 +459,8 @@ impl WebResearcher {
 
     async fn search_arxiv_api(&self, query: &str) -> Result<Vec<String>> {
         // Distill query to remove token pollution from academic indexing
-        let cleaned_query = query.to_lowercase()
+        let cleaned_query = query
+            .to_lowercase()
             .replace("arxiv", "")
             .replace("papers", "")
             .replace("paper", "")
@@ -459,7 +474,7 @@ impl WebResearcher {
         // Target both titles and abstracts specifically for high-density accuracy
         let search_query = format!("ti:\"{0}\" OR abs:\"{0}\"", cleaned_query);
         let encoded_query = urlencoding::encode(&search_query);
-        
+
         // Force chronological sorting to capture state-of-the-art results (2024-2026)
         let url = format!(
             "{}?search_query={}&id_list=&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
@@ -514,7 +529,10 @@ impl WebResearcher {
         if let Some(content_type) = response.headers().get("content-type") {
             if let Ok(ct_str) = content_type.to_str() {
                 let ct_lower = ct_str.to_lowercase();
-                if ct_lower.contains("pdf") || ct_lower.contains("octet-stream") || ct_lower.contains("zip") {
+                if ct_lower.contains("pdf")
+                    || ct_lower.contains("octet-stream")
+                    || ct_lower.contains("zip")
+                {
                     anyhow::bail!("Aborting ingestion of binary non-text asset: {}", ct_str);
                 }
             }

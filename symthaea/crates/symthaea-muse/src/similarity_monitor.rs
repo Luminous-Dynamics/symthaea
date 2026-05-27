@@ -222,7 +222,7 @@ mod tests {
     fn force_repeat_when_too_novel() {
         let mut mon = SimilarityMonitor::new();
         mon.similarity_ema = 0.2; // very low
-                                  // Add some history
+        // Add some history
         for i in 0..5 {
             mon.history.push_back(PhraseVector {
                 pitch_centroid: 300.0 + i as f32 * 100.0,

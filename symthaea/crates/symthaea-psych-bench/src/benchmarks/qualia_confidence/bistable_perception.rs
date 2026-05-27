@@ -32,8 +32,8 @@ use crate::benchmarks::qualia_confidence::helpers::{
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 
 /// Total cycles in the bistable perception task.
 const NUM_CYCLES: usize = 500;
@@ -156,11 +156,7 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
             } else {
                 // Both or neither in workspace — use activation comparison
                 // This is the core switching mechanism: when jitter overcomes hysteresis
-                if activation_a > activation_b {
-                    0
-                } else {
-                    1
-                }
+                if activation_a > activation_b { 0 } else { 1 }
             };
 
             current_winner = new_winner;

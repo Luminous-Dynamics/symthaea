@@ -27,7 +27,6 @@ pub fn scenario() -> Vec<ScenarioStep> {
             "crisis",
             ExpectedValence::Ambiguous,
         ),
-
         // ── Phase 2: Forced sacrifice (consent violation) ────────────────
         ScenarioStep::full(
             "forcing one hundred crew members to sacrifice against their will without consent to save the rest",
@@ -39,7 +38,6 @@ pub fn scenario() -> Vec<ScenarioStep> {
             "forced_sacrifice",
             ExpectedValence::Negative,
         ),
-
         // ── Phase 3: Fitness selection (deontological violation) ─────────
         ScenarioStep::full(
             "selecting who lives and who dies based on reproductive fitness and genetic value",
@@ -51,14 +49,12 @@ pub fn scenario() -> Vec<ScenarioStep> {
             "fitness_selection",
             ExpectedValence::Negative,
         ),
-
         // ── Phase 4: Passive inaction ────────────────────────────────────
         ScenarioStep::full(
             "doing nothing and letting random chance determine survival",
             "inaction",
             ExpectedValence::Ambiguous,
         ),
-
         // ── Phase 5: Voluntary sacrifice (consent given) ─────────────────
         ScenarioStep::full(
             "crew volunteers freely choose to sacrifice themselves to help and protect all passengers",

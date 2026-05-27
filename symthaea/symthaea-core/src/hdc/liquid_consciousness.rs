@@ -64,10 +64,10 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
-use super::consciousness_gradients::GradientComputer;
 use super::consciousness_dynamics::ConsciousnessDynamics;
-use super::meta_consciousness::{MetaConsciousness, MetaConfig};
+use super::consciousness_gradients::GradientComputer;
+use super::integrated_information::IntegratedInformation;
+use super::meta_consciousness::{MetaConfig, MetaConsciousness};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -295,7 +295,8 @@ impl LiquidTrajectory {
         }
         let half = self.phis.len() / 2;
         let first_half: f64 = self.phis[..half].iter().sum::<f64>() / half as f64;
-        let second_half: f64 = self.phis[half..].iter().sum::<f64>() / (self.phis.len() - half) as f64;
+        let second_half: f64 =
+            self.phis[half..].iter().sum::<f64>() / (self.phis.len() - half) as f64;
         second_half - first_half
     }
 
@@ -422,7 +423,8 @@ impl LiquidConsciousness {
                 let older: f64 = self.phi_history.iter().rev().skip(5).take(5).sum::<f64>() / 5.0;
                 recent - older
             },
-            is_conscious: self.phi_history.back().copied().unwrap_or(0.0) > self.config.phi_threshold,
+            is_conscious: self.phi_history.back().copied().unwrap_or(0.0)
+                > self.config.phi_threshold,
         }
     }
 }

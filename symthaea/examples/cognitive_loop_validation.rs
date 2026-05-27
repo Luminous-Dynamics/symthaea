@@ -9,7 +9,7 @@
 //!   cargo run --example cognitive_loop_validation --release
 
 use symthaea::benchmarks::{
-    print_cognitive_loop_validation_summary, CognitiveLoopValidation, CognitiveLoopValidationConfig,
+    CognitiveLoopValidation, CognitiveLoopValidationConfig, print_cognitive_loop_validation_summary,
 };
 
 fn main() -> anyhow::Result<()> {

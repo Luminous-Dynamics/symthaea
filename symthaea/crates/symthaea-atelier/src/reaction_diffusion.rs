@@ -15,8 +15,8 @@
 //! Pearson, J. E. (1993). Complex patterns in a simple system. *Science*, 261, 189–192.
 //! Gray, P. & Scott, S. K. (1983). Autocatalytic reactions in the CSTR. *Chemical Engineering Science*.
 
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use symthaea_canvas::{CognitiveSnapshot, SceneNode};
 
 // ─── Parameter space ─────────────────────────────────────────────────────────

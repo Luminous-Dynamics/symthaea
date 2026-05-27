@@ -9,6 +9,8 @@
 //! 3. Directional Phi Flow
 
 use symthaea::benchmarks::{
+    TuebingenAdapter,
+    UnifiedCausalReasoning,
     // Individual primitives
     discover_by_compression,
     discover_by_directional_phi,
@@ -18,8 +20,6 @@ use symthaea::benchmarks::{
     // Previous methods for comparison
     discover_information_theoretic,
     discover_majority_voting,
-    TuebingenAdapter,
-    UnifiedCausalReasoning,
 };
 
 fn main() {

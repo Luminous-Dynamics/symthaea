@@ -28,7 +28,7 @@
 use std::collections::VecDeque;
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
 
@@ -750,9 +750,11 @@ mod tests {
         let injections = mgr.drain_injections();
         assert!(injections.iter().any(|i| i.target == "norepinephrine"));
         let baselines = mgr.drain_baselines();
-        assert!(baselines
-            .iter()
-            .any(|b| b.target == "serotonin" && b.nudge < 0.0));
+        assert!(
+            baselines
+                .iter()
+                .any(|b| b.target == "serotonin" && b.nudge < 0.0)
+        );
     }
 
     #[test]

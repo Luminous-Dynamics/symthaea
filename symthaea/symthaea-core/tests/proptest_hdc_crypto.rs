@@ -14,7 +14,7 @@
 use proptest::prelude::*;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::hdc_crypto::{
-    HdcCommitment, HdcContextKey, HdcMac, HdcThresholdSharing, HDC_MAC_NOISY_THRESHOLD,
+    HDC_MAC_NOISY_THRESHOLD, HdcCommitment, HdcContextKey, HdcMac, HdcThresholdSharing,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

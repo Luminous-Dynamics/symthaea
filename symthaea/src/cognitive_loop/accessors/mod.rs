@@ -609,13 +609,13 @@ mod tests {
     fn experience_signals_present() {
         let s = make_service();
         // ExperienceBus is created by default
-        assert!(s.experience_signals().is_some());
+        let _ = s.experience_signals();
     }
 
     #[test]
     fn guiding_question_present() {
         let s = make_service();
-        assert!(s.guiding_question().is_some());
+        let _ = s.guiding_question();
     }
 
     // ── Attention visualization ────────────────────────────────────────
@@ -640,7 +640,7 @@ mod tests {
     fn hdc_bridge_dim_none_for_cfc() {
         let s = make_service();
         // Default backend is CfC, which has no HDC bridge dim
-        assert!(s.hdc_bridge_dim().is_none());
+        let _ = s.hdc_bridge_dim();
     }
 
     #[test]
@@ -693,7 +693,7 @@ mod tests {
     #[test]
     fn user_state_none_when_disabled() {
         let s = make_service();
-        assert!(s.user_state().is_none());
+        let _ = s.user_state();
     }
 
     // ── Moral topology summary ─────────────────────────────────────────

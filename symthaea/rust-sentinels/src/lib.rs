@@ -40,10 +40,10 @@
 //! - `wasm`: Enable WebAssembly bindings
 
 pub mod error;
-pub mod signal;
-pub mod sentinels;
-pub mod types;
 pub mod hardware;
+pub mod sentinels;
+pub mod signal;
+pub mod types;
 
 // Optional modules
 #[cfg(feature = "python")]
@@ -57,21 +57,39 @@ pub use types::*;
 
 // Re-export hardware abstraction
 pub use hardware::{
-    EegDevice, EegSample, DeviceConfig, DeviceInfo, DeviceError,
-    OpenBciAdapter, OpenBciConfig, OpenBciBoard,
-    MuseAdapter, MuseConfig, MuseModel,
+    DeviceConfig, DeviceError, DeviceInfo, EegDevice, EegSample, MuseAdapter, MuseConfig,
+    MuseModel, OpenBciAdapter, OpenBciBoard, OpenBciConfig,
 };
 
 // Re-export all sentinels and their types
 pub use sentinels::{
-    // Trilogy
-    EmotionSentinel, EmotionScore, EmotionQuadrant,
-    SleepSentinel, SleepScore, SleepStage, SleepConfig, SpectralRatios, SpindleEvent, KComplexEvent,
-    MeditationSentinel, MeditationScore, MeditationState,
+    AttentionConfig,
+    AttentionScore,
     // Extended Proofs
-    AttentionSentinel, AttentionScore, AttentionState, AttentionConfig,
-    FlowSentinel, FlowScore, FlowState, FlowConfig,
-    EngagementSentinel, EngagementScore, EngagementLevel, EngagementConfig,
+    AttentionSentinel,
+    AttentionState,
+    EmotionQuadrant,
+    EmotionScore,
+    // Trilogy
+    EmotionSentinel,
+    EngagementConfig,
+    EngagementLevel,
+    EngagementScore,
+    EngagementSentinel,
+    FlowConfig,
+    FlowScore,
+    FlowSentinel,
+    FlowState,
+    KComplexEvent,
+    MeditationScore,
+    MeditationSentinel,
+    MeditationState,
+    SleepConfig,
+    SleepScore,
+    SleepSentinel,
+    SleepStage,
+    SpectralRatios,
+    SpindleEvent,
 };
 
 /// Analysis mode selection
@@ -259,8 +277,14 @@ pub fn analyze_extended(
     };
 
     // Compute overall state with extended info
-    let (state, consciousness_level, wellbeing_score) =
-        compute_extended_state(&emotion, &sleep, &meditation, &attention, &flow, &engagement);
+    let (state, consciousness_level, wellbeing_score) = compute_extended_state(
+        &emotion,
+        &sleep,
+        &meditation,
+        &attention,
+        &flow,
+        &engagement,
+    );
 
     // Calculate performance potential (from attention + flow)
     let performance_potential = match (&attention, &flow) {
@@ -274,7 +298,11 @@ pub fn analyze_extended(
     let learning_readiness = match (&attention, &engagement) {
         (Some(a), Some(e)) => {
             let base = (a.attention_index / 3.0 * 0.4 + e.engagement_index / 3.0 * 0.4).min(1.0);
-            if e.fatigue > 0.5 { base * 0.5 } else { base + (1.0 - e.fatigue) * 0.2 }
+            if e.fatigue > 0.5 {
+                base * 0.5
+            } else {
+                base + (1.0 - e.fatigue) * 0.2
+            }
         }
         (Some(a), None) => a.attention_index / 3.0,
         (None, Some(e)) => e.engagement_index / 3.0,
@@ -363,7 +391,10 @@ fn compute_overall_state(
 
     // Flow state detection
     if consciousness_level > 0.8 && wellbeing > 0.7 {
-        if matches!(state, ConsciousnessState::Focused | ConsciousnessState::Meditative) {
+        if matches!(
+            state,
+            ConsciousnessState::Focused | ConsciousnessState::Meditative
+        ) {
             state = ConsciousnessState::Flow;
         }
     }
@@ -384,7 +415,10 @@ fn compute_extended_state(
         compute_overall_state(emotion, sleep, meditation);
 
     // If awake, use Extended Proofs to refine
-    if !matches!(state, ConsciousnessState::DeepSleep | ConsciousnessState::LightSleep | ConsciousnessState::Rem) {
+    if !matches!(
+        state,
+        ConsciousnessState::DeepSleep | ConsciousnessState::LightSleep | ConsciousnessState::Rem
+    ) {
         // Flow state from FlowSentinel
         if let Some(f) = flow {
             if f.flow_index > 0.6 {
@@ -465,7 +499,10 @@ mod tests {
     fn test_insufficient_data() {
         let data: Vec<f32> = vec![0.0; 100];
         let result = analyze_consciousness(&data, 256.0, AnalysisMode::Auto);
-        assert!(matches!(result, Err(SentinelError::InsufficientData { .. })));
+        assert!(matches!(
+            result,
+            Err(SentinelError::InsufficientData { .. })
+        ));
     }
 
     #[test]

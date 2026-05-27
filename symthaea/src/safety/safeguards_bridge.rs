@@ -11,7 +11,7 @@
 //! Requires both `safety-agents` and `proliferation-safeguards` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 #[allow(unused_imports)]
 use symthaea_nuclear_forensics::safeguards::SafeguardsFepAction;
 

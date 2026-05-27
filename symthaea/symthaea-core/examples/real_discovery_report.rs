@@ -22,13 +22,13 @@ use std::time::Instant;
 
 use symthaea_core::hdc::abstract_thought::expr_canonical_string;
 use symthaea_core::hdc::conjecture_engine::{
-    observe_balmer_series, observe_bell_numbers, observe_blackbody_peak, observe_catalan,
-    observe_central_binomial_limit, observe_derangement_ratio, observe_fibonacci_ratios,
-    observe_hydrogen_energy_levels, observe_inverse_square_law, observe_kepler_third_law,
-    observe_partitions, observe_prime_counting, observe_prime_gaps,
-    observe_quantum_harmonic_oscillator, observe_relativistic_kinetic_energy,
-    observe_stefan_boltzmann, BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr,
-    MathDomain, ObservedSequence, PreferredEmlBackend, RegressorConfig, UnaryFn,
+    BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr, MathDomain, ObservedSequence,
+    PreferredEmlBackend, RegressorConfig, UnaryFn, observe_balmer_series, observe_bell_numbers,
+    observe_blackbody_peak, observe_catalan, observe_central_binomial_limit,
+    observe_derangement_ratio, observe_fibonacci_ratios, observe_hydrogen_energy_levels,
+    observe_inverse_square_law, observe_kepler_third_law, observe_partitions,
+    observe_prime_counting, observe_prime_gaps, observe_quantum_harmonic_oscillator,
+    observe_relativistic_kinetic_energy, observe_stefan_boltzmann,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -410,7 +410,9 @@ fn pct(numerator: usize, denominator: usize) -> String {
 fn print_summary(reports: &[FamilyReport]) {
     println!("# Symthaea Real Discovery Report");
     println!();
-    println!("| family | obs | conjectures | verified | formal | refuted | EML backed | EML verified | macro candidates | macro ops | suspicious | ms |");
+    println!(
+        "| family | obs | conjectures | verified | formal | refuted | EML backed | EML verified | macro candidates | macro ops | suspicious | ms |"
+    );
     println!(
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
     );

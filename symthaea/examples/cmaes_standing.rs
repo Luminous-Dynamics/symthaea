@@ -96,7 +96,7 @@ fn run() {
         "Gen", "BestFit", "MeanFit", "BestEver", "Sigma"
     );
 
-    for gen in 0..n_generations {
+    for r#gen in 0..n_generations {
         // Sample population
         let mut population: Vec<Vec<f64>> = Vec::with_capacity(pop_size);
         let mut fitnesses: Vec<f64> = Vec::with_capacity(pop_size);
@@ -104,7 +104,7 @@ fn run() {
         for p in 0..pop_size {
             // Sample: x = mean + sigma * step_sizes * N(0,1)
             let mut candidate = vec![0.0f64; n_params];
-            let mut rng_state = (gen * pop_size + p + 42) as u64;
+            let mut rng_state = (r#gen * pop_size + p + 42) as u64;
             for i in 0..n_params {
                 rng_state ^= rng_state << 13;
                 rng_state ^= rng_state >> 7;
@@ -170,10 +170,10 @@ fn run() {
 
         mean = new_mean;
 
-        if gen % 10 == 0 || gen == n_generations - 1 {
+        if r#gen % 10 == 0 || r#gen == n_generations - 1 {
             println!(
                 "{:>5} {:>12.4} {:>12.4} {:>12.4} {:>8.5}",
-                gen, best_fitness, mean_fitness, best_ever_fitness, sigma
+                r#gen, best_fitness, mean_fitness, best_ever_fitness, sigma
             );
         }
     }

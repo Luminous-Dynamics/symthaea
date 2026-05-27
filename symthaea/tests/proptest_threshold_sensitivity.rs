@@ -23,7 +23,7 @@ and verifies the system's internal parameter space doesn't hide divergence.
 
 use proptest::prelude::*;
 use symthaea::cognitive_loop::{
-    config::ConsciousnessProfile, CognitiveLoopConfig, CognitiveLoopService,
+    CognitiveLoopConfig, CognitiveLoopService, config::ConsciousnessProfile,
 };
 use symthaea_core::hdc::substrate_independence::SubstrateType;
 

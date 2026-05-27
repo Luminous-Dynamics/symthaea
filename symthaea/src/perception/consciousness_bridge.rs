@@ -34,11 +34,8 @@ use anyhow::Result;
 use std::sync::Arc;
 
 use crate::brain::prefrontal::AttentionBid;
-use crate::perception::{
-    MultiModalPerception, MultiModalIntegrator, ModalityType,
-    SemanticVision,
-};
-use crate::embeddings::{Qwen3Embedder, Qwen3Config};
+use crate::embeddings::{Qwen3Config, Qwen3Embedder};
+use crate::perception::{ModalityType, MultiModalIntegrator, MultiModalPerception, SemanticVision};
 
 /// Configuration for the perception-consciousness bridge
 #[derive(Debug, Clone)]
@@ -171,7 +168,8 @@ impl PerceptionBridge {
 
     /// Create a unified attention bid from multi-modal perception
     fn create_unified_bid(&self, perception: &MultiModalPerception) -> AttentionBid {
-        let modality_names: Vec<&str> = perception.modalities
+        let modality_names: Vec<&str> = perception
+            .modalities
             .iter()
             .map(|m| m.modality.name())
             .collect();
@@ -185,10 +183,7 @@ impl PerceptionBridge {
         let mut bid = AttentionBid::new("Perception", content)
             .with_salience(self.config.base_salience * perception.confidence)
             .with_urgency(self.config.base_urgency)
-            .with_tags(vec![
-                "perception".to_string(),
-                "multi-modal".to_string(),
-            ]);
+            .with_tags(vec!["perception".to_string(), "multi-modal".to_string()]);
 
         // Add HDC vector if configured
         if self.config.include_hdc {
@@ -200,7 +195,10 @@ impl PerceptionBridge {
     }
 
     /// Create an attention bid for a single modality
-    fn create_modality_bid(&self, contribution: &crate::perception::ModalityContribution) -> Option<AttentionBid> {
+    fn create_modality_bid(
+        &self,
+        contribution: &crate::perception::ModalityContribution,
+    ) -> Option<AttentionBid> {
         let content = format!(
             "{} perception: {:.1}% confidence",
             contribution.modality.name(),
@@ -255,10 +253,13 @@ impl PerceptionBridge {
         // Project to HDC
         let hdc_vector = self.integrator.project_text_embedding(&embedding)?;
 
-        let bid = AttentionBid::new("TextPerception", format!("Text: {}", &text[..text.len().min(50)]))
-            .with_salience(0.7)
-            .with_urgency(0.5)
-            .with_tags(vec!["perception".to_string(), "text".to_string()]);
+        let bid = AttentionBid::new(
+            "TextPerception",
+            format!("Text: {}", &text[..text.len().min(50)]),
+        )
+        .with_salience(0.7)
+        .with_urgency(0.5)
+        .with_tags(vec!["perception".to_string(), "text".to_string()]);
 
         if self.config.include_hdc {
             let hdc_i8 = self.boolean_to_i8_vec(&hdc_vector);
@@ -285,10 +286,7 @@ impl PerceptionBridge {
         let hdc_vector = self.integrator.project_image_embedding(&embedding)?;
 
         let (width, height) = image.dimensions();
-        let bid = AttentionBid::new(
-            "VisionPerception",
-            format!("Image: {}x{}", width, height)
-        )
+        let bid = AttentionBid::new("VisionPerception", format!("Image: {}x{}", width, height))
             .with_salience(0.6)
             .with_urgency(0.4)
             .with_tags(vec!["perception".to_string(), "vision".to_string()]);
@@ -303,7 +301,10 @@ impl PerceptionBridge {
 
     /// Convert boolean HdcVector to Vec<i8> for SharedHdcVector compatibility
     fn boolean_to_i8_vec(&self, hdc: &crate::perception::multi_modal::HdcVector) -> Vec<i8> {
-        hdc.bits.iter().map(|&bit| if bit { 1i8 } else { -1i8 }).collect()
+        hdc.bits
+            .iter()
+            .map(|&bit| if bit { 1i8 } else { -1i8 })
+            .collect()
     }
 
     /// Get bridge statistics

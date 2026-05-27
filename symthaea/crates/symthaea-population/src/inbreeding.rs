@@ -15,11 +15,7 @@ use std::collections::HashMap;
 /// Where Ho = observed heterozygosity, He = expected heterozygosity.
 /// Returns 0.0 if He is zero (monomorphic locus).
 pub fn inbreeding_coefficient_from_heterozygosity(he: f64, ho: f64) -> f64 {
-    if he == 0.0 {
-        0.0
-    } else {
-        1.0 - ho / he
-    }
+    if he == 0.0 { 0.0 } else { 1.0 - ho / he }
 }
 
 /// Kinship coefficient between two individuals from pedigree data.

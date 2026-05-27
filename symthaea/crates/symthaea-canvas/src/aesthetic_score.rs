@@ -40,7 +40,7 @@ fn compute_symmetry(state: &AestheticState) -> f32 {
     }
     let variance: f32 = radii.iter().map(|r| (r - mean).powi(2)).sum::<f32>() / 8.0;
     let cv = variance.sqrt() / mean; // coefficient of variation
-                                     // Low CV → high symmetry. CV of 0 → 1.0, CV of 1 → ~0
+    // Low CV → high symmetry. CV of 0 → 1.0, CV of 1 → ~0
     (1.0 - cv).clamp(0.0, 1.0)
 }
 

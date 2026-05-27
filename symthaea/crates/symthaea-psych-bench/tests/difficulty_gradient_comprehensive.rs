@@ -26,9 +26,9 @@ use symthaea_psych_bench::benchmarks::{
     },
 };
 use symthaea_psych_bench::harness::{
-    difficulty::{difficulty_model_for, DifficultyModelType},
-    report::key_metric_for_benchmark,
     BenchmarkConfig, PsychBenchmark,
+    difficulty::{DifficultyModelType, difficulty_model_for},
+    report::key_metric_for_benchmark,
 };
 
 /// Run a benchmark at multiple difficulty levels and return its key metric values.

@@ -828,9 +828,10 @@ mod tests {
 
         assert!(lm.vocab_size > 0);
         assert!(lm.unigrams.contains_key("cat"));
-        assert!(lm
-            .bigrams
-            .contains_key(&("the".to_string(), "cat".to_string())));
+        assert!(
+            lm.bigrams
+                .contains_key(&("the".to_string(), "cat".to_string()))
+        );
     }
 
     #[test]

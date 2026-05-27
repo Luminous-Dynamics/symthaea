@@ -148,7 +148,8 @@ mod tests {
         assert!(
             sim_ff > sim_cross,
             "firefox and firefox-esr ({:.3}) should be more similar than firefox and postgresql ({:.3})",
-            sim_ff, sim_cross,
+            sim_ff,
+            sim_cross,
         );
     }
 

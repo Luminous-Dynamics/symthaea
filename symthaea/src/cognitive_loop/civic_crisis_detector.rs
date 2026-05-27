@@ -525,10 +525,12 @@ mod tests {
 
         let event = detector.tick(&input, 20);
         let event = event.expect("Phi collapse + safety escalation should trigger");
-        assert!(event
-            .trigger_signals
-            .iter()
-            .any(|s| s.name == "phi_collapse"));
+        assert!(
+            event
+                .trigger_signals
+                .iter()
+                .any(|s| s.name == "phi_collapse")
+        );
     }
 
     #[test]

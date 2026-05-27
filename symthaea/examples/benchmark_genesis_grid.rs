@@ -9,7 +9,7 @@
 fn main() {
     println!("=== Genesis Mission Challenge 1: Grid Scaling ===\n");
 
-    use symthaea::physics::grid::{GridReading, GridTwin, GRID_HORIZONS};
+    use symthaea::physics::grid::{GRID_HORIZONS, GridReading, GridTwin};
 
     // 1. Create a healthy grid scenario
     let healthy = GridReading {

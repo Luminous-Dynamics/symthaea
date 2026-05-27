@@ -10,7 +10,7 @@ use symthaea_geodesic::manifold::ProgramManifold;
 use symthaea_geodesic::manifold_bootstrap::bootstrap_with_topology;
 use symthaea_geodesic::pdg::{NodeKind, ProgramDependenceGraph};
 use symthaea_geodesic::sheaf::{CodeSheaf, LocalSection};
-use symthaea_geodesic::skeleton_synthesis::{build_skeleton_from_topology, SkeletonCombinator};
+use symthaea_geodesic::skeleton_synthesis::{SkeletonCombinator, build_skeleton_from_topology};
 use symthaea_geodesic::topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};
 use symthaea_geodesic::{CodeSpec, GeodesicSynthesizer, SynthesisConfig};
 

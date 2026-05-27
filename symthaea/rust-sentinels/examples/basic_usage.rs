@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Basic usage example for the Sentinels library
 
-use sentinels::{analyze_consciousness, AnalysisMode};
+use sentinels::{AnalysisMode, analyze_consciousness};
 
 fn main() {
     // Generate synthetic EEG-like data (30 seconds at 256 Hz)
@@ -21,7 +21,7 @@ fn main() {
             0.5 * (pi2 * 10.0 * t).sin()  // Alpha
                 + 0.3 * (pi2 * 6.0 * t).sin()   // Theta
                 + 0.1 * (pi2 * 20.0 * t).sin()  // Beta
-                + 0.1 * (pi2 * 2.0 * t).sin()   // Delta
+                + 0.1 * (pi2 * 2.0 * t).sin() // Delta
         })
         .collect();
 
@@ -31,7 +31,10 @@ fn main() {
             println!("=== Proof of Consciousness ===");
             println!();
             println!("Overall State: {:?}", poc.state);
-            println!("Consciousness Level: {:.1}%", poc.consciousness_level * 100.0);
+            println!(
+                "Consciousness Level: {:.1}%",
+                poc.consciousness_level * 100.0
+            );
             println!("Wellbeing Score: {:.1}%", poc.wellbeing_score * 100.0);
             println!();
 
@@ -50,7 +53,11 @@ fn main() {
 
             if let Some(meditation) = &poc.meditation {
                 println!("Meditation:");
-                println!("  Depth: {:.2} ({:?})", meditation.depth, meditation.state());
+                println!(
+                    "  Depth: {:.2} ({:?})",
+                    meditation.depth,
+                    meditation.state()
+                );
                 println!("  Index: {:.2}", meditation.meditation_index);
             }
 

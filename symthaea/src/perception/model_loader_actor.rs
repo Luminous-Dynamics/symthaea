@@ -135,7 +135,12 @@ impl ModelLoaderActor {
 
         // Check which models are already downloaded
         let mut loaded_models = std::collections::HashSet::new();
-        for spec in [ModelSpec::Qwen3Embedding, ModelSpec::SigLIP, ModelSpec::Moondream, ModelSpec::BGE] {
+        for spec in [
+            ModelSpec::Qwen3Embedding,
+            ModelSpec::SigLIP,
+            ModelSpec::Moondream,
+            ModelSpec::BGE,
+        ] {
             if hub.is_downloaded(spec) {
                 loaded_models.insert(spec);
             }
@@ -224,13 +229,15 @@ impl ModelLoaderActor {
 
         // Perform the download
         info!("Loading model {:?}...", spec);
-        self.loader.update_progress(&model_name, 0.1, "Starting download...");
+        self.loader
+            .update_progress(&model_name, 0.1, "Starting download...");
 
         #[cfg(feature = "vision")]
         let result = {
             match self.hub.ensure_model(spec) {
                 Ok(path) => {
-                    self.loader.update_progress(&model_name, 0.9, "Validating...");
+                    self.loader
+                        .update_progress(&model_name, 0.9, "Validating...");
                     self.loader.complete_loading(&model_name);
                     self.loaded_models.insert(spec);
 
@@ -260,7 +267,8 @@ impl ModelLoaderActor {
         #[cfg(not(feature = "vision"))]
         let result = {
             // Without vision feature, mark as unavailable
-            self.loader.fail_loading(&model_name, "Vision feature not enabled");
+            self.loader
+                .fail_loading(&model_name, "Vision feature not enabled");
             ModelLoadResult {
                 spec,
                 success: false,
@@ -281,10 +289,7 @@ impl ModelLoaderActor {
     }
 
     /// Handle preload all request
-    async fn handle_preload_all(
-        &mut self,
-        notify: Option<oneshot::Sender<Vec<ModelLoadResult>>>,
-    ) {
+    async fn handle_preload_all(&mut self, notify: Option<oneshot::Sender<Vec<ModelLoadResult>>>) {
         let specs_to_load: Vec<ModelSpec> = [
             ModelSpec::Qwen3Embedding,
             ModelSpec::SigLIP,
@@ -312,7 +317,8 @@ impl ModelLoaderActor {
 
     /// Get all loading statuses as snapshots
     fn get_all_statuses(&self) -> Vec<LoadingStatusSnapshot> {
-        self.loader.all_statuses()
+        self.loader
+            .all_statuses()
             .into_iter()
             .map(|status| LoadingStatusSnapshot {
                 model_name: status.model.clone(),
@@ -359,11 +365,15 @@ impl ModelLoaderHandle {
     pub async fn load_model_and_wait(&self, spec: ModelSpec) -> anyhow::Result<ModelLoadResult> {
         let (tx, rx) = oneshot::channel();
         self.sender
-            .send(ModelLoaderMessage::LoadModel { spec, notify: Some(tx) })
+            .send(ModelLoaderMessage::LoadModel {
+                spec,
+                notify: Some(tx),
+            })
             .await
             .map_err(|_| anyhow::anyhow!("Actor channel closed"))?;
 
-        rx.await.map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
+        rx.await
+            .map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
     }
 
     /// Check if a model is loaded
@@ -374,7 +384,8 @@ impl ModelLoaderHandle {
             .await
             .map_err(|_| anyhow::anyhow!("Actor channel closed"))?;
 
-        rx.await.map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
+        rx.await
+            .map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
     }
 
     /// Get current loading statuses
@@ -385,7 +396,8 @@ impl ModelLoaderHandle {
             .await
             .map_err(|_| anyhow::anyhow!("Actor channel closed"))?;
 
-        rx.await.map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
+        rx.await
+            .map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
     }
 
     /// Preload all models (fire-and-forget)
@@ -404,7 +416,8 @@ impl ModelLoaderHandle {
             .await
             .map_err(|_| anyhow::anyhow!("Actor channel closed"))?;
 
-        rx.await.map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
+        rx.await
+            .map_err(|_| anyhow::anyhow!("Actor dropped reply channel"))
     }
 
     /// Shutdown the actor

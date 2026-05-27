@@ -2751,7 +2751,10 @@ mod tests {
         assert!(
             pos_warm_count > 0 || neg_dark_count > 0,
             "valence should affect word choice. Positive warm={}, Negative dark={}. Positive: {}. Negative: {}",
-            pos_warm_count, neg_dark_count, pos_joined, neg_joined,
+            pos_warm_count,
+            neg_dark_count,
+            pos_joined,
+            neg_joined,
         );
     }
 

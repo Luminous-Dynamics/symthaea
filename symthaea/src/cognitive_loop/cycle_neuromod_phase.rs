@@ -17,6 +17,7 @@
 //! - Experience bus update (principled signals)
 //! - Guiding question → subsystem priority
 
+use super::CognitiveLoopService;
 use super::thresholds;
 use super::thresholds::{
     NEUROMOD_AROUSAL_EMA_DECAY, NEUROMOD_AROUSAL_EMA_INPUT, NEUROMOD_AROUSAL_PHASIC_SPIKE,
@@ -28,7 +29,6 @@ use super::thresholds::{
     NEUROMOD_NE_PHASIC_THRESHOLD, NEUROMOD_SEIZURE_EXPLORATION_FREEZE,
     NEUROMOD_SEROTONIN_CRASH_PRODUCTION,
 };
-use super::CognitiveLoopService;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Result struct

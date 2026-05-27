@@ -10,7 +10,7 @@
 
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
-use crate::types::{pd_cruise_baseline_with_road, MeshSignal, VehicleCommand, VehicleState};
+use crate::types::{MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road};
 
 /// Configuration for a swarm simulation.
 #[derive(Debug, Clone)]

@@ -117,11 +117,7 @@ fn extract_indicator_score(
         "AST-1" => {
             // Attention schema: attention_schema_focus with non-zero fallback
             let focus = metadata.attention.attention_schema_focus as f64;
-            if focus > 0.0 {
-                focus
-            } else {
-                0.01
-            }
+            if focus > 0.0 { focus } else { 0.01 }
         }
         _ => 0.0,
     }

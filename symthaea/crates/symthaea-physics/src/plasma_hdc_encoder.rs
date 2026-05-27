@@ -1210,12 +1210,16 @@ mod tests {
             !assessment.critical_sensors.is_empty(),
             "Should detect critical sensors"
         );
-        assert!(assessment
-            .critical_sensors
-            .contains(&PlasmaSensorType::PlasmaCurrent));
-        assert!(assessment
-            .critical_sensors
-            .contains(&PlasmaSensorType::SafetyFactor));
+        assert!(
+            assessment
+                .critical_sensors
+                .contains(&PlasmaSensorType::PlasmaCurrent)
+        );
+        assert!(
+            assessment
+                .critical_sensors
+                .contains(&PlasmaSensorType::SafetyFactor)
+        );
     }
 
     // -------------------------------------------------------------------------

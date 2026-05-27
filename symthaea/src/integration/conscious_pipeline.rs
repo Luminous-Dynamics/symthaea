@@ -1268,23 +1268,28 @@ mod tests {
     #[test]
     fn test_nix_hook_feedback_forwarding() {
         let mut hook = MockNixHook::confident();
-        assert!(!hook
-            .feedback_called
-            .load(std::sync::atomic::Ordering::Relaxed));
+        assert!(
+            !hook
+                .feedback_called
+                .load(std::sync::atomic::Ordering::Relaxed)
+        );
 
         symthaea_nix::plugin::pipeline_integration::NixPipelineHook::feedback(&mut hook, true);
-        assert!(hook
-            .feedback_called
-            .load(std::sync::atomic::Ordering::Relaxed));
+        assert!(
+            hook.feedback_called
+                .load(std::sync::atomic::Ordering::Relaxed)
+        );
     }
 
     #[cfg(feature = "nix-mind")]
     #[test]
     fn test_nix_hook_post_execute_called() {
         let mut hook = MockNixHook::confident();
-        assert!(!hook
-            .post_execute_called
-            .load(std::sync::atomic::Ordering::Relaxed));
+        assert!(
+            !hook
+                .post_execute_called
+                .load(std::sync::atomic::Ordering::Relaxed)
+        );
 
         symthaea_nix::plugin::pipeline_integration::NixPipelineHook::post_execute(
             &mut hook,
@@ -1292,9 +1297,10 @@ mod tests {
             true,
             "activation successful",
         );
-        assert!(hook
-            .post_execute_called
-            .load(std::sync::atomic::Ordering::Relaxed));
+        assert!(
+            hook.post_execute_called
+                .load(std::sync::atomic::Ordering::Relaxed)
+        );
     }
 
     #[test]

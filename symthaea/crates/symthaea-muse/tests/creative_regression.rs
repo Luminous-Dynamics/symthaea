@@ -22,7 +22,7 @@
 //! (e.g., a synthesis bug that flattens all notes to the same pitch would
 //! destroy melodic coherence). They are NOT a substitute for listening tests.
 
-use symthaea_muse::{creative_bench, MuseConfig, MusicalState};
+use symthaea_muse::{MuseConfig, MusicalState, creative_bench};
 
 /// Regression tolerance: a metric may decline by at most this much before failing.
 /// Allows for minor floating-point variance across platforms.

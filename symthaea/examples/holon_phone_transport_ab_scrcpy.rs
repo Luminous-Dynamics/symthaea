@@ -15,9 +15,7 @@
 
 #[cfg(not(all(feature = "holon-viewer", feature = "phone-scrcpy")))]
 fn main() {
-    eprintln!(
-        "Requires: --features holon-viewer,phone-scrcpy (nix develop for ffmpeg + libclang)"
-    );
+    eprintln!("Requires: --features holon-viewer,phone-scrcpy (nix develop for ffmpeg + libclang)");
     std::process::exit(1);
 }
 
@@ -47,8 +45,7 @@ async fn main() -> anyhow::Result<()> {
     // with heavy scrcpy keyframe payloads. 10 s is generous for the
     // A/B; per-frame time is what we measure, not the deadline.
     const FRAME_TIMEOUT: Duration = Duration::from_secs(10);
-    const DEFAULT_JAR: &str =
-        "crates/symthaea-phone-embodiment/vendor/scrcpy-server-v2.4.jar";
+    const DEFAULT_JAR: &str = "crates/symthaea-phone-embodiment/vendor/scrcpy-server-v2.4.jar";
     const DEFAULT_TCP_PORT: u16 = 8408; // Dev/test range 8400-8409 per PORTS.md
 
     #[derive(Debug)]
@@ -118,10 +115,8 @@ async fn main() -> anyhow::Result<()> {
                         .context("parse --height")?;
                 }
                 "--jar" => {
-                    config.jar = PathBuf::from(
-                        args.next()
-                            .ok_or_else(|| anyhow!("--jar needs a value"))?,
-                    );
+                    config.jar =
+                        PathBuf::from(args.next().ok_or_else(|| anyhow!("--jar needs a value"))?);
                 }
                 "--tcp-port" => {
                     config.tcp_port = args
@@ -302,7 +297,9 @@ async fn main() -> anyhow::Result<()> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .context("bind WS scrcpy A/B listener")?;
-        let addr = listener.local_addr().context("read WS scrcpy A/B address")?;
+        let addr = listener
+            .local_addr()
+            .context("read WS scrcpy A/B address")?;
         let router = holon_router(state.clone());
         let server = tokio::spawn(async move { axum::serve(listener, router).await });
 
@@ -318,8 +315,7 @@ async fn main() -> anyhow::Result<()> {
             let Some(expected_id) = display_frame_id(frame) else {
                 continue;
             };
-            let sealed = seal_frame(frame, &mut sender_session)
-                .context("seal WS scrcpy frame")?;
+            let sealed = seal_frame(frame, &mut sender_session).context("seal WS scrcpy frame")?;
             let sent_at = Instant::now();
             state.push_rdp_outbound(sealed);
 
@@ -345,8 +341,8 @@ async fn main() -> anyhow::Result<()> {
         }
 
         let input = sample_input(1);
-        let sealed_input = seal_input(&input, &mut receiver_session)
-            .context("seal WS scrcpy reverse input")?;
+        let sealed_input =
+            seal_input(&input, &mut receiver_session).context("seal WS scrcpy reverse input")?;
         socket
             .send(Message::Binary(sealed_input.into()))
             .await
@@ -390,8 +386,8 @@ async fn main() -> anyhow::Result<()> {
             let Some(expected_id) = display_frame_id(frame) else {
                 continue;
             };
-            let sealed = seal_frame(frame, &mut sender_session)
-                .context("seal QUIC scrcpy frame")?;
+            let sealed =
+                seal_frame(frame, &mut sender_session).context("seal QUIC scrcpy frame")?;
             let sent_at = Instant::now();
             state.push_rdp_outbound(sealed);
 
@@ -434,12 +430,8 @@ async fn main() -> anyhow::Result<()> {
         frames.len()
     );
 
-    let ws = run_ws(&frames)
-        .await
-        .context("WS scrcpy A/B failed")?;
-    let quic = run_quic(&frames)
-        .await
-        .context("QUIC scrcpy A/B failed")?;
+    let ws = run_ws(&frames).await.context("WS scrcpy A/B failed")?;
+    let quic = run_quic(&frames).await.context("QUIC scrcpy A/B failed")?;
 
     println!(
         "WS   samples={} p50={}us p99={}us max={}us",

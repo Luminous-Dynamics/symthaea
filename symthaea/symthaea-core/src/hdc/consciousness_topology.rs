@@ -1756,8 +1756,15 @@ mod tests {
             let interaction = (u_bind - u_bundle) - (s_bind - s_bundle);
             interaction_effects.push(interaction);
 
-            println!("Fold {}: U(bind={:.3}, bundle={:.3}), S(bind={:.3}, bundle={:.3}), interaction={:.4}",
-                     fold + 1, u_bind, u_bundle, s_bind, s_bundle, interaction);
+            println!(
+                "Fold {}: U(bind={:.3}, bundle={:.3}), S(bind={:.3}, bundle={:.3}), interaction={:.4}",
+                fold + 1,
+                u_bind,
+                u_bundle,
+                s_bind,
+                s_bundle,
+                interaction
+            );
         }
 
         // Compute cross-validated statistics

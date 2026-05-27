@@ -23,7 +23,7 @@ The CycleUrgency enum is public and tested directly.
 
 use proptest::prelude::*;
 use symthaea::cognitive_loop::{
-    config::ConsciousnessProfile, CognitiveLoopConfig, CognitiveLoopService, CycleUrgency,
+    CognitiveLoopConfig, CognitiveLoopService, CycleUrgency, config::ConsciousnessProfile,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

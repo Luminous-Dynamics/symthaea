@@ -1113,9 +1113,15 @@ impl CodeLearningEngine {
                 let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
                 for inv in invariants {
                     // Try to find a counterexample (negate the safety invariant)
-                    let query = format!("(assert (not {}))", inv.trim_start_matches("(assert ").trim_end_matches(')'));
+                    let query = format!(
+                        "(assert (not {}))",
+                        inv.trim_start_matches("(assert ").trim_end_matches(')')
+                    );
                     if z3.verify_satisfiable(&query).is_sat() {
-                        tracing::warn!("🚨 Symbolic Safety Veto: Potential invariant violation detected: {}", inv);
+                        tracing::warn!(
+                            "🚨 Symbolic Safety Veto: Potential invariant violation detected: {}",
+                            inv
+                        );
                         symbolic_veto = true;
                         break;
                     }
@@ -1448,7 +1454,7 @@ impl CodeLearningEngine {
     ///
     /// This is the error-driven learning loop:
     /// - Compilation failures → encoded as error patterns for future fix hints
-    /// - Successful generations → stored as learned templates for future native gen
+    /// - Successful generations → stored as learned templates for future native r#gen
     /// - Fix strategies → persisted for cross-session error recovery
     ///
     /// Call this after `run_session()` to persist learning across sessions.

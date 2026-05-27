@@ -66,11 +66,11 @@ impl Default for BindingConfig {
     fn default() -> Self {
         Self {
             frequencies: vec![
-                40.0,   // Standard gamma
-                80.0,   // High gamma
-                20.0,   // Beta
-                10.0,   // Alpha
-                4.0,    // Theta
+                40.0, // Standard gamma
+                80.0, // High gamma
+                20.0, // Beta
+                10.0, // Alpha
+                4.0,  // Theta
             ],
             coupling_strength: 0.5,
             noise_level: 0.05,
@@ -224,7 +224,9 @@ impl MultiScaleBinding {
     pub fn new(config: BindingConfig) -> Self {
         let n = config.frequencies.len();
 
-        let oscillators: Vec<GammaOscillator> = config.frequencies.iter()
+        let oscillators: Vec<GammaOscillator> = config
+            .frequencies
+            .iter()
             .map(|&f| GammaOscillator::new(f))
             .collect();
 
@@ -324,7 +326,8 @@ impl MultiScaleBinding {
         let binding_energy = self.compute_binding_energy(&scale_coherence);
 
         // Step 7: Find dominant frequency
-        let dominant_idx = scale_coherence.iter()
+        let dominant_idx = scale_coherence
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
@@ -332,9 +335,7 @@ impl MultiScaleBinding {
         let dominant_frequency = self.config.frequencies[dominant_idx];
 
         // Outputs
-        let outputs: Vec<f64> = self.oscillators.iter()
-            .map(|o| o.output())
-            .collect();
+        let outputs: Vec<f64> = self.oscillators.iter().map(|o| o.output()).collect();
 
         BindingResult {
             outputs,
@@ -426,7 +427,9 @@ impl MultiScaleBinding {
         }
 
         // Scale weights by oscillator output and coherence
-        let weights: Vec<f32> = self.oscillators.iter()
+        let weights: Vec<f32> = self
+            .oscillators
+            .iter()
             .zip(coherence.iter())
             .map(|(osc, &c)| (osc.output().abs() * c) as f32)
             .collect();
@@ -450,7 +453,8 @@ impl MultiScaleBinding {
     /// Compute total binding energy
     fn compute_binding_energy(&self, coherence: &[f64]) -> f64 {
         // Energy = sum of (amplitude * coherence * frequency_weight)
-        self.oscillators.iter()
+        self.oscillators
+            .iter()
             .zip(coherence.iter())
             .map(|(osc, &c)| {
                 let freq_weight = osc.frequency / 40.0; // Normalize to gamma
@@ -573,9 +577,7 @@ mod tests {
         let mut binder = MultiScaleBinding::default_config();
         let dim = 1024;
 
-        let features: Vec<ContinuousHV> = (0..3)
-            .map(|i| ContinuousHV::random(dim, i))
-            .collect();
+        let features: Vec<ContinuousHV> = (0..3).map(|i| ContinuousHV::random(dim, i)).collect();
 
         // Run for 100ms
         let dt = 0.001;
@@ -624,9 +626,7 @@ mod tests {
     fn test_dominant_frequency() {
         let binder = MultiScaleBinding::default_config();
 
-        let features: Vec<ContinuousHV> = (0..3)
-            .map(|i| ContinuousHV::random(1024, i))
-            .collect();
+        let features: Vec<ContinuousHV> = (0..3).map(|i| ContinuousHV::random(1024, i)).collect();
 
         let mut b = binder;
         let result = b.step(&features, 0.001);
@@ -639,9 +639,7 @@ mod tests {
     fn test_stats() {
         let mut binder = MultiScaleBinding::default_config();
 
-        let features: Vec<ContinuousHV> = (0..2)
-            .map(|i| ContinuousHV::random(1024, i))
-            .collect();
+        let features: Vec<ContinuousHV> = (0..2).map(|i| ContinuousHV::random(1024, i)).collect();
 
         let _ = binder.step(&features, 0.001);
         let stats = binder.stats();
@@ -655,9 +653,7 @@ mod tests {
     fn test_reset() {
         let mut binder = MultiScaleBinding::default_config();
 
-        let features: Vec<ContinuousHV> = (0..2)
-            .map(|i| ContinuousHV::random(1024, i))
-            .collect();
+        let features: Vec<ContinuousHV> = (0..2).map(|i| ContinuousHV::random(1024, i)).collect();
 
         // Run for a bit
         for _ in 0..50 {

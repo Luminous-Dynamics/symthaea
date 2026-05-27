@@ -316,8 +316,8 @@ impl QualiaConfidenceScore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::harness::config::BenchmarkConfig;
     use crate::harness::PsychBenchmark;
+    use crate::harness::config::BenchmarkConfig;
 
     fn run_all_benchmarks() -> Vec<BenchmarkResult> {
         let config = BenchmarkConfig {

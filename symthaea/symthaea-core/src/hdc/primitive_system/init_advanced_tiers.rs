@@ -10,7 +10,7 @@
 //! - Tier 9: Code & Symbol Manipulation Primitives
 
 use super::{
-    seed_from_name, BindingRule, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier,
+    BindingRule, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier, seed_from_name,
 };
 use crate::hdc::binary_hv::BinaryHV;
 

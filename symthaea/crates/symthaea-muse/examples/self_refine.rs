@@ -13,7 +13,7 @@ use symthaea_aesthetic::ValenceArousal;
 use symthaea_muse::creative_bench::{
     AudioQualityScore, CreativeQualityScore, HarmonicProgressionScore, TheoryValidation,
 };
-use symthaea_muse::{compose, export, pitch, MuseConfig, MusicalState};
+use symthaea_muse::{MuseConfig, MusicalState, compose, export, pitch};
 
 const CANDIDATES_PER_ROUND: usize = 6;
 const REFINEMENT_ROUNDS: usize = 4;

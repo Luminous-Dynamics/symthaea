@@ -59,11 +59,11 @@ pub mod types;
 pub use bridge::PhysicsBridge;
 pub use catalog::PhysicsCatalog;
 pub use dimensional::DimensionalEncoder;
-pub use dimensional_inference::{infer_dimensions, InferenceResult, UnitMap};
+pub use dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
 pub use equation_ast::EquationEncoder;
 pub use query::{PhysicsSearchEngine, SearchWeights};
 pub use recognize::{
-    expr_to_equation_node, recognize_expr, recognize_expr_with_units, RecognitionReport,
+    RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
 };
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::infer_symmetry;

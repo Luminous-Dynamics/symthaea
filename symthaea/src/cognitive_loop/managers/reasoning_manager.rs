@@ -19,7 +19,7 @@
 //! Proposes changes via SubsystemOutput which the OutputCollector integrates.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 
 /// Reasoning Manager — consolidates reasoning reliability feedback into LR modulation,

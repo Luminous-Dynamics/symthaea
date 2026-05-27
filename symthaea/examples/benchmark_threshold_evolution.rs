@@ -17,14 +17,16 @@
 #[cfg(not(feature = "neuroevolution"))]
 fn main() {
     eprintln!("Requires `neuroevolution` feature.");
-    eprintln!("Run: cargo run --release --features neuroevolution --example benchmark_threshold_evolution");
+    eprintln!(
+        "Run: cargo run --release --features neuroevolution --example benchmark_threshold_evolution"
+    );
 }
 
 #[cfg(feature = "neuroevolution")]
 fn main() {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
     use symthaea_neuroevolution::{
-        threshold_genome::evaluate_threshold_fitness, NeuralGenome, ThresholdPhenotype,
+        NeuralGenome, ThresholdPhenotype, threshold_genome::evaluate_threshold_fitness,
     };
 
     println!("═══════════════════════════════════════════════════════════════");
@@ -186,7 +188,7 @@ fn evolve_best_thresholds(
     generations: usize,
     seed: u64,
 ) -> symthaea_neuroevolution::ThresholdPhenotype {
-    use symthaea_neuroevolution::{threshold_genome::evaluate_threshold_fitness, NeuralGenome};
+    use symthaea_neuroevolution::{NeuralGenome, threshold_genome::evaluate_threshold_fitness};
 
     struct Rng(u64);
     impl Rng {

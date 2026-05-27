@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 
 use super::agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 use super::markov_blanket::{MarkovBoundaryOperator, MarkovPartition, PermeabilityInputs};
-use super::motor::{rand_f64, MotorSystem};
+use super::motor::{MotorSystem, rand_f64};
 use super::td_learning::TemporalDifferenceLearningStats;
 use super::types::{
     CognitiveLoopFEPResult, EnhancedFEPCycleResult, MotorCommand, MotorCommandType, Observation,

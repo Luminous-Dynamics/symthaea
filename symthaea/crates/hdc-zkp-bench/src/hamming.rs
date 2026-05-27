@@ -13,12 +13,11 @@
 
 use std::time::Instant;
 
-use binius_core::word::Word;
 use binius_core::verify::verify_constraints;
+use binius_core::word::Word;
 use binius_frontend::CircuitBuilder;
 use binius_prover::{
-    OptimalPackedB128, Prover,
-    hash::parallel_compression::ParallelCompressionAdaptor,
+    OptimalPackedB128, Prover, hash::parallel_compression::ParallelCompressionAdaptor,
 };
 use binius_transcript::{ProverTranscript, VerifierTranscript};
 use binius_verifier::{
@@ -47,7 +46,10 @@ pub struct HammingBenchResult {
 /// 4. Assert total_distance matches public output
 pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
     let dim_bits = dim_words * 64;
-    println!("\n=== BINIUS: Hamming Similarity ({} bits = {} words) ===\n", dim_bits, dim_words);
+    println!(
+        "\n=== BINIUS: Hamming Similarity ({} bits = {} words) ===\n",
+        dim_bits, dim_words
+    );
 
     let builder = CircuitBuilder::new();
 
@@ -99,7 +101,10 @@ pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
     let stat = binius_frontend::CircuitStat::collect(&circuit);
     println!("  AND constraints: {}", stat.n_and_constraints);
     println!("  MUL constraints: {}", stat.n_mul_constraints);
-    println!("  XOR operations: {} (all FREE — the similarity diff)", dim_words);
+    println!(
+        "  XOR operations: {} (all FREE — the similarity diff)",
+        dim_words
+    );
 
     // Fill witness
     let mut witness = circuit.new_witness_filler();
@@ -136,7 +141,9 @@ pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
     }
     witness[distance_out] = Word(acc);
 
-    circuit.populate_wire_witness(&mut witness).expect("witness failed");
+    circuit
+        .populate_wire_witness(&mut witness)
+        .expect("witness failed");
 
     let cs = circuit.constraint_system();
     let witness_vec = witness.into_value_vec();
@@ -160,16 +167,25 @@ pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
     let prove_time = prove_start.elapsed();
 
     let proof_size = proof.len();
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
     println!("  Prover time: {:.1} ms", prove_time.as_secs_f64() * 1000.0);
 
     let verify_start = Instant::now();
     let mut vt = VerifierTranscript::new(challenger, proof);
-    verifier.verify(&public_words, &mut vt).expect("verify failed");
+    verifier
+        .verify(&public_words, &mut vt)
+        .expect("verify failed");
     vt.finalize().expect("finalize failed");
     let verify_time = verify_start.elapsed();
 
-    println!("  Verifier time: {:.3} ms", verify_time.as_secs_f64() * 1000.0);
+    println!(
+        "  Verifier time: {:.3} ms",
+        verify_time.as_secs_f64() * 1000.0
+    );
     println!("  Verification: PASSED (real cryptographic proof)");
 
     HammingBenchResult {

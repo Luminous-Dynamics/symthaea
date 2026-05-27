@@ -34,7 +34,7 @@ use candle_transformers::models::gpt2::{Config as Gpt2Config, GPT2};
 use tokenizers::Tokenizer;
 
 #[cfg(feature = "neural-bridge")]
-use hf_hub::{api::sync::Api, Repo, RepoType};
+use hf_hub::{Repo, RepoType, api::sync::Api};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;

@@ -106,10 +106,10 @@ impl CognitiveLoopService {
         // High D2 → easier transitions (lower hysteresis), low D2 → perseveration.
         let flexibility = self.neuromod.bath.behavioral_flexibility();
         let flex_mod = 1.0 / flexibility; // 0.67–1.43 (inverted: high flex = lower threshold)
-                                          // Session 11 Item 2: Wire hysteresis_factor into urgency computation.
-                                          // Sustained stability relaxes hysteresis (factor decays from 1.0 toward 0.5),
-                                          // permitting smoother mode transitions after long stable runs.
-                                          // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
+        // Session 11 Item 2: Wire hysteresis_factor into urgency computation.
+        // Sustained stability relaxes hysteresis (factor decays from 1.0 toward 0.5),
+        // permitting smoother mode transitions after long stable runs.
+        // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
         let hysteresis_relax = self.carryover.quality.hysteresis_factor;
         let base_hysteresis = match self.carryover.urgency.urgency {
             super::super::CycleUrgency::Cruise => {
@@ -261,7 +261,7 @@ impl CognitiveLoopService {
                 let oldest_of_4 = error_history[len - 4];
                 // Compute linear trend (simple slope)
                 let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
-                                                          // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
+                // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
                 let mut sign_changes = 0u32;
                 let ref_val = oldest_of_4;
                 for i in 0..len.saturating_sub(1) {

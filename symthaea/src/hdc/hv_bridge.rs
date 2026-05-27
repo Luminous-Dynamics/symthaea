@@ -23,8 +23,8 @@
 //!
 //! Cross-similarity computes similarity without materializing the full conversion.
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Bridge between BinaryHV and ContinuousHV representations.
 ///

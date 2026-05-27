@@ -11,8 +11,8 @@
 
 use symthaea_core::hdc::substrate_independence::SubstrateType;
 use symthaea_psych_bench::substrate_transfer::{
-    generate_synthetic_baseline, simulate_transfer_degradation, BenchmarkScore, CognitiveDomain,
-    SubstrateTransferMatrix, TransferProtocol,
+    BenchmarkScore, CognitiveDomain, SubstrateTransferMatrix, TransferProtocol,
+    generate_synthetic_baseline, simulate_transfer_degradation,
 };
 
 /// A transfer scenario: source substrate, target substrate, degradation factor.

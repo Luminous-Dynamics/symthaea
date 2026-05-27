@@ -6,8 +6,8 @@
 //! Converts `Composition` note sequences into MusicXML (score-partwise)
 //! and simplified SVG staff renderings.
 
-use crate::midi::freq_to_midi_note;
 use crate::Composition;
+use crate::midi::freq_to_midi_note;
 
 /// Divisions per quarter note (16th note resolution: quarter = 4 divisions).
 const DIVISIONS: u32 = 4;

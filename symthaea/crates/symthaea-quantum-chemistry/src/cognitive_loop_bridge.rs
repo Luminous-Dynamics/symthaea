@@ -32,7 +32,7 @@
 //! ```
 
 use crate::molecule::Molecule;
-use crate::multi_theory::{compute_theory_scores, THEORY_NAMES};
+use crate::multi_theory::{THEORY_NAMES, compute_theory_scores};
 
 /// Physics-grounded consciousness state for the cognitive loop.
 ///

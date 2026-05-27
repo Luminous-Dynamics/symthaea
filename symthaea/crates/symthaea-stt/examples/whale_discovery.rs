@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::PathBuf;
 use symthaea_stt::audio::AudioFrontend;
-use symthaea_stt::whale::{analyze_coda_topology, WhaleConfig, WhaleSentinel};
+use symthaea_stt::whale::{WhaleConfig, WhaleSentinel, analyze_coda_topology};
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════════════════╗");

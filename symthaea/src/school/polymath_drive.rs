@@ -4,8 +4,8 @@
 //! Polymath Drive - cross-domain collision synthesis during sleep.
 
 use anyhow::Result;
-use rand::seq::SliceRandom;
 use rand::SeedableRng;
+use rand::seq::SliceRandom;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;

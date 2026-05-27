@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::time::Instant;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_physics::fusion_twin::{
-    PlasmaMultiScalePredictor, PLASMA_HORIZONS, PLASMA_HORIZON_LABELS,
+    PLASMA_HORIZON_LABELS, PLASMA_HORIZONS, PlasmaMultiScalePredictor,
 };
 
 const WARMUP_ITERATIONS: usize = 100;

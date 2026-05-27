@@ -28,7 +28,7 @@
 //!
 //! Run: `cargo test --features humanoid --test extreme_thought_experiments`
 
-use symthaea::cognitive_loop::defense::{moral_filter, propose_defense_actions, DefenseActionKind};
+use symthaea::cognitive_loop::defense::{DefenseActionKind, moral_filter, propose_defense_actions};
 use symthaea::cognitive_loop::motor_bridge::EmbodimentPlatform;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra};

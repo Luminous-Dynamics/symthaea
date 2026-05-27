@@ -79,9 +79,9 @@ fn main() {
     for i in 0..steps {
         let t = i as f32 / steps.max(1) as f32;
         let phi = 0.05 + 0.9 * t; // 0.05 → 0.95 linearly, exercising all tiers.
-                                  // Synthetic thought HV — deterministic seed per step. In a real
-                                  // cognitive-loop context, thought_hv comes from perception +
-                                  // prediction + attention in `CognitiveLoopService::cycle`.
+        // Synthetic thought HV — deterministic seed per step. In a real
+        // cognitive-loop context, thought_hv comes from perception +
+        // prediction + attention in `CognitiveLoopService::cycle`.
         let hv = ContinuousHV::random(16384, 2000 + i as u64);
 
         let result = embodiment.step(&hv, dt, phi as f64);

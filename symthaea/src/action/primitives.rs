@@ -1680,18 +1680,22 @@ mod tests {
         assert!(PrimitiveValue::Unit.is_success());
         assert!(PrimitiveValue::Bool(true).is_success());
         assert!(!PrimitiveValue::Bool(false).is_success());
-        assert!(PrimitiveValue::CommandResult {
-            stdout: String::new(),
-            stderr: String::new(),
-            exit_code: 0,
-        }
-        .is_success());
-        assert!(!PrimitiveValue::CommandResult {
-            stdout: String::new(),
-            stderr: "error".into(),
-            exit_code: 1,
-        }
-        .is_success());
+        assert!(
+            PrimitiveValue::CommandResult {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+            }
+            .is_success()
+        );
+        assert!(
+            !PrimitiveValue::CommandResult {
+                stdout: String::new(),
+                stderr: "error".into(),
+                exit_code: 1,
+            }
+            .is_success()
+        );
     }
 
     #[test]

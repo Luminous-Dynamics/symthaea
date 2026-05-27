@@ -3,11 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Criterion benchmarks for Symthaea STT core operations
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use std::f32::consts::PI;
 use symthaea_stt::{
-    bundle, weighted_bundle, AudioConfig, AudioFrontend, AudioProjector, LtcCell, LtcConfig,
-    PhonemeResonator, HV16,
+    AudioConfig, AudioFrontend, AudioProjector, HV16, LtcCell, LtcConfig, PhonemeResonator, bundle,
+    weighted_bundle,
 };
 
 /// Generate synthetic audio for benchmarks

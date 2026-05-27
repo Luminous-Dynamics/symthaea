@@ -7,8 +7,8 @@
 //! is retrieved. Tests whether the system has a consistent strategy
 //! for handling conflicting information (recency, frequency, etc.).
 
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

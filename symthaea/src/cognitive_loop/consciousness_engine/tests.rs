@@ -1102,10 +1102,11 @@ fn test_substrate_feasibility_affects_consciousness() {
     // The values should differ because substrate_feasibility scales the equation
     if full.equation_v2_consciousness > 0.01 {
         assert!(
-                (full.equation_v2_consciousness - half.equation_v2_consciousness).abs() > 1e-10,
-                "Different substrate feasibility should produce different consciousness: full={}, half={}",
-                full.equation_v2_consciousness, half.equation_v2_consciousness
-            );
+            (full.equation_v2_consciousness - half.equation_v2_consciousness).abs() > 1e-10,
+            "Different substrate feasibility should produce different consciousness: full={}, half={}",
+            full.equation_v2_consciousness,
+            half.equation_v2_consciousness
+        );
     }
 }
 

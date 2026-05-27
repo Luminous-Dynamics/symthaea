@@ -15,7 +15,7 @@ use symtropy_physics::world::PhysicsWorld;
 use symtropy_physics::{CollisionEvent, PhysicsCallback};
 
 use crate::simulator::QuadrupedPhysicsSimulator;
-use crate::types::{QuadrupedCommand, QuadrupedState, NUM_ACTUATORS};
+use crate::types::{NUM_ACTUATORS, QuadrupedCommand, QuadrupedState};
 
 /// Consciousness-coupled physics callback for quadruped.
 ///

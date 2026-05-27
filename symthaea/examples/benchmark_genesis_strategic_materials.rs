@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 21: Strategic Materials ===\n");
 
     use symthaea_materials::strategic::{
-        StrategicHdcEncoder, StrategicPredictor, StrategicReading, STRATEGIC_HORIZONS,
+        STRATEGIC_HORIZONS, StrategicHdcEncoder, StrategicPredictor, StrategicReading,
     };
 
     let encoder = StrategicHdcEncoder::new();

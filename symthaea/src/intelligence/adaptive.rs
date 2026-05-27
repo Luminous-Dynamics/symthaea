@@ -65,7 +65,7 @@ impl UserPattern {
     /// Calculate relevance score for a given context using semantic similarity
     pub fn relevance(&self, input: &str) -> f32 {
         use symthaea_core::hdc::semantic_decoder::SemanticSimilarity;
-        
+
         // Exact match
         if self.context == input {
             return self.weight * 2.0;
@@ -78,7 +78,7 @@ impl UserPattern {
 
         // Combine with lexical similarity
         let lexical_sim = lexical_similarity(&self.context, input);
-        
+
         // Weighted combination
         (self.weight * 0.7 * semantic_sim) + (self.weight * 0.3 * lexical_sim)
     }

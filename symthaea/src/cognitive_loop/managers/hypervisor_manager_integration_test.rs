@@ -49,9 +49,11 @@ mod tests {
 
         // Verify A generated an election event
         let a_events = agent_a.drain_events();
-        assert!(a_events
-            .iter()
-            .any(|e| matches!(e, SupervisoryEvent::Elected { .. })));
+        assert!(
+            a_events
+                .iter()
+                .any(|e| matches!(e, SupervisoryEvent::Elected { .. }))
+        );
     }
 
     /// Test: Supervisor broadcasts heartbeat, subordinate receives it via SwarmEvent.

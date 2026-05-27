@@ -25,7 +25,7 @@
 use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
-    ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
+    ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1078,11 +1078,7 @@ impl Vocabulary {
             .iter()
             .filter_map(|w| {
                 let id = self.token_id(w);
-                if id != UNK_ID {
-                    Some(id)
-                } else {
-                    None
-                }
+                if id != UNK_ID { Some(id) } else { None }
             })
             .collect()
     }

@@ -117,9 +117,9 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
-use super::consciousness_gradients::{GradientComputer, GradientConfig};
 use super::consciousness_dynamics::{ConsciousnessDynamics, DynamicsConfig};
+use super::consciousness_gradients::{GradientComputer, GradientConfig};
+use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 
 /// Causal efficacy assessment
@@ -468,10 +468,9 @@ impl CausalEfficacyTester {
 
         for _ in 0..self.config.gradient_steps {
             // Take step in direction of increasing Φ
-            current = self.gradient.gradient_step(
-                &current,
-                self.config.learning_rate as f32,
-            );
+            current = self
+                .gradient
+                .gradient_step(&current, self.config.learning_rate as f32);
         }
 
         current
@@ -479,7 +478,8 @@ impl CausalEfficacyTester {
 
     /// Evolve state naturally (random walk)
     fn evolve_state(&self, state: &[BinaryHV]) -> Vec<BinaryHV> {
-        state.iter()
+        state
+            .iter()
             .enumerate()
             .map(|(i, hv)| {
                 // Small random perturbation
@@ -512,9 +512,11 @@ impl CausalEfficacyTester {
     /// Variance of outcome
     fn variance_outcome(&self, results: &[ExperimentResult]) -> f64 {
         let mean = self.average_outcome(results);
-        results.iter()
+        results
+            .iter()
             .map(|r| (r.outcome - mean).powi(2))
-            .sum::<f64>() / results.len() as f64
+            .sum::<f64>()
+            / results.len() as f64
     }
 
     /// Generate explanation
@@ -609,10 +611,13 @@ mod tests {
 
     #[test]
     fn test_causal_efficacy_test() {
-        let mut tester = CausalEfficacyTester::new(4, CausalEfficacyConfig {
-            num_trials: 5,
-            ..Default::default()
-        });
+        let mut tester = CausalEfficacyTester::new(
+            4,
+            CausalEfficacyConfig {
+                num_trials: 5,
+                ..Default::default()
+            },
+        );
 
         let initial = vec![BinaryHV::random(1000); 4];
         let target = vec![BinaryHV::random(2000); 4];
@@ -681,10 +686,13 @@ mod tests {
 
     #[test]
     fn test_trials_consistency() {
-        let mut tester = CausalEfficacyTester::new(4, CausalEfficacyConfig {
-            num_trials: 3,
-            ..Default::default()
-        });
+        let mut tester = CausalEfficacyTester::new(
+            4,
+            CausalEfficacyConfig {
+                num_trials: 3,
+                ..Default::default()
+            },
+        );
 
         let initial = vec![BinaryHV::random(1000); 4];
         let target = vec![BinaryHV::random(2000); 4];

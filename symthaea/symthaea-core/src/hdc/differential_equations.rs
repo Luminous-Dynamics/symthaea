@@ -1388,14 +1388,18 @@ mod tests {
         // Both solutions must be finite and bounded in [0, 1]
         assert!(r_coarse.u_final.iter().all(|v| v.is_finite()));
         assert!(r_fine.u_final.iter().all(|v| v.is_finite()));
-        assert!(r_coarse
-            .u_final
-            .iter()
-            .all(|&v| v >= -1e-10 && v <= 1.0 + 1e-10));
-        assert!(r_fine
-            .u_final
-            .iter()
-            .all(|&v| v >= -1e-10 && v <= 1.0 + 1e-10));
+        assert!(
+            r_coarse
+                .u_final
+                .iter()
+                .all(|&v| v >= -1e-10 && v <= 1.0 + 1e-10)
+        );
+        assert!(
+            r_fine
+                .u_final
+                .iter()
+                .all(|&v| v >= -1e-10 && v <= 1.0 + 1e-10)
+        );
     }
 
     // ── Wave equation ─────────────────────────────────────────────────────

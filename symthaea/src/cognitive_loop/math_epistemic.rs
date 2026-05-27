@@ -318,10 +318,12 @@ mod tests {
         assert!(result.confidence >= 0.5);
         assert!(result.is_actionable());
         // Should have a caveat about not being verified
-        assert!(result
-            .caveats
-            .iter()
-            .any(|c| c.contains("not independently verified")));
+        assert!(
+            result
+                .caveats
+                .iter()
+                .any(|c| c.contains("not independently verified"))
+        );
     }
 
     #[test]
@@ -343,10 +345,12 @@ mod tests {
         // Large error → Uncertain
         let large_err = EpistemicMathResult::from_computation(42.0, 1.0, false, 2, 1, 0.8);
         assert_eq!(large_err.soundness, SoundnessLevel::Uncertain);
-        assert!(large_err
-            .caveats
-            .iter()
-            .any(|c| c.contains("Numerical error")));
+        assert!(
+            large_err
+                .caveats
+                .iter()
+                .any(|c| c.contains("Numerical error"))
+        );
     }
 
     #[test]
@@ -362,10 +366,12 @@ mod tests {
 
         // Low method agreement
         let low_agree = EpistemicMathResult::from_computation(1.0, 1e-8, false, 4, 1, 0.7);
-        assert!(low_agree
-            .caveats
-            .iter()
-            .any(|c| c.contains("Low method agreement")));
+        assert!(
+            low_agree
+                .caveats
+                .iter()
+                .any(|c| c.contains("Low method agreement"))
+        );
 
         // Single method
         let single = EpistemicMathResult::from_computation(1.0, 1e-8, false, 1, 1, 0.8);

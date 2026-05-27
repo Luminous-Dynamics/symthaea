@@ -30,12 +30,12 @@
 //! If Ollama is not available, the test will skip gracefully.
 
 use std::sync::Arc;
+use symthaea::Symthaea;
 use symthaea::language::{LLMBackend, LLMOrgan, LLMOrganConfig, OllamaBackend};
 use symthaea::mind::{
     ConstraintType, EmotionalTone, EpistemicStatus, ResponseConstraint, ResponseType,
     SemanticIntent, StructuredThought,
 };
-use symthaea::Symthaea;
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
 /// Check if Ollama is running and accessible

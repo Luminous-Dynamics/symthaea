@@ -1124,8 +1124,13 @@ fn main() {
         if cycle % 50 == 0 {
             println!(
                 "  Cycle {:3}/{} | Consciousness: {:.3} | FE: {:.2} | Unity: {:.3} | Phase: {} | Frames: {}",
-                cycle, total_cycles, m.consciousness.consciousness_level, m.fep.fep_surprise,
-                m.ethics.moral_topo_unity, phase, frame_count
+                cycle,
+                total_cycles,
+                m.consciousness.consciousness_level,
+                m.fep.fep_surprise,
+                m.ethics.moral_topo_unity,
+                phase,
+                frame_count
             );
         }
     }

@@ -66,8 +66,8 @@ use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 use crate::bridge::PhoneBridge;
-use crate::scrcpy::stream::{ScrcpyCaptureStream, StreamError};
 use crate::scrcpy::ScrcpyOptions;
+use crate::scrcpy::stream::{ScrcpyCaptureStream, StreamError};
 
 /// Streaming-capture wrapper around [`PhoneBridge`].
 ///

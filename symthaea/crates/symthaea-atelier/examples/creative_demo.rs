@@ -65,9 +65,16 @@ fn main() {
             std::fs::write(&path, &artwork.svg).expect("write SVG");
 
             let s = &artwork.aesthetic_score;
-            println!("    {style_name:12} → score: {:.3} (order={:.2} complexity={:.2} harmony={:.2} birkhoff={:.2}) [{} nodes, {} cycles]",
-                s.composite, s.order, s.complexity, s.harmony, s.birkhoff,
-                artwork.scene.node_count(), artwork.generation_cycles);
+            println!(
+                "    {style_name:12} → score: {:.3} (order={:.2} complexity={:.2} harmony={:.2} birkhoff={:.2}) [{} nodes, {} cycles]",
+                s.composite,
+                s.order,
+                s.complexity,
+                s.harmony,
+                s.birkhoff,
+                artwork.scene.node_count(),
+                artwork.generation_cycles
+            );
         }
         println!();
     }

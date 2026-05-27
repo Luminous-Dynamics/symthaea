@@ -373,11 +373,7 @@ impl ConflictMatrix {
             .iter()
             .map(|c| {
                 let p = c.magnitude / total;
-                if p > 1e-10 {
-                    -p * p.ln()
-                } else {
-                    0.0
-                }
+                if p > 1e-10 { -p * p.ln() } else { 0.0 }
             })
             .sum()
     }

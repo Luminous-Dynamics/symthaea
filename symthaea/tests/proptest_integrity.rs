@@ -19,8 +19,8 @@ Feature-gated: `integrity`.
 
 use proptest::prelude::*;
 use symthaea::integrity::{
-    attestation::{blake3_hash, blake3_hash_f32_slice, AttestationRegistry},
     IntegrityManager,
+    attestation::{AttestationRegistry, blake3_hash, blake3_hash_f32_slice},
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

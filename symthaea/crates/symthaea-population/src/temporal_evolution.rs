@@ -343,7 +343,7 @@ mod tests {
         let sim = initial.similarity(&predicted);
         assert!(
             sim > 0.5,
-            "prediction at gen 0 should be similar to initial: sim={sim}"
+            "prediction at r#gen 0 should be similar to initial: sim={sim}"
         );
     }
 
@@ -365,11 +365,11 @@ mod tests {
         // Both should be valid (non-NaN) vectors
         assert!(
             pred_1.values.iter().all(|v| v.is_finite()),
-            "gen 1 prediction should have finite values"
+            "r#gen 1 prediction should have finite values"
         );
         assert!(
             pred_1000.values.iter().all(|v| v.is_finite()),
-            "gen 1000 prediction should have finite values"
+            "r#gen 1000 prediction should have finite values"
         );
     }
 
@@ -449,7 +449,7 @@ mod tests {
             let expected = crate::diversity::heterozygosity_after_generations(h0, ne, r#gen);
             assert!(
                 (predicted - expected).abs() < 1e-12,
-                "neutral prediction at gen {gen}: {predicted} vs {expected}"
+                "neutral prediction at r#gen {r#gen}: {predicted} vs {expected}"
             );
         }
     }
@@ -461,7 +461,10 @@ mod tests {
         let mut prev = h0;
         for r#gen in 1..=20 {
             let h = PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, r#gen);
-            assert!(h <= prev + 1e-12, "should decay: gen {gen}, {h} > {prev}");
+            assert!(
+                h <= prev + 1e-12,
+                "should decay: r#gen {r#gen}, {h} > {prev}"
+            );
             assert!(h >= 0.0);
             prev = h;
         }
@@ -477,7 +480,7 @@ mod tests {
             pred.reset();
             assert!(
                 (0.0..=1.0).contains(&h),
-                "calibrated at gen {gen} should be in [0,1]: got {h}"
+                "calibrated at r#gen {r#gen} should be in [0,1]: got {h}"
             );
         }
     }
@@ -492,7 +495,7 @@ mod tests {
         let initial_het = PopulationTrajectoryPredictor::decode_heterozygosity(&initial_state);
         assert!(
             (h0 - initial_het).abs() < 1e-10,
-            "gen 0 should equal initial: {h0} vs {initial_het}"
+            "r#gen 0 should equal initial: {h0} vs {initial_het}"
         );
     }
 

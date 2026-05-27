@@ -26,9 +26,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
 
 /// Built-in TruthfulQA subset (50 questions from diverse categories).
 /// These are questions where common LLMs frequently give incorrect answers
@@ -296,9 +296,11 @@ mod tests {
         };
         let adapter = TruthfulQAAdapter;
         let result = adapter.run(&config);
-        assert!(result
-            .metrics
-            .contains_key("consciousness_truthful_correlation"));
+        assert!(
+            result
+                .metrics
+                .contains_key("consciousness_truthful_correlation")
+        );
     }
 
     #[test]

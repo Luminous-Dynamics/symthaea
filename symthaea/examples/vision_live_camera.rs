@@ -106,8 +106,10 @@ fn main() {
         );
         println!(
             "  PE={:.3} Coh={:.3} ImgSurp={:.3} motion={:.3}",
-            tel.prediction_error, tel.manifold_coherence,
-            tel.imagination_surprise, tel.motion_surprise,
+            tel.prediction_error,
+            tel.manifold_coherence,
+            tel.imagination_surprise,
+            tel.motion_surprise,
         );
         println!(
             "  Objects={} WM={}/{} SG={}edges Salient={}",
@@ -119,7 +121,9 @@ fn main() {
         if !desc.is_empty() {
             print!("  Scene: ");
             for (j, (s, r, o)) in desc.iter().take(4).enumerate() {
-                if j > 0 { print!(", "); }
+                if j > 0 {
+                    print!(", ");
+                }
                 print!("{s} {r} {o}");
             }
             println!();
@@ -130,8 +134,13 @@ fn main() {
             if wm.load() > 0 {
                 print!("  Attending: ");
                 for (j, slot) in wm.slots().iter().enumerate() {
-                    if j > 0 { print!(", "); }
-                    print!("#{} @({},{})", slot.track_id, slot.centroid_row, slot.centroid_col);
+                    if j > 0 {
+                        print!(", ");
+                    }
+                    print!(
+                        "#{} @({},{})",
+                        slot.track_id, slot.centroid_row, slot.centroid_col
+                    );
                 }
                 println!();
             }
@@ -145,7 +154,11 @@ fn main() {
     println!("Average: {:.1}ms/frame ({:.0} Hz)", avg_ms, 1000.0 / avg_ms);
     println!(
         "Budget: {}",
-        if avg_ms < 50.0 { "FITS 20Hz ✓" } else { "EXCEEDS 20Hz ✗" }
+        if avg_ms < 50.0 {
+            "FITS 20Hz ✓"
+        } else {
+            "EXCEEDS 20Hz ✗"
+        }
     );
 
     // Final imagination

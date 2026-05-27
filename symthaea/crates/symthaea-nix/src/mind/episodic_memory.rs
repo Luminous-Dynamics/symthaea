@@ -177,11 +177,7 @@ impl NixEpisodicMemory {
             .iter()
             .map(|ep| {
                 let sim = ep.state_before.similarity(state).max(0.0) as f64;
-                if sim.is_finite() {
-                    sim
-                } else {
-                    0.0
-                }
+                if sim.is_finite() { sim } else { 0.0 }
             })
             .sum();
 
@@ -202,11 +198,7 @@ impl NixEpisodicMemory {
             .sum();
 
         let result = weighted_valence / total_weight;
-        if result.is_finite() {
-            result
-        } else {
-            0.0
-        }
+        if result.is_finite() { result } else { 0.0 }
     }
 
     /// Consolidate memory — keep high-importance episodes, evict low ones.

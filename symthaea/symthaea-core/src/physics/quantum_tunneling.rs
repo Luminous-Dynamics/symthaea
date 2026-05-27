@@ -681,7 +681,7 @@ impl ConsciousTunnelingCalculator {
             "multiply",
         );
         trace.push(format!(
-            "2m|V-E|: {:.6e} (coherence: {:.4})",
+            "2m|V-E|: {:.12} (coherence: {:.4})",
             me_result.approximate_value, me_result.coherence
         ));
         total_coherence += me_result.coherence;
@@ -999,13 +999,7 @@ mod tests {
         let width = 1.0e-10;
 
         // Define rectangular potential
-        let potential = |x: f64| -> f64 {
-            if x > 0.0 && x < width {
-                v0
-            } else {
-                0.0
-            }
-        };
+        let potential = |x: f64| -> f64 { if x > 0.0 && x < width { v0 } else { 0.0 } };
 
         let result = calc.wkb_transmission(energy, potential, -1.0e-10, 2.0e-10, 300);
         assert!(result.transmission > 0.0 && result.transmission < 1.0);

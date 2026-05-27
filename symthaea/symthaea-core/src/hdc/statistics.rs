@@ -461,11 +461,7 @@ impl Distribution {
                 // If X ~ Gamma(α,1), Y ~ Gamma(β,1), then X/(X+Y) ~ Beta(α,β)
                 let x = sample_gamma(*alpha, 1.0, rng);
                 let y = sample_gamma(*beta, 1.0, rng);
-                if x + y > 1e-15 {
-                    x / (x + y)
-                } else {
-                    0.5
-                }
+                if x + y > 1e-15 { x / (x + y) } else { 0.5 }
             }
             Distribution::Gamma { alpha, beta } => sample_gamma(*alpha, *beta, rng),
         }
@@ -1165,11 +1161,7 @@ pub fn fit_normal_mle(data: &[f64]) -> (f64, f64) {
 /// MLE estimate for Exponential distribution: λ̂ = 1/mean
 pub fn fit_exponential_mle(data: &[f64]) -> f64 {
     let m = mean(data);
-    if m > 1e-15 {
-        1.0 / m
-    } else {
-        1.0
-    }
+    if m > 1e-15 { 1.0 / m } else { 1.0 }
 }
 
 /// MLE estimate for Gamma via moment matching.

@@ -20,7 +20,7 @@
 //! attractor that dominates untrained generation.
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --bin gen-creativity-training
+//!   cargo run --release -p symthaea-broca --bin r#gen-creativity-training
 //!
 //! Outputs:
 //!   data/train-creativity-v1.jsonl  (80%)

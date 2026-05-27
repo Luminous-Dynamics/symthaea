@@ -1,7 +1,7 @@
 use symthaea_core::hdc::abstract_thought::expr_canonical_string;
 use symthaea_core::hdc::conjecture_engine::{
-    observe_bell_numbers, observe_catalan, observe_fibonacci_ratios, observe_partitions,
-    ConjectureEngine, RegressorConfig,
+    ConjectureEngine, RegressorConfig, observe_bell_numbers, observe_catalan,
+    observe_fibonacci_ratios, observe_partitions,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 use symthaea_eml_egraph::compare_current_vs_egg_collapse;

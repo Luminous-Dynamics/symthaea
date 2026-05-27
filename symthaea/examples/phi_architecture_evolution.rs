@@ -256,7 +256,7 @@ fn main() {
     full_evo.search(SearchStrategy::Evolutionary, 1); // Initialize
     println!("Gen  0: Phi = {:.4} (initial)", full_evo.stats().best_phi);
 
-    for gen in 1..=30 {
+    for r#gen in 1..=30 {
         full_evo.search(SearchStrategy::Evolutionary, 1);
         let stats = full_evo.stats();
 
@@ -267,7 +267,7 @@ fn main() {
 
         println!(
             "Gen {:2}: Phi = {:.4} [{}{}] avg = {:.4}",
-            gen, stats.best_phi, bar, empty, stats.avg_phi
+            r#gen, stats.best_phi, bar, empty, stats.avg_phi
         );
     }
 

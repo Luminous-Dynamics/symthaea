@@ -218,7 +218,7 @@ use crate::cognitive_loop::{
 };
 
 // Language processing (Broca's Area)
-use crate::language::{llm_backend, LLMOrgan, LLMOrganConfig};
+use crate::language::{LLMOrgan, LLMOrganConfig, llm_backend};
 
 // Motor cortex (action execution)
 use crate::action::{

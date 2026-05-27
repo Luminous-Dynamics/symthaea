@@ -52,7 +52,10 @@ pub struct EngagementScore {
 impl EngagementScore {
     /// Check if user is actively engaged
     pub fn is_engaged(&self) -> bool {
-        matches!(self.level, EngagementLevel::Moderate | EngagementLevel::High)
+        matches!(
+            self.level,
+            EngagementLevel::Moderate | EngagementLevel::High
+        )
     }
 
     /// Check if user needs a break (fatigued or overloaded)
@@ -87,7 +90,7 @@ impl Default for EngagementConfig {
     fn default() -> Self {
         Self {
             index_thresholds: [0.5, 1.0, 2.0, 3.0],
-            fatigue_threshold: 0.35, // Theta > 35% suggests fatigue
+            fatigue_threshold: 0.35,  // Theta > 35% suggests fatigue
             interest_threshold: 0.08, // Gamma > 8% suggests interest
         }
     }
@@ -196,12 +199,7 @@ impl EngagementSentinel {
 
         let total = delta + theta + alpha + beta + gamma + 1e-10;
 
-        (
-            theta / total,
-            alpha / total,
-            beta / total,
-            gamma / total,
-        )
+        (theta / total, alpha / total, beta / total, gamma / total)
     }
 
     /// Classify engagement level
@@ -295,7 +293,10 @@ mod tests {
     fn test_engagement_levels() {
         let sentinel = EngagementSentinel::new();
 
-        assert_eq!(sentinel.classify_level(0.3, 0.0), EngagementLevel::Disengaged);
+        assert_eq!(
+            sentinel.classify_level(0.3, 0.0),
+            EngagementLevel::Disengaged
+        );
         assert_eq!(sentinel.classify_level(0.7, 0.0), EngagementLevel::Low);
         assert_eq!(sentinel.classify_level(1.5, 0.0), EngagementLevel::Moderate);
         assert_eq!(sentinel.classify_level(2.5, 0.0), EngagementLevel::High);
@@ -307,10 +308,7 @@ mod tests {
         let sentinel = EngagementSentinel::new();
 
         // High engagement index but high fatigue should cap at Low
-        assert_eq!(
-            sentinel.classify_level(1.5, 0.7),
-            EngagementLevel::Low
-        );
+        assert_eq!(sentinel.classify_level(1.5, 0.7), EngagementLevel::Low);
     }
 
     #[test]

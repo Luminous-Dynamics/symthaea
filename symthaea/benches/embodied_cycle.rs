@@ -14,7 +14,7 @@
 //! cargo bench --bench embodied_cycle --features humanoid -- --save-baseline main
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea::cognitive_loop::motor_bridge::EmbodimentPlatform;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 

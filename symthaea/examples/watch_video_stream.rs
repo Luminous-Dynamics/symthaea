@@ -218,7 +218,10 @@ fn main() {
     }
     println!();
     println!("--- Working Memory ---");
-    println!("  Saturation: {}/{} frames at 4/4", wm_saturations, frames_seen);
+    println!(
+        "  Saturation: {}/{} frames at 4/4",
+        wm_saturations, frames_seen
+    );
     println!();
 
     // Scene memory consolidation summary
@@ -255,7 +258,10 @@ fn main() {
             let mut summary = String::new();
             summary.push_str(&format!("Session: {session_id}\n"));
             summary.push_str(&format!("Frames: {frames_seen}\n"));
-            summary.push_str(&format!("Duration: {:.1}s\n", frames_seen as f64 / fps as f64));
+            summary.push_str(&format!(
+                "Duration: {:.1}s\n",
+                frames_seen as f64 / fps as f64
+            ));
             summary.push_str(&format!("Scene cuts: {}\n", scene_cuts.len()));
             summary.push_str(&format!("Novelty events: {}\n", novelty_events.len()));
             summary.push_str(&format!("Landmarks: {landmarks}\n"));
@@ -279,7 +285,9 @@ fn main() {
             );
         }
     } else {
-        println!("[Save] No save (no novelty events, no --save flag). Pixels discarded, memory volatile.");
+        println!(
+            "[Save] No save (no novelty events, no --save flag). Pixels discarded, memory volatile."
+        );
     }
 
     println!();

@@ -20,8 +20,8 @@
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::swarm::{
-    evaluate_compatibility, AgentPubKey, CapabilityCard, CardStats, HandshakeConfig,
-    HolochainConfig, HolochainCortex, ReputationBridge, VouchDecision,
+    AgentPubKey, CapabilityCard, CardStats, HandshakeConfig, HolochainConfig, HolochainCortex,
+    ReputationBridge, VouchDecision, evaluate_compatibility,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -276,8 +276,8 @@ fn test_substrate_telemetry_survives_json_roundtrip() {
 
 #[test]
 fn test_unified_gwt_handler_registration() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use symthaea::consciousness::gwt_integration::{UnifiedGWTConfig, UnifiedGlobalWorkspace};
 
     let mut ws = UnifiedGlobalWorkspace::new(UnifiedGWTConfig::default());

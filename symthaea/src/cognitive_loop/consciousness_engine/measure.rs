@@ -9,8 +9,8 @@ use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, Core
 use crate::consciousness::cross_modal_binding::Modality;
 use crate::consciousness::multi_modal_integration::ModalInput;
 
-use super::types::{ConsciousnessEngineInput, ConsciousnessEngineOutput};
 use super::ConsciousnessEngine;
+use super::types::{ConsciousnessEngineInput, ConsciousnessEngineOutput};
 
 impl ConsciousnessEngine {
     /// Measure consciousness for the current cycle.

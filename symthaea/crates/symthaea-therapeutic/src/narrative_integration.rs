@@ -527,9 +527,10 @@ mod tests {
         // type is correct and non-panicking.
         for r in &reauthored {
             assert!(r.similarity > 0.2);
-            assert!(r
-                .reframe_suggestion
-                .contains("Drawing from the experience of"));
+            assert!(
+                r.reframe_suggestion
+                    .contains("Drawing from the experience of")
+            );
             assert_eq!(r.original_index, 0);
         }
     }

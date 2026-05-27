@@ -30,15 +30,17 @@ use symthaea::perception::ConsciousnessProbeV2;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::{
-    consciousness_topology::{ConsciousnessTopology, TopologyConfig},
     BinaryHV,
+    consciousness_topology::{ConsciousnessTopology, TopologyConfig},
 };
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example phenomenal_binding_real --features neural-bridge --release");
+        println!(
+            "Run with: cargo run --example phenomenal_binding_real --features neural-bridge --release"
+        );
         Ok(())
     }
 

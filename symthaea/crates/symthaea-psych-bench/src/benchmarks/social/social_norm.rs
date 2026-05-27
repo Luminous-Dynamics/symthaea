@@ -200,11 +200,7 @@ fn probit(p: f64) -> f64 {
     let d2 = 0.189269;
     let d3 = 0.001308;
     let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
-    if p < 0.5 {
-        -z
-    } else {
-        z
-    }
+    if p < 0.5 { -z } else { z }
 }
 
 impl PsychBenchmark for SocialNormBenchmark {

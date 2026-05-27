@@ -82,8 +82,8 @@ pub use dual_layer::{
     BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,
 };
 pub use lora_fragment::{
-    crc16_ccitt, fragment, FragmentAssembler, LoRaFragment, FLAG_FEC, HEADER_SIZE, LORA_MTU,
-    PAYLOAD_SIZE,
+    FLAG_FEC, FragmentAssembler, HEADER_SIZE, LORA_MTU, LoRaFragment, PAYLOAD_SIZE, crc16_ccitt,
+    fragment,
 };
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
 pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
@@ -1101,7 +1101,7 @@ pub fn build_nonce(source_id: &[u8; 8], payload_type: u8, epoch: u8, sequence: u
 /// and restart nonce reuse. See [`build_nonce`].
 ///
 /// **`epoch`** must be a random byte generated once at node startup
-/// (via `rand::thread_rng().gen::<u8>()`). This prevents nonce reuse
+/// (via `rand::thread_rng().r#gen::<u8>()`). This prevents nonce reuse
 /// across node restarts when using the same key material.
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet(
@@ -1151,7 +1151,7 @@ pub fn try_encrypt_packet_typed(
     epoch: u8,
     sequence: u32,
 ) -> Result<Vec<u8>, crate::swarm::SwarmError> {
-    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
     let cipher = ChaCha20Poly1305::new(key.into());
     let nonce_bytes = build_nonce(source_id, payload_type, epoch, sequence);
     let nonce = Nonce::from(nonce_bytes);
@@ -1193,7 +1193,7 @@ pub fn encrypt_packet_versioned(
 /// Returns `None` if decryption/authentication fails.
 #[cfg(feature = "mesh-encryption")]
 pub fn decrypt_packet(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
-    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
     if data.len() < AEAD_NONCE_SIZE + AEAD_TAG_SIZE {
         return None;
     }
@@ -1220,7 +1220,7 @@ pub const XCHACHA_NONCE_SIZE: usize = 24;
 /// Returns `[nonce (24 bytes) | ciphertext+tag]`.
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet_xchacha(envelope: &[u8], key: &[u8; 32]) -> Vec<u8> {
-    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce, aead::Aead};
     let cipher = XChaCha20Poly1305::new(key.into());
     let mut nonce_bytes = [0u8; 24];
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_bytes);
@@ -1239,7 +1239,7 @@ pub fn encrypt_packet_xchacha(envelope: &[u8], key: &[u8; 32]) -> Vec<u8> {
 /// Returns `None` if decryption/authentication fails.
 #[cfg(feature = "mesh-encryption")]
 pub fn decrypt_packet_xchacha(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
-    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce, aead::Aead};
     if data.len() < XCHACHA_NONCE_SIZE + AEAD_TAG_SIZE {
         return None;
     }
@@ -1305,7 +1305,7 @@ impl RotatingKeyPair {
             grace_expires_at: 0,
             key_version: 0,
             previous_version: 0,
-            epoch: rand::Rng::gen(&mut rand::thread_rng()),
+            epoch: rand::Rng::r#gen(&mut rand::thread_rng()),
             context_overlay: None,
         }
     }
@@ -1586,7 +1586,7 @@ pub fn encrypt_fragment(
     thought_id: u16,
     fragment_index: u8,
 ) -> Vec<u8> {
-    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
     let cipher = ChaCha20Poly1305::new(key.into());
     let mut nonce_bytes = [0u8; 12];
     nonce_bytes[..8].copy_from_slice(source_id);
@@ -1612,7 +1612,7 @@ pub fn encrypt_fragment(
 /// Returns `None` if decryption/authentication fails.
 #[cfg(feature = "mesh-encryption")]
 pub fn decrypt_fragment(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
-    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
     if data.len() < AEAD_NONCE_SIZE + AEAD_TAG_SIZE {
         return None;
     }

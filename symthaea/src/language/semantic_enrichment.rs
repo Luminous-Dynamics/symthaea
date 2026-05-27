@@ -2385,10 +2385,12 @@ mod tests {
 
         // Check word-level decomposition
         assert!(result.word_primes.contains_key("install"));
-        assert!(result
-            .word_primes
-            .get("install")
-            .unwrap()
-            .contains(&SemanticPrime::Do));
+        assert!(
+            result
+                .word_primes
+                .get("install")
+                .unwrap()
+                .contains(&SemanticPrime::Do)
+        );
     }
 }

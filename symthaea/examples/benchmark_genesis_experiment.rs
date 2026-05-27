@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 5: Experiment Planner ===\n");
 
     use symthaea::symthaea_cell_foundry::experiment_planner::{
-        ExperimentHdcEncoder, ExperimentPredictor, ExperimentReading, EXPERIMENT_HORIZONS,
+        EXPERIMENT_HORIZONS, ExperimentHdcEncoder, ExperimentPredictor, ExperimentReading,
     };
 
     let encoder = ExperimentHdcEncoder::new();

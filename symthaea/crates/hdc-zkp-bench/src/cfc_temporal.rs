@@ -35,12 +35,11 @@
 
 use std::time::Instant;
 
-use binius_core::word::Word;
 use binius_core::verify::verify_constraints;
+use binius_core::word::Word;
 use binius_frontend::CircuitBuilder;
 use binius_prover::{
-    OptimalPackedB128, Prover,
-    hash::parallel_compression::ParallelCompressionAdaptor,
+    OptimalPackedB128, Prover, hash::parallel_compression::ParallelCompressionAdaptor,
 };
 use binius_transcript::{ProverTranscript, VerifierTranscript};
 use binius_verifier::{
@@ -74,7 +73,10 @@ pub struct CfcBenchResult {
 /// The multiplication sigma * (x_inf - h_old) is the only AND constraint.
 /// The additions are FREE in Binius.
 pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
-    println!("\n=== BINIUS: CfC Temporal Proof ({} neurons × {} steps) ===\n", neurons, timesteps);
+    println!(
+        "\n=== BINIUS: CfC Temporal Proof ({} neurons × {} steps) ===\n",
+        neurons, timesteps
+    );
 
     let builder = CircuitBuilder::new();
 
@@ -85,7 +87,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     let mut sigma_wires = Vec::new(); // Track all sigma witnesses
 
     for _ in 0..neurons {
-        h_wires.push(builder.add_witness());     // h(0) — private
+        h_wires.push(builder.add_witness()); // h(0) — private
         x_inf_wires.push(builder.add_witness()); // x_inf — private
         final_h_wires.push(builder.add_inout()); // h(T) — public
     }
@@ -118,9 +120,17 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     let circuit = builder.build();
 
     let stat = binius_frontend::CircuitStat::collect(&circuit);
-    println!("  AND constraints: {} (1 per neuron per timestep)", stat.n_and_constraints);
+    println!(
+        "  AND constraints: {} (1 per neuron per timestep)",
+        stat.n_and_constraints
+    );
     println!("  MUL constraints: {}", stat.n_mul_constraints);
-    println!("  Expected: {} AND ({}×{})", neurons * timesteps, neurons, timesteps);
+    println!(
+        "  Expected: {} AND ({}×{})",
+        neurons * timesteps,
+        neurons,
+        timesteps
+    );
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
     // Fill witness: simulate CfC evolution matching circuit construction order
@@ -158,7 +168,9 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
         witness[final_h_wires[n]] = Word(h_state[n]);
     }
 
-    circuit.populate_wire_witness(&mut witness).expect("witness population failed");
+    circuit
+        .populate_wire_witness(&mut witness)
+        .expect("witness population failed");
 
     let cs = circuit.constraint_system();
     let witness_vec = witness.into_value_vec();
@@ -177,22 +189,33 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
 
     let prove_start = Instant::now();
     let mut prover_transcript = ProverTranscript::new(challenger.clone());
-    prover.prove(witness_vec, &mut prover_transcript).expect("proving failed");
+    prover
+        .prove(witness_vec, &mut prover_transcript)
+        .expect("proving failed");
     let proof = prover_transcript.finalize();
     let prove_time = prove_start.elapsed();
 
     let proof_size = proof.len();
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
     println!("  Prover time: {:.1} ms", prove_time.as_secs_f64() * 1000.0);
 
     // Verify
     let verify_start = Instant::now();
     let mut verifier_transcript = VerifierTranscript::new(challenger, proof);
-    verifier.verify(&public_words, &mut verifier_transcript).expect("verification failed");
+    verifier
+        .verify(&public_words, &mut verifier_transcript)
+        .expect("verification failed");
     verifier_transcript.finalize().expect("finalize failed");
     let verify_time = verify_start.elapsed();
 
-    println!("  Verifier time: {:.3} ms", verify_time.as_secs_f64() * 1000.0);
+    println!(
+        "  Verifier time: {:.3} ms",
+        verify_time.as_secs_f64() * 1000.0
+    );
     println!("  Verification: PASSED (real cryptographic proof)");
 
     CfcBenchResult {

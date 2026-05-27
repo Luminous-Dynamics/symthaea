@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `threat-assessment` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 #[cfg(test)]
 use symthaea_physics::threat::ThreatFepAction;
 use symthaea_physics::threat::{ThreatLevel, ThreatOutput};

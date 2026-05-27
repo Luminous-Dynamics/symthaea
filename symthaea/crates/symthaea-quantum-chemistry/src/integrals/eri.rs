@@ -250,8 +250,8 @@ pub fn compute_eri_tensor(basis: &[ContractedGaussian]) -> (Vec<f64>, usize, usi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::basis::sto3g::Sto3g;
     use crate::basis::BasisSetProvider;
+    use crate::basis::sto3g::Sto3g;
     use crate::molecule::Molecule;
 
     #[test]

@@ -18,12 +18,12 @@
 //! ```
 
 use symthaea_core::hdc::abstract_thought::macro_quality::{
-    evaluate_common_metrics, maybe_enforce, print_report, MacroQualityReport,
-    MacroQualityThresholds,
+    MacroQualityReport, MacroQualityThresholds, evaluate_common_metrics, maybe_enforce,
+    print_report,
 };
 use symthaea_core::hdc::conjecture_engine::{
-    observe_fibonacci_ratios, observe_partitions, ConjectureEngine, ConjectureStatus, MathDomain,
-    ObservedSequence,
+    ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence, observe_fibonacci_ratios,
+    observe_partitions,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 

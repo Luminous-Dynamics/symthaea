@@ -11,8 +11,8 @@
 //! 4. **Verification**: Executes NIX_BUILD.
 //! 5. **Feedback**: Perceives build output and promotes knowledge to "Verified".
 
-use symthaea::action::{PolicyBundle, SandboxRoot};
 use symthaea::Symthaea;
+use symthaea::action::{PolicyBundle, SandboxRoot};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

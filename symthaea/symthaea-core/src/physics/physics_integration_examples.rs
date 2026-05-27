@@ -11,7 +11,7 @@
 //!
 //! These examples show practical applications and cross-module integration.
 
-use super::chaos_dynamics::{systems, AttractorAnalyzer, LyapunovCalculator};
+use super::chaos_dynamics::{AttractorAnalyzer, LyapunovCalculator, systems};
 use super::constants::{C, G};
 use super::decoherence::DensityMatrix;
 use super::nonequilibrium::{FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients};

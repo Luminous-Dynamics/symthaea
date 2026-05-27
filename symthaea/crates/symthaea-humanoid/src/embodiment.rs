@@ -2,34 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! EmbodimentBridge implementation for the bipedal humanoid platform.
-//!
-//! Closes the one-platform gap in the EmbodimentBridge trait family.
-//! The other 9 symthaea robot platforms (flight, helicopter, vehicle, AUV,
-//! manipulator, exoskeleton, surgical, orbital, quadruped) already had
-//! `embodiment.rs`; humanoid was previously driven via ad-hoc MotorBridge
-//! wiring in the main crate. This module gives the cognitive loop a
-//! uniform, trait-polymorphic path to all ten platforms.
-//!
-//! # Control pathway
-//!
-//! `step(thought_hv, dt, phi)` runs the full cognition-to-torque path:
-//!
-//! 1. `HumanoidController::forward(thought_hv, dt)` evolves the HDC-LTC
-//!    network, bottlenecks 16,384D → 64D via fixed random projections,
-//!    and projects 64D → 21D via the learned output matrix. The result
-//!    is a `HumanoidCommand { torques: Vec<f32> }` with per-joint
-//!    torque in `[-1, 1]`. **There is no hand-authored PD or CPG
-//!    controller in the path** — the 21D command is produced entirely
-//!    by the consciousness-coupled HDC-LTC projection.
-//! 2. Phi maps to `MotorSafetyLevel` via the shared thresholds
-//!    (Green > 0.6, Yellow > 0.3, Orange > 0.1, else Red).
-//! 3. Safety override, moral gate, and phi level are max-composed.
-//! 4. Non-Red tiers scale commanded torques by `motor_gain()` (1.0 /
-//!    0.6 / 0.3). Red triggers the StandingLock fallback — zero torque
-//!    except a gravity-compensation baseline at the hip joints so the
-//!    robot stays upright instead of collapsing.
-//! 5. Simulator steps physics; encoder produces the next proprioceptive
-//!    HV; prediction error is `1 - cosine_sim(perception, prev)`.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -40,18 +12,11 @@ use crate::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 use crate::types::{HumanoidCommand, HumanoidConfig};
 
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
 
 /// Emergency fallback posture for bipedal humanoid.
-///
-/// Unlike the quadrotor (which has a multi-stage landing sequence), a
-/// bipedal humanoid's safest failure mode is to lock the current joint
-/// configuration and let passive mechanics + a small gravity-comp
-/// baseline hold standing posture. Collapsing is only appropriate if
-/// the robot is already falling and mid-air damage mitigation is the
-/// goal — which is out of scope for this bridge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidFallbackStage {
     /// Hold current pose with gravity-compensation torque baseline.
@@ -76,10 +41,7 @@ pub struct HumanoidEmbodiment {
 }
 
 impl HumanoidEmbodiment {
-    /// Gravity-compensation torque baseline applied to hip pitch joints
-    /// during StandingLock. Small and normalized ([-1, 1]). Empirical
-    /// value picked to hold the default DMC21 standing pose against
-    /// simulator gravity without adding forward momentum.
+    /// Gravity-compensation torque baseline applied to hip pitch joints during StandingLock.
     const GRAVITY_COMP_BASELINE: f32 = 0.05;
 
     pub fn new(genesis: &GenesisSeed) -> Self {
@@ -104,10 +66,6 @@ impl HumanoidEmbodiment {
     }
 
     /// Apply moral gate from ethics engine.
-    ///
-    /// A bipedal humanoid is heavy and contacting a person at walking
-    /// speed delivers real force — ahimsa or Blocked forces Red. Consent
-    /// violation forces Orange (retreat posture). Caution caps at Yellow.
     pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
         self.moral_safety =
             if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
@@ -134,17 +92,14 @@ impl HumanoidEmbodiment {
     }
 
     fn apply_standing_lock(&self, cmd: &mut HumanoidCommand) {
-        // Zero all torques as the default safe state.
+        // Zero all torques as the default safe state
         for t in cmd.torques.iter_mut() {
             *t = 0.0;
         }
-        // Gravity-compensation baseline on the hip pitch joints —
-        // indices 0 and 3 for DMC21 (right_hip_y, left_hip_y per
-        // `types::JOINT_NAMES`). Clamp to command size for smaller
-        // morphologies.
-        const HIP_PITCH_INDICES: [usize; 2] = [0, 3];
-        for &idx in &HIP_PITCH_INDICES {
-            if idx < cmd.torques.len() {
+        // Dynamically resolve hip pitch joints from the morphology layout map
+        let names = crate::morphology::HumanoidMorphology::Dmc21.joint_names();
+        for (idx, name) in names.iter().enumerate() {
+            if name.contains("hip_y") && idx < cmd.torques.len() {
                 cmd.torques[idx] = Self::GRAVITY_COMP_BASELINE;
             }
         }
@@ -291,11 +246,6 @@ impl symthaea_core::embodiment::EmbodimentBridge for HumanoidEmbodiment {
     }
 }
 
-/// SafeFallback for Humanoid — StandingLock posture.
-///
-/// Priority 9: one below flight (10, airborne) and above ground-platform
-/// defaults. A falling humanoid still outranks a parked vehicle since
-/// head-strike is more consequential than a halted drive cycle.
 impl SafeFallback for HumanoidEmbodiment {
     fn platform_name(&self) -> &'static str {
         "humanoid"

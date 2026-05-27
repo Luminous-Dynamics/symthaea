@@ -21,12 +21,12 @@ pub use conversation::{
     ConversationTurn,
 };
 pub use coordinator::{
-    content_hash, CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator,
-    MemorySignals, MemorySource,
+    CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
+    MemorySource, content_hash,
 };
 pub use episodic_replay::{
-    bath_cosine_similarity, Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig,
-    ReplaySessionResult,
+    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
+    bath_cosine_similarity,
 };
 #[allow(deprecated)]
 pub use hippocampus::{

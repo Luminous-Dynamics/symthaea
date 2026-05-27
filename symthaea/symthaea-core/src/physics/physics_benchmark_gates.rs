@@ -7,7 +7,7 @@
 //! generous time bounds (typically 5x expected). They catch catastrophic
 //! performance regressions without requiring a separate benchmark harness.
 
-use super::decoherence::{simulate_decoherence, Complex64, DecoherenceChannel, DensityMatrix};
+use super::decoherence::{Complex64, DecoherenceChannel, DensityMatrix, simulate_decoherence};
 use super::hadrons::Hadrons;
 use super::nonequilibrium::JarzynskiEstimator;
 use super::quantum_tunneling::TunnelingCalculator;

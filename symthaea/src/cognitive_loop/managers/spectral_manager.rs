@@ -39,7 +39,7 @@
 //! - Jensen, O. & Colgin, L.L. (2007). Cross-frequency coupling. TiCS.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput, SNAPSHOT_STATE_DIM,
+    CognitiveSubsystem, CycleSnapshot, SNAPSHOT_STATE_DIM, SubsystemOutput, output_flags,
 };
 use crate::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
 use serde::{Deserialize, Serialize};

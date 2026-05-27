@@ -38,12 +38,12 @@
 //! 4. **Broadcast**: Winning concepts get broadcast to all brain modules
 
 use super::prefrontal::{AttentionBid, PrefrontalCortexActor};
-use crate::memory::EmotionalValence;
 use crate::consciousness::recursive_improvement::{
-    ConsciousnessWorldModel, WorldModelStats,
-    ConsciousnessAction, ActionType, ConsciousnessTransition, LatentConsciousnessState,
+    ActionType, ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel,
+    LatentConsciousnessState, WorldModelStats,
 };
 use crate::dynamics::CrystalizedConcept;
+use crate::memory::EmotionalValence;
 use std::collections::VecDeque;
 
 /// Bridge between ConsciousnessWorldModel and PrefrontalCortex
@@ -169,16 +169,26 @@ impl ConsciousnessBridge {
     }
 
     /// Convert a crystallized concept to an attention bid
-    fn concept_to_bid(&mut self, concept: &CrystalizedConcept, stats: &WorldModelStats) -> AttentionBid {
+    fn concept_to_bid(
+        &mut self,
+        concept: &CrystalizedConcept,
+        stats: &WorldModelStats,
+    ) -> AttentionBid {
         // Calculate salience based on concept properties
         // Use activation_count as a proxy for importance
-        let activation_bonus = (concept.activation_count as f32 * self.config.activation_salience_multiplier).min(0.3);
+        let activation_bonus =
+            (concept.activation_count as f32 * self.config.activation_salience_multiplier).min(0.3);
         let salience = (self.config.base_salience + activation_bonus).clamp(0.0, 1.0);
 
         // Calculate urgency based on consciousness level and whether this is a new concept
         let consciousness_factor = stats.consciousness_level as f32 * 0.2;
-        let newness_bonus = if concept.activation_count <= 1 { 0.2 } else { 0.0 }; // New concepts are urgent
-        let urgency = (self.config.base_urgency + consciousness_factor + newness_bonus).clamp(0.0, 1.0);
+        let newness_bonus = if concept.activation_count <= 1 {
+            0.2
+        } else {
+            0.0
+        }; // New concepts are urgent
+        let urgency =
+            (self.config.base_urgency + consciousness_factor + newness_bonus).clamp(0.0, 1.0);
 
         // Determine emotional valence based on concept properties
         let emotion = if concept.activation_count <= 1 {
@@ -200,9 +210,7 @@ impl ConsciousnessBridge {
         let name_str = concept.name.as_deref().unwrap_or("unnamed");
         let content = format!(
             "Crystallized Concept [{}]: name='{}', activations={}",
-            concept.uid,
-            name_str,
-            concept.activation_count
+            concept.uid, name_str, concept.activation_count
         );
 
         AttentionBid::new("ConsciousnessWorldModel", content)
@@ -291,44 +299,50 @@ impl BridgeToPrefrontal for ConsciousnessWorldModel {
         let stats = self.stats();
         let new_concepts = &self.pending_concepts[last_count..];
 
-        new_concepts.iter().map(|concept| {
-            let activation_bonus = (concept.activation_count as f32 * 0.01).min(0.3);
-            let salience = (0.6 + activation_bonus).clamp(0.0, 1.0);
+        new_concepts
+            .iter()
+            .map(|concept| {
+                let activation_bonus = (concept.activation_count as f32 * 0.01).min(0.3);
+                let salience = (0.6 + activation_bonus).clamp(0.0, 1.0);
 
-            let consciousness_factor = stats.consciousness_level as f32 * 0.2;
-            let newness_bonus = if concept.activation_count <= 1 { 0.2 } else { 0.0 };
-            let urgency = (0.5 + consciousness_factor + newness_bonus).clamp(0.0, 1.0);
+                let consciousness_factor = stats.consciousness_level as f32 * 0.2;
+                let newness_bonus = if concept.activation_count <= 1 {
+                    0.2
+                } else {
+                    0.0
+                };
+                let urgency = (0.5 + consciousness_factor + newness_bonus).clamp(0.0, 1.0);
 
-            let emotion = if concept.activation_count <= 1 {
-                EmotionalValence::Positive
-            } else if concept.name.is_some() {
-                EmotionalValence::Neutral
-            } else {
-                EmotionalValence::Negative
-            };
+                let emotion = if concept.activation_count <= 1 {
+                    EmotionalValence::Positive
+                } else if concept.name.is_some() {
+                    EmotionalValence::Neutral
+                } else {
+                    EmotionalValence::Negative
+                };
 
-            let name_str = concept.name.as_deref().unwrap_or("unnamed");
-            let content = format!(
-                "Crystallized Concept [{}]: name='{}', activations={}",
-                concept.uid, name_str, concept.activation_count
-            );
+                let name_str = concept.name.as_deref().unwrap_or("unnamed");
+                let content = format!(
+                    "Crystallized Concept [{}]: name='{}', activations={}",
+                    concept.uid, name_str, concept.activation_count
+                );
 
-            AttentionBid::new("ConsciousnessWorldModel", content)
-                .with_salience(salience)
-                .with_urgency(urgency)
-                .with_emotion(emotion)
-                .with_tags(vec![
-                    "concept".to_string(),
-                    "crystallized".to_string(),
-                ])
-        }).collect()
+                AttentionBid::new("ConsciousnessWorldModel", content)
+                    .with_salience(salience)
+                    .with_urgency(urgency)
+                    .with_emotion(emotion)
+                    .with_tags(vec!["concept".to_string(), "crystallized".to_string()])
+            })
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consciousness::recursive_improvement::{WorldModelConfig, ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState};
+    use crate::consciousness::recursive_improvement::{
+        ConsciousnessAction, ConsciousnessTransition, LatentConsciousnessState, WorldModelConfig,
+    };
 
     #[test]
     fn test_bridge_creation() {

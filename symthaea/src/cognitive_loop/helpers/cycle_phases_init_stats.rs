@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cycle initialization, preprocessing, and end-of-cycle statistics.
 
+use super::super::CognitiveLoopService;
 use super::super::neuromodulators::NeuromodulatorBathExt;
 use super::super::temporal_network::TemporalNetwork;
-use super::super::CognitiveLoopService;
 use super::cycle_phases::CycleInitResult;
 
 impl CognitiveLoopService {

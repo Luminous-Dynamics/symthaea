@@ -60,7 +60,7 @@ use std::io::Write;
 use std::path::Path;
 
 // Use shared HDC types from the hdc module
-use crate::hdc::{bundle, HV16};
+use crate::hdc::{HV16, bundle};
 
 // ============================================================================
 // DISCOVERED UNIT (The "Alien Phoneme")
@@ -891,11 +891,7 @@ impl DiscoveryPipeline {
                 .iter()
                 .map(|u| {
                     let p = u.instance_count as f32 / total_instances as f32;
-                    if p > 0.0 {
-                        p * p.ln()
-                    } else {
-                        0.0
-                    }
+                    if p > 0.0 { p * p.ln() } else { 0.0 }
                 })
                 .sum::<f32>()
         } else {

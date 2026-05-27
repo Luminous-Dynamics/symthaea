@@ -30,7 +30,7 @@
 //! Structural validation (no `sorry` in emitted tautologies, tactic
 //! choice matches fragment) is covered by this module's unit tests.
 
-use symthaea_core::hdc::fol_ext_smt::{detect_fragment, SmtFragment};
+use symthaea_core::hdc::fol_ext_smt::{SmtFragment, detect_fragment};
 use symthaea_core::hdc::fol_formula_ext::{ArithOp, FolFormulaExt, NumericType, Term};
 
 use crate::bridge::render_lean_file;
@@ -412,9 +412,9 @@ fn build_nlinarith_hints_widened(names: &[String]) -> String {
 /// on miniF2F-v2's typical goal shapes.
 fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanTactic, bool) {
     let _ = fragment; // cascade is fragment-agnostic; fragment guides
-                      // the FIRST-choice tactic but we always include
-                      // the full cascade so strong goals close fast
-                      // and weird shapes still have fallbacks.
+    // the FIRST-choice tactic but we always include
+    // the full cascade so strong goals close fast
+    // and weird shapes still have fallbacks.
 
     // Lean 4 `first | t1 | t2 | …` tries alternatives left-to-right,
     // committing to the first that succeeds. `intros` + tactic composes

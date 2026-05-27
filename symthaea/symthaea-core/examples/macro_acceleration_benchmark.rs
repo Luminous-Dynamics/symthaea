@@ -39,14 +39,14 @@ use std::collections::HashMap;
 
 use symthaea_core::hdc::abstract_thought::expr_signature;
 use symthaea_core::hdc::abstract_thought::macro_quality::{
-    evaluate_common_metrics, maybe_enforce, print_report, MacroQualityReport,
-    MacroQualityThresholds,
+    MacroQualityReport, MacroQualityThresholds, evaluate_common_metrics, maybe_enforce,
+    print_report,
 };
 use symthaea_core::hdc::conjecture_engine::{
-    observe_fibonacci_ratios, observe_hydrogen_energy_levels, observe_inverse_square_law,
-    observe_kepler_third_law, observe_quantum_harmonic_oscillator,
-    observe_relativistic_kinetic_energy, observe_stefan_boltzmann, ConjectureEngine, Expr,
-    MathDomain, ObservedSequence, RegressorConfig, SeedSpecializationStats, SymbolicRegressor,
+    ConjectureEngine, Expr, MathDomain, ObservedSequence, RegressorConfig, SeedSpecializationStats,
+    SymbolicRegressor, observe_fibonacci_ratios, observe_hydrogen_energy_levels,
+    observe_inverse_square_law, observe_kepler_third_law, observe_quantum_harmonic_oscillator,
+    observe_relativistic_kinetic_energy, observe_stefan_boltzmann,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -142,7 +142,7 @@ impl RunMetrics {
         // Fitness = MSE + lambda * complexity, with lambda=0.001.
         // For ranking "when did we get a good fit" we approximate raw MSE
         // by subtracting a conservative complexity penalty (~max 0.02).
-        // This is approximate but adequate for "did we solve it by gen K".
+        // This is approximate but adequate for "did we solve it by r#gen K".
         let gens_to_epsilon = fitness_history
             .iter()
             .position(|&f| (f - 0.02).max(0.0) < EPSILON);

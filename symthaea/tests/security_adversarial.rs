@@ -30,10 +30,10 @@
 //! cargo test --test security_adversarial -- --nocapture
 //! ```
 
+use symthaea::Symthaea;
 use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
 use symthaea::mind::intent::{EpistemicAssessment, IntentClassifier};
 use symthaea::mind::structured_thought::EpistemicStatus;
-use symthaea::Symthaea;
 
 // =============================================================================
 // HELPER FUNCTIONS

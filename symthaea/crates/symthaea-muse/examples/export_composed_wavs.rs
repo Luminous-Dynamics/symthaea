@@ -10,7 +10,7 @@
 //! cargo run --release -p symthaea-muse --example export_composed_wavs
 //! ```
 
-use symthaea_muse::{compose, export, MuseConfig, MusicalState};
+use symthaea_muse::{MuseConfig, MusicalState, compose, export};
 
 fn main() {
     println!("═══ Symthaea Muse: Composed WAV Export ═══\n");

@@ -135,11 +135,7 @@ fn predict_impact_time(obj_pos: [f64; 3], obj_vel: [f64; 3], target_pos: [f64; 3
     }
 
     let t = (-b + disc.sqrt()) / (2.0 * a);
-    if t > 0.0 {
-        t
-    } else {
-        f64::INFINITY
-    }
+    if t > 0.0 { t } else { f64::INFINITY }
 }
 
 /// Compute human danger level from beam state.

@@ -18,8 +18,8 @@
 //! Reference: Zhuo et al. (2018), J. Phys. Chem. Lett. 9, 1668.
 
 use crate::bandgap_baseline::electronegativity_bandgap;
-use crate::features::{extract_features, N_FEATURES};
-use crate::training_data::{load_training_data, CrystalSystem};
+use crate::features::{N_FEATURES, extract_features};
+use crate::training_data::{CrystalSystem, load_training_data};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------

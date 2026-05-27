@@ -92,7 +92,7 @@ mod clock_tests {
 #[cfg(feature = "mesh")]
 mod trust_tests {
     use symthaea::swarm::consciousness_certificate::{
-        verify_consciousness_certificate, ConsciousnessCertifier,
+        ConsciousnessCertifier, verify_consciousness_certificate,
     };
     use symthaea::swarm::web_of_trust::{TrustGraph, UnifiedTrust};
 

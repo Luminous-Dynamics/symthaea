@@ -538,11 +538,7 @@ fn structurally_equal(a: &Expr, b: &Expr) -> bool {
 fn sort_commutative(a: Expr, b: Expr) -> (Expr, Expr) {
     let sa = format!("{}", a);
     let sb = format!("{}", b);
-    if sa <= sb {
-        (a, b)
-    } else {
-        (b, a)
-    }
+    if sa <= sb { (a, b) } else { (b, a) }
 }
 
 /// Canonical string representation of an expression.
@@ -1058,8 +1054,8 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════════
 
     use crate::hdc::conjecture_engine::{
-        attach_eml_metadata, Conjecture, ConjectureEngine, ConjectureStatus, MathDomain,
-        ObservedSequence,
+        Conjecture, ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence,
+        attach_eml_metadata,
     };
 
     fn make_verified_conjecture(formula: Expr, domain: MathDomain, source: &str) -> Conjecture {

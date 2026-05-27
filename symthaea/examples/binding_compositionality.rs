@@ -22,7 +22,7 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::BgeM3;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]

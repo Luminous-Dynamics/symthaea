@@ -9,7 +9,7 @@
 //! Run burn benchmarks (requires `burn` feature):
 //!   cargo bench -p symthaea-embeddings --features burn
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_embeddings::{Qwen3Config, Qwen3Embedder};
 
 // ── Simulation benchmarks (always available) ─────────────────────────

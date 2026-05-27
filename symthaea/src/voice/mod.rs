@@ -101,8 +101,8 @@ pub use articulatory_synthesizer::{
 pub use formant_targets::{FormantDatabase, FormantTarget};
 pub use phoneme_hdc::{AcousticParams, Manner, PhonemeHdcCodec, PhonemeSpec, PitchContour, Place};
 pub use vocoder::{
-    cognitive_state_to_voice_quality, cognitive_state_to_voice_quality_extended, FormantVocoder,
-    VocoderConfig, VoiceQuality,
+    FormantVocoder, VocoderConfig, VoiceQuality, cognitive_state_to_voice_quality,
+    cognitive_state_to_voice_quality_extended,
 };
 
 // Re-export cognitive bridge types
@@ -124,17 +124,17 @@ pub use synthesis_bridge::cycle_result_to_thought_channels;
 
 // Re-export vocal tract types (Phase 17)
 pub use vocal_tract_controller::{
-    refine_controller_ls, train_controller_cv_vc_transitions, train_controller_on_phoneme_db,
-    train_controller_transitions,
-};
-pub use vocal_tract_controller::{
     ProsodyCorrection, ProsodyHead, SpeakerProfile, TrainingHyperparams, VocalTractConfig,
     VocalTractController,
+};
+pub use vocal_tract_controller::{
+    refine_controller_ls, train_controller_cv_vc_transitions, train_controller_on_phoneme_db,
+    train_controller_transitions,
 };
 pub use vocal_tract_encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
 #[cfg(feature = "vocal-tract")]
 pub use vocal_tract_fep::{
-    predict_duration, Intonation, ProsodyContext, StreamingVocalTract, VocalTractPipeline,
+    Intonation, ProsodyContext, StreamingVocalTract, VocalTractPipeline, predict_duration,
 };
 pub use vocal_tract_fep::{
     VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation,
@@ -156,7 +156,7 @@ pub use repl_voice::{
 
 // Re-export Kokoro TTS types
 pub use g2p::G2PConverter;
-pub use kokoro_engine::{save_wav, KokoroConfig, KokoroEngine};
+pub use kokoro_engine::{KokoroConfig, KokoroEngine, save_wav};
 
 /// LTC-driven speech pacing parameters
 ///

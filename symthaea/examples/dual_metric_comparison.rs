@@ -10,10 +10,10 @@
 ///
 /// Results will inform how to frame the paper's claims.
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
+    HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology,
     integrated_information::IntegratedInformation,
     phi_topology_validation::real_hv_to_hv16_probabilistic,
-    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator,
 };
 
 fn main() {

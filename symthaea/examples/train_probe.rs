@@ -34,10 +34,10 @@ use std::time::Instant;
 use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::bge_m3::{BgeM3, BGE_M3_DIM};
+use symthaea::perception::bge_m3::{BGE_M3_DIM, BgeM3};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]

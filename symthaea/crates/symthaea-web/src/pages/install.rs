@@ -352,7 +352,7 @@ fn download_text(filename: &str, content: &str) {
     let blob_parts = js_sys::Array::new();
     blob_parts.push(&wasm_bindgen::JsValue::from_str(content));
     let mut opts = web_sys::BlobPropertyBag::new();
-    opts.type_("text/plain");
+    opts.set_type("text/plain");
     if let Ok(blob) = web_sys::Blob::new_with_str_sequence_and_options(&blob_parts, &opts) {
         if let Ok(url) = web_sys::Url::create_object_url_with_blob(&blob) {
             let a = document.create_element("a").unwrap();
@@ -540,27 +540,62 @@ struct DesktopOption {
 }
 
 const DESKTOP_OPTIONS: &[DesktopOption] = &[
-    DesktopOption { id: "gnome", name: "GNOME", desc: "Beginner-friendly, clean and polished",
+    DesktopOption {
+        id: "gnome",
+        name: "GNOME",
+        desc: "Beginner-friendly, clean and polished",
         preview: "Activities overview, dock at bottom, clean top bar. Like macOS but with a dynamic workspace grid.",
-        min_ram_mb: 4096, resource_note: "Needs 4GB+ RAM. Smooth on modern hardware." },
-    DesktopOption { id: "kde", name: "KDE Plasma", desc: "Highly customizable, Windows-like layout",
+        min_ram_mb: 4096,
+        resource_note: "Needs 4GB+ RAM. Smooth on modern hardware.",
+    },
+    DesktopOption {
+        id: "kde",
+        name: "KDE Plasma",
+        desc: "Highly customizable, Windows-like layout",
         preview: "Taskbar, start menu, system tray. Familiar Windows layout with deep customization.",
-        min_ram_mb: 3072, resource_note: "Needs 3GB+ RAM. Feature-rich, great for Windows users." },
-    DesktopOption { id: "cosmic", name: "Cosmic", desc: "System76's new Rust-native desktop",
+        min_ram_mb: 3072,
+        resource_note: "Needs 3GB+ RAM. Feature-rich, great for Windows users.",
+    },
+    DesktopOption {
+        id: "cosmic",
+        name: "Cosmic",
+        desc: "System76's new Rust-native desktop",
         preview: "Modern tiling + floating hybrid. Built in Rust by System76. Still in alpha — expect bugs.",
-        min_ram_mb: 2048, resource_note: "Needs 2GB+ RAM. Alpha software — not recommended for primary machines." },
-    DesktopOption { id: "hyprland", name: "Hyprland", desc: "Tiling compositor, keyboard-driven",
+        min_ram_mb: 2048,
+        resource_note: "Needs 2GB+ RAM. Alpha software — not recommended for primary machines.",
+    },
+    DesktopOption {
+        id: "hyprland",
+        name: "Hyprland",
+        desc: "Tiling compositor, keyboard-driven",
         preview: "No mouse needed. Windows tile automatically. Config via text file. For power users.",
-        min_ram_mb: 1024, resource_note: "Very light (~1GB RAM). Keyboard-driven — learn keybinds first." },
-    DesktopOption { id: "sway", name: "Sway", desc: "Tiling Wayland compositor, i3-like",
+        min_ram_mb: 1024,
+        resource_note: "Very light (~1GB RAM). Keyboard-driven — learn keybinds first.",
+    },
+    DesktopOption {
+        id: "sway",
+        name: "Sway",
+        desc: "Tiling Wayland compositor, i3-like",
         preview: "i3-compatible Wayland compositor. Keyboard-driven tiling. Minimal and fast.",
-        min_ram_mb: 1024, resource_note: "Very light (~1GB RAM). Perfect for older hardware." },
-    DesktopOption { id: "xfce", name: "XFCE", desc: "Lightweight and resource-efficient",
+        min_ram_mb: 1024,
+        resource_note: "Very light (~1GB RAM). Perfect for older hardware.",
+    },
+    DesktopOption {
+        id: "xfce",
+        name: "XFCE",
+        desc: "Lightweight and resource-efficient",
         preview: "Traditional desktop, very light on resources. Good for older hardware or VMs.",
-        min_ram_mb: 512, resource_note: "Runs on anything with 512MB+ RAM. Best for old PCs." },
-    DesktopOption { id: "none", name: "None / Server", desc: "No GUI — terminal only",
+        min_ram_mb: 512,
+        resource_note: "Runs on anything with 512MB+ RAM. Best for old PCs.",
+    },
+    DesktopOption {
+        id: "none",
+        name: "None / Server",
+        desc: "No GUI — terminal only",
         preview: "Command line only. SSH access. Minimal resource usage. Add a DE later if needed.",
-        min_ram_mb: 256, resource_note: "Minimal footprint. You can add a DE later with one config change." },
+        min_ram_mb: 256,
+        resource_note: "Minimal footprint. You can add a DE later with one config change.",
+    },
 ];
 
 #[component]

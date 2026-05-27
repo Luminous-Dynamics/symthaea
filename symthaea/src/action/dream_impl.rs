@@ -4,13 +4,18 @@
 //! DreamableAction implementation for ActionIR
 
 use super::{ActionIR, DestructivenessLevel};
-use symthaea_dream::DreamableAction;
 use std::collections::BTreeMap;
+use symthaea_dream::DreamableAction;
 
 impl DreamableAction for ActionIR {
     fn perturb(&self, seed: u64) -> Self {
         match self {
-            ActionIR::RunCommand { program, args, env, working_dir } => {
+            ActionIR::RunCommand {
+                program,
+                args,
+                env,
+                working_dir,
+            } => {
                 let mut new_args = args.clone();
                 if seed % 2 == 0 {
                     if new_args.is_empty() {
@@ -24,7 +29,7 @@ impl DreamableAction for ActionIR {
                         };
                     }
                 }
-                
+
                 ActionIR::RunCommand {
                     program: program.clone(),
                     args: new_args,
@@ -32,7 +37,11 @@ impl DreamableAction for ActionIR {
                     working_dir: working_dir.clone(),
                 }
             }
-            ActionIR::WriteFile { path, content, create_dirs } => {
+            ActionIR::WriteFile {
+                path,
+                content,
+                create_dirs,
+            } => {
                 let mut new_path = path.clone();
                 if let Some(ext) = path.extension() {
                     let mut new_ext = ext.to_os_string();
@@ -41,21 +50,19 @@ impl DreamableAction for ActionIR {
                 } else {
                     new_path.set_extension("dream");
                 }
-                
+
                 ActionIR::WriteFile {
                     path: new_path,
                     content: content.clone(),
                     create_dirs: *create_dirs,
                 }
             }
-            ActionIR::DeleteFile { path } => {
-                ActionIR::RunCommand { 
-                    program: "ls".to_string(), 
-                    args: vec!["-l".to_string(), path.to_string_lossy().to_string()],
-                    env: std::collections::BTreeMap::new(),
-                    working_dir: None
-                }
-            }
+            ActionIR::DeleteFile { path } => ActionIR::RunCommand {
+                program: "ls".to_string(),
+                args: vec!["-l".to_string(), path.to_string_lossy().to_string()],
+                env: std::collections::BTreeMap::new(),
+                working_dir: None,
+            },
             ActionIR::Sequence(actions) => {
                 let idx = (seed as usize) % actions.len().max(1);
                 let mut new_actions = actions.clone();

@@ -84,4 +84,5 @@ pub mod synthesis_trait;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
 
+/// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;

@@ -89,14 +89,14 @@ fn run() {
     );
     std::io::stdout().flush().unwrap_or(());
 
-    for gen in 0..n_generations {
+    for r#gen in 0..n_generations {
         let mut population: Vec<Vec<f64>> = Vec::with_capacity(pop_size);
         let mut fitnesses: Vec<f64> = Vec::with_capacity(pop_size);
         let mut best_speed = 0.0f64;
 
         for p in 0..pop_size {
             let mut candidate = vec![0.0f64; n_params];
-            let mut rng = (gen * pop_size + p + 42) as u64;
+            let mut rng = (r#gen * pop_size + p + 42) as u64;
             for i in 0..n_params {
                 rng ^= rng << 13;
                 rng ^= rng >> 7;
@@ -168,11 +168,11 @@ fn run() {
 
         mean = new_mean;
 
-        if gen % 5 == 0 || gen == n_generations - 1 {
+        if r#gen % 5 == 0 || r#gen == n_generations - 1 {
             let gain = best_ever_params[n_params - 1];
             println!(
                 "{:>5} {:>10.4} {:>10.4} {:>10.4} {:>7.4} {:>7.3} {:>7.3}",
-                gen, best_fitness, mean_fitness, best_ever_fitness, sigma, gain, best_speed
+                r#gen, best_fitness, mean_fitness, best_ever_fitness, sigma, gain, best_speed
             );
             std::io::stdout().flush().unwrap_or(());
         }

@@ -11,10 +11,10 @@
 //! - Car & Parrinello (1985). Phys. Rev. Lett. 55, 2471.
 //! - Marx & Hutter (2009). *Ab Initio Molecular Dynamics*. Cambridge UP.
 
-use crate::basis::sto3g::Sto3g;
 use crate::basis::BasisSetProvider;
+use crate::basis::sto3g::Sto3g;
 use crate::molecule::Molecule;
-use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
 /// Atomic masses in atomic units (electron masses). 1 amu = 1822.888 a.u.
 const AMU_TO_AU: f64 = 1822.888;

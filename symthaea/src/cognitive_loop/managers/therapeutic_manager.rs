@@ -1528,10 +1528,12 @@ mod tests {
 
         // Manually add a dream preference (ordinal 6 = ExposurePrep)
         manager.regulation_engine.incorporate_dream_wisdom(6, 0.5);
-        assert!(manager
-            .regulation_engine
-            .dream_preferred_strategy()
-            .is_some());
+        assert!(
+            manager
+                .regulation_engine
+                .dream_preferred_strategy()
+                .is_some()
+        );
 
         // Simulate high prediction error (bad accuracy)
         for i in 0..10 {

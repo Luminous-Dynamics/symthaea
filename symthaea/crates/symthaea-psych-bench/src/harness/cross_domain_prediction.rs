@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::analysis::normal_cdf;
-use super::report::{key_metric_for_benchmark, BenchmarkReport};
+use super::report::{BenchmarkReport, key_metric_for_benchmark};
 use super::trial_analysis::TrialOutcome;
 
 // ────────────────────────────────────────────────────────────────────

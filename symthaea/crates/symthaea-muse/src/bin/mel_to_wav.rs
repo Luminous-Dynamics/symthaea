@@ -174,7 +174,7 @@ fn main() {
     f.write_all(&(SAMPLE_RATE * 2).to_le_bytes()).unwrap(); // byte rate
     f.write_all(&2u16.to_le_bytes()).unwrap(); // block align
     f.write_all(&16u16.to_le_bytes()).unwrap(); // bits per sample
-                                                // data chunk
+    // data chunk
     f.write_all(b"data").unwrap();
     f.write_all(&(data_bytes as u32).to_le_bytes()).unwrap();
     for &s in &out {

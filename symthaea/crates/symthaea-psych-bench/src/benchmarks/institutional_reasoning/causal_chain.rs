@@ -279,9 +279,11 @@ mod tests {
         let config = BenchmarkConfig::default();
         let result = CausalChainBenchmark.run(&config);
         assert!(result.metrics.contains_key("causal_chain_coherence"));
-        assert!(result
-            .metrics
-            .contains_key("causal_chain_terminal_accuracy"));
+        assert!(
+            result
+                .metrics
+                .contains_key("causal_chain_terminal_accuracy")
+        );
         assert!(result.metrics.contains_key("causal_chain_step_count"));
     }
 

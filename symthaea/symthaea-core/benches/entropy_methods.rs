@@ -16,7 +16,7 @@
 //!
 //! Run with: cargo bench --bench entropy_methods
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::consciousness_metrics::{
     ContinuousEntropyEstimator, EntropyMethod, IIT4Calculator, ParallelEntropyCalculator,
     QuantumEntropyCalculator, TruePhiCalculator,

@@ -40,9 +40,9 @@ pub mod tournament;
 
 pub use fitness::{FepFitnessBridge, FepFitnessConfig, FitnessWeights, InputStrategy};
 pub use genome::{NeuralGenome, NeuralPhenotype};
-pub use governance::{blend_thresholds, gate_threshold_proposal, GovernanceResult};
+pub use governance::{GovernanceResult, blend_thresholds, gate_threshold_proposal};
 pub use organism::{NeuralOrganism, OrganismFitness, StepResult};
-pub use threshold_genome::{decode_thresholds, encode_thresholds, ThresholdPhenotype};
+pub use threshold_genome::{ThresholdPhenotype, decode_thresholds, encode_thresholds};
 pub use tournament::{
     Checkpoint, EvolutionResult, GenerationSnapshot, NeuroevolutionConfig, NeuroevolutionEngine,
     SpeciesInfo,

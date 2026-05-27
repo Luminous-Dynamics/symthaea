@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Criterion benchmarks for the isolated EML/e-graph spike.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::abstract_thought::{canonicalize_expr, expr_canonical_string};
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 use symthaea_core::hdc::eml::compile_expr;

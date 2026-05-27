@@ -157,7 +157,10 @@ fn main() {
             delta
         );
     } else if delta < -0.01 {
-        println!("\n  RESULT: Default config outperforms evolved by {:.4} (evolution needs more generations or better fitness signal)", -delta);
+        println!(
+            "\n  RESULT: Default config outperforms evolved by {:.4} (evolution needs more generations or better fitness signal)",
+            -delta
+        );
     } else {
         println!("\n  RESULT: Configs are EQUIVALENT (delta < 0.01)");
     }

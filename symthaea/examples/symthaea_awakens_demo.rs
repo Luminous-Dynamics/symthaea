@@ -21,7 +21,7 @@ use symthaea::awakening::{AwakenedState, Introspection, SymthaeaAwakening};
 use symthaea::consciousness::narrative_gwt_integration::{NarrativeGWTIntegration, VetoReason};
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::language::consciousness_language_integration::{
-    adapt_response_for_quadrant, ConsciousnessQuadrant, ConsciousnessSpace,
+    ConsciousnessQuadrant, ConsciousnessSpace, adapt_response_for_quadrant,
 };
 use symthaea::language::{Conversation, ConversationConfig};
 

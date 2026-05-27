@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Performance benchmarks for Sentinels library
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use sentinels::{analyze_consciousness, AnalysisMode};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use sentinels::{AnalysisMode, analyze_consciousness};
 
 fn generate_signal(n_samples: usize, sample_rate: f32) -> Vec<f32> {
     (0..n_samples)
@@ -31,9 +31,7 @@ fn benchmark_full_analysis(c: &mut Criterion) {
             BenchmarkId::new("auto", format!("{}s", duration as i32)),
             &signal,
             |b, data| {
-                b.iter(|| {
-                    analyze_consciousness(black_box(data), sample_rate, AnalysisMode::Auto)
-                });
+                b.iter(|| analyze_consciousness(black_box(data), sample_rate, AnalysisMode::Auto));
             },
         );
     }
@@ -50,25 +48,23 @@ fn benchmark_individual_sentinels(c: &mut Criterion) {
     let mut group = c.benchmark_group("individual_sentinels");
 
     group.bench_function("emotion_only", |b| {
-        b.iter(|| {
-            analyze_consciousness(black_box(&signal), sample_rate, AnalysisMode::Emotion)
-        });
+        b.iter(|| analyze_consciousness(black_box(&signal), sample_rate, AnalysisMode::Emotion));
     });
 
     group.bench_function("sleep_only", |b| {
-        b.iter(|| {
-            analyze_consciousness(black_box(&signal), sample_rate, AnalysisMode::Sleep)
-        });
+        b.iter(|| analyze_consciousness(black_box(&signal), sample_rate, AnalysisMode::Sleep));
     });
 
     group.bench_function("meditation_only", |b| {
-        b.iter(|| {
-            analyze_consciousness(black_box(&signal), sample_rate, AnalysisMode::Meditation)
-        });
+        b.iter(|| analyze_consciousness(black_box(&signal), sample_rate, AnalysisMode::Meditation));
     });
 
     group.finish();
 }
 
-criterion_group!(benches, benchmark_full_analysis, benchmark_individual_sentinels);
+criterion_group!(
+    benches,
+    benchmark_full_analysis,
+    benchmark_individual_sentinels
+);
 criterion_main!(benches);

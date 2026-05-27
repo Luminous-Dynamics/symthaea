@@ -19,8 +19,8 @@
 //! `swarm/iroh/bridge.rs` for the original design rationale.
 
 use super::{DualLayerMesh, MeshReceiver, WisdomPacket};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
 
 /// Shared encryption key that can be updated at runtime.

@@ -52,11 +52,7 @@ struct TrialResult {
 /// Score how close a computed value is to a reference (within tol%).
 fn relative_score(computed: f64, reference: f64, tol_frac: f64) -> f64 {
     if reference.abs() < 1e-12 {
-        if computed.abs() < 1e-6 {
-            1.0
-        } else {
-            0.0
-        }
+        if computed.abs() < 1e-6 { 1.0 } else { 0.0 }
     } else {
         let err = (computed - reference).abs() / reference.abs();
         // Full credit within tol_frac; linear decay out to 3×tol_frac; 0 beyond.
@@ -252,8 +248,7 @@ impl PsychBenchmark for ChemistryBenchmark {
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
             paradigm: "Physical Chemistry (Stoichiometry, Hess, Gibbs, ICE, Arrhenius)",
-            citation:
-                "NIST-JANAF (Chase 1998); Atkins Physical Chemistry 11e; Zumdahl Chemistry 10e",
+            citation: "NIST-JANAF (Chase 1998); Atkins Physical Chemistry 11e; Zumdahl Chemistry 10e",
             year: 1998,
             doi: Some("10.18434/T42S31"),
         })

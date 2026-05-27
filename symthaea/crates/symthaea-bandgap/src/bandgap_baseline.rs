@@ -18,7 +18,7 @@
 //! - Penn, D.R. (1962). Phys. Rev. 128, 2093.
 //! - Phillips, J.C. (1968). Phys. Rev. Lett. 20, 550.
 
-use crate::periodic_table::{electronegativity, element_block, COVALENT_RADIUS};
+use crate::periodic_table::{COVALENT_RADIUS, electronegativity, element_block};
 
 /// Estimate bandgap from composition using the electronegativity model.
 ///

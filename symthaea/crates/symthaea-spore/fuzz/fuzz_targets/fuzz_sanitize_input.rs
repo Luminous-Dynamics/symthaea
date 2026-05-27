@@ -19,7 +19,10 @@ fuzz_target!(|data: &str| {
                 assert!(!result.contains('&'), "Ampersand must be rejected");
                 assert!(!result.contains('\n'), "Newline must be rejected");
                 if !allow_slashes {
-                    assert!(!result.contains('/'), "Slash must be rejected when not allowed");
+                    assert!(
+                        !result.contains('/'),
+                        "Slash must be rejected when not allowed"
+                    );
                 }
             }
             Err(_) => {}

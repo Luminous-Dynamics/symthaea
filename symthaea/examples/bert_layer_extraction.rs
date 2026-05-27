@@ -20,15 +20,17 @@ use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::{
-    bert_extraction_status, print_bert_status, BertExtractionStatus, BertLayerExtractor,
-    BertPreset, LayerExtractor,
+    BertExtractionStatus, BertLayerExtractor, BertPreset, LayerExtractor, bert_extraction_status,
+    print_bert_status,
 };
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example bert_layer_extraction --features neural-bridge --release");
+        println!(
+            "Run with: cargo run --example bert_layer_extraction --features neural-bridge --release"
+        );
         return Ok(());
     }
 

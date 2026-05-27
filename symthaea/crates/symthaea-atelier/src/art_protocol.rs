@@ -101,15 +101,21 @@ mod serde_bytes_compat {
             .collect();
 
         for chunk in bytes.chunks(4) {
-            if chunk.len() < 2 { break; }
+            if chunk.len() < 2 {
+                break;
+            }
             let b0 = chunk[0] as u32;
             let b1 = chunk[1] as u32;
             let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
             let b3 = if chunk.len() > 3 { chunk[3] as u32 } else { 0 };
             let triple = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
             result.push(((triple >> 16) & 255) as u8);
-            if chunk.len() > 2 { result.push(((triple >> 8) & 255) as u8); }
-            if chunk.len() > 3 { result.push((triple & 255) as u8); }
+            if chunk.len() > 2 {
+                result.push(((triple >> 8) & 255) as u8);
+            }
+            if chunk.len() > 3 {
+                result.push((triple & 255) as u8);
+            }
         }
         Ok(result)
     }
@@ -142,10 +148,7 @@ pub fn encode_art_message(
 /// Returns the perceived HV and extracted metadata. The receiver can use
 /// the perceived HV as input to their own cognitive loop, effectively
 /// "experiencing" the sender's state through their art.
-pub fn decode_art_message(
-    message: &ArtMessage,
-    _encoder: &PerceptualEncoder,
-) -> DecodedArt {
+pub fn decode_art_message(message: &ArtMessage, _encoder: &PerceptualEncoder) -> DecodedArt {
     // We can't decode PNG back to pixels without a decoder, so we use the
     // metadata directly + the perceptual signature from the harmony activations.
     // In a full implementation, we'd decode the PNG and run it through the
@@ -219,9 +222,7 @@ mod tests {
         let canvas = PixelCanvas::new(16, 16, [128, 64, 32, 255]);
         let harmonies = [0.5, 0.7, 0.3, 0.8, 0.4, 0.6, 0.9, 0.2];
 
-        let message = encode_art_message(
-            &canvas, harmonies, 0.7, 0.3, 0.5, 100, "agent-001",
-        );
+        let message = encode_art_message(&canvas, harmonies, 0.7, 0.3, 0.5, 100, "agent-001");
 
         assert_eq!(message.harmony_activations, harmonies);
         assert_eq!(message.consciousness_level, 0.7);
@@ -257,15 +258,16 @@ mod tests {
 
         let res = empathic_resonance(&hv1, &hv2);
         // Different states should have lower resonance than identical
-        assert!(res < 0.9, "different-state resonance should be < 1.0: {res}");
+        assert!(
+            res < 0.9,
+            "different-state resonance should be < 1.0: {res}"
+        );
     }
 
     #[test]
     fn message_json_serializable() {
         let canvas = PixelCanvas::new(4, 4, [100, 50, 25, 255]);
-        let message = encode_art_message(
-            &canvas, [0.5; 8], 0.6, 0.2, 0.4, 42, "test",
-        );
+        let message = encode_art_message(&canvas, [0.5; 8], 0.6, 0.2, 0.4, 42, "test");
 
         let json = serde_json::to_string(&message).expect("serialize");
         let decoded: ArtMessage = serde_json::from_str(&json).expect("deserialize");

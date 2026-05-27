@@ -3,8 +3,8 @@
 //! Input is a path to a newline-delimited log file. Streaming ingestion is a
 //! Phase 2+ concern — the spike only needs offline corpus parsing.
 
-use crate::event::{LogEvent, Severity, Source};
 use crate::Result;
+use crate::event::{LogEvent, Severity, Source};
 use chrono::Utc;
 use std::collections::BTreeMap;
 use std::fs::File;

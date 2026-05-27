@@ -129,7 +129,7 @@ async fn run_acid_test(
     impl_markers: &[&str],
 ) -> AcidTestResult {
     let start = Instant::now();
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     // ── Step 1: THE YIELD ──────────────────────────────────────────────
@@ -143,7 +143,7 @@ async fn run_acid_test(
         spec: spec.clone(),
     };
 
-    let generated = gen.generate(&intent, &ctx);
+    let generated = r#gen.generate(&intent, &ctx);
     let yielded_todo = needs_llm(&generated.source);
 
     eprintln!("\n============================================================");
@@ -650,7 +650,7 @@ async fn acid_test_summary() {
 
     // Quick smoke test: generate code for a simple novel case and verify
     // the prompt construction works end-to-end
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     let intent = CodeIntent::Create {
@@ -663,7 +663,7 @@ async fn acid_test_summary() {
         .with_signature("fn trie_insert(root: &mut TrieNode, word: &str)"),
     };
 
-    let generated = gen.generate(&intent, &ctx);
+    let generated = r#gen.generate(&intent, &ctx);
     let has_todo = needs_llm(&generated.source);
 
     eprintln!("  Smoke test (trie_insert): todo!() = {}", has_todo);

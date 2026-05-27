@@ -16,8 +16,8 @@
 fn main() {
     use symthaea::consciousness::counterfactual::semantic_roles::{RoleSubstitution, SemanticRole};
     use symthaea::consciousness::counterfactual::{
-        composer::CounterfactualComposer, CausalDAG, CausalQuery, CausalReferenceHarness,
-        CounterfactualReasoner,
+        CausalDAG, CausalQuery, CausalReferenceHarness, CounterfactualReasoner,
+        composer::CounterfactualComposer,
     };
     use symthaea_core::hdc::binary_hv::BinaryHV;
 

@@ -241,12 +241,16 @@ mod tests {
             ..Default::default()
         };
         let result = HorizonBenchmark.run(&config);
-        assert!(result
-            .metrics
-            .contains_key("horizon_1::directed_exploration"));
-        assert!(result
-            .metrics
-            .contains_key("horizon_6::directed_exploration"));
+        assert!(
+            result
+                .metrics
+                .contains_key("horizon_1::directed_exploration")
+        );
+        assert!(
+            result
+                .metrics
+                .contains_key("horizon_6::directed_exploration")
+        );
         assert!(result.metrics.contains_key("horizon_1::exploitation_rate"));
     }
 }

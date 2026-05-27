@@ -25,10 +25,10 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use symthaea_sentinel::{
-    compute_ioi_variance, compute_mfcc, compute_onset_strength, compute_spectral_centroid,
-    compute_spectral_flatness, compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory,
-    AudioFeatures, AudioSentinel, DatasetProcessor, FileAudioConfig, FileAudioPump, LtcPreset,
-    CONTROL_RATE, MEL_BANDS,
+    AudioCategory, AudioFeatures, AudioSentinel, CONTROL_RATE, DatasetProcessor, FileAudioConfig,
+    FileAudioPump, LtcPreset, MEL_BANDS, compute_ioi_variance, compute_mfcc,
+    compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
+    compute_temporal_regularity, spectrum_to_mel_bands,
 };
 
 /// Process a file through the sentinel and get averaged features

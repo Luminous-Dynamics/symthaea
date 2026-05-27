@@ -7,7 +7,7 @@
 //! after being extracted from a single file into multiple submodules.
 
 use symthaea::physiology::coherence::{
-    analyze_scatter, CoherenceConfig, CoherenceField, ScatterCause, TaskComplexity,
+    CoherenceConfig, CoherenceField, ScatterCause, TaskComplexity, analyze_scatter,
 };
 use symthaea::physiology::endocrine::HormoneState;
 

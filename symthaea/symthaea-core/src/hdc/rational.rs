@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 use std::cmp::Ordering;
 
 /// A rational number encoded in HDC space
@@ -33,11 +33,7 @@ pub struct RationalResult {
 
 /// Compute greatest common divisor using Euclidean algorithm
 fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 /// Normalize a rational number: ensure denominator > 0 and coprime with numerator

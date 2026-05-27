@@ -18,9 +18,9 @@
 //! | EEG Beta    | 48.2%         | ~68%              |
 //! | HRV         | 95.8%         | ~98%              |
 
+use crate::hdc::HDC_DIMENSION;
 use crate::hdc::cincinnati_ltc::CincinnatiEstimator;
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::HDC_DIMENSION;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI; // Used by FftConvolver
 

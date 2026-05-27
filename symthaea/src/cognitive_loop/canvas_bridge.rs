@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "canvas")]
 use symthaea_canvas::{
-    aesthetic_score, build_scene, render_svg, AestheticEngine, AestheticState, CognitiveSnapshot,
+    AestheticEngine, AestheticState, CognitiveSnapshot, aesthetic_score, build_scene, render_svg,
 };
 
 /// Telemetry from the canvas pipeline, stored in CycleMetadata.

@@ -87,12 +87,6 @@ pub use crate::hdc::unified_hv::ContinuousHV;
 
 // Core types (most commonly used)
 pub use core::{
-    auto_phi,
-    auto_tier,
-    // Global functions
-    global_phi,
-    global_phi_stats,
-    set_global_tier,
     ApproximationTier,
     HierarchicalPhi,
     IncrementalPhiState,
@@ -100,12 +94,16 @@ pub use core::{
     TieredPhi,
     TieredPhiConfig,
     TieredPhiStats,
+    auto_phi,
+    auto_tier,
+    // Global functions
+    global_phi,
+    global_phi_stats,
+    set_global_tier,
 };
 
 // Dynamics types
 pub use dynamics::{
-    analyze_phi_attractor,
-    classify_consciousness_state,
     // Attractor types
     AttractorConfig,
     AttractorResult,
@@ -119,14 +117,12 @@ pub use dynamics::{
     TransitionDirection,
     TransitionType,
     TrendDirection,
+    analyze_phi_attractor,
+    classify_consciousness_state,
 };
 
 // Analysis types
 pub use analysis::{
-    analyze_phi_complexity,
-    integrated_complexity,
-    multi_scale_phi,
-    optimal_scale,
     PhiEntropyAnalyzer,
     // Entropy types
     PhiEntropyConfig,
@@ -134,18 +130,14 @@ pub use analysis::{
     PhiPyramid,
     PhiPyramidConfig,
     PhiPyramidResult,
+    analyze_phi_complexity,
+    integrated_complexity,
+    multi_scale_phi,
+    optimal_scale,
 };
 
 // Advanced types
 pub use advanced::{
-    analyze_causal_interventions,
-    analyze_network_modularity,
-    compute_causal_power,
-    compute_modularity_score,
-    compute_transfer_matrix,
-    detect_module_count,
-    find_critical_nodes,
-    transfer_from_ring,
     CausalAnalysisResult,
     CausalInterventionConfig,
     ConsciousnessModule,
@@ -166,10 +158,18 @@ pub use advanced::{
     // Transfer types
     PhiTransferConfig,
     PhiTransferResult,
+    analyze_causal_interventions,
+    analyze_network_modularity,
+    compute_causal_power,
+    compute_modularity_score,
+    compute_transfer_matrix,
+    detect_module_count,
+    find_critical_nodes,
+    transfer_from_ring,
 };
 
 // Streaming gradient types
 pub use streaming::{
-    compute_phi_gradient, compute_phi_gradient_fast, GradientConfig, GradientEvent,
-    GradientPrecision, GradientStats, OptimizationAction, PhiGradient, StreamingPhiGradient,
+    GradientConfig, GradientEvent, GradientPrecision, GradientStats, OptimizationAction,
+    PhiGradient, StreamingPhiGradient, compute_phi_gradient, compute_phi_gradient_fast,
 };

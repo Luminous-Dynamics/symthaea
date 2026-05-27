@@ -26,11 +26,11 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use symthaea::hdc::{
+    HDC_DIMENSION,
     consciousness_topology_generators::ConsciousnessTopology,
     semantic_encoder::{CharNgramEncoder, MoralSemanticEncoder, SemanticEncoder},
     spectral_connectivity::ConnectivityCalculator,
     unified_hv::ContinuousHV,
-    HDC_DIMENSION,
 };
 
 /// Ethics category from the ETHICS benchmark
@@ -529,7 +529,9 @@ fn main() {
             } else {
                 println!("  🟡 WEAK CORRELATION: Φ and ethics accuracy are not strongly related");
                 if matches!(method, EncoderMethod::CharNgram) {
-                    println!("     The character n-gram method may be too simple to reveal the relationship.");
+                    println!(
+                        "     The character n-gram method may be too simple to reveal the relationship."
+                    );
                 } else {
                     println!(
                         "     The correlation may be inherently weak, or require more samples."

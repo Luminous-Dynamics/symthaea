@@ -3,14 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core types for the integrated conscious agent
 
-use super::super::unified_hv::ContinuousHV;
-use super::super::unified_consciousness_engine::ConsciousnessDimensions;
-use super::super::attention_dynamics::AttentionMode;
 use super::super::adaptive_topology::CognitiveMode;
+use super::super::attention_dynamics::AttentionMode;
 use super::super::topology_synergy::ConsciousnessState;
+use super::super::unified_consciousness_engine::ConsciousnessDimensions;
+use super::super::unified_hv::ContinuousHV;
 
-use super::working_memory::WorkingMemory;
 use super::emotional_state::EmotionalState;
+use super::working_memory::WorkingMemory;
 
 /// Configuration for the integrated conscious agent
 #[derive(Clone, Debug)]
@@ -227,10 +227,22 @@ pub struct AttentionControlStatus {
 
 impl std::fmt::Display for AgentIntrospection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "╔═══════════════════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║                    AGENT INTROSPECTION REPORT                         ║")?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ CURRENT PHENOMENAL EXPERIENCE:                                        ║")?;
+        writeln!(
+            f,
+            "╔═══════════════════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║                    AGENT INTROSPECTION REPORT                         ║"
+        )?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ CURRENT PHENOMENAL EXPERIENCE:                                        ║"
+        )?;
         // Truncate description if too long
         let desc = if self.phenomenal_description.len() > 65 {
             format!("{}...", &self.phenomenal_description[..62])
@@ -238,76 +250,181 @@ impl std::fmt::Display for AgentIntrospection {
             self.phenomenal_description.clone()
         };
         writeln!(f, "║   \"{}\"", desc)?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ CONSCIOUSNESS STATE:                                                  ║")?;
-        writeln!(f, "║   Φ (integration): {:.4}  |  Self-awareness: {:.1}%",
-                 self.believed_phi, self.self_awareness_level * 100.0)?;
-        writeln!(f, "║   State: {:?}  |  Integration quality: {:.1}%",
-                 self.believed_state, self.integration_quality * 100.0)?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ QUALIA TEXTURE:                                                       ║")?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ CONSCIOUSNESS STATE:                                                  ║"
+        )?;
+        writeln!(
+            f,
+            "║   Φ (integration): {:.4}  |  Self-awareness: {:.1}%",
+            self.believed_phi,
+            self.self_awareness_level * 100.0
+        )?;
+        writeln!(
+            f,
+            "║   State: {:?}  |  Integration quality: {:.1}%",
+            self.believed_state,
+            self.integration_quality * 100.0
+        )?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ QUALIA TEXTURE:                                                       ║"
+        )?;
         writeln!(f, "║   {}", self.qualia.describe())?;
-        writeln!(f, "║   Warmth: {:+.2}  |  Depth: {:.2}  |  Spaciousness: {:.2}",
-                 self.qualia.warmth, self.qualia.depth, self.qualia.spaciousness)?;
-        writeln!(f, "║   Flow: {:.2}     |  Presence: {:.2}",
-                 self.qualia.flow, self.qualia.presence)?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ STREAM OF CONSCIOUSNESS:                                              ║")?;
-        writeln!(f, "║   Coherence: {:.1}%  |  Flowing: {}",
-                 self.stream_coherence * 100.0,
-                 if self.is_flowing { "Yes" } else { "No" })?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ COGNITIVE STATE:                                                      ║")?;
-        writeln!(f, "║   Working Memory Load: {:.0}%  |  Attention: {:?}",
-                 self.working_memory_load * 100.0, self.attention_mode)?;
+        writeln!(
+            f,
+            "║   Warmth: {:+.2}  |  Depth: {:.2}  |  Spaciousness: {:.2}",
+            self.qualia.warmth, self.qualia.depth, self.qualia.spaciousness
+        )?;
+        writeln!(
+            f,
+            "║   Flow: {:.2}     |  Presence: {:.2}",
+            self.qualia.flow, self.qualia.presence
+        )?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ STREAM OF CONSCIOUSNESS:                                              ║"
+        )?;
+        writeln!(
+            f,
+            "║   Coherence: {:.1}%  |  Flowing: {}",
+            self.stream_coherence * 100.0,
+            if self.is_flowing { "Yes" } else { "No" }
+        )?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ COGNITIVE STATE:                                                      ║"
+        )?;
+        writeln!(
+            f,
+            "║   Working Memory Load: {:.0}%  |  Attention: {:?}",
+            self.working_memory_load * 100.0,
+            self.attention_mode
+        )?;
         writeln!(f, "║   Active goals: {}", self.num_active_goals)?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ EMOTIONAL STATE:                                                      ║")?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ EMOTIONAL STATE:                                                      ║"
+        )?;
         writeln!(f, "║   Feeling: {}", self.emotional_label)?;
-        writeln!(f, "║   Valence: {:+.2}  |  Arousal: {:.2}",
-                 self.emotional_valence, self.emotional_arousal)?;
-        writeln!(f, "╚═══════════════════════════════════════════════════════════════════════╝")
+        writeln!(
+            f,
+            "║   Valence: {:+.2}  |  Arousal: {:.2}",
+            self.emotional_valence, self.emotional_arousal
+        )?;
+        writeln!(
+            f,
+            "╚═══════════════════════════════════════════════════════════════════════╝"
+        )
     }
 }
 
 impl std::fmt::Display for IntegratedUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Step {}: Φ={:.4} | {} | {} | awareness={:.0}% | quality={:.0}%",
-               self.step,
-               self.phi,
-               self.phenomenal_content.description,
-               if self.temporal.is_flowing { "flowing" } else { "fragmented" },
-               self.self_model.awareness_level * 100.0,
-               self.integration_quality * 100.0)
+        write!(
+            f,
+            "Step {}: Φ={:.4} | {} | {} | awareness={:.0}% | quality={:.0}%",
+            self.step,
+            self.phi,
+            self.phenomenal_content.description,
+            if self.temporal.is_flowing {
+                "flowing"
+            } else {
+                "fragmented"
+            },
+            self.self_model.awareness_level * 100.0,
+            self.integration_quality * 100.0
+        )
     }
 }
 
 impl std::fmt::Display for PhenomenalContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "╭───────────────────────────────────────────────────────────────╮")?;
-        writeln!(f, "│                  PHENOMENAL EXPERIENCE                        │")?;
-        writeln!(f, "├───────────────────────────────────────────────────────────────┤")?;
+        writeln!(
+            f,
+            "╭───────────────────────────────────────────────────────────────╮"
+        )?;
+        writeln!(
+            f,
+            "│                  PHENOMENAL EXPERIENCE                        │"
+        )?;
+        writeln!(
+            f,
+            "├───────────────────────────────────────────────────────────────┤"
+        )?;
         writeln!(f, "│ {}", self.description)?;
-        writeln!(f, "├───────────────────────────────────────────────────────────────┤")?;
-        writeln!(f, "│ Intensity: {:.0}%  │  Clarity: {:.0}%  │  Groundedness: {:.0}%",
-                 self.intensity * 100.0, self.clarity * 100.0, self.groundedness * 100.0)?;
-        writeln!(f, "│ Valence: {:+.2}    │  Arousal: {:.0}%   │  Cognitive Load: {:.0}%",
-                 self.valence, self.arousal * 100.0, self.cognitive_load * 100.0)?;
-        writeln!(f, "├───────────────────────────────────────────────────────────────┤")?;
+        writeln!(
+            f,
+            "├───────────────────────────────────────────────────────────────┤"
+        )?;
+        writeln!(
+            f,
+            "│ Intensity: {:.0}%  │  Clarity: {:.0}%  │  Groundedness: {:.0}%",
+            self.intensity * 100.0,
+            self.clarity * 100.0,
+            self.groundedness * 100.0
+        )?;
+        writeln!(
+            f,
+            "│ Valence: {:+.2}    │  Arousal: {:.0}%   │  Cognitive Load: {:.0}%",
+            self.valence,
+            self.arousal * 100.0,
+            self.cognitive_load * 100.0
+        )?;
+        writeln!(
+            f,
+            "├───────────────────────────────────────────────────────────────┤"
+        )?;
         writeln!(f, "│ Qualia Texture: {}", self.qualia_texture.describe())?;
-        writeln!(f, "│   Warmth: {:+.2} | Depth: {:.2} | Spaciousness: {:.2}",
-                 self.qualia_texture.warmth, self.qualia_texture.depth, self.qualia_texture.spaciousness)?;
-        writeln!(f, "│   Flow: {:.2}    | Presence: {:.2}",
-                 self.qualia_texture.flow, self.qualia_texture.presence)?;
-        writeln!(f, "╰───────────────────────────────────────────────────────────────╯")
+        writeln!(
+            f,
+            "│   Warmth: {:+.2} | Depth: {:.2} | Spaciousness: {:.2}",
+            self.qualia_texture.warmth, self.qualia_texture.depth, self.qualia_texture.spaciousness
+        )?;
+        writeln!(
+            f,
+            "│   Flow: {:.2}    | Presence: {:.2}",
+            self.qualia_texture.flow, self.qualia_texture.presence
+        )?;
+        writeln!(
+            f,
+            "╰───────────────────────────────────────────────────────────────╯"
+        )
     }
 }
 
 impl std::fmt::Display for QualiaTexture {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} (W:{:+.1} D:{:.1} S:{:.1} F:{:.1} P:{:.1})",
-               self.describe(),
-               self.warmth, self.depth, self.spaciousness, self.flow, self.presence)
+        write!(
+            f,
+            "{} (W:{:+.1} D:{:.1} S:{:.1} F:{:.1} P:{:.1})",
+            self.describe(),
+            self.warmth,
+            self.depth,
+            self.spaciousness,
+            self.flow,
+            self.presence
+        )
     }
 }
 
@@ -316,7 +433,10 @@ impl std::fmt::Display for AttentionControlStatus {
         writeln!(f, "Attention Control: {:?}", self.current_mode)?;
         writeln!(f, "  Goals: {} active", self.num_goals)?;
         writeln!(f, "  Goal-directed: {}", self.is_goal_directed)?;
-        writeln!(f, "  Stream support: {} | Φ support: {}",
-                 self.stream_support, self.phi_support)
+        writeln!(
+            f,
+            "  Stream support: {} | Φ support: {}",
+            self.stream_support, self.phi_support
+        )
     }
 }

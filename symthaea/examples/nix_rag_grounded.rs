@@ -8,10 +8,10 @@
 //! not "does it match the golden?" but "does nix actually accept it?".
 //!
 //! Three signals per prompt:
-//! - **structural**: `nix_scorer::score(gen, golden).pass()` — matches
+//! - **structural**: `nix_scorer::score(r#gen, golden).pass()` — matches
 //!   golden attrpaths + values. Depends on having a golden.
-//! - **parse**: `rnix::Root::parse(gen).errors().is_empty()` — syntactic.
-//! - **grounded**: `cached_module_eval(gen)` → `NixVerdict::ParseOk` —
+//! - **parse**: `rnix::Root::parse(r#gen).errors().is_empty()` — syntactic.
+//! - **grounded**: `cached_module_eval(r#gen)` → `NixVerdict::ParseOk` —
 //!   nix-instantiate with full module evaluation succeeds. This is what
 //!   the compiler says, independent of golden.
 //!

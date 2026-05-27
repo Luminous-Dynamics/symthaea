@@ -422,8 +422,7 @@ fn sharf_data_points() -> Vec<ValidationDataPoint> {
             label: "7 months",
             months: 7,
             day: 210,
-            description:
-                "Peak activity; theta phase-locking 28% of units; ~400 ms coherence (REPORTED)",
+            description: "Peak activity; theta phase-locking 28% of units; ~400 ms coherence (REPORTED)",
             metrics: OrganoidMetrics {
                 cell_count: 120_000,              // ESTIMATED
                 neuron_count: 30_000,             // ESTIMATED

@@ -10,7 +10,7 @@
 
 use image::GenericImageView;
 use symthaea_core::embodiment::{
-    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, GROUNDING_TEMPORAL,
+    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, GROUNDING_TEMPORAL, MotorSafetyLevel,
 };
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_vision_manifold::{VisionConfig, VisionManifold};
@@ -172,7 +172,7 @@ impl PhoneBridge {
     /// Converts from the 8×8 grid (at 64×64) to native screen pixels.
     pub fn grid_to_screen(&self, grid_row: usize, grid_col: usize) -> (u32, u32) {
         let patch_size = 8; // VisionConfig default
-                            // Center of the patch
+        // Center of the patch
         let vision_x = (grid_col * patch_size + patch_size / 2) as f32;
         let vision_y = (grid_row * patch_size + patch_size / 2) as f32;
         // Scale to screen

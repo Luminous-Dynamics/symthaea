@@ -8,8 +8,8 @@
 //! 2. Autonomous verification in the WasmSandbox.
 //! 3. Hot-swapping the 'DNA' (Verified status) after successful test.
 
-use symthaea::action::PolicyBundle;
 use symthaea::Symthaea;
+use symthaea::action::PolicyBundle;
 use tracing::Level;
 
 #[tokio::main]

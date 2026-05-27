@@ -13,9 +13,9 @@
 //! Run with: cargo run --example phi_evolution_demo
 
 use symthaea_core::hdc::{
-    demo_phi_evolution, ContinuousHV, HdcLtcUnifiedNetwork, PhiCalculationMethod,
-    PhiDiagnosticAnalyzer, PhiValidator, UnifiedConfig, UnifiedNetworkConfig,
-    UnifiedNetworkPhiMeasurer, UnifiedPhiConfig,
+    ContinuousHV, HdcLtcUnifiedNetwork, PhiCalculationMethod, PhiDiagnosticAnalyzer, PhiValidator,
+    UnifiedConfig, UnifiedNetworkConfig, UnifiedNetworkPhiMeasurer, UnifiedPhiConfig,
+    demo_phi_evolution,
 };
 
 fn main() {

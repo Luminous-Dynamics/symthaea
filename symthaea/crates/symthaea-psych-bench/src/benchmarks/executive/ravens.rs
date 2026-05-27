@@ -289,11 +289,7 @@ fn predict_feature_symbolic(vals: &[usize]) -> Option<usize> {
     // (Carpenter et al., 1990). 0-error tolerance was too strict,
     // failing on medium/hard items where perceptual noise causes 1-cell
     // deviations. 1-error threshold matches human partial-rule extraction.
-    if best_errors <= 1 {
-        best_pred
-    } else {
-        None
-    }
+    if best_errors <= 1 { best_pred } else { None }
 }
 
 impl RavensProgressiveMatricesBenchmark {

@@ -7,7 +7,7 @@
 mod tests {
     use crate::bandgap_baseline::electronegativity_bandgap;
     use crate::ml_bandgap::BandgapPredictor;
-    use crate::training_data::{load_training_data, CrystalSystem};
+    use crate::training_data::{CrystalSystem, load_training_data};
 
     /// Compute MAE, RMSE, R^2 from parallel (predicted, actual) slices.
     fn metrics(predicted: &[f64], actual: &[f64]) -> (f64, f64, f64) {

@@ -38,13 +38,13 @@ use anyhow::{Context, Result};
 use candle_core::{DType, Device, Tensor};
 
 #[cfg(feature = "neural-bridge")]
-use candle_nn::{embedding, layer_norm, linear, Embedding, LayerNorm, Linear, Module, VarBuilder};
+use candle_nn::{Embedding, LayerNorm, Linear, Module, VarBuilder, embedding, layer_norm, linear};
 
 #[cfg(feature = "neural-bridge")]
 use tokenizers::Tokenizer;
 
 #[cfg(feature = "neural-bridge")]
-use hf_hub::{api::sync::Api, Repo, RepoType};
+use hf_hub::{Repo, RepoType, api::sync::Api};
 
 #[cfg(feature = "neural-bridge")]
 use std::path::PathBuf;

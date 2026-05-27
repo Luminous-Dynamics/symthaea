@@ -6,8 +6,8 @@
 //! Symthaea applies her SSM research to optimize her own core math.
 
 use std::path::PathBuf;
-use symthaea::action::{PolicyBundle, SandboxRoot};
 use symthaea::Symthaea;
+use symthaea::action::{PolicyBundle, SandboxRoot};
 use tracing::Level;
 
 #[tokio::main]

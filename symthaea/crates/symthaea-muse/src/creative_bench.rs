@@ -1775,10 +1775,15 @@ mod external_validation_tests {
                 audio.composite
             );
             let harmonic = HarmonicProgressionScore::evaluate(&comp.notes);
-            eprintln!("  Theory:    scale={:.0}% p5={:.0}% grid={:.0}% range={:.0}% contour={:.0}% -> {:.3}",
-                theory.scale_adherence * 100.0, theory.parallel_fifth_avoidance * 100.0,
-                theory.rhythmic_quantization * 100.0, theory.voice_range_compliance * 100.0,
-                theory.phrase_contour_quality * 100.0, theory.composite);
+            eprintln!(
+                "  Theory:    scale={:.0}% p5={:.0}% grid={:.0}% range={:.0}% contour={:.0}% -> {:.3}",
+                theory.scale_adherence * 100.0,
+                theory.parallel_fifth_avoidance * 100.0,
+                theory.rhythmic_quantization * 100.0,
+                theory.voice_range_compliance * 100.0,
+                theory.phrase_contour_quality * 100.0,
+                theory.composite
+            );
             eprintln!(
                 "  Harmonic:  strong={:.0}% resolve={:.0}% variety={:.0}% -> {:.3}",
                 harmonic.strong_progressions * 100.0,

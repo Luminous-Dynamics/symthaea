@@ -279,11 +279,7 @@ impl PhiGuidedMath {
 
     /// Return the Unicode label for a domain index.
     pub fn domain_label(idx: usize) -> &'static str {
-        if idx < 5 {
-            DOMAIN_LABELS[idx]
-        } else {
-            "?"
-        }
+        if idx < 5 { DOMAIN_LABELS[idx] } else { "?" }
     }
 
     // ========================================================================
@@ -341,11 +337,7 @@ impl PhiGuidedMath {
             (phi - avg) / avg
         } else {
             // First operation: treat any positive phi as above average
-            if phi > 0.0 {
-                1.0
-            } else {
-                0.0
-            }
+            if phi > 0.0 { 1.0 } else { 0.0 }
         };
 
         // Boost or attenuate the result domain

@@ -485,7 +485,9 @@ Key Improvements in Advanced:
     );
     println!("  └─ Baseline → Advanced:  {:>+6.1}%", improvement_overall);
 
-    println!("\n╔══════════════════════════════════════════════════════════════════════════════════════╗");
+    println!(
+        "\n╔══════════════════════════════════════════════════════════════════════════════════════╗"
+    );
     println!(
         "║                      ADVANCED COMPARISON COMPLETE                                    ║"
     );

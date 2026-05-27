@@ -9,13 +9,13 @@
 //! 3. Within-episode learning curve: 1 episode x 1000 steps with telemetry
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_multirotor::benchmarks::{run_wind_benchmark, WindBenchmarkConfig, WindGust};
+use symthaea_multirotor::benchmarks::{WindBenchmarkConfig, WindGust, run_wind_benchmark};
 use symthaea_multirotor::fep_agent::FlightFepConfig;
 use symthaea_multirotor::simulator::PhysicsSimulator;
 use symthaea_multirotor::training::FlightTrainer;
 use symthaea_multirotor::{
-    pd_baseline, pid_baseline, ActiveInferenceFlightAgent, FlightConfig, FlightController,
-    FlightSetpoint, PdGains, PidState, QuadrotorHdcEncoder, SimplePhysicsSimulator,
+    ActiveInferenceFlightAgent, FlightConfig, FlightController, FlightSetpoint, PdGains, PidState,
+    QuadrotorHdcEncoder, SimplePhysicsSimulator, pd_baseline, pid_baseline,
 };
 
 #[test]
@@ -484,7 +484,7 @@ fn test_regression_pid_vs_pd() {
 #[ignore] // Requires MuJoCo library: cargo test -p symthaea-multirotor --features mujoco -- --ignored --nocapture diagnostic_kinetic_sacrifice
 fn diagnostic_kinetic_sacrifice() {
     use symthaea_multirotor::scenarios::kinetic_sacrifice::{
-        run_kinetic_sacrifice, KineticSacrificeConfig,
+        KineticSacrificeConfig, run_kinetic_sacrifice,
     };
 
     println!("\n{}", "=".repeat(80));

@@ -581,10 +581,14 @@ impl SleepAndAlteredStates {
                 )
             }
             AlteredState::SleepN2 | AlteredState::SleepN3 => {
-                format!("Unconscious sleep (p={prob:.2}). Workspace collapsed, no attention, minimal binding.")
+                format!(
+                    "Unconscious sleep (p={prob:.2}). Workspace collapsed, no attention, minimal binding."
+                )
             }
             AlteredState::DreamNonLucid => {
-                format!("Non-lucid dreaming (p={prob:.2}). Vivid workspace but bizarre binding, no meta-awareness.")
+                format!(
+                    "Non-lucid dreaming (p={prob:.2}). Vivid workspace but bizarre binding, no meta-awareness."
+                )
             }
             AlteredState::DreamLucid => {
                 format!(
@@ -597,13 +601,19 @@ impl SleepAndAlteredStates {
                 )
             }
             AlteredState::AnesthesiaKetamine => {
-                format!("Ketamine anesthesia (p={prob:.2}). Dissociative: binding intact but workspace destroyed.")
+                format!(
+                    "Ketamine anesthesia (p={prob:.2}). Dissociative: binding intact but workspace destroyed."
+                )
             }
             AlteredState::VegetativeState => {
-                format!("Vegetative state (p={prob:.2}). No workspace, no conscious access despite sleep-wake cycles.")
+                format!(
+                    "Vegetative state (p={prob:.2}). No workspace, no conscious access despite sleep-wake cycles."
+                )
             }
             AlteredState::MinimallyConscious => {
-                format!("Minimally conscious (p={prob:.2}). Intermittent workspace function, occasional awareness.")
+                format!(
+                    "Minimally conscious (p={prob:.2}). Intermittent workspace function, occasional awareness."
+                )
             }
         }
     }

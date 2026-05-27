@@ -12,9 +12,9 @@ use std::fs;
 use std::hint::black_box;
 use std::path::Path;
 use std::time::{Duration, Instant};
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::hdc::simd_ops::{bind_simd, hamming_distance_simd, invert_simd, matching_bits_simd};
-use symthaea::hdc::HDC_DIMENSION;
 
 /// Benchmark result for a single operation
 #[derive(Debug, Clone)]

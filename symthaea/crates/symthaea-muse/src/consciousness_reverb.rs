@@ -9,8 +9,8 @@
 //! - Modulated comb delays for lush, living tail
 //! - Phi → room size mapping (closet → cathedral)
 
-use crate::synth::Freeverb;
 use crate::MusicalState;
+use crate::synth::Freeverb;
 
 /// Consciousness-driven reverb engine.
 pub struct ConsciousnessReverb {

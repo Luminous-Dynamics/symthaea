@@ -43,7 +43,7 @@ use super::hdc_emergence_metrics::{
 use super::molecular_biology::MolBioEncoder;
 use super::neuroscience::NeuroEncoder;
 use super::periodic_table::PeriodicTable;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
+use super::standard_model::{PHYSICS_DIM, StandardModel};
 use crate::consciousness_metrics::{EntropyConfig, TruePhiCalculator, TruePhiResult};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;

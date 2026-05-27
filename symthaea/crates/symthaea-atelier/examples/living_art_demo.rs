@@ -4,7 +4,7 @@
 //!
 //! Run: cargo run -p symthaea-atelier --example living_art_demo
 
-use symthaea_atelier::living_art::{generate_living_art, LivingArtConfig};
+use symthaea_atelier::living_art::{LivingArtConfig, generate_living_art};
 use symthaea_canvas::CognitiveSnapshot;
 
 fn main() {

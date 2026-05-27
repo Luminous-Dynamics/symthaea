@@ -178,7 +178,9 @@ fn test_consciousness_vs_zombie_divergence() {
     eprintln!("  Cycles: {n}");
     eprintln!("  Max phi difference: {max_phi_diff:.6}");
     eprintln!("  Mean phi difference: {mean_phi_diff:.6}");
-    eprintln!("  Emergency phi — conscious: {conscious_emergency_phi:.4}, zombie: {zombie_emergency_phi:.4}");
+    eprintln!(
+        "  Emergency phi — conscious: {conscious_emergency_phi:.4}, zombie: {zombie_emergency_phi:.4}"
+    );
     eprintln!("  Emergency phi difference: {emergency_phi_diff:.6}");
     eprintln!();
 

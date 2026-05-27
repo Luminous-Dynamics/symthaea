@@ -25,8 +25,8 @@
 //!   machinery has a deeper flaw worth investigating.
 
 use symthaea_core::hdc::conjecture_engine::{
-    discover_invariants_autonomous_with_seed_templates, AutonomousInvariant, BinOp, Expr,
-    RegressorConfig, UnaryFn,
+    AutonomousInvariant, BinOp, Expr, RegressorConfig, UnaryFn,
+    discover_invariants_autonomous_with_seed_templates,
 };
 
 const SEEDS: &[u64] = &[42, 1337, 2718, 7919, 31415];
@@ -115,7 +115,7 @@ fn main() {
     println!("║  Does the full arc's machinery recover Kepler's invariants?  ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!(
-        "\nConfig: {} seeds, pop={}, gen={}, t_max={}, dt={}",
+        "\nConfig: {} seeds, pop={}, r#gen={}, t_max={}, dt={}",
         SEEDS.len(),
         POP_SIZE,
         GENERATIONS,

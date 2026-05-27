@@ -9,10 +9,10 @@
 use std::hint::black_box;
 use std::time::Instant;
 
-use mycelix_zkp_core::fixed_point::FixedPoint;
-use mycelix_zkp_core::pogq::{simulate_pogq, PoGQPublicInputs, PoGQWitness};
-use mycelix_zkp_core::types::AuthenticatedProof;
 use mycelix_zkp_core::domain::DomainTag;
+use mycelix_zkp_core::fixed_point::FixedPoint;
+use mycelix_zkp_core::pogq::{PoGQPublicInputs, PoGQWitness, simulate_pogq};
+use mycelix_zkp_core::types::AuthenticatedProof;
 
 fn bench_fixed_point_ops(iterations: u64) {
     let a = FixedPoint::from_f32(0.85);

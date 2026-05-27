@@ -27,7 +27,7 @@ use std::process::ExitCode;
 
 use symthaea_core::hdc::logic_engine::{LogicEngine, ProofResult, ProofStepLogic, Proposition};
 use symthaea_lean_bridge::bridge::render_lean_file;
-use symthaea_lean_bridge::runner::{check_with_lean4, CheckOutcome};
+use symthaea_lean_bridge::runner::{CheckOutcome, check_with_lean4};
 
 fn atom(name: &str) -> Proposition {
     Proposition::Atom(name.to_string())

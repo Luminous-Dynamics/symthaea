@@ -9,9 +9,9 @@
 //! intent markers. Uses HDC bundling for accumulated context encoding.
 
 #[cfg(not(feature = "symthaea-backend"))]
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
-#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::harness::difficulty::difficulty_model_for;

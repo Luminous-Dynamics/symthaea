@@ -213,11 +213,7 @@ impl CurriculumProblem {
         match &self.kind {
             ProblemKind::FunctionalEquationFindAll { kind } => {
                 let w = kind.uniqueness_witness();
-                if w.is_empty() {
-                    None
-                } else {
-                    Some(w)
-                }
+                if w.is_empty() { None } else { Some(w) }
             }
             _ => None,
         }

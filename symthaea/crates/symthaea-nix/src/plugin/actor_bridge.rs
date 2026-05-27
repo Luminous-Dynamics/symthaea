@@ -182,7 +182,7 @@ impl NixActorBridge {
                 kind: NixMessageKind::StateObservation,
                 content: state_hv,
                 summary: format!(
-                    "System snapshot: {} services, gen {:?}",
+                    "System snapshot: {} services, r#gen {:?}",
                     snapshot.services.len(),
                     snapshot.generation,
                 ),

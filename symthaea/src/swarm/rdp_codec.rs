@@ -624,7 +624,7 @@ mod tests {
         assert_eq!(full.patch_cols, 4); // 256/64 = 4
         assert_eq!(full.patch_rows, 4);
         assert_eq!(full.patches.len(), 16); // 4×4 grid
-                                            // Each tile is 64×64 = 4096 grayscale bytes.
+        // Each tile is 64×64 = 4096 grayscale bytes.
         assert_eq!(full.patches[0].values.len(), TILE_SIZE * TILE_SIZE);
     }
 

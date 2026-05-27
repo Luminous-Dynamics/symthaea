@@ -40,8 +40,8 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::dynamical_system::{
-    simulate, state_to_hv, trajectory_to_hvs, ChargedParticle, DynamicalSystem, HarmonicOscillator,
-    HeatEquation1D, Integrator, LorenzSystem, NBodyGravity, Rk4Integrator, SimulationResult,
+    ChargedParticle, DynamicalSystem, HarmonicOscillator, HeatEquation1D, Integrator, LorenzSystem,
+    NBodyGravity, Rk4Integrator, SimulationResult, simulate, state_to_hv, trajectory_to_hvs,
 };
 use crate::hdc::unified_hv::ContinuousHV;
 

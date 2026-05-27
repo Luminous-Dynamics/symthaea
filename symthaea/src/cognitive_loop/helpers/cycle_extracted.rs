@@ -30,11 +30,7 @@ fn geometric_mean(factors: &[f32]) -> f32 {
         return 1.0;
     }
     let mean = (log_sum / count as f32).exp();
-    if mean.is_finite() {
-        mean
-    } else {
-        1.0
-    }
+    if mean.is_finite() { mean } else { 1.0 }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -377,7 +373,7 @@ impl CognitiveLoopService {
 
         // Compute Spinozist affect fingerprint for telemetry.
         // Uses deliberate() for trajectory-aware fingerprinting.
-        use crate::hdc::spinozist_geometry::{SpinozistClassifier, NUM_AFFECTS};
+        use crate::hdc::spinozist_geometry::{NUM_AFFECTS, SpinozistClassifier};
         use std::sync::OnceLock;
         static SPINOZIST: OnceLock<SpinozistClassifier> = OnceLock::new();
         let classifier = SPINOZIST.get_or_init(SpinozistClassifier::new);

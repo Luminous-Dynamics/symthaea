@@ -8,8 +8,8 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MotorSafetyLevel,
+    grounding_from_prediction_error, grounding_label,
 };
 
 pub struct ScavengerEmbodiment {

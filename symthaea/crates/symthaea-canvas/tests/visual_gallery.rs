@@ -6,7 +6,7 @@
 //! Run: `cargo test -p symthaea-canvas --test visual_gallery -- --nocapture`
 //! Then open `target/canvas-gallery/*.svg` in a browser.
 
-use symthaea_canvas::{render_snapshot, CognitiveSnapshot};
+use symthaea_canvas::{CognitiveSnapshot, render_snapshot};
 
 fn gallery_dir() -> std::path::PathBuf {
     let dir =

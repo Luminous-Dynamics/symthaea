@@ -62,7 +62,7 @@ pub fn newton_system(
                 return Err(format!(
                     "newton_system: singular Jacobian at iteration {}",
                     iter
-                ))
+                ));
             }
         };
 

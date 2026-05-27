@@ -192,12 +192,20 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "vision-manifold")]
         if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
-            let pixels = self.sensorimotor.vision_sensory.vision_frame_buffer.as_ref()
+            let pixels = self
+                .sensorimotor
+                .vision_sensory
+                .vision_frame_buffer
+                .as_ref()
                 .map(|f| f.as_slice())
                 .unwrap_or(&[]);
             let w = self.config.vision_frame_width;
             let h = self.config.vision_frame_height;
-            let channels = if bridge.manifold().encoder().config().enable_color { 3 } else { 1 };
+            let channels = if bridge.manifold().encoder().config().enable_color {
+                3
+            } else {
+                1
+            };
             let dt = self.config.cfc_config.delta_t;
 
             // Store initial dimension to detect dilation/constriction during processing
@@ -217,7 +225,9 @@ impl CognitiveLoopService {
             scene_recognized = telemetry.scene_recognition_similarity > 0.0;
 
             if current_cycle >= last_change + super::thresholds::VISION_DILATION_COOLDOWN {
-                let target = if vision_mean_surprise > super::thresholds::VISION_SURPRISE_DILATION_THRESHOLD {
+                let target = if vision_mean_surprise
+                    > super::thresholds::VISION_SURPRISE_DILATION_THRESHOLD
+                {
                     Some(symthaea_core::hdc::HdcDimensionality::Ultra)
                 } else if dim_after_fep > 16384 {
                     Some(symthaea_core::hdc::HdcDimensionality::Standard)
@@ -275,7 +285,8 @@ impl CognitiveLoopService {
         // PHASE 1.1: Surprise and Exploration
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_error = encoding_res.prediction_error;
-        let (surprise_triggered, exploration_action) = self.run_surprise_exploration(&encoding_res.compressed_state);
+        let (surprise_triggered, exploration_action) =
+            self.run_surprise_exploration(&encoding_res.compressed_state);
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.2: Urgency Phase
@@ -357,10 +368,7 @@ impl CognitiveLoopService {
         #[cfg(feature = "foveation")]
         let foveation_recognition_count = fov_results.len();
         #[cfg(feature = "foveation")]
-        let foveation_top_confidence = fov_results
-                .iter()
-                .map(|r| r.confidence)
-                .fold(0.0, f32::max);
+        let foveation_top_confidence = fov_results.iter().map(|r| r.confidence).fold(0.0, f32::max);
 
         Ok(PerceptionPhaseResult {
             encoding: PercEncoding {
@@ -378,7 +386,7 @@ impl CognitiveLoopService {
                 moral_score,
                 moral_concern_detected,
                 moral_judgment,
-                soul_alignment: 0.0, 
+                soul_alignment: 0.0,
                 moral_affect_coords: spinozist_affect_coords,
                 moral_fluctuatio_tension: spinozist_fluctuatio,
                 moral_is_ambiguous: spinozist_ambiguous,

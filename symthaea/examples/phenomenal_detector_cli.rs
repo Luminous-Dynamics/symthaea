@@ -37,7 +37,9 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This tool requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example phenomenal_detector_cli --features neural-bridge --release");
+        println!(
+            "Run with: cargo run --example phenomenal_detector_cli --features neural-bridge --release"
+        );
         return Ok(());
     }
 

@@ -63,7 +63,8 @@ pub struct CodingExperienceStore {
     success_cache: Vec<(String, String)>,
     /// In-memory cache of negative prototypes (disproven logic) for MCTS (INV-12).
     #[cfg(feature = "reasoning_engine")]
-    pub negative_prototypes_cache: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
+    pub negative_prototypes_cache:
+        crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     /// Maximum cache size (oldest entries evicted).
     max_cache_size: usize,
     /// Records queued for DB persistence (flushed on next async call or explicit flush).
@@ -80,7 +81,8 @@ impl CodingExperienceStore {
             error_hints_cache: Vec::new(),
             success_cache: Vec::new(),
             #[cfg(feature = "reasoning_engine")]
-            negative_prototypes_cache: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
+            negative_prototypes_cache:
+                crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
             max_cache_size: 128,
             pending_writes: Vec::new(),
         })
@@ -99,7 +101,8 @@ impl CodingExperienceStore {
             error_hints_cache: Vec::new(),
             success_cache: Vec::new(),
             #[cfg(feature = "reasoning_engine")]
-            negative_prototypes_cache: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
+            negative_prototypes_cache:
+                crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
             max_cache_size: 128,
             pending_writes: Vec::new(),
         };
@@ -660,7 +663,9 @@ impl CodingExperienceStore {
 
     /// Get the current negative prototypes bank for MCTS.
     #[cfg(feature = "reasoning_engine")]
-    pub fn negative_prototypes(&self) -> &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank {
+    pub fn negative_prototypes(
+        &self,
+    ) -> &crate::consciousness::temporal_planning::mcts::NegativePrototypeBank {
         &self.negative_prototypes_cache
     }
 }

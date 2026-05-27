@@ -315,8 +315,8 @@ fn build_xc_matrix(v_xc: &[f64], basis_at_grid: &[f64], grid: &DftGrid, n: usize
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::basis::sto3g::Sto3g;
     use crate::basis::BasisSetProvider;
+    use crate::basis::sto3g::Sto3g;
 
     #[test]
     fn test_dft_h2_converges() {

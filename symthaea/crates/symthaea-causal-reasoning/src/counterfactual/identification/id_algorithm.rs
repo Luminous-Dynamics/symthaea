@@ -519,7 +519,7 @@ impl IDAlgorithm {
                             return Ok(CausalExpression::Probability {
                                 outcome: s.iter().copied().collect(),
                                 conditioning: Vec::new(),
-                            })
+                            });
                         }
                     };
                     let direct_edge = graph

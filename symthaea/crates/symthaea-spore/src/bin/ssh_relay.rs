@@ -54,7 +54,10 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     command.arg("-c").arg(cmd);
     // Supplement PATH with NixOS-specific locations
     let sys_path = std::env::var("PATH").unwrap_or_default();
-    let full_path = format!("{}:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:/sbin", sys_path);
+    let full_path = format!(
+        "{}:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:/sbin",
+        sys_path
+    );
     command.env("PATH", &full_path);
     // Ensure NIX_PATH is set for nixos-install
     if std::env::var("NIX_PATH").is_err() {
@@ -4057,8 +4060,8 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             }
 
             "switch_generation" => {
-                let gen = &client_msg.command;
-                if gen.is_empty() || !gen.chars().all(|c| c.is_ascii_digit()) {
+                let r#gen = &client_msg.command;
+                if r#gen.is_empty() || !r#gen.chars().all(|c| c.is_ascii_digit()) {
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error("Invalid generation number").to_json(),
@@ -4066,8 +4069,11 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         .await;
                     continue;
                 }
-                eprintln!("[{}] Switching to generation {}...", peer_addr, gen);
-                let cmd = format!("nix-env --switch-generation {} -p /nix/var/nix/profiles/system && /nix/var/nix/profiles/system/bin/switch-to-configuration switch 2>&1", gen);
+                eprintln!("[{}] Switching to generation {}...", peer_addr, r#gen);
+                let cmd = format!(
+                    "nix-env --switch-generation {} -p /nix/var/nix/profiles/system && /nix/var/nix/profiles/system/bin/switch-to-configuration switch 2>&1",
+                    r#gen
+                );
                 match run_cmd(&cmd).await {
                     Ok(r) => {
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;

@@ -71,11 +71,14 @@ impl SimulationBackend for OpenSeesBridge {
 
         // Real path: execute command
         let cmd = CommandSolver::new(&self.solver_cmd).arg("model.tcl");
-        
+
         let _output = cmd.execute()?;
 
-        Ok(SimulationResult::converged(&request.id, 0.85)
-            .with_metric("max_drift_ratio", 0.010, "ratio"))
+        Ok(SimulationResult::converged(&request.id, 0.85).with_metric(
+            "max_drift_ratio",
+            0.010,
+            "ratio",
+        ))
     }
 }
 

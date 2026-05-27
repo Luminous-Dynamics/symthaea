@@ -13,7 +13,7 @@
 //! 3. **Thermodynamic Regulation**: Dampens request frequency under high metabolic load.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 
 /// Multimodal Manager — gates external generative models based on consciousness and ethics.
@@ -116,7 +116,7 @@ impl CognitiveSubsystem for MultimodalManager {
             self.total_requests += 1;
 
             // ── 1. Consciousness Gating ──────────────────────────────────────
-            // If Ψ is too low, the system lacks the integration to "direct" a gen model.
+            // If Ψ is too low, the system lacks the integration to "direct" a r#gen model.
             if snapshot.unified_psi < Self::MIN_PSI_FOR_GEN {
                 output.flags |= output_flags::VETO_ACTION;
                 output.flags |= output_flags::ANOMALY_DETECTED;

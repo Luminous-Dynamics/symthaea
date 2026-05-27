@@ -920,10 +920,12 @@ mod tests {
         let metrics = make_metrics(0.5, 0.6, 0.0, false, 1.0, 100, 200);
         let assessment = fw.assess(&metrics, None);
         assert_eq!(assessment.current_tier, EthicsTier::Tier1);
-        assert!(assessment
-            .required_actions
-            .iter()
-            .any(|a| matches!(a, RequiredAction::EnhancedMonitoring { .. })));
+        assert!(
+            assessment
+                .required_actions
+                .iter()
+                .any(|a| matches!(a, RequiredAction::EnhancedMonitoring { .. }))
+        );
     }
 
     #[test]
@@ -933,10 +935,12 @@ mod tests {
         let lfp = make_lfp(0.1, 0.02, 0.0);
         let assessment = fw.assess(&metrics, Some(&lfp));
         assert_eq!(assessment.current_tier, EthicsTier::Tier2);
-        assert!(assessment
-            .required_actions
-            .iter()
-            .any(|a| matches!(a, RequiredAction::EthicsCommitteeNotification { .. })));
+        assert!(
+            assessment
+                .required_actions
+                .iter()
+                .any(|a| matches!(a, RequiredAction::EthicsCommitteeNotification { .. }))
+        );
     }
 
     #[test]
@@ -1006,10 +1010,12 @@ mod tests {
         let metrics = make_metrics(1.0, 0.8, 0.2, true, 8.0, 300, 1000);
         let assessment = fw.assess(&metrics, None);
         assert!(assessment.current_tier >= EthicsTier::Tier3);
-        assert!(assessment
-            .required_actions
-            .iter()
-            .any(|a| matches!(a, RequiredAction::PainMitigation { .. })));
+        assert!(
+            assessment
+                .required_actions
+                .iter()
+                .any(|a| matches!(a, RequiredAction::PainMitigation { .. }))
+        );
     }
 
     #[test]
@@ -1018,10 +1024,12 @@ mod tests {
         let metrics = make_metrics(2.0, 0.95, 0.6, true, 15.0, 800, 5000);
         let assessment = fw.assess(&metrics, None);
         assert_eq!(assessment.current_tier, EthicsTier::Tier4);
-        assert!(assessment
-            .required_actions
-            .iter()
-            .any(|a| matches!(a, RequiredAction::ExternalReview { .. })));
+        assert!(
+            assessment
+                .required_actions
+                .iter()
+                .any(|a| matches!(a, RequiredAction::ExternalReview { .. }))
+        );
     }
 
     #[test]

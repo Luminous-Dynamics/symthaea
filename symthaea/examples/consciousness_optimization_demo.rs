@@ -20,7 +20,7 @@
 //! ```
 
 use symthaea_core::hdc::autodiff_phi::{
-    topology, AutodiffConfig, AutodiffPhiEngine, ConsciousnessOptimizer, OptimizerConfig,
+    AutodiffConfig, AutodiffPhiEngine, ConsciousnessOptimizer, OptimizerConfig, topology,
 };
 
 fn main() {

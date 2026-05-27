@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+use drm::Device;
 /// DRM/KMS framebuffer abstraction.
 ///
 /// Opens a DRM device, finds a connected display, creates a dumb buffer at
@@ -11,7 +12,6 @@ use drm::control::connector::{Info as ConnectorInfo, State as ConnectorState};
 use drm::control::crtc::Handle as CrtcHandle;
 use drm::control::framebuffer::Handle as FbHandle;
 use drm::control::{self, Device as ControlDevice, Mode, ResourceHandles};
-use drm::Device;
 use std::fs::{File, OpenOptions};
 use std::os::unix::io::{AsFd, BorrowedFd};
 

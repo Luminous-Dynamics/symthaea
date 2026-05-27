@@ -109,7 +109,7 @@ impl VisualCortex {
             let num_filters = 2usize.pow((_layer + 2) as u32).min(64);
             let filters: Vec<ContinuousHV> = (0..num_filters)
                 .map(|_| {
-                    let seed: u64 = rand::Rng::gen(&mut rng);
+                    let seed: u64 = rand::Rng::r#gen(&mut rng);
                     ContinuousHV::random(dim, seed)
                 })
                 .collect();

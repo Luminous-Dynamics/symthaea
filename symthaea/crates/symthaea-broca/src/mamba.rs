@@ -63,7 +63,7 @@ pub fn best_device() -> Device {
 /// All methods used by [`crate::liquid_mamba::LiquidMambaGenerator`] are
 /// included. Methods that expose candle-specific types (`State`, `Device`,
 /// `Tokenizer`) remain as inherent methods on [`MambaWrapper`] only.
-pub trait MambaBackend: Send {
+pub trait MambaBackend: Send + Sync {
     fn clone_box(&self) -> Box<dyn MambaBackend>;
 
     /// Single-token forward pass. Returns logits as `Vec<f32>` (vocab_size elements).

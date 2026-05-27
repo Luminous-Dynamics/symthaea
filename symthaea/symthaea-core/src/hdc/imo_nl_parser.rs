@@ -50,7 +50,7 @@
 //!   feature would upgrade this to a real ONNX sentence transformer.
 
 use crate::hdc::curriculum::{CurriculumProblem, Difficulty, Domain, ProblemKind};
-use crate::hdc::semantic_encoder::{create_best_encoder, SemanticEncoder};
+use crate::hdc::semantic_encoder::{SemanticEncoder, create_best_encoder};
 use crate::hdc::unified_hv::ContinuousHV;
 
 // ─── Reference corpus ──────────────────────────────────────────────────────
@@ -1172,7 +1172,7 @@ impl ImoNlParser {
     /// manual env-var workaround in `memory/onnx_exploration_apr13.md`).
     #[cfg(feature = "embeddings")]
     pub fn new_cascade() -> Self {
-        use crate::hdc::semantic_encoder::{create_encoder, EncoderType};
+        use crate::hdc::semantic_encoder::{EncoderType, create_encoder};
         let corpus = reference_corpus();
         let mut entries = Vec::new();
 
@@ -1412,28 +1412,58 @@ mod tests {
         let parser = ImoNlParser::new();
         let problems = [
             // Pigeonhole — varied phrasings, none match a reference verbatim
-            ("If you put 15 objects into 4 bins, prove one bin must contain at least 4 objects.", "Pigeonhole"),
-            ("Show that any selection of 8 integers contains two with the same parity (mod 2).", "Pigeonhole"),
+            (
+                "If you put 15 objects into 4 bins, prove one bin must contain at least 4 objects.",
+                "Pigeonhole",
+            ),
+            (
+                "Show that any selection of 8 integers contains two with the same parity (mod 2).",
+                "Pigeonhole",
+            ),
             // Pell — paraphrased
-            ("Demonstrate that the diophantine equation x squared minus 5 y squared equals 1 has solutions in positive integers.", "Pell"),
+            (
+                "Demonstrate that the diophantine equation x squared minus 5 y squared equals 1 has solutions in positive integers.",
+                "Pell",
+            ),
             // CRT — varied
-            ("There exists an integer x such that x leaves remainder 1 mod 3 and remainder 2 mod 5 and remainder 3 mod 7.", "CRT"),
+            (
+                "There exists an integer x such that x leaves remainder 1 mod 3 and remainder 2 mod 5 and remainder 3 mod 7.",
+                "CRT",
+            ),
             // Legendre — different wording
-            ("Determine if the integer 5 is a square modulo the prime 13.", "Legendre"),
+            (
+                "Determine if the integer 5 is a square modulo the prime 13.",
+                "Legendre",
+            ),
             // AM-GM — non-standard
-            ("For positive reals 2, 3, 6 the arithmetic mean is at least the geometric mean.", "AM-GM"),
+            (
+                "For positive reals 2, 3, 6 the arithmetic mean is at least the geometric mean.",
+                "AM-GM",
+            ),
             // Cauchy-Schwarz — varied
-            ("For pair of vectors 1, 2 and 3, 4 verify Cauchy-Schwarz inequality.", "Cauchy-Schwarz"),
+            (
+                "For pair of vectors 1, 2 and 3, 4 verify Cauchy-Schwarz inequality.",
+                "Cauchy-Schwarz",
+            ),
             // Primality
             ("Show that 13 is prime.", "Primality"),
             // EulerPhi
             ("Calculate Euler's totient function of 24.", "EulerPhi"),
             // PowerMean
-            ("Verify that the harmonic mean of 4, 6, 8 does not exceed their arithmetic mean.", "PowerMean"),
+            (
+                "Verify that the harmonic mean of 4, 6, 8 does not exceed their arithmetic mean.",
+                "PowerMean",
+            ),
             // Schur
-            ("For non-negative reals 2, 5, 7 verify Schur's inequality at exponent 1.", "Schur"),
+            (
+                "For non-negative reals 2, 5, 7 verify Schur's inequality at exponent 1.",
+                "Schur",
+            ),
             // Bezout
-            ("Find integers x, y satisfying 18 x + 12 y = gcd(18, 12).", "Bezout"),
+            (
+                "Find integers x, y satisfying 18 x + 12 y = gcd(18, 12).",
+                "Bezout",
+            ),
         ];
 
         let mut parse_successes = 0usize;
@@ -1631,37 +1661,79 @@ mod tests {
         let parser = ImoNlParser::new();
         let problems = [
             // Pigeonhole
-            ("Prove that among any 25 distinct integers, some two have the same remainder when divided by 24.", "Pigeonhole"),
-            ("If 50 balls are placed in 7 urns, prove at least one urn contains 8 or more balls.", "Pigeonhole"),
+            (
+                "Prove that among any 25 distinct integers, some two have the same remainder when divided by 24.",
+                "Pigeonhole",
+            ),
+            (
+                "If 50 balls are placed in 7 urns, prove at least one urn contains 8 or more balls.",
+                "Pigeonhole",
+            ),
             // Pell
-            ("Show that the equation x² − 2y² = 1 admits infinitely many integer solutions.", "Pell"),
+            (
+                "Show that the equation x² − 2y² = 1 admits infinitely many integer solutions.",
+                "Pell",
+            ),
             ("Find a positive integer solution to x² − 19y² = 1.", "Pell"),
             // CRT
-            ("Determine a positive integer x with x ≡ 1 (mod 3), x ≡ 2 (mod 5), and x ≡ 3 (mod 7).", "CRT"),
+            (
+                "Determine a positive integer x with x ≡ 1 (mod 3), x ≡ 2 (mod 5), and x ≡ 3 (mod 7).",
+                "CRT",
+            ),
             // Legendre
-            ("Prove that 3 is a quadratic residue modulo the prime 11.", "Legendre"),
-            ("Show that 7 is a quadratic non-residue modulo the prime 23.", "Legendre"),
+            (
+                "Prove that 3 is a quadratic residue modulo the prime 11.",
+                "Legendre",
+            ),
+            (
+                "Show that 7 is a quadratic non-residue modulo the prime 23.",
+                "Legendre",
+            ),
             // AM-GM
-            ("For the positive numbers 5, 10, 20, prove the arithmetic mean exceeds the geometric mean.", "AM-GM"),
+            (
+                "For the positive numbers 5, 10, 20, prove the arithmetic mean exceeds the geometric mean.",
+                "AM-GM",
+            ),
             // Cauchy-Schwarz
-            ("Verify the Cauchy-Schwarz inequality for the vectors 3, 4, 5 and 6, 7, 8.", "Cauchy-Schwarz"),
+            (
+                "Verify the Cauchy-Schwarz inequality for the vectors 3, 4, 5 and 6, 7, 8.",
+                "Cauchy-Schwarz",
+            ),
             // Primality
             ("Prove that 37 is a prime number.", "Primality"),
             ("Determine whether 1009 is prime.", "Primality"),
             // Euler phi
             ("Compute Euler's totient phi of 18.", "EulerPhi"),
-            ("Calculate the number of positive integers less than 20 that are relatively prime to 20.", "EulerPhi"),
+            (
+                "Calculate the number of positive integers less than 20 that are relatively prime to 20.",
+                "EulerPhi",
+            ),
             // Power mean
-            ("Show that the harmonic mean of 3, 4, 6 is at most their arithmetic mean.", "PowerMean"),
+            (
+                "Show that the harmonic mean of 3, 4, 6 is at most their arithmetic mean.",
+                "PowerMean",
+            ),
             // Schur
-            ("Verify Schur's inequality at t=1 for the non-negative triple 1, 4, 9.", "Schur"),
+            (
+                "Verify Schur's inequality at t=1 for the non-negative triple 1, 4, 9.",
+                "Schur",
+            ),
             // Bezout
             ("Find integers x, y with 21x + 14y = gcd(21, 14).", "Bezout"),
             ("Prove Bezout's identity for the pair 30 and 18.", "Bezout"),
             // Expected failures (unusual phrasings or out-of-scope)
-            ("Color the vertices of a regular pentagon with 3 colors such that no two adjacent vertices share a color.", "out-of-scope graph coloring"),
-            ("Show that the sum of the first n cubes equals the square of the sum of the first n integers.", "out-of-scope identity proof"),
-            ("For a triangle with sides a, b, c, prove that a² + b² + c² ≤ 2(ab + bc + ca).", "out-of-scope triangle inequality"),
+            (
+                "Color the vertices of a regular pentagon with 3 colors such that no two adjacent vertices share a color.",
+                "out-of-scope graph coloring",
+            ),
+            (
+                "Show that the sum of the first n cubes equals the square of the sum of the first n integers.",
+                "out-of-scope identity proof",
+            ),
+            (
+                "For a triangle with sides a, b, c, prove that a² + b² + c² ≤ 2(ab + bc + ca).",
+                "out-of-scope triangle inequality",
+            ),
         ];
 
         let mut parse_successes = 0usize;
@@ -1742,13 +1814,34 @@ mod tests {
     fn test_end_to_end_nl_parse_batch() {
         let parser = ImoNlParser::new();
         let problems = [
-            ("Among any 7 integers, some two have the same remainder when divided by 6.", "Pigeonhole"),
-            ("Show that the Pell equation x² − 13y² = 1 has a positive integer solution.", "Pell"),
-            ("Find the smallest positive integer x with x ≡ 2 (mod 3) and x ≡ 3 (mod 5).", "CRT"),
-            ("Determine whether 2 is a quadratic residue modulo the prime 7.", "Legendre"),
-            ("Prove the arithmetic-mean geometric-mean inequality for the positive numbers 1, 2, and 4.", "AM-GM"),
-            ("Verify the Cauchy-Schwarz inequality for the vectors 1, 2, 3 and 4, 5, 6.", "Cauchy-Schwarz"),
-            ("Show that among 10 integers, some two differ by a multiple of 9.", "Pigeonhole rephrased"),
+            (
+                "Among any 7 integers, some two have the same remainder when divided by 6.",
+                "Pigeonhole",
+            ),
+            (
+                "Show that the Pell equation x² − 13y² = 1 has a positive integer solution.",
+                "Pell",
+            ),
+            (
+                "Find the smallest positive integer x with x ≡ 2 (mod 3) and x ≡ 3 (mod 5).",
+                "CRT",
+            ),
+            (
+                "Determine whether 2 is a quadratic residue modulo the prime 7.",
+                "Legendre",
+            ),
+            (
+                "Prove the arithmetic-mean geometric-mean inequality for the positive numbers 1, 2, and 4.",
+                "AM-GM",
+            ),
+            (
+                "Verify the Cauchy-Schwarz inequality for the vectors 1, 2, 3 and 4, 5, 6.",
+                "Cauchy-Schwarz",
+            ),
+            (
+                "Show that among 10 integers, some two differ by a multiple of 9.",
+                "Pigeonhole rephrased",
+            ),
         ];
         let mut successes = 0;
         let total = problems.len();
@@ -2081,10 +2174,7 @@ mod tests {
                 "Suppose f: R → R satisfies f(u*v) = f(u)*f(v). Determine f.",
                 EquationKind::Multiplicative,
             ),
-            (
-                "Find all f with f(f(t)) = t.",
-                EquationKind::Involution,
-            ),
+            ("Find all f with f(f(t)) = t.", EquationKind::Involution),
         ];
         let mut hits = 0usize;
         let total = cases.len();
@@ -2181,45 +2271,117 @@ mod tests {
     #[cfg(feature = "embeddings")]
     #[test]
     fn test_cascade_vs_single_encoder() {
-        use crate::hdc::semantic_encoder::{create_encoder, EncoderType};
+        use crate::hdc::semantic_encoder::{EncoderType, create_encoder};
         use std::time::Instant;
 
         // Combined corpus: standard 20 + hard 12 = 32 problems
         let standard_problems: Vec<(&str, &str)> = vec![
-            ("Prove that among any 25 distinct integers, some two have the same remainder when divided by 24.", "Pigeonhole"),
-            ("If 50 balls are placed in 7 urns, prove at least one urn contains 8 or more balls.", "Pigeonhole"),
-            ("Show that the equation x² − 2y² = 1 admits infinitely many integer solutions.", "Pell"),
+            (
+                "Prove that among any 25 distinct integers, some two have the same remainder when divided by 24.",
+                "Pigeonhole",
+            ),
+            (
+                "If 50 balls are placed in 7 urns, prove at least one urn contains 8 or more balls.",
+                "Pigeonhole",
+            ),
+            (
+                "Show that the equation x² − 2y² = 1 admits infinitely many integer solutions.",
+                "Pell",
+            ),
             ("Find a positive integer solution to x² − 19y² = 1.", "Pell"),
-            ("Determine a positive integer x with x ≡ 1 (mod 3), x ≡ 2 (mod 5), and x ≡ 3 (mod 7).", "CRT"),
-            ("Prove that 3 is a quadratic residue modulo the prime 11.", "Legendre"),
-            ("Show that 7 is a quadratic non-residue modulo the prime 23.", "Legendre"),
-            ("For the positive numbers 5, 10, 20, prove the arithmetic mean exceeds the geometric mean.", "AM-GM"),
-            ("Verify the Cauchy-Schwarz inequality for the vectors 3, 4, 5 and 6, 7, 8.", "Cauchy-Schwarz"),
+            (
+                "Determine a positive integer x with x ≡ 1 (mod 3), x ≡ 2 (mod 5), and x ≡ 3 (mod 7).",
+                "CRT",
+            ),
+            (
+                "Prove that 3 is a quadratic residue modulo the prime 11.",
+                "Legendre",
+            ),
+            (
+                "Show that 7 is a quadratic non-residue modulo the prime 23.",
+                "Legendre",
+            ),
+            (
+                "For the positive numbers 5, 10, 20, prove the arithmetic mean exceeds the geometric mean.",
+                "AM-GM",
+            ),
+            (
+                "Verify the Cauchy-Schwarz inequality for the vectors 3, 4, 5 and 6, 7, 8.",
+                "Cauchy-Schwarz",
+            ),
             ("Prove that 37 is a prime number.", "Primality"),
             ("Determine whether 1009 is prime.", "Primality"),
             ("Compute Euler's totient phi of 18.", "EulerPhi"),
-            ("Calculate the number of positive integers less than 20 that are relatively prime to 20.", "EulerPhi"),
-            ("Show that the harmonic mean of 3, 4, 6 is at most their arithmetic mean.", "PowerMean"),
-            ("Verify Schur's inequality at t=1 for the non-negative triple 1, 4, 9.", "Schur"),
+            (
+                "Calculate the number of positive integers less than 20 that are relatively prime to 20.",
+                "EulerPhi",
+            ),
+            (
+                "Show that the harmonic mean of 3, 4, 6 is at most their arithmetic mean.",
+                "PowerMean",
+            ),
+            (
+                "Verify Schur's inequality at t=1 for the non-negative triple 1, 4, 9.",
+                "Schur",
+            ),
             ("Find integers x, y with 21x + 14y = gcd(21, 14).", "Bezout"),
             ("Prove Bezout's identity for the pair 30 and 18.", "Bezout"),
-            ("Color the vertices of a regular pentagon with 3 colors such that no two adjacent vertices share a color.", "out-of-scope"),
-            ("Show that the sum of the first n cubes equals the square of the sum of the first n integers.", "out-of-scope"),
-            ("For a triangle with sides a, b, c, prove that a² + b² + c² ≤ 2(ab + bc + ca).", "out-of-scope"),
+            (
+                "Color the vertices of a regular pentagon with 3 colors such that no two adjacent vertices share a color.",
+                "out-of-scope",
+            ),
+            (
+                "Show that the sum of the first n cubes equals the square of the sum of the first n integers.",
+                "out-of-scope",
+            ),
+            (
+                "For a triangle with sides a, b, c, prove that a² + b² + c² ≤ 2(ab + bc + ca).",
+                "out-of-scope",
+            ),
         ];
         let hard_problems: Vec<(&str, &str)> = vec![
-            ("If you put 15 objects into 4 bins, prove one bin must contain at least 4 objects.", "Pigeonhole"),
-            ("Show that any selection of 8 integers contains two with the same parity (mod 2).", "Pigeonhole"),
-            ("Demonstrate that the diophantine equation x squared minus 5 y squared equals 1 has solutions in positive integers.", "Pell"),
-            ("There exists an integer x such that x leaves remainder 1 mod 3 and remainder 2 mod 5 and remainder 3 mod 7.", "CRT"),
-            ("Determine if the integer 5 is a square modulo the prime 13.", "Legendre"),
-            ("For positive reals 2, 3, 6 the arithmetic mean is at least the geometric mean.", "AM-GM"),
-            ("For pair of vectors 1, 2 and 3, 4 verify Cauchy-Schwarz inequality.", "Cauchy-Schwarz"),
+            (
+                "If you put 15 objects into 4 bins, prove one bin must contain at least 4 objects.",
+                "Pigeonhole",
+            ),
+            (
+                "Show that any selection of 8 integers contains two with the same parity (mod 2).",
+                "Pigeonhole",
+            ),
+            (
+                "Demonstrate that the diophantine equation x squared minus 5 y squared equals 1 has solutions in positive integers.",
+                "Pell",
+            ),
+            (
+                "There exists an integer x such that x leaves remainder 1 mod 3 and remainder 2 mod 5 and remainder 3 mod 7.",
+                "CRT",
+            ),
+            (
+                "Determine if the integer 5 is a square modulo the prime 13.",
+                "Legendre",
+            ),
+            (
+                "For positive reals 2, 3, 6 the arithmetic mean is at least the geometric mean.",
+                "AM-GM",
+            ),
+            (
+                "For pair of vectors 1, 2 and 3, 4 verify Cauchy-Schwarz inequality.",
+                "Cauchy-Schwarz",
+            ),
             ("Show that 13 is prime.", "Primality"),
             ("Calculate Euler's totient function of 24.", "EulerPhi"),
-            ("Verify that the harmonic mean of 4, 6, 8 does not exceed their arithmetic mean.", "PowerMean"),
-            ("For non-negative reals 2, 5, 7 verify Schur's inequality at exponent 1.", "Schur"),
-            ("Find integers x, y satisfying 18 x + 12 y = gcd(18, 12).", "Bezout"),
+            (
+                "Verify that the harmonic mean of 4, 6, 8 does not exceed their arithmetic mean.",
+                "PowerMean",
+            ),
+            (
+                "For non-negative reals 2, 5, 7 verify Schur's inequality at exponent 1.",
+                "Schur",
+            ),
+            (
+                "Find integers x, y satisfying 18 x + 12 y = gcd(18, 12).",
+                "Bezout",
+            ),
         ];
         let in_scope_count = standard_problems
             .iter()

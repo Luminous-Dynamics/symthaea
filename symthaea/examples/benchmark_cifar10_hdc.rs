@@ -347,7 +347,9 @@ fn main() {
     let dir = data_dir();
     if !dir.exists() {
         eprintln!("CIFAR-10 data not found at: {}", dir.display());
-        eprintln!("Download: cd data/benchmarks/cifar10 && curl -sL https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz | tar xzf -");
+        eprintln!(
+            "Download: cd data/benchmarks/cifar10 && curl -sL https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz | tar xzf -"
+        );
         eprintln!("Set SYMTHAEA_CIFAR10_DATA_DIR to override.");
         return;
     }

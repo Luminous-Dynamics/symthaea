@@ -103,7 +103,7 @@ impl NetworkBackend for LocalChannelBackend {
             _ => {
                 return Err(NetworkError::SendFailed {
                     reason: "LocalChannelBackend only supports Channel addresses".to_string(),
-                })
+                });
             }
         };
 

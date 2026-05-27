@@ -583,10 +583,12 @@ mod tests {
         // Phi below threshold → skipped
         let result = bridge.execute(&[0.0], 0.8, 0.1, &request);
         assert!(!result.success);
-        assert!(result
-            .error
-            .unwrap()
-            .contains("below motor output threshold"));
+        assert!(
+            result
+                .error
+                .unwrap()
+                .contains("below motor output threshold")
+        );
     }
 
     #[test]

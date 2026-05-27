@@ -31,10 +31,10 @@
 //!
 //! This is biologically inspired by predictive coding in the cortex.
 
+use crate::hdc::HDC_DIMENSION;
 use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use crate::hdc::text_encoder::{TextEncoder, TextEncoderConfig};
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::HDC_DIMENSION;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};

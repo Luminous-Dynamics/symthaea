@@ -12,4 +12,4 @@ pub mod interactive;
 
 pub use commands::{Cli, Command, OutputFormat};
 pub use completions::generate_completions;
-pub use interactive::{process_oneshot, ConsciousRepl, ConsciousnessQuadrant};
+pub use interactive::{ConsciousRepl, ConsciousnessQuadrant, process_oneshot};

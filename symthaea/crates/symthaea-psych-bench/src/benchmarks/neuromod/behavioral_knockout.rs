@@ -11,10 +11,10 @@
 //! Science: Doya (2002) — "Metalearning and neuromodulation"
 //! Cohen (1988) — Effect size conventions (small=0.2, medium=0.5, large=0.8)
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 

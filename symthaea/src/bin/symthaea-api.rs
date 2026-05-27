@@ -34,13 +34,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Secure-by-default: localhost only unless explicitly configured otherwise.
     let addr = env::var("SYMTHAEA_API_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
 
-    let bearer_token = env::var("SYMTHAEA_API_BEARER_TOKEN").ok().and_then(|t| {
-        if t.trim().is_empty() {
-            None
-        } else {
-            Some(t)
-        }
-    });
+    let bearer_token = env::var("SYMTHAEA_API_BEARER_TOKEN")
+        .ok()
+        .and_then(|t| if t.trim().is_empty() { None } else { Some(t) });
 
     // If the operator intentionally wants to run unauthenticated on a non-loopback bind, require
     // an explicit "insecure" opt-in so this can't happen by accident.

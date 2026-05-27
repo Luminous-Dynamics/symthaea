@@ -73,11 +73,10 @@ impl SimulationBackend for NgspiceBridge {
         let cmd = CommandSolver::new(&self.solver_cmd)
             .arg("-b") // Batch mode
             .arg("input.sp");
-        
+
         let _output = cmd.execute()?;
-        
-        Ok(SimulationResult::converged(&request.id, 0.8)
-            .with_metric("peak_voltage", 12.0, "V"))
+
+        Ok(SimulationResult::converged(&request.id, 0.8).with_metric("peak_voltage", 12.0, "V"))
     }
 }
 

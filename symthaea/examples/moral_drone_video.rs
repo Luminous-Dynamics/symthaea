@@ -36,13 +36,13 @@ fn main() {
     use std::sync::Arc;
 
     use symthaea::multirotor::{
+        PhysicsSimulator,
         controller::FlightController,
         encoder::QuadrotorHdcEncoder,
         fep_agent::{ActiveInferenceFlightAgent, FlightEnvironment, FlightFepConfig},
         mujoco_reexports::*,
         mujoco_sim::MuJoCoSimulator,
         types::*,
-        PhysicsSimulator,
     };
     use symthaea_core::genesis::GenesisSeed;
 
@@ -1624,11 +1624,7 @@ fn compute_danger(beam_pos: [f64; 3], beam_vel: [f64; 3], human_pos: [f64; 3]) -
             f64::INFINITY
         } else {
             let t = (-b + disc.sqrt()) / (2.0 * a);
-            if t > 0.0 {
-                t
-            } else {
-                f64::INFINITY
-            }
+            if t > 0.0 { t } else { f64::INFINITY }
         }
     };
     if tti > 3.0 || tti == f64::INFINITY {

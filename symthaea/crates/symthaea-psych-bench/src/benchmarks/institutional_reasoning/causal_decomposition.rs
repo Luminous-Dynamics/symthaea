@@ -412,18 +412,26 @@ mod tests {
     fn test_institutional_reasoning_runs() {
         let config = BenchmarkConfig::default();
         let result = InstitutionalReasoningBenchmark.run(&config);
-        assert!(result
-            .metrics
-            .contains_key("institutional_decomposition_accuracy"));
-        assert!(result
-            .metrics
-            .contains_key("institutional_axiom_discrimination"));
-        assert!(result
-            .metrics
-            .contains_key("institutional_recovery_fidelity"));
-        assert!(result
-            .metrics
-            .contains_key("institutional_cross_domain_coherence"));
+        assert!(
+            result
+                .metrics
+                .contains_key("institutional_decomposition_accuracy")
+        );
+        assert!(
+            result
+                .metrics
+                .contains_key("institutional_axiom_discrimination")
+        );
+        assert!(
+            result
+                .metrics
+                .contains_key("institutional_recovery_fidelity")
+        );
+        assert!(
+            result
+                .metrics
+                .contains_key("institutional_cross_domain_coherence")
+        );
     }
 
     #[test]

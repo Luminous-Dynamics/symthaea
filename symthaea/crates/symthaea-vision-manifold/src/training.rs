@@ -212,11 +212,7 @@ impl ManifoldTrainer {
                 self.rng_state ^= self.rng_state >> 7;
                 self.rng_state ^= self.rng_state << 17;
                 self.rng_state = self.rng_state.wrapping_add(i as u64);
-                if self.rng_state % 2 == 0 {
-                    1.0
-                } else {
-                    -1.0
-                }
+                if self.rng_state % 2 == 0 { 1.0 } else { -1.0 }
             })
             .collect();
 

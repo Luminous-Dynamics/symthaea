@@ -14,12 +14,12 @@
 //! cargo run --example cincinnati_ltc_demo --release
 //! ```
 
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::cincinnati_ltc::{
     BuddingEvent, CincinnatiEstimator, CincinnatiLtcEngine, LateralBinder, PoGMetrics,
     PredictiveBudding,
 };
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");

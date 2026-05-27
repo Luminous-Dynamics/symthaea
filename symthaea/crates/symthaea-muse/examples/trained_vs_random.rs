@@ -15,7 +15,7 @@ use std::path::Path;
 use symthaea_muse::critic::evaluate_composition;
 use symthaea_muse::export::write_wav;
 use symthaea_muse::rhythm::compute_tempo;
-use symthaea_muse::{compose, MelodyMode, MuseConfig, MusicalState};
+use symthaea_muse::{MelodyMode, MuseConfig, MusicalState, compose};
 
 fn main() {
     println!("═══════════════════════════════════════════════════════");

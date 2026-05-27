@@ -24,11 +24,11 @@
 
 use std::sync::Arc;
 
+use symthaea_core::hdc::HDC_DIMENSION;
 use symthaea_core::hdc::hdc_ltc_unified::{
     HdcLtcUnifiedNetwork, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
 };
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::HDC_DIMENSION;
 
 use super::harmony_basis::HarmonyBasis;
 use super::moral_algebra::{ConsentState, MoralIntent, MoralVerdict};
@@ -36,7 +36,7 @@ use super::moral_parser::MoralParser;
 use super::moral_prototypes::MoralLabel;
 use super::moral_text_encoder::TextHdcEncoder;
 use super::spinozist_geometry::{
-    AffectBasis, FluctuatioAnimi, MoralFingerprint, NsmLexicon, NsmPrimeBasis, NUM_AFFECTS,
+    AffectBasis, FluctuatioAnimi, MoralFingerprint, NUM_AFFECTS, NsmLexicon, NsmPrimeBasis,
 };
 
 /// Configuration for the CfC moral classifier.

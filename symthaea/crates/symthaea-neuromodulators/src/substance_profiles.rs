@@ -957,10 +957,11 @@ mod tests {
         assert_eq!(p.category, SubstanceCategory::Opioids);
         assert!(!p.dangerous_withdrawal);
         // Opioids primarily affect DA
-        assert!(p
-            .primary_effects
-            .iter()
-            .any(|e| matches!(e.target, TransmitterTarget::Dopamine)));
+        assert!(
+            p.primary_effects
+                .iter()
+                .any(|e| matches!(e.target, TransmitterTarget::Dopamine))
+        );
         // Fast tolerance
         assert!(p.tolerance_acceleration >= 2.0);
     }
@@ -970,10 +971,11 @@ mod tests {
         let p = alcohol_profile();
         assert!(p.dangerous_withdrawal);
         // Primarily GABAergic
-        assert!(p
-            .primary_effects
-            .iter()
-            .any(|e| matches!(e.target, TransmitterTarget::Gaba)));
+        assert!(
+            p.primary_effects
+                .iter()
+                .any(|e| matches!(e.target, TransmitterTarget::Gaba))
+        );
     }
 
     #[test]

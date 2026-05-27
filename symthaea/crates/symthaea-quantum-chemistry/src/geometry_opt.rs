@@ -13,10 +13,10 @@ use crate::Atom;
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-use crate::basis::sto3g::Sto3g;
 use crate::basis::BasisSetProvider;
+use crate::basis::sto3g::Sto3g;
 use crate::molecule::Molecule;
-use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
 /// Configuration for geometry optimization.
 #[derive(Debug, Clone)]

@@ -502,11 +502,7 @@ impl PredictiveConsciousness {
                     .zip(predicted.iter())
                     .map(
                         |(&obs, &pred)| {
-                            if obs != pred {
-                                error.magnitude
-                            } else {
-                                0.0
-                            }
+                            if obs != pred { error.magnitude } else { 0.0 }
                         },
                     )
                     .collect();

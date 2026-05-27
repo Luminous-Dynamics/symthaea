@@ -17,8 +17,8 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    multi_seed_hea_search, AdvancedMaterials, FusionReaction, HEATarget, RadiationDamageSystem,
-    SparkEngineSpec, SparkTarget,
+    AdvancedMaterials, FusionReaction, HEATarget, RadiationDamageSystem, SparkEngineSpec,
+    SparkTarget, multi_seed_hea_search,
 };
 
 fn main() {

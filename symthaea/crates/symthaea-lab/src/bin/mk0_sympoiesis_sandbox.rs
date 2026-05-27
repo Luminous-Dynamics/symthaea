@@ -9,13 +9,15 @@
 //! - mk0-detritivore (material recycler)
 //! - mk0-fabricator (3D print farm)
 
-use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
-use symthaea_infrastructure::simulator::{SimpleInfrastructureSimulator, InfrastructurePhysicsSimulator};
-use symthaea_engineering::EngineeringManager;
-use symthaea_silicon::PowerDistributionLogic;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use symthaea_engineering::EngineeringManager;
+use symthaea_infrastructure::simulator::{
+    InfrastructurePhysicsSimulator, SimpleInfrastructureSimulator,
+};
+use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
+use symthaea_silicon::PowerDistributionLogic;
 
 /// A mock Mycelix IPC client for simulated economic transactions.
 pub struct MycelixClient {
@@ -74,7 +76,7 @@ impl Mk0LockstepSandbox {
 
         // 1. Primary Metabolism: Solar Generation (mk0-helios)
         let generation = self.solar_input_mw;
-        
+
         // 2. Consumption: Seed-node + Fabricator print jobs
         let fabricator_demand = self.print_queue_depth as f32 * 2.5; // 2.5MW per print job
         let total_demand = 1.0 + fabricator_demand; // 1MW overhead for seed-node
@@ -89,7 +91,8 @@ impl Mk0LockstepSandbox {
 
         // 5. Economic Integration: TendBalance Transaction
         if total_demand > 0.0 {
-            self.mycelix.send_transaction(&format!("tend_{:.1}W", total_demand));
+            self.mycelix
+                .send_transaction(&format!("tend_{:.1}W", total_demand));
         }
 
         // 6. Diagnostics

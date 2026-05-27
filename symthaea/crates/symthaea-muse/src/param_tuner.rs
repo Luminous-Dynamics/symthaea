@@ -429,7 +429,7 @@ pub fn evolve(config: &TunerConfig) -> TunerResult {
 
         if r#gen % 10 == 0 || r#gen == config.max_generations - 1 {
             println!(
-                "  Gen {gen:3}/{}: best={best:.4} mean={mean:.4}",
+                "  Gen {r#gen:3}/{}: best={best:.4} mean={mean:.4}",
                 config.max_generations
             );
         }
@@ -596,7 +596,7 @@ pub fn evolve_taste(config: &TunerConfig) -> TunerResult {
 
         if r#gen % 5 == 0 || r#gen == config.max_generations - 1 {
             println!(
-                "  Gen {gen:3}/{}: best={best:.1} mean={mean:.1}",
+                "  Gen {r#gen:3}/{}: best={best:.1} mean={mean:.1}",
                 config.max_generations
             );
         }

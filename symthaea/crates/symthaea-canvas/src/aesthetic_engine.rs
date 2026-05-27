@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! CognitiveSnapshot → AestheticState: maps cognitive telemetry to visual parameters.
 
+use crate::CognitiveSnapshot;
 use crate::animation::breathing_phase;
 use crate::color::Palette;
-use crate::CognitiveSnapshot;
 use serde::{Deserialize, Serialize};
 
 /// All visual parameters, normalized and ready for scene generation.

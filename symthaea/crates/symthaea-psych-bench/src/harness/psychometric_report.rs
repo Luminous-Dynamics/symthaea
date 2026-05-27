@@ -8,12 +8,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::PsychBenchmark;
 use super::cognitive_profile::CognitiveProfile;
 use super::config::BenchmarkConfig;
 use super::neuromod_correlation::NeuromodCorrelationMatrix;
-use super::report::{key_metric_for_benchmark, BenchmarkReport};
-use super::staircase::{run_staircase, StaircaseConfig, StaircaseResult};
-use super::PsychBenchmark;
+use super::report::{BenchmarkReport, key_metric_for_benchmark};
+use super::staircase::{StaircaseConfig, StaircaseResult, run_staircase};
 
 /// A full psychometric assessment combining all analysis modules.
 #[derive(Debug, Clone, Serialize, Deserialize)]

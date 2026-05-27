@@ -59,8 +59,11 @@ mod phi_tier_unit_tests {
 
         // For n=2, normalized Φ is always 1.0 (or very close due to normalization)
         // because the only partition loses all information
-        assert!(phi > 0.9 && phi <= 1.0,
-                "Two-component system should have high Φ (~1.0) since any partition loses all info, got {:.4}", phi);
+        assert!(
+            phi > 0.9 && phi <= 1.0,
+            "Two-component system should have high Φ (~1.0) since any partition loses all info, got {:.4}",
+            phi
+        );
     }
 
     #[test]

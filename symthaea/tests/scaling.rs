@@ -15,8 +15,8 @@ use std::time::Instant;
 
 use symthaea::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology, real_hv::RealHV,
-    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
+    HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology, real_hv::RealHV,
+    spectral_connectivity::ConnectivityCalculator,
 };
 use symthaea::inference::{StreamingConfig, StreamingInference};
 use symthaea::perception::semantic_encoder::SemanticEncoder;
@@ -366,7 +366,7 @@ fn test_hdc_vector_creation_throughput() {
 
 #[tokio::test]
 async fn test_federated_10_node_sync() {
-    use symthaea::swarm::{create_test_network, FederatedCoordinator};
+    use symthaea::swarm::{FederatedCoordinator, create_test_network};
 
     let coordinators: Vec<FederatedCoordinator> = create_test_network(10, 100).await;
 
@@ -387,7 +387,7 @@ async fn test_federated_10_node_sync() {
 
 #[tokio::test]
 async fn test_federated_gradient_sharing_10_nodes() {
-    use symthaea::swarm::{create_test_network, FederatedCoordinator};
+    use symthaea::swarm::{FederatedCoordinator, create_test_network};
 
     let coordinators: Vec<FederatedCoordinator> = create_test_network(10, 50).await;
 

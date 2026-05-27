@@ -220,11 +220,7 @@ fn t_critical_95(n: usize) -> f64 {
         2.048,  // df=28
         2.045,  // df=29
     ];
-    if df <= 29 {
-        T_TABLE[df - 1]
-    } else {
-        1.96
-    }
+    if df <= 29 { T_TABLE[df - 1] } else { 1.96 }
 }
 
 impl fmt::Display for MetricValue {
@@ -3456,9 +3452,9 @@ mod tests {
         use crate::benchmarks::speech::VotContinuumBenchmark;
         use crate::benchmarks::tombench::FalseBeliefBenchmark;
         use crate::benchmarks::worm::{DigitSpanBenchmark, NBackBenchmark};
+        use crate::harness::PsychBenchmark;
         use crate::harness::config::BenchmarkConfig;
         use crate::harness::reliability_analysis::ReliabilityBattery;
-        use crate::harness::PsychBenchmark;
 
         let benchmarks: Vec<&dyn PsychBenchmark> = vec![
             // Core cognitive (fast benchmarks, one per major domain)

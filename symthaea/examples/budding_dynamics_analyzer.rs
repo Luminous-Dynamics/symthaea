@@ -13,9 +13,9 @@
 //! - ASCII visualization of network growth
 
 use std::collections::VecDeque;
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::cincinnati_ltc::{BuddingEvent, CincinnatiLtcEngine};
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 
 /// Track budding events and network dynamics
 #[derive(Debug)]

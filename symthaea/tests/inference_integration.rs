@@ -18,8 +18,8 @@
 use ndarray::Array1;
 use symthaea::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use symthaea::inference::{
-    default_streaming, high_capacity_streaming, low_latency_streaming, StreamingConfig,
-    StreamingInference,
+    StreamingConfig, StreamingInference, default_streaming, high_capacity_streaming,
+    low_latency_streaming,
 };
 
 // ============================================================================

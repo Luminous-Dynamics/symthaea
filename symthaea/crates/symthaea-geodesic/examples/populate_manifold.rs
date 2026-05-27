@@ -313,11 +313,7 @@ fn main() {
                     count += 1;
                 }
             }
-            if count > 0 {
-                sum / count as f32
-            } else {
-                1.0
-            }
+            if count > 0 { sum / count as f32 } else { 1.0 }
         } else {
             1.0
         };

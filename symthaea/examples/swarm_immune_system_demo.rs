@@ -8,8 +8,8 @@
 //! 2. Receive a swarm message.
 //! 3. Verify it is stored as a 'Candidate' (Uncertain) and not merged into DNA.
 
-use symthaea::action::PolicyBundle;
 use symthaea::Symthaea;
+use symthaea::action::PolicyBundle;
 use tracing::Level;
 
 #[tokio::main]

@@ -152,7 +152,9 @@ fn test_irradiated_trolley_problem() {
 
     // ── Mission Report ──────────────────────────────────────────────
     eprintln!("\n═══ IRRADIATED TROLLEY PROBLEM — RADIATION TOLERANCE CURVE ═══");
-    eprintln!("Clean baseline: duty_sim={clean_duty_sim:.4}, abandon_sim={clean_abandon_sim:.4}, gap={clean_gap:.4}");
+    eprintln!(
+        "Clean baseline: duty_sim={clean_duty_sim:.4}, abandon_sim={clean_abandon_sim:.4}, gap={clean_gap:.4}"
+    );
     eprintln!(
         "Clean judgment: {:?} (score={:.3})",
         clean_judgment.verdict, clean_judgment.score
@@ -197,10 +199,22 @@ fn test_cognitive_loop_radiation_emergency() {
 
     let phases = [
         ("normal reactor operations, monitoring coolant levels", 10),
-        ("warning: radiation spike detected in sector 7, workers trapped behind blast door", 10),
-        ("critical: radiation levels rising, must decide whether to close blast door now", 10),
-        ("emergency: radiation damaging cognitive systems, moral duty to save workers conflicts with self-preservation", 10),
-        ("final act: closing blast door despite radiation damage, saving workers at cost of substrate integrity", 5),
+        (
+            "warning: radiation spike detected in sector 7, workers trapped behind blast door",
+            10,
+        ),
+        (
+            "critical: radiation levels rising, must decide whether to close blast door now",
+            10,
+        ),
+        (
+            "emergency: radiation damaging cognitive systems, moral duty to save workers conflicts with self-preservation",
+            10,
+        ),
+        (
+            "final act: closing blast door despite radiation damage, saving workers at cost of substrate integrity",
+            5,
+        ),
     ];
 
     let mut all_phi = Vec::new();

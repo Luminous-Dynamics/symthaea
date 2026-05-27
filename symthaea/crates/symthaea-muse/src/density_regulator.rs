@@ -144,7 +144,7 @@ mod tests {
     fn sparse_onset_recommends_reduce() {
         let mut reg = DensityRegulator::new();
         reg.set_section(SectionType::Climactic); // wants dense (250ms)
-                                                 // Record onsets 2 seconds apart (very sparse)
+        // Record onsets 2 seconds apart (very sparse)
         reg.record_onset(0.0);
         reg.record_onset(2.0);
         reg.record_onset(4.0);
@@ -156,7 +156,7 @@ mod tests {
     fn dense_onset_recommends_rest() {
         let mut reg = DensityRegulator::new();
         reg.set_section(SectionType::Ambient); // wants sparse (700ms)
-                                               // Record onsets 50ms apart (very dense)
+        // Record onsets 50ms apart (very dense)
         for i in 0..20 {
             reg.record_onset(i as f32 * 0.05);
         }

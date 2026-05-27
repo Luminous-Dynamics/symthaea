@@ -27,7 +27,7 @@ fn main() {
 #[cfg(feature = "phase-2a-lz4")]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    use anyhow::{anyhow, bail, Context};
+    use anyhow::{Context, anyhow, bail};
     use std::path::PathBuf;
     use std::time::{Duration, Instant};
 

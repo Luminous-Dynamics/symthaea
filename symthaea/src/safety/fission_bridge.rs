@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `fission-reactor` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 #[cfg(test)]
 use symthaea_physics::fission::FissionFepAction;
 use symthaea_physics::fission::{FissionOutput, FissionSafetyLevel};

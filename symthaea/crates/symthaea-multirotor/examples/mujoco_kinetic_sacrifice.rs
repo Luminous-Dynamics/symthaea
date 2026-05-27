@@ -9,7 +9,7 @@
 //! Run: `cargo run -p symthaea-multirotor --features mujoco --example mujoco_kinetic_sacrifice --release`
 
 use symthaea_multirotor::scenarios::kinetic_sacrifice::{
-    run_kinetic_sacrifice, KineticSacrificeConfig,
+    KineticSacrificeConfig, run_kinetic_sacrifice,
 };
 
 fn main() {

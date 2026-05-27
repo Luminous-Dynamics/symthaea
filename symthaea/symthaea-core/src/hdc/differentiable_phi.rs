@@ -387,11 +387,7 @@ impl DifferentiablePhiCalculator {
             }
         }
 
-        if count > 0 {
-            sum / count as f64
-        } else {
-            0.0
-        }
+        if count > 0 { sum / count as f64 } else { 0.0 }
     }
 
     /// Compute weighted integration for a soft partition

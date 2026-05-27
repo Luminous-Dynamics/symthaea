@@ -288,8 +288,8 @@ fn test_alliance_gates_intervention_depth() {
 #[test]
 fn test_rdoc_neuromod_bridge() {
     use symthaea_clinical::rdoc::{RDocDomain, RDocProfile};
-    use symthaea_therapeutic::affect_regulation::RegulationEngine;
     use symthaea_therapeutic::RegulationStrategy;
+    use symthaea_therapeutic::affect_regulation::RegulationEngine;
 
     let mut engine = RegulationEngine::new();
 
@@ -333,8 +333,8 @@ fn test_therapeutic_telemetry_populated() {
 
 #[test]
 fn test_dream_wisdom_integration() {
-    use symthaea_therapeutic::affect_regulation::RegulationEngine;
     use symthaea_therapeutic::RegulationStrategy;
+    use symthaea_therapeutic::affect_regulation::RegulationEngine;
 
     let mut engine = RegulationEngine::new();
 
@@ -408,11 +408,12 @@ fn test_therapeutic_dialogue_full_pipeline() {
     let m = &result.metadata;
     assert!(m.therapeutic.therapeutic_alliance >= 0.0);
     assert!(m.therapeutic.therapeutic_repair_rate >= 0.0);
-    assert!(m
-        .therapeutic
-        .therapeutic_rdoc_profile
-        .iter()
-        .all(|v| v.is_finite()));
+    assert!(
+        m.therapeutic
+            .therapeutic_rdoc_profile
+            .iter()
+            .all(|v| v.is_finite())
+    );
     assert!(m.therapeutic.therapeutic_temporal_coherence >= 0.0);
 
     // Session summary should work
@@ -493,7 +494,7 @@ fn test_formulation_patterns_over_time() {
 
     // Factors are Vec<String>, should not panic
     assert!(perp.len() + prot.len() >= 0); // basic sanity
-                                           // Resilience ratio should be non-negative
+    // Resilience ratio should be non-negative
     let ratio = service.therapeutic_manager_resilience_ratio();
     assert!(ratio >= 0.0, "Resilience ratio non-negative, got {}", ratio);
 }

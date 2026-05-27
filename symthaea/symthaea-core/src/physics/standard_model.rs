@@ -344,7 +344,7 @@ impl StandardModel {
         let antimatter = genesis.hv("standard_model::antimatter", PHYSICS_DIM);
 
         // Enrich particles with their properties
-        // UP QUARK: +2/3 charge, 2.2 MeV, gen 1
+        // UP QUARK: +2/3 charge, 2.2 MeV, r#gen 1
         let up_quark = Self::enrich_particle(
             &up_quark_base,
             &properties,
@@ -721,7 +721,7 @@ mod tests {
         let up_down_sim = model.up_quark.similarity(&model.down_quark);
         let up_charm_sim = model.up_quark.similarity(&model.charm_quark);
 
-        // Up and Down are gen 1, Charm is gen 2
+        // Up and Down are r#gen 1, Charm is r#gen 2
         // They should have some similarity due to shared structure
         assert!(
             up_down_sim > up_charm_sim * 0.8,

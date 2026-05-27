@@ -16,15 +16,15 @@
 //! ```
 
 use clap::{Parser, Subcommand};
-use console::{style, Emoji};
+use console::{Emoji, style};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use symthaea_stt::{
-    phoneme_error_rate, AudioFrontend, AudioProjector, BatchConfig, BatchTrainer, BootstrapConfig,
-    CmuDictionary, PhonemeResonator, TextToPhonemes, TrainedPrototypes,
+    AudioFrontend, AudioProjector, BatchConfig, BatchTrainer, BootstrapConfig, CmuDictionary,
+    PhonemeResonator, TextToPhonemes, TrainedPrototypes, phoneme_error_rate,
 };
 
 static DOWNLOAD: Emoji<'_, '_> = Emoji("📥 ", "");

@@ -471,7 +471,7 @@ fn build_error_articles() -> Vec<KnowledgeArticle> {
                        derivation. For development, you can temporarily set `sandbox = relaxed` \
                        in nix.conf.",
             commands: &[
-                "nix build --option sandbox false",  // only for debugging!
+                "nix build --option sandbox false", // only for debugging!
             ],
         },
         KnowledgeArticle {
@@ -789,9 +789,7 @@ fn flake_pattern_articles() -> Vec<KnowledgeArticle> {
             ],
             solution: "Use `follows` to make all inputs share the same nixpkgs instance. \
                        This reduces eval time and store size significantly.",
-            commands: &[
-                "nix flake metadata --json | jq '.locks.nodes | keys'",
-            ],
+            commands: &["nix flake metadata --json | jq '.locks.nodes | keys'"],
         },
         KnowledgeArticle {
             id: "flake-override",
@@ -841,10 +839,7 @@ fn flake_pattern_articles() -> Vec<KnowledgeArticle> {
             solution: "Flakes enforce pure evaluation by default. You cannot access files \
                        outside the flake directory or use impure builtins. Add files to git \
                        (even unstaged) or use `--impure` for development.",
-            commands: &[
-                "git add <file>",
-                "nix build --impure",
-            ],
+            commands: &["git add <file>", "nix build --impure"],
         },
     ]
 }
@@ -1099,9 +1094,11 @@ mod tests {
 
         let build_errors = kb.articles_in_category(KnowledgeCategory::BuildError);
         assert!(!build_errors.is_empty());
-        assert!(build_errors
-            .iter()
-            .all(|a| a.category == KnowledgeCategory::BuildError));
+        assert!(
+            build_errors
+                .iter()
+                .all(|a| a.category == KnowledgeCategory::BuildError)
+        );
 
         let service_issues = kb.articles_in_category(KnowledgeCategory::ServiceIssue);
         assert!(!service_issues.is_empty());

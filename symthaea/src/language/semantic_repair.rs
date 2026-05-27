@@ -58,7 +58,9 @@ pub fn try_semantic_ast_repair(source: &str, diagnostics: &[String]) -> Option<S
     }
 
     // NEW: Lifetime Return Fix
-    if joined.contains("missing lifetime specifier") || joined.contains("explicit lifetime name needed") {
+    if joined.contains("missing lifetime specifier")
+        || joined.contains("explicit lifetime name needed")
+    {
         if let Some(repaired) = try_fix_missing_lifetime(source) {
             return Some(repaired);
         }
@@ -99,8 +101,10 @@ fn try_inject_missing_imports(source: &str, diagnostics: &str) -> Option<String>
             || diagnostics.contains(&format!("cannot find value `{name_lower}`"))
         {
             if !has_import(&file, name) {
-                let path_segments: Vec<syn::Ident> =
-                    path.split("::").map(|s| syn::parse_str(s).unwrap()).collect();
+                let path_segments: Vec<syn::Ident> = path
+                    .split("::")
+                    .map(|s| syn::parse_str(s).unwrap())
+                    .collect();
                 let use_item: syn::ItemUse = syn::parse_quote!(use #(#path_segments)::* ;);
                 file.items.insert(0, syn::Item::Use(use_item));
                 changed = true;
@@ -207,7 +211,12 @@ impl VisitMut for LifetimeFixVisitor {
             "'static".to_string()
         } else {
             // Default to 'a if it exists in generics, otherwise nothing
-            if i.sig.generics.params.iter().any(|p| matches!(p, syn::GenericParam::Lifetime(_))) {
+            if i.sig
+                .generics
+                .params
+                .iter()
+                .any(|p| matches!(p, syn::GenericParam::Lifetime(_)))
+            {
                 "'a".to_string()
             } else {
                 return;
@@ -260,7 +269,7 @@ fn try_fix_missing_reference(source: &str, diagnostics: &str) -> Option<String> 
     let mut file = syn::parse_file(source).ok()?;
     // Heuristic: extract the 'found' type or variable name if possible
     let name = binding_name_from_backticks(diagnostics);
-    
+
     let mut visitor = ReferenceFixVisitor {
         name,
         changed: false,
@@ -293,7 +302,7 @@ impl VisitMut for ReferenceFixVisitor {
                 _ => {}
             }
         }
-        
+
         visit_mut::visit_expr_mut(self, expr);
     }
 }
@@ -534,7 +543,8 @@ mod tests {
     #[test]
     fn injects_missing_hashmap_import() {
         let source = "pub fn new_map() { let mut m = HashMap::new(); }";
-        let diagnostic = "error[E0433]: failed to resolve: cannot find type `HashMap` in this scope";
+        let diagnostic =
+            "error[E0433]: failed to resolve: cannot find type `HashMap` in this scope";
         let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
 
         let normalized = repaired.replace(' ', "");
@@ -544,7 +554,8 @@ mod tests {
 
     #[test]
     fn fixes_vec_to_slice_mismatch() {
-        let source = "pub fn take_slice(s: &[i32]) {} pub fn main() { let v = vec![1]; take_slice(&v); }";
+        let source =
+            "pub fn take_slice(s: &[i32]) {} pub fn main() { let v = vec![1]; take_slice(&v); }";
         let diagnostic = "expected `&[i32]`, found `&Vec<i32>`";
         let repaired = try_semantic_ast_repair(source, &[diagnostic.into()]).unwrap();
 

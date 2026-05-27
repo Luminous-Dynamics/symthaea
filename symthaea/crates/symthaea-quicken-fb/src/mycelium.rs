@@ -5,7 +5,7 @@
 ///
 /// Generates procedural mycelial network growth seeded by the genesis phrase.
 /// Renders to a raw pixel buffer using Bresenham's line algorithm — no GPU required.
-use crate::color::{Rgba, LEAF_GREEN, LICHEN_GREY, MOSS_DEEP, MYCELIAL_WHITE, SOLAR_GOLD};
+use crate::color::{LEAF_GREEN, LICHEN_GREY, MOSS_DEEP, MYCELIAL_WHITE, Rgba, SOLAR_GOLD};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 

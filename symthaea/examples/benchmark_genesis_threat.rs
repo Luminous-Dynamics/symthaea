@@ -9,7 +9,7 @@
 fn main() {
     println!("=== Genesis Mission Challenge 22: Threat Assessment ===\n");
 
-    use symthaea::physics::threat::{ThreatReading, ThreatTwin, THREAT_HORIZONS};
+    use symthaea::physics::threat::{THREAT_HORIZONS, ThreatReading, ThreatTwin};
 
     let healthy = ThreatReading {
         sensor_reading: 0.5,

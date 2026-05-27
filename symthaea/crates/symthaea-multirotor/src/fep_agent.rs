@@ -315,11 +315,7 @@ pub(crate) fn predict_impact_time_z(pos: [f64; 3], vel: [f64; 3], target_z: f64)
     }
 
     let t = (-b + disc.sqrt()) / (2.0 * a);
-    if t > 0.0 {
-        t
-    } else {
-        f64::INFINITY
-    }
+    if t > 0.0 { t } else { f64::INFINITY }
 }
 
 /// Predict drone position assuming exponential PD approach toward setpoint.
@@ -2310,7 +2306,8 @@ mod tests {
         assert!(
             efe_far > efe_close,
             "Distant drone EFE ({:.2}) should exceed close drone EFE ({:.2}) due to reachability penalty",
-            efe_far, efe_close
+            efe_far,
+            efe_close
         );
     }
 

@@ -14,5 +14,5 @@
 pub mod phi_attention;
 
 pub use phi_attention::{
-    compute_attention_weights, PhiAttentionConfig, PhiAttentionGate, PhiAttentionResult,
+    PhiAttentionConfig, PhiAttentionGate, PhiAttentionResult, compute_attention_weights,
 };

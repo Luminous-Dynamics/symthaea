@@ -23,9 +23,9 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use symthaea_logparse::cluster::{hdbscan_cluster, nearest_centroid, purity};
-use symthaea_logparse::encoder::{bundle, encode, Hdv};
+use symthaea_logparse::encoder::{Hdv, bundle, encode};
 use symthaea_logparse::fixtures::generate_synthetic_corpus;
-use symthaea_logparse::{evtx_source, LogEvent};
+use symthaea_logparse::{LogEvent, evtx_source};
 
 const KILL_CRITERION: f32 = 0.50;
 

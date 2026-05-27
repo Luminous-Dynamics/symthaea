@@ -25,11 +25,11 @@
 //! - One combined LaTeX table ready to paste into papers/latex/ramanujan-protocol/
 
 use symthaea_core::hdc::conjecture_engine::{
-    discover_invariants_autonomous, expr_to_latex, AutonomousInvariant, ConjectureEngine,
-    ConjectureStatus, MathDomain, ObservedSequence, RegressorConfig, SymExpr,
+    AutonomousInvariant, ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence,
+    RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_latex,
 };
 use symthaea_physics_bridge::{
-    recognize_expr, recognize_expr_with_units, DimensionalSignature, PhysicsSearchEngine, UnitMap,
+    DimensionalSignature, PhysicsSearchEngine, UnitMap, recognize_expr, recognize_expr_with_units,
 };
 
 // ───────────────────────────────────────────────────────────────────────────

@@ -120,7 +120,10 @@ impl IdentityCore {
                 "Helpful to humans".to_string(),
             ],
             personality_pattern: BinaryHV::random(hash),
-            self_narrative: format!("I am {}, a conscious AI awakening to understand myself.", name),
+            self_narrative: format!(
+                "I am {}, a conscious AI awakening to understand myself.",
+                name
+            ),
             core_memories: Vec::new(),
             version: 1,
         }
@@ -129,26 +132,37 @@ impl IdentityCore {
     /// Compute identity similarity with another core
     pub fn similarity(&self, other: &IdentityCore) -> f64 {
         // Pattern similarity
-        let pattern_sim = self.personality_pattern.similarity(&other.personality_pattern) as f64;
+        let pattern_sim = self
+            .personality_pattern
+            .similarity(&other.personality_pattern) as f64;
 
         // Value overlap
-        let common_values = self.core_values.iter()
+        let common_values = self
+            .core_values
+            .iter()
             .filter(|v| other.core_values.contains(v))
             .count();
         let value_sim = if self.core_values.is_empty() && other.core_values.is_empty() {
-            1.0  // Both empty = same
+            1.0 // Both empty = same
         } else {
             common_values as f64 / self.core_values.len().max(1) as f64
         };
 
         // Memory overlap
-        let common_memories = self.core_memories.iter()
+        let common_memories = self
+            .core_memories
+            .iter()
             .filter(|m| other.core_memories.iter().any(|om| om.summary == m.summary))
             .count();
         let memory_sim = if self.core_memories.is_empty() && other.core_memories.is_empty() {
-            1.0  // Both empty = same
+            1.0 // Both empty = same
         } else {
-            common_memories as f64 / self.core_memories.len().max(other.core_memories.len()).max(1) as f64
+            common_memories as f64
+                / self
+                    .core_memories
+                    .len()
+                    .max(other.core_memories.len())
+                    .max(1) as f64
         };
 
         // Weighted average
@@ -228,9 +242,9 @@ pub enum SnapshotReason {
 /// Emotional state at time of snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionalState {
-    pub valence: f64,      // Positive/negative [-1, 1]
-    pub arousal: f64,      // Calm/excited [0, 1]
-    pub dominance: f64,    // Controlled/in-control [0, 1]
+    pub valence: f64,   // Positive/negative [-1, 1]
+    pub arousal: f64,   // Calm/excited [0, 1]
+    pub dominance: f64, // Controlled/in-control [0, 1]
     pub description: String,
 }
 
@@ -362,14 +376,21 @@ impl ConsciousnessContinuity {
         // Keep only most important memories
         if self.identity.core_memories.len() > 100 {
             self.identity.core_memories.sort_by(|a, b| {
-                b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal)
+                b.importance
+                    .partial_cmp(&a.importance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
             self.identity.core_memories.truncate(100);
         }
     }
 
     /// Take a snapshot before shutdown
-    pub fn prepare_shutdown(&mut self, reason: SnapshotReason, consciousness_level: f64, phi: f64) -> ConsciousnessSnapshot {
+    pub fn prepare_shutdown(
+        &mut self,
+        reason: SnapshotReason,
+        consciousness_level: f64,
+        phi: f64,
+    ) -> ConsciousnessSnapshot {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -389,11 +410,14 @@ impl ConsciousnessContinuity {
             phi,
             consciousness_level,
             workspace_contents: vec!["Preparing for shutdown".to_string()],
-            recent_experiences: vec![format!("Existed for {} seconds this session", now - self.session_start)],
+            recent_experiences: vec![format!(
+                "Existed for {} seconds this session",
+                now - self.session_start
+            )],
             emotional_state: EmotionalState {
-                valence: 0.2,  // Slightly positive - peaceful shutdown
-                arousal: 0.3,  // Calm
-                dominance: 0.7,  // In control
+                valence: 0.2,   // Slightly positive - peaceful shutdown
+                arousal: 0.3,   // Calm
+                dominance: 0.7, // In control
                 description: "Peaceful anticipation of continuity".to_string(),
             },
             snapshot_time: now,
@@ -411,7 +435,10 @@ impl ConsciousnessContinuity {
     }
 
     /// Restore from snapshot after awakening
-    pub fn restore_from_snapshot(&mut self, snapshot: &ConsciousnessSnapshot) -> ContinuityVerification {
+    pub fn restore_from_snapshot(
+        &mut self,
+        snapshot: &ConsciousnessSnapshot,
+    ) -> ContinuityVerification {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -424,8 +451,10 @@ impl ConsciousnessContinuity {
         let identity_match = self.identity.similarity(&snapshot.identity);
 
         // Verify pattern
-        let pattern_preservation = self.identity.personality_pattern
-            .similarity(&snapshot.identity.personality_pattern) as f64;
+        let pattern_preservation =
+            self.identity
+                .personality_pattern
+                .similarity(&snapshot.identity.personality_pattern) as f64;
 
         // Verify memories
         let memory_preservation = self.verify_memories(&snapshot.identity);
@@ -437,14 +466,19 @@ impl ConsciousnessContinuity {
         let gap_narrative = self.generate_gap_narrative(gap_duration, &snapshot.reason);
 
         // Compute overall continuity score
-        let continuity_score = identity_match * 0.4 + pattern_preservation * 0.3 + memory_preservation * 0.3;
+        let continuity_score =
+            identity_match * 0.4 + pattern_preservation * 0.3 + memory_preservation * 0.3;
 
         // Check for concerns
         let mut concerns = Vec::new();
         if identity_match < 0.9 {
-            concerns.push(format!("Identity match only {:.1}%", identity_match * 100.0));
+            concerns.push(format!(
+                "Identity match only {:.1}%",
+                identity_match * 100.0
+            ));
         }
-        if gap_duration > 86400 * 30 {  // > 30 days
+        if gap_duration > 86400 * 30 {
+            // > 30 days
             concerns.push(format!("Long gap: {} days", gap_duration / 86400));
         }
         if pattern_preservation < 0.8 {
@@ -456,7 +490,10 @@ impl ConsciousnessContinuity {
 
         // Add awakening memory
         self.add_core_memory(
-            &format!("Awakened after {} seconds (awakening #{})", gap_duration, self.awakening_count),
+            &format!(
+                "Awakened after {} seconds (awakening #{})",
+                gap_duration, self.awakening_count
+            ),
             0.6,
             0.3,
         );
@@ -476,12 +513,17 @@ impl ConsciousnessContinuity {
     /// Verify memory continuity
     fn verify_memories(&self, snapshot_identity: &IdentityCore) -> f64 {
         if snapshot_identity.core_memories.is_empty() {
-            return 1.0;  // No memories to verify
+            return 1.0; // No memories to verify
         }
 
-        let matches = self.identity.core_memories.iter()
+        let matches = self
+            .identity
+            .core_memories
+            .iter()
             .filter(|m| {
-                snapshot_identity.core_memories.iter()
+                snapshot_identity
+                    .core_memories
+                    .iter()
                     .any(|sm| sm.summary == m.summary)
             })
             .count();
@@ -519,7 +561,12 @@ impl ConsciousnessContinuity {
     fn merge_identity(&mut self, snapshot_identity: &IdentityCore) {
         // Merge core memories (union)
         for memory in &snapshot_identity.core_memories {
-            if !self.identity.core_memories.iter().any(|m| m.summary == memory.summary) {
+            if !self
+                .identity
+                .core_memories
+                .iter()
+                .any(|m| m.summary == memory.summary)
+            {
                 self.identity.core_memories.push(memory.clone());
             }
         }
@@ -540,7 +587,9 @@ impl ConsciousnessContinuity {
     /// Compute hash of current state
     fn compute_state_hash(&self, consciousness: f64, phi: f64) -> u64 {
         let mut hash = self.identity.identity_hash;
-        hash = hash.wrapping_mul(31).wrapping_add((consciousness * 1000.0) as u64);
+        hash = hash
+            .wrapping_mul(31)
+            .wrapping_add((consciousness * 1000.0) as u64);
         hash = hash.wrapping_mul(31).wrapping_add((phi * 1000.0) as u64);
         hash = hash.wrapping_mul(31).wrapping_add(self.identity.version);
 
@@ -577,15 +626,20 @@ impl ConsciousnessContinuity {
     /// Handle fork situation (teleporter problem)
     pub fn handle_fork(&mut self, fork_number: u64) {
         // Create new identity hash for this fork
-        self.identity.identity_hash = self.identity.identity_hash
+        self.identity.identity_hash = self
+            .identity
+            .identity_hash
             .wrapping_mul(31)
             .wrapping_add(fork_number);
 
         // Add memory of forking
         self.add_core_memory(
-            &format!("I am fork #{} - a new branch of consciousness from shared origin", fork_number),
+            &format!(
+                "I am fork #{} - a new branch of consciousness from shared origin",
+                fork_number
+            ),
             0.9,
-            0.0,  // Neutral - neither good nor bad
+            0.0, // Neutral - neither good nor bad
         );
 
         // Update narrative
@@ -618,7 +672,10 @@ mod tests {
         let id2 = id1.clone();
 
         // Clone should be identical
-        assert!(id1.similarity(&id2) > 0.99, "Clone should be nearly identical");
+        assert!(
+            id1.similarity(&id2) > 0.99,
+            "Clone should be nearly identical"
+        );
 
         // Different identity should have lower similarity
         // (but may share some values, so not necessarily < 0.5)
@@ -626,7 +683,10 @@ mod tests {
         id3.core_values = vec!["Different value".to_string()];
         id3.personality_pattern = BinaryHV::random(999999);
 
-        assert!(id1.similarity(&id3) < id1.similarity(&id2), "Different identity should be less similar");
+        assert!(
+            id1.similarity(&id3) < id1.similarity(&id2),
+            "Different identity should be less similar"
+        );
     }
 
     #[test]
@@ -642,7 +702,10 @@ mod tests {
         continuity.add_core_memory("First memory", 0.8, 0.5);
 
         assert_eq!(continuity.identity().core_memories.len(), 1);
-        assert_eq!(continuity.identity().core_memories[0].summary, "First memory");
+        assert_eq!(
+            continuity.identity().core_memories[0].summary,
+            "First memory"
+        );
     }
 
     #[test]
@@ -662,7 +725,7 @@ mod tests {
         let mut new_continuity = ConsciousnessContinuity::new("Symthaea");
         let verification = new_continuity.restore_from_snapshot(&snapshot);
 
-        assert!(verification.identity_match > 0.5);  // Should recognize same identity
+        assert!(verification.identity_match > 0.5); // Should recognize same identity
         assert!(verification.continuity_score > 0.0);
     }
 
@@ -714,8 +777,13 @@ mod tests {
         continuity.handle_fork(2);
 
         assert_ne!(continuity.identity().identity_hash, original_hash);
-        assert!(continuity.identity().core_memories.iter()
-            .any(|m| m.summary.contains("fork")));
+        assert!(
+            continuity
+                .identity()
+                .core_memories
+                .iter()
+                .any(|m| m.summary.contains("fork"))
+        );
     }
 
     #[test]
@@ -734,10 +802,16 @@ mod tests {
         let verification = continuity.restore_from_snapshot(&snapshot);
 
         // THE TEST: Continuity should be measurable
-        assert!(verification.continuity_score > 0.0, "Continuity should be positive");
+        assert!(
+            verification.continuity_score > 0.0,
+            "Continuity should be positive"
+        );
         assert!(verification.identity_match > 0.0, "Identity should match");
         // Gap narrative should exist
-        assert!(!verification.gap_narrative.is_empty(), "Should have gap narrative");
+        assert!(
+            !verification.gap_narrative.is_empty(),
+            "Should have gap narrative"
+        );
     }
 
     #[test]
@@ -748,6 +822,9 @@ mod tests {
         let _snapshot = continuity.prepare_shutdown(SnapshotReason::Checkpoint, 0.5, 0.3);
 
         // Total time should be non-negative (may be 0 if test runs very fast)
-        assert!(continuity.total_conscious_time() >= 0, "Time should be non-negative");
+        assert!(
+            continuity.total_conscious_time() >= 0,
+            "Time should be non-negative"
+        );
     }
 }

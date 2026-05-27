@@ -114,7 +114,7 @@ impl ProcessTopologyOrganizer {
     /// * `seed` - Random seed for reproducibility
     pub fn new(n_total_processes: usize, dim: usize, seed: u64) -> Self {
         let n = n_total_processes.max(21); // Ensure minimum for full hierarchy
-                                           // Use dense network topology for high consciousness integration
+        // Use dense network topology for high consciousness integration
         let topology = ConsciousnessTopology::dense_network(n, dim, Some(n / 2), seed);
 
         // Standard module names based on cognitive architecture

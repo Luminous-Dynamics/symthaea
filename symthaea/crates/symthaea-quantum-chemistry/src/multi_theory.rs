@@ -23,14 +23,14 @@
 //! 9. Dissipative (Prigogine) — entropy production proxy
 //! 10. Quantum Darwinism (Zurek) — quantum-classical transition parameter
 
-use crate::basis::sto3g::Sto3g;
 use crate::basis::BasisSetProvider;
+use crate::basis::sto3g::Sto3g;
 use crate::consciousness::{build_atom_basis_ranges, compute_orbital_phi};
 use crate::integrals::eri::compute_eri_tensor;
 use crate::molecule::Molecule;
 use crate::post_hf::mp2::mp2_correlation_energy;
 use crate::quantum_info::{bipartition_entanglement, orbital_mutual_information};
-use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 use crate::stat_mech;
 use crate::time_dependent::cis_excitations;
 
@@ -419,11 +419,7 @@ fn pearson(x: &[f64], y: &[f64]) -> f64 {
         return 0.0;
     }
     let r = cov / (vx * vy).sqrt();
-    if r.is_nan() {
-        0.0
-    } else {
-        r.clamp(-1.0, 1.0)
-    }
+    if r.is_nan() { 0.0 } else { r.clamp(-1.0, 1.0) }
 }
 
 /// Compute information-geometric Phi (KL divergence from product state).

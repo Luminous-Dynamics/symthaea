@@ -15,7 +15,7 @@
 //! - Bundling accumulates adaptation evidence
 //! - Similarity-preserving means adapted prototypes still work
 
-use crate::hdc::{bundle, BundleAccumulator, HV16};
+use crate::hdc::{BundleAccumulator, HV16, bundle};
 use std::collections::HashMap;
 
 /// Speaker profile containing adaptation parameters

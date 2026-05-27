@@ -12,8 +12,8 @@ use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 use crate::types::AuvConfig;
 
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 
 /// AUV embodiment bridge.

@@ -35,8 +35,8 @@ use crate::humanoid::{
 // single Rust type across the entire workspace — no more E0308 mismatches.
 
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentBridge, EmbodimentPlatform,
-    EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentBridge, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry,
+    GROUNDING_SENSORIMOTOR, MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 
 // ── Humanoid implementation ─────────────────────────────────────────────────

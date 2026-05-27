@@ -28,7 +28,7 @@
 //! - Stevens, Volkmann, Newman (1937). A scale for the measurement of the
 //!   psychological magnitude pitch.
 
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 
 /// Parameters for mel-spectrogram extraction.
 #[derive(Debug, Clone)]

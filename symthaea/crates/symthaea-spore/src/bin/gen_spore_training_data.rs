@@ -4,7 +4,7 @@
 //! Generate consciousness-aware training data using ONLY the Spore's 512-word vocabulary.
 //!
 //! Usage:
-//!   cargo run --release --bin gen-spore-training-data
+//!   cargo run --release --bin r#gen-spore-training-data
 //!
 //! Outputs:
 //!   data/train-spore-vocab.jsonl  (80% of pairs)

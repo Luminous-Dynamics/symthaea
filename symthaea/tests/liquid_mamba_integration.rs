@@ -51,9 +51,9 @@ fn make_generator() -> LiquidMambaGenerator {
 #[test]
 #[ignore = "Requires mamba-130m (~260MB)"]
 fn test_generate_from_channels() {
-    let mut gen = make_generator();
+    let mut r#gen = make_generator();
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // Either produces text or hits EOS immediately — both are valid
     assert!(
@@ -67,9 +67,9 @@ fn test_generate_from_channels() {
 #[test]
 #[ignore = "Requires mamba-130m (~260MB)"]
 fn test_output_hvs_collected() {
-    let mut gen = make_generator();
+    let mut r#gen = make_generator();
     let channels = ThoughtChannels::with_intent(1); // Answer
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // output_hvs should contain one HV per generated token (including EOS-terminated)
     // Note: veto is disabled so no spurious tokens
@@ -149,9 +149,9 @@ fn test_coherence_monitoring() {
         ..Default::default()
     };
 
-    let mut gen = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
+    let mut r#gen = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // Coherence should be finite regardless of whether veto fired
     assert!(
@@ -187,8 +187,8 @@ fn test_direct_neural_path() {
     }];
 
     let channels = thought_to_channels(&thought, 1.0);
-    let mut gen = make_generator();
-    let result = gen.generate(&channels);
+    let mut r#gen = make_generator();
+    let result = r#gen.generate(&channels);
 
     assert!(
         result.final_coherence.is_finite(),
@@ -200,28 +200,28 @@ fn test_direct_neural_path() {
 #[test]
 #[ignore = "Requires mamba-130m (~260MB)"]
 fn test_gradient_convergence() {
-    let mut gen = make_generator();
+    let mut r#gen = make_generator();
     let channels = ThoughtChannels::with_intent(1);
 
     // Initial generation to get baseline PE
-    let result0 = gen.generate(&channels);
+    let result0 = r#gen.generate(&channels);
     let pe0 = result0.semantic_pe;
 
     // Run 5 gradient steps using the output HVs from each generation
     let mut last_pe = pe0;
     for step in 0..5 {
-        let result = gen.generate(&channels);
+        let result = r#gen.generate(&channels);
         if result.output_hvs.is_empty() {
             continue; // EOS immediately — nothing to learn from
         }
 
-        let thought_hv = gen.encoder().encode(&channels);
+        let thought_hv = r#gen.encoder().encode(&channels);
         let refs: Vec<&ContinuousHV> = result.output_hvs.iter().collect();
         let bundled = ContinuousHV::bundle(&refs).normalize();
 
-        gen.projection_mut()
+        r#gen.projection_mut()
             .compute_gradients(&thought_hv, &bundled);
-        gen.projection_mut().apply_gradients(0.001, 1.0);
+        r#gen.projection_mut().apply_gradients(0.001, 1.0);
 
         last_pe = result.semantic_pe;
         assert!(
@@ -250,13 +250,13 @@ fn test_biological_modulation() {
         ..Default::default()
     };
 
-    let mut gen = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
+    let mut r#gen = LiquidMambaGenerator::new(&genesis, config).expect("load failed");
 
     // Simulate exhausted state
-    gen.update_affect(0.95, 0.5);
+    r#gen.update_affect(0.95, 0.5);
 
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // Should still produce output (possibly shorter due to faster decay)
     assert!(
@@ -273,13 +273,13 @@ fn test_biological_modulation() {
 #[test]
 #[ignore = "Requires mamba-130m (~260MB)"]
 fn test_distill_step_end_to_end() {
-    let mut gen = make_generator();
+    let mut r#gen = make_generator();
     let channels = ThoughtChannels::with_intent(1); // Answer
 
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // PE should be tracked after generation
-    let pe_after_gen = gen.last_semantic_pe();
+    let pe_after_gen = r#gen.last_semantic_pe();
     assert!(
         pe_after_gen.is_finite(),
         "PE should be finite after generate()"
@@ -290,22 +290,22 @@ fn test_distill_step_end_to_end() {
     );
 
     // Distill step should not crash
-    gen.distill_step(&channels, &result);
+    r#gen.distill_step(&channels, &result);
 
     // Generation count should have incremented
     assert!(
-        gen.generation_count() >= 1,
+        r#gen.generation_count() >= 1,
         "generation_count should increment"
     );
 
     // Generate again — PE may change
-    let result2 = gen.generate(&channels);
+    let result2 = r#gen.generate(&channels);
     assert!(
         result2.semantic_pe.is_finite(),
         "PE should stay finite after distill"
     );
     assert!(
-        gen.last_semantic_pe().is_finite(),
+        r#gen.last_semantic_pe().is_finite(),
         "last_semantic_pe should stay finite after second generation"
     );
 }
@@ -314,13 +314,13 @@ fn test_distill_step_end_to_end() {
 #[test]
 #[ignore = "Requires mamba-130m (~260MB)"]
 fn test_streaming_callback_l_ssm() {
-    let mut gen = make_generator();
+    let mut r#gen = make_generator();
     let channels = ThoughtChannels::with_intent(1); // Answer
 
     let mut streamed = String::new();
     let mut callback_count = 0usize;
 
-    let result = gen.generate_with_callback(&channels, &mut |token| {
+    let result = r#gen.generate_with_callback(&channels, &mut |token| {
         streamed.push_str(token);
         callback_count += 1;
     });

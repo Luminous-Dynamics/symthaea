@@ -738,6 +738,58 @@ impl HdcSsmProjection {
         ContinuousHV::from_vec(values)
     }
 
+    /// Verify a metamorphic kernel before application.
+    /// Ensures it doesn't cause manifold collapse or magnitude explosion.
+    pub fn verify_metamorphic_kernel(&self, kernel: &[f32]) -> bool {
+        if kernel.is_empty() {
+            return false;
+        }
+
+        // 1. Check for NaNs or Infinities
+        if kernel.iter().any(|&v| !v.is_finite()) {
+            return false;
+        }
+
+        // 2. Check Kernel Entropy (Manifold Volume)
+        // A "flat" kernel (all same values) would cause collapse.
+        let mean: f32 = kernel.iter().sum::<f32>() / kernel.len() as f32;
+        let variance: f32 =
+            kernel.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / kernel.len() as f32;
+
+        if variance < 0.001 {
+            // Kernel is too uniform: would destroy semantic differentiation
+            return false;
+        }
+
+        // 3. Check Magnitude
+        let norm: f32 = kernel.iter().map(|&v| v * v).sum::<f32>().sqrt();
+        if norm > 100.0 {
+            // Kernel is too explosive
+            return false;
+        }
+
+        true
+    }
+
+    /// Apply a metamorphic weight update kernel with a dynamic pressure factor.
+    /// High pressure (confusion) increases plasticity; low pressure (stable) crystalizes.
+    pub fn apply_metamorphic_kernel(&mut self, kernel: &[f32], target: &str, pressure: f32) {
+        let weights = match target {
+            "w_down" => &mut self.w_down,
+            "w_up" => &mut self.w_up,
+            _ => return,
+        };
+
+        // Pressure maps to a metamorphic learning rate [0.01, 0.10]
+        let lr = pressure.clamp(0.01, 0.10);
+        let retention = 1.0 - lr;
+
+        // Apply kernel via element-wise modulation (Metamorphic Scaling)
+        for (w, &k) in weights.iter_mut().zip(kernel.iter().cycle()) {
+            *w = *w * retention + k * lr;
+        }
+    }
+
     /// Backpropagate gradients and update weights mathematically correctly.
     /// `d_bottleneck` must be the gradient of the loss with respect to the bottleneck output (size: self.bottleneck).
     pub fn backward(&mut self, input_hv: &ContinuousHV, d_bottleneck: &[f32], lr: f32) {

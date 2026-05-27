@@ -576,7 +576,8 @@ impl<'a> Default for CodeContext<'a> {
             source_files: Vec::new(),
             past_examples: Vec::new(),
             mcts_plan_confidence: 0.0,
-            negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
+            negative_prototypes:
+                crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
             error_hints: Vec::new(),
             diagnostic_hvs: Vec::new(),
             issue_text: None,
@@ -1243,10 +1244,12 @@ impl CodeGenerator {
         // 3. CfC plan (informed by primitive composition + MCTS confidence)
         // Use purpose text for direct keyword-based pattern detection (more reliable
         // than HDC similarity with byte-hash encoding)
-        let mut plan_steps = self
-            .sequencer
-            .plan_structure_with_purpose(&intent_hv, &similar_refs, &spec.purpose, &context.negative_prototypes);
-
+        let mut plan_steps = self.sequencer.plan_structure_with_purpose(
+            &intent_hv,
+            &similar_refs,
+            &spec.purpose,
+            &context.negative_prototypes,
+        );
 
         // If MCTS confidence is high, boost low-confidence plan steps
         // (the reasoning engine has already vetted this direction)

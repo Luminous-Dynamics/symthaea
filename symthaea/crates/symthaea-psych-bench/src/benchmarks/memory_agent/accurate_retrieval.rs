@@ -6,8 +6,8 @@
 //! Store N facts as HDC vectors, run delay ticks, then query
 //! working memory to see if the facts are retrievable.
 
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;

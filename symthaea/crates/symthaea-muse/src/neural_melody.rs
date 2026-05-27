@@ -9,10 +9,10 @@
 //! the liquid-time dynamics.
 
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::hdc_ltc_unified::{
     HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
-use symthaea_core::hdc::ContinuousHV;
 
 use crate::{MuseConfig, MusicalState, Note};
 

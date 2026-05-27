@@ -172,7 +172,7 @@ pub struct CycleSnapshot {
     /// Moral score from the latest ethics evaluation (-1.0 to 1.0).
     pub moral_score: f32,
 
-    /// Whether there are active external multimodal requests (e.g. video gen).
+    /// Whether there are active external multimodal requests (e.g. video r#gen).
     /// bool as u8 for repr(C) compatibility.
     pub active_external_requests: u8,
 

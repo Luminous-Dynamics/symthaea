@@ -15,8 +15,8 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, LshIndex, StoreConfig};

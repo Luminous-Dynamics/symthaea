@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use web_sys::{MessageEvent, Worker};
 
 static NEXT_ID: AtomicU32 = AtomicU32::new(1);
@@ -117,7 +117,7 @@ impl EngineWorker {
                     // Fire-and-forget broadcast (cycle updates, battery_progress, etc.)
                     let handler = broadcast_clone.lock().unwrap();
                     if let Some(ref h) = *handler {
-                        (h.0 .0)(data);
+                        (h.0.0)(data);
                     }
                 }
             }) as Box<dyn FnMut(MessageEvent)>);

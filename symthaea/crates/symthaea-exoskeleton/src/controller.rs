@@ -85,9 +85,10 @@ mod tests {
             &ExoskeletonConfig::default(),
         );
         let cmd = c.forward(&ContinuousHV::random(HDC_DIM, 42), 0.005);
-        assert!(cmd
-            .joint_torques
-            .iter()
-            .all(|t| t.is_finite() && t.abs() <= 1.0));
+        assert!(
+            cmd.joint_torques
+                .iter()
+                .all(|t| t.is_finite() && t.abs() <= 1.0)
+        );
     }
 }

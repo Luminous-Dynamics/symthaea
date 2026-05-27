@@ -12,9 +12,9 @@
 //! that powers Symthaea's acoustic processing, adapted for biosignals.
 
 use crate::edf_loader::SleepStage;
-use crate::hdc::{bundle, HV16};
+use crate::hdc::{HV16, bundle};
 use crate::ltc::{LtcCell, LtcConfig};
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 
 /// Consciousness state as determined by the Sentinel

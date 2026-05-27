@@ -6,15 +6,13 @@
 //! These methods bridge the IntegratedConsciousAgent with Symthaea's embodied
 //! consciousness systems: hormones, coherence, memory, identity, and voice.
 
-use super::super::unified_hv::ContinuousHV;
 use super::super::attention_dynamics::AttentionMode;
+use super::super::unified_hv::ContinuousHV;
 
-use crate::physiology::{
-    HormoneState, CoherenceState, TaskComplexity,
-};
 use crate::memory::EmotionalValence;
-use crate::voice::LTCPacing;
+use crate::physiology::{CoherenceState, HormoneState, TaskComplexity};
 use crate::soul::KVector;
+use crate::voice::LTCPacing;
 
 use super::agent::IntegratedConsciousAgent;
 use super::working_memory::MemorySource;
@@ -26,18 +24,39 @@ use super::working_memory::MemorySource;
 /// Suggested hormone events for EndocrineSystem
 #[derive(Clone, Debug)]
 pub enum HormoneEventSuggestion {
-    Threat { intensity: f32, reason: String },
-    Reward { value: f32, reason: String },
-    DeepFocus { duration_cycles: u32, reason: String },
-    Success { magnitude: f32, reason: String },
-    Error { severity: f32, reason: String },
+    Threat {
+        intensity: f32,
+        reason: String,
+    },
+    Reward {
+        value: f32,
+        reason: String,
+    },
+    DeepFocus {
+        duration_cycles: u32,
+        reason: String,
+    },
+    Success {
+        magnitude: f32,
+        reason: String,
+    },
+    Error {
+        severity: f32,
+        reason: String,
+    },
 }
 
 /// Result of coherence gating check
 #[derive(Clone, Debug)]
 pub enum CoherenceGating {
-    Proceed { margin: f32 },
-    Defer { current: f32, required: f32, centering_needed: f32 },
+    Proceed {
+        margin: f32,
+    },
+    Defer {
+        current: f32,
+        required: f32,
+        centering_needed: f32,
+    },
 }
 
 /// Modulation values for qualia based on coherence
@@ -78,9 +97,9 @@ pub struct IdentityCoherence {
 /// Identity status from K-Vector comparison
 #[derive(Clone, Debug, PartialEq)]
 pub enum IdentityStatus {
-    Stable,    // > 0.8 similarity
-    Drifting,  // 0.65-0.8 similarity
-    Crisis,    // < 0.65 similarity
+    Stable,   // > 0.8 similarity
+    Drifting, // 0.65-0.8 similarity
+    Crisis,   // < 0.65 similarity
 }
 
 /// Prosody hints for text-to-speech
@@ -181,12 +200,12 @@ impl IntegratedConsciousAgent {
     pub fn sync_with_hormones(&mut self, hormones: &HormoneState) {
         // Cortisol effect: stress hormone drives negative valence and high arousal
         // Baseline cortisol is ~0.3, so we center around that
-        let cortisol_valence_effect = -(hormones.cortisol - 0.3) * 0.8;  // Negative contribution
-        let cortisol_arousal_effect = (hormones.cortisol - 0.3) * 0.6;   // Stress increases arousal
+        let cortisol_valence_effect = -(hormones.cortisol - 0.3) * 0.8; // Negative contribution
+        let cortisol_arousal_effect = (hormones.cortisol - 0.3) * 0.6; // Stress increases arousal
 
         // Dopamine effect: reward hormone drives positive valence
         // Baseline dopamine is ~0.5
-        let dopamine_valence_effect = (hormones.dopamine - 0.5) * 1.0;   // Positive contribution
+        let dopamine_valence_effect = (hormones.dopamine - 0.5) * 1.0; // Positive contribution
 
         // Acetylcholine doesn't directly affect emotion but modulates attention depth
         // We'll use it to affect cognitive load perception
@@ -284,7 +303,9 @@ impl IntegratedConsciousAgent {
                 depth_boost: coherence.coherence * 0.3,
                 presence_boost: coherence.coherence * 0.4,
                 warmth_boost: coherence.relational_resonance * 0.5,
-                spaciousness_boost: (1.0 - self.working_memory.load() as f32) * coherence.coherence * 0.3,
+                spaciousness_boost: (1.0 - self.working_memory.load() as f32)
+                    * coherence.coherence
+                    * 0.3,
             }
         } else {
             QualiaModulation::default()
@@ -300,7 +321,8 @@ impl IntegratedConsciousAgent {
     /// Returns items with sufficient activation and emotional significance
     /// for encoding into HippocampusActor's episodic memory
     pub fn export_for_hippocampus(&self) -> Vec<MemoryExport> {
-        self.working_memory.episodic_buffer
+        self.working_memory
+            .episodic_buffer
             .iter()
             .filter(|item| {
                 // Export if: high activation OR high goal relevance OR strong emotion
@@ -367,18 +389,24 @@ impl IntegratedConsciousAgent {
         }
 
         // Encode emotional quadrant
-        let emotion_offset = 250 + match (self.emotional_state.valence > 0.0, self.emotional_state.arousal > 0.5) {
-            (true, true) => 0,   // excited/happy
-            (true, false) => 1,  // calm/content
-            (false, true) => 2,  // stressed/anxious
-            (false, false) => 3, // sad/bored
-        } * 50;
+        let emotion_offset = 250
+            + match (
+                self.emotional_state.valence > 0.0,
+                self.emotional_state.arousal > 0.5,
+            ) {
+                (true, true) => 0,   // excited/happy
+                (true, false) => 1,  // calm/content
+                (false, true) => 2,  // stressed/anxious
+                (false, false) => 3, // sad/bored
+            } * 50;
         for i in emotion_offset..(emotion_offset + 50).min(dim) {
             k_vec[i] = 1.0;
         }
 
         // Encode integration quality
-        let quality_signal = self.history.back()
+        let quality_signal = self
+            .history
+            .back()
             .map(|u| u.integration_quality)
             .unwrap_or(0.5);
         for i in 450..500 {
@@ -386,7 +414,11 @@ impl IntegratedConsciousAgent {
         }
 
         // Encode goal-directedness
-        let goal_signal = if self.goals.iter().any(|g| g.active) { 1.0 } else { 0.0 };
+        let goal_signal = if self.goals.iter().any(|g| g.active) {
+            1.0
+        } else {
+            0.0
+        };
         for i in 500..550 {
             k_vec[i] = goal_signal;
         }
@@ -443,7 +475,11 @@ impl IntegratedConsciousAgent {
         let current = self.generate_k_vector();
 
         // Compute cosine similarity
-        let dot: f64 = current.iter().zip(reference.iter()).map(|(a, b)| a * b).sum();
+        let dot: f64 = current
+            .iter()
+            .zip(reference.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let mag_current: f64 = current.iter().map(|x| x * x).sum::<f64>().sqrt();
         let mag_ref: f64 = reference.iter().map(|x| x * x).sum::<f64>().sqrt();
 
@@ -470,22 +506,34 @@ impl IntegratedConsciousAgent {
         let mut drifts = Vec::new();
 
         // Check attention drift (0-250)
-        let attention_drift: f64 = current[0..250].iter().zip(&reference[0..250])
-            .map(|(a, b)| (a - b).abs()).sum::<f64>() / 250.0;
+        let attention_drift: f64 = current[0..250]
+            .iter()
+            .zip(&reference[0..250])
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f64>()
+            / 250.0;
         if attention_drift > 0.3 {
             drifts.push("attention_mode".to_string());
         }
 
         // Check emotional drift (250-450)
-        let emotion_drift: f64 = current[250..450].iter().zip(&reference[250..450])
-            .map(|(a, b)| (a - b).abs()).sum::<f64>() / 200.0;
+        let emotion_drift: f64 = current[250..450]
+            .iter()
+            .zip(&reference[250..450])
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f64>()
+            / 200.0;
         if emotion_drift > 0.3 {
             drifts.push("emotional_state".to_string());
         }
 
         // Check qualia drift (550-800)
-        let qualia_drift: f64 = current[550..800].iter().zip(&reference[550..800])
-            .map(|(a, b)| (a - b).abs()).sum::<f64>() / 250.0;
+        let qualia_drift: f64 = current[550..800]
+            .iter()
+            .zip(&reference[550..800])
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f64>()
+            / 250.0;
         if qualia_drift > 0.3 {
             drifts.push("qualia_texture".to_string());
         }
@@ -538,9 +586,12 @@ impl IntegratedConsciousAgent {
         }
 
         // Set peak flow flag
-        pacing.peak_flow = stream.is_flowing && self.history.back()
-            .map(|u| u.integration_quality > 0.75)
-            .unwrap_or(false);
+        pacing.peak_flow = stream.is_flowing
+            && self
+                .history
+                .back()
+                .map(|u| u.integration_quality > 0.75)
+                .unwrap_or(false);
 
         pacing
     }

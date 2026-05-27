@@ -248,7 +248,9 @@ fn main() {
 
     if active_platforms == 0 {
         println!("⚠️  No platforms enabled. Build with:");
-        println!("   cargo run --release --example robotics_benchmark_suite --features humanoid,helicopter,multirotor,vehicle,auv,manipulator");
+        println!(
+            "   cargo run --release --example robotics_benchmark_suite --features humanoid,helicopter,multirotor,vehicle,auv,manipulator"
+        );
         println!();
     }
 

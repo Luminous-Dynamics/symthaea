@@ -9,7 +9,7 @@
 //! k-means, or agglomerative clustering behind this interface without
 //! changing the metric code.
 
-use crate::encoder::{cosine, Hdv};
+use crate::encoder::{Hdv, cosine};
 use hdbscan::{DistanceMetric, Hdbscan, HdbscanHyperParams};
 use std::collections::HashMap;
 

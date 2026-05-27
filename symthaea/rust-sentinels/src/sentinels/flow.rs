@@ -136,11 +136,14 @@ impl FlowSentinel {
         // Calculate alpha optimality using gaussian function
         // Flow requires moderate alpha (not too high = drowsy, not too low = stressed)
         let alpha_diff = (alpha_rel - self.config.optimal_alpha).abs();
-        let alpha_optimal = (-alpha_diff.powi(2) / (2.0 * self.config.alpha_tolerance.powi(2))).exp();
+        let alpha_optimal =
+            (-alpha_diff.powi(2) / (2.0 * self.config.alpha_tolerance.powi(2))).exp();
 
         // Calculate effortlessness from reduced frontal beta
         // Lower beta = less self-monitoring, more automatic action
-        let effortlessness = (1.0 - beta_rel / self.config.max_frontal_beta).max(0.0).min(1.0);
+        let effortlessness = (1.0 - beta_rel / self.config.max_frontal_beta)
+            .max(0.0)
+            .min(1.0);
 
         // Calculate immersion from theta/alpha balance
         let immersion = ((alpha_rel + theta_rel * 0.5) * 1.5).min(1.0);
@@ -153,7 +156,8 @@ impl FlowSentinel {
 
         // Calculate overall flow index
         // Geometric mean to require all components
-        let flow_index = (alpha_optimal * effortlessness * immersion * (0.5 + performance * 0.5)).powf(0.5);
+        let flow_index =
+            (alpha_optimal * effortlessness * immersion * (0.5 + performance * 0.5)).powf(0.5);
 
         // Classify state based on various indicators
         let state = self.classify_state(flow_index, alpha_rel, beta_rel, theta_rel);
@@ -186,12 +190,7 @@ impl FlowSentinel {
 
         let total = delta + theta + alpha + beta + gamma + 1e-10;
 
-        (
-            theta / total,
-            alpha / total,
-            beta / total,
-            smr / total,
-        )
+        (theta / total, alpha / total, beta / total, smr / total)
     }
 
     /// Classify flow state
@@ -223,7 +222,11 @@ impl FlowSentinel {
     /// Calculate confidence
     fn calculate_confidence(&self, alpha: f32, beta: f32) -> f32 {
         // Higher confidence when signals are in expected ranges
-        let alpha_conf = if alpha > 0.15 && alpha < 0.50 { 1.0 } else { 0.7 };
+        let alpha_conf = if alpha > 0.15 && alpha < 0.50 {
+            1.0
+        } else {
+            0.7
+        };
         let beta_conf = if beta > 0.05 && beta < 0.35 { 1.0 } else { 0.7 };
 
         (alpha_conf + beta_conf) / 2.0

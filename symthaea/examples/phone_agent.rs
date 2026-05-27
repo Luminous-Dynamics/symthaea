@@ -54,7 +54,10 @@ fn main() {
     // Simulated consciousness level — in a full cognitive loop this comes
     // from the consciousness engine. For the demo we use a fixed moderate value.
     let phi: f64 = 0.65; // Green safety level → full control allowed
-    println!("[Phi] Consciousness level: {:.2} (Green — full control)", phi);
+    println!(
+        "[Phi] Consciousness level: {:.2} (Green — full control)",
+        phi
+    );
 
     // Parse args for mode
     let args: Vec<String> = std::env::args().collect();
@@ -73,10 +76,10 @@ fn main() {
 
     // Known app positions on the Pixel home screen (128×128, 16×16 grid).
     let known_positions: &[(&str, usize, usize, usize, usize)] = &[
-        ("youtube",       4, 8, 2, 2),
-        ("settings",      8, 8, 2, 2),
-        ("clock",         4, 12, 2, 2),
-        ("spotify",       8, 0, 2, 2),
+        ("youtube", 4, 8, 2, 2),
+        ("settings", 8, 8, 2, 2),
+        ("clock", 4, 12, 2, 2),
+        ("spotify", 8, 0, 2, 2),
         ("authenticator", 4, 0, 2, 2),
     ];
 
@@ -135,7 +138,12 @@ fn main() {
 
         for (step_idx, task_step) in t.steps.iter().enumerate() {
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            println!("Task Step {}/{}: {}", step_idx + 1, t.steps.len(), task_step.description);
+            println!(
+                "Task Step {}/{}: {}",
+                step_idx + 1,
+                t.steps.len(),
+                task_step.description
+            );
 
             let mut success = false;
             for attempt in 1..=task_step.max_attempts {
@@ -145,7 +153,10 @@ fn main() {
                     continue;
                 }
                 let tel = phone.vision().telemetry().clone();
-                println!("  [{attempt}] PE={:.3} ImgSurp={:.3}", tel.prediction_error, tel.imagination_surprise);
+                println!(
+                    "  [{attempt}] PE={:.3} ImgSurp={:.3}",
+                    tel.prediction_error, tel.imagination_surprise
+                );
 
                 // Execute action based on step type
                 match &task_step.action {
@@ -169,7 +180,8 @@ fn main() {
                             }
                             StepTarget::None => symthaea_phone_embodiment::PhoneAction::NoOp,
                         };
-                        let sim_info = phone.last_match_similarity()
+                        let sim_info = phone
+                            .last_match_similarity()
                             .map(|s| format!(" sim={s:.3}"))
                             .unwrap_or_default();
                         println!("  ACTION: {}{sim_info}", action.label());
@@ -180,7 +192,8 @@ fn main() {
                     }
                     StepAction::Type(text) => {
                         println!("  ACTION: type \"{text}\"");
-                        let action = symthaea_phone_embodiment::PhoneAction::Type { text: text.clone() };
+                        let action =
+                            symthaea_phone_embodiment::PhoneAction::Type { text: text.clone() };
                         if let Err(e) = phone.execute_action(&action) {
                             println!("  [ERR] {e}");
                             continue;
@@ -189,7 +202,11 @@ fn main() {
                     StepAction::ScrollDown => {
                         let mid_x = 504; // screen center
                         let action = symthaea_phone_embodiment::PhoneAction::Swipe {
-                            x1: mid_x, y1: 1500, x2: mid_x, y2: 700, duration_ms: 300,
+                            x1: mid_x,
+                            y1: 1500,
+                            x2: mid_x,
+                            y2: 700,
+                            duration_ms: 300,
                         };
                         println!("  ACTION: scroll down");
                         let _ = phone.execute_action(&action);
@@ -245,7 +262,10 @@ fn main() {
             if success {
                 println!("  [OK] Step complete.");
             } else {
-                println!("  [FAIL] Step failed after {} attempts.", task_step.max_attempts);
+                println!(
+                    "  [FAIL] Step failed after {} attempts.",
+                    task_step.max_attempts
+                );
             }
             println!();
         }
@@ -274,11 +294,18 @@ fn main() {
         let perceive_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
         // 2. Report what she sees
-        println!("  [{:.0}ms] PE={:.3} ImgSurp={:.3} Coh={:.3} motion={:.3}",
-            perceive_ms, tel.prediction_error, tel.imagination_surprise,
-            tel.manifold_coherence, tel.motion_surprise);
-        println!("  WM={}/4  SG={}edges",
-            tel.working_memory_load, tel.scene_graph_edges);
+        println!(
+            "  [{:.0}ms] PE={:.3} ImgSurp={:.3} Coh={:.3} motion={:.3}",
+            perceive_ms,
+            tel.prediction_error,
+            tel.imagination_surprise,
+            tel.manifold_coherence,
+            tel.motion_surprise
+        );
+        println!(
+            "  WM={}/4  SG={}edges",
+            tel.working_memory_load, tel.scene_graph_edges
+        );
 
         // 3. Working memory — what she's attending to
         let wm_summary = phone.working_memory_summary();
@@ -306,10 +333,15 @@ fn main() {
         } else {
             phone.propose_action(phi)
         };
-        let match_info = phone.last_match_similarity()
+        let match_info = phone
+            .last_match_similarity()
             .map(|s| format!(" [MATCH sim={s:.3}]"))
             .unwrap_or_default();
-        println!("  ACTION: {} (phi_req={:.2}){match_info}", action.label(), action.required_phi());
+        println!(
+            "  ACTION: {} (phi_req={:.2}){match_info}",
+            action.label(),
+            action.required_phi()
+        );
 
         if interactive {
             // Interactive mode: ask for confirmation
@@ -319,12 +351,10 @@ fn main() {
             stdin.lock().read_line(&mut input).unwrap();
             let input = input.trim().to_lowercase();
             match input.as_str() {
-                "y" | "yes" => {
-                    match phone.confirm_and_execute() {
-                        Ok(()) => println!("  [OK] Executed."),
-                        Err(e) => println!("  [ERR] {e}"),
-                    }
-                }
+                "y" | "yes" => match phone.confirm_and_execute() {
+                    Ok(()) => println!("  [OK] Executed."),
+                    Err(e) => println!("  [ERR] {e}"),
+                },
                 "q" | "quit" => {
                     println!("\nSymthaea returns to stillness.");
                     break;

@@ -511,7 +511,7 @@ mod tests {
         let items = vec![0, 1, 2, 3, 4];
         let result = combinations(&items, 2);
         assert_eq!(result.len(), 10); // C(5,2) = 10
-                                      // Verify some specific combos
+        // Verify some specific combos
         assert!(result.contains(&vec![0, 1]));
         assert!(result.contains(&vec![3, 4]));
         assert!(result.contains(&vec![1, 3]));

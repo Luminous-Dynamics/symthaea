@@ -43,10 +43,10 @@
 //! ```
 
 use super::binary_hv::BinaryHV;
-use super::tiered_phi::{TieredPhi, TieredPhiConfig, ApproximationTier};
-use super::test_oracle::{TestOracle, ConsciousnessLevel};
-use std::sync::Mutex;
+use super::test_oracle::{ConsciousnessLevel, TestOracle};
+use super::tiered_phi::{ApproximationTier, TieredPhi, TieredPhiConfig};
 use once_cell::sync::Lazy;
+use std::sync::Mutex;
 
 // ============================================================================
 // TEST HARNESS CONFIGURATION
@@ -180,7 +180,8 @@ impl TestHarness {
             TestMode::Tiered | TestMode::Exact => {
                 // Auto-downgrade if too many components
                 if components.len() > self.config.max_components_for_exact
-                   && self.config.mode == TestMode::Exact {
+                    && self.config.mode == TestMode::Exact
+                {
                     self.tiered_phi.config.tier = ApproximationTier::SpectralConnectivity;
                 }
                 self.tiered_phi.compute(components)
@@ -207,9 +208,7 @@ impl TestHarness {
     /// Compute free energy (inversely related to Φ)
     pub fn compute_free_energy(&mut self, components: &[BinaryHV]) -> f64 {
         match self.config.mode {
-            TestMode::Mock => {
-                self.oracle.free_energy(components.len())
-            }
+            TestMode::Mock => self.oracle.free_energy(components.len()),
             _ => {
                 let phi = self.compute_phi(components);
                 // Free energy inversely correlates with Φ
@@ -249,23 +248,31 @@ pub struct HarnessStats {
 // ============================================================================
 
 /// Global test harness for easy access
-static GLOBAL_HARNESS: Lazy<Mutex<TestHarness>> = Lazy::new(|| {
-    Mutex::new(TestHarness::new(TestMode::from_env()))
-});
+static GLOBAL_HARNESS: Lazy<Mutex<TestHarness>> =
+    Lazy::new(|| Mutex::new(TestHarness::new(TestMode::from_env())));
 
 /// Compute Φ using global harness
 pub fn test_phi(components: &[BinaryHV]) -> f64 {
-    GLOBAL_HARNESS.lock().expect("lock poisoned").compute_phi(components)
+    GLOBAL_HARNESS
+        .lock()
+        .expect("lock poisoned")
+        .compute_phi(components)
 }
 
 /// Get consciousness level using global harness
 pub fn test_consciousness_level(components: &[BinaryHV]) -> ConsciousnessLevel {
-    GLOBAL_HARNESS.lock().expect("lock poisoned").consciousness_level(components)
+    GLOBAL_HARNESS
+        .lock()
+        .expect("lock poisoned")
+        .consciousness_level(components)
 }
 
 /// Compute free energy using global harness
 pub fn test_free_energy(components: &[BinaryHV]) -> f64 {
-    GLOBAL_HARNESS.lock().expect("lock poisoned").compute_free_energy(components)
+    GLOBAL_HARNESS
+        .lock()
+        .expect("lock poisoned")
+        .compute_free_energy(components)
 }
 
 /// Reset global harness to defaults
@@ -295,7 +302,9 @@ macro_rules! assert_phi_in_range {
         assert!(
             phi >= $min && phi <= $max,
             "Φ = {} not in range [{}, {}]",
-            phi, $min, $max
+            phi,
+            $min,
+            $max
         );
     }};
 }

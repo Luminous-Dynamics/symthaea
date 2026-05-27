@@ -28,8 +28,8 @@ use symthaea_fep::Observation;
 use symthaea_fep::TemporalDifferenceLearningConfig;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 
-use crate::audio_feedback::AudioFeatures;
 use crate::MusicalState;
+use crate::audio_feedback::AudioFeatures;
 
 /// Musical action types (mapped to ActiveInferenceAgent's action indices).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -31,13 +31,13 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use anyhow::{Context, Result, anyhow};
 use cpal::SampleFormat;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Producer, Split};
 use ringbuf::{HeapCons, HeapRb};
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_stt::{bundle, StreamConfig, StreamProcessor, HV16};
+use symthaea_stt::{HV16, StreamConfig, StreamProcessor, bundle};
 
 /// Configuration for live microphone capture.
 #[derive(Debug, Clone)]

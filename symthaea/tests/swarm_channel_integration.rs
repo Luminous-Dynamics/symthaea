@@ -9,8 +9,8 @@
 //! We must run ≥83 cycles to guarantee at least one `process()` call.
 
 use symthaea::cognitive_loop::{
-    forward_affective_state, forward_federated_round, CognitiveLoopConfig, CognitiveLoopService,
-    SwarmEvent,
+    CognitiveLoopConfig, CognitiveLoopService, SwarmEvent, forward_affective_state,
+    forward_federated_round,
 };
 
 fn make_cls() -> CognitiveLoopService {

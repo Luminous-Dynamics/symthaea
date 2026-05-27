@@ -213,7 +213,7 @@ fn e2e_immune_evolution_vdj_recombination() {
     assert!(evolver.stats().recombinations > 0, "Should perform V(D)J recombinations");
 
     // Check cytokine status
-    assert!(!evolver.cytokines().is_inflamed(), "Should not be inflamed on first gen");
+    assert!(!evolver.cytokines().is_inflamed(), "Should not be inflamed on first r#gen");
 }
 
 // ==================================================================================
@@ -317,11 +317,11 @@ fn e2e_primitive_evolution_hybrid() {
 
 #[test]
 fn e2e_self_modification_error_clustering() {
-    let mut gen = FixRuleGenerator::new();
+    let mut r#gen = FixRuleGenerator::new();
 
     // Simulate a recurring error pattern
     for i in 0..7 {
-        gen.observe_error(
+        r#gen.observe_error(
             "E0308",
             "TypeMismatch",
             "mismatched types: expected String, found &str",
@@ -331,7 +331,7 @@ fn e2e_self_modification_error_clustering() {
         );
     }
 
-    assert!(gen.stats().clusters_detected > 0, "Should detect error cluster");
+    assert!(r#gen.stats().clusters_detected > 0, "Should detect error cluster");
 }
 
 // ==================================================================================
@@ -340,11 +340,11 @@ fn e2e_self_modification_error_clustering() {
 
 #[test]
 fn e2e_self_modification_rule_generation_gated() {
-    let mut gen = FixRuleGenerator::new();
+    let mut r#gen = FixRuleGenerator::new();
 
     // Build a failure cluster
     for _ in 0..7 {
-        gen.observe_error(
+        r#gen.observe_error(
             "E0308",
             "TypeMismatch",
             "expected String found &str",
@@ -355,22 +355,22 @@ fn e2e_self_modification_rule_generation_gated() {
     }
 
     // Gate 1: Low consciousness → blocked
-    let rules = gen.try_generate_rules(0.1, 0.9);
+    let rules = r#gen.try_generate_rules(0.1, 0.9);
     assert!(rules.is_empty(), "Low Phi should block self-modification");
-    assert!(gen.stats().consciousness_gates > 0);
+    assert!(r#gen.stats().consciousness_gates > 0);
 
     // Gate 2: Low calibration → blocked
-    let rules = gen.try_generate_rules(0.5, 0.3);
+    let rules = r#gen.try_generate_rules(0.5, 0.3);
     assert!(rules.is_empty(), "Low calibration should block self-modification");
-    assert!(gen.stats().calibration_gates > 0);
+    assert!(r#gen.stats().calibration_gates > 0);
 
     // Gate 3: Both passing → generates rule
-    let rules = gen.try_generate_rules(0.5, 0.9);
+    let rules = r#gen.try_generate_rules(0.5, 0.9);
     assert!(!rules.is_empty(), "Should generate rule when gates pass");
-    assert_eq!(gen.stats().rules_generated, 1);
+    assert_eq!(r#gen.stats().rules_generated, 1);
 
     // Verify the generated rule
-    let rule = &gen.all_rules()[0];
+    let rule = &r#gen.all_rules()[0];
     assert!(rule.error_code.as_deref() == Some("E0308"));
     assert!(rule.confidence > 0.0);
     assert!(!rule.promoted);
@@ -383,25 +383,25 @@ fn e2e_self_modification_rule_generation_gated() {
 
 #[test]
 fn e2e_self_modification_full_lifecycle() {
-    let mut gen = FixRuleGenerator::new();
+    let mut r#gen = FixRuleGenerator::new();
 
     // Phase 1: Accumulate failures
     for _ in 0..7 {
-        gen.observe_error("E0277", "MissingImport", "HashMap not found", "none", false, "HashMap::new()");
+        r#gen.observe_error("E0277", "MissingImport", "HashMap not found", "none", false, "HashMap::new()");
     }
 
     // Phase 2: Generate rule
-    let rules = gen.try_generate_rules(0.6, 0.9);
+    let rules = r#gen.try_generate_rules(0.6, 0.9);
     assert!(!rules.is_empty());
     let rule_id = rules[0].clone();
 
     // Phase 3: Apply rule successfully 6 times
     for _ in 0..6 {
-        gen.record_rule_outcome(&rule_id, true, Some(true));
+        r#gen.record_rule_outcome(&rule_id, true, Some(true));
     }
 
     // Phase 4: Rule should be promoted (>70% success, 5+ applications)
-    let rule = gen.all_rules().iter().find(|r| r.id == rule_id).unwrap();
+    let rule = r#gen.all_rules().iter().find(|r| r.id == rule_id).unwrap();
     assert!(rule.is_proven(), "Rule should be proven after 6/6 successes");
     assert!(rule.promoted, "Rule should be auto-promoted");
     assert!(!rule.demoted, "Rule should not be demoted");

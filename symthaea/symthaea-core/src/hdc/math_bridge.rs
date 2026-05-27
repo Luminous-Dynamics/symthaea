@@ -1251,11 +1251,13 @@ mod tests {
     fn test_is_zero() {
         assert!(MathValue::Natural(0).is_zero());
         assert!(MathValue::Integer(0).is_zero());
-        assert!(MathValue::Rational {
-            numerator: 0,
-            denominator: 5
-        }
-        .is_zero());
+        assert!(
+            MathValue::Rational {
+                numerator: 0,
+                denominator: 5
+            }
+            .is_zero()
+        );
         assert!(MathValue::Real(0.0).is_zero());
         assert!(MathValue::Complex { re: 0.0, im: 0.0 }.is_zero());
         assert!(!MathValue::Natural(1).is_zero());

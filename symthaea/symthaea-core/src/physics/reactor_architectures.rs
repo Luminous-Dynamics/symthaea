@@ -32,11 +32,11 @@
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
-use super::trigger_systems::{
-    ExtendedTriggerMethod, TriggerSystemSpec, TriggerSystemLibrary,
-    estimate_fusion_yield, FusionYieldEstimate,
-};
 use super::radiation_damage::FusionReaction;
+use super::trigger_systems::{
+    ExtendedTriggerMethod, FusionYieldEstimate, TriggerSystemLibrary, TriggerSystemSpec,
+    estimate_fusion_yield,
+};
 
 /// Reactor architecture type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ pub enum FuelType {
     Tritium,
     Helium3,
     Protium,
-    DeuteriumTritium,  // 50-50 mix
+    DeuteriumTritium, // 50-50 mix
 }
 
 impl FuelType {
@@ -101,10 +101,10 @@ impl FuelType {
 
     pub fn cost_per_gram_usd(&self) -> f64 {
         match self {
-            FuelType::Protium => 0.0001,     // Essentially free
-            FuelType::Deuterium => 0.01,     // $10/kg from seawater
-            FuelType::Tritium => 30_000.0,   // $30,000/g (breeder required)
-            FuelType::Helium3 => 1_000_000.0, // $1M/g (lunar mining needed)
+            FuelType::Protium => 0.0001,            // Essentially free
+            FuelType::Deuterium => 0.01,            // $10/kg from seawater
+            FuelType::Tritium => 30_000.0,          // $30,000/g (breeder required)
+            FuelType::Helium3 => 1_000_000.0,       // $1M/g (lunar mining needed)
             FuelType::DeuteriumTritium => 15_000.0, // Average
         }
     }
@@ -127,7 +127,7 @@ pub enum FuelState {
     Liquid,
     Solid,
     Plasma,
-    Dissolved,  // In liquid metal or molten salt
+    Dissolved, // In liquid metal or molten salt
 }
 
 /// Cooling system specification
@@ -150,12 +150,12 @@ pub struct CoolingSystem {
 /// Cooling methods
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CoolingMethod {
-    Passive,        // Natural convection
-    ForcedAir,      // Fan cooling
-    WaterLoop,      // Water jacket
-    LiquidMetal,    // NaK, PbLi, Galinstan
-    HeatPipe,       // Passive high-flux
-    MoltenSalt,     // FLiBe, FLiNaK
+    Passive,          // Natural convection
+    ForcedAir,        // Fan cooling
+    WaterLoop,        // Water jacket
+    LiquidMetal,      // NaK, PbLi, Galinstan
+    HeatPipe,         // Passive high-flux
+    MoltenSalt,       // FLiBe, FLiNaK
     DirectConversion, // MHD or thermionic (for charged particles)
 }
 
@@ -268,8 +268,8 @@ impl MassBreakdown {
 
         let containment_kg = 5.0 + power_w * 0.001;
 
-        let subtotal = fuel_kg + structure_kg + shielding_mass_kg
-            + cooling_kg + trigger_kg + containment_kg;
+        let subtotal =
+            fuel_kg + structure_kg + shielding_mass_kg + cooling_kg + trigger_kg + containment_kg;
         let bop_kg = subtotal * 0.12; // 12% balance of plant
 
         let total_kg = subtotal + bop_kg;
@@ -377,11 +377,7 @@ pub struct FuelCycle {
 
 impl FuelCycle {
     /// Compute fuel cycle for a D-D reactor.
-    pub fn compute(
-        reactions_per_second: f64,
-        pd_mass_kg: f64,
-        loading_ratio: f64,
-    ) -> Self {
+    pub fn compute(reactions_per_second: f64, pd_mass_kg: f64, loading_ratio: f64) -> Self {
         // D consumption: 2 deuterons per reaction, each 2.014 amu
         let amu_to_g = 1.6605e-24;
         let d_per_reaction = 2.0;
@@ -493,7 +489,7 @@ pub struct ReactorDesignParams {
 impl Default for ReactorDesignParams {
     fn default() -> Self {
         Self {
-            target_power_w: 10_000.0,  // 10 kW
+            target_power_w: 10_000.0, // 10 kW
             target_lifetime_years: 20.0,
             max_cost_usd: 100_000.0,
             max_volume_m3: 1.0,
@@ -514,7 +510,7 @@ impl ReactorDesignParams {
             max_cost_usd: 50_000.0,
             max_volume_m3: 0.5,
             max_mass_kg: 500.0,
-            allow_neutrons: false,  // Consumer wants aneutronic
+            allow_neutrons: false, // Consumer wants aneutronic
             min_trl: 6,
             risk_weight: 0.5, // Moderate risk consideration for consumer
         }
@@ -537,7 +533,7 @@ impl ReactorDesignParams {
     /// Industrial power plant
     pub fn industrial() -> Self {
         Self {
-            target_power_w: 100_000_000.0,  // 100 MW
+            target_power_w: 100_000_000.0, // 100 MW
             target_lifetime_years: 40.0,
             max_cost_usd: 1_000_000_000.0,
             max_volume_m3: 10_000.0,
@@ -684,12 +680,15 @@ impl ReactorDesigner {
         };
 
         // Select trigger for power scale
-        let trigger = self.trigger_library.optimal_for_power(params.target_power_w).clone();
+        let trigger = self
+            .trigger_library
+            .optimal_for_power(params.target_power_w)
+            .clone();
 
         // Calculate dimensions
         let power_density = 50_000.0; // W/m³ for solid-state
         let core_volume = params.target_power_w / power_density;
-        let core_radius = (3.0 * core_volume / (4.0 * PI)).powf(1.0/3.0);
+        let core_radius = (3.0 * core_volume / (4.0 * PI)).powf(1.0 / 3.0);
         let shell_thickness = 0.01 + core_radius * 0.2;
         let total_radius = core_radius + shell_thickness + 0.05; // +5cm shielding
 
@@ -737,7 +736,7 @@ impl ReactorDesigner {
             attenuation_factor: (-shielding_thickness * 10.0).exp(),
         };
 
-        let volume = 4.0/3.0 * PI * total_radius.powi(3);
+        let volume = 4.0 / 3.0 * PI * total_radius.powi(3);
         let mass = shielding.total_mass_kg + core_volume * 12000.0; // Pd density
 
         let yield_estimate = estimate_fusion_yield(&trigger, core_volume * 12000.0 * 1000.0, 0.7);
@@ -777,7 +776,10 @@ impl ReactorDesigner {
     /// Design flowing liquid metal reactor
     fn design_flow_reactor(&self, params: &ReactorDesignParams) -> ReactorSpec {
         // Flowing Pb-Li eutectic with dissolved deuterium
-        let trigger = self.trigger_library.systems.iter()
+        let trigger = self
+            .trigger_library
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::ElectronBeam)
             .expect("trigger library must contain ElectronBeam system")
             .clone();
@@ -794,7 +796,7 @@ impl ReactorDesigner {
             pressure_atm: 5.0,
             temperature_k: 600.0,
             flow_rate_g_s: Some(params.target_power_w / 10.0), // ~100g/s per kW
-            loading_ratio: Some(0.001), // Much lower in liquid
+            loading_ratio: Some(0.001),                        // Much lower in liquid
         };
 
         let cooling = CoolingSystem {
@@ -858,7 +860,10 @@ impl ReactorDesigner {
     fn design_aneutronic(&self, params: &ReactorDesignParams) -> ReactorSpec {
         // Aneutronic requires higher temperatures/energies
         // Use piezo phonon + laser for multi-mode trigger
-        let trigger = self.trigger_library.systems.iter()
+        let trigger = self
+            .trigger_library
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::LaserBremsstrahlung)
             .expect("trigger library must contain LaserBremsstrahlung system")
             .clone();
@@ -868,7 +873,7 @@ impl ReactorDesigner {
             secondary_fuel: Some(FuelType::Helium3),
             state: FuelState::Gas,
             host_material: None,
-            pressure_atm: 100.0, // High pressure gas target
+            pressure_atm: 100.0,   // High pressure gas target
             temperature_k: 1000.0, // Elevated temperature
             flow_rate_g_s: Some(0.01),
             loading_ratio: None,
@@ -881,7 +886,7 @@ impl ReactorDesigner {
             inlet_temp_k: 800.0,
             outlet_temp_k: 1200.0,
             flow_rate_kg_s: 0.0, // No coolant flow - direct conversion
-            htc: 100_000.0, // High HTC for direct energy extraction
+            htc: 100_000.0,      // High HTC for direct energy extraction
         };
 
         // Minimal shielding - aneutronic!
@@ -906,7 +911,10 @@ impl ReactorDesigner {
         let yield_estimate = estimate_fusion_yield(&trigger, 10.0, 0.5);
 
         ReactorSpec {
-            name: format!("AneutronicCore D-He3 ({:.1}kW)", params.target_power_w / 1000.0),
+            name: format!(
+                "AneutronicCore D-He3 ({:.1}kW)",
+                params.target_power_w / 1000.0
+            ),
             architecture: ReactorArchitecture::AneutronicCore,
             reactions: vec![FusionReaction::DHe3],
             trigger,
@@ -917,8 +925,8 @@ impl ReactorDesigner {
             volume_m3: volume,
             mass_kg: mass,
             cost_usd: 500_000.0 + fuel_cost_year * 10.0, // Include 10yr fuel cost
-            lifetime_years: 100.0, // No neutron damage
-            trl: 2, // Very early stage
+            lifetime_years: 100.0,                       // No neutron damage
+            trl: 2,                                      // Very early stage
             advantages: vec![
                 "No neutron damage to structure".to_string(),
                 "Minimal shielding required".to_string(),
@@ -942,7 +950,10 @@ impl ReactorDesigner {
 
     /// Design pulsed electrolysis reactor (simplest)
     fn design_electrolysis(&self, params: &ReactorDesignParams) -> ReactorSpec {
-        let trigger = self.trigger_library.systems.iter()
+        let trigger = self
+            .trigger_library
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::PulsedElectrolysis)
             .expect("trigger library must contain PulsedElectrolysis system")
             .clone();
@@ -989,9 +1000,9 @@ impl ReactorDesigner {
             power_w: params.target_power_w,
             volume_m3: 0.05, // Very compact
             mass_kg: 50.0,
-            cost_usd: 5_000.0, // Very cheap
+            cost_usd: 5_000.0,   // Very cheap
             lifetime_years: 5.0, // Limited by cathode degradation
-            trl: 5, // Some experimental validation
+            trl: 5,              // Some experimental validation
             advantages: vec![
                 "Extremely simple setup".to_string(),
                 "Very low cost (<$5K)".to_string(),
@@ -1014,7 +1025,10 @@ impl ReactorDesigner {
 
     /// Design molten salt reactor (for large scale)
     fn design_molten_salt(&self, params: &ReactorDesignParams) -> ReactorSpec {
-        let trigger = self.trigger_library.systems.iter()
+        let trigger = self
+            .trigger_library
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::CompactXRay)
             .expect("trigger library must contain CompactXRay system")
             .clone();
@@ -1094,7 +1108,10 @@ impl ReactorDesigner {
         let cell_power = 100.0;
         let num_cells = (params.target_power_w / cell_power).ceil() as usize;
 
-        let trigger = self.trigger_library.systems.iter()
+        let trigger = self
+            .trigger_library
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::PiezoPhonon)
             .expect("trigger library must contain PiezoPhonon system")
             .clone();
@@ -1142,8 +1159,11 @@ impl ReactorDesigner {
         let yield_estimate = estimate_fusion_yield(&trigger, cell_mass * 500.0, 0.8);
 
         ReactorSpec {
-            name: format!("ModularCell {}x ({:.1}kW)",
-                         num_cells, params.target_power_w / 1000.0),
+            name: format!(
+                "ModularCell {}x ({:.1}kW)",
+                num_cells,
+                params.target_power_w / 1000.0
+            ),
             architecture: ReactorArchitecture::ModularCell,
             reactions: vec![FusionReaction::DD],
             trigger,
@@ -1180,7 +1200,10 @@ impl ReactorDesigner {
     /// Design magnetized target fusion hybrid
     fn design_magnetized(&self, params: &ReactorDesignParams) -> ReactorSpec {
         // MTF uses magnetic compression of plasma target
-        let trigger = self.trigger_library.systems.iter()
+        let trigger = self
+            .trigger_library
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::LaserBremsstrahlung)
             .expect("trigger library must contain LaserBremsstrahlung system")
             .clone();
@@ -1190,7 +1213,7 @@ impl ReactorDesigner {
             secondary_fuel: None,
             state: FuelState::Plasma,
             host_material: None,
-            pressure_atm: 0.001, // Low pressure plasma
+            pressure_atm: 0.001,         // Low pressure plasma
             temperature_k: 10_000_000.0, // 10 keV plasma
             flow_rate_g_s: Some(0.001),
             loading_ratio: None,
@@ -1220,7 +1243,10 @@ impl ReactorDesigner {
         let yield_estimate = estimate_fusion_yield(&trigger, 10.0, 0.5);
 
         ReactorSpec {
-            name: format!("MagnetizedTarget ({:.1}MW)", params.target_power_w / 1_000_000.0),
+            name: format!(
+                "MagnetizedTarget ({:.1}MW)",
+                params.target_power_w / 1_000_000.0
+            ),
             architecture: ReactorArchitecture::MagnetizedTarget,
             reactions: vec![FusionReaction::DT],
             trigger,
@@ -1265,7 +1291,8 @@ impl ReactorDesigner {
             ReactorArchitecture::MagnetizedTarget,
         ];
 
-        architectures.iter()
+        architectures
+            .iter()
             .map(|arch| {
                 let mut p = params.clone();
                 // Override architecture selection
@@ -1275,7 +1302,7 @@ impl ReactorDesigner {
                     ReactorArchitecture::AneutronicCore => {
                         p.allow_neutrons = false;
                         self.design_aneutronic(&p)
-                    },
+                    }
                     ReactorArchitecture::PulsedElectrolysis => self.design_electrolysis(&p),
                     ReactorArchitecture::MoltenSalt => self.design_molten_salt(&p),
                     ReactorArchitecture::ModularCell => self.design_modular(&p),
@@ -1290,10 +1317,13 @@ impl ReactorDesigner {
     pub fn rank(&self, params: &ReactorDesignParams) -> Vec<(ReactorSpec, f64)> {
         let specs = self.compare_all(params);
 
-        let mut scored: Vec<_> = specs.into_iter().map(|spec| {
-            let score = self.score_architecture(&spec, params);
-            (spec, score)
-        }).collect();
+        let mut scored: Vec<_> = specs
+            .into_iter()
+            .map(|spec| {
+                let score = self.score_architecture(&spec, params);
+                (spec, score)
+            })
+            .collect();
 
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         scored
@@ -1360,7 +1390,11 @@ impl ReactorDesigner {
     ///
     /// This is a simplified model based on how well the spec meets constraints
     /// and known risk factors for each architecture type.
-    fn estimate_feasibility_probability(&self, spec: &ReactorSpec, params: &ReactorDesignParams) -> f64 {
+    fn estimate_feasibility_probability(
+        &self,
+        spec: &ReactorSpec,
+        params: &ReactorDesignParams,
+    ) -> f64 {
         let mut p_feasible = 1.0;
 
         // TRL penalty: lower TRL = higher uncertainty
@@ -1476,7 +1510,7 @@ mod tests {
 
         // Scores should be in descending order
         for i in 1..ranked.len() {
-            assert!(ranked[i-1].1 >= ranked[i].1);
+            assert!(ranked[i - 1].1 >= ranked[i].1);
         }
     }
 
@@ -1506,12 +1540,18 @@ mod tests {
         let spec = designer.design(&params);
 
         let mb = spec.mass_breakdown.expect("Should have mass breakdown");
-        let sum = mb.fuel_kg + mb.structure_kg + mb.shielding_kg
-            + mb.cooling_kg + mb.trigger_kg + mb.bop_kg + mb.containment_kg;
+        let sum = mb.fuel_kg
+            + mb.structure_kg
+            + mb.shielding_kg
+            + mb.cooling_kg
+            + mb.trigger_kg
+            + mb.bop_kg
+            + mb.containment_kg;
         assert!(
             (sum - mb.total_kg).abs() < 0.01,
             "Mass components ({:.2}) should sum to total ({:.2})",
-            sum, mb.total_kg
+            sum,
+            mb.total_kg
         );
         assert_eq!(spec.mass_kg, mb.total_kg);
     }
@@ -1528,7 +1568,8 @@ mod tests {
         assert!(
             (total - cb.total_usd).abs() < 0.01,
             "Cost components ({:.2}) should sum to total ({:.2})",
-            total, cb.total_usd
+            total,
+            cb.total_usd
         );
         assert_eq!(spec.cost_usd, cb.total_usd);
     }
@@ -1542,7 +1583,9 @@ mod tests {
             ..Default::default()
         };
         let spec = designer.design(&params);
-        let tc = spec.thermal_constraint.expect("Should have thermal constraint");
+        let tc = spec
+            .thermal_constraint
+            .expect("Should have thermal constraint");
         // Thermal min volume should be significant for high power
         assert!(tc.min_volume_m3 > 0.0);
         assert!(tc.min_surface_area_m2 > 0.0);
@@ -1595,14 +1638,26 @@ mod tests {
         let specs = designer.compare_all(&params);
 
         for spec in &specs {
-            assert!(spec.mass_breakdown.is_some(),
-                    "{} should have mass breakdown", spec.name);
-            assert!(spec.cost_breakdown.is_some(),
-                    "{} should have cost breakdown", spec.name);
-            assert!(spec.fuel_cycle.is_some(),
-                    "{} should have fuel cycle", spec.name);
-            assert!(spec.thermal_constraint.is_some(),
-                    "{} should have thermal constraint", spec.name);
+            assert!(
+                spec.mass_breakdown.is_some(),
+                "{} should have mass breakdown",
+                spec.name
+            );
+            assert!(
+                spec.cost_breakdown.is_some(),
+                "{} should have cost breakdown",
+                spec.name
+            );
+            assert!(
+                spec.fuel_cycle.is_some(),
+                "{} should have fuel cycle",
+                spec.name
+            );
+            assert!(
+                spec.thermal_constraint.is_some(),
+                "{} should have thermal constraint",
+                spec.name
+            );
         }
     }
 
@@ -1635,7 +1690,9 @@ mod tests {
             assert!(
                 *score_risk <= *score_no_risk + 0.01, // Small tolerance for floating point
                 "Risk-adjusted score {} ({:.2}) should be <= non-risk ({:.2})",
-                i, score_risk, score_no_risk
+                i,
+                score_risk,
+                score_no_risk
             );
         }
     }
@@ -1651,7 +1708,8 @@ mod tests {
             assert!(
                 p >= 0.05 && p <= 0.99,
                 "{:?} feasibility ({:.3}) should be in [0.05, 0.99]",
-                spec.architecture, p
+                spec.architecture,
+                p
             );
         }
     }
@@ -1667,17 +1725,22 @@ mod tests {
         let high_trl: Vec<_> = specs.iter().filter(|s| s.trl >= 6).collect();
 
         if !low_trl.is_empty() && !high_trl.is_empty() {
-            let avg_low: f64 = low_trl.iter()
+            let avg_low: f64 = low_trl
+                .iter()
                 .map(|s| designer.estimate_feasibility_probability(s, &params))
-                .sum::<f64>() / low_trl.len() as f64;
-            let avg_high: f64 = high_trl.iter()
+                .sum::<f64>()
+                / low_trl.len() as f64;
+            let avg_high: f64 = high_trl
+                .iter()
                 .map(|s| designer.estimate_feasibility_probability(s, &params))
-                .sum::<f64>() / high_trl.len() as f64;
+                .sum::<f64>()
+                / high_trl.len() as f64;
 
             assert!(
                 avg_high >= avg_low * 0.8, // High TRL should have better or similar feasibility
                 "High TRL avg ({:.3}) should be >= 80% of low TRL avg ({:.3})",
-                avg_high, avg_low
+                avg_high,
+                avg_low
             );
         }
     }

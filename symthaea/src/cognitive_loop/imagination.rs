@@ -4,9 +4,9 @@
 
 //! Proactive mental simulation (Imagination) module.
 
+use super::CognitiveLoopService;
 #[cfg(feature = "vision-manifold")]
 use super::types::MentalMovie;
-use super::CognitiveLoopService;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

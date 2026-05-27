@@ -29,10 +29,10 @@ use symthaea::mind::structured_thought::EpistemicStatus;
 
 #[cfg(feature = "geodesic_synthesis")]
 use symthaea_geodesic::{
+    FragmentKind, FragmentQuery, FragmentTypeInfo, ProgramManifold, TypeFillContext,
     build_skeleton_from_topology, emit_rust_from_skeleton, fill_from_manifold,
     fill_type_aware_slots_from_manifold,
     topology::{BettiNumbers, TopologicalFingerprint},
-    FragmentKind, FragmentQuery, FragmentTypeInfo, ProgramManifold, TypeFillContext,
 };
 
 const EXERCISM_DIR: &str = "benchmarks/external/exercism-rust/exercises/practice";
@@ -286,7 +286,7 @@ fn parse_test_examples(exercise_dir: &Path, fn_name: &str) -> Vec<(String, Strin
             // Pattern: assert_eq!(func(args), expected)
             if trimmed.starts_with("assert_eq!(") {
                 let inner = &trimmed[11..]; // skip "assert_eq!("
-                                            // Find the function call and expected value
+                // Find the function call and expected value
                 if let Some(comma_pos) = find_balanced_comma(inner) {
                     let call = inner[..comma_pos].trim();
                     let expected = inner[comma_pos + 1..]
@@ -4787,7 +4787,7 @@ fn main() {
                             all_implementations.push(source);
                             any_generated = true;
                             method = format!(
-                                "DISCOVERED(gen:{}, fit:{:.2}, compiled:{}/{})",
+                                "DISCOVERED(r#gen:{}, fit:{:.2}, compiled:{}/{})",
                                 result.generations,
                                 result.best_fitness,
                                 result.compiled_count,

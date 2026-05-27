@@ -37,11 +37,7 @@ impl SymExpr {
             SymExpr::Pow(base, exp) => base.eval(vars).powf(*exp),
             SymExpr::Log(a) => {
                 let v = a.eval(vars);
-                if v > 0.0 {
-                    v.ln()
-                } else {
-                    f64::NAN
-                }
+                if v > 0.0 { v.ln() } else { f64::NAN }
             }
             SymExpr::Sin(a) => a.eval(vars).sin(),
             SymExpr::Cos(a) => a.eval(vars).cos(),

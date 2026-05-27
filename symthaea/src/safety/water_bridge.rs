@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `water-prediction` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 use symthaea_cell_foundry::hydrology::{WaterFepAction, WaterFepAgent, WaterQualityReading};
 
 /// Input bundle for a single water safety assessment.

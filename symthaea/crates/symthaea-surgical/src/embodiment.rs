@@ -3,10 +3,10 @@
 use crate::controller::SurgicalController;
 use crate::encoder::SurgicalHdcEncoder;
 use crate::simulator::{SimpleSurgicalSimulator, SurgicalPhysicsSimulator};
-use crate::types::{SurgicalConfig, SurgicalSafetyLevel, NUM_ACTUATORS};
+use crate::types::{NUM_ACTUATORS, SurgicalConfig, SurgicalSafetyLevel};
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;

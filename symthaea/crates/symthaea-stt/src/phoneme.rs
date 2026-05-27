@@ -9,7 +9,7 @@
 //! - Modern Hopfield resonator for pattern matching
 //! - Coarticulation model for sequence constraints
 
-use crate::hdc::{bundle, BundleAccumulator, HV16};
+use crate::hdc::{BundleAccumulator, HV16, bundle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -558,11 +558,7 @@ impl PhonemeDecoder {
                     }
                 }
                 // Heavy penalty for oscillation: 0.3 for 1 cycle, 0.1 for 2+ cycles
-                if oscillation_count >= 2 {
-                    0.1
-                } else {
-                    0.3
-                }
+                if oscillation_count >= 2 { 0.1 } else { 0.3 }
             } else {
                 1.0
             }

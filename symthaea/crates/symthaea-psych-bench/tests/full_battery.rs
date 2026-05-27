@@ -95,8 +95,8 @@ use symthaea_psych_bench::benchmarks::{
     },
 };
 use symthaea_psych_bench::harness::{
-    snapshot::{RegressionReport, RegressionSnapshot},
     BenchmarkConfig, BenchmarkReport, PsychBenchmark,
+    snapshot::{RegressionReport, RegressionSnapshot},
 };
 
 fn battery_config() -> BenchmarkConfig {

@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `materials` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 use symthaea_materials::AgingPrediction;
 
 /// Adapter that translates material aging predictions into Safety Agent inputs.

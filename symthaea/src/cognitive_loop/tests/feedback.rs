@@ -232,11 +232,13 @@ fn test_embodied_phi_modulation_affects_unified_psi() {
     // Both should produce valid results
     assert!(baseline_result.prediction_error.is_finite());
     assert!(embodied_result.prediction_error.is_finite());
-    assert!(embodied_result
-        .metadata
-        .embodied
-        .embodied_phi_modulation
-        .is_finite());
+    assert!(
+        embodied_result
+            .metadata
+            .embodied
+            .embodied_phi_modulation
+            .is_finite()
+    );
     // The embodied phi modulation should be non-trivial (not exactly 1.0 after 20 cycles)
     // (lenient — we just verify the feedback path exists and doesn't break)
 }
@@ -546,11 +548,13 @@ fn test_predictive_affective_crossmodal_synergy() {
     // All 6 new metadata fields should be populated with valid values
     assert!(result.metadata.fep.predictive_free_energy.is_finite());
     assert!(result.metadata.fep.predictive_phi_modulation.is_finite());
-    assert!(result
-        .metadata
-        .temporal
-        .cross_modal_binding_strength
-        .is_finite());
+    assert!(
+        result
+            .metadata
+            .temporal
+            .cross_modal_binding_strength
+            .is_finite()
+    );
     assert!(result.metadata.temporal.cross_modal_psi.is_finite());
     assert!(
         result.metadata.embodied.affective_valence >= -1.0
@@ -1056,11 +1060,13 @@ fn test_coherence_field_none_when_disabled() {
     })
     .unwrap();
 
-    assert!(service
-        .sensorimotor
-        .vision_sensory
-        .coherence_field
-        .is_none());
+    assert!(
+        service
+            .sensorimotor
+            .vision_sensory
+            .coherence_field
+            .is_none()
+    );
 }
 
 #[test]

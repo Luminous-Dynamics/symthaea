@@ -22,7 +22,7 @@
 //!
 //! Usage:
 //!   cargo run --features code_generation --example nix_prefix_parse_probe \
-//!       -- --in /tmp/holdout-gen.jsonl
+//!       -- --in /tmp/holdout-r#gen.jsonl
 
 use serde::Deserialize;
 use std::path::PathBuf;

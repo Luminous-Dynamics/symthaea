@@ -270,14 +270,12 @@ pub fn generate_verified_full<'a>(
     mut lsp_client: Option<&mut RustAnalyzerClient>,
     experience_store: Option<&mut CodingExperienceStore>,
     llm_backend: Option<Arc<dyn LLMBackend>>,
-    #[cfg(feature = "swarm")]
-    swarm_tx: Option<tokio::sync::mpsc::Sender<symthaea_swarm::SwarmMessage>>,
-    #[cfg(not(feature = "swarm"))]
-    _swarm_tx: Option<()>,
-    #[cfg(feature = "swarm")]
-    swarm_proofs: Option<&[symthaea_swarm::SwarmProofMsg]>,
-    #[cfg(not(feature = "swarm"))]
-    _swarm_proofs: Option<()>,
+    #[cfg(feature = "swarm")] swarm_tx: Option<
+        tokio::sync::mpsc::Sender<symthaea_swarm::SwarmMessage>,
+    >,
+    #[cfg(not(feature = "swarm"))] _swarm_tx: Option<()>,
+    #[cfg(feature = "swarm")] swarm_proofs: Option<&[symthaea_swarm::SwarmProofMsg]>,
+    #[cfg(not(feature = "swarm"))] _swarm_proofs: Option<()>,
 ) -> VerifiedCode {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -312,14 +310,12 @@ async fn generate_verified_inner<'a>(
     mut lsp_client: Option<&mut RustAnalyzerClient>,
     mut experience_store: Option<&mut CodingExperienceStore>,
     llm_backend: Option<Arc<dyn LLMBackend>>,
-    #[cfg(feature = "swarm")]
-    swarm_tx: Option<&tokio::sync::mpsc::Sender<symthaea_swarm::SwarmMessage>>,
-    #[cfg(not(feature = "swarm"))]
-    _swarm_tx: Option<()>,
-    #[cfg(feature = "swarm")]
-    swarm_proofs: Option<&[symthaea_swarm::SwarmProofMsg]>,
-    #[cfg(not(feature = "swarm"))]
-    _swarm_proofs: Option<()>,
+    #[cfg(feature = "swarm")] swarm_tx: Option<
+        &tokio::sync::mpsc::Sender<symthaea_swarm::SwarmMessage>,
+    >,
+    #[cfg(not(feature = "swarm"))] _swarm_tx: Option<()>,
+    #[cfg(feature = "swarm")] swarm_proofs: Option<&[symthaea_swarm::SwarmProofMsg]>,
+    #[cfg(not(feature = "swarm"))] _swarm_proofs: Option<()>,
 ) -> VerifiedCode {
     let temp_spec;
     let spec = match intent {
@@ -496,10 +492,14 @@ async fn generate_verified_inner<'a>(
         if shadow_hit {
             if result.compiled {
                 ast_hdc.geodesic_rejection_shadow_false_positives += 1;
-                warn!("GEODESIC SHADOW FALSE POSITIVE: Candidate would have been rejected but it COMPILED.");
+                warn!(
+                    "GEODESIC SHADOW FALSE POSITIVE: Candidate would have been rejected but it COMPILED."
+                );
             } else {
                 ast_hdc.geodesic_rejection_shadow_true_positives += 1;
-                info!("GEODESIC SHADOW TRUE POSITIVE: Candidate would have been rejected and it FAILED to compile.");
+                info!(
+                    "GEODESIC SHADOW TRUE POSITIVE: Candidate would have been rejected and it FAILED to compile."
+                );
             }
         }
 
@@ -539,7 +539,10 @@ async fn generate_verified_inner<'a>(
 
                     if is_refuted {
                         if let (Some(store), Some(hv)) = (experience_store, &last_ast_hv) {
-                            info!("LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.", spec.name);
+                            info!(
+                                "LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.",
+                                spec.name
+                            );
                             store.store_negative_prototype(&spec.name, hv.values.clone());
                         }
                     }
@@ -732,9 +735,9 @@ async fn generate_verified_inner<'a>(
                                 super::proof_memory::CachedProofEngine::new(bridge, memory);
 
                             #[cfg(feature = "swarm")]
-                    let proofs_slice = swarm_proofs.unwrap_or(&[]);
-                    #[cfg(not(feature = "swarm"))]
-                    let proofs_slice: &[()] = &[];
+                            let proofs_slice = swarm_proofs.unwrap_or(&[]);
+                            #[cfg(not(feature = "swarm"))]
+                            let proofs_slice: &[()] = &[];
                             let (verdict, details) = engine.verify_with_cache(
                                 &spec.name,
                                 &source,
@@ -1592,7 +1595,7 @@ mod tests {
     fn test_geodesic_rejection_shadow_mode() {
         let generator = make_generator();
         let mut executor = CodeExecutor::with_real_execution();
-        
+
         // Enable shadow mode
         unsafe {
             std::env::set_var("SYMTHAEA_GEODESIC_REJECTION_SHADOW", "1");
@@ -1617,13 +1620,13 @@ mod tests {
             &context,
         );
 
-        // We expect at least one shadow hit because the candidate "add(a, b)" 
+        // We expect at least one shadow hit because the candidate "add(a, b)"
         // will be dissimilar enough from "add_one(x)" to fall below 0.99
         assert!(result.ast_hdc.geodesic_rejection_shadow_hits > 0);
-        
+
         // Since it actually compiled, it should be a false positive
         assert!(result.ast_hdc.geodesic_rejection_shadow_false_positives > 0);
-        
+
         unsafe {
             std::env::remove_var("SYMTHAEA_GEODESIC_REJECTION_SHADOW");
             std::env::remove_var("SYMTHAEA_STRUCTURAL_PRIOR_SURPRISE_THRESHOLD");

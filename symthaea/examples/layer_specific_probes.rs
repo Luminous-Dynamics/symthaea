@@ -18,7 +18,7 @@ use anyhow::Result;
 use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
+use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]

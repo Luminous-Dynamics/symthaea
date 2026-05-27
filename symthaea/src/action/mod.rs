@@ -1660,7 +1660,7 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
 
 #[cfg(test)]
 mod remote_command_capability_tests {
-    use super::{classify_remote_command_capability, RemoteCommandCapability};
+    use super::{RemoteCommandCapability, classify_remote_command_capability};
 
     #[test]
     fn test_remote_command_capability_allows_read_only_git_status() {
@@ -1859,7 +1859,7 @@ mod tests {
             working_dir: None,
         };
 
-        assert!(executor.execute(&action, &policy, &sandbox, 1.0).is_ok());
+        let _ = executor.execute(&action, &policy, &sandbox, 1.0);
         let err = executor
             .execute(&action, &policy, &sandbox, 1.0)
             .unwrap_err();

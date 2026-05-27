@@ -40,12 +40,12 @@
 //! ```
 
 use super::swarm_manager::{
-    convert_affective_sync, convert_consciousness_vector, convert_navigation_estimate,
-    convert_peer_event, SwarmEvent, SwarmManager,
+    SwarmEvent, SwarmManager, convert_affective_sync, convert_consciousness_vector,
+    convert_navigation_estimate, convert_peer_event,
 };
 use crate::swarm::{AffectiveSync, ConsciousnessVector, NetworkService, PeerEvent};
-use std::sync::mpsc;
 use std::sync::Arc;
+use std::sync::mpsc;
 use tokio::sync::broadcast;
 
 /// Cap on events drained per poll cycle to avoid starving the cognitive loop.

@@ -163,10 +163,10 @@ pub fn time_evolve_eigenstate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::basis::sto3g::Sto3g;
     use crate::basis::BasisSetProvider;
+    use crate::basis::sto3g::Sto3g;
     use crate::molecule::Molecule;
-    use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+    use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
     #[test]
     fn test_cis_excitations_positive() {

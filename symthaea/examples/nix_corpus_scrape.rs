@@ -311,11 +311,7 @@ fn static_attrpath(key_node: &SyntaxNode) -> Option<Vec<String>> {
             NodeOrToken::Token(_) => {}
         }
     }
-    if segs.is_empty() {
-        None
-    } else {
-        Some(segs)
-    }
+    if segs.is_empty() { None } else { Some(segs) }
 }
 
 /// Count `NODE_ATTRPATH_VALUE` children inside an attrset literal.

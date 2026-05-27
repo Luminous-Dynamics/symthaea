@@ -98,11 +98,7 @@ pub fn fifty_five_hundred_rule() -> (f64, f64) {
 ///
 /// Uses the 50/500 rule: Ne >= 50 for short-term, Ne >= 500 for long-term.
 pub fn meets_mvp_threshold(ne: f64, long_term: bool) -> bool {
-    if long_term {
-        ne >= 500.0
-    } else {
-        ne >= 50.0
-    }
+    if long_term { ne >= 500.0 } else { ne >= 50.0 }
 }
 
 /// Ratio of effective to census population size.
@@ -234,7 +230,7 @@ mod tests {
         // Ne = -100 / (2 * ln(0.9)) ~ 474.56
         assert!(
             (ne - 474.56).abs() < 1.0,
-            "90% retention over 100 gen: Ne ~ 475, got {ne}"
+            "90% retention over 100 r#gen: Ne ~ 475, got {ne}"
         );
     }
 

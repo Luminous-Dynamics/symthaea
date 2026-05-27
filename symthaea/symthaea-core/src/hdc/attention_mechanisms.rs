@@ -109,7 +109,7 @@ impl AttentionTarget {
             strength,
             attention_type,
             source,
-            priority: strength,  // Initially same as strength
+            priority: strength, // Initially same as strength
         }
     }
 
@@ -156,9 +156,9 @@ impl AttentionalState {
         Self {
             focus: None,
             candidates: Vec::new(),
-            gain: 1.0,           // Baseline (no enhancement)
-            suppression: 0.0,    // No suppression
-            capacity_used: 0.0,  // Empty
+            gain: 1.0,          // Baseline (no enhancement)
+            suppression: 0.0,   // No suppression
+            capacity_used: 0.0, // Empty
         }
     }
 
@@ -180,7 +180,7 @@ impl AttentionalState {
                 similarity * (1.0 - self.suppression)
             }
         } else {
-            1.0  // No focus = uniform attention
+            1.0 // No focus = uniform attention
         }
     }
 }
@@ -208,9 +208,9 @@ impl Default for AttentionConfig {
     fn default() -> Self {
         Self {
             max_gain: 3.0,              // Up to 3x enhancement (realistic)
-            suppression_strength: 0.7,   // Strong suppression of distractors
-            competition_threshold: 0.6,  // Need >0.6 priority to win
-            capacity_limit: 4,           // ~4 items typical human limit
+            suppression_strength: 0.7,  // Strong suppression of distractors
+            competition_threshold: 0.6, // Need >0.6 priority to win
+            capacity_limit: 4,          // ~4 items typical human limit
             feature_similarity_gain: true,
         }
     }
@@ -293,12 +293,7 @@ impl AttentionSystem {
         // Compute base strength
         let strength = self.compute_strength(&representation, source);
 
-        let target = AttentionTarget::new(
-            representation,
-            strength,
-            attention_type,
-            source,
-        );
+        let target = AttentionTarget::new(representation, strength, attention_type, source);
 
         self.state.candidates.push(target);
     }
@@ -308,14 +303,16 @@ impl AttentionSystem {
         match source {
             AttentionSource::BottomUp => {
                 // Bottom-up: Use salience (default 0.5 if not specified)
-                0.5  // Could look up in salience_map if we had IDs
+                0.5 // Could look up in salience_map if we had IDs
             }
             AttentionSource::TopDown => {
                 // Top-down: Similarity to goals
                 if self.goals.is_empty() {
                     0.5
                 } else {
-                    let max_similarity = self.goals.iter()
+                    let max_similarity = self
+                        .goals
+                        .iter()
                         .map(|goal| goal.similarity(representation) as f64)
                         .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                         .unwrap_or(0.5);
@@ -328,7 +325,8 @@ impl AttentionSystem {
                 let top_down = if self.goals.is_empty() {
                     0.5
                 } else {
-                    self.goals.iter()
+                    self.goals
+                        .iter()
                         .map(|goal| goal.similarity(representation) as f64)
                         .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                         .unwrap_or(0.5)
@@ -346,7 +344,9 @@ impl AttentionSystem {
 
         // Sort candidates by priority (descending)
         self.state.candidates.sort_by(|a, b| {
-            b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal)
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Select winner(s) based on capacity
@@ -361,7 +361,8 @@ impl AttentionSystem {
             self.state.focus = Some(winner);
 
             // Compute gain based on priority
-            self.state.gain = 1.0 + (self.config.max_gain - 1.0) * self.state.candidates[0].priority;
+            self.state.gain =
+                1.0 + (self.config.max_gain - 1.0) * self.state.candidates[0].priority;
 
             // Compute suppression (inverse of focus strength)
             self.state.suppression = self.config.suppression_strength;
@@ -455,8 +456,10 @@ impl AttentionSystem {
         }
 
         if self.state.suppression > 0.5 {
-            parts.push(format!("Strong distractor suppression ({:.0}%)",
-                self.state.suppression * 100.0));
+            parts.push(format!(
+                "Strong distractor suppression ({:.0}%)",
+                self.state.suppression * 100.0
+            ));
         }
 
         parts.join(". ")
@@ -579,7 +582,7 @@ mod tests {
             AttentionType::Spatial,
             AttentionSource::BottomUp,
         );
-        weak.priority = 0.3;  // Below threshold (0.6)
+        weak.priority = 0.3; // Below threshold (0.6)
         system.state.candidates.push(weak);
 
         let assessment = system.compete();
@@ -606,12 +609,12 @@ mod tests {
 
         // Get gain on focused representation
         let gain = system.get_gain(&focus_repr);
-        assert!(gain > 1.0);  // Enhanced
+        assert!(gain > 1.0); // Enhanced
 
         // Get gain on different representation
         let other = BinaryHV::zero();
         let gain_other = system.get_gain(&other);
-        assert!(gain_other < gain);  // Suppressed
+        assert!(gain_other < gain); // Suppressed
     }
 
     #[test]
@@ -633,7 +636,7 @@ mod tests {
         let assessment = system.compete();
 
         // Should use full capacity (4 out of 4 capacity slots filled)
-        assert!((assessment.capacity_used - 1.0).abs() < 0.1);  // 4/4 = 1.0 (full)
+        assert!((assessment.capacity_used - 1.0).abs() < 0.1); // 4/4 = 1.0 (full)
     }
 
     #[test]
@@ -641,7 +644,11 @@ mod tests {
         let mut system = AttentionSystem::new(AttentionConfig::default());
 
         system.set_goal(BinaryHV::ones());
-        system.add_candidate(BinaryHV::zero(), AttentionType::Spatial, AttentionSource::BottomUp);
+        system.add_candidate(
+            BinaryHV::zero(),
+            AttentionType::Spatial,
+            AttentionSource::BottomUp,
+        );
 
         system.clear();
 

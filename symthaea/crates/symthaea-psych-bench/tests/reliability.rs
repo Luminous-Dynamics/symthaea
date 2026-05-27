@@ -16,8 +16,8 @@ use symthaea_psych_bench::benchmarks::{
     worm::NBackBenchmark,
 };
 use symthaea_psych_bench::harness::{
-    analysis::{icc_2_1, CrossBenchmarkAnalysis},
     BenchmarkConfig, BenchmarkReport, PsychBenchmark,
+    analysis::{CrossBenchmarkAnalysis, icc_2_1},
 };
 
 /// Run a representative subset with multiple seeds and check reliability.

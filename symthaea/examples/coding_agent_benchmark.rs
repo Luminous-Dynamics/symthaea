@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use symthaea::coding_agent::{CodingAgent, CodingAgentConfig, TaskPhase};
-use symthaea::language::code_executor::{try_auto_fix, CodeExecutor};
+use symthaea::language::code_executor::{CodeExecutor, try_auto_fix};
 use symthaea::language::intelligent_dispatcher::BackendTier;
 
 /// A benchmark task with expected outcomes and test assertions.

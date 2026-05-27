@@ -23,7 +23,7 @@
 //! or `/sys/class/thermal/thermal_zone*/temp`) sends `ThermalLevel` via the channel.
 //! The bridge smooths transitions via EMA and produces `ThermalSignals` each cycle.
 
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Thermal level enum — maps to platform APIs

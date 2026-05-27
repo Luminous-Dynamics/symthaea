@@ -25,13 +25,13 @@
 //! 3. **Budding as Attention**: Budding events boost content activation
 //! 4. **Conscious Broadcast**: Salient patterns enter workspace and broadcast
 
+use crate::hdc::BinaryHV;
+use crate::hdc::HDC_DIMENSION;
 use crate::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use crate::hdc::global_workspace::{
     GlobalWorkspace, WorkspaceAssessment, WorkspaceConfig, WorkspaceContent,
 };
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::BinaryHV;
-use crate::hdc::HDC_DIMENSION;
 use serde::{Deserialize, Serialize};
 
 // =============================================================================

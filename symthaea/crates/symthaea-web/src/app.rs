@@ -258,7 +258,9 @@ pub fn App() -> impl IntoView {
                         let promise = engine_bg.send_simple("loadBrocaPipeline");
                         match JsFuture::from(promise).await {
                             Ok(_) => {
-                                log::info!("Full Broca pipeline loaded — chat will use production language generation");
+                                log::info!(
+                                    "Full Broca pipeline loaded — chat will use production language generation"
+                                );
                             }
                             Err(_) => {
                                 log::info!("Full Broca pipeline not available — using BrocaLite");

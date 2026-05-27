@@ -291,7 +291,7 @@ fn no_core_phase_exceeds_budget_half() {
     let t = &result.metadata.module_timings_us;
 
     let budget_half_us = 25_000; // 25ms = half of 50ms cycle budget
-                                 // These are soft assertions — CI machines may be slow
+    // These are soft assertions — CI machines may be slow
     if t.core_hdc_encode > budget_half_us {
         eprintln!(
             "WARNING: HDC encode took {}us > {}us budget half",

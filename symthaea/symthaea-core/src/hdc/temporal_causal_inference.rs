@@ -295,7 +295,11 @@ impl TemporalCausalInference {
     /// # Returns
     /// GrangerResult with F-statistic, p-value, and causality determination
     pub fn granger_causality(&self, x: &[f64], y: &[f64], max_lag: usize) -> GrangerResult {
-        let max_lag = if max_lag == 0 { self.config.max_lag } else { max_lag };
+        let max_lag = if max_lag == 0 {
+            self.config.max_lag
+        } else {
+            max_lag
+        };
         let n = x.len().min(y.len());
 
         if n < max_lag + self.config.min_samples {
@@ -330,8 +334,7 @@ impl TemporalCausalInference {
         let df_denominator = effective_n.saturating_sub(2 * max_lag + 1);
 
         let f_statistic = if rss_full > 0.0 && df_denominator > 0 {
-            ((rss_restricted - rss_full) / df_numerator as f64) /
-            (rss_full / df_denominator as f64)
+            ((rss_restricted - rss_full) / df_numerator as f64) / (rss_full / df_denominator as f64)
         } else {
             0.0
         };
@@ -340,10 +343,13 @@ impl TemporalCausalInference {
         let p_value = self.f_distribution_p_value(f_statistic, df_numerator, df_denominator);
 
         // R-squared improvement
-        let tss = y_target.iter().map(|yi| {
-            let mean = y_target.iter().sum::<f64>() / y_target.len() as f64;
-            (yi - mean).powi(2)
-        }).sum::<f64>();
+        let tss = y_target
+            .iter()
+            .map(|yi| {
+                let mean = y_target.iter().sum::<f64>() / y_target.len() as f64;
+                (yi - mean).powi(2)
+            })
+            .sum::<f64>();
 
         let r_squared_improvement = if tss > 0.0 {
             (rss_restricted - rss_full) / tss
@@ -424,9 +430,13 @@ impl TemporalCausalInference {
         for ((y_past, x_past, y_present), count) in &joint_counts {
             let prob = *count as f64 / total as f64;
 
-            *p_y_past_x_past.entry((y_past.clone(), x_past.clone())).or_insert(0.0) += prob;
+            *p_y_past_x_past
+                .entry((y_past.clone(), x_past.clone()))
+                .or_insert(0.0) += prob;
             *p_y_past.entry(y_past.clone()).or_insert(0.0) += prob;
-            *p_y_past_y_present.entry((y_past.clone(), *y_present)).or_insert(0.0) += prob;
+            *p_y_past_y_present
+                .entry((y_past.clone(), *y_present))
+                .or_insert(0.0) += prob;
         }
 
         // Compute transfer entropy
@@ -436,9 +446,13 @@ impl TemporalCausalInference {
         for ((y_past, x_past, y_present), count) in &joint_counts {
             let p_joint = *count as f64 / total as f64;
 
-            let p_y_ypast_xpast = p_y_past_x_past.get(&(y_past.clone(), x_past.clone())).unwrap_or(&1e-10);
+            let p_y_ypast_xpast = p_y_past_x_past
+                .get(&(y_past.clone(), x_past.clone()))
+                .unwrap_or(&1e-10);
             let p_ypast = p_y_past.get(y_past).unwrap_or(&1e-10);
-            let p_y_ypast = p_y_past_y_present.get(&(y_past.clone(), *y_present)).unwrap_or(&1e-10);
+            let p_y_ypast = p_y_past_y_present
+                .get(&(y_past.clone(), *y_present))
+                .unwrap_or(&1e-10);
 
             if *p_y_ypast_xpast > 1e-10 && *p_ypast > 1e-10 && *p_y_ypast > 1e-10 {
                 // p(y_t | y_past, x_past) = p(y_t, y_past, x_past) / p(y_past, x_past)
@@ -472,8 +486,16 @@ impl TemporalCausalInference {
     ///
     /// # Returns
     /// CausalGraph with discovered relationships
-    pub fn discover_causal_graph(&mut self, signals: &[Vec<f64>], significance: f64) -> CausalGraph {
-        let significance = if significance == 0.0 { self.config.significance_threshold } else { significance };
+    pub fn discover_causal_graph(
+        &mut self,
+        signals: &[Vec<f64>],
+        significance: f64,
+    ) -> CausalGraph {
+        let significance = if significance == 0.0 {
+            self.config.significance_threshold
+        } else {
+            significance
+        };
         let n_vars = signals.len();
 
         let mut edges = vec![vec![0.0; n_vars]; n_vars];
@@ -637,8 +659,8 @@ impl TemporalCausalInference {
         }
 
         // Wilson-Hilferty approximation
-        let z = (chi2 / df as f64).powf(1.0/3.0) - (1.0 - 2.0/(9.0 * df as f64));
-        let z = z / (2.0/(9.0 * df as f64)).sqrt();
+        let z = (chi2 / df as f64).powf(1.0 / 3.0) - (1.0 - 2.0 / (9.0 * df as f64));
+        let z = z / (2.0 / (9.0 * df as f64)).sqrt();
 
         // Standard normal CDF approximation
         0.5 * (1.0 - self.erf(z / std::f64::consts::SQRT_2))
@@ -647,12 +669,12 @@ impl TemporalCausalInference {
     /// Error function approximation
     fn erf(&self, x: f64) -> f64 {
         // Abramowitz and Stegun approximation
-        let a1 =  0.254829592;
+        let a1 = 0.254829592;
         let a2 = -0.284496736;
-        let a3 =  1.421413741;
+        let a3 = 1.421413741;
         let a4 = -1.453152027;
-        let a5 =  1.061405429;
-        let p  =  0.3275911;
+        let a5 = 1.061405429;
+        let p = 0.3275911;
 
         let sign = if x < 0.0 { -1.0 } else { 1.0 };
         let x = x.abs();
@@ -665,8 +687,12 @@ impl TemporalCausalInference {
 
     /// Beta CDF approximation
     fn beta_cdf(&self, x: f64, a: f64, b: f64) -> f64 {
-        if x <= 0.0 { return 0.0; }
-        if x >= 1.0 { return 1.0; }
+        if x <= 0.0 {
+            return 0.0;
+        }
+        if x >= 1.0 {
+            return 1.0;
+        }
 
         // Simple numerical integration
         let steps = 100;
@@ -726,10 +752,13 @@ impl TemporalCausalInference {
             return vec![0; signal.len()];
         }
 
-        signal.iter().map(|&x| {
-            let normalized = (x - min_val) / range;
-            ((normalized * (bins - 1) as f64).round() as usize).min(bins - 1)
-        }).collect()
+        signal
+            .iter()
+            .map(|&x| {
+                let normalized = (x - min_val) / range;
+                ((normalized * (bins - 1) as f64).round() as usize).min(bins - 1)
+            })
+            .collect()
     }
 }
 
@@ -756,8 +785,14 @@ mod tests {
 
         let result = tci.granger_causality(&x, &y, 10);
 
-        println!("Granger X→Y: F={:.2}, p={:.4}", result.f_statistic, result.p_value);
-        assert!(result.f_statistic > 1.0, "F-statistic should be significant");
+        println!(
+            "Granger X→Y: F={:.2}, p={:.4}",
+            result.f_statistic, result.p_value
+        );
+        assert!(
+            result.f_statistic > 1.0,
+            "F-statistic should be significant"
+        );
         // Note: exact p-value depends on approximation quality
     }
 
@@ -771,10 +806,16 @@ mod tests {
 
         let result = tci.granger_causality(&x, &y, 5);
 
-        println!("Granger Independent: F={:.2}, p={:.4}", result.f_statistic, result.p_value);
+        println!(
+            "Granger Independent: F={:.2}, p={:.4}",
+            result.f_statistic, result.p_value
+        );
         // F-statistic for independent series can vary due to random correlations
         // Just verify the test runs and returns valid results
-        assert!(result.f_statistic >= 0.0, "F-statistic should be non-negative");
+        assert!(
+            result.f_statistic >= 0.0,
+            "F-statistic should be non-negative"
+        );
     }
 
     #[test]
@@ -802,7 +843,10 @@ mod tests {
 
         // Perfectly correlated (no temporal lag)
         let x: Vec<f64> = (0..200).map(|t| (t as f64 * 0.1).sin()).collect();
-        let y: Vec<f64> = x.iter().map(|&xi| xi + 0.01 * rand::random::<f64>()).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .map(|&xi| xi + 0.01 * rand::random::<f64>())
+            .collect();
 
         let te_xy = tci.transfer_entropy(&x, &y, 1, 1, 8);
         let te_yx = tci.transfer_entropy(&y, &x, 1, 1, 8);
@@ -846,8 +890,10 @@ mod tests {
 
         // X should have positive flow (source)
         // Z should have negative flow (sink)
-        assert!(graph.causal_flow_index[0] >= graph.causal_flow_index[2],
-                "Source should have higher flow than sink");
+        assert!(
+            graph.causal_flow_index[0] >= graph.causal_flow_index[2],
+            "Source should have higher flow than sink"
+        );
     }
 
     #[test]
@@ -862,16 +908,22 @@ mod tests {
         y[0] = 0.5;
 
         for t in 1..200 {
-            x[t] = 0.5 * x[t-1] + 0.4 * y[t-1] + 0.1 * rand::random::<f64>();
-            y[t] = 0.3 * y[t-1] + 0.6 * x[t-1] + 0.1 * rand::random::<f64>();
+            x[t] = 0.5 * x[t - 1] + 0.4 * y[t - 1] + 0.1 * rand::random::<f64>();
+            y[t] = 0.3 * y[t - 1] + 0.6 * x[t - 1] + 0.1 * rand::random::<f64>();
         }
 
         let (is_bidirectional, strength) = tci.detect_feedback(&x, &y);
 
-        println!("Feedback: bidirectional={}, strength={:.3}", is_bidirectional, strength);
+        println!(
+            "Feedback: bidirectional={}, strength={:.3}",
+            is_bidirectional, strength
+        );
 
         // Bidirectional causality should be detected for mutually coupled signals
-        assert!(is_bidirectional, "Mutually coupled X↔Y should be detected as bidirectional");
+        assert!(
+            is_bidirectional,
+            "Mutually coupled X↔Y should be detected as bidirectional"
+        );
         assert!(strength.is_finite(), "Feedback strength should be finite");
         assert!(strength >= 0.0, "Feedback strength should be non-negative");
     }
@@ -892,10 +944,16 @@ mod tests {
         println!("Net information flow X→Y: {:.4}", net_flow);
 
         // Net flow should be finite
-        assert!(net_flow.is_finite(), "Net information flow should be finite");
+        assert!(
+            net_flow.is_finite(),
+            "Net information flow should be finite"
+        );
         // X strongly drives Y (0.9 coefficient), so net flow should be positive
-        assert!(net_flow > 0.0,
-                "Net flow should be positive when X strongly drives Y, got {}", net_flow);
+        assert!(
+            net_flow > 0.0,
+            "Net flow should be positive when X strongly drives Y, got {}",
+            net_flow
+        );
     }
 
     #[test]

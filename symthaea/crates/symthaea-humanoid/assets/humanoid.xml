@@ -1,23 +1,3 @@
-<!--
-  Humanoid model for the DeepMind Control Suite "Humanoid" task.
-
-  Adapted from dm_control/suite/humanoid.xml (Apache 2.0 license).
-  See LICENSE-dm_control for full license text.
-
-  Adaptations for symthaea-humanoid:
-    - Explicit timestep: 0.025s (40Hz, matching HumanoidConfig::physics_hz)
-    - Contact condim=3 for mujoco-rs 2.3 compatibility
-    - Simplified visual elements (no textures)
-
-  21 actuated joints matching types::JOINT_NAMES:
-    abdomen_y, abdomen_z, abdomen_x,
-    right_hip_x, right_hip_z, right_hip_y, right_knee,
-    right_ankle_x, right_ankle_y,
-    left_hip_x, left_hip_z, left_hip_y, left_knee,
-    left_ankle_x, left_ankle_y,
-    right_shoulder1, right_shoulder2, right_elbow,
-    left_shoulder1, left_shoulder2, left_elbow
--->
 <mujoco model="humanoid">
   <compiler angle="degree" inertiafromgeom="true"/>
   <option timestep="0.025" integrator="RK4">
@@ -26,108 +6,110 @@
 
   <default>
     <joint armature="1" damping="1" limited="true"/>
-    <geom conaffinity="0" condim="3" contype="0" margin="0.001" material="geom" rgba="0.8 0.6 0.4 1"/>
+    <geom conaffinity="0" condim="3" contype="1" margin="0.001" material="polished_white"/>
     <motor ctrllimited="true" ctrlrange="-1 1"/>
   </default>
 
   <asset>
-    <material name="geom" rgba="0.8 0.6 0.4 1"/>
-    <material name="floor_mat" rgba="0.8 0.9 0.8 1" specular="0" shininess="0.5"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.1 0.12 0.16" rgb2="0.02 0.02 0.03" width="512" height="512"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.12 0.12 0.14" rgb2="0.18 0.18 0.20" width="512" height="512" mark="edge" markrgb="0.25 0.25 0.3"/>
+    
+    <material name="floor_mat" texture="grid" texrepeat="4 4" texuniform="true" reflectance="0.22" shininess="0.4"/>
+    <material name="polished_white" rgba="0.95 0.95 0.98 1" shininess="0.8" specular="0.7"/>
+    <material name="carbon_black" rgba="0.15 0.15 0.17 1" shininess="0.3" specular="0.3"/>
+    <material name="gold_chrome" rgba="0.88 0.68 0.22 1" shininess="0.95" specular="1.0"/>
   </asset>
 
   <worldbody>
-    <light cutoff="100" diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3" specular="0.1 0.1 0.1"/>
-    <geom conaffinity="1" condim="3" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="40 40 40" type="plane" material="floor_mat"/>
+    <light mode="targetbodycom" target="torso" directional="false" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" pos="1 -4 4" dir="-0.2 0.8 -1" castshadow="true"/>
+    <light mode="targetbodycom" target="torso" directional="false" diffuse="0.4 0.4 0.4" pos="-2 4 3" dir="0.5 -0.7 -1" castshadow="false"/>
+    <light directional="true" diffuse="0.2 0.2 0.25" pos="0 0 5" dir="0 0 -1" castshadow="false"/>
+
+    <geom conaffinity="1" condim="3" name="floor" pos="0 0 0" type="plane" size="40 40 40" material="floor_mat" contype="0"/>
 
     <body name="torso" pos="0 0 1.4">
-      <camera name="track" mode="trackcom" pos="0 -4 0" xyaxes="1 0 0 0 0 1"/>
+      <camera name="track" mode="trackcom" pos="0 -3.2 0.2" xyaxes="1 0 0 0 0.1 1"/>
       <freejoint name="root"/>
 
-      <!-- Torso -->
-      <geom fromto="0 -0.07 0 0 0.07 0" name="torso1" size="0.07" type="capsule"/>
-      <geom fromto="-0.01 -0.06 -0.12 -0.01 0.06 -0.12" name="uwaist" size="0.06" type="capsule"/>
+      <geom fromto="0 -0.07 0 0 0.07 0" name="torso1" size="0.07" type="capsule" material="polished_white"/>
+      <geom fromto="0 0 0.02 0 0 -0.24" name="spine_structural_column" size="0.045" type="capsule" material="carbon_black"/>
+      <geom fromto="-0.01 -0.06 -0.12 -0.01 0.06 -0.12" name="uwaist" size="0.06" type="capsule" material="polished_white"/>
 
-      <!-- Head -->
       <body name="head" pos="0 0 0.19">
-        <geom name="head" size="0.09" type="sphere"/>
+        <geom name="head" size="0.09" type="sphere" material="gold_chrome"/>
       </body>
 
-      <!-- Lower waist (abdomen joints) -->
+      <body name="right_upper_arm" pos="0 -0.17 0.06">
+        <joint axis="2 1 1" name="right_shoulder1" pos="0 0 0" range="-85 60" stiffness="100" type="hinge"/>
+        <joint axis="0 -1 1" name="right_shoulder2" pos="0 0 0" range="-85 60" stiffness="100" type="hinge"/>
+        <geom fromto="0 0 0 0.16 -0.16 -0.16" name="right_uarm1" size="0.04" type="capsule" material="polished_white"/>
+
+        <body name="right_lower_arm" pos="0.18 -0.18 -0.18">
+          <joint axis="0 -1 1" name="right_elbow" pos="0 0 0" range="-90 50" stiffness="80" type="hinge"/>
+          <geom fromto="0.01 0.01 0.01 0.17 0.17 0.17" name="right_larm" size="0.031" type="capsule" material="carbon_black"/>
+
+          <body name="right_hand" pos="0.18 0.18 0.18">
+            <geom name="right_hand" size="0.04" type="sphere" material="gold_chrome"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="left_upper_arm" pos="0 0.17 0.06">
+        <joint axis="2 -1 1" name="left_shoulder1" pos="0 0 0" range="-60 85" stiffness="100" type="hinge"/>
+        <joint axis="0 1 1" name="left_shoulder2" pos="0 0 0" range="-60 85" stiffness="100" type="hinge"/>
+        <geom fromto="0 0 0 0.16 0.16 -0.16" name="left_uarm1" size="0.04" type="capsule" material="polished_white"/>
+
+        <body name="left_lower_arm" pos="0.18 0.18 -0.18">
+          <joint axis="0 -1 -1" name="left_elbow" pos="0 0 0" range="-90 50" stiffness="80" type="hinge"/>
+          <geom fromto="0.01 -0.01 0.01 0.17 -0.17 0.17" name="left_larm" size="0.031" type="capsule" material="carbon_black"/>
+
+          <body name="left_hand" pos="0.18 -0.18 0.18">
+            <geom name="left_hand" size="0.04" type="sphere" material="gold_chrome"/>
+          </body>
+        </body>
+      </body>
+
       <body name="lwaist" pos="-0.01 0 -0.26">
-        <geom fromto="0 -0.06 0 0 0.06 0" name="lwaist" size="0.06" type="capsule"/>
+        <geom fromto="0 -0.06 0 0 0.06 0" name="lwaist" size="0.06" type="capsule" material="carbon_black"/>
         <joint axis="0 0 1" name="abdomen_z" pos="0 0 0.065" range="-45 45" stiffness="500" type="hinge"/>
         <joint axis="0 1 0" name="abdomen_y" pos="0 0 0.065" range="-75 30" stiffness="500" type="hinge"/>
 
         <body name="pelvis" pos="0 0 -0.165">
           <joint axis="1 0 0" name="abdomen_x" pos="0 0 0.1" range="-35 35" stiffness="500" type="hinge"/>
-          <geom fromto="-0.02 -0.07 0 -0.02 0.07 0" name="butt" size="0.09" type="capsule"/>
+          <geom fromto="-0.02 -0.07 0 -0.02 0.07 0" name="butt" size="0.09" type="capsule" material="polished_white"/>
 
-          <!-- Right leg -->
           <body name="right_thigh" pos="0 -0.1 -0.04">
             <joint axis="-1 0 0" name="right_hip_x" pos="0 0 0" range="-25 5" stiffness="250" type="hinge"/>
             <joint axis="0 0 -1" name="right_hip_z" pos="0 0 0" range="-60 35" stiffness="250" type="hinge"/>
             <joint axis="0 1 0" name="right_hip_y" pos="0 0 0" range="-110 20" stiffness="350" type="hinge"/>
-            <geom fromto="0 0 0 0 0.01 -0.34" name="right_thigh1" size="0.06" type="capsule"/>
+            <geom fromto="0 0 0 0 0.01 -0.34" name="right_thigh1" size="0.06" type="capsule" material="polished_white"/>
 
             <body name="right_shin" pos="0 0.01 -0.403">
               <joint axis="0 -1 0" name="right_knee" pos="0 0 0.02" range="-160 2" stiffness="300" type="hinge"/>
-              <geom fromto="0 0 0 0 0 -0.3" name="right_shin1" size="0.049" type="capsule"/>
+              <geom fromto="0 0 0 0 0 -0.3" name="right_shin1" size="0.049" type="capsule" material="carbon_black"/>
 
               <body name="right_foot" pos="0 0 -0.35">
                 <joint axis="1 0 0.5" name="right_ankle_x" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
                 <joint axis="0 1 0" name="right_ankle_y" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
-                <geom name="right_foot" fromto="-0.07 -0.02 0 0.14 -0.04 0" size="0.027" type="capsule" conaffinity="1" contype="1"/>
+                <geom name="right_foot" type="box" pos="0.04 -0.015 -0.01" size="0.10 0.05 0.015" material="polished_white"/>
               </body>
             </body>
           </body>
 
-          <!-- Left leg (mirrored) -->
           <body name="left_thigh" pos="0 0.1 -0.04">
             <joint axis="-1 0 0" name="left_hip_x" pos="0 0 0" range="-25 5" stiffness="250" type="hinge"/>
             <joint axis="0 0 1" name="left_hip_z" pos="0 0 0" range="-60 35" stiffness="250" type="hinge"/>
             <joint axis="0 1 0" name="left_hip_y" pos="0 0 0" range="-110 20" stiffness="350" type="hinge"/>
-            <geom fromto="0 0 0 0 -0.01 -0.34" name="left_thigh1" size="0.06" type="capsule"/>
+            <geom fromto="0 0 0 0 -0.01 -0.34" name="left_thigh1" size="0.06" type="capsule" material="polished_white"/>
 
             <body name="left_shin" pos="0 -0.01 -0.403">
               <joint axis="0 -1 0" name="left_knee" pos="0 0 0.02" range="-160 2" stiffness="300" type="hinge"/>
-              <geom fromto="0 0 0 0 0 -0.3" name="left_shin1" size="0.049" type="capsule"/>
+              <geom fromto="0 0 0 0 0 -0.3" name="left_shin1" size="0.049" type="capsule" material="carbon_black"/>
 
               <body name="left_foot" pos="0 0 -0.35">
                 <joint axis="1 0 0.5" name="left_ankle_x" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
                 <joint axis="0 1 0" name="left_ankle_y" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
-                <geom name="left_foot" fromto="-0.07 0.02 0 0.14 0.04 0" size="0.027" type="capsule" conaffinity="1" contype="1"/>
-              </body>
-            </body>
-          </body>
-
-          <!-- Right arm -->
-          <body name="right_upper_arm" pos="0 -0.17 0.06">
-            <joint axis="2 1 1" name="right_shoulder1" pos="0 0 0" range="-85 60" stiffness="100" type="hinge"/>
-            <joint axis="0 -1 1" name="right_shoulder2" pos="0 0 0" range="-85 60" stiffness="100" type="hinge"/>
-            <geom fromto="0 0 0 0.16 -0.16 -0.16" name="right_uarm1" size="0.04" type="capsule"/>
-
-            <body name="right_lower_arm" pos="0.18 -0.18 -0.18">
-              <joint axis="0 -1 1" name="right_elbow" pos="0 0 0" range="-90 50" stiffness="80" type="hinge"/>
-              <geom fromto="0.01 0.01 0.01 0.17 0.17 0.17" name="right_larm" size="0.031" type="capsule"/>
-
-              <body name="right_hand" pos="0.18 0.18 0.18">
-                <geom name="right_hand" size="0.04" type="sphere"/>
-              </body>
-            </body>
-          </body>
-
-          <!-- Left arm (mirrored) -->
-          <body name="left_upper_arm" pos="0 0.17 0.06">
-            <joint axis="2 -1 1" name="left_shoulder1" pos="0 0 0" range="-60 85" stiffness="100" type="hinge"/>
-            <joint axis="0 1 1" name="left_shoulder2" pos="0 0 0" range="-60 85" stiffness="100" type="hinge"/>
-            <geom fromto="0 0 0 0.16 0.16 -0.16" name="left_uarm1" size="0.04" type="capsule"/>
-
-            <body name="left_lower_arm" pos="0.18 0.18 -0.18">
-              <joint axis="0 -1 -1" name="left_elbow" pos="0 0 0" range="-90 50" stiffness="80" type="hinge"/>
-              <geom fromto="0.01 -0.01 0.01 0.17 -0.17 0.17" name="left_larm" size="0.031" type="capsule"/>
-
-              <body name="left_hand" pos="0.18 -0.18 0.18">
-                <geom name="left_hand" size="0.04" type="sphere"/>
+                <geom name="left_foot" type="box" pos="0.04 0.015 -0.01" size="0.10 0.05 0.015" material="polished_white"/>
               </body>
             </body>
           </body>
@@ -138,29 +120,24 @@
   </worldbody>
 
   <actuator>
-    <!-- Abdomen -->
     <motor gear="100" joint="abdomen_y" name="abdomen_y"/>
     <motor gear="100" joint="abdomen_z" name="abdomen_z"/>
     <motor gear="100" joint="abdomen_x" name="abdomen_x"/>
-    <!-- Right leg -->
     <motor gear="100" joint="right_hip_x" name="right_hip_x"/>
     <motor gear="100" joint="right_hip_z" name="right_hip_z"/>
     <motor gear="300" joint="right_hip_y" name="right_hip_y"/>
     <motor gear="200" joint="right_knee" name="right_knee"/>
     <motor gear="100" joint="right_ankle_x" name="right_ankle_x"/>
     <motor gear="100" joint="right_ankle_y" name="right_ankle_y"/>
-    <!-- Left leg -->
     <motor gear="100" joint="left_hip_x" name="left_hip_x"/>
     <motor gear="100" joint="left_hip_z" name="left_hip_z"/>
     <motor gear="300" joint="left_hip_y" name="left_hip_y"/>
     <motor gear="200" joint="left_knee" name="left_knee"/>
     <motor gear="100" joint="left_ankle_x" name="left_ankle_x"/>
     <motor gear="100" joint="left_ankle_y" name="left_ankle_y"/>
-    <!-- Right arm -->
     <motor gear="25" joint="right_shoulder1" name="right_shoulder1"/>
     <motor gear="25" joint="right_shoulder2" name="right_shoulder2"/>
     <motor gear="25" joint="right_elbow" name="right_elbow"/>
-    <!-- Left arm -->
     <motor gear="25" joint="left_shoulder1" name="left_shoulder1"/>
     <motor gear="25" joint="left_shoulder2" name="left_shoulder2"/>
     <motor gear="25" joint="left_elbow" name="left_elbow"/>

@@ -71,11 +71,7 @@ pub fn black_hole_entropy(mass_gev: f64) -> f64 {
 /// curvature k, scale factor a, and cosmological constant Λ.
 pub fn hubble_parameter(rho_gev4: f64, k: f64, a: f64, lambda_gev2: f64) -> f64 {
     let h_sq = 8.0 * PI * G_NEWTON_NATURAL * rho_gev4 / 3.0 - k / (a * a) + lambda_gev2 / 3.0;
-    if h_sq > 0.0 {
-        h_sq.sqrt()
-    } else {
-        0.0
-    }
+    if h_sq > 0.0 { h_sq.sqrt() } else { 0.0 }
 }
 
 /// Critical density: ρ_c = 3H²/(8πG)

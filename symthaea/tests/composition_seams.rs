@@ -26,10 +26,10 @@ use symthaea::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
 use symthaea::consciousness::epistemic_conflict::{
-    phi_integration::effective_phi, ConflictDetector, MultiTheoryMetrics, TheoryCalibrator,
+    ConflictDetector, MultiTheoryMetrics, TheoryCalibrator, phi_integration::effective_phi,
 };
 use symthaea::consciousness::reasoning_engine::{ConsciousReasoningEngine, ReasoningContext};
-use symthaea::consciousness::temporal_planning::mcts::{evs, MctsPlanner};
+use symthaea::consciousness::temporal_planning::mcts::{MctsPlanner, evs};
 use symthaea::consciousness::temporal_planning::types::{
     BudgetTier, ForkedState, MctsConfig, PlannedAction, ReasoningBudget,
 };

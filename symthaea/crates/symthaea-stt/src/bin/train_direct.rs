@@ -15,9 +15,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, CrystalReservoir,
-    DirectAccumulator, DirectClassifier, DirectClassifierConfig, LtcCell, LtcConfig, RFActivation,
-    RandomProjection,
+    AudioConfig, AudioFrontend, CrystalReservoir, DirectAccumulator, DirectClassifier,
+    DirectClassifierConfig, LtcCell, LtcConfig, RFActivation, RandomProjection, id_to_audio_path,
+    load_alignments,
 };
 
 #[derive(Parser)]

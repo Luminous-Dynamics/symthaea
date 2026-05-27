@@ -6,8 +6,8 @@
 //! Present a sequence of items, then test recall at each position.
 //! Produces the classic serial position curve (primacy + recency effects).
 
-use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

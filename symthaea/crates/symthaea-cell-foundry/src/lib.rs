@@ -53,12 +53,12 @@ pub use lab_controller::{
 
 // Genesis Mission Challenge 5: Experiment Planner
 pub use experiment_planner::{
-    ExperimentFepAction, ExperimentFepAgent, ExperimentHdcEncoder, ExperimentPredictor,
-    ExperimentReading, EXPERIMENT_HORIZONS, EXPERIMENT_HORIZON_LABELS,
+    EXPERIMENT_HORIZON_LABELS, EXPERIMENT_HORIZONS, ExperimentFepAction, ExperimentFepAgent,
+    ExperimentHdcEncoder, ExperimentPredictor, ExperimentReading,
 };
 
 // Genesis Mission Challenge 8: Water Prediction
 pub use hydrology::{
-    HydrologicalPredictor, WaterFepAction, WaterFepAgent, WaterHdcEncoder, WaterQualityReading,
-    WATER_HORIZONS,
+    HydrologicalPredictor, WATER_HORIZONS, WaterFepAction, WaterFepAgent, WaterHdcEncoder,
+    WaterQualityReading,
 };

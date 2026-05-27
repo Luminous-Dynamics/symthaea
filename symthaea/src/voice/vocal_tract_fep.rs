@@ -19,7 +19,7 @@ pub use symthaea_vocal_tract::fep::{
 
 #[cfg(feature = "vocal-tract")]
 pub use symthaea_vocal_tract::pipeline::{
-    predict_duration, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
+    Intonation, PitchAccent, ProsodyContext, VocalTractPipeline, predict_duration,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -645,7 +645,7 @@ mod tests {
         }
 
         assert_eq!(audio.len(), 2400); // 20 frames × 120 samples
-                                       // Should have non-trivial audio content
+        // Should have non-trivial audio content
         let rms: f32 = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
         assert!(
             rms > 1e-6,

@@ -57,7 +57,7 @@ fn test_compute_unified_psi_clamped_at_one() {
     s.behavior.flow_state.in_flow = true;
     s.behavior.flow_state.intensity = 10.0; // very high
     s.behavior.social_mgr.social.relational_psi = 10.0; // very high
-                                                        // body/embodied modulations far above neutral to maximize their contribution
+    // body/embodied modulations far above neutral to maximize their contribution
     s.carryover.consciousness.body_phi_modulation = 100.0;
     s.carryover.consciousness.embodied_phi_modulation = 100.0;
 

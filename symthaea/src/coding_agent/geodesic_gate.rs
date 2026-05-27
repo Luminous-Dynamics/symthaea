@@ -22,8 +22,8 @@ impl CodingAgent {
     #[cfg(feature = "geodesic_synthesis")]
     pub(super) fn verify_with_gcs(&self, source: &str, function_name: &str) -> Vec<String> {
         use symthaea_geodesic::{
-            execution_oracle::OperationType, ExecutionOracle, ProgramDependenceGraph,
-            TopologicalFingerprint,
+            ExecutionOracle, ProgramDependenceGraph, TopologicalFingerprint,
+            execution_oracle::OperationType,
         };
 
         let mut violations = Vec::new();

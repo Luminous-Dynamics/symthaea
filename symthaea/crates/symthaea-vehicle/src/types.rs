@@ -981,7 +981,7 @@ mod tests {
         );
         // position_x should NOT be zeroed (only 4 channels)
         assert!((state.position_x - 0.0).abs() < 1e-10); // was already 0
-                                                         // mesh channels should be untouched
+        // mesh channels should be untouched
         assert!((state.nearest_peer_distance - 200.0).abs() < 1e-10);
     }
 

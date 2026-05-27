@@ -246,7 +246,9 @@ fn run_study() {
     // ─── CSV output ───
     println!();
     println!("━━━ CSV Output ━━━");
-    println!("noise_pct,hdc_standing_reward,hdc_head_height,hdc_uprightness,weight_standing_reward,weight_head_height,weight_uprightness");
+    println!(
+        "noise_pct,hdc_standing_reward,hdc_head_height,hdc_uprightness,weight_standing_reward,weight_head_height,weight_uprightness"
+    );
     for i in 0..noise_levels.len() {
         let (n, hr, hh, hu) = hdc_results[i];
         let (_, wr, wh, wu) = weight_results[i];

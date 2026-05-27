@@ -19,7 +19,7 @@
 //! This is System Testing: we're checking if the machine runs,
 //! not just if the parts fit.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};

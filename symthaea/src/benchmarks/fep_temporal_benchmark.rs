@@ -515,7 +515,8 @@ mod tests {
         assert!(
             late_2nd <= early_2nd * 1.15,
             "Error in last 20 cycles ({:.4}) should not significantly exceed first 20 of 2nd half ({:.4})",
-            late_2nd, early_2nd
+            late_2nd,
+            early_2nd
         );
     }
 

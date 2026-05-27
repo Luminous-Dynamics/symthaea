@@ -32,7 +32,10 @@ impl PublicInputs {
     }
 
     /// Create from a serde-serializable value.
-    pub fn from_value<T: serde::Serialize>(value: &T, description: impl Into<String>) -> ZkpResult<Self> {
+    pub fn from_value<T: serde::Serialize>(
+        value: &T,
+        description: impl Into<String>,
+    ) -> ZkpResult<Self> {
         let data = serde_json::to_vec(value)
             .map_err(|e: serde_json::Error| crate::error::ZkpError::Serialization(e.to_string()))?;
         Ok(Self::new(data, description))
@@ -60,11 +63,7 @@ pub trait ProofBackend: Send + Sync {
     ///
     /// - `public_inputs`: Circuit-specific public inputs.
     /// - `witness`: Private witness data (f32 values, Q16.16 encoded internally).
-    fn prove(
-        &self,
-        public_inputs: &PublicInputs,
-        witness: &[f32],
-    ) -> ZkpResult<ProofResult>;
+    fn prove(&self, public_inputs: &PublicInputs, witness: &[f32]) -> ZkpResult<ProofResult>;
 
     /// Verify a proof against its public inputs.
     ///
@@ -123,16 +122,13 @@ pub mod winterfell_backend {
             true // Always available when feature is enabled
         }
 
-        fn prove(
-            &self,
-            _public_inputs: &PublicInputs,
-            _witness: &[f32],
-        ) -> ZkpResult<ProofResult> {
+        fn prove(&self, _public_inputs: &PublicInputs, _witness: &[f32]) -> ZkpResult<ProofResult> {
             // Circuit-specific proving logic is injected by each cluster's ZKP crate.
             // This base implementation provides the backend interface;
             // actual AIR circuits are defined in governance-zkp, health-zkp, etc.
             Err(crate::error::ZkpError::ProvingError(
-                "Use a circuit-specific prover (e.g. governance-zkp) instead of the base backend".into(),
+                "Use a circuit-specific prover (e.g. governance-zkp) instead of the base backend"
+                    .into(),
             ))
         }
 
@@ -145,7 +141,8 @@ pub mod winterfell_backend {
             // Circuit-specific verification is handled by each cluster's ZKP crate
             // which calls winterfell::verify() with the appropriate AIR.
             Err(crate::error::ZkpError::VerificationFailed(
-                "Use a circuit-specific verifier (e.g. governance-zkp) instead of the base backend".into(),
+                "Use a circuit-specific verifier (e.g. governance-zkp) instead of the base backend"
+                    .into(),
             ))
         }
     }
@@ -194,11 +191,7 @@ pub mod risc0_backend {
             true // Available when feature is enabled
         }
 
-        fn prove(
-            &self,
-            _public_inputs: &PublicInputs,
-            _witness: &[f32],
-        ) -> ZkpResult<ProofResult> {
+        fn prove(&self, _public_inputs: &PublicInputs, _witness: &[f32]) -> ZkpResult<ProofResult> {
             // Circuit-specific guest programs are defined per cluster.
             Err(crate::error::ZkpError::ProvingError(
                 "Use a circuit-specific prover with a RISC0 guest image".into(),

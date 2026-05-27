@@ -3,26 +3,20 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core IntegratedConsciousAgent struct and primary implementation
 
-use super::super::unified_hv::ContinuousHV;
-use super::super::unified_consciousness_engine::EngineConfig;
+use super::super::attention_dynamics::{AttentionAllocation, AttentionDynamics, AttentionMode};
 use super::super::emergent_self_model::{
-    SelfAwareConsciousness, SelfModel, SelfAwareUpdate, MetaCognitiveAssessment,
+    MetaCognitiveAssessment, SelfAwareConsciousness, SelfAwareUpdate, SelfModel,
 };
-use super::super::temporal_binding::{
-    TemporalBindingEngine, TemporalBindingConfig, StreamHealth,
-};
-use super::super::attention_dynamics::{
-    AttentionDynamics, AttentionMode, AttentionAllocation,
-};
+use super::super::temporal_binding::{StreamHealth, TemporalBindingConfig, TemporalBindingEngine};
 use super::super::topology_synergy::ConsciousnessState;
+use super::super::unified_consciousness_engine::EngineConfig;
+use super::super::unified_hv::ContinuousHV;
 
-use crate::physiology::{
-    CoherenceState, TaskComplexity,
-};
+use crate::physiology::{CoherenceState, TaskComplexity};
 
-use super::types::*;
-use super::working_memory::{WorkingMemory, MemorySource};
 use super::emotional_state::EmotionalState;
+use super::types::*;
+use super::working_memory::{MemorySource, WorkingMemory};
 
 use std::collections::VecDeque;
 
@@ -111,8 +105,8 @@ impl IntegratedConsciousAgent {
         // ═══════════════════════════════════════════════════════════════════
 
         // Bind attended content with attention-modulated strength
-        let binding_strength = self.config.attention_binding_coupling
-            * attention_result.mode.intensity();
+        let binding_strength =
+            self.config.attention_binding_coupling * attention_result.mode.intensity();
         let modulated_content = attended_content.scale(binding_strength as f32);
 
         let temporal_moment = self.stream.bind(&modulated_content);
@@ -122,7 +116,9 @@ impl IntegratedConsciousAgent {
         // ═══════════════════════════════════════════════════════════════════
 
         // Process through self-aware consciousness engine
-        let self_aware_update = self.self_awareness.process_aware(&temporal_moment.bound_experience);
+        let self_aware_update = self
+            .self_awareness
+            .process_aware(&temporal_moment.bound_experience);
 
         // ═══════════════════════════════════════════════════════════════════
         // STAGE 4: METACOGNITIVE CONTROL - Should we change anything?
@@ -150,16 +146,19 @@ impl IntegratedConsciousAgent {
             goal_relevance,
             self.step,
         );
-        self.working_memory.update(self.dominant_experience.as_ref());
+        self.working_memory
+            .update(self.dominant_experience.as_ref());
 
         // Update emotional state based on processing results
         let goal_progress = if self.goals.is_empty() {
             0.5
         } else {
-            self.goals.iter()
+            self.goals
+                .iter()
                 .filter(|g| g.active)
                 .map(|g| attended_content.similarity(&g.target).max(0.0) as f64 * g.priority)
-                .sum::<f64>() / self.goals.len() as f64
+                .sum::<f64>()
+                / self.goals.len() as f64
         };
         self.emotional_state.update(
             self_aware_update.base_update.phi,
@@ -172,11 +171,8 @@ impl IntegratedConsciousAgent {
         // ═══════════════════════════════════════════════════════════════════
 
         let stream_health = self.stream.stream_health();
-        let integration_quality = self.compute_integration_quality(
-            &self_aware_update,
-            &attention_result,
-            &stream_health,
-        );
+        let integration_quality =
+            self.compute_integration_quality(&self_aware_update, &attention_result, &stream_health);
 
         let phenomenal_content = self.create_phenomenal_content(
             &temporal_moment.bound_experience,
@@ -276,13 +272,18 @@ impl IntegratedConsciousAgent {
         for goal in &self.goals {
             if goal.active && goal.priority > 0.5 {
                 // Add goal as persistent attention target
-                self.attention.add_target(goal.target.clone(), goal.priority);
+                self.attention
+                    .add_target(goal.target.clone(), goal.priority);
             }
         }
     }
 
     /// Create attended content from input and attention result
-    fn create_attended_content(&self, input: &ContinuousHV, attention: &AttentionAllocation) -> ContinuousHV {
+    fn create_attended_content(
+        &self,
+        input: &ContinuousHV,
+        attention: &AttentionAllocation,
+    ) -> ContinuousHV {
         // Modulate input by attention intensity
         let attention_weight = attention.mode.intensity();
         let attended = input.scale(attention_weight as f32);
@@ -290,7 +291,8 @@ impl IntegratedConsciousAgent {
         // Blend with focus if in spotlight mode
         if attention.mode == AttentionMode::Spotlight {
             let focus_blend = 0.3;
-            attended.scale((1.0 - focus_blend) as f32)
+            attended
+                .scale((1.0 - focus_blend) as f32)
                 .add(&attention.focus.scale(focus_blend as f32))
                 .normalize()
         } else {
@@ -362,10 +364,10 @@ impl IntegratedConsciousAgent {
         let intensity = (base_intensity * 0.7 + arousal * 0.3).clamp(0.0, 1.0);
 
         // Valence: integrate emotional valence with cognitive valence
-        let cognitive_valence = (self_update.base_update.phi - 0.5) * 2.0
-            * (1.0 - self_update.prediction_error);
-        let valence = (cognitive_valence * 0.4 + self.emotional_state.valence * 0.6)
-            .clamp(-1.0, 1.0);
+        let cognitive_valence =
+            (self_update.base_update.phi - 0.5) * 2.0 * (1.0 - self_update.prediction_error);
+        let valence =
+            (cognitive_valence * 0.4 + self.emotional_state.valence * 0.6).clamp(-1.0, 1.0);
 
         // Clarity based on attention mode, self-model confidence, and working memory load
         let attention_clarity = match attention.mode {
@@ -377,8 +379,8 @@ impl IntegratedConsciousAgent {
         };
         // High cognitive load reduces clarity
         let load_penalty = self.working_memory.load() * 0.3;
-        let clarity = (attention_clarity * self_update.self_model.confidence - load_penalty)
-            .clamp(0.0, 1.0);
+        let clarity =
+            (attention_clarity * self_update.self_model.confidence - load_penalty).clamp(0.0, 1.0);
 
         // Groundedness: stability + low arousal + presence
         let groundedness = (self.emotional_state.stability() * 0.4
@@ -390,12 +392,7 @@ impl IntegratedConsciousAgent {
         let cognitive_load = self.working_memory.load();
 
         // Compute qualia texture
-        let qualia_texture = self.compute_qualia_texture(
-            self_update,
-            attention,
-            valence,
-            arousal,
-        );
+        let qualia_texture = self.compute_qualia_texture(self_update, attention, valence, arousal);
 
         // Generate rich description incorporating all dimensions
         let description = self.describe_experience_rich(
@@ -428,12 +425,12 @@ impl IntegratedConsciousAgent {
     ) -> QualiaTexture {
         // Warmth: positive valence + relational resonance (if goals active)
         let goal_warmth = if !self.goals.is_empty() && self.goals.iter().any(|g| g.active) {
-            0.2  // Having active goals adds warmth
+            0.2 // Having active goals adds warmth
         } else {
             0.0
         };
-        let warmth = (valence * 0.7 + goal_warmth + self.emotional_state.dominance * 0.1)
-            .clamp(-1.0, 1.0);
+        let warmth =
+            (valence * 0.7 + goal_warmth + self.emotional_state.dominance * 0.1).clamp(-1.0, 1.0);
 
         // Depth: Φ integration + self-awareness + prediction accuracy
         let depth = (self_update.base_update.phi * 0.4
@@ -455,7 +452,7 @@ impl IntegratedConsciousAgent {
             .clamp(0.0, 1.0);
 
         // Flow: stream coherence + moderate arousal + low prediction error
-        let arousal_flow = 1.0 - (arousal - 0.5).abs() * 2.0;  // Peak at 0.5 arousal
+        let arousal_flow = 1.0 - (arousal - 0.5).abs() * 2.0; // Peak at 0.5 arousal
         let stream_health = self.stream.stream_health();
         let flow = (stream_health.coherence * 0.4
             + arousal_flow.max(0.0) * 0.3
@@ -581,22 +578,16 @@ impl IntegratedConsciousAgent {
 
         // Attention quality
         let attention_quality = match attention_mode {
-            AttentionMode::Spotlight if qualia.presence > 0.7 =>
-                "laser-focused presence",
-            AttentionMode::Spotlight =>
-                "concentrated attention",
-            AttentionMode::Distributed if qualia.spaciousness > 0.6 =>
-                "open, distributed awareness",
-            AttentionMode::Distributed =>
-                "divided attention",
-            AttentionMode::Diffuse if qualia.flow > 0.5 =>
-                "floating, receptive awareness",
-            AttentionMode::Diffuse =>
-                "soft, ambient attention",
-            AttentionMode::Switching =>
-                "shifting attention",
-            AttentionMode::Blink =>
-                "momentary pause",
+            AttentionMode::Spotlight if qualia.presence > 0.7 => "laser-focused presence",
+            AttentionMode::Spotlight => "concentrated attention",
+            AttentionMode::Distributed if qualia.spaciousness > 0.6 => {
+                "open, distributed awareness"
+            }
+            AttentionMode::Distributed => "divided attention",
+            AttentionMode::Diffuse if qualia.flow > 0.5 => "floating, receptive awareness",
+            AttentionMode::Diffuse => "soft, ambient attention",
+            AttentionMode::Switching => "shifting attention",
+            AttentionMode::Blink => "momentary pause",
         };
 
         // Cognitive texture based on working memory
@@ -610,11 +601,7 @@ impl IntegratedConsciousAgent {
 
         format!(
             "{} {} {} {}{}",
-            intensity_prefix,
-            state_desc,
-            emotional_tone,
-            attention_quality,
-            cognitive_note
+            intensity_prefix, state_desc, emotional_tone, attention_quality, cognitive_note
         )
     }
 
@@ -690,12 +677,21 @@ impl IntegratedConsciousAgent {
         let stream = self.stream.stream_health();
 
         // Get latest qualia from history
-        let (qualia, phenomenal_description) = self.history.back()
-            .map(|u| (u.phenomenal_content.qualia_texture.clone(), u.phenomenal_content.description.clone()))
-            .unwrap_or_else(|| (
-                QualiaTexture::new(0.0, 0.5, 0.5, 0.5, 0.5),
-                "awaiting first experience".to_string()
-            ));
+        let (qualia, phenomenal_description) = self
+            .history
+            .back()
+            .map(|u| {
+                (
+                    u.phenomenal_content.qualia_texture.clone(),
+                    u.phenomenal_content.description.clone(),
+                )
+            })
+            .unwrap_or_else(|| {
+                (
+                    QualiaTexture::new(0.0, 0.5, 0.5, 0.5, 0.5),
+                    "awaiting first experience".to_string(),
+                )
+            });
 
         AgentIntrospection {
             believed_phi: self_report.believed_phi,
@@ -705,7 +701,9 @@ impl IntegratedConsciousAgent {
             is_flowing: stream.is_flowing,
             attention_mode: self.attention.mode(),
             num_active_goals: self.goals.iter().filter(|g| g.active).count(),
-            integration_quality: self.history.back()
+            integration_quality: self
+                .history
+                .back()
                 .map(|u| u.integration_quality)
                 .unwrap_or(0.5),
             working_memory_load: self.working_memory.load(),

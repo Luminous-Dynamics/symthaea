@@ -669,7 +669,7 @@ impl NeuromodulatorBath {
         let ne = self.noradrenaline.effective() as f64;
         // 5-HT inverts: high confidence → exploit (lower c), low → explore (higher c)
         let sht_effect = (0.5 - sht) * 0.8; // [-0.4, +0.4]
-                                            // NE adds exploration breadth
+        // NE adds exploration breadth
         let ne_effect = (ne - 0.5) * 0.4; // [-0.2, +0.2]
         (1.0 + sht_effect + ne_effect).clamp(0.6, 1.8)
     }
@@ -3451,7 +3451,7 @@ mod tests {
         let mut bath = NeuromodulatorBath::default();
         bath.glutamate.level = 0.6;
         bath.report_learning(0.05, 0.3, true); // is_sleep = true
-                                               // Sleep clearance: glutamate *= 0.9
+        // Sleep clearance: glutamate *= 0.9
         assert!(
             bath.glutamate.level < 0.6,
             "Sleep should clear glutamate: {}",
@@ -3498,7 +3498,7 @@ mod tests {
         }
         assert_eq!(t.high_exposure_cycles, 20);
         assert!(!t.is_tolerant()); // exactly 20, not >20
-                                   // Cycle 21+: fast desensitization kicks in
+        // Cycle 21+: fast desensitization kicks in
         for _ in 0..10 {
             t.reuptake();
         }
@@ -5014,7 +5014,7 @@ mod tests {
         // Set load to 0.6 (below 0.75 release threshold)
         bath.allostatic_load = 0.6;
         bath.accumulate_allostatic_load(0.0, false); // cortisol=0 → no new accumulation
-                                                     // Release should have bumped baselines by +0.002
+        // Release should have bumped baselines by +0.002
         assert!(
             bath.dopamine.baseline_val() > 0.35,
             "DA baseline should increase when load drops below 0.75: got {}",
@@ -5082,7 +5082,7 @@ mod tests {
         let mut bath = NeuromodulatorBath::default();
         bath.dopamine.set_baseline(0.35);
         bath.allostatic_load = 0.1; // very low load
-                                    // 100 non-sleep cycles — release restores to 0.45 max, not 0.5
+        // 100 non-sleep cycles — release restores to 0.45 max, not 0.5
         for _ in 0..100 {
             bath.accumulate_allostatic_load(0.0, false);
         }

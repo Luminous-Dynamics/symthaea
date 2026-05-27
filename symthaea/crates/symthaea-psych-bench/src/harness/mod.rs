@@ -28,24 +28,24 @@ pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
 pub use cross_domain_prediction::{
     CrossDomainMatrix, DomainCorrelation, PredictionModel, SharedMechanism,
 };
-pub use difficulty::{difficulty_model_for, DifficultyModel, DifficultyModelType};
+pub use difficulty::{DifficultyModel, DifficultyModelType, difficulty_model_for};
 pub use neuromod_correlation::NeuromodCorrelationMatrix;
 pub use normative_comparison::{NormativeReport, NormativeScore};
 pub use psychometric_report::{BenchmarkDetail, PsychometricReport, ReportSummary};
 pub use reliability_analysis::{
-    compute_icc, compute_sem, pearson_r, PracticeDirection, PracticeEffect, ReliabilityBattery,
-    ReliabilityClass, TestRetestResult,
+    PracticeDirection, PracticeEffect, ReliabilityBattery, ReliabilityClass, TestRetestResult,
+    compute_icc, compute_sem, pearson_r,
 };
 pub use report::{
-    key_metric_for_benchmark, provenance_table, BaselineComparison, BenchmarkReport,
-    BenchmarkResult, CompositeScore, ForestPlotRow, LearningCurveRow, MetricValue, RtSummary,
+    BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, ForestPlotRow,
+    LearningCurveRow, MetricValue, RtSummary, key_metric_for_benchmark, provenance_table,
 };
-pub use sat_curves::{run_sat_curve, SatBattery, SatCurve, SatFit, SatPoint};
+pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
 pub use snapshot::{
     RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
     SNAPSHOT_SCHEMA_VERSION,
 };
-pub use staircase::{run_staircase, StaircaseConfig, StaircaseResult, StaircaseRule};
+pub use staircase::{StaircaseConfig, StaircaseResult, StaircaseRule, run_staircase};
 pub use trial_analysis::{
     CalibrationResult, ErrorBurst, SpeedAccuracyResult, StrategyShift, TrialAnalysis,
     TrialBlockRow, TrialOutcome,

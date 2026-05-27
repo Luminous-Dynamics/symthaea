@@ -65,8 +65,8 @@ pub use consciousness_routing::{
 
 // ── Re-exports from advanced ────────────────────────────────────────────────
 pub use advanced::{
-    apid, bands, light_time_seconds, min_sharing_cadence_for_latency, CcsdsPacket, DetectedSignal,
-    RtlSdrHardware, SignalClass,
+    CcsdsPacket, DetectedSignal, RtlSdrHardware, SignalClass, apid, bands, light_time_seconds,
+    min_sharing_cadence_for_latency,
 };
 
 #[cfg(test)]

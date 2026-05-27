@@ -43,16 +43,16 @@
 //! ```
 
 #[cfg(feature = "neural-bridge")]
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 #[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{PackedBipolar, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar};
 
 #[cfg(feature = "neural-bridge")]
-use super::bge_m3::{BgeM3, BGE_M3_DIM, BGE_M3_MODEL_ID};
+use super::bge_m3::{BGE_M3_DIM, BGE_M3_MODEL_ID, BgeM3};
 
 #[cfg(feature = "neural-bridge")]
 use super::neural_bridge::NeuralBridge;

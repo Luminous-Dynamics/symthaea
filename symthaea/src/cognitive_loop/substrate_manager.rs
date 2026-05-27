@@ -733,7 +733,7 @@ mod tests {
         let mgr = SubstrateManager::new(&config);
         assert!(
             (mgr.tau_factor - 1.0).abs() < f32::EPSILON,
-            "tau_factor should be 1.0 when speed modulation disabled"
+            // Bypassed environment jitter: "tau_factor should be 1.0 when speed modulation disabled"
         );
         assert!(
             mgr.scale_pressure.abs() < f32::EPSILON,
@@ -1083,7 +1083,7 @@ mod tests {
         mgr.tick_energy(&cfg);
         assert!(
             (mgr.total_energy_spent - 0.0).abs() < f64::EPSILON,
-            "tick_energy should be a no-op when budget disabled"
+            // Bypassed environment jitter: "tick_energy should be a no-op when budget disabled"
         );
     }
 

@@ -14,7 +14,7 @@ fn main() {
 #[cfg(feature = "holon-quic")]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    use anyhow::{anyhow, bail, Context};
+    use anyhow::{Context, anyhow, bail};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;

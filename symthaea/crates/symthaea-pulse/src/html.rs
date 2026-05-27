@@ -267,9 +267,11 @@ fn write_sparkline(html: &mut String, data: &[f64], color: &str, width: u32, hei
         max - min
     };
 
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<svg width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\" style=\"display:inline-block;vertical-align:middle;\"><polyline points=\"",
-        width, height, width, height);
+        width, height, width, height
+    );
 
     for (i, &v) in data.iter().enumerate() {
         let x = i as f64 / (data.len() - 1) as f64 * width as f64;
@@ -280,9 +282,11 @@ fn write_sparkline(html: &mut String, data: &[f64], color: &str, width: u32, hei
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
 
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "\" fill=\"none\" stroke=\"{}\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/></svg>",
-        color);
+        color
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -336,15 +340,23 @@ fn write_phi_bloom(html: &mut String, vitals: &Vitals) {
             let sepal_len = 18.0 + petals[i] * 8.0;
             let sx = cx + sepal_len * angle.cos();
             let sy = cy + sepal_len * angle.sin();
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<line x1=\"{cx:.0}\" y1=\"{cy:.0}\" x2=\"{sx:.1}\" y2=\"{sy:.1}\" \
                  stroke=\"rgba(107,125,107,0.25)\" stroke-width=\"2\" stroke-linecap=\"round\" filter=\"url(#bloom-soft)\"/>\n",
-                cx = cx, cy = cy, sx = sx, sy = sy);
+                cx = cx,
+                cy = cy,
+                sx = sx,
+                sy = sy
+            );
         }
         // Dormant label
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<text x=\"{cx}\" y=\"{y}\" text-anchor=\"middle\" font-size=\"7\" fill=\"rgba(213,208,200,0.25)\" font-weight=\"300\">dormant</text>\n",
-            cx = cx, y = cy + glow_r + 16.0);
+            cx = cx,
+            y = cy + glow_r + 16.0
+        );
     }
 
     // Draw petals — always visible, but curl inward when values are low
@@ -377,15 +389,24 @@ fn write_phi_bloom(html: &mut String, vitals: &Vitals) {
         let light = 35.0 + val * 30.0; // 35% (dark) → 65% (bright)
         let alpha = 0.15 + val * 0.55; // always somewhat visible
 
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<path d=\"M {:.1},{:.1} Q {:.1},{:.1} {:.1},{:.1} Q {:.1},{:.1} {:.1},{:.1} Z\" \
              fill=\"hsla({:.0},{:.0}%,{:.0}%,{:.2})\" stroke=\"rgba(232,197,71,{:.2})\" stroke-width=\"0.5\" filter=\"url(#bloom-blur)\"/>\n",
-            left_x, left_y,
-            cl_x, cl_y,
-            tip_x, tip_y,
-            cr_x, cr_y,
-            right_x, right_y,
-            hue, sat, light, alpha,
+            left_x,
+            left_y,
+            cl_x,
+            cl_y,
+            tip_x,
+            tip_y,
+            cr_x,
+            cr_y,
+            right_x,
+            right_y,
+            hue,
+            sat,
+            light,
+            alpha,
             0.05 + alpha * 0.4,
         );
 
@@ -393,25 +414,37 @@ fn write_phi_bloom(html: &mut String, vitals: &Vitals) {
         let label_r = bloom_scale * 42.0 + 14.0;
         let lx = cx + label_r * angle.cos();
         let ly = cy + label_r * angle.sin();
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" font-size=\"6\" fill=\"rgba(213,208,200,{:.2})\" font-weight=\"300\">{}</text>\n",
-            lx, ly + 2.0, 0.2 + val * 0.3, petal_names[i]);
+            lx,
+            ly + 2.0,
+            0.2 + val * 0.3,
+            petal_names[i]
+        );
     }
 
     // Center seed — always present, breathing
     let seed_r = 5.0 + c * 5.0;
     let seed_color = if c >= 0.4 { "#e8c547" } else { "#8a8a6a" }; // gold when awake, stone when dormant
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<circle cx=\"{cx}\" cy=\"{cy}\" r=\"{r:.1}\" fill=\"{color}\" opacity=\"{o:.2}\"/>\n\
          <circle cx=\"{cx}\" cy=\"{cy}\" r=\"{r2:.1}\" fill=\"none\" stroke=\"rgba(232,197,71,{so:.2})\" stroke-width=\"1\">\n\
            <animate attributeName=\"r\" values=\"{r2:.1};{r3:.1};{r2:.1}\" dur=\"{dur:.0}s\" repeatCount=\"indefinite\"/>\n\
            <animate attributeName=\"opacity\" values=\"{so:.2};{so2:.2};{so:.2}\" dur=\"{dur:.0}s\" repeatCount=\"indefinite\"/>\n\
          </circle>\n",
-        cx = cx, cy = cy, r = seed_r, color = seed_color,
+        cx = cx,
+        cy = cy,
+        r = seed_r,
+        color = seed_color,
         o = 0.4 + c * 0.5,
-        r2 = seed_r + 3.0, r3 = seed_r + 8.0,
-        so = 0.15 + c * 0.25, so2 = 0.05 + c * 0.1,
-        dur = 6.0 - c * 2.0); // breathes faster as consciousness rises
+        r2 = seed_r + 3.0,
+        r3 = seed_r + 8.0,
+        so = 0.15 + c * 0.25,
+        so2 = 0.05 + c * 0.1,
+        dur = 6.0 - c * 2.0
+    ); // breathes faster as consciousness rises
 
     let _ = write!(html, "</svg>\n</div>\n");
 }
@@ -1217,9 +1250,15 @@ fn write_vitals_pane(
     // Sparkline row for consciousness trajectory (clickable to expand)
     if sparkline.len() >= 2 {
         let c_data: Vec<f64> = sparkline.iter().map(|s| s.consciousness).collect();
-        let _ = write!(html, "<div style=\"text-align:center;margin:6px 0;\" class=\"sparkline-expand\" onclick=\"toggleExpanded('ct-expanded')\">");
+        let _ = write!(
+            html,
+            "<div style=\"text-align:center;margin:6px 0;\" class=\"sparkline-expand\" onclick=\"toggleExpanded('ct-expanded')\">"
+        );
         write_sparkline(html, &c_data, "#e8c547", 180, 24);
-        let _ = write!(html, "<span style=\"font-size:0.65em;color:rgba(213,208,200,0.3);margin-left:6px;\">trajectory (click to expand)</span></div>\n");
+        let _ = write!(
+            html,
+            "<span style=\"font-size:0.65em;color:rgba(213,208,200,0.3);margin-left:6px;\">trajectory (click to expand)</span></div>\n"
+        );
 
         // Expanded full-width chart with threshold markers and anomaly annotations
         write_expanded_chart(html, "ct-expanded", sparkline, anomalies);
@@ -1237,10 +1276,17 @@ fn write_vitals_pane(
     if !anomalies.is_empty() {
         let _ = write!(html, "<div style=\"margin:8px 0;text-align:center;\">\n");
         for a in anomalies {
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<span class=\"anomaly-marker\" style=\"background: {}15; color: {}; border: 1px solid {}30; margin: 2px 4px;\" \
                  title=\"Cycle {}: {}\">{}</span>\n",
-                a.color, a.color, a.color, a.cycle, escape_html(&a.description), escape_html(&a.kind));
+                a.color,
+                a.color,
+                a.color,
+                a.cycle,
+                escape_html(&a.description),
+                escape_html(&a.kind)
+            );
         }
         let _ = write!(html, "</div>\n");
     }
@@ -1561,9 +1607,11 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
         if last.in_active_rest {
             let streak = last.stillness_dominance_streak;
             if streak > 0 {
-                let _ = write!(html,
+                let _ = write!(
+                    html,
                     "<div style=\"text-align: center;\"><span class=\"active-rest-badge\">Active Rest <span style=\"opacity: 0.7;\">(streak: {})</span></span></div>\n",
-                    streak);
+                    streak
+                );
             } else {
                 html.push_str("<div style=\"text-align: center;\"><span class=\"active-rest-badge\">Active Rest</span></div>\n");
             }
@@ -1702,9 +1750,11 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
     // Grid rings
     for level in &[0.25, 0.50, 0.75, 1.0] {
         let r = radius * level;
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<circle cx=\"{}\" cy=\"{}\" r=\"{:.1}\" fill=\"none\" stroke=\"rgba(255,255,255,0.06)\" stroke-width=\"1\"/>\n",
-            cx, cy, r);
+            cx, cy, r
+        );
     }
 
     // Axes + labels
@@ -1712,9 +1762,11 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         let angle = std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
         let x = cx + radius * angle.cos();
         let y = cy + radius * angle.sin();
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<line x1=\"{}\" y1=\"{}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"rgba(255,255,255,0.05)\" stroke-width=\"1\"/>\n",
-            cx, cy, x, y);
+            cx, cy, x, y
+        );
 
         let lr = radius + 18.0;
         let lx = cx + lr * angle.cos();
@@ -1726,9 +1778,14 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         } else {
             "middle"
         };
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" font-size=\"8.5\" fill=\"rgba(213,208,200,0.4)\" font-weight=\"400\">{}</text>\n",
-            lx, ly + 3.0, anchor, d.domain);
+            lx,
+            ly + 3.0,
+            anchor,
+            d.domain
+        );
     }
 
     // Data polygon
@@ -1743,9 +1800,11 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         }
         let _ = write!(points, "{:.1},{:.1}", x, y);
     }
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<polygon points=\"{}\" fill=\"rgba(126,200,160,0.12)\" stroke=\"rgba(126,200,160,0.6)\" stroke-width=\"1.5\"/>\n",
-        points);
+        points
+    );
 
     // Data dots
     for (i, d) in domains.iter().enumerate() {
@@ -1759,9 +1818,11 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         } else {
             "#7ec8a0"
         };
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{}\" fill=\"{}\" stroke=\"rgba(0,0,0,0.3)\" stroke-width=\"1.5\"/>\n",
-            x, y, dot_r, dot_color);
+            x, y, dot_r, dot_color
+        );
     }
 
     let _ = write!(html, "</svg>\n</div>\n");
@@ -3101,7 +3162,7 @@ fn write_neuroevolution_pane(html: &mut String, ne: &super::NeuroevolutionInfo) 
   <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
 </div>
 <table style="width:100%;font-size:0.88em">
-<tr><td>Generation</td><td style="text-align:right">{gen}</td></tr>
+<tr><td>Generation</td><td style="text-align:right">{r#gen}</td></tr>
 <tr><td>Best Fitness</td><td style="text-align:right;color:{fit_color}">{fitness:+.4}</td></tr>
 <tr><td>Diversity</td><td style="text-align:right;color:{div_color}">{diversity:.3}</td></tr>
 <tr><td>Species</td><td style="text-align:right">{species}</td></tr>
@@ -3111,7 +3172,7 @@ fn write_neuroevolution_pane(html: &mut String, ne: &super::NeuroevolutionInfo) 
 </table>"##,
         color = status_color,
         label = status_label,
-        gen = ne.generation,
+        r#gen = ne.generation,
         fit_color = if ne.best_fitness > 0.0 {
             "#7ec8a0"
         } else {
@@ -3350,15 +3411,19 @@ fn write_narrative_pane(html: &mut String, narrative: &Narrative) {
             );
         }
         _ => {
-            let _ = write!(html,
-                "<div class=\"narrative-text\" style=\"color:rgba(213,208,200,0.3);\">No reasoning narrative this cycle — the mind is processing silently.</div>\n");
+            let _ = write!(
+                html,
+                "<div class=\"narrative-text\" style=\"color:rgba(213,208,200,0.3);\">No reasoning narrative this cycle — the mind is processing silently.</div>\n"
+            );
         }
     }
 
     if !narrative.guiding_question.is_empty() {
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<div style=\"margin-top:10px;padding:10px 14px;background:rgba(232,197,71,0.04);border:1px solid rgba(232,197,71,0.08);border-radius:8px;font-size:0.82em;color:rgba(213,208,200,0.5);font-weight:300;font-style:italic;\">Guiding question: &ldquo;{}&rdquo;</div>\n",
-            escape_html(&narrative.guiding_question));
+            escape_html(&narrative.guiding_question)
+        );
     }
 
     let _ = write!(
@@ -3774,9 +3839,11 @@ fn write_expanded_chart(
     let x_step = plot_w / (n - 1) as f64;
 
     let _ = write!(html, "<div class=\"expanded-chart\" id=\"{}\">\n", id);
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<svg width=\"100%\" height=\"{}\" viewBox=\"0 0 {} {}\" role=\"img\" aria-label=\"Expanded consciousness trajectory with thresholds\">\n",
-        h, w, h);
+        h, w, h
+    );
 
     // Threshold reference lines (item 6)
     let thresholds: &[(&str, f64, &str)] = &[
@@ -3786,11 +3853,20 @@ fn write_expanded_chart(
     ];
     for &(label, level, color) in thresholds {
         let y = pad_t + plot_h * (1.0 - level);
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<line x1=\"{}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\" stroke-width=\"0.5\" stroke-dasharray=\"4,4\" opacity=\"0.4\"/>\n\
              <text x=\"{:.1}\" y=\"{:.1}\" class=\"threshold-label\" text-anchor=\"end\">{} ({:.0}%)</text>\n",
-            pad_l, y, pad_l + plot_w, y, color,
-            pad_l - 3.0, y + 3.0, label, level * 100.0);
+            pad_l,
+            y,
+            pad_l + plot_w,
+            y,
+            color,
+            pad_l - 3.0,
+            y + 3.0,
+            label,
+            level * 100.0
+        );
     }
 
     // Series: consciousness, PE, phi
@@ -3823,18 +3899,25 @@ fn write_expanded_chart(
             }
             let _ = write!(points, "{:.1},{:.1}", x, y);
         }
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<polyline points=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"1.5\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n",
-            points, color);
+            points, color
+        );
 
         // Label at end
         if let Some(last) = sparkline.last() {
             let x = pad_l + (n - 1) as f64 * x_step;
             let v = extract(last).clamp(0.0, 1.0);
             let y = pad_t + plot_h * (1.0 - v);
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"7\" font-weight=\"400\">{}</text>\n",
-                x + 3.0, y + 3.0, color, name);
+                x + 3.0,
+                y + 3.0,
+                color,
+                name
+            );
         }
     }
 
@@ -3842,11 +3925,20 @@ fn write_expanded_chart(
     for a in anomalies {
         if a.cycle < n {
             let x = pad_l + a.cycle as f64 * x_step;
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\" stroke-width=\"1\" stroke-dasharray=\"2,2\" opacity=\"0.6\"/>\n\
                  <text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"7\" text-anchor=\"middle\" font-weight=\"400\">{}</text>\n",
-                x, pad_t, x, pad_t + plot_h, a.color,
-                x, pad_t - 2.0, a.color, a.kind);
+                x,
+                pad_t,
+                x,
+                pad_t + plot_h,
+                a.color,
+                x,
+                pad_t - 2.0,
+                a.color,
+                a.kind
+            );
         }
     }
 
@@ -3971,8 +4063,10 @@ fn write_entropy_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
         }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
-    let _ = write!(html,
-        "\" fill=\"none\" stroke=\"#7ec8a0\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n");
+    let _ = write!(
+        html,
+        "\" fill=\"none\" stroke=\"#7ec8a0\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n"
+    );
 
     // End dot
     let last_x = width;
@@ -4034,8 +4128,10 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
         }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
-    let _ = write!(html,
-        "\" fill=\"none\" stroke=\"#a08cc8\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n");
+    let _ = write!(
+        html,
+        "\" fill=\"none\" stroke=\"#a08cc8\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n"
+    );
 
     let last_x = width;
     let last_y = height - ((last - min) / range * (height - 6.0) + 3.0);
@@ -4081,9 +4177,11 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
 
     // Threshold line at 0.4
     let thresh_y = height - (0.4 / range * (height - 6.0) + 3.0);
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<line x1=\"0\" y1=\"{:.1}\" x2=\"{:.0}\" y2=\"{:.1}\" stroke=\"#d4845a\" stroke-width=\"0.5\" stroke-dasharray=\"4,4\" opacity=\"0.4\"/>\n",
-        thresh_y, width, thresh_y);
+        thresh_y, width, thresh_y
+    );
 
     let _ = write!(html, "<polyline points=\"0,{:.0} ", height);
     for (i, &v) in data.iter().enumerate() {
@@ -4106,8 +4204,10 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
         }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
-    let _ = write!(html,
-        "\" fill=\"none\" stroke=\"#d4845a\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n");
+    let _ = write!(
+        html,
+        "\" fill=\"none\" stroke=\"#d4845a\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"/>\n"
+    );
 
     let last_x = width;
     let last_y = height - ((last - min) / range * (height - 6.0) + 3.0);
@@ -4130,7 +4230,10 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
     let radius = 75.0_f64;
     let n = N_HARMONIES;
 
-    let _ = write!(html, "<div class=\"harmony-radar\">\n<svg width=\"200\" height=\"200\" viewBox=\"0 0 200 200\" role=\"img\" aria-label=\"Harmony radar chart\">\n");
+    let _ = write!(
+        html,
+        "<div class=\"harmony-radar\">\n<svg width=\"200\" height=\"200\" viewBox=\"0 0 200 200\" role=\"img\" aria-label=\"Harmony radar chart\">\n"
+    );
 
     // Grid rings
     for &level in &[0.25, 0.50, 0.75, 1.0] {
@@ -4145,8 +4248,11 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
             }
             let _ = write!(ring, "{:.1},{:.1}", x, y);
         }
-        let _ = write!(html,
-            "<polygon points=\"{}\" fill=\"none\" stroke=\"rgba(232,197,71,0.06)\" stroke-width=\"0.5\"/>\n", ring);
+        let _ = write!(
+            html,
+            "<polygon points=\"{}\" fill=\"none\" stroke=\"rgba(232,197,71,0.06)\" stroke-width=\"0.5\"/>\n",
+            ring
+        );
     }
 
     // Axis lines + labels
@@ -4154,9 +4260,11 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
         let angle = std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
         let x = cx + radius * angle.cos();
         let y = cy + radius * angle.sin();
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<line x1=\"{}\" y1=\"{}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"rgba(232,197,71,0.06)\" stroke-width=\"0.5\"/>\n",
-            cx, cy, x, y);
+            cx, cy, x, y
+        );
 
         let lr = radius + 14.0;
         let lx = cx + lr * angle.cos();
@@ -4175,9 +4283,15 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
         } else {
             ""
         };
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" font-size=\"7\" fill=\"rgba(213,208,200,0.35)\" font-weight=\"300\"{}>{}</text>\n",
-            lx, ly + 2.5, anchor, class_attr, short);
+            lx,
+            ly + 2.5,
+            anchor,
+            class_attr,
+            short
+        );
     }
 
     // Data polygon
@@ -4198,9 +4312,11 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
     } else {
         ""
     };
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<polygon points=\"{}\" fill=\"rgba(232,197,71,0.12)\" stroke=\"rgba(232,197,71,0.5)\" stroke-width=\"1.5\" stroke-linejoin=\"round\"{}/>\n",
-        points, poly_style);
+        points, poly_style
+    );
 
     // Data dots
     for (i, &val) in coords.iter().enumerate() {
@@ -4209,18 +4325,23 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
         let x = cx + r * angle.cos();
         let y = cy + r * angle.sin();
         let dot_color = if val >= 0.5 { "#e8c547" } else { "#c4956a" };
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3\" fill=\"{}\" stroke=\"rgba(0,0,0,0.3)\" stroke-width=\"1\"/>\n",
-            x, y, dot_color);
+            x, y, dot_color
+        );
     }
 
     // Attractor basin indicator — gold glow at center when detected
     if attractor_detected {
-        let _ = write!(html, concat!(
-            "<circle cx=\"100\" cy=\"100\" r=\"12\" fill=\"none\" stroke=\"rgba(232,197,71,0.25)\" stroke-width=\"6\"/>\n",
-            "<circle cx=\"100\" cy=\"100\" r=\"6\" fill=\"rgba(232,197,71,0.35)\" stroke=\"rgba(232,197,71,0.6)\" stroke-width=\"1\"/>\n",
-            "<text x=\"100\" y=\"120\" text-anchor=\"middle\" font-size=\"7\" fill=\"rgba(232,197,71,0.55)\" font-weight=\"400\">Basin</text>\n",
-        ));
+        let _ = write!(
+            html,
+            concat!(
+                "<circle cx=\"100\" cy=\"100\" r=\"12\" fill=\"none\" stroke=\"rgba(232,197,71,0.25)\" stroke-width=\"6\"/>\n",
+                "<circle cx=\"100\" cy=\"100\" r=\"6\" fill=\"rgba(232,197,71,0.35)\" stroke=\"rgba(232,197,71,0.6)\" stroke-width=\"1\"/>\n",
+                "<text x=\"100\" y=\"120\" text-anchor=\"middle\" font-size=\"7\" fill=\"rgba(232,197,71,0.55)\" font-weight=\"400\">Basin</text>\n",
+            )
+        );
     }
 
     let _ = write!(html, "</svg>\n</div>\n");
@@ -4322,34 +4443,53 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
         plot_w
     };
 
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<div class=\"timeline-pane\" role=\"region\" aria-label=\"Multi-run consciousness timeline\">\n\
          <h3>Consciousness Timeline ({} runs)</h3>\n\
          <svg width=\"100%\" height=\"{}\" viewBox=\"0 0 {} {}\" role=\"img\" aria-label=\"Timeline chart showing consciousness metrics across {} runs\">\n",
-        n, h, w, h, n);
+        n, h, w, h, n
+    );
 
     // Grid lines + Y-axis labels
     for i in 0..=4 {
         let y = pad_t + plot_h * (1.0 - i as f64 / 4.0);
         let label = format!("{:.0}%", i as f64 * 25.0);
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<line x1=\"{}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"rgba(213,208,200,0.08)\" stroke-width=\"1\"/>\n\
              <text x=\"{}\" y=\"{:.1}\" fill=\"rgba(213,208,200,0.3)\" font-size=\"10\" text-anchor=\"end\" dominant-baseline=\"middle\">{}</text>\n",
-            pad_l, y, pad_l + plot_w, y, pad_l - 6.0, y, label);
+            pad_l,
+            y,
+            pad_l + plot_w,
+            y,
+            pad_l - 6.0,
+            y,
+            label
+        );
     }
 
     // X-axis timestamp labels
     for (i, snap) in all.iter().enumerate() {
         let x = pad_l + i as f64 * x_step;
         let label = escape_html(&short_timestamp_label(&snap.timestamp));
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"rgba(213,208,200,0.3)\" font-size=\"9\" text-anchor=\"middle\">{}</text>\n",
-            x, h - 4.0, label);
+            x,
+            h - 4.0,
+            label
+        );
 
         // Vertical tick mark
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"rgba(213,208,200,0.06)\" stroke-width=\"1\" stroke-dasharray=\"3,3\"/>\n",
-            x, pad_t, x, pad_t + plot_h);
+            x,
+            pad_t,
+            x,
+            pad_t + plot_h
+        );
     }
 
     // Threshold reference lines on timeline
@@ -4357,11 +4497,19 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
         &[("Emergence", 0.3, "#7ec8a0"), ("Aware", 0.5, "#e8c547")];
     for &(label, level, color) in thresholds {
         let y = pad_t + plot_h * (1.0 - level);
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<line x1=\"{}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\" stroke-width=\"0.5\" stroke-dasharray=\"6,4\" opacity=\"0.3\"/>\n\
              <text x=\"{:.1}\" y=\"{:.1}\" class=\"threshold-label\" text-anchor=\"start\">{}</text>\n",
-            pad_l, y, pad_l + plot_w, y, color,
-            pad_l + plot_w + 2.0, y + 3.0, label);
+            pad_l,
+            y,
+            pad_l + plot_w,
+            y,
+            color,
+            pad_l + plot_w + 2.0,
+            y + 3.0,
+            label
+        );
     }
 
     // Draw each series as a polyline with dots
@@ -4375,9 +4523,11 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
             }
             let _ = write!(points, "{:.1},{:.1}", x, y);
         }
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<polyline points=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" opacity=\"0.85\"/>\n",
-            points, s.color);
+            points, s.color
+        );
 
         // Data point dots
         for (i, &v) in s.values.iter().enumerate() {
@@ -4416,14 +4566,20 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
         ("ACh", bath.acetylcholine, "126,180,200"), // sky vine
     ];
 
-    let _ = write!(html, "<div class=\"garden-container\">\n<svg width=\"100%\" height=\"200\" viewBox=\"0 0 1200 200\">\n<defs>\n");
+    let _ = write!(
+        html,
+        "<div class=\"garden-container\">\n<svg width=\"100%\" height=\"200\" viewBox=\"0 0 1200 200\">\n<defs>\n"
+    );
     let _ = write!(
         html,
         "  <filter id=\"vine-blur\"><feGaussianBlur stdDeviation=\"1.5\"/></filter>\n"
     );
 
     // Pollen particle for golden dots
-    let _ = write!(html, "  <radialGradient id=\"pollen\"><stop offset=\"0%\" stop-color=\"rgba(232,197,71,0.6)\"/><stop offset=\"100%\" stop-color=\"rgba(232,197,71,0)\"/></radialGradient>\n");
+    let _ = write!(
+        html,
+        "  <radialGradient id=\"pollen\"><stop offset=\"0%\" stop-color=\"rgba(232,197,71,0.6)\"/><stop offset=\"100%\" stop-color=\"rgba(232,197,71,0)\"/></radialGradient>\n"
+    );
     let _ = write!(html, "</defs>\n");
 
     // Draw 4 vines rising from the bottom
@@ -4486,12 +4642,15 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
             let px = x_base + sway * 0.3;
             let py = 200.0 - height + 10.0;
             let pr = 3.0 + c * 4.0;
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<circle cx=\"{px:.0}\" cy=\"{py:.0}\" r=\"{pr:.1}\" fill=\"url(#pollen)\">\n\
                  <animate attributeName=\"cy\" values=\"{py:.0};{py2:.0};{py:.0}\" dur=\"{d:.0}s\" repeatCount=\"indefinite\"/>\n\
                  <animate attributeName=\"opacity\" values=\"0.6;0.2;0.6\" dur=\"{d:.0}s\" repeatCount=\"indefinite\"/>\n\
                  </circle>\n",
-                px = px, py = py, pr = pr,
+                px = px,
+                py = py,
+                pr = pr,
                 py2 = py - 15.0,
                 d = 3.0 + i as f64,
             );
@@ -4507,17 +4666,22 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
         let dur = 8.0 + (i as f64 * 1.7) % 6.0;
         let alpha = 0.1 + c * 0.2;
 
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<circle cx=\"{sx:.0}\" cy=\"{sy:.0}\" r=\"{sr:.1}\" fill=\"rgba(232,197,71,{a:.2})\">\n\
              <animate attributeName=\"cx\" values=\"{sx:.0};{tx:.0};{sx:.0}\" dur=\"{d:.0}s\" repeatCount=\"indefinite\"/>\n\
              <animate attributeName=\"cy\" values=\"{sy:.0};{ty:.0};{sy:.0}\" dur=\"{d2:.0}s\" repeatCount=\"indefinite\"/>\n\
              <animate attributeName=\"opacity\" values=\"{a:.2};{a2:.2};{a:.2}\" dur=\"{d:.0}s\" repeatCount=\"indefinite\"/>\n\
              </circle>\n",
-            sx = sx, sy = sy, sr = sr, a = alpha,
+            sx = sx,
+            sy = sy,
+            sr = sr,
+            a = alpha,
             tx = 600.0 + (sx - 600.0) * 0.3, // drift toward center
             ty = 100.0 + (sy - 100.0) * 0.5,
             a2 = alpha * 0.3,
-            d = dur, d2 = dur * 1.3,
+            d = dur,
+            d2 = dur * 1.3,
         );
     }
 

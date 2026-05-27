@@ -283,7 +283,7 @@ impl CodingAgent {
         {
             use crate::language::program_node_translator;
             use symthaea_core::hdc::program_algebra::{
-                encode_task_description, ProgramPatternLibrary,
+                ProgramPatternLibrary, encode_task_description,
             };
 
             let task_hv = encode_task_description(&task_lower);

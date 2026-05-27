@@ -11,7 +11,7 @@
 //!
 //! Run with: cargo bench --bench hdc_improvements
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::sparse_hv::SparseHV;
 

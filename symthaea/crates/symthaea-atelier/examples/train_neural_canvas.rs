@@ -4,9 +4,9 @@
 //!
 //! Run: cargo run -p symthaea-atelier --example train_neural_canvas
 
-use symthaea_atelier::neural_canvas::NeuralCanvas;
-use symthaea_atelier::training::{train_projections, TrainingConfig};
 use symthaea_atelier::AtelierConfig;
+use symthaea_atelier::neural_canvas::NeuralCanvas;
+use symthaea_atelier::training::{TrainingConfig, train_projections};
 use symthaea_canvas::CognitiveSnapshot;
 use symthaea_core::genesis::GenesisSeed;
 

@@ -39,9 +39,9 @@
 //! println!("Is emergent: {}", result.is_emergent);
 //! ```
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use crate::hdc::spectral_connectivity::ConnectivityCalculator;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for emergence detection
@@ -166,7 +166,8 @@ impl CausalEmergenceDetector {
         };
 
         // Step 3: Compute Φ for each partition
-        let partition_phis: Vec<f64> = partitions.iter()
+        let partition_phis: Vec<f64> = partitions
+            .iter()
             .map(|p| {
                 if p.representations.len() >= 2 {
                     self.phi_calculator.compute(&p.representations)
@@ -176,9 +177,8 @@ impl CausalEmergenceDetector {
             })
             .collect();
 
-        let partition_sizes: Vec<usize> = partitions.iter()
-            .map(|p| p.representations.len())
-            .collect();
+        let partition_sizes: Vec<usize> =
+            partitions.iter().map(|p| p.representations.len()).collect();
 
         // Step 4: Compute emergence metrics
         let phi_micro_sum: f64 = partition_phis.iter().sum();
@@ -217,7 +217,8 @@ impl CausalEmergenceDetector {
             for j in 0..n {
                 if i != j {
                     similarities[i][j] = topology.node_representations[i]
-                        .similarity(&topology.node_representations[j]) as f64;
+                        .similarity(&topology.node_representations[j])
+                        as f64;
                 }
             }
         }
@@ -227,7 +228,8 @@ impl CausalEmergenceDetector {
 
         for community in communities {
             if community.len() >= self.config.min_partition_size {
-                let representations: Vec<ContinuousHV> = community.iter()
+                let representations: Vec<ContinuousHV> = community
+                    .iter()
                     .map(|&i| topology.node_representations[i].clone())
                     .collect();
 
@@ -259,7 +261,8 @@ impl CausalEmergenceDetector {
 
         // Merge communities greedily until we reach target number
         while communities.len() > num_partitions {
-            let (merge_a, merge_b) = self.find_best_merge(similarities, &communities, &community_of);
+            let (merge_a, merge_b) =
+                self.find_best_merge(similarities, &communities, &community_of);
 
             if merge_a == merge_b {
                 break;
@@ -338,7 +341,8 @@ impl CausalEmergenceDetector {
             };
 
             let node_indices: Vec<usize> = (start..end).collect();
-            let representations: Vec<ContinuousHV> = node_indices.iter()
+            let representations: Vec<ContinuousHV> = node_indices
+                .iter()
                 .map(|&i| topology.node_representations[i].clone())
                 .collect();
 
@@ -381,7 +385,10 @@ impl CausalEmergenceDetector {
     }
 
     /// Analyze emergence across different partition counts
-    pub fn sweep_partitions(&self, topology: &ConsciousnessTopology) -> Vec<(usize, EmergenceResult)> {
+    pub fn sweep_partitions(
+        &self,
+        topology: &ConsciousnessTopology,
+    ) -> Vec<(usize, EmergenceResult)> {
         let n = topology.node_representations.len();
         let max_partitions = n / 2;
 
@@ -424,11 +431,13 @@ impl CausalEmergenceDetector {
     pub fn multi_scale_emergence(&self, topology: &ConsciousnessTopology) -> MultiScaleEmergence {
         let results = self.sweep_partitions(topology);
 
-        let scale_emergence: Vec<(usize, f64)> = results.iter()
+        let scale_emergence: Vec<(usize, f64)> = results
+            .iter()
             .map(|(scale, r)| (*scale, r.emergence))
             .collect();
 
-        let (optimal_scale, max_emergence) = scale_emergence.iter()
+        let (optimal_scale, max_emergence) = scale_emergence
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|&(s, e)| (s, e))
             .unwrap_or((2, 0.0));
@@ -501,13 +510,23 @@ mod tests {
         println!("Scale emergence:");
         for (scale, emergence) in &multi.scale_emergence {
             println!("  {} partitions: {:.4}", scale, emergence);
-            assert!(emergence.is_finite(), "Emergence at scale {} should be finite", scale);
+            assert!(
+                emergence.is_finite(),
+                "Emergence at scale {} should be finite",
+                scale
+            );
         }
         println!("Optimal scale: {}", multi.optimal_scale);
         println!("Max emergence: {:.4}", multi.max_emergence);
 
-        assert!(!multi.scale_emergence.is_empty(), "Should have at least one scale");
-        assert!(multi.max_emergence.is_finite(), "Max emergence should be finite");
+        assert!(
+            !multi.scale_emergence.is_empty(),
+            "Should have at least one scale"
+        );
+        assert!(
+            multi.max_emergence.is_finite(),
+            "Max emergence should be finite"
+        );
         assert!(multi.optimal_scale > 0, "Optimal scale should be positive");
     }
 
@@ -537,6 +556,9 @@ mod tests {
 
         assert!(result.phi_macro.is_finite(), "Phi_macro should be finite");
         assert!(result.phi_macro >= 0.0, "Phi_macro should be non-negative");
-        assert!(result.emergence_ratio.is_finite(), "Emergence ratio should be finite");
+        assert!(
+            result.emergence_ratio.is_finite(),
+            "Emergence ratio should be finite"
+        );
     }
 }

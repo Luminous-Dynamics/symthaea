@@ -62,10 +62,7 @@ impl Default for LivingArtConfig {
 /// 2. JavaScript CfC kernel that continues evolving
 /// 3. Energy budget countdown (art fades when energy depletes)
 /// 4. The consciousness metadata that birthed this piece
-pub fn generate_living_art(
-    snapshot: &CognitiveSnapshot,
-    config: &LivingArtConfig,
-) -> String {
+pub fn generate_living_art(snapshot: &CognitiveSnapshot, config: &LivingArtConfig) -> String {
     let genesis = GenesisSeed::from_phrase("living-art");
     let mut painter = NeuralPainter::new(&genesis);
 
@@ -84,22 +81,20 @@ pub fn generate_living_art(
     // Export CfC parameters for the JS kernel
     let harmony_json = format!(
         "[{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3}]",
-        snapshot.harmony_activations[0], snapshot.harmony_activations[1],
-        snapshot.harmony_activations[2], snapshot.harmony_activations[3],
-        snapshot.harmony_activations[4], snapshot.harmony_activations[5],
-        snapshot.harmony_activations[6], snapshot.harmony_activations[7],
+        snapshot.harmony_activations[0],
+        snapshot.harmony_activations[1],
+        snapshot.harmony_activations[2],
+        snapshot.harmony_activations[3],
+        snapshot.harmony_activations[4],
+        snapshot.harmony_activations[5],
+        snapshot.harmony_activations[6],
+        snapshot.harmony_activations[7],
     );
 
     // Export stroke history for JS replay/continuation
     let strokes_json = strokes_to_json(&initial_strokes);
 
-    generate_html(
-        &png_b64,
-        &harmony_json,
-        &strokes_json,
-        snapshot,
-        config,
-    )
+    generate_html(&png_b64, &harmony_json, &strokes_json, snapshot, config)
 }
 
 fn strokes_to_json(strokes: &[Brushstroke]) -> String {
@@ -368,8 +363,16 @@ fn base64_encode(data: &[u8]) -> String {
         let triple = (b0 << 16) | (b1 << 8) | b2;
         result.push(CHARS[((triple >> 18) & 63) as usize] as char);
         result.push(CHARS[((triple >> 12) & 63) as usize] as char);
-        result.push(if chunk.len() > 1 { CHARS[((triple >> 6) & 63) as usize] as char } else { '=' });
-        result.push(if chunk.len() > 2 { CHARS[(triple & 63) as usize] as char } else { '=' });
+        result.push(if chunk.len() > 1 {
+            CHARS[((triple >> 6) & 63) as usize] as char
+        } else {
+            '='
+        });
+        result.push(if chunk.len() > 2 {
+            CHARS[(triple & 63) as usize] as char
+        } else {
+            '='
+        });
     }
     result
 }

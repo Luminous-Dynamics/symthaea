@@ -907,13 +907,13 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                     .parse()
                     .map_err(|_| "--eval-limit must be a number")?;
             }
-            "--max-gen-tokens" => {
+            "--max-r#gen-tokens" => {
                 i += 1;
                 opts.max_gen_tokens = args
                     .get(i)
-                    .ok_or("--max-gen-tokens requires a number")?
+                    .ok_or("--max-r#gen-tokens requires a number")?
                     .parse()
-                    .map_err(|_| "--max-gen-tokens must be a number")?;
+                    .map_err(|_| "--max-r#gen-tokens must be a number")?;
             }
             "--max-gated-perplexity" => {
                 i += 1;
@@ -1054,7 +1054,7 @@ fn print_usage() {
         "  --dump-generations PATH  Write raw/gated canonical generation diagnostics as JSONL"
     );
     eprintln!("  --eval-limit N         Limit eval pairs (default: all)");
-    eprintln!("  --max-gen-tokens N     Max teacher-forced/generated tokens (default: 64)");
+    eprintln!("  --max-r#gen-tokens N     Max teacher-forced/generated tokens (default: 64)");
     eprintln!("  --report-only          Emit canonical quality JSON without applying thresholds");
     eprintln!("  --teacher-forced-only  Skip generation-heavy canonical metrics");
     eprintln!("  --max-gated-perplexity F        Fail canonical eval above this gated PPL");

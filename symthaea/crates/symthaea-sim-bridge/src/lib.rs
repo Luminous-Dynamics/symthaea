@@ -11,8 +11,8 @@
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::seed_from_name;
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::seed_from_name;
 use thiserror::Error;
 
 /// Simple deterministic text embedding for HDC space.
@@ -429,9 +429,9 @@ impl SimulationRegistry {
 
     /// Run a simulation request using the first matching backend.
     pub fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
-        let backend = self.find_backend(request.solver).ok_or_else(|| {
-            SimulationError::SolverUnavailable(request.solver)
-        })?;
+        let backend = self
+            .find_backend(request.solver)
+            .ok_or_else(|| SimulationError::SolverUnavailable(request.solver))?;
         backend.run(request)
     }
 }
@@ -452,23 +452,20 @@ impl MetricEncoder {
     /// Project a simulation result into an HDC vector.
     pub fn encode_result(&self, result: &SimulationResult) -> ContinuousHV {
         let mut hv = ContinuousHV::zero(self.dimension);
-        
+
         for (i, metric) in result.metrics.iter().enumerate() {
             // Bind the metric name and value into the vector
-            let name_hv = ContinuousHV::random(
-                self.dimension, 
-                seed_from_name(&metric.name)
-            );
+            let name_hv = ContinuousHV::random(self.dimension, seed_from_name(&metric.name));
             // Simple scalar projection: scale the random vector by the metric value
             let sensation = name_hv.scale(metric.value as f32);
-            
+
             if i == 0 {
                 hv = sensation;
             } else {
                 hv = ContinuousHV::bundle(&[&hv, &sensation]);
             }
         }
-        
+
         hv.normalize()
     }
 }
@@ -593,7 +590,7 @@ impl AmygdalaInterlock {
         match self.status {
             SafetyStatus::Green => raw_value,
             SafetyStatus::Yellow => raw_value * 0.5, // Dampen output
-            SafetyStatus::Red => 0.0,               // Clamp output
+            SafetyStatus::Red => 0.0,                // Clamp output
         }
     }
 
@@ -610,8 +607,12 @@ mod tests {
     #[derive(Debug, Default)]
     struct MockBackend;
     impl SimulationBackend for MockBackend {
-        fn name(&self) -> &'static str { "mock" }
-        fn supported_solvers(&self) -> &[SolverKind] { &[SolverKind::FiniteElement] }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
+        fn supported_solvers(&self) -> &[SolverKind] {
+            &[SolverKind::FiniteElement]
+        }
         fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
             Ok(SimulationResult::converged(&request.id, 1.0))
         }
@@ -646,7 +647,12 @@ mod tests {
         );
 
         let result = registry.run(&request);
-        assert!(matches!(result, Err(SimulationError::SolverUnavailable(SolverKind::ComputationalFluidDynamics))));
+        assert!(matches!(
+            result,
+            Err(SimulationError::SolverUnavailable(
+                SolverKind::ComputationalFluidDynamics
+            ))
+        ));
     }
 
     #[test]

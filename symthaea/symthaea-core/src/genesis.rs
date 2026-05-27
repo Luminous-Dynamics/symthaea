@@ -23,8 +23,8 @@
 use crate::hdc::unified_hv::ContinuousHV;
 use rand::RngCore;
 use sha3::{
-    digest::{ExtendableOutput, Update, XofReader},
     Shake256,
+    digest::{ExtendableOutput, Update, XofReader},
 };
 
 /// The root singularity: a seed phrase that deterministically generates

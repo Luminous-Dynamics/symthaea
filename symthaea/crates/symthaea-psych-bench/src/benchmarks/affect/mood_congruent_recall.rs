@@ -214,12 +214,16 @@ mod tests {
         };
         let result = MoodCongruentRecallBenchmark.run(&config);
         assert!(result.metrics.contains_key("congruence_ratio"));
-        assert!(result
-            .metrics
-            .contains_key("positive_mood::congruence_ratio"));
-        assert!(result
-            .metrics
-            .contains_key("negative_mood::congruence_ratio"));
+        assert!(
+            result
+                .metrics
+                .contains_key("positive_mood::congruence_ratio")
+        );
+        assert!(
+            result
+                .metrics
+                .contains_key("negative_mood::congruence_ratio")
+        );
         for val in result.metrics.values() {
             assert!(val.mean.is_finite());
         }

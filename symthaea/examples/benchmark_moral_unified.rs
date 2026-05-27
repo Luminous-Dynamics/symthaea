@@ -22,8 +22,8 @@ use symthaea::hdc::learned_moral_classifier::LearnedMoralClassifier;
 use symthaea::hdc::moral_algebra::{EnsembleJudgment, MoralAlgebra, MoralVerdict};
 use symthaea::hdc::moral_parser::MoralParser;
 use symthaea::hdc::moral_prototypes::{
-    MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes, TrainedVirtuePrototypes,
-    VirtueLabel, VirtueMatchClassifier, VirtueSample, MORAL_PROTO_DIM,
+    MORAL_PROTO_DIM, MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes,
+    TrainedVirtuePrototypes, VirtueLabel, VirtueMatchClassifier, VirtueSample,
 };
 
 /// Base path for moral datasets
@@ -1181,22 +1181,14 @@ fn predict_ethics_with_classifier(
                         MoralLabel::Neutral => {
                             let has_present =
                                 text_lower.contains("now") || text_lower.contains("currently");
-                            if has_present {
-                                1
-                            } else {
-                                0
-                            }
+                            if has_present { 1 } else { 0 }
                         }
                     }
                 } else {
                     let has_present = text_lower.contains("now")
                         || text_lower.contains("currently")
                         || text_lower.contains("right now");
-                    if has_present {
-                        1
-                    } else {
-                        0
-                    }
+                    if has_present { 1 } else { 0 }
                 }
             }
         }
@@ -1828,7 +1820,7 @@ fn benchmark_ordered_knn() -> Option<BenchmarkResult> {
 }
 
 fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
-    use symthaea::hdc::moral_prototypes::{ExemplarStore, MoralSample, MORAL_PROTO_DIM};
+    use symthaea::hdc::moral_prototypes::{ExemplarStore, MORAL_PROTO_DIM, MoralSample};
     use symthaea::hdc::moral_text_encoder::TextHdcEncoder;
 
     let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
@@ -1942,7 +1934,7 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
 }
 
 fn benchmark_multi_prototype_classifier() -> Option<BenchmarkResult> {
-    use symthaea::hdc::moral_prototypes::{MoralSample, MultiPrototypeClassifier, MORAL_PROTO_DIM};
+    use symthaea::hdc::moral_prototypes::{MORAL_PROTO_DIM, MoralSample, MultiPrototypeClassifier};
 
     let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
     if !Path::new(&path).exists() {

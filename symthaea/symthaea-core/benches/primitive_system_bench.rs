@@ -13,7 +13,7 @@
 //! - Similarity matrix computation
 //! - Cache performance
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{
     CompositionAlgebra, CompositionCache, PrimitiveSystem, PrimitiveTier,

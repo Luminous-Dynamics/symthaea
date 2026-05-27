@@ -535,11 +535,7 @@ pub fn moebius(n: u64) -> i64 {
     if m > 1 {
         num_factors += 1; // remaining prime factor
     }
-    if num_factors % 2 == 0 {
-        1
-    } else {
-        -1
-    }
+    if num_factors % 2 == 0 { 1 } else { -1 }
 }
 
 /// Rising factorial (Pochhammer symbol): x^{(n)} = x(x+1)(x+2)...(x+n-1).

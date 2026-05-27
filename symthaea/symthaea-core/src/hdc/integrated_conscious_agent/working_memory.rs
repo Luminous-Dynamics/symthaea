@@ -60,11 +60,19 @@ impl WorkingMemory {
     }
 
     /// Add item to episodic buffer (the integration hub)
-    pub fn add_to_episodic(&mut self, content: ContinuousHV, source: MemorySource, goal_relevance: f64, timestamp: usize) {
+    pub fn add_to_episodic(
+        &mut self,
+        content: ContinuousHV,
+        source: MemorySource,
+        goal_relevance: f64,
+        timestamp: usize,
+    ) {
         // If at capacity, remove least activated item
         if self.episodic_buffer.len() >= self.capacity {
             // Find and remove lowest activation item
-            if let Some(min_idx) = self.episodic_buffer.iter()
+            if let Some(min_idx) = self
+                .episodic_buffer
+                .iter()
                 .enumerate()
                 .min_by(|a, b| a.1.activation.total_cmp(&b.1.activation))
                 .map(|(i, _)| i)
@@ -106,9 +114,9 @@ impl WorkingMemory {
 
     /// Get most activated item
     pub fn most_active(&self) -> Option<&WorkingMemoryItem> {
-        self.episodic_buffer.iter().max_by(|a, b|
-            a.activation.total_cmp(&b.activation)
-        )
+        self.episodic_buffer
+            .iter()
+            .max_by(|a, b| a.activation.total_cmp(&b.activation))
     }
 
     /// Get working memory load (0-1)
@@ -121,7 +129,10 @@ impl WorkingMemory {
         if self.episodic_buffer.is_empty() {
             return 0.0;
         }
-        self.episodic_buffer.iter().map(|i| i.activation).sum::<f64>()
+        self.episodic_buffer
+            .iter()
+            .map(|i| i.activation)
+            .sum::<f64>()
             / self.episodic_buffer.len() as f64
     }
 

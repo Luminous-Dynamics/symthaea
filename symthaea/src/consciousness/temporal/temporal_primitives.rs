@@ -52,7 +52,7 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -1872,9 +1872,11 @@ mod tests {
         // Test Equals grounding
         let equals =
             AllenRelationPrimitiveGrounding::for_relation(AllenRelation::Equals, &primitive_system);
-        assert!(equals
-            .nsm_primitives
-            .contains(&"NSM_AT_THE_SAME_TIME".to_string()));
+        assert!(
+            equals
+                .nsm_primitives
+                .contains(&"NSM_AT_THE_SAME_TIME".to_string())
+        );
         assert!(equals.nsm_primitives.contains(&"NSM_SAME".to_string()));
         assert!(!equals.is_causal_candidate);
         assert_eq!(equals.overlap_degree, 1.0);

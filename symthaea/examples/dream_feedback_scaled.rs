@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[cfg(feature = "magi_loop")]
 use symthaea::consciousness::recursive_improvement::{
-    hash_context, DreamFeedbackBridge, DreamInsight,
+    DreamFeedbackBridge, DreamInsight, hash_context,
 };
 
 fn main() -> Result<()> {

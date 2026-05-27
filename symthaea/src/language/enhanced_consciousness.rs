@@ -1681,7 +1681,8 @@ impl EnhancedConsciousness {
         let base_desc = self.base.describe_state();
         format!(
             "{}\n\nEnhanced State:\n- Integration Coherence: {:.2}\n- Flow: {} ({:.0}%)\n- Phenomenal: {}\n- User: {}",
-            format!("Integration: {}, Workspace: {}, Attention: {}, Prediction: {:.0}%, Recurrence: {}, Embodiment: {}",
+            format!(
+                "Integration: {}, Workspace: {}, Attention: {}, Prediction: {:.0}%, Recurrence: {}, Embodiment: {}",
                 base_desc.integration_level,
                 base_desc.workspace_state,
                 base_desc.attention_state,
@@ -1690,7 +1691,11 @@ impl EnhancedConsciousness {
                 base_desc.embodiment_state,
             ),
             self.integrator.integration_coherence(),
-            if self.temporal.flow_state.in_flow { "Yes" } else { "No" },
+            if self.temporal.flow_state.in_flow {
+                "Yes"
+            } else {
+                "No"
+            },
             self.temporal.flow_state.flow_score * 100.0,
             self.phenomenal.describe(),
             self.user_model.describe(),

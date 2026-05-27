@@ -29,7 +29,7 @@ use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::consciousness_integration::{ConsciousnessPipeline, IntegrationConfig};
 use crate::hdc::dynamical_system::{HarmonicOscillator, LorenzSystem, NBodyGravity};
 use crate::hdc::math_bridge::{MathValue, UnifiedMathEngine};
-use crate::physics::simulation_bridge::{state_to_binary_hv, PhysicsSimulator, SimulationAnalysis};
+use crate::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis, state_to_binary_hv};
 
 // =============================================================================
 // PHYSICS → HDC → CONSCIOUSNESS PIPELINE

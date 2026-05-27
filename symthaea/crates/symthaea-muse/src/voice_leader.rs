@@ -9,8 +9,8 @@
 //! Call-and-response: the lead plays a phrase, then the harmony echoes it
 //! (transposed down a third or fifth) in the next phrase.
 
-use crate::melodic_grammar::MelodicContext;
 use crate::Note;
+use crate::melodic_grammar::MelodicContext;
 
 /// Voice roles with independent behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

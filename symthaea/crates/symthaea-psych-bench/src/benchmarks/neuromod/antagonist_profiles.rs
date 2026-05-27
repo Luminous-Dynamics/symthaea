@@ -8,10 +8,10 @@
 //!
 //! Science: Stahl (2013) — Essential Psychopharmacology; Seeman (2002) — D2 receptor occupancy.
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 
@@ -135,7 +135,7 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
                 bath.update(&inputs);
             }
             bath.inject_d2_antagonist(0.3, 20); // short half-life
-                                                // Run past expiration
+            // Run past expiration
             for _ in 0..200 {
                 bath.update(&inputs);
             }

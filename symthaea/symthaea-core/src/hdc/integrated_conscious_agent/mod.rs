@@ -59,13 +59,13 @@
 //! - Prediction errors (attend to surprising things)
 //! - Metacognitive assessment (attend to what needs attention)
 
+mod agent;
+mod attention_controller;
+mod emotional_state;
+mod physiology;
+mod runtime;
 mod types;
 mod working_memory;
-mod emotional_state;
-mod agent;
-mod physiology;
-mod attention_controller;
-mod runtime;
 
 #[cfg(test)]
 mod tests;
@@ -77,13 +77,12 @@ mod runtime_tests;
 
 // Types
 pub use types::{
-    AgentConfig, AttentionGoal, IntegratedUpdate, AttentionSummary,
-    TemporalSummary, SelfModelSummary, PhenomenalContent, QualiaTexture,
-    AgentIntrospection, AttentionControlStatus,
+    AgentConfig, AgentIntrospection, AttentionControlStatus, AttentionGoal, AttentionSummary,
+    IntegratedUpdate, PhenomenalContent, QualiaTexture, SelfModelSummary, TemporalSummary,
 };
 
 // Working memory
-pub use working_memory::{WorkingMemory, WorkingMemoryItem, MemorySource};
+pub use working_memory::{MemorySource, WorkingMemory, WorkingMemoryItem};
 
 // Emotional state
 pub use emotional_state::EmotionalState;
@@ -93,19 +92,17 @@ pub use agent::IntegratedConsciousAgent;
 
 // Physiology integration types
 pub use physiology::{
-    HormoneEventSuggestion, CoherenceGating, QualiaModulation,
-    MemoryExport, MemoryImport, IdentityCoherence, IdentityStatus,
-    ProsodyHints, ExtendedPacing,
+    CoherenceGating, ExtendedPacing, HormoneEventSuggestion, IdentityCoherence, IdentityStatus,
+    MemoryExport, MemoryImport, ProsodyHints, QualiaModulation,
 };
 
 // Attention controller
 pub use attention_controller::{
-    SelfDirectedAttentionController, HabituationState, AttentionStrategy,
+    AttentionStrategy, HabituationState, SelfDirectedAttentionController,
 };
 
 // Runtime
 pub use runtime::{
-    RuntimeMessage, HormoneEventType, RuntimeResponse, RuntimeConfig,
-    RuntimeSnapshot, EmotionalStateSummary, ConsciousAgentRuntime,
-    SyncConsciousAgentRuntime,
+    ConsciousAgentRuntime, EmotionalStateSummary, HormoneEventType, RuntimeConfig, RuntimeMessage,
+    RuntimeResponse, RuntimeSnapshot, SyncConsciousAgentRuntime,
 };

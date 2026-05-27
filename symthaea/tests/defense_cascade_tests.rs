@@ -10,7 +10,7 @@
 //! Run: `cargo test --test defense_cascade_tests`
 
 use symthaea::cognitive_loop::defense::{
-    moral_filter, propose_defense_actions, DefenseAction, DefenseActionKind,
+    DefenseAction, DefenseActionKind, moral_filter, propose_defense_actions,
 };
 use symthaea::safety::SafetyLevel;
 

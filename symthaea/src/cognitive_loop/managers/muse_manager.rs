@@ -28,7 +28,7 @@
 //! - Fritz et al. (2009): Universal recognition of emotional cues in music
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use serde::{Deserialize, Serialize};
 use symthaea_muse::streaming::StreamingSynth;

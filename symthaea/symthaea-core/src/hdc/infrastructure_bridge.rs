@@ -34,7 +34,7 @@ pub use crate::voice::LTCPacing;
 #[cfg(feature = "voice-tts")]
 use crate::voice::{VoiceOutput, VoiceOutputConfig};
 
-use crate::memory::hippocampus::{HippocampusActor, EmotionalValence, RecallQuery};
+use crate::memory::hippocampus::{EmotionalValence, HippocampusActor, RecallQuery};
 
 /// Memory record for persistence
 #[derive(Debug, Clone)]
@@ -52,10 +52,14 @@ pub struct ConsciousnessMemoryRecord {
 pub trait EpisodicMemoryBackend: Send + Sync {
     /// Store a memory record
     fn store(&self, record: ConsciousnessMemoryRecord) -> Result<u64, String>;
-    
+
     /// Recall similar memories
-    fn recall(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<ConsciousnessMemoryRecord>, String>;
-    
+    fn recall(
+        &self,
+        query_embedding: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<ConsciousnessMemoryRecord>, String>;
+
     /// Consolidate memories during "sleep"
     fn consolidate(&self) -> Result<usize, String>;
 }
@@ -64,7 +68,7 @@ pub trait EpisodicMemoryBackend: Send + Sync {
 pub trait VoiceSynthesisBackend: Send + Sync {
     /// Synthesize speech with consciousness-driven pacing
     fn synthesize(&self, text: &str, pacing: &LTCPacing) -> Result<Vec<f32>, String>;
-    
+
     /// Check if voice is ready
     fn is_ready(&self) -> bool;
 }
@@ -84,42 +88,45 @@ impl MockMemoryBackend {
 
 impl EpisodicMemoryBackend for MockMemoryBackend {
     fn store(&self, mut record: ConsciousnessMemoryRecord) -> Result<u64, String> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| format!("No runtime: {}", e))?;
-        
+        let rt = tokio::runtime::Handle::try_current().map_err(|e| format!("No runtime: {}", e))?;
+
         rt.block_on(async {
             let mut id = self.next_id.write().await;
             *id += 1;
             record.id = *id;
-            
+
             let mut records = self.records.write().await;
             records.push(record);
-            
+
             Ok(*id)
         })
     }
-    
-    fn recall(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<ConsciousnessMemoryRecord>, String> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| format!("No runtime: {}", e))?;
-        
+
+    fn recall(
+        &self,
+        query_embedding: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<ConsciousnessMemoryRecord>, String> {
+        let rt = tokio::runtime::Handle::try_current().map_err(|e| format!("No runtime: {}", e))?;
+
         rt.block_on(async {
             let records = self.records.read().await;
-            
+
             // Simple cosine similarity
-            let mut scored: Vec<_> = records.iter()
+            let mut scored: Vec<_> = records
+                .iter()
                 .map(|r| {
                     let sim = cosine_similarity(query_embedding, &r.embedding);
                     (r.clone(), sim)
                 })
                 .collect();
-            
+
             scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            
+
             Ok(scored.into_iter().take(top_k).map(|(r, _)| r).collect())
         })
     }
-    
+
     fn consolidate(&self) -> Result<usize, String> {
         // Mock: no-op consolidation
         Ok(0)
@@ -135,9 +142,9 @@ impl VoiceSynthesisBackend for MockVoiceBackend {
         // Return empty samples (no actual audio)
         Ok(vec![])
     }
-    
+
     fn is_ready(&self) -> bool {
-        false  // No actual TTS
+        false // No actual TTS
     }
 }
 
@@ -197,32 +204,33 @@ impl HippocampusMemoryBackend {
 
 impl EpisodicMemoryBackend for HippocampusMemoryBackend {
     fn store(&self, record: ConsciousnessMemoryRecord) -> Result<u64, String> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| format!("No runtime: {}", e))?;
+        let rt = tokio::runtime::Handle::try_current().map_err(|e| format!("No runtime: {}", e))?;
 
         rt.block_on(async {
             let mut hippocampus = self.hippocampus.write().await;
 
             let emotion = Self::parse_emotion(&record.emotion);
 
-            hippocampus.remember(
-                record.text,
-                record.tags,
-                emotion,
-            ).map_err(|e| format!("Failed to store memory: {}", e))
+            hippocampus
+                .remember(record.text, record.tags, emotion)
+                .map_err(|e| format!("Failed to store memory: {}", e))
         })
     }
 
-    fn recall(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<ConsciousnessMemoryRecord>, String> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| format!("No runtime: {}", e))?;
+    fn recall(
+        &self,
+        query_embedding: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<ConsciousnessMemoryRecord>, String> {
+        let rt = tokio::runtime::Handle::try_current().map_err(|e| format!("No runtime: {}", e))?;
 
         rt.block_on(async {
             let mut hippocampus = self.hippocampus.write().await;
 
             // Create a query string from embedding (simple hash for now)
             // In practice, you'd want to use the embedding directly
-            let query_hash: u64 = query_embedding.iter()
+            let query_hash: u64 = query_embedding
+                .iter()
                 .take(8)
                 .enumerate()
                 .map(|(i, v)| ((v * 1000.0) as u64).wrapping_mul(i as u64 + 1))
@@ -235,11 +243,13 @@ impl EpisodicMemoryBackend for HippocampusMemoryBackend {
                 ..Default::default()
             };
 
-            let results = hippocampus.recall(query)
+            let results = hippocampus
+                .recall(query)
                 .map_err(|e| format!("Failed to recall: {}", e))?;
 
-            Ok(results.into_iter().map(|r| {
-                ConsciousnessMemoryRecord {
+            Ok(results
+                .into_iter()
+                .map(|r| ConsciousnessMemoryRecord {
                     id: r.trace.id,
                     timestamp: r.trace.timestamp,
                     text: r.trace.content,
@@ -247,14 +257,13 @@ impl EpisodicMemoryBackend for HippocampusMemoryBackend {
                     phi: r.similarity as f64,
                     emotion: Self::emotion_to_string(r.trace.emotion),
                     tags: r.trace.tags,
-                }
-            }).collect())
+                })
+                .collect())
         })
     }
 
     fn consolidate(&self) -> Result<usize, String> {
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| format!("No runtime: {}", e))?;
+        let rt = tokio::runtime::Handle::try_current().map_err(|e| format!("No runtime: {}", e))?;
 
         rt.block_on(async {
             let hippocampus = self.hippocampus.read().await;
@@ -265,7 +274,7 @@ impl EpisodicMemoryBackend for HippocampusMemoryBackend {
             // Return count of memories that could be consolidated
             // (actual consolidation happens via sleep cycle manager)
             if pressure > 0.7 {
-                Ok(hippocampus.memory_count() / 10)  // ~10% eligible for consolidation
+                Ok(hippocampus.memory_count() / 10) // ~10% eligible for consolidation
             } else {
                 Ok(0)
             }
@@ -321,10 +330,13 @@ impl KokoroVoiceBackend {
 #[cfg(feature = "voice-tts")]
 impl VoiceSynthesisBackend for KokoroVoiceBackend {
     fn synthesize(&self, text: &str, pacing: &LTCPacing) -> Result<Vec<f32>, String> {
-        let mut voice = self.voice.lock()
+        let mut voice = self
+            .voice
+            .lock()
             .map_err(|e| format!("Voice lock poisoned: {}", e))?;
 
-        let result = voice.synthesize_with_pacing(text, pacing.clone())
+        let result = voice
+            .synthesize_with_pacing(text, pacing.clone())
             .map_err(|e| format!("Synthesis failed: {}", e))?;
 
         Ok(result.samples)
@@ -410,7 +422,10 @@ impl InfrastructureBridge {
     }
 
     /// Create with Hippocampus memory and custom capacity
-    pub fn with_hippocampus_capacity(dimensions: usize, max_memories: usize) -> Result<Self, String> {
+    pub fn with_hippocampus_capacity(
+        dimensions: usize,
+        max_memories: usize,
+    ) -> Result<Self, String> {
         let memory = HippocampusMemoryBackend::with_capacity(dimensions, max_memories)?;
 
         Ok(Self {
@@ -446,38 +461,46 @@ impl InfrastructureBridge {
             stats: BridgeStats::default(),
         })
     }
-    
+
     /// Store consciousness memory
     pub fn store_memory(&mut self, record: ConsciousnessMemoryRecord) -> Result<u64, String> {
         let id = self.memory.store(record)?;
         self.stats.memories_stored += 1;
         Ok(id)
     }
-    
+
     /// Recall similar memories
-    pub fn recall_memories(&mut self, query: &[f32], top_k: usize) -> Result<Vec<ConsciousnessMemoryRecord>, String> {
+    pub fn recall_memories(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<ConsciousnessMemoryRecord>, String> {
         let results = self.memory.recall(query, top_k)?;
         self.stats.memories_recalled += results.len() as u64;
         Ok(results)
     }
-    
+
     /// Synthesize speech with consciousness pacing
-    pub fn synthesize_speech(&mut self, text: &str, pacing: &LTCPacing) -> Result<Vec<f32>, String> {
+    pub fn synthesize_speech(
+        &mut self,
+        text: &str,
+        pacing: &LTCPacing,
+    ) -> Result<Vec<f32>, String> {
         let samples = self.voice.synthesize(text, pacing)?;
         self.stats.voice_synthesized += 1;
         Ok(samples)
     }
-    
+
     /// Check if voice is available
     pub fn voice_ready(&self) -> bool {
         self.voice.is_ready()
     }
-    
+
     /// Get statistics
     pub fn stats(&self) -> &BridgeStats {
         &self.stats
     }
-    
+
     /// Consolidate memories
     pub fn consolidate(&self) -> Result<usize, String> {
         self.memory.consolidate()
@@ -493,19 +516,19 @@ impl Default for InfrastructureBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_mock_backend() {
         let bridge = InfrastructureBridge::mock();
         assert_eq!(bridge.stats().memories_stored, 0);
     }
-    
+
     #[test]
     fn test_cosine_similarity() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
         assert!((cosine_similarity(&a, &b) - 1.0).abs() < 0.001);
-        
+
         let c = vec![0.0, 1.0, 0.0];
         assert!(cosine_similarity(&a, &c).abs() < 0.001);
     }

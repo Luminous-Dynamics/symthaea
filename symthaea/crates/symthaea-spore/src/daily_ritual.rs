@@ -21,8 +21,8 @@
 //! 3. Reverent Withdrawal — Sacred Stillness, sleep preparation
 
 use crate::boot_consciousness::{
-    BootAnimation, BootColor, BootGlyph, GLYPH_OMEGA_0, GLYPH_OMEGA_1, GLYPH_OMEGA_13,
-    GLYPH_OMEGA_22, GLYPH_OMEGA_26, GLYPH_OMEGA_33, GLYPH_OMEGA_48, GLYPH_OMEGA_8, GLYPH_OMEGA_9,
+    BootAnimation, BootColor, BootGlyph, GLYPH_OMEGA_0, GLYPH_OMEGA_1, GLYPH_OMEGA_8,
+    GLYPH_OMEGA_9, GLYPH_OMEGA_13, GLYPH_OMEGA_22, GLYPH_OMEGA_26, GLYPH_OMEGA_33, GLYPH_OMEGA_48,
 };
 use crate::dream_journal::DreamFragment;
 use serde::{Deserialize, Serialize};
@@ -306,9 +306,7 @@ fn harmony_intention(harmony: &str, alignment: f32) -> (BootGlyph, String) {
     let glyph = harmony_to_glyph(harmony);
 
     let intention = match harmony {
-        "Resonant Coherence" => {
-            "Today's intention: seek coherence in one relationship or task."
-        }
+        "Resonant Coherence" => "Today's intention: seek coherence in one relationship or task.",
         "Pan-Sentient Flourishing" => {
             "Today's intention: extend care to one being you might otherwise overlook."
         }

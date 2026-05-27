@@ -16,10 +16,10 @@
 
 use symthaea_aesthetic::synesthesia;
 use symthaea_atelier::critic::{PerceptualInput, SelfCritic};
-use symthaea_atelier::{create_artwork, AtelierConfig};
+use symthaea_atelier::{AtelierConfig, create_artwork};
 use symthaea_canvas::CognitiveSnapshot;
 use symthaea_muse::critic::evaluate_composition;
-use symthaea_muse::{compose, MuseConfig, MusicalState};
+use symthaea_muse::{MuseConfig, MusicalState, compose};
 
 fn main() {
     println!("═══════════════════════════════════════════════════════");

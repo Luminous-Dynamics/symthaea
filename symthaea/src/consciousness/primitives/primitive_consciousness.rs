@@ -44,8 +44,8 @@ use crate::consciousness::primitive_reasoning::{
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 
 // =============================================================================
 // PRIMITIVE CONSCIOUSNESS STATE

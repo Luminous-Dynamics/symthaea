@@ -57,7 +57,7 @@ fn generate_pattern_embedding(pattern: PatternType, seed: u64) -> Vec<f32> {
             embedding[0] = 0.9; // Red
             embedding[1] = 0.1; // Green
             embedding[2] = 0.1; // Blue
-                                // Square features: corners, parallel edges, high symmetry
+            // Square features: corners, parallel edges, high symmetry
             embedding[8] = 0.8; // Corners
             embedding[9] = 0.8; // Parallel edges
             embedding[10] = 0.1; // Curvature (low)
@@ -68,7 +68,7 @@ fn generate_pattern_embedding(pattern: PatternType, seed: u64) -> Vec<f32> {
             embedding[0] = 0.1; // Red
             embedding[1] = 0.1; // Green
             embedding[2] = 0.9; // Blue
-                                // Circle features: no corners, curved, radial symmetry
+            // Circle features: no corners, curved, radial symmetry
             embedding[8] = 0.1; // Corners (none)
             embedding[9] = 0.1; // Parallel edges (none)
             embedding[10] = 0.9; // Curvature (high)
@@ -80,7 +80,7 @@ fn generate_pattern_embedding(pattern: PatternType, seed: u64) -> Vec<f32> {
             embedding[0] = 0.1; // Red
             embedding[1] = 0.9; // Green
             embedding[2] = 0.1; // Blue
-                                // Triangle features: sharp corners, some edges, low symmetry
+            // Triangle features: sharp corners, some edges, low symmetry
             embedding[8] = 0.9; // Corners (sharp)
             embedding[9] = 0.3; // Parallel edges (few)
             embedding[10] = 0.1; // Curvature (none)

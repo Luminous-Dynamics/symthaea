@@ -22,7 +22,7 @@
 //! Multi-path verification (e.g., solve via LU vs QR → compare).
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 use serde::{Deserialize, Serialize};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1317,17 +1317,13 @@ pub fn preconditioned_conjugate_gradient(
     let m_inv: Vec<f64> = (0..n)
         .map(|i| {
             let d = a[i][i];
-            if d.abs() > 1e-15 {
-                1.0 / d
-            } else {
-                1.0
-            }
+            if d.abs() > 1e-15 { 1.0 / d } else { 1.0 }
         })
         .collect();
 
     let mut x = vec![0.0f64; n];
     let mut r = b.to_vec(); // r₀ = b - A*0 = b
-                            // z = M⁻¹ * r
+    // z = M⁻¹ * r
     let mut z: Vec<f64> = r.iter().zip(m_inv.iter()).map(|(ri, mi)| ri * mi).collect();
     let mut p = z.clone();
     let mut rz = dot(&r, &z);

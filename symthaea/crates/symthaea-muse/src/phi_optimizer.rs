@@ -242,7 +242,7 @@ mod tests {
         );
 
         opt.update_phi(0.7); // above target
-                             // After EMA smoothing, error direction depends on history
+        // After EMA smoothing, error direction depends on history
         let metrics = opt.metrics();
         assert!(metrics.phi_ema > 0.3, "EMA should track upward");
     }

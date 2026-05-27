@@ -12,7 +12,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-use super::diagnostics::{analyze_scatter, CoherencePrediction, ScatterAnalysis};
+use super::diagnostics::{CoherencePrediction, ScatterAnalysis, analyze_scatter};
 use super::learning::AdaptiveThresholds;
 use super::patterns::PatternLibrary;
 use super::types::{

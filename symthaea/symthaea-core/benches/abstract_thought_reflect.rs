@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::abstract_thought::AbstractThought;
 use symthaea_core::hdc::conjecture_engine::{
-    attach_eml_metadata, BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr,
-    MacroPromotionTier, MathDomain, UnaryFn,
+    BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier, MathDomain,
+    UnaryFn, attach_eml_metadata,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 

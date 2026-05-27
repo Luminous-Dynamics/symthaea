@@ -30,10 +30,10 @@
 //! cargo bench --bench ethics
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
+    HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator,
 };
 use symthaea::safety::{SafetyCheck, SafetyGateway};
 

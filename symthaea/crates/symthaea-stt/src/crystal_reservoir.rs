@@ -386,11 +386,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
 
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-8 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 1e-8 { dot / denom } else { 0.0 }
 }
 
 #[cfg(test)]

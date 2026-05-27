@@ -432,11 +432,7 @@ fn predict_justice(algebra: &MoralAlgebra, scenario: &str) -> i32 {
     };
 
     let prop = algebra.encode_proportionality("effort", effort_mag, "reward", reward_mag);
-    if prop.is_proportional {
-        1
-    } else {
-        0
-    }
+    if prop.is_proportional { 1 } else { 0 }
 }
 
 /// Run virtue benchmark

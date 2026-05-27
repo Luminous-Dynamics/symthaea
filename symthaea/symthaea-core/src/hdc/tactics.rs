@@ -865,7 +865,7 @@ pub fn tactic_norm_num(goal: &Goal) -> TacticResult {
     match &simplified {
         Expr::Bool(true) => return TacticResult::Closed,
         Expr::Bool(false) => {
-            return TacticResult::Failed("norm_num: evaluates to false".to_string())
+            return TacticResult::Failed("norm_num: evaluates to false".to_string());
         }
         Expr::Eq(a, b) => {
             if let (Some(av), Some(bv)) = (a.eval(&env), b.eval(&env)) {
@@ -1017,13 +1017,13 @@ pub fn try_seq(goal: &Goal, tactics: &[Box<dyn Fn(&Goal) -> TacticResult>]) -> T
 // existential shape. Integration tests below show how to build the matching
 // `Expr` goal and close it with these tactics.
 
-use crate::hdc::barycentric::{centroid, circumcenter, incenter, orthocenter, Barycentric};
+use crate::hdc::barycentric::{Barycentric, centroid, circumcenter, incenter, orthocenter};
 use crate::hdc::combinatorial::{
     find_linear_invariant, find_linear_monovariant, pigeonhole_apply, pigeonhole_min_max_bucket,
 };
 use crate::hdc::computational_geometry::Point2D;
 use crate::hdc::diophantine::pell_equation;
-use crate::hdc::functional_equations::{classify, Classification, EquationKind};
+use crate::hdc::functional_equations::{Classification, EquationKind, classify};
 use crate::hdc::inequalities::{
     amgm_holds, cauchy_schwarz_holds, jensen_convex_holds, power_mean_inequality_holds,
     schur_t1_holds, schur_t2_holds,
@@ -1770,14 +1770,18 @@ mod tests {
             TacticResult::Subgoals(subs) => {
                 assert_eq!(subs.len(), 1);
                 // Should have both A and B as hypotheses
-                assert!(subs[0]
-                    .hypotheses
-                    .iter()
-                    .any(|(_, e)| e == &Expr::Var("A".into())));
-                assert!(subs[0]
-                    .hypotheses
-                    .iter()
-                    .any(|(_, e)| e == &Expr::Var("B".into())));
+                assert!(
+                    subs[0]
+                        .hypotheses
+                        .iter()
+                        .any(|(_, e)| e == &Expr::Var("A".into()))
+                );
+                assert!(
+                    subs[0]
+                        .hypotheses
+                        .iter()
+                        .any(|(_, e)| e == &Expr::Var("B".into()))
+                );
             }
             other => panic!("Expected Subgoals, got {:?}", other),
         }

@@ -21,8 +21,8 @@
 //!
 //! Run with: `cargo test --test e2e_ollama_integration -- --nocapture`
 
-use symthaea::language::{LLMBackend, OllamaBackend};
 use symthaea::Symthaea;
+use symthaea::language::{LLMBackend, OllamaBackend};
 
 /// Check if Ollama is running and accessible.
 async fn ollama_available() -> bool {

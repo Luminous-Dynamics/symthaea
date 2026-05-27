@@ -7,8 +7,8 @@
 //! Uses only the imports that work from the existing benchmark system.
 
 use symthaea::benchmarks::{
-    discover_information_theoretic, discover_majority_voting, AnmDiscovery, CausalDirection,
-    IgciDiscovery, ReciDiscovery, TuebingenAdapter,
+    AnmDiscovery, CausalDirection, IgciDiscovery, ReciDiscovery, TuebingenAdapter,
+    discover_information_theoretic, discover_majority_voting,
 };
 
 /// Meta-features extracted from a pair

@@ -561,8 +561,7 @@ impl SovereignConversation {
     }
 
     fn ask_about_use_case(&mut self) -> ConversationResponse {
-        let msg =
-            "I want to get this right. Can you tell me more about what you'll use this for?\n\n\
+        let msg = "I want to get this right. Can you tell me more about what you'll use this for?\n\n\
             For example:\n\
             - \"I write code in Rust and Python\"\n\
             - \"I produce music and need low-latency audio\"\n\
@@ -622,7 +621,10 @@ impl SovereignConversation {
             } else {
                 self.state.known_desktop = Some("hyprland".into());
                 self.state.confidence_desktop = 0.5;
-                ("Hyprland", "Tiling compositor — fast keyboard-driven workflow for coding. Or GNOME if you prefer traditional.")
+                (
+                    "Hyprland",
+                    "Tiling compositor — fast keyboard-driven workflow for coding. Or GNOME if you prefer traditional.",
+                )
             }
         } else if use_cases.contains(&"privacy".to_string()) {
             self.state.known_desktop = Some("sway".into());
@@ -1004,10 +1006,11 @@ mod tests {
         let _greeting = conv.greet();
         let resp = conv.respond("I need a secure, privacy-focused system with encryption");
 
-        assert!(conv
-            .state()
-            .known_use_cases
-            .contains(&"privacy".to_string()));
+        assert!(
+            conv.state()
+                .known_use_cases
+                .contains(&"privacy".to_string())
+        );
         assert!(conv.state().known_encryption == Some(true));
     }
 }

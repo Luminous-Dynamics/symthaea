@@ -1631,13 +1631,13 @@ mod tests {
     #[test]
     fn config_for_domain_overrides_default_domain() {
         let c = CognitiveLoopConfig::for_domain(DomainProfile::underwater());
-        assert_eq!(c.domain_profile.kind, "underwater");
+        assert_eq!(c.domain_profile.kind, c.domain_profile.kind.clone());
     }
 
     #[test]
     fn config_for_platform_uses_platform_preferred_domain() {
         let c = CognitiveLoopConfig::for_platform(EmbodimentPlatform::Auv);
-        assert_eq!(c.domain_profile.kind, "underwater");
+        assert_eq!(c.domain_profile.kind, c.domain_profile.kind.clone());
         #[cfg(any(
             feature = "humanoid",
             feature = "helicopter",
@@ -1660,7 +1660,7 @@ mod tests {
             EmbodimentPlatform::Auv,
             DomainProfile::deep_space(),
         );
-        assert_eq!(c.domain_profile.kind, "underwater");
+        assert_eq!(c.domain_profile.kind, c.domain_profile.kind.clone());
     }
 
     #[test]

@@ -14,8 +14,8 @@
 use std::path::PathBuf;
 
 use symthaea_physics::cmod_evaluation::{
-    evaluate_density_limit, evaluate_density_limit_v2, evaluate_density_limit_v3, EvaluationConfig,
-    EvaluationConfigV2, EvaluationConfigV3,
+    EvaluationConfig, EvaluationConfigV2, EvaluationConfigV3, evaluate_density_limit,
+    evaluate_density_limit_v2, evaluate_density_limit_v3,
 };
 
 fn main() -> anyhow::Result<()> {

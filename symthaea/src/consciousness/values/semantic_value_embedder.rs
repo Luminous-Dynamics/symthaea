@@ -9,8 +9,8 @@
 use super::eight_harmonies::Harmony;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 
 /// Configuration for the semantic value embedder
 #[derive(Debug, Clone, Serialize, Deserialize)]

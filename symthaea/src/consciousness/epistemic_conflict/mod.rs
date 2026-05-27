@@ -18,9 +18,9 @@ pub mod phi_integration;
 pub mod types;
 
 // Re-export key types for ergonomic use
-pub use calibrator::{soft_min, TheoryCalibrator};
+pub use calibrator::{TheoryCalibrator, soft_min};
 pub use detector::ConflictDetector;
-pub use phi_integration::{compute_phi_eff, effective_phi, thresholds, PhiEffResult};
+pub use phi_integration::{PhiEffResult, compute_phi_eff, effective_phi, thresholds};
 pub use types::{
     AnchorKind, ConflictKind, ConflictMatrix, ConflictScore, EpistemicAction, MultiTheoryMetrics,
     TheoryCalibration, TheoryCalibrations, TheoryId,

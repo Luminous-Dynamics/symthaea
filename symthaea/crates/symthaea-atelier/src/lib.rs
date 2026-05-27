@@ -37,8 +37,8 @@ pub mod reaction_diffusion;
 pub mod strange_attractors;
 pub mod timeline;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::AestheticScore;
 use symthaea_canvas::{CognitiveSnapshot, SceneNode};

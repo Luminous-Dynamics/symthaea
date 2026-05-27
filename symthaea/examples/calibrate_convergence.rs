@@ -12,7 +12,7 @@
 //! ```
 
 use symthaea::hdc::moral_topology::{
-    calibrate_convergence_threshold, CalibrationScenario, MoralAnomalyConfig,
+    CalibrationScenario, MoralAnomalyConfig, calibrate_convergence_threshold,
 };
 use symthaea_core::hdc::ContinuousHV;
 

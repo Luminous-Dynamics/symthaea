@@ -128,11 +128,13 @@ mod tests {
         };
         let result = engine.assess_system_state(&telemetry);
         assert!(result.expected_free_energy > 0.0);
-        assert!(result
-            .predicted_failure
-            .as_ref()
-            .unwrap()
-            .contains("memory"));
+        assert!(
+            result
+                .predicted_failure
+                .as_ref()
+                .unwrap()
+                .contains("memory")
+        );
     }
 
     #[test]
@@ -144,11 +146,13 @@ mod tests {
         };
         let result = engine.assess_system_state(&telemetry);
         assert!(result.expected_free_energy >= 3.0);
-        assert!(result
-            .predicted_failure
-            .as_ref()
-            .unwrap()
-            .contains("gossip peers"));
+        assert!(
+            result
+                .predicted_failure
+                .as_ref()
+                .unwrap()
+                .contains("gossip peers")
+        );
     }
 
     #[test]

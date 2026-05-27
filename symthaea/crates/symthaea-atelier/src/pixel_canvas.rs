@@ -164,7 +164,11 @@ impl PixelCanvas {
             g_sum += chunk[1] as f32;
             b_sum += chunk[2] as f32;
         }
-        [r_sum / (n * 255.0), g_sum / (n * 255.0), b_sum / (n * 255.0)]
+        [
+            r_sum / (n * 255.0),
+            g_sum / (n * 255.0),
+            b_sum / (n * 255.0),
+        ]
     }
 
     /// Extract a feature vector for visual perception (downsampled color histogram).
@@ -318,10 +322,17 @@ impl NeuralPainter {
 
         // Gradient background from dominant harmonies
         let mut harmony_order: Vec<(usize, f32)> = snapshot
-            .harmony_activations.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+            .harmony_activations
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i, v))
+            .collect();
         harmony_order.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let hue_top = harmony_order[0].0 as f32 * 45.0;
-        let hue_bot = harmony_order.get(1).map(|h| h.0 as f32 * 45.0).unwrap_or(hue_top + 60.0);
+        let hue_bot = harmony_order
+            .get(1)
+            .map(|h| h.0 as f32 * 45.0)
+            .unwrap_or(hue_top + 60.0);
         let lightness = 0.10 + snapshot.consciousness_level as f32 * 0.08;
 
         let mut canvas = PixelCanvas::new(width, height, [0, 0, 0, 255]);
@@ -331,8 +342,10 @@ impl NeuralPainter {
             let hue = hue_top * (1.0 - t) + hue_bot * t;
             let phase = hue / 360.0 * std::f32::consts::TAU;
             let r = ((phase.sin() * 0.3 + 0.5) * lightness * 255.0).clamp(0.0, 255.0) as u8;
-            let g = (((phase + 2.094).sin() * 0.3 + 0.5) * lightness * 255.0).clamp(0.0, 255.0) as u8;
-            let b = (((phase + 4.189).sin() * 0.3 + 0.5) * lightness * 255.0).clamp(0.0, 255.0) as u8;
+            let g =
+                (((phase + 2.094).sin() * 0.3 + 0.5) * lightness * 255.0).clamp(0.0, 255.0) as u8;
+            let b =
+                (((phase + 4.189).sin() * 0.3 + 0.5) * lightness * 255.0).clamp(0.0, 255.0) as u8;
             for x in 0..width {
                 let idx = ((y * width + x) * 4) as usize;
                 canvas.pixels[idx] = r;
@@ -502,14 +515,28 @@ mod tests {
 
         // Paint red then green at same position
         let red = Brushstroke {
-            x: 0.5, y: 0.5, radius: 15.0, pressure: 1.0,
-            r: 1.0, g: 0.0, b: 0.0, alpha: 0.5,
-            angle: 0.0, elongation: 1.0,
+            x: 0.5,
+            y: 0.5,
+            radius: 15.0,
+            pressure: 1.0,
+            r: 1.0,
+            g: 0.0,
+            b: 0.0,
+            alpha: 0.5,
+            angle: 0.0,
+            elongation: 1.0,
         };
         let green = Brushstroke {
-            x: 0.5, y: 0.5, radius: 15.0, pressure: 1.0,
-            r: 0.0, g: 1.0, b: 0.0, alpha: 0.5,
-            angle: 0.0, elongation: 1.0,
+            x: 0.5,
+            y: 0.5,
+            radius: 15.0,
+            pressure: 1.0,
+            r: 0.0,
+            g: 1.0,
+            b: 0.0,
+            alpha: 0.5,
+            angle: 0.0,
+            elongation: 1.0,
         };
         canvas.paint_stroke(&red);
         canvas.paint_stroke(&green);
@@ -576,7 +603,9 @@ mod tests {
 
         let mut p1 = NeuralPainter::new(&genesis);
         let serene = CognitiveSnapshot {
-            consciousness_level: 0.9, valence: 0.7, arousal: 0.2,
+            consciousness_level: 0.9,
+            valence: 0.7,
+            arousal: 0.2,
             harmony_activations: [0.8, 0.8, 0.7, 0.2, 0.7, 0.7, 0.5, 0.9],
             ..CognitiveSnapshot::dormant()
         };
@@ -584,7 +613,9 @@ mod tests {
 
         let mut p2 = NeuralPainter::new(&genesis);
         let turb = CognitiveSnapshot {
-            consciousness_level: 0.5, valence: -0.7, arousal: 0.9,
+            consciousness_level: 0.5,
+            valence: -0.7,
+            arousal: 0.9,
             harmony_activations: [0.2, 0.1, 0.3, 0.9, 0.5, 0.1, 0.8, 0.1],
             noradrenaline: 0.8,
             ..CognitiveSnapshot::dormant()

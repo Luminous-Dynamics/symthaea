@@ -13,7 +13,7 @@ use crate::encoding::{AudioHdcEncoder, AudioHdcVectors, EncoderMode, PremiumHdcE
 use crate::features::{AudioFeatures, CONTROL_RATE, FREQ_BINS};
 use crate::hdc::{HDC_DIM, HV};
 use crate::patterns::{
-    AudioCategory, AudioPattern, PatternSimilarity, MAX_EXEMPLARS, NUM_LTC_LEVELS,
+    AudioCategory, AudioPattern, MAX_EXEMPLARS, NUM_LTC_LEVELS, PatternSimilarity,
 };
 use crate::temporal::{HierarchicalLtc, LtcPreset};
 

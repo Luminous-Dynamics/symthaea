@@ -24,8 +24,8 @@ use std::time::Instant;
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_stt::{
-    audio_hdc_encoder::AudioHdcEncoder, id_to_audio_path, load_alignments,
-    phoneme_hdc_ltc::PhonemeHdcLtc, AudioConfig, AudioFrontend,
+    AudioConfig, AudioFrontend, audio_hdc_encoder::AudioHdcEncoder, id_to_audio_path,
+    load_alignments, phoneme_hdc_ltc::PhonemeHdcLtc,
 };
 
 #[derive(Parser)]

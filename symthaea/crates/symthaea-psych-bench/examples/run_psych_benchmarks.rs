@@ -115,8 +115,8 @@ use symthaea_psych_bench::benchmarks::worm::{
     SerialRecallBenchmark, SpatialUpdatingBenchmark,
 };
 use symthaea_psych_bench::harness::{
-    analysis::CrossBenchmarkAnalysis, BenchmarkConfig, BenchmarkReport, PsychBenchmark,
-    RegressionReport, RegressionSnapshot,
+    BenchmarkConfig, BenchmarkReport, PsychBenchmark, RegressionReport, RegressionSnapshot,
+    analysis::CrossBenchmarkAnalysis,
 };
 
 fn main() {
@@ -636,7 +636,7 @@ fn main() {
     // Speed-accuracy tradeoff: 6-level sweep with Wickelgren curve fitting
     if sat_mode {
         use symthaea_psych_bench::harness::analysis::{
-            fit_sat_curve, sat_curve_ascii, SatCurvePoint,
+            SatCurvePoint, fit_sat_curve, sat_curve_ascii,
         };
 
         println!("\n--- Speed-Accuracy Tradeoff (6-level sweep) ---");
@@ -881,7 +881,7 @@ fn main() {
     // HDC dimensionality scaling sweep
     if dim_sweep_mode {
         use symthaea_psych_bench::harness::analysis::{
-            dim_scaling_slope, format_dim_scaling, DimScalingResult,
+            DimScalingResult, dim_scaling_slope, format_dim_scaling,
         };
 
         let sweep_dims = [128, 256, 512, 1024, 2048];
@@ -1405,11 +1405,7 @@ fn linear_slope(values: &[f64]) -> f64 {
         num += (x - x_mean) * (y - y_mean);
         den += (x - x_mean).powi(2);
     }
-    if den.abs() < 1e-15 {
-        0.0
-    } else {
-        num / den
-    }
+    if den.abs() < 1e-15 { 0.0 } else { num / den }
 }
 
 /// Compute ICC(2,1) for a benchmark across seed reports.

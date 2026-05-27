@@ -8,8 +8,8 @@ use crate::control_plane::{AuditEvent, AuditLog};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use symthaea_core::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
+    HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator,
 };
 use tokio::sync::{RwLock, Semaphore};
 use uuid::Uuid;

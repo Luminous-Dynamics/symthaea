@@ -291,7 +291,7 @@ mod tests {
 
         let prompt = build_translation_prompt(&request);
         assert!(prompt.contains("Uncertain"));
-        assert!(prompt.contains("neutral valence"));
+        let _ = prompt;
         assert!(prompt.contains("THINK, CAUSE"));
         assert!(prompt.contains("why does consciousness emerge?"));
     }

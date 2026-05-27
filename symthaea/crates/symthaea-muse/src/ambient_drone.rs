@@ -49,7 +49,7 @@ impl AmbientDrone {
         // Drone frequency follows the key (first harmony = root)
         // Use a very low octave for warmth
         let base_freq = 65.41; // C2
-                               // Modulate by valence: positive = major feel (slight sharp), negative = minor (slight flat)
+        // Modulate by valence: positive = major feel (slight sharp), negative = minor (slight flat)
         let detune = state.valence * 2.0; // ±2 cents
         self.target_freq = base_freq * 2.0f32.powf(detune / 1200.0);
 

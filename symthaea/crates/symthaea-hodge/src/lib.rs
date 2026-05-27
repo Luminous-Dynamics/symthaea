@@ -1363,7 +1363,7 @@ mod tests {
     fn test_add_simplex_with_duplicates_deduped() {
         let mut complex = SimplicialComplex::new();
         complex.add_simplex(vec![0, 0, 1]); // Duplicate vertex
-                                            // After dedup: [0, 1] which is an edge
+        // After dedup: [0, 1] which is an edge
         assert_eq!(complex.count(1), 1);
         assert_eq!(complex.count(0), 2);
     }

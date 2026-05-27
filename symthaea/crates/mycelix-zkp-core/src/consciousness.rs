@@ -16,7 +16,6 @@
 
 use serde::{Deserialize, Serialize};
 
-
 /// Well-known consciousness gate thresholds (from bridge-common).
 pub mod thresholds {
     /// Basic participation (Finance pledge, Attribution)
@@ -32,11 +31,11 @@ pub mod thresholds {
 /// Consciousness tier names for human-readable output.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CivicTier {
-    Observer,       // < 0.2
-    Participant,    // >= 0.2
-    Citizen,        // >= 0.3
-    Steward,        // >= 0.4
-    Guardian,       // >= 0.6
+    Observer,    // < 0.2
+    Participant, // >= 0.2
+    Citizen,     // >= 0.3
+    Steward,     // >= 0.4
+    Guardian,    // >= 0.6
 }
 
 impl CivicTier {
@@ -134,7 +133,8 @@ pub fn prove_consciousness_tier(
         threshold,
         10000, // Max Φ = 1.0 = 10000 scaled
         score_commitment,
-    ).map_err(|e| ZkpError::ProvingError(e))?;
+    )
+    .map_err(|e| ZkpError::ProvingError(e))?;
 
     let prove_time = prove_start.elapsed();
 
@@ -166,16 +166,12 @@ pub fn verify_consciousness_tier(
 
     let threshold = required_tier.threshold_scaled();
 
-    crate::circuits::range_proof::verify_range(
-        proof,
-        threshold,
-        10000,
-        *score_commitment,
-    ).map(|_| true)
-    .or_else(|e| {
-        // Verification failed — proof is invalid
-        Ok(false)
-    })
+    crate::circuits::range_proof::verify_range(proof, threshold, 10000, *score_commitment)
+        .map(|_| true)
+        .or_else(|e| {
+            // Verification failed — proof is invalid
+            Ok(false)
+        })
 }
 
 #[cfg(test)]
@@ -195,15 +191,19 @@ mod tests {
         assert!(result.eligible);
         assert!(!result.proof_bytes.is_empty());
         assert!(result.prove_time_ms > 0.0);
-        println!("Voting tier proof: {:.1}ms, {} bytes",
-            result.prove_time_ms, result.proof_bytes.len());
+        println!(
+            "Voting tier proof: {:.1}ms, {} bytes",
+            result.prove_time_ms,
+            result.proof_bytes.len()
+        );
 
         // Verify the proof
         let valid = verify_consciousness_tier(
             &result.proof_bytes,
             &CivicTier::Steward,
             &result.score_commitment,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(valid, "real STARK proof must verify");
     }
 
@@ -237,7 +237,8 @@ mod tests {
             &result.proof_bytes,
             &CivicTier::Guardian,
             &result.score_commitment,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(valid);
     }
 
@@ -259,7 +260,8 @@ mod tests {
             &result.proof_bytes,
             &CivicTier::Guardian,
             &result.score_commitment,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(!valid, "Participant proof must not verify as Guardian");
     }
 

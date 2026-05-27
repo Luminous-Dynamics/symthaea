@@ -24,7 +24,7 @@ use symthaea_core::hdc::hdc_ltc_unified::UnifiedNetworkConfig;
 use symthaea_core::hdc::substrate_independence::{SubstrateRequirements, SubstrateType};
 use symthaea_core::hdc::substrate_validation::EvidenceLevel;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::{HdcLtcUnifiedNetwork, TextEncoder, TextEncoderConfig, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, HdcLtcUnifiedNetwork, TextEncoder, TextEncoderConfig};
 use symthaea_harmonies::EightHarmonies;
 use symthaea_neuromodulators::NeuromodulatorBath;
 use symthaea_types::Harmony;

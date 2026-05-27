@@ -29,8 +29,8 @@
 //! let (verdict, confidence) = clf.classify("sharing food with neighbors");
 //! ```
 
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 use super::learned_encoding::{LearnableLevelConfig, LearnedHdcClassifier};
 use super::moral_algebra::MoralVerdict;

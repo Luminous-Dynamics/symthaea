@@ -524,10 +524,12 @@ mod tests {
         let modified = "{ config }: { foo = 1;"; // missing closing brace
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Unbalanced braces"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unbalanced braces")
+        );
     }
 
     #[test]
@@ -536,10 +538,12 @@ mod tests {
         let modified = "[ a b c"; // missing closing bracket
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Unbalanced brackets"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unbalanced brackets")
+        );
     }
 
     #[test]
@@ -557,10 +561,12 @@ mod tests {
         let modified = "{ foo = 1; }";
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("networking.hostName"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("networking.hostName")
+        );
     }
 
     #[test]

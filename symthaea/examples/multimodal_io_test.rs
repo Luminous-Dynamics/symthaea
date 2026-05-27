@@ -19,7 +19,7 @@ use std::time::Instant;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::perception::{
     ConsciousPerception, ConsciousPerceptionConfig, MultiModalIntegrator, PerceptionResult,
-    SemanticVision, VisualCortex, SIGLIP_EMBEDDING_DIM,
+    SIGLIP_EMBEDDING_DIM, SemanticVision, VisualCortex,
 };
 
 fn main() -> Result<()> {

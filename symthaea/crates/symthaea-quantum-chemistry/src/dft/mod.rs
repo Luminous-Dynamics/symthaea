@@ -16,5 +16,5 @@ pub mod lda;
 pub mod xc;
 
 pub use grid::{DftGrid, GridPoint};
-pub use lda::{lda_exchange_correlation, SlaterExchange, VwnCorrelation};
-pub use xc::{kohn_sham_dft, DftConfig, DftResult, XcFunctional};
+pub use lda::{SlaterExchange, VwnCorrelation, lda_exchange_correlation};
+pub use xc::{DftConfig, DftResult, XcFunctional, kohn_sham_dft};

@@ -34,7 +34,9 @@ fn main() {
         (11, 4)
     } else {
         #[cfg(not(feature = "cuda-version-from-build-system"))]
-        panic!("Must specify one of the following features: [cuda-version-from-build-system, cuda-12080, cuda-12060, cuda-12050, cuda-12040, cuda-12030, cuda-12020, cuda-12010, cuda-12000, cuda-11080, cuda-11070, cuda-11060, cuda-11050, cuda-11040]");
+        panic!(
+            "Must specify one of the following features: [cuda-version-from-build-system, cuda-12080, cuda-12060, cuda-12050, cuda-12040, cuda-12030, cuda-12020, cuda-12010, cuda-12000, cuda-11080, cuda-11070, cuda-11060, cuda-11050, cuda-11040]"
+        );
 
         #[cfg(feature = "cuda-version-from-build-system")]
         {

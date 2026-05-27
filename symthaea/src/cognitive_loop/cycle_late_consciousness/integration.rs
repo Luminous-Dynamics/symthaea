@@ -1138,9 +1138,9 @@ impl CognitiveLoopService {
             // "aware" moments regardless of absolute consciousness range.
             let ema = &mut self.carryover.history.consciousness_ema;
             *ema = *ema * 0.95 + level * 0.05; // EMA α=0.05, ~20-cycle half-life
-                                               // Moral salience lowers consolidation threshold → morally significant
-                                               // moments are more readily encoded into episodic memory.
-                                               // Science: Zak (2012) — moral narratives activate oxytocin → enhanced encoding.
+            // Moral salience lowers consolidation threshold → morally significant
+            // moments are more readily encoded into episodic memory.
+            // Science: Zak (2012) — moral narratives activate oxytocin → enhanced encoding.
             let moral_ease = {
                 use crate::cognitive_loop::thresholds::{
                     MORAL_CONSOLIDATION_EASE, MORAL_CONSOLIDATION_THRESHOLD,

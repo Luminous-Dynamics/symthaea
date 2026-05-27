@@ -23,7 +23,9 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example h1_category_breakdown --features neural-bridge --release");
+        println!(
+            "Run with: cargo run --example h1_category_breakdown --features neural-bridge --release"
+        );
         Ok(())
     }
 

@@ -28,7 +28,7 @@
 //! - e⁺ + e⁻ → 2γ (1.022 MeV total)
 
 use super::hadrons::Hadrons;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
+use super::standard_model::{PHYSICS_DIM, StandardModel};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 

@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 use crate::cmod_evaluation::{
-    classify_at_threshold, compute_auc, compute_roc_curve, LeadTimeStats, RocPoint,
+    LeadTimeStats, RocPoint, classify_at_threshold, compute_auc, compute_roc_curve,
 };
 
 // ── Configuration ────────────────────────────────────────────────────────────

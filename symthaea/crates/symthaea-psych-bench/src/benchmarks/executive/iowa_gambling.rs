@@ -209,11 +209,7 @@ impl IowaGamblingBenchmark {
             let den: f64 = (0..block_f.len())
                 .map(|i| (i as f64 - x_mean).powi(2))
                 .sum();
-            if den.abs() > 1e-10 {
-                num / den
-            } else {
-                0.0
-            }
+            if den.abs() > 1e-10 { num / den } else { 0.0 }
         } else {
             0.0
         };

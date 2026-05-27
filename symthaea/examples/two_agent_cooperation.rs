@@ -275,8 +275,10 @@ fn print_social_status(mind_a: &ContinuousMind, mind_b: &ContinuousMind, phase: 
 
     if let Some(sc) = mind_a.social_coherence() {
         if let Some(rel) = sc.get_relationship("homesteader") {
-            println!("  Explorer → Homesteader:  trust={:.2}  familiarity={:.2}  reciprocity={:.2}  type={:?}",
-                     rel.trust, rel.familiarity, rel.reciprocity, rel.relationship_type);
+            println!(
+                "  Explorer → Homesteader:  trust={:.2}  familiarity={:.2}  reciprocity={:.2}  type={:?}",
+                rel.trust, rel.familiarity, rel.reciprocity, rel.relationship_type
+            );
         } else {
             println!("  Explorer → Homesteader:  (no relationship yet)");
         }
@@ -290,8 +292,10 @@ fn print_social_status(mind_a: &ContinuousMind, mind_b: &ContinuousMind, phase: 
 
     if let Some(sc) = mind_b.social_coherence() {
         if let Some(rel) = sc.get_relationship("explorer") {
-            println!("  Homesteader → Explorer:  trust={:.2}  familiarity={:.2}  reciprocity={:.2}  type={:?}",
-                     rel.trust, rel.familiarity, rel.reciprocity, rel.relationship_type);
+            println!(
+                "  Homesteader → Explorer:  trust={:.2}  familiarity={:.2}  reciprocity={:.2}  type={:?}",
+                rel.trust, rel.familiarity, rel.reciprocity, rel.relationship_type
+            );
         } else {
             println!("  Homesteader → Explorer:  (no relationship yet)");
         }

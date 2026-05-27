@@ -546,7 +546,7 @@ mod tests {
         assert!(LOW_COHERENCE_EXPLORATION_THRESHOLD > 0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST > 0.0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST < 0.1); // don't over-explore
-                                                        // Prediction horizon PE-adaptive scaling
+        // Prediction horizon PE-adaptive scaling
         assert!(HORIZON_PE_CONTRACT_THRESHOLD > 0.0 && HORIZON_PE_CONTRACT_THRESHOLD < 1.0);
         assert!(HORIZON_PE_CONTRACT_RATE > 0.0 && HORIZON_PE_CONTRACT_RATE <= 1.0);
         assert!(
@@ -1646,7 +1646,7 @@ mod tests {
         // Peer discovery
         assert!(RADIO_BEACON_INTERVAL_CYCLES > 0);
         assert!(RADIO_BEACON_SIZE <= 50); // Must fit Regional MTU
-                                          // Relay routing
+        // Relay routing
         assert!(RADIO_MAX_RELAY_HOPS > 0 && RADIO_MAX_RELAY_HOPS <= 8);
         assert!(RADIO_MAX_ROUTE_ENTRIES > 0 && RADIO_MAX_ROUTE_ENTRIES <= 512);
         assert!(RADIO_ROUTE_EXPIRY_CYCLES > 0);

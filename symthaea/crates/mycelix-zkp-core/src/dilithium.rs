@@ -116,11 +116,7 @@ impl DilithiumKeypair {
 /// Verify a Dilithium5 signature (standalone, no keypair needed).
 ///
 /// This is the function called inside Holochain zome integrity validation.
-pub fn verify_signature(
-    message: &[u8],
-    signature: &[u8],
-    public_key: &[u8],
-) -> ZkpResult<bool> {
+pub fn verify_signature(message: &[u8], signature: &[u8], public_key: &[u8]) -> ZkpResult<bool> {
     if public_key.len() != PUBLIC_KEY_SIZE {
         return Err(ZkpError::InvalidKeyMaterial(format!(
             "public key: expected {} bytes, got {}",
@@ -132,8 +128,8 @@ pub fn verify_signature(
     let pk = dilithium5::PublicKey::from_bytes(public_key)
         .map_err(|e| ZkpError::InvalidKeyMaterial(format!("public key parse: {:?}", e)))?;
 
-    let signed_msg = dilithium5::SignedMessage::from_bytes(signature)
-        .map_err(|_| ZkpError::SignatureInvalid)?;
+    let signed_msg =
+        dilithium5::SignedMessage::from_bytes(signature).map_err(|_| ZkpError::SignatureInvalid)?;
 
     match dilithium5::open(&signed_msg, &pk) {
         Ok(verified_msg) => Ok(verified_msg == message),
@@ -245,9 +241,12 @@ mod tests {
         assert!(!proof.signature.is_empty());
         // pqcrypto sign() returns message + signature concatenated
         // Signature size = message_len + SIGNATURE_SIZE
-        assert!(proof.signature.len() > SIGNATURE_SIZE,
+        assert!(
+            proof.signature.len() > SIGNATURE_SIZE,
             "signature bytes ({}) must be > SIGNATURE_SIZE ({})",
-            proof.signature.len(), SIGNATURE_SIZE);
+            proof.signature.len(),
+            SIGNATURE_SIZE
+        );
 
         let valid = verify_authenticated_signature(&proof, kp.public_key()).unwrap();
         assert!(valid, "authenticated proof signature must verify");

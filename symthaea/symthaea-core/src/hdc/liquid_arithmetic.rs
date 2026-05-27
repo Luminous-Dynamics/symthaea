@@ -33,9 +33,9 @@
 //! continuous evolution rather than discrete search. This mirrors how
 //! human mathematical insight often comes from "sitting with" a problem.
 
+use crate::hdc::arithmetic_engine::{ArithmeticOp, HybridArithmeticEngine, HybridResult};
+use crate::hdc::hdc_ltc_neuron::{ActivationFunction, HdcLtcConfig, HdcLtcNeuron};
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use crate::hdc::hdc_ltc_neuron::{HdcLtcNeuron, HdcLtcConfig, ActivationFunction};
-use crate::hdc::arithmetic_engine::{HybridArithmeticEngine, HybridResult, ArithmeticOp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -77,7 +77,7 @@ pub struct LiquidArithmeticConfig {
 impl Default for LiquidArithmeticConfig {
     fn default() -> Self {
         Self {
-            tau_base: 0.1,              // 100ms base time constant
+            tau_base: 0.1,               // 100ms base time constant
             complexity_scaling: 0.3,     // Moderate complexity effect
             phi_scaling: 0.5,            // Consciousness moderately affects time
             num_neurons: 8,              // 8 neurons for proof exploration
@@ -354,13 +354,13 @@ impl LiquidArithmeticReasoner {
             }
 
             // Bundle neuron states into proof state
-            let neuron_states: Vec<&ContinuousHV> = self.neurons.iter()
-                .map(|n| n.state())
-                .collect();
+            let neuron_states: Vec<&ContinuousHV> =
+                self.neurons.iter().map(|n| n.state()).collect();
             self.proof_state = ContinuousHV::bundle(&neuron_states);
 
             // Check convergence
-            let state_change = (self.proof_state.norm() - prev_state_mag).abs() / (prev_state_mag + 1e-6);
+            let state_change =
+                (self.proof_state.norm() - prev_state_mag).abs() / (prev_state_mag + 1e-6);
 
             // Record snapshot
             trajectory.push(ProofSnapshot {
@@ -384,13 +384,17 @@ impl LiquidArithmeticReasoner {
 
         // Compute answer using traditional engine
         let answer = self.compute_answer(op, a, b);
-        let avg_phi = if steps > 0 { total_reasoning_phi / steps as f64 } else { 0.0 };
+        let avg_phi = if steps > 0 {
+            total_reasoning_phi / steps as f64
+        } else {
+            0.0
+        };
 
         // Compute confidence based on convergence and Φ
         let confidence = if converged {
-            0.5 + 0.5 * (avg_phi / 0.5).min(1.0)  // Higher Φ = higher confidence
+            0.5 + 0.5 * (avg_phi / 0.5).min(1.0) // Higher Φ = higher confidence
         } else {
-            0.3  // Lower confidence if didn't converge
+            0.3 // Lower confidence if didn't converge
         };
 
         // Update stats
@@ -398,9 +402,10 @@ impl LiquidArithmeticReasoner {
         self.stats.total_steps += steps;
         if converged {
             self.stats.converged_count += 1;
-            self.stats.avg_steps_to_converge =
-                (self.stats.avg_steps_to_converge * (self.stats.converged_count - 1) as f32
-                 + steps as f32) / self.stats.converged_count as f32;
+            self.stats.avg_steps_to_converge = (self.stats.avg_steps_to_converge
+                * (self.stats.converged_count - 1) as f32
+                + steps as f32)
+                / self.stats.converged_count as f32;
         }
         self.stats.total_phi += total_reasoning_phi;
         self.total_phi += total_reasoning_phi;
@@ -421,10 +426,9 @@ impl LiquidArithmeticReasoner {
     fn reset_to_query(&mut self, query: &MathQuery) {
         for (i, neuron) in self.neurons.iter_mut().enumerate() {
             // Each neuron starts with query + random perturbation for diversity
-            let perturbation = ContinuousHV::random(
-                self.config.dimension,
-                self.config.seed + i as u64 * 500
-            ).scale(0.1);
+            let perturbation =
+                ContinuousHV::random(self.config.dimension, self.config.seed + i as u64 * 500)
+                    .scale(0.1);
             let initial_state = query.encoding.add(&perturbation);
             neuron.set_state(initial_state);
         }
@@ -442,7 +446,7 @@ impl LiquidArithmeticReasoner {
         let mut count = 0;
 
         for i in 0..self.neurons.len() {
-            for j in (i+1)..self.neurons.len() {
+            for j in (i + 1)..self.neurons.len() {
                 let sim = self.neurons[i].state().similarity(self.neurons[j].state());
                 total_sim += sim.abs();
                 count += 1;
@@ -465,8 +469,9 @@ impl LiquidArithmeticReasoner {
     fn compute_tau(&self, state_mag: f32, phi: f64) -> f32 {
         // τ = τ_base × (1 + complexity_scaling × ||P|| + phi_scaling × Φ)
         self.config.tau_base
-            * (1.0 + self.config.complexity_scaling * state_mag
-               + self.config.phi_scaling * phi as f32)
+            * (1.0
+                + self.config.complexity_scaling * state_mag
+                + self.config.phi_scaling * phi as f32)
     }
 
     /// Compute actual answer using arithmetic engine
@@ -557,7 +562,10 @@ mod tests {
 
         assert!(result.answer.is_some());
         assert_eq!(result.answer.unwrap().value, 56);
-        println!("Multiplication reasoning: {} steps, Φ={:.4}", result.steps, result.average_phi);
+        println!(
+            "Multiplication reasoning: {} steps, Φ={:.4}",
+            result.steps, result.average_phi
+        );
     }
 
     #[test]
@@ -571,8 +579,10 @@ mod tests {
 
         // Check trajectory has Φ values
         for snapshot in &result.trajectory[..5.min(result.trajectory.len())] {
-            println!("Step {}: Φ={:.4}, τ={:.4}, Δstate={:.4}",
-                     snapshot.step, snapshot.phi, snapshot.tau, snapshot.state_change);
+            println!(
+                "Step {}: Φ={:.4}, τ={:.4}, Δstate={:.4}",
+                snapshot.step, snapshot.phi, snapshot.tau, snapshot.state_change
+            );
         }
 
         assert!(result.peak_phi >= result.average_phi);

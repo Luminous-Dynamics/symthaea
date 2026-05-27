@@ -20,10 +20,10 @@ use std::collections::{HashMap, VecDeque};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::BinaryHV;
 
 use crate::consciousness::primitive_consciousness::{
     ActivationReason, ConsciousnessPrimitiveProcessor, PrimitiveConsciousnessState,

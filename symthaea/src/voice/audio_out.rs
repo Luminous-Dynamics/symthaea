@@ -14,8 +14,8 @@
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{
-    traits::{Observer, Producer, Split},
     HeapRb,
+    traits::{Observer, Producer, Split},
 };
 
 /// Real-time audio output via cpal + ring buffer.

@@ -617,7 +617,7 @@ mod tests {
     fn fm_electric_piano_sounds() {
         let buf = render_fm_instrument(Instrument::ElectricPiano, 261.63, 0.8, 1.0, 44100);
         assert!(buf.len() > 44100); // note + release
-                                    // Should have signal
+        // Should have signal
         assert!(buf.iter().any(|&s| s.abs() > 0.1));
         // Should decay
         let late_rms: f32 =

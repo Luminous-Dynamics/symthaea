@@ -6,8 +6,8 @@
 //! Combines health checks, knowledge base search, and predictive monitoring
 //! into a single coherent assessment with prioritized recommendations.
 
-use crate::encoding::codebook::NixCodebook;
 use crate::encoding::SystemStateSnapshot;
+use crate::encoding::codebook::NixCodebook;
 use crate::observe::hardware::HardwareInfo;
 use crate::support::health_check::{HealthAssessor, HealthCheck, HealthStatus};
 use crate::support::knowledge::KnowledgeBase;

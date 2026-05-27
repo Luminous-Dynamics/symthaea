@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use super::report::{key_metric_for_benchmark, BenchmarkReport};
+use super::report::{BenchmarkReport, key_metric_for_benchmark};
 
 /// A cognitive domain with its constituent benchmarks.
 #[derive(Debug, Clone, Serialize, Deserialize)]

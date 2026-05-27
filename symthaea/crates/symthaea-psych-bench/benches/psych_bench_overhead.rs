@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Criterion benchmark: wall-clock per trial for each benchmark suite.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use symthaea_psych_bench::benchmarks::cogbench::ProbabilisticReasoningBenchmark;
 use symthaea_psych_bench::benchmarks::memory_agent::AccurateRetrievalBenchmark;
 use symthaea_psych_bench::benchmarks::tombench::FalseBeliefBenchmark;

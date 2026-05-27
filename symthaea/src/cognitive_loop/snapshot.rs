@@ -8,9 +8,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::ActionHint;
 use super::drives::SelfAssessment;
 use super::routing::CognitiveDepth;
-use super::ActionHint;
 use crate::consciousness::consciousness_unification::{EmotionalPattern, UnifiedEmotion};
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 

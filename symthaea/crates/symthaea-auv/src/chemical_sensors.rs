@@ -153,7 +153,7 @@ impl SensorNoiseModel {
             s ^= s << 25;
             s ^= s >> 27;
             let uniform = (s as f64) / (u64::MAX as f64); // [0, 1)
-                                                          // Box-Muller approximation: (uniform - 0.5) * sqrt(12) ≈ N(0,1)
+            // Box-Muller approximation: (uniform - 0.5) * sqrt(12) ≈ N(0,1)
             let gaussian = (uniform - 0.5) * 3.464;
 
             // Additive noise

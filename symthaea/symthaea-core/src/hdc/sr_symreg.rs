@@ -71,11 +71,7 @@ impl SrExpr {
                 let va = a.eval(xs)?;
                 let vb = b.eval(xs)?;
                 let r = va * vb;
-                if r.is_finite() {
-                    Some(r)
-                } else {
-                    None
-                }
+                if r.is_finite() { Some(r) } else { None }
             }
             SrExpr::Div(a, b) => {
                 let vb = b.eval(xs)?;

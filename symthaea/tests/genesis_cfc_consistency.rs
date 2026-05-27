@@ -196,7 +196,7 @@ fn test_ectogenesis_deterministic_reproducibility() {
 // =============================================================================
 
 /// PopulationTrajectoryPredictor's predict_at_generation() calls set_state()
-/// then evolve_closed_form(), so it is a deterministic function of (state, gen).
+/// then evolve_closed_form(), so it is a deterministic function of (state, r#gen).
 /// Same inputs must yield identical outputs (CfC closed-form is deterministic).
 #[test]
 fn test_population_deterministic_reproducibility() {

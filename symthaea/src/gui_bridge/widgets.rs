@@ -1071,11 +1071,7 @@ impl ServiceDashboard {
                 SortField::ActiveSince => a.active_since.cmp(&b.active_since),
             };
 
-            if ascending {
-                cmp
-            } else {
-                cmp.reverse()
-            }
+            if ascending { cmp } else { cmp.reverse() }
         });
     }
 

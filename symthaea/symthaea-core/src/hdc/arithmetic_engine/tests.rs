@@ -579,11 +579,13 @@ fn test_transitive_divisibility() {
     assert_eq!(assertion.subject, "2");
     assert_eq!(assertion.object, "12");
     assert!(assertion.proof_source.is_some());
-    assert!(assertion
-        .proof_source
-        .unwrap()
-        .inductive_step
-        .contains("transitive"));
+    assert!(
+        assertion
+            .proof_source
+            .unwrap()
+            .inductive_step
+            .contains("transitive")
+    );
 }
 
 #[test]

@@ -294,11 +294,7 @@ impl InsightProblemBenchmark {
             let lapse_seed = seed.wrapping_add(9000);
             let r =
                 (lapse_seed.wrapping_mul(0x9E3779B97F4A7C15) >> 33) as f64 / (1u64 << 31) as f64;
-            if r < config.lapse_rate {
-                0.0
-            } else {
-                accuracy
-            }
+            if r < config.lapse_rate { 0.0 } else { accuracy }
         } else {
             accuracy
         };

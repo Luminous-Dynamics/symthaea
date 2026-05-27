@@ -9,8 +9,8 @@
 //!
 //! Run: `cargo run --features multirotor,humanoid --example transfer_flight_to_humanoid --release`
 
-use symthaea::humanoid::transfer::{transfer_learning_comparison, MorphologicalTransfer};
 use symthaea::humanoid::HumanoidConfig;
+use symthaea::humanoid::transfer::{MorphologicalTransfer, transfer_learning_comparison};
 use symthaea::multirotor::{
     FlightConfig, FlightController, FlightState, QuadrotorCommand, QuadrotorHdcEncoder,
 };

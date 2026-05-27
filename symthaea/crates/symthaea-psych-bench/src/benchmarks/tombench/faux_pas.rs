@@ -10,9 +10,9 @@
 //! embeddings, then detect faux pas via intent-reaction divergence.
 
 #[cfg(not(feature = "symthaea-backend"))]
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
-#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::harness::difficulty::difficulty_model_for;

@@ -30,9 +30,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
+use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
-use symthaea_core::hdc::BinaryHV;
 
 /// Representational Similarity Analysis benchmark for HDC grid encodings.
 pub struct ArcRsaBenchmark;
@@ -116,11 +116,7 @@ fn spearman(x: &[f64], y: &[f64]) -> f64 {
         dy2 += dyi * dyi;
     }
     let den = (dx2 * dy2).sqrt();
-    if den > 1e-12 {
-        num / den
-    } else {
-        0.0
-    }
+    if den > 1e-12 { num / den } else { 0.0 }
 }
 
 #[derive(Debug, Clone, Copy)]

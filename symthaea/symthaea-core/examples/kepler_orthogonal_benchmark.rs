@@ -23,8 +23,8 @@
 //! expression in the top-10 in stage 2 (vs 0/5 in stage 1).
 
 use symthaea_core::hdc::conjecture_engine::{
-    compose_top_k_invariants, discover_invariants_autonomous_with_seed_templates,
-    AutonomousInvariant, BinOp, Expr, RegressorConfig, UnaryFn,
+    AutonomousInvariant, BinOp, Expr, RegressorConfig, UnaryFn, compose_top_k_invariants,
+    discover_invariants_autonomous_with_seed_templates,
 };
 
 const SEEDS: &[u64] = &[42, 1337, 2718, 7919, 31415];
@@ -239,7 +239,7 @@ fn main() {
     println!("║  Does penalizing ∇L-parallel candidates unshadow energy/1/r? ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!(
-        "\nConfig: {} seeds, pop={}, gen={}, t_max={}, dt={}",
+        "\nConfig: {} seeds, pop={}, r#gen={}, t_max={}, dt={}",
         SEEDS.len(),
         POP_SIZE,
         GENERATIONS,

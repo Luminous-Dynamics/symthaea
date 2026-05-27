@@ -62,7 +62,11 @@ fn seal_envelope_has_correct_layout() {
     let envelope = s
         .seal(b"", PAYLOAD_TYPE_RDP_FRAME)
         .expect("seal empty plaintext");
-    assert_eq!(envelope.len(), 28, "empty plaintext envelope must be 28 bytes (12 nonce + 16 tag)");
+    assert_eq!(
+        envelope.len(),
+        28,
+        "empty plaintext envelope must be 28 bytes (12 nonce + 16 tag)"
+    );
 }
 
 #[test]
@@ -185,8 +189,12 @@ fn cross_payload_type_distinct_nonces() {
     // the payload_type byte is actually flowing into the nonce.
     let mut s = fixed_key_session("xtype", 0x33);
     let plaintext = b"payload";
-    let env_frame = s.seal(plaintext, PAYLOAD_TYPE_RDP_FRAME).expect("seal frame");
-    let env_input = s.seal(plaintext, PAYLOAD_TYPE_RDP_INPUT).expect("seal input");
+    let env_frame = s
+        .seal(plaintext, PAYLOAD_TYPE_RDP_FRAME)
+        .expect("seal frame");
+    let env_input = s
+        .seal(plaintext, PAYLOAD_TYPE_RDP_INPUT)
+        .expect("seal input");
 
     // Nonces are bytes 0..12 of the envelope. Byte 6 is the payload_type.
     assert_ne!(
@@ -209,8 +217,15 @@ fn sequential_seals_have_monotonic_sequence_in_nonce() {
 
     let seq1 = u32::from_le_bytes([env1[8], env1[9], env1[10], env1[11]]);
     let seq2 = u32::from_le_bytes([env2[8], env2[9], env2[10], env2[11]]);
-    assert!(seq2 > seq1, "sequential seals must have monotonic sequence: {seq1} -> {seq2}");
-    assert_eq!(seq2 - seq1, 1, "sequence should advance by exactly 1 per seal");
+    assert!(
+        seq2 > seq1,
+        "sequential seals must have monotonic sequence: {seq1} -> {seq2}"
+    );
+    assert_eq!(
+        seq2 - seq1,
+        1,
+        "sequence should advance by exactly 1 per seal"
+    );
 }
 
 #[test]

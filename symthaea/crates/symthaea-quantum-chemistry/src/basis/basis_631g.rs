@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_631g_hf_water_more_accurate() {
-        use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+        use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
         let water = Molecule::water();
 

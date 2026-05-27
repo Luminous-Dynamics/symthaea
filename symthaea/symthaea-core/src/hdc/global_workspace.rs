@@ -821,8 +821,8 @@ mod tests {
 
     #[test]
     fn test_register_handler_dispatches_on_broadcast() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         let counter = Arc::new(AtomicUsize::new(0));
         let c = counter.clone();
@@ -857,8 +857,8 @@ mod tests {
 
     #[test]
     fn test_handler_only_fires_for_matching_recipients() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         let counter = Arc::new(AtomicUsize::new(0));
         let c = counter.clone();
@@ -893,8 +893,8 @@ mod tests {
     mod proptests {
         use super::*;
         use proptest::prelude::*;
-        use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         /// Strategy: generate a list of recipient names for the workspace
         fn recipient_names() -> impl Strategy<Value = Vec<String>> {

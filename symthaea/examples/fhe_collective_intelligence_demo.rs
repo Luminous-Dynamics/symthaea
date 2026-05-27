@@ -22,7 +22,7 @@
 
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::hdc_crypto::HdcThresholdSharing;
-use symthaea_core::hdc::hdc_fhe::{generate_collective_mask, CollectiveWisdomPool, EncryptedHV};
+use symthaea_core::hdc::hdc_fhe::{CollectiveWisdomPool, EncryptedHV, generate_collective_mask};
 
 fn main() {
     println!("\n╔══════════════════════════════════════════════════════════════╗");

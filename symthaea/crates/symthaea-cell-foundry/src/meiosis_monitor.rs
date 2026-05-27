@@ -166,7 +166,7 @@ mod tests {
         let mut cell = CellState::new_somatic();
         cell.viability = 0.9;
         cell.pluripotency_score = 0.2; // Low pluripotency = differentiated toward germ
-                                       // Add some gene expression diversity
+        // Add some gene expression diversity
         cell.gene_expression = (0..DEFAULT_GENE_EXPR_LEN)
             .map(|i| i as f64 / DEFAULT_GENE_EXPR_LEN as f64)
             .collect();

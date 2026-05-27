@@ -126,8 +126,8 @@ pub fn evaluate_arc_tasks(
     dimension: usize,
     seed: u64,
 ) -> ArcDatasetResult {
-    use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
     use symthaea_core::hdc::BinaryHV;
+    use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 
     let _dimension = dimension;
     let mut tasks_correct: usize = 0;

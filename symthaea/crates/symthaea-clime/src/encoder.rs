@@ -51,7 +51,7 @@ impl ClimeHdcEncoder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ClimeState, AIR_QUALITY, CO2_LOAD, THERMAL_STRESS};
+    use crate::types::{AIR_QUALITY, CO2_LOAD, ClimeState, THERMAL_STRESS};
 
     #[test]
     fn test_encode_dim() {

@@ -1,9 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+use anyhow::Result;
 #[cfg(feature = "ina219-linux")]
 use anyhow::anyhow;
-use anyhow::Result;
 use std::time::{Duration, Instant};
 
 use symthaea_ssm::{SelectiveParams, SsmState};
@@ -119,7 +119,9 @@ fn build_source() -> Result<Box<dyn PowerSource>> {
         }
         #[cfg(not(feature = "ina219-linux"))]
         {
-            eprintln!("Real INA219 requested but feature 'ina219-linux' not enabled; using simulated source.");
+            eprintln!(
+                "Real INA219 requested but feature 'ina219-linux' not enabled; using simulated source."
+            );
         }
     }
 

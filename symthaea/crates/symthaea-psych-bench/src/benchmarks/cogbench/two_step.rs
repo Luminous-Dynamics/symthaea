@@ -58,14 +58,14 @@ impl TwoStepBenchmark {
         // evidence accumulates. Prevents early noise from distorting transition estimates
         // while letting later episodes reflect true 70/30 structure more sharply.
         let mut transition_counts = [[1.0f64; 2]; 2]; // will be recomputed per-episode
-                                                      // Reward model: EMA of rewards in each state
+        // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-                                            // Higher LR (0.60, up from 0.50) speeds reward learning, allowing the
-                                            // agent to track the state-reward difference (state 0: 60% vs state 1: 40%)
-                                            // more precisely. This improves the transition×reward interaction signal
-                                            // (β3) because the model-based value difference between actions becomes
-                                            // more distinct when state rewards are tracked accurately. Behrens et al.
-                                            // (2007): optimal reward LR increases with reward volatility.
+        // Higher LR (0.60, up from 0.50) speeds reward learning, allowing the
+        // agent to track the state-reward difference (state 0: 60% vs state 1: 40%)
+        // more precisely. This improves the transition×reward interaction signal
+        // (β3) because the model-based value difference between actions becomes
+        // more distinct when state rewards are tracked accurately. Behrens et al.
+        // (2007): optimal reward LR increases with reward volatility.
         let reward_lr = 0.60;
         let mut rt_ticks = Vec::new();
 

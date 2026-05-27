@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, SwarmEvent};
+use hound::WavReader;
 #[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use symthaea_swarm::SwarmStateMsg;
-#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use symthaea_muse::audio_analyzer::AudioSurpriseMeter;
-#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use symthaea_muse::mel_extractor::MelConfig;
-#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use image::{DynamicImage, ImageBuffer, Rgb, imageops, GenericImageView};
-#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use symthaea_core::core::ContinuousHV;
+use image::{DynamicImage, GenericImageView, ImageBuffer, Rgb, imageops};
 #[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
 use std::fs;
 #[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 #[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
-use hound::WavReader;
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, SwarmEvent};
+#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
+use symthaea_core::core::ContinuousHV;
+#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
+use symthaea_muse::audio_analyzer::AudioSurpriseMeter;
+#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
+use symthaea_muse::mel_extractor::MelConfig;
+#[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
+use symthaea_swarm::SwarmStateMsg;
 
 fn main() {
     #[cfg(all(feature = "vision-manifold", feature = "swarm", feature = "muse"))]
@@ -58,14 +58,20 @@ fn main() {
         // 2. Analyze the Audio Entropy
         let audio_path = "gallery/music/turbulent.wav";
         println!("🎧 Analyzing musical entropy: {} ...", audio_path);
-        
+
         let mut reader = WavReader::open(audio_path).expect("Failed to open wav");
         let spec = reader.spec();
         let samples: Vec<f32> = match spec.sample_format {
-            hound::SampleFormat::Float => reader.samples::<f32>().map(|s: Result<f32, _>| s.unwrap()).collect(),
+            hound::SampleFormat::Float => reader
+                .samples::<f32>()
+                .map(|s: Result<f32, _>| s.unwrap())
+                .collect(),
             hound::SampleFormat::Int => {
                 let max = (1 << (spec.bits_per_sample - 1)) as f32;
-                reader.samples::<i32>().map(|s: Result<i32, _>| s.unwrap() as f32 / max).collect()
+                reader
+                    .samples::<i32>()
+                    .map(|s: Result<i32, _>| s.unwrap() as f32 / max)
+                    .collect()
             }
         };
 
@@ -74,16 +80,23 @@ fn main() {
             ..Default::default()
         });
         let report = meter.analyze(&samples);
-        println!("📈 Audio Analysis Complete. Mean Entropy: {:.3} | Max Surprise: {:.3}", 
-            report.mean_entropy, report.max_surprise);
+        println!(
+            "📈 Audio Analysis Complete. Mean Entropy: {:.3} | Max Surprise: {:.3}",
+            report.mean_entropy, report.max_surprise
+        );
 
         // Find the peak surprise index to trigger the "Shock"
-        let (peak_idx, &peak_val) = report.surprise_curve.iter()
+        let (peak_idx, &peak_val) = report
+            .surprise_curve
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap();
-        
-        println!("💥 Peak Surprise detected at frame {} (val: {:.3})", peak_idx, peak_val);
+
+        println!(
+            "💥 Peak Surprise detected at frame {} (val: {:.3})",
+            peak_idx, peak_val
+        );
 
         // 3. Trigger Swarm SOS based on Audio Peak
         println!("📡 Node A encountering musical shock -> Broadcasting SOS...");
@@ -95,25 +108,34 @@ fn main() {
             local_phi: 0.9,
             consciousness_hv: node_a.consciousness_hv().unwrap(),
             intent_hv: node_a.last_intent_hv().unwrap(),
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64,
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
         };
-        node_b.swarm_manager_mut().inject_event(SwarmEvent::FullStateUpdate(sos_msg));
-        for _ in 0..50 { let _ = node_b.cycle("sync-swarm"); }
+        node_b
+            .swarm_manager_mut()
+            .inject_event(SwarmEvent::FullStateUpdate(sos_msg));
+        for _ in 0..50 {
+            let _ = node_b.cycle("sync-swarm");
+        }
 
         // 4. Generate the Musical Geodesic (12 frames)
         println!("🎭 Dreaming a 12-frame trajectory synced to entropy peaks...");
         let start_dream = Instant::now();
-        
+
         // We use the collaborative imagine helper, which now uses the O(1) CfC projection
         match node_b.collaborative_imagine_future(&id_a, 12) {
             Ok(movie) => {
                 std::fs::create_dir_all("dream_captures_musical").unwrap();
-                
+
                 for (i, hv_frame) in movie.trajectory.iter().enumerate() {
                     let traj_dim = hv_frame.values.len();
-                    
+
                     // Match mathematical coordinates to Blueprint Vocabulary
-                    let mut distances: Vec<(f32, usize)> = visual_dictionary.iter().enumerate()
+                    let mut distances: Vec<(f32, usize)> = visual_dictionary
+                        .iter()
+                        .enumerate()
                         .map(|(idx, (dict_hv, _))| {
                             // DILATION SYNC: Ensure landmark matches the trajectory's resolution
                             let synced_hv = if dict_hv.values.len() != traj_dim {
@@ -128,7 +150,7 @@ fn main() {
 
                     let (sim1, idx1) = distances[0];
                     let img1 = &visual_dictionary[idx1].1;
-                    
+
                     let mut final_img = img1.clone();
 
                     if distances.len() > 1 && distances[1].0 > 0.35 {
@@ -138,9 +160,12 @@ fn main() {
 
                         for (x, y, pixel) in final_img.enumerate_pixels_mut() {
                             let p2 = img2.get_pixel(x, y);
-                            pixel[0] = ((pixel[0] as f32 * (1.0 - alpha)) + (p2[0] as f32 * alpha)) as u8;
-                            pixel[1] = ((pixel[1] as f32 * (1.0 - alpha)) + (p2[1] as f32 * alpha)) as u8;
-                            pixel[2] = ((pixel[2] as f32 * (1.0 - alpha)) + (p2[2] as f32 * alpha)) as u8;
+                            pixel[0] =
+                                ((pixel[0] as f32 * (1.0 - alpha)) + (p2[0] as f32 * alpha)) as u8;
+                            pixel[1] =
+                                ((pixel[1] as f32 * (1.0 - alpha)) + (p2[1] as f32 * alpha)) as u8;
+                            pixel[2] =
+                                ((pixel[2] as f32 * (1.0 - alpha)) + (p2[2] as f32 * alpha)) as u8;
                         }
                     }
 
@@ -148,7 +173,10 @@ fn main() {
                     final_img.save(&path).unwrap();
                     println!("💾 Saved Frame {:02} | Primary Sim: {:.3}", i, sim1);
                 }
-                println!("\n✅ Musical Geodesic complete in {:?}. Blueprints synced to audio entropy.", start_dream.elapsed());
+                println!(
+                    "\n✅ Musical Geodesic complete in {:?}. Blueprints synced to audio entropy.",
+                    start_dream.elapsed()
+                );
             }
             Err(e) => println!("❌ Geodesic failed: {:?}", e),
         }

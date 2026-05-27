@@ -4,7 +4,7 @@
 //! Analyze temporal regularity of test sounds
 
 use symthaea_sentinel::{
-    compute_onset_strength, compute_temporal_regularity, FileAudioConfig, FileAudioPump,
+    FileAudioConfig, FileAudioPump, compute_onset_strength, compute_temporal_regularity,
 };
 
 fn analyze_file(path: &str) {

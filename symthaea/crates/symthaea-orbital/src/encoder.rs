@@ -1,4 +1,4 @@
-use crate::types::{OrbitalState, NUM_STATE_CHANNELS};
+use crate::types::{NUM_STATE_CHANNELS, OrbitalState};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;

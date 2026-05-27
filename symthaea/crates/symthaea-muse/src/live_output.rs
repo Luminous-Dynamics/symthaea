@@ -28,8 +28,8 @@ use crate::streaming::StreamingSynth;
 use crate::{MuseConfig, MusicalState};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Observer, Producer, Split};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Errors from the live audio system.
 #[derive(Debug)]

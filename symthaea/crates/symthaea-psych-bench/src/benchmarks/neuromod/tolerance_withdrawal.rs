@@ -9,10 +9,10 @@
 //! Science: Koob & Le Moal (2001) — Allostatic model of addiction
 //!          Gainetdinov et al. (2004) — GPCR desensitization kinetics
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 

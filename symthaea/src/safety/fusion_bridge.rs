@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `fusion-twin` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 use symthaea_physics::fusion_twin::{DisruptionRisk, FusionTwinOutput, PlasmaFepAction};
 
 /// Adapter that translates Fusion Digital Twin outputs into Safety Agent inputs.

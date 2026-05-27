@@ -441,7 +441,7 @@ async fn test_sqlite_list_all() {
 
 #[tokio::test]
 async fn test_default_config_creates_sqlite() {
-    use symthaea::databases::{create_database, DatabaseConfig};
+    use symthaea::databases::{DatabaseConfig, create_database};
 
     let db = create_database(&DatabaseConfig::default())
         .await

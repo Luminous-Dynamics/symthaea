@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 23: Design-Production Loop ===\n");
 
     use symthaea_fabrication_kernel::design_loop::{
-        DesignLoopReading, DesignLoopTwin, DESIGN_LOOP_HORIZONS,
+        DESIGN_LOOP_HORIZONS, DesignLoopReading, DesignLoopTwin,
     };
 
     let healthy = DesignLoopReading {

@@ -15,7 +15,7 @@
 //! Goal: Approach 100% accuracy on causal discovery benchmarks
 
 use super::tuebingen_adapter::{
-    discover_by_information_theoretic, CausalDirection, CausalDiscoveryResult, CausalFeatures,
+    CausalDirection, CausalDiscoveryResult, CausalFeatures, discover_by_information_theoretic,
 };
 use std::collections::HashMap;
 
@@ -1868,11 +1868,7 @@ fn skewness(data: &[f64]) -> f64 {
     let m2: f64 = data.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / n;
     let m3: f64 = data.iter().map(|&x| (x - mean).powi(3)).sum::<f64>() / n;
 
-    if m2 > 1e-10 {
-        m3 / m2.powf(1.5)
-    } else {
-        0.0
-    }
+    if m2 > 1e-10 { m3 / m2.powf(1.5) } else { 0.0 }
 }
 
 fn kurtosis(data: &[f64]) -> f64 {

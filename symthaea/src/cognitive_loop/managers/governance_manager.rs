@@ -28,7 +28,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
 use crate::mycelix::collective_identity::CommunityMode;

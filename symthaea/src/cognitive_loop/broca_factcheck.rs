@@ -18,7 +18,7 @@
 //! verification improves epistemic quality of language production.
 
 use std::collections::VecDeque;
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 
 // ── Named Constants ──────────────────────────────────────────────────────
 

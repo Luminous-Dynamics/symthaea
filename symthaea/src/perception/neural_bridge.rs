@@ -64,9 +64,9 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
-use symthaea_core::hdc::{PackedBipolar, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar};
 
 /// Neural Bridge for LLM activation -> HDC conversion.
 ///

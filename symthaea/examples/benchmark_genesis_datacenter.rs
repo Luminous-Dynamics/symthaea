@@ -9,7 +9,7 @@
 fn main() {
     println!("=== Genesis Mission Challenge 20: Data Center Operations ===\n");
 
-    use symthaea::physics::datacenter::{DatacenterReading, DatacenterTwin, DATACENTER_HORIZONS};
+    use symthaea::physics::datacenter::{DATACENTER_HORIZONS, DatacenterReading, DatacenterTwin};
 
     let healthy = DatacenterReading {
         power_draw: 0.6,

@@ -245,7 +245,7 @@ mod tests {
         // Boot/networking get 0.9
         assert!((ConfigEncoder::option_weight("boot.loader.grub.device") - 0.9).abs() < 1e-6);
         assert!((ConfigEncoder::option_weight("networking.firewall.enable") - 1.0).abs() < 1e-6); // has "enable"
-                                                                                                  // Services get 0.8
+        // Services get 0.8
         assert!((ConfigEncoder::option_weight("services.postgresql.port") - 0.8).abs() < 1e-6);
         // Packages get 0.7
         assert!((ConfigEncoder::option_weight("environment.systemPackages") - 0.7).abs() < 1e-6);

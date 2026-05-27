@@ -20,16 +20,16 @@
 //! cargo run --example soak_discovery_pipeline --release
 //! ```
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::swarm::{
-    evaluate_compatibility, AgentPubKey, CapabilityCard, HandshakeConfig, ReputationBridge,
-    VouchDecision,
+    AgentPubKey, CapabilityCard, HandshakeConfig, ReputationBridge, VouchDecision,
+    evaluate_compatibility,
 };
-use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 
 const SOAK_CYCLES: usize = 1_000;
 const CARD_SAMPLE_INTERVAL: usize = 100;

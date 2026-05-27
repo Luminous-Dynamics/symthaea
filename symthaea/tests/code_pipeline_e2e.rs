@@ -228,7 +228,7 @@ fn test_experience_store_informs_generation() {
 
     // 1. Create a CodeGenerator
     let encoder = CodeHDEncoder::new(256);
-    let gen = CodeGenerator::new(encoder);
+    let r#gen = CodeGenerator::new(encoder);
 
     // 2. Build a CodeContext with error hints pre-populated
     //    (simulating what CodingExperienceStore.cached_error_hints() would provide)
@@ -255,7 +255,7 @@ fn test_experience_store_informs_generation() {
             .with_signature("fn sum_values(v: &[i32]) -> i32"),
     };
 
-    let result = gen.generate(&intent, &context);
+    let result = r#gen.generate(&intent, &context);
 
     eprintln!("Generated source ({} chars):", result.source.len());
     eprintln!("{}", result.source);
@@ -313,7 +313,7 @@ fn test_experience_store_informs_generation() {
             .with_signature("fn product_values(v: &[i32]) -> i32"),
     };
 
-    let result2 = gen.generate(&intent2, &context_with_examples);
+    let result2 = r#gen.generate(&intent2, &context_with_examples);
     eprintln!("\nSecond generation with past examples:");
     eprintln!("  Source: {}", result2.source);
     eprintln!("  Notes: {:?}", result2.notes);

@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use super::rdp_protocol::{ControlMessage, RdpFrame, RdpSessionConfig, RDP_PROTOCOL_VERSION};
+use super::rdp_protocol::{ControlMessage, RDP_PROTOCOL_VERSION, RdpFrame, RdpSessionConfig};
 
 /// How often to request consciousness re-attestation (seconds).
 const REATTESTATION_INTERVAL_SECS: u64 = 60;
@@ -322,7 +322,7 @@ impl RdpSession {
     /// the canonical assignments.
     #[cfg(feature = "mesh-encryption")]
     pub fn seal(&mut self, plaintext: &[u8], payload_type: u8) -> Option<Vec<u8>> {
-        use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+        use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
         let key = *self.session_key.as_ref()?;
         let seq = (self.next_nonce() & 0xFFFF_FFFF) as u32;
 
@@ -367,7 +367,7 @@ impl RdpSession {
     /// pass `&mut session`.
     #[cfg(feature = "mesh-encryption")]
     pub fn open(&mut self, envelope: &[u8]) -> Option<Vec<u8>> {
-        use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+        use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
 
         // (1) length check
         if envelope.len() < 12 + 16 {

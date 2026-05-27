@@ -28,7 +28,7 @@
 //! and the most misaligned value for dashboard display.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────

@@ -238,8 +238,7 @@ pub fn problem_06_cauchy_schwarz_gap() -> (BenchProblem, BenchResult) {
         name: "Cauchy-Schwarz on (1,2,3), (4,5,6) with slack",
         difficulty: Difficulty::Easy,
         domain: "Inequalities",
-        description:
-            "Verify C-S and quantify slack (non-zero because vectors aren't proportional).",
+        description: "Verify C-S and quantify slack (non-zero because vectors aren't proportional).",
     };
     let a = [1.0, 2.0, 3.0];
     let b = [4.0, 5.0, 6.0];

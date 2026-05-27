@@ -49,11 +49,7 @@ fn main() {
                 let x = i % width;
                 let y = i / width;
                 let checker = ((x / block_size) + (y / block_size)) % 2;
-                if checker == 0 {
-                    seed
-                } else {
-                    255 - seed
-                }
+                if checker == 0 { seed } else { 255 - seed }
             })
             .collect()
     };

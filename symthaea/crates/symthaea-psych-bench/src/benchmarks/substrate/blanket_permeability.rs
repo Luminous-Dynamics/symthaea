@@ -155,9 +155,8 @@ impl PsychBenchmark for BlanketPermeabilityBenchmark {
             trial_results.push(Self::run_trial(config));
         }
 
-        let collect = |f: fn(&TrialResult) -> f64| -> Vec<f64> {
-            trial_results.iter().map(f).collect()
-        };
+        let collect =
+            |f: fn(&TrialResult) -> f64| -> Vec<f64> { trial_results.iter().map(f).collect() };
 
         let mut result = BenchmarkResult::new(self.name(), None);
         result.conditions = 1;

@@ -31,8 +31,8 @@
 //! result. If it shows clear signal, Session 19 can scale it up.
 
 use symthaea_core::hdc::conjecture_engine::{
-    discover_invariants_autonomous_with_seed_templates, AutonomousInvariant, BinOp, Expr,
-    RegressorConfig, UnaryFn,
+    AutonomousInvariant, BinOp, Expr, RegressorConfig, UnaryFn,
+    discover_invariants_autonomous_with_seed_templates,
 };
 
 const SEEDS: &[u64] = &[42, 1337, 2718, 7919, 31415];
@@ -154,7 +154,7 @@ fn run_one(
     run_with_budget(seed, priors, exclude_trig, diverse_n, POP_SIZE, GENERATIONS)
 }
 
-/// Session 23: variant with caller-specified budget. Higher pop/gen
+/// Session 23: variant with caller-specified budget. Higher pop/r#gen
 /// gives crossover more chances to compose pinned Jacobi primitives
 /// into the full invariant.
 fn run_with_budget(
@@ -295,7 +295,7 @@ fn main() {
     println!("║  discovery on PCR3BP?                                        ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!(
-        "\nConfig: {} seeds, pop={}, gen={}, t_max={}, dt={}\n",
+        "\nConfig: {} seeds, pop={}, r#gen={}, t_max={}, dt={}\n",
         SEEDS.len(),
         POP_SIZE,
         GENERATIONS,
@@ -365,7 +365,7 @@ fn main() {
     aggregate("cheat + diverse-5", &cheat_div);
 
     println!("\n━━━ Jacobi cheat + no-trig + diverse-5 + HIGH BUDGET (Session 23) ━━━");
-    println!("  pop=300 gen=100 max_depth=6 max_complexity=24, depth+reach boosted");
+    println!("  pop=300 r#gen=100 max_depth=6 max_complexity=24, depth+reach boosted");
     let cheat_hb: Vec<SeedResult> = SEEDS
         .iter()
         .map(|&seed| {

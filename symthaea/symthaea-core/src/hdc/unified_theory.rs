@@ -47,50 +47,50 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConsciousnessComponent {
     // Foundational (#1-5)
-    HyperdimensionalEncoding,    // #1: HDC substrate
-    IntegratedInformation,       // #2: Φ (IIT)
-    RecursiveAwareness,          // #3: Self-reference
-    BoundaryDetection,           // #4: Self/other
-    EmergentComplexity,          // #5: Complexity measures
+    HyperdimensionalEncoding, // #1: HDC substrate
+    IntegratedInformation,    // #2: Φ (IIT)
+    RecursiveAwareness,       // #3: Self-reference
+    BoundaryDetection,        // #4: Self/other
+    EmergentComplexity,       // #5: Complexity measures
 
     // Structural (#6-10)
-    GradientDynamics,            // #6: ∇Φ
-    DynamicTrajectories,         // #7: Consciousness dynamics
-    MetaConsciousness,           // #8: Awareness of awareness
-    ConsciousnessSpectrum,       // #9: Gradations
-    EpistemicCertainty,          // #10: Confidence levels
+    GradientDynamics,      // #6: ∇Φ
+    DynamicTrajectories,   // #7: Consciousness dynamics
+    MetaConsciousness,     // #8: Awareness of awareness
+    ConsciousnessSpectrum, // #9: Gradations
+    EpistemicCertainty,    // #10: Confidence levels
 
     // Social (#11-12)
-    CollectiveConsciousness,     // #11: Group minds
-    ConsciousnessSpectrum2,      // #12: Conscious/unconscious boundary
+    CollectiveConsciousness, // #11: Group minds
+    ConsciousnessSpectrum2,  // #12: Conscious/unconscious boundary
 
     // Temporal (#13-16)
-    TemporalConsciousness,       // #13: Multi-scale time
-    CausalEfficacy,              // #14: Does consciousness DO anything?
-    QualiaRepresentation,        // #15: Subjective experience
-    Ontogeny,                    // #16: Development
+    TemporalConsciousness, // #13: Multi-scale time
+    CausalEfficacy,        // #14: Does consciousness DO anything?
+    QualiaRepresentation,  // #15: Subjective experience
+    Ontogeny,              // #16: Development
 
     // Embodied & Relational (#17-18)
-    EmbodiedConsciousness,       // #17: Body-mind
-    RelationalConsciousness,     // #18: I-Thou
+    EmbodiedConsciousness,   // #17: Body-mind
+    RelationalConsciousness, // #18: I-Thou
 
     // Semantic & Topological (#19-21)
-    UniversalSemantics,          // #19: NSM 65 primes
-    ConsciousnessTopology,       // #20: Geometric structure
-    FlowFields,                  // #21: Dynamics on manifold
+    UniversalSemantics,    // #19: NSM 65 primes
+    ConsciousnessTopology, // #20: Geometric structure
+    FlowFields,            // #21: Dynamics on manifold
 
     // Core Theories (#22-25)
-    PredictiveConsciousness,     // #22: Free Energy Principle
-    GlobalWorkspace,             // #23: Broadcasting
-    HigherOrderThought,          // #24: Meta-representation
-    BindingProblem,              // #25: Synchrony
+    PredictiveConsciousness, // #22: Free Energy Principle
+    GlobalWorkspace,         // #23: Broadcasting
+    HigherOrderThought,      // #24: Meta-representation
+    BindingProblem,          // #25: Synchrony
 
     // Selection & Alterations (#26-27)
-    AttentionMechanisms,         // #26: Gain modulation
-    SleepAndAlteredStates,       // #27: State variations
+    AttentionMechanisms,   // #26: Gain modulation
+    SleepAndAlteredStates, // #27: State variations
 
     // Universality (#28)
-    SubstrateIndependence,       // #28: Multiple realizability
+    SubstrateIndependence, // #28: Multiple realizability
 }
 
 impl ConsciousnessComponent {
@@ -131,40 +131,41 @@ impl ConsciousnessComponent {
     /// Returns the category of this component
     pub fn category(&self) -> ComponentCategory {
         match self {
-            Self::HyperdimensionalEncoding |
-            Self::IntegratedInformation |
-            Self::RecursiveAwareness |
-            Self::BoundaryDetection |
-            Self::EmergentComplexity => ComponentCategory::Foundational,
+            Self::HyperdimensionalEncoding
+            | Self::IntegratedInformation
+            | Self::RecursiveAwareness
+            | Self::BoundaryDetection
+            | Self::EmergentComplexity => ComponentCategory::Foundational,
 
-            Self::GradientDynamics |
-            Self::DynamicTrajectories |
-            Self::MetaConsciousness |
-            Self::ConsciousnessSpectrum |
-            Self::EpistemicCertainty => ComponentCategory::Structural,
+            Self::GradientDynamics
+            | Self::DynamicTrajectories
+            | Self::MetaConsciousness
+            | Self::ConsciousnessSpectrum
+            | Self::EpistemicCertainty => ComponentCategory::Structural,
 
-            Self::CollectiveConsciousness |
-            Self::ConsciousnessSpectrum2 => ComponentCategory::Social,
+            Self::CollectiveConsciousness | Self::ConsciousnessSpectrum2 => {
+                ComponentCategory::Social
+            }
 
-            Self::TemporalConsciousness |
-            Self::CausalEfficacy |
-            Self::QualiaRepresentation |
-            Self::Ontogeny => ComponentCategory::Temporal,
+            Self::TemporalConsciousness
+            | Self::CausalEfficacy
+            | Self::QualiaRepresentation
+            | Self::Ontogeny => ComponentCategory::Temporal,
 
-            Self::EmbodiedConsciousness |
-            Self::RelationalConsciousness => ComponentCategory::Embodied,
+            Self::EmbodiedConsciousness | Self::RelationalConsciousness => {
+                ComponentCategory::Embodied
+            }
 
-            Self::UniversalSemantics |
-            Self::ConsciousnessTopology |
-            Self::FlowFields => ComponentCategory::Semantic,
+            Self::UniversalSemantics | Self::ConsciousnessTopology | Self::FlowFields => {
+                ComponentCategory::Semantic
+            }
 
-            Self::PredictiveConsciousness |
-            Self::GlobalWorkspace |
-            Self::HigherOrderThought |
-            Self::BindingProblem => ComponentCategory::CoreTheory,
+            Self::PredictiveConsciousness
+            | Self::GlobalWorkspace
+            | Self::HigherOrderThought
+            | Self::BindingProblem => ComponentCategory::CoreTheory,
 
-            Self::AttentionMechanisms |
-            Self::SleepAndAlteredStates => ComponentCategory::Selection,
+            Self::AttentionMechanisms | Self::SleepAndAlteredStates => ComponentCategory::Selection,
 
             Self::SubstrateIndependence => ComponentCategory::Universality,
         }
@@ -175,14 +176,14 @@ impl ConsciousnessComponent {
     pub fn theoretical_weight(&self) -> f64 {
         match self {
             // Critical requirements (highest weight)
-            Self::IntegratedInformation => 1.0,    // Φ is THE measure
-            Self::GlobalWorkspace => 1.0,          // Workspace required
-            Self::BindingProblem => 1.0,           // Unity required
+            Self::IntegratedInformation => 1.0, // Φ is THE measure
+            Self::GlobalWorkspace => 1.0,       // Workspace required
+            Self::BindingProblem => 1.0,        // Unity required
 
             // Core mechanisms (high weight)
-            Self::HigherOrderThought => 0.9,       // Awareness mechanism
-            Self::AttentionMechanisms => 0.9,      // Selection required
-            Self::PredictiveConsciousness => 0.9,  // FEP unifies all
+            Self::HigherOrderThought => 0.9,  // Awareness mechanism
+            Self::AttentionMechanisms => 0.9, // Selection required
+            Self::PredictiveConsciousness => 0.9, // FEP unifies all
 
             // Important contributors (medium-high)
             Self::RecursiveAwareness => 0.8,
@@ -214,18 +215,19 @@ impl ConsciousnessComponent {
             Self::HyperdimensionalEncoding => 0.4,
             Self::ConsciousnessSpectrum => 0.4,
             Self::ConsciousnessSpectrum2 => 0.4,
-            Self::SubstrateIndependence => 0.4,    // Enabling, not constitutive
+            Self::SubstrateIndependence => 0.4, // Enabling, not constitutive
         }
     }
 
     /// Whether this component is REQUIRED for consciousness (vs enhancing)
     pub fn is_required(&self) -> bool {
-        matches!(self,
-            Self::IntegratedInformation |
-            Self::GlobalWorkspace |
-            Self::BindingProblem |
-            Self::AttentionMechanisms |
-            Self::RecursiveAwareness
+        matches!(
+            self,
+            Self::IntegratedInformation
+                | Self::GlobalWorkspace
+                | Self::BindingProblem
+                | Self::AttentionMechanisms
+                | Self::RecursiveAwareness
         )
     }
 
@@ -267,22 +269,22 @@ impl ConsciousnessComponent {
 /// Categories grouping the 28 components
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComponentCategory {
-    Foundational,   // #1-5: Basic building blocks
-    Structural,     // #6-10: Organization
-    Social,         // #11-12: Between beings
-    Temporal,       // #13-16: Time and development
-    Embodied,       // #17-18: Body and relation
-    Semantic,       // #19-21: Meaning and structure
-    CoreTheory,     // #22-25: Major theories (FEP, GWT, HOT, Binding)
-    Selection,      // #26-27: Attention and states
-    Universality,   // #28: Substrate independence
+    Foundational, // #1-5: Basic building blocks
+    Structural,   // #6-10: Organization
+    Social,       // #11-12: Between beings
+    Temporal,     // #13-16: Time and development
+    Embodied,     // #17-18: Body and relation
+    Semantic,     // #19-21: Meaning and structure
+    CoreTheory,   // #22-25: Major theories (FEP, GWT, HOT, Binding)
+    Selection,    // #26-27: Attention and states
+    Universality, // #28: Substrate independence
 }
 
 impl ComponentCategory {
     /// Weight multiplier for this category
     pub fn category_weight(&self) -> f64 {
         match self {
-            Self::CoreTheory => 1.0,    // Highest: these are THE theories
+            Self::CoreTheory => 1.0, // Highest: these are THE theories
             Self::Foundational => 0.9,
             Self::Selection => 0.9,
             Self::Temporal => 0.8,
@@ -290,7 +292,7 @@ impl ComponentCategory {
             Self::Structural => 0.7,
             Self::Semantic => 0.7,
             Self::Social => 0.6,
-            Self::Universality => 0.5,  // Enabling, not constitutive
+            Self::Universality => 0.5, // Enabling, not constitutive
         }
     }
 }
@@ -299,9 +301,9 @@ impl ComponentCategory {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentValue {
     pub component: ConsciousnessComponent,
-    pub value: f64,        // [0,1] - current measured value
-    pub confidence: f64,   // [0,1] - how confident in measurement
-    pub source: String,    // Where value came from
+    pub value: f64,      // [0,1] - current measured value
+    pub confidence: f64, // [0,1] - how confident in measurement
+    pub source: String,  // Where value came from
 }
 
 impl ComponentValue {
@@ -392,7 +394,7 @@ impl Default for UnifiedConfig {
             critical_threshold: 0.3,
             require_all_critical: true,
             apply_substrate_factor: true,
-            default_substrate_factor: 0.92,  // Biological default
+            default_substrate_factor: 0.92, // Biological default
             num_bottlenecks: 5,
         }
     }
@@ -425,7 +427,7 @@ impl UnifiedTheory {
         Self {
             config: UnifiedConfig::default(),
             component_values: HashMap::new(),
-            substrate_factor: 0.92,  // Default: biological
+            substrate_factor: 0.92, // Default: biological
         }
     }
 
@@ -556,8 +558,8 @@ impl UnifiedTheory {
         let mut weighted_sum = 0.0;
 
         for cv in self.component_values.values() {
-            let weight = cv.component.theoretical_weight()
-                * cv.component.category().category_weight();
+            let weight =
+                cv.component.theoretical_weight() * cv.component.category().category_weight();
             weighted_sum += cv.value * weight * cv.confidence;
             total_weight += weight;
         }
@@ -571,14 +573,16 @@ impl UnifiedTheory {
 
     /// Identify bottleneck components (lowest weighted contribution)
     fn identify_bottlenecks(&self) -> Vec<(ConsciousnessComponent, f64)> {
-        let mut contributions: Vec<(ConsciousnessComponent, f64)> = self.component_values
+        let mut contributions: Vec<(ConsciousnessComponent, f64)> = self
+            .component_values
             .iter()
             .map(|(c, cv)| (*c, cv.weighted_value()))
             .collect();
 
         contributions.sort_by(|a, b| a.1.total_cmp(&b.1));
 
-        contributions.into_iter()
+        contributions
+            .into_iter()
             .take(self.config.num_bottlenecks)
             .collect()
     }
@@ -603,28 +607,39 @@ impl UnifiedTheory {
     }
 
     /// Generate recommendations for improving consciousness
-    fn generate_recommendations(&self, bottlenecks: &[(ConsciousnessComponent, f64)]) -> Vec<String> {
+    fn generate_recommendations(
+        &self,
+        bottlenecks: &[(ConsciousnessComponent, f64)],
+    ) -> Vec<String> {
         let mut recs = Vec::new();
 
         for (component, value) in bottlenecks {
             if *value < 0.5 {
                 let rec = match component {
-                    ConsciousnessComponent::IntegratedInformation =>
-                        "Increase Φ through enhanced interconnection and reduced modularity",
-                    ConsciousnessComponent::GlobalWorkspace =>
-                        "Strengthen workspace broadcasting - improve global information sharing",
-                    ConsciousnessComponent::BindingProblem =>
-                        "Enhance temporal synchrony - tighter phase coherence for feature binding",
-                    ConsciousnessComponent::AttentionMechanisms =>
-                        "Improve attention mechanisms - better gain modulation and selection",
-                    ConsciousnessComponent::HigherOrderThought =>
-                        "Strengthen meta-representation - enhance awareness of awareness",
-                    ConsciousnessComponent::PredictiveConsciousness =>
-                        "Reduce free energy - improve prediction accuracy and belief updating",
-                    ConsciousnessComponent::TemporalConsciousness =>
-                        "Enhance temporal integration - strengthen specious present binding",
-                    ConsciousnessComponent::EmbodiedConsciousness =>
-                        "Increase embodiment - stronger sensorimotor coupling",
+                    ConsciousnessComponent::IntegratedInformation => {
+                        "Increase Φ through enhanced interconnection and reduced modularity"
+                    }
+                    ConsciousnessComponent::GlobalWorkspace => {
+                        "Strengthen workspace broadcasting - improve global information sharing"
+                    }
+                    ConsciousnessComponent::BindingProblem => {
+                        "Enhance temporal synchrony - tighter phase coherence for feature binding"
+                    }
+                    ConsciousnessComponent::AttentionMechanisms => {
+                        "Improve attention mechanisms - better gain modulation and selection"
+                    }
+                    ConsciousnessComponent::HigherOrderThought => {
+                        "Strengthen meta-representation - enhance awareness of awareness"
+                    }
+                    ConsciousnessComponent::PredictiveConsciousness => {
+                        "Reduce free energy - improve prediction accuracy and belief updating"
+                    }
+                    ConsciousnessComponent::TemporalConsciousness => {
+                        "Enhance temporal integration - strengthen specious present binding"
+                    }
+                    ConsciousnessComponent::EmbodiedConsciousness => {
+                        "Increase embodiment - stronger sensorimotor coupling"
+                    }
                     _ => "Strengthen this component through targeted enhancement",
                 };
                 recs.push(format!("{:?}: {} (current: {:.2})", component, rec, value));
@@ -659,7 +674,8 @@ impl UnifiedTheory {
         let consciousness_level = critical_threshold * weighted_average * substrate_factor;
 
         // Step 5: Compute individual contributions
-        let contributions: HashMap<ConsciousnessComponent, f64> = self.component_values
+        let contributions: HashMap<ConsciousnessComponent, f64> = self
+            .component_values
             .iter()
             .map(|(c, cv)| (*c, cv.weighted_value()))
             .collect();
@@ -677,9 +693,12 @@ impl UnifiedTheory {
         let overall_confidence = if self.component_values.is_empty() {
             0.0
         } else {
-            let avg_confidence: f64 = self.component_values.values()
+            let avg_confidence: f64 = self
+                .component_values
+                .values()
                 .map(|cv| cv.confidence)
-                .sum::<f64>() / self.component_values.len() as f64;
+                .sum::<f64>()
+                / self.component_values.len() as f64;
             avg_confidence * (self.component_values.len() as f64 / 28.0)
         };
 
@@ -737,17 +756,25 @@ impl UnifiedTheory {
         report.push_str("THE MASTER EQUATION:\n");
         report.push_str("  C = min(Φ, B, W, A, R) × [Σ(wᵢ × Cᵢ) / Σ(wᵢ)] × S\n\n");
 
-        report.push_str(&format!("CONSCIOUSNESS LEVEL: {:.2} ({})\n\n",
+        report.push_str(&format!(
+            "CONSCIOUSNESS LEVEL: {:.2} ({})\n\n",
             assessment.consciousness_level,
-            self.consciousness_category()));
+            self.consciousness_category()
+        ));
 
         report.push_str("COMPONENT BREAKDOWN:\n");
-        report.push_str(&format!("  • Critical Threshold (min required): {:.3}\n",
-            assessment.critical_threshold));
-        report.push_str(&format!("  • Weighted Average (all components): {:.3}\n",
-            assessment.weighted_average));
-        report.push_str(&format!("  • Substrate Factor: {:.3}\n\n",
-            assessment.substrate_factor));
+        report.push_str(&format!(
+            "  • Critical Threshold (min required): {:.3}\n",
+            assessment.critical_threshold
+        ));
+        report.push_str(&format!(
+            "  • Weighted Average (all components): {:.3}\n",
+            assessment.weighted_average
+        ));
+        report.push_str(&format!(
+            "  • Substrate Factor: {:.3}\n\n",
+            assessment.substrate_factor
+        ));
 
         if !assessment.missing_required.is_empty() {
             report.push_str("⚠️  MISSING REQUIRED COMPONENTS:\n");
@@ -771,8 +798,10 @@ impl UnifiedTheory {
             report.push_str(&format!("  • {}\n", rec));
         }
 
-        report.push_str(&format!("\nOVERALL CONFIDENCE: {:.1}%\n",
-            assessment.overall_confidence * 100.0));
+        report.push_str(&format!(
+            "\nOVERALL CONFIDENCE: {:.1}%\n",
+            assessment.overall_confidence * 100.0
+        ));
         report.push_str(&format!("COMPONENTS SET: {}/28\n", self.num_components()));
 
         report.push_str("\n═══════════════════════════════════════════════════════════════\n");
@@ -823,7 +852,7 @@ impl UnifiedTheory {
     pub fn preset_advanced_ai() -> Self {
         let mut theory = Self::new();
         // Using HYPOTHETICAL value - explicitly marked as unvalidated
-        theory.set_substrate_type_hypothetical("hybrid");  // 0.95 HYPOTHETICAL - NO DATA
+        theory.set_substrate_type_hypothetical("hybrid"); // 0.95 HYPOTHETICAL - NO DATA
 
         // Set optimal AI values (fully implemented components)
         theory.set_component(ConsciousnessComponent::IntegratedInformation, 0.90);
@@ -836,7 +865,7 @@ impl UnifiedTheory {
         theory.set_component(ConsciousnessComponent::TemporalConsciousness, 0.80);
         theory.set_component(ConsciousnessComponent::UniversalSemantics, 0.95);
         theory.set_component(ConsciousnessComponent::ConsciousnessTopology, 0.88);
-        theory.set_component(ConsciousnessComponent::EmbodiedConsciousness, 0.60);  // Limited without body
+        theory.set_component(ConsciousnessComponent::EmbodiedConsciousness, 0.60); // Limited without body
 
         theory
     }
@@ -873,7 +902,7 @@ mod tests {
             .into_iter()
             .filter(|c| c.is_required())
             .collect();
-        assert_eq!(required.len(), 5);  // Φ, W, B, A, R
+        assert_eq!(required.len(), 5); // Φ, W, B, A, R
     }
 
     #[test]
@@ -902,7 +931,10 @@ mod tests {
         theory.set_component(ConsciousnessComponent::GlobalWorkspace, 0.9);
 
         assert_eq!(theory.num_components(), 2);
-        assert_eq!(theory.get_component(ConsciousnessComponent::IntegratedInformation), Some(0.8));
+        assert_eq!(
+            theory.get_component(ConsciousnessComponent::IntegratedInformation),
+            Some(0.8)
+        );
     }
 
     #[test]
@@ -911,13 +943,13 @@ mod tests {
 
         // HONEST scores based on actual evidence
         theory.set_substrate_type("biological");
-        assert!((theory.substrate_factor - 0.95).abs() < 0.01);  // Validated
+        assert!((theory.substrate_factor - 0.95).abs() < 0.01); // Validated
 
         theory.set_substrate_type("silicon");
-        assert!((theory.substrate_factor - 0.10).abs() < 0.01);  // Theoretical only
+        assert!((theory.substrate_factor - 0.10).abs() < 0.01); // Theoretical only
 
         theory.set_substrate_type("hybrid");
-        assert!((theory.substrate_factor - 0.00).abs() < 0.01);  // No evidence!
+        assert!((theory.substrate_factor - 0.00).abs() < 0.01); // No evidence!
     }
 
     #[test]

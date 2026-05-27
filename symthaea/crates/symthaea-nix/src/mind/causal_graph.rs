@@ -359,11 +359,7 @@ impl NixCausalGraph {
 
     /// Encode a boolean as numeric
     pub fn encode_bool(value: bool) -> f64 {
-        if value {
-            1.0
-        } else {
-            0.0
-        }
+        if value { 1.0 } else { 0.0 }
     }
 
     /// Add a structural causal edge from known NixOS knowledge.
@@ -1625,9 +1621,11 @@ mod tests {
 
         // Observe A→C for the first time (no prior edge)
         graph.observe_outcome("A", &["C"], &[]);
-        assert!(graph
-            .causal_graph
-            .contains_key(&("A".to_string(), "C".to_string())));
+        assert!(
+            graph
+                .causal_graph
+                .contains_key(&("A".to_string(), "C".to_string()))
+        );
         let edge = &graph.causal_graph[&("A".to_string(), "C".to_string())];
         assert!(
             edge.confidence > 0.3,

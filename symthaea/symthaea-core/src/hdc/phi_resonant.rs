@@ -801,8 +801,8 @@ impl Default for ResonantPhiCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
     use crate::hdc::HDC_DIMENSION;
+    use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 
     #[test]
     fn test_resonant_phi_convergence() {

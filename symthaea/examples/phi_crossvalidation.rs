@@ -33,8 +33,8 @@
 //! ```
 
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology, phi_resonant::ResonantPhiCalculator,
-    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
+    HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology,
+    phi_resonant::ResonantPhiCalculator, spectral_connectivity::ConnectivityCalculator,
 };
 
 /// Topology specification for testing

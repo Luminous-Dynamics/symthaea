@@ -10,7 +10,7 @@
 //!
 //! Usage: `cargo run -p symthaea-multirotor --example multi_scenario --release`
 
-use symthaea_multirotor::benchmarks::{evaluate_scenario_variants, ScenarioVariant};
+use symthaea_multirotor::benchmarks::{ScenarioVariant, evaluate_scenario_variants};
 
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");

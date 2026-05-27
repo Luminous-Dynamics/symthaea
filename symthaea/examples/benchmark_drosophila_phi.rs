@@ -212,7 +212,7 @@ fn main() {
         let mem_est_mb = (n * HDC_DIM * 4) as f64 / (1024.0 * 1024.0); // f32 per element
 
         println!(
-            "  n={:>5} │ Φ = {:.6} │ gen: {:.1}s, compute: {:.1}s │ ~{:.0}MB",
+            "  n={:>5} │ Φ = {:.6} │ r#gen: {:.1}s, compute: {:.1}s │ ~{:.0}MB",
             n, phi_result.phi, gen_time, compute_time, mem_est_mb
         );
 

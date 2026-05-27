@@ -18,11 +18,11 @@
 //! - Stream 4: File transfer
 //! - Stream 5: Chat + RemoteExec
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
-use std::sync::Arc;
 
-use super::rdp_protocol::{RdpFrame, RDP_ALPN};
+use super::rdp_protocol::{RDP_ALPN, RdpFrame};
 
 /// QUIC stream IDs for multiplexing.
 pub const STREAM_CONTROL: u8 = 0;

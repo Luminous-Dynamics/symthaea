@@ -9,8 +9,8 @@
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Types of sensory modalities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -248,9 +248,10 @@ fn test_contrastive_pretrain_then_generate() {
         .collect();
 
     // Contrastive pretrain
-    let (avg_dist, avg_recon) = gen_obj
-        .projection_mut()
-        .contrastive_pretrain(&thought_hvs, 5, 0.01);
+    let (avg_dist, avg_recon) =
+        gen_obj
+            .projection_mut()
+            .contrastive_pretrain(&thought_hvs, 5, 0.01);
     assert!(
         avg_dist.is_finite(),
         "avg_dist should be finite: {avg_dist}"
@@ -313,8 +314,8 @@ fn test_surprise_gradient_amplifies() {
 fn test_eval_only_workflow() {
     use symthaea_broca::checkpoint::ProjectionCheckpoint;
     use symthaea_broca::evaluation::{
-        evaluate_liquid_mamba, format_liquid_mamba_eval_report, LiquidMambaEvalConfig,
-        QualityGateThresholds,
+        LiquidMambaEvalConfig, QualityGateThresholds, evaluate_liquid_mamba,
+        format_liquid_mamba_eval_report,
     };
     use symthaea_broca::training::{TrainingDataset, TrainingPair};
 
@@ -628,8 +629,8 @@ fn test_diagnostics_triggered_collapse_recovery() {
 fn test_full_training_pipeline_smoke() {
     use symthaea_broca::checkpoint::ProjectionCheckpoint;
     use symthaea_broca::evaluation::{
-        evaluate_liquid_mamba, format_liquid_mamba_eval_report, LiquidMambaEvalConfig,
-        QualityGateThresholds,
+        LiquidMambaEvalConfig, QualityGateThresholds, evaluate_liquid_mamba,
+        format_liquid_mamba_eval_report,
     };
     use symthaea_broca::training::{TrainingDataset, TrainingPair};
 
@@ -681,7 +682,9 @@ fn test_full_training_pipeline_smoke() {
 
     // 5. Save checkpoint with diagnostics snapshot
     let weights = gen_obj.projection().flatten_weights();
-    let diag = gen_obj.projection_diagnostics().expect("diagnostics enabled");
+    let diag = gen_obj
+        .projection_diagnostics()
+        .expect("diagnostics enabled");
     let snap = diag.snapshot();
     let mut ckpt = ProjectionCheckpoint::new(
         weights.clone(),

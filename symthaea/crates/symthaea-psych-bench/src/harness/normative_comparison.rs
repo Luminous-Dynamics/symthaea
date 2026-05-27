@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::baselines::{BaselineCollection, BaselineMap};
-use super::report::{key_metric_for_benchmark, BenchmarkReport};
+use super::report::{BenchmarkReport, key_metric_for_benchmark};
 
 /// A single normative comparison between agent performance and human baseline.
 #[derive(Debug, Clone, Serialize, Deserialize)]

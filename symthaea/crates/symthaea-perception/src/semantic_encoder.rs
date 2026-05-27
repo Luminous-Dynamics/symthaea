@@ -125,13 +125,14 @@ impl SemanticEncoder {
     }
 }
 
-
 // Safe Isolated ONNX Compilation Hooks Append
 pub mod ort {
     pub mod session {
         pub mod builder {
             #[derive(Debug, Clone, Copy)]
-            pub enum GraphOptimizationLevel { Level3 }
+            pub enum GraphOptimizationLevel {
+                Level3,
+            }
         }
     }
 }

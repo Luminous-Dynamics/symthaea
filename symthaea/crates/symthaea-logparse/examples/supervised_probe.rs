@@ -18,10 +18,10 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use symthaea_logparse::encoder::{encode, Hdv};
+use symthaea_logparse::encoder::{Hdv, encode};
 use symthaea_logparse::fixtures::generate_synthetic_corpus;
-use symthaea_logparse::probe::{stratified_split, LogisticProbe, TrainConfig};
-use symthaea_logparse::{evtx_source, LogEvent};
+use symthaea_logparse::probe::{LogisticProbe, TrainConfig, stratified_split};
+use symthaea_logparse::{LogEvent, evtx_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arg = std::env::args()

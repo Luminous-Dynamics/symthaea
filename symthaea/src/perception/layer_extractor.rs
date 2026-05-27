@@ -55,7 +55,7 @@ use candle_core::{DType, Device, IndexOp, Tensor};
 use tokenizers::Tokenizer;
 
 #[cfg(feature = "neural-bridge")]
-use hf_hub::{api::sync::Api, Repo, RepoType};
+use hf_hub::{Repo, RepoType, api::sync::Api};
 
 #[cfg(feature = "neural-bridge")]
 use std::path::PathBuf;

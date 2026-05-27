@@ -19,7 +19,7 @@ use crate::hdc::arithmetic_engine::{
     HybridArithmeticEngine, Polynomial, SymbolicExpr, SymbolicOp, TermType,
 };
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 
 /// Result of a calculus operation with HDC encoding
 pub struct CalculusResult {
@@ -935,11 +935,7 @@ impl RationalPolynomial {
                 }
                 let g = gcd_i64(n.abs(), d.abs());
                 let (n2, d2) = (n / g, d / g);
-                if d2 < 0 {
-                    (-n2, -d2)
-                } else {
-                    (n2, d2)
-                }
+                if d2 < 0 { (-n2, -d2) } else { (n2, d2) }
             })
             .collect();
         Self {
@@ -1122,7 +1118,7 @@ pub fn sine_integral(x: f64) -> f64 {
     let h = x / n as f64;
     // Simpson's rule
     let mut sum = x.sin() / x; // sinc at x
-                               // f(0) = sin(0)/0 = 1 by L'Hôpital
+    // f(0) = sin(0)/0 = 1 by L'Hôpital
     sum += 1.0; // f(0) = 1
     for i in 1..n {
         let t = i as f64 * h;

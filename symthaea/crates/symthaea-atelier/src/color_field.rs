@@ -7,8 +7,8 @@
 //! Each region's color is determined by the dominant neuromodulator,
 //! creating large soft-edged abstract color compositions.
 
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use symthaea_canvas::scene_graph::{Style, Transform};
 use symthaea_canvas::{CognitiveSnapshot, Color, SceneNode};
 

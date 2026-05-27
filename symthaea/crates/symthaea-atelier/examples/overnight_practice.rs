@@ -16,10 +16,10 @@
 //! cargo run -p symthaea-atelier --example overnight_practice --release
 //! ```
 
-use symthaea_atelier::critic::{auto_improve_with, PerceptualInput, PracticeResult, SelfCritic};
-use symthaea_atelier::{create_artwork, AtelierConfig};
+use symthaea_atelier::critic::{PerceptualInput, PracticeResult, SelfCritic, auto_improve_with};
+use symthaea_atelier::{AtelierConfig, create_artwork};
 use symthaea_canvas::CognitiveSnapshot;
-use symthaea_gallery::style::{compute_style, StyleEmbedding, STYLE_DIM};
+use symthaea_gallery::style::{STYLE_DIM, StyleEmbedding, compute_style};
 use symthaea_gallery::{ArtModality, GalleryEntry, GalleryIndex};
 
 fn main() {
@@ -153,8 +153,14 @@ fn main() {
 
             println!(
                 "  Round {:4}/{} | score={:.3} avg10={:.3} | drift={:.4} | aros={:.2} val={:+.2} ser={:.2} Ψ={:.2}",
-                round + 1, total_rounds, verdict.composite, recent_avg, drift,
-                snapshot.arousal, snapshot.valence, snapshot.serotonin,
+                round + 1,
+                total_rounds,
+                verdict.composite,
+                recent_avg,
+                drift,
+                snapshot.arousal,
+                snapshot.valence,
+                snapshot.serotonin,
                 snapshot.consciousness_level
             );
         }
@@ -236,8 +242,12 @@ fn main() {
     println!("    target/practice-study/worst.svg (round {worst_round}, score {worst_score:.4})");
 
     if total_drift > 0.05 {
-        println!("\n  ✦ Style drifted significantly ({total_drift:.3}). The system developed distinct preferences.");
+        println!(
+            "\n  ✦ Style drifted significantly ({total_drift:.3}). The system developed distinct preferences."
+        );
     } else {
-        println!("\n  ○ Style drift minimal ({total_drift:.3}). System converged early — needs more diverse input or lower stillness threshold.");
+        println!(
+            "\n  ○ Style drift minimal ({total_drift:.3}). System converged early — needs more diverse input or lower stillness threshold."
+        );
     }
 }

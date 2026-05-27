@@ -32,7 +32,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{RwLock, oneshot};
 use tracing::{debug, info, warn};
 
 use super::actor_model::{ActorPriority, ActorTrait as Actor, OrganMessage, Response};

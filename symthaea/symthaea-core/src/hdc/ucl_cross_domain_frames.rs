@@ -52,7 +52,7 @@
 //! - ADAPTATION: Physical (biology) + MetaCognitive (learning)
 
 use super::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, DomainManifold, PrimitiveTier};
+use crate::hdc::primitive_system::{DomainManifold, PrimitiveTier, seed_from_name};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

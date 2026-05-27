@@ -46,7 +46,7 @@ pqcrypto-traits = "0.3"
 tree-sitter-rust = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
-mycelix-zkp-core = { path = "../mycelix-zkp-core" }
+mycelix-zkp-core = { path = "../mycelix-zkp-core", features = ["dilithium"] }
 symthaea-lean-bridge = { path = "../symthaea-lean-bridge" }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 
@@ -58,7 +58,10 @@ candle-core = { workspace = true }
 candle-nn = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }
 tokenizers = { version = "0.21", optional = true }
+wasmtime = { version = "29.0", optional = true }
 rustyline = "14.0"
+bytemuck = "1.25.0"
+lru.workspace = true
 
 # WASM support — getrandom + uuid need explicit features on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -171,7 +174,9 @@ required-features = ["mamba-cpu"]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
 gpu = ["candle-core/cuda", "dep:candle-nn", "candle-nn/cuda"]
-parallel = ["dep:rayon"]
+parallel = ["dep:rayon", "symthaea-core/parallel"]
+# WASM sandboxing support via wasmtime
+wasm-sandbox = ["dep:wasmtime"]
 # Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
 mamba-cpu = ["dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
 # Mamba with CUDA GPU acceleration (default for local dev)
@@ -191,3 +196,7 @@ code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
 [[bin]]
 name = "fused_cognitive_node"
 path = "src/bin/fused_cognitive_node.rs"
+
+[[example]]
+name = "hierarchical_reasoning"
+required-features = ["mamba-cpu"]

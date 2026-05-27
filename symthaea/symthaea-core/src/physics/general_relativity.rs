@@ -425,11 +425,7 @@ impl GREncoder {
 
     /// Time dilation near a mass
     pub fn gravitational_time_dilation(&self, r: f64, rs: f64) -> f64 {
-        if r <= rs {
-            0.0
-        } else {
-            (1.0 - rs / r).sqrt()
-        }
+        if r <= rs { 0.0 } else { (1.0 - rs / r).sqrt() }
     }
 }
 

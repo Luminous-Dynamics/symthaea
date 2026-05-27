@@ -12,23 +12,21 @@
 //! - Identity continuity tracking (WeaverActor -> K-Vector monitoring)
 //! - Consciousness-driven voice output (QualiaTexture -> LTCPacing)
 
-use super::super::unified_hv::ContinuousHV;
 use super::super::attention_dynamics::AttentionMode;
+use super::super::unified_hv::ContinuousHV;
 
-use crate::physiology::{
-    HormoneState, TaskComplexity,
-};
+use crate::physiology::{HormoneState, TaskComplexity};
 use crate::soul::KVector;
 
 use super::agent::IntegratedConsciousAgent;
-use super::types::AgentConfig;
 use super::physiology::{
-    HormoneEventSuggestion, CoherenceGating, MemoryExport, MemoryImport,
-    IdentityCoherence, IdentityStatus, ProsodyHints,
+    CoherenceGating, HormoneEventSuggestion, IdentityCoherence, IdentityStatus, MemoryExport,
+    MemoryImport, ProsodyHints,
 };
+use super::types::AgentConfig;
 
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 
 /// Messages that can be sent to the conscious agent runtime
 #[derive(Debug, Clone)]
@@ -59,7 +57,11 @@ pub enum HormoneEventType {
     /// Acetylcholine boost (focus/attention)
     AcetylcholineBoost(f32),
     /// Full hormone state update
-    FullState { cortisol: f32, dopamine: f32, acetylcholine: f32 },
+    FullState {
+        cortisol: f32,
+        dopamine: f32,
+        acetylcholine: f32,
+    },
 }
 
 /// Responses from the conscious agent runtime
@@ -177,7 +179,12 @@ impl ConsciousAgentRuntime {
 
     /// Start the runtime with message channels
     /// Returns (sender, receiver) for bidirectional communication
-    pub fn start(&self) -> (mpsc::Sender<RuntimeMessage>, mpsc::Receiver<RuntimeResponse>) {
+    pub fn start(
+        &self,
+    ) -> (
+        mpsc::Sender<RuntimeMessage>,
+        mpsc::Receiver<RuntimeResponse>,
+    ) {
         let (msg_tx, mut msg_rx) = mpsc::channel::<RuntimeMessage>(self.config.message_buffer_size);
         let (resp_tx, resp_rx) = mpsc::channel::<RuntimeResponse>(self.config.message_buffer_size);
 
@@ -293,7 +300,9 @@ impl ConsciousAgentRuntime {
         // Check coherence gating
         let gating = agent.can_perform_with_coherence(complexity);
         match gating {
-            CoherenceGating::Defer { current, required, .. } => {
+            CoherenceGating::Defer {
+                current, required, ..
+            } => {
                 return RuntimeResponse::Error(format!(
                     "Insufficient coherence: {:.2} < {:.2} required",
                     current, required
@@ -360,16 +369,20 @@ impl ConsciousAgentRuntime {
                     acetylcholine: 0.5,
                 }
             }
-            HormoneEventType::AcetylcholineBoost(level) => {
-                HormoneState {
-                    cortisol: 0.3,
-                    dopamine: 0.5,
-                    acetylcholine: level,
-                }
-            }
-            HormoneEventType::FullState { cortisol, dopamine, acetylcholine } => {
-                HormoneState { cortisol, dopamine, acetylcholine }
-            }
+            HormoneEventType::AcetylcholineBoost(level) => HormoneState {
+                cortisol: 0.3,
+                dopamine: 0.5,
+                acetylcholine: level,
+            },
+            HormoneEventType::FullState {
+                cortisol,
+                dopamine,
+                acetylcholine,
+            } => HormoneState {
+                cortisol,
+                dopamine,
+                acetylcholine,
+            },
         };
 
         agent.sync_with_hormones(&hormone_state);
@@ -401,18 +414,14 @@ impl ConsciousAgentRuntime {
     }
 
     /// Get voice/prosody parameters
-    async fn get_voice_params(
-        agent: &Arc<RwLock<IntegratedConsciousAgent>>,
-    ) -> RuntimeResponse {
+    async fn get_voice_params(agent: &Arc<RwLock<IntegratedConsciousAgent>>) -> RuntimeResponse {
         let agent = agent.read().await;
         let hints = agent.generate_prosody_hints();
         RuntimeResponse::VoiceReady(hints)
     }
 
     /// Export memories for hippocampus consolidation
-    async fn export_memories(
-        agent: &Arc<RwLock<IntegratedConsciousAgent>>,
-    ) -> Vec<MemoryExport> {
+    async fn export_memories(agent: &Arc<RwLock<IntegratedConsciousAgent>>) -> Vec<MemoryExport> {
         let agent = agent.read().await;
         agent.export_for_hippocampus()
     }
@@ -509,7 +518,10 @@ impl SyncConsciousAgentRuntime {
         };
 
         let gating = self.agent.can_perform_with_coherence(complexity);
-        if let CoherenceGating::Defer { current, required, .. } = gating {
+        if let CoherenceGating::Defer {
+            current, required, ..
+        } = gating
+        {
             return RuntimeResponse::Error(format!(
                 "Insufficient coherence: {:.2} < {:.2}",
                 current, required
@@ -565,9 +577,9 @@ impl SyncConsciousAgentRuntime {
 
     /// Check identity coherence
     pub fn check_identity(&self) -> Option<IdentityCoherence> {
-        self.reference_kvector.as_ref().map(|ref_kv| {
-            self.agent.check_identity_coherence(ref_kv)
-        })
+        self.reference_kvector
+            .as_ref()
+            .map(|ref_kv| self.agent.check_identity_coherence(ref_kv))
     }
 
     /// Get hormone suggestions
@@ -577,7 +589,9 @@ impl SyncConsciousAgentRuntime {
 
     /// Get current snapshot
     pub fn snapshot(&self) -> RuntimeSnapshot {
-        let identity_status = self.reference_kvector.as_ref()
+        let identity_status = self
+            .reference_kvector
+            .as_ref()
             .map(|kv| self.agent.check_identity_coherence(kv).status)
             .unwrap_or(IdentityStatus::Stable);
 
@@ -589,7 +603,11 @@ impl SyncConsciousAgentRuntime {
                 valence: self.agent.emotional_state.valence,
                 arousal: self.agent.emotional_state.arousal,
                 dominance: self.agent.emotional_state.dominance,
-                quadrant: self.agent.emotional_state.get_emotion_quadrant().to_string(),
+                quadrant: self
+                    .agent
+                    .emotional_state
+                    .get_emotion_quadrant()
+                    .to_string(),
             },
             memory_load: self.agent.working_memory.central_executive_load,
             identity_status,

@@ -9,14 +9,14 @@ use crate::api::{
 };
 use crate::control_plane::parse_bearer_token;
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 use symthaea_core::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology, ContinuousHV, HDC_DIMENSION,
+    ContinuousHV, HDC_DIMENSION, consciousness_topology_generators::ConsciousnessTopology,
 };
 use tracing::{info, warn};
 use uuid::Uuid;

@@ -16,7 +16,7 @@
 //! Usage: cargo run --example benchmark_jepa_thermodynamic --features jepa --release
 
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_jepa::{cosine_loss, JepaConfig, JepaEngine};
+use symthaea_jepa::{JepaConfig, JepaEngine, cosine_loss};
 
 /// Input dimension matching CfC default (not HDC_DIMENSION).
 const INPUT_DIM: usize = 256;

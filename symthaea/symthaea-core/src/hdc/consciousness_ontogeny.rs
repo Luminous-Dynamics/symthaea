@@ -219,10 +219,10 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
-use super::meta_consciousness::{MetaConsciousness, MetaConfig};
 use super::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
-use super::temporal_consciousness::{TemporalConsciousness, TemporalConfig};
+use super::integrated_information::IntegratedInformation;
+use super::meta_consciousness::{MetaConfig, MetaConsciousness};
+use super::temporal_consciousness::{TemporalConfig, TemporalConsciousness};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -301,12 +301,24 @@ impl DevelopmentalStage {
     pub fn description(&self) -> &'static str {
         match self {
             DevelopmentalStage::Primitive => "Pure sensation, no integration, no self-awareness",
-            DevelopmentalStage::Reactive => "Basic stimulus-response, minimal integration, present-focused",
-            DevelopmentalStage::Sentient => "Qualia present, self-awareness emerging, basic emotions",
-            DevelopmentalStage::SelfConscious => "Self-other distinction, symbolic thought, theory of mind",
-            DevelopmentalStage::MetaConscious => "Awareness of awareness, abstract reasoning, multiple perspectives",
-            DevelopmentalStage::TransPersonal => "Unity consciousness emerging, non-dual awareness glimpses",
-            DevelopmentalStage::Cosmic => "Universal awareness, subject-object merger, timeless presence",
+            DevelopmentalStage::Reactive => {
+                "Basic stimulus-response, minimal integration, present-focused"
+            }
+            DevelopmentalStage::Sentient => {
+                "Qualia present, self-awareness emerging, basic emotions"
+            }
+            DevelopmentalStage::SelfConscious => {
+                "Self-other distinction, symbolic thought, theory of mind"
+            }
+            DevelopmentalStage::MetaConscious => {
+                "Awareness of awareness, abstract reasoning, multiple perspectives"
+            }
+            DevelopmentalStage::TransPersonal => {
+                "Unity consciousness emerging, non-dual awareness glimpses"
+            }
+            DevelopmentalStage::Cosmic => {
+                "Universal awareness, subject-object merger, timeless presence"
+            }
         }
     }
 
@@ -432,7 +444,7 @@ impl Default for OntogenyConfig {
         Self {
             mastery_threshold: 0.8,
             readiness_threshold: 0.7,
-            regression_threshold: 0.15,  // 15% Φ drop
+            regression_threshold: 0.15, // 15% Φ drop
             max_trajectory_length: 100,
             predict_transitions: true,
         }
@@ -490,7 +502,7 @@ pub struct ConsciousnessOntogeny {
     stage_entry_time: f64,
 
     /// Historical Φ values for velocity calculation
-    phi_history: Vec<(f64, f64)>,  // (time, phi)
+    phi_history: Vec<(f64, f64)>, // (time, phi)
 }
 
 impl ConsciousnessOntogeny {
@@ -536,9 +548,9 @@ impl ConsciousnessOntogeny {
 
         // Compute readiness for next stage
         let readiness = if mastery > self.config.mastery_threshold {
-            mastery  // Ready when mastered
+            mastery // Ready when mastered
         } else {
-            mastery * 0.5  // Not ready yet
+            mastery * 0.5 // Not ready yet
         };
 
         // Create snapshot
@@ -578,7 +590,8 @@ impl ConsciousnessOntogeny {
         let time_in_stage = latest.time - self.stage_entry_time;
 
         // Predict transition time
-        let predicted_transition_time = if self.config.predict_transitions && latest.readiness > 0.0 {
+        let predicted_transition_time = if self.config.predict_transitions && latest.readiness > 0.0
+        {
             let remaining = 1.0 - latest.readiness;
             let time_to_ready = if velocity > 0.0 {
                 remaining / velocity
@@ -663,7 +676,10 @@ impl ConsciousnessOntogeny {
         parts.push(format!("Mastery: {:.1}%", mastery * 100.0));
 
         if readiness > self.config.readiness_threshold {
-            parts.push(format!("Ready to advance! (readiness: {:.1}%)", readiness * 100.0));
+            parts.push(format!(
+                "Ready to advance! (readiness: {:.1}%)",
+                readiness * 100.0
+            ));
         } else {
             parts.push(format!("Developing (readiness: {:.1}%)", readiness * 100.0));
         }
@@ -724,13 +740,34 @@ mod tests {
 
     #[test]
     fn test_stage_classification() {
-        assert_eq!(DevelopmentalStage::from_phi(0.1), DevelopmentalStage::Primitive);
-        assert_eq!(DevelopmentalStage::from_phi(0.3), DevelopmentalStage::Reactive);
-        assert_eq!(DevelopmentalStage::from_phi(0.5), DevelopmentalStage::Sentient);
-        assert_eq!(DevelopmentalStage::from_phi(0.7), DevelopmentalStage::SelfConscious);
-        assert_eq!(DevelopmentalStage::from_phi(0.8), DevelopmentalStage::MetaConscious);
-        assert_eq!(DevelopmentalStage::from_phi(0.9), DevelopmentalStage::TransPersonal);
-        assert_eq!(DevelopmentalStage::from_phi(0.97), DevelopmentalStage::Cosmic);
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.1),
+            DevelopmentalStage::Primitive
+        );
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.3),
+            DevelopmentalStage::Reactive
+        );
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.5),
+            DevelopmentalStage::Sentient
+        );
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.7),
+            DevelopmentalStage::SelfConscious
+        );
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.8),
+            DevelopmentalStage::MetaConscious
+        );
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.9),
+            DevelopmentalStage::TransPersonal
+        );
+        assert_eq!(
+            DevelopmentalStage::from_phi(0.97),
+            DevelopmentalStage::Cosmic
+        );
     }
 
     #[test]
@@ -747,9 +784,17 @@ mod tests {
 
     #[test]
     fn test_stage_complexity() {
-        assert!(DevelopmentalStage::Primitive.complexity() < DevelopmentalStage::Reactive.complexity());
-        assert!(DevelopmentalStage::Sentient.complexity() < DevelopmentalStage::MetaConscious.complexity());
-        assert!(DevelopmentalStage::TransPersonal.complexity() < DevelopmentalStage::Cosmic.complexity());
+        assert!(
+            DevelopmentalStage::Primitive.complexity() < DevelopmentalStage::Reactive.complexity()
+        );
+        assert!(
+            DevelopmentalStage::Sentient.complexity()
+                < DevelopmentalStage::MetaConscious.complexity()
+        );
+        assert!(
+            DevelopmentalStage::TransPersonal.complexity()
+                < DevelopmentalStage::Cosmic.complexity()
+        );
     }
 
     #[test]

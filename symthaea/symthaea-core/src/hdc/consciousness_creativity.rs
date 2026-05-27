@@ -605,11 +605,14 @@ impl ConsciousnessCreativity {
             + insight_readiness.min(1.0))
             / 4.0;
 
-        let explanation =
-            format!(
+        let explanation = format!(
             "Mode: {:?}, {} ideas, {} insights, divergent={:.2}, convergent={:.2}, potential={:.2}",
-            self.mode, self.ideas.len(), self.insights.len(),
-            divergent_score, convergent_score, creative_potential
+            self.mode,
+            self.ideas.len(),
+            self.insights.len(),
+            divergent_score,
+            convergent_score,
+            creative_potential
         );
 
         CreativityAssessment {

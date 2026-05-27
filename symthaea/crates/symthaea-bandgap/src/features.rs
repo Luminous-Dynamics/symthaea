@@ -836,7 +836,7 @@ mod tests {
         // Alkali metals should have low Pettifor numbers, halogens high
         assert!(pettifor_number(3) < pettifor_number(9)); // Li < F
         assert!(pettifor_number(11) < pettifor_number(17)); // Na < Cl
-                                                            // Transition metals in the middle
+        // Transition metals in the middle
         assert!(pettifor_number(26) > pettifor_number(11)); // Fe > Na
         assert!(pettifor_number(26) < pettifor_number(9)); // Fe < F
     }

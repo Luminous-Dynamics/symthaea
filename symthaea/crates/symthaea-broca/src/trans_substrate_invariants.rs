@@ -40,10 +40,16 @@ impl TransSubstrateInvariantEngine {
 
         for element in elements {
             self.binding_engine.bind_element(substrate_name, &element);
-            
+
             // For now, we use a synthetic "nix_hv" to satisfy the CrossLanguageInvariant struct
             // In a real system, this would be retrieved from the Nix Knowledge Graph
-            let rust_hv = self.binding_engine.list_blueprints().last().unwrap().clone();
+            let rust_hv = self
+                .binding_engine
+                .list_blueprints()
+                .last()
+                .cloned()
+                .cloned()
+                .unwrap();
             let nix_hv = rust_hv.clone(); // locked alignment
 
             self.invariants.insert(

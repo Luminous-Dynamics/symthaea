@@ -24,13 +24,13 @@ use std::time::Duration;
 use tempfile::TempDir;
 
 use symthaea::consciousness::recursive_improvement::{
-    // Resolution System
-    resolution::{ExitCodeResolver, Resolver, ResourceStateResolver},
     // Active Inference Bridge
     ActiveInferenceBridge,
     ActiveInferenceBridgeConfig,
     // Core MAGI types
     OutcomeCategory,
+    // Resolution System
+    resolution::{ExitCodeResolver, Resolver, ResourceStateResolver},
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

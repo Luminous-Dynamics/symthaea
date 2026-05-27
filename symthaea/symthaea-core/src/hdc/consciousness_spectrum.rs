@@ -358,10 +358,7 @@ impl ConsciousnessSpectrum {
     /// Create new spectrum analyzer
     pub fn new(num_components: usize, config: SpectrumConfig) -> Self {
         let meta = if config.enable_meta {
-            Some(MetaConsciousness::new(
-                num_components,
-                Default::default(),
-            ))
+            Some(MetaConsciousness::new(num_components, Default::default()))
         } else {
             None
         };
@@ -482,13 +479,16 @@ impl ConsciousnessSpectrum {
         }
 
         // Average activity (how active is system?)
-        let avg_activity = self.activity_levels.iter().sum::<f64>()
-            / self.activity_levels.len() as f64;
+        let avg_activity =
+            self.activity_levels.iter().sum::<f64>() / self.activity_levels.len() as f64;
 
         // Variance (how differentiated? High variance = selective attention)
-        let variance = self.activity_levels.iter()
+        let variance = self
+            .activity_levels
+            .iter()
             .map(|a| (a - avg_activity).powi(2))
-            .sum::<f64>() / self.activity_levels.len() as f64;
+            .sum::<f64>()
+            / self.activity_levels.len() as f64;
 
         // Access = activity × differentiation
         (avg_activity * variance.sqrt()).min(1.0)
@@ -622,8 +622,12 @@ mod tests {
 
     #[test]
     fn test_consciousness_level_ordering() {
-        assert!(ConsciousnessLevel::MetaConscious.level() > ConsciousnessLevel::FullyConscious.level());
-        assert!(ConsciousnessLevel::FullyConscious.level() > ConsciousnessLevel::Unconscious.level());
+        assert!(
+            ConsciousnessLevel::MetaConscious.level() > ConsciousnessLevel::FullyConscious.level()
+        );
+        assert!(
+            ConsciousnessLevel::FullyConscious.level() > ConsciousnessLevel::Unconscious.level()
+        );
     }
 
     #[test]

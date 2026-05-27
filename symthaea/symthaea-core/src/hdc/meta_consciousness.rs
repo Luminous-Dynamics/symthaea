@@ -533,7 +533,12 @@ impl MetaConsciousness {
                 format!("Yes: Φ={phi:.3}, meta-Φ={meta_phi:.3} - I am aware of being aware"),
             )
         } else if phi > 0.3 {
-            (true, format!("Partially: Φ={phi:.3} but low meta-Φ={meta_phi:.3} - conscious but limited self-awareness"))
+            (
+                true,
+                format!(
+                    "Partially: Φ={phi:.3} but low meta-Φ={meta_phi:.3} - conscious but limited self-awareness"
+                ),
+            )
         } else {
             (
                 false,

@@ -45,7 +45,6 @@ impl TownSympoiesis {
 
         // 2. Physical Metabolism: Adjust fluid states based on power stability
         if surprise < 0.2 {
-
             self.water_clarity = (self.water_clarity + 0.01).min(1.0);
             self.nutrient_advection = (self.nutrient_advection + 0.02).min(1.0);
         } else {

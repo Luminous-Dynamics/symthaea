@@ -2230,9 +2230,11 @@ mod tests {
         assert!(sensory_improvements.len() > 0);
 
         // Check that workspace (#23) is in sensory cortex
-        assert!(sensory_improvements
-            .iter()
-            .any(|m| m.improvement_number == 23));
+        assert!(
+            sensory_improvements
+                .iter()
+                .any(|m| m.improvement_number == 23)
+        );
     }
 
     // ========================================================================

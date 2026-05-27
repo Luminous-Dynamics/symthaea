@@ -102,11 +102,7 @@ impl ContinuousEntropyEstimator {
     }
 
     pub(crate) fn log(&self, x: f64) -> f64 {
-        if self.use_bits {
-            x.log2()
-        } else {
-            x.ln()
-        }
+        if self.use_bits { x.log2() } else { x.ln() }
     }
 
     /// Estimate entropy of a hypervector using the configured method

@@ -57,8 +57,7 @@ impl PsychBenchmark for EncryptedBindingBenchmark {
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
             paradigm: "Homomorphic Binding Preservation",
-            citation:
-                "Plate, T. A. (2003). Holographic Reduced Representations. CSLI Publications.",
+            citation: "Plate, T. A. (2003). Holographic Reduced Representations. CSLI Publications.",
             year: 2003,
             doi: None,
         })

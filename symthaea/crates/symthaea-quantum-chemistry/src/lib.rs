@@ -58,10 +58,10 @@ pub mod validation;
 
 // Re-export key types for convenience
 pub use basis::{BasisSet, BasisSetProvider, ContractedGaussian, PrimitiveGaussian, ShellType};
-pub use consciousness::{build_atom_basis_ranges, compute_orbital_phi, OrbitalPhiMeasurement};
-pub use dft::{kohn_sham_dft, DftConfig, DftResult, XcFunctional};
-pub use geometry_opt::{optimize_geometry, GeomOptConfig, GeomOptResult};
+pub use consciousness::{OrbitalPhiMeasurement, build_atom_basis_ranges, compute_orbital_phi};
+pub use dft::{DftConfig, DftResult, XcFunctional, kohn_sham_dft};
+pub use geometry_opt::{GeomOptConfig, GeomOptResult, optimize_geometry};
 pub use molecule::{Atom, Molecule};
-pub use post_hf::mp2::{mp2_correlation_energy, Mp2Result};
+pub use post_hf::mp2::{Mp2Result, mp2_correlation_energy};
 pub use scf::generalized_eigen::GeneralizedEigenResult;
-pub use scf::rhf::{restricted_hartree_fock, RhfConfig, RhfResult};
+pub use scf::rhf::{RhfConfig, RhfResult, restricted_hartree_fock};

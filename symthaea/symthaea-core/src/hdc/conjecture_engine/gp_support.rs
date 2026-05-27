@@ -434,11 +434,7 @@ pub(crate) fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usi
             trial = replace_nth_constant(&trial, i, val);
         }
         let mse = compute_mse(&trial, data);
-        if mse.is_finite() {
-            mse
-        } else {
-            1e30
-        }
+        if mse.is_finite() { mse } else { 1e30 }
     };
 
     let mut simplex: Vec<Vec<f64>> = Vec::with_capacity(n + 1);

@@ -364,8 +364,8 @@ impl Z3Bridge {
                 let g = metric_components[i * dim + j];
                 let residual = (ric - k * g).abs();
                 let smt = format!(
-                    "; Einstein residual at ({i},{j}): |{:.6} - {:.6}*{:.6}| = {:.6e}\n\
-                     (assert (<= (- (abs {:.6}) 0.0) {:.6e}))",
+                    "; Einstein residual at ({i},{j}): |{:.6} - {:.6}*{:.6}| = {:.12}\n\
+                     (assert (<= (- (abs {:.6}) 0.0) {:.12}))",
                     ric, k, g, residual, residual, tolerance
                 );
                 assertions.push(smt);
@@ -515,8 +515,8 @@ impl Z3Bridge {
         format!(
             "; ODE constraint at t={t:.4}, y={y:.4}: residual={residual:.2e}\n\
              (declare-const ode_res_{idx} Real)\n\
-             (assert (= ode_res_{idx} {residual:.6e}))\n\
-             (assert (< ode_res_{idx} {tol:.6e}))",
+             (assert (= ode_res_{idx} {residual:.12}))\n\
+             (assert (< ode_res_{idx} {tol:.12}))",
             idx = ((t * 1000.0) as i64).unsigned_abs(),
         )
     }
@@ -1360,7 +1360,7 @@ mod tests {
     /// discovery pipeline (Phase 8 of math/science plan).
     #[test]
     fn test_verified_einstein_pipeline() {
-        use symthaea_core::hdc::einstein_search::{search_einstein_metrics, EinsteinSearchConfig};
+        use symthaea_core::hdc::einstein_search::{EinsteinSearchConfig, search_einstein_metrics};
         use symthaea_core::hdc::riemannian_geometry::MetricTensor;
 
         // Step 1: Search for Einstein metrics on S² (trivially the round sphere)

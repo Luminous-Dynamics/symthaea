@@ -20,15 +20,15 @@ fn main() {
     use std::fs;
     use std::io::Write;
     use std::path::Path;
+    use symthaea::voice::FormantFrame;
     use symthaea::voice::formant_targets::FormantDatabase;
     use symthaea::voice::predict_duration;
     use symthaea::voice::vocal_tract_encoder::VoiceCognitiveState;
     use symthaea::voice::vocal_tract_fep::VocalTractObservation;
     use symthaea::voice::vocal_tract_fep::{
-        populate_manner_map, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
+        Intonation, PitchAccent, ProsodyContext, VocalTractPipeline, populate_manner_map,
     };
     use symthaea::voice::vocoder::FormantVocoder;
-    use symthaea::voice::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::HDC_DIMENSION;
 
@@ -53,7 +53,7 @@ fn main() {
         buf.extend_from_slice(&byte_rate.to_le_bytes());
         buf.extend_from_slice(&2u16.to_le_bytes()); // block align
         buf.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
-                                                     // data chunk
+        // data chunk
         buf.extend_from_slice(b"data");
         buf.extend_from_slice(&data_size.to_le_bytes());
         for &s in samples {

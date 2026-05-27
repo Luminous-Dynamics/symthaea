@@ -44,9 +44,9 @@ fn test_generator() -> BrocaGenerator {
 
 #[test]
 fn test_basic_generation_produces_tokens() {
-    let mut gen = test_generator();
+    let mut r#gen = test_generator();
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     assert!(result.num_tokens > 0, "should generate at least one token");
     assert!(
@@ -66,17 +66,17 @@ fn test_consciousness_gating_suppresses_low_psi() {
         enable_consciousness_gating: true,
         ..Default::default()
     };
-    let mut gen = BrocaGenerator::new(&test_genesis(), config);
+    let mut r#gen = BrocaGenerator::new(&test_genesis(), config);
 
     // Very low consciousness — should reduce max tokens significantly
     let mut channels = ThoughtChannels::default();
     channels.set_consciousness(0.05, 0.1, 0.1); // psi=0.05
 
-    let low_result = gen.generate(&channels);
+    let low_result = r#gen.generate(&channels);
 
     // High consciousness
     channels.set_consciousness(0.95, 0.9, 0.9);
-    let high_result = gen.generate(&channels);
+    let high_result = r#gen.generate(&channels);
 
     // High consciousness should generally produce more tokens
     // (or at least not fewer, given the gating formula)
@@ -94,19 +94,19 @@ fn test_consciousness_gating_suppresses_low_psi() {
 
 #[test]
 fn test_epistemic_gating_affects_output() {
-    let mut gen = test_generator();
+    let mut r#gen = test_generator();
 
     // Certain (epistemic=0 means certain in the ordinal scale)
     let mut certain_channels = ThoughtChannels::default();
     certain_channels.set_epistemic(0.0); // Certain
     certain_channels.set_consciousness(0.8, 0.7, 0.8);
-    let certain_result = gen.generate(&certain_channels);
+    let certain_result = r#gen.generate(&certain_channels);
 
     // Out-of-domain (epistemic=4.0 means OOD)
     let mut ood_channels = ThoughtChannels::default();
     ood_channels.set_epistemic(4.0); // Out of domain
     ood_channels.set_consciousness(0.8, 0.7, 0.8);
-    let ood_result = gen.generate(&ood_channels);
+    let ood_result = r#gen.generate(&ood_channels);
 
     // Both should produce output (not gated by consciousness)
     assert!(certain_result.num_tokens > 0);
@@ -126,18 +126,18 @@ fn test_epistemic_gating_affects_output() {
 
 #[test]
 fn test_multi_turn_continuing_differs_from_fresh() {
-    let mut gen = test_generator();
+    let mut r#gen = test_generator();
     let channels = ThoughtChannels::default();
 
     // First generation (fresh state)
-    let result1 = gen.generate(&channels);
+    let result1 = r#gen.generate(&channels);
 
     // Second generation with continuing (preserves CfC temporal context)
-    let result2 = gen.generate_continuing(&channels);
+    let result2 = r#gen.generate_continuing(&channels);
 
     // Third generation with fresh reset
-    gen.controller_mut().reset();
-    let result3 = gen.generate(&channels);
+    r#gen.controller_mut().reset();
+    let result3 = r#gen.generate(&channels);
 
     // result1 and result3 should be identical (same fresh state)
     assert_eq!(
@@ -164,9 +164,9 @@ fn test_coherence_dynamics_populated() {
         enable_coherence_feedback: true,
         ..Default::default()
     };
-    let mut gen = BrocaGenerator::new(&test_genesis(), config);
+    let mut r#gen = BrocaGenerator::new(&test_genesis(), config);
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     assert_eq!(
         result.coherence_dynamics.len(),
@@ -198,11 +198,11 @@ fn test_gating_trace_populated() {
         enable_emotional_modulation: true,
         ..Default::default()
     };
-    let mut gen = BrocaGenerator::new(&test_genesis(), config);
+    let mut r#gen = BrocaGenerator::new(&test_genesis(), config);
 
     let mut channels = ThoughtChannels::default();
     channels.set_consciousness(0.8, 0.7, 0.8);
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     assert_eq!(
         result.gating_trace.len(),
@@ -222,9 +222,9 @@ fn test_gating_trace_populated() {
 
 #[test]
 fn test_hallucination_flag_field_exists() {
-    let mut gen = test_generator();
+    let mut r#gen = test_generator();
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // hallucination_flag should be a valid bool (structural test)
     let _flag: bool = result.hallucination_flag;
@@ -244,9 +244,9 @@ fn test_semantic_veto_field_present() {
         enable_coherence_feedback: true,
         ..Default::default()
     };
-    let mut gen = BrocaGenerator::new(&test_genesis(), config);
+    let mut r#gen = BrocaGenerator::new(&test_genesis(), config);
     let channels = ThoughtChannels::default();
-    let result = gen.generate(&channels);
+    let result = r#gen.generate(&channels);
 
     // veto_triggered should be accessible (structural check)
     let _veto: bool = result.veto_triggered;
@@ -260,19 +260,19 @@ fn test_semantic_veto_field_present() {
 
 #[test]
 fn test_emotional_modulation_affects_output() {
-    let mut gen = test_generator();
+    let mut r#gen = test_generator();
 
     // Calm, positive
     let mut calm = ThoughtChannels::default();
     calm.set_emotion(0.8, 0.1, 0.9); // positive valence, low arousal, warm
     calm.set_consciousness(0.8, 0.7, 0.8);
-    let calm_result = gen.generate(&calm);
+    let calm_result = r#gen.generate(&calm);
 
     // Excited, negative
     let mut excited = ThoughtChannels::default();
     excited.set_emotion(-0.8, 0.9, 0.1); // negative valence, high arousal, cold
     excited.set_consciousness(0.8, 0.7, 0.8);
-    let excited_result = gen.generate(&excited);
+    let excited_result = r#gen.generate(&excited);
 
     // Both should produce output
     assert!(calm_result.num_tokens > 0);
@@ -308,8 +308,8 @@ fn test_context_channels_accessible() {
     assert!((channels.response_confidence() - 0.95).abs() < 1e-6);
 
     // Generate with these channels
-    let mut gen = test_generator();
-    let result = gen.generate(&channels);
+    let mut r#gen = test_generator();
+    let result = r#gen.generate(&channels);
     assert!(result.num_tokens > 0);
 }
 
@@ -358,8 +358,8 @@ fn test_eval_result_has_new_metrics() {
     use symthaea_broca::evaluation::{evaluate, EvalConfig};
     use symthaea_broca::training::TrainingDataset;
 
-    let mut gen = test_generator();
-    let tokenizer = gen.tokenizer().clone();
+    let mut r#gen = test_generator();
+    let tokenizer = r#gen.tokenizer().clone();
 
     // Create a tiny eval dataset
     let mut dataset = TrainingDataset::default();
@@ -382,7 +382,7 @@ fn test_eval_result_has_new_metrics() {
         max_gen_tokens: 16,
     };
 
-    let result = evaluate(&mut gen, &config);
+    let result = evaluate(&mut r#gen, &config);
 
     // New metrics should be present
     assert!(result.contrastive_intent_score.is_some());
@@ -405,17 +405,17 @@ fn test_eval_result_has_new_metrics() {
 
 #[test]
 fn test_checkpoint_roundtrip_preserves_generation() {
-    let mut gen = test_generator();
+    let mut r#gen = test_generator();
     let channels = ThoughtChannels::default();
 
-    let result1 = gen.generate(&channels);
+    let result1 = r#gen.generate(&channels);
 
     // Save checkpoint
     let path = std::env::temp_dir()
         .join("broca_integration_checkpoint.bin")
         .to_string_lossy()
         .to_string();
-    gen.save_checkpoint(&path, 0, 1.0, None, None, None)
+    r#gen.save_checkpoint(&path, 0, 1.0, None, None, None)
         .expect("save should succeed");
 
     // Reload

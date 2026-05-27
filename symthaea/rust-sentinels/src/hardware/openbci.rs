@@ -206,7 +206,8 @@ impl OpenBciAdapter {
     fn generate_simulated_sample(&self) -> EegSample {
         use std::f32::consts::PI;
 
-        let timestamp_ms = self.stream_start
+        let timestamp_ms = self
+            .stream_start
             .map(|start| start.elapsed().as_secs_f64() * 1000.0)
             .unwrap_or(0.0);
 
@@ -301,7 +302,8 @@ impl EegDevice for OpenBciAdapter {
         self.sample_index += 1;
 
         // Simulate sample rate timing
-        let sample_period = Duration::from_secs_f64(1.0 / self.config.common.sample_rate.as_f32() as f64);
+        let sample_period =
+            Duration::from_secs_f64(1.0 / self.config.common.sample_rate.as_f32() as f64);
         std::thread::sleep(sample_period);
 
         Ok(Some(sample))
@@ -331,26 +333,33 @@ impl EegDevice for OpenBciAdapter {
         let channel_names = match self.config.board {
             OpenBciBoard::Cyton => vec!["Fp1", "Fp2", "C3", "C4", "P7", "P8", "O1", "O2"],
             OpenBciBoard::CytonDaisy => vec![
-                "Fp1", "Fp2", "C3", "C4", "P7", "P8", "O1", "O2",
-                "F7", "F8", "F3", "F4", "T7", "T8", "P3", "P4",
+                "Fp1", "Fp2", "C3", "C4", "P7", "P8", "O1", "O2", "F7", "F8", "F3", "F4", "T7",
+                "T8", "P3", "P4",
             ],
             OpenBciBoard::Ganglion => vec!["Fp1", "Fp2", "T3", "T4"],
         };
 
-        channel_names.iter().enumerate().map(|(i, name)| {
-            ChannelInfo {
-                index: i,
-                name: name.to_string(),
-                enabled: self.config.common.enabled_channels.contains(&i),
-                gain: 24.0, // Default OpenBCI gain
-                channel_type: ChannelType::Eeg,
-            }
-        }).collect()
+        channel_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                ChannelInfo {
+                    index: i,
+                    name: name.to_string(),
+                    enabled: self.config.common.enabled_channels.contains(&i),
+                    gain: 24.0, // Default OpenBCI gain
+                    channel_type: ChannelType::Eeg,
+                }
+            })
+            .collect()
     }
 
     fn set_channel_enabled(&mut self, channel: usize, enabled: bool) -> Result<(), DeviceError> {
         if channel >= self.info.num_channels {
-            return Err(DeviceError::InvalidConfig(format!("Invalid channel: {}", channel)));
+            return Err(DeviceError::InvalidConfig(format!(
+                "Invalid channel: {}",
+                channel
+            )));
         }
 
         if enabled {
@@ -359,7 +368,10 @@ impl EegDevice for OpenBciAdapter {
                 self.config.common.enabled_channels.sort();
             }
         } else {
-            self.config.common.enabled_channels.retain(|&c| c != channel);
+            self.config
+                .common
+                .enabled_channels
+                .retain(|&c| c != channel);
         }
 
         Ok(())
@@ -367,7 +379,10 @@ impl EegDevice for OpenBciAdapter {
 
     fn set_channel_gain(&mut self, channel: usize, _gain: f32) -> Result<(), DeviceError> {
         if channel >= self.info.num_channels {
-            return Err(DeviceError::InvalidConfig(format!("Invalid channel: {}", channel)));
+            return Err(DeviceError::InvalidConfig(format!(
+                "Invalid channel: {}",
+                channel
+            )));
         }
         // In real implementation, would send gain command to device
         Ok(())

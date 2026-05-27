@@ -76,7 +76,7 @@ pub mod types;
 
 pub use gis::GracefulIgnoranceSystem;
 #[cfg(feature = "mycelix")]
-pub use governance_verify::{headless_test, ScenarioConfig, ScenarioReport};
+pub use governance_verify::{ScenarioConfig, ScenarioReport, headless_test};
 pub use kosmic_song::{HarmonicProfile, KosmicResponse, KosmicSong, KosmicSongBuilder};
 pub use mapper::*;
 pub use network::{

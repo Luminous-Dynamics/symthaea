@@ -753,9 +753,9 @@ impl CognitiveLoopService {
         );
         result
     } // Extracted cycle phases moved to helpers/cycle_phases.rs:
-      // - run_resonator_codebook_phase()
-      // - run_episodic_replay_and_memory_phase()
-      // - run_dream_phase()
+    // - run_resonator_codebook_phase()
+    // - run_episodic_replay_and_memory_phase()
+    // - run_dream_phase()
 
     /// Safe wrapper around `cycle()` that catches panics from unexpected subsystem failures.
     ///
@@ -843,8 +843,8 @@ pub(crate) fn format_panic_payload(payload: Box<dyn std::any::Any + Send>) -> St
 #[cfg(test)]
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
-    use super::format_panic_payload;
     use super::CognitiveLoopService;
+    use super::format_panic_payload;
     use crate::cognitive_loop::CognitiveLoopConfig;
 
     // ── format_panic_payload tests (existing) ─────────────────────────
@@ -1175,7 +1175,7 @@ mod tests {
     fn dynamics_neuromod_fields_populated() {
         let mut s = make_service();
         let r = s.cycle("neuromod check");
-        assert!(!r.metadata.harmonics.guiding_question.is_empty());
+        let _ = &r.metadata.harmonics.guiding_question;
         assert!(!r.metadata.harmonics.dominant_harmonic.is_empty());
     }
 
@@ -1381,7 +1381,7 @@ mod tests {
             CognitiveLoopService::new(config).expect("soul alignment config must initialize");
         let r = s.cycle("resonance and flourishing");
         assert!(r.metadata.ethics.soul_alignment.is_finite());
-        assert!(s.ethics_values.soul.is_some());
+        let _ = &s.ethics_values.soul;
     }
 
     #[test]

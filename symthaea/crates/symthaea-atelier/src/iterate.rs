@@ -7,11 +7,11 @@
 //! and keeps the best. This is a microcosm of the Wallas cycle:
 //! divergent mutation → convergent selection.
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use symthaea_canvas::CognitiveSnapshot;
 
-use crate::{generate, score_scene, Artwork, AtelierConfig};
+use crate::{Artwork, AtelierConfig, generate, score_scene};
 
 /// Create artwork with iterative refinement.
 ///

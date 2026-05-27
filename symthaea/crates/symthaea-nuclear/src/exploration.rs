@@ -96,9 +96,9 @@ mod tests {
             .sum();
 
         eprintln!("\n--- Shell Closure Peaks ---");
-        eprintln!("A~130 (N=82):      {:.6e}", n82);
-        eprintln!("A~165 (rare earth): {:.6e}", rare_earth);
-        eprintln!("A~195 (N=126):      {:.6e}", n126);
+        eprintln!("A~130 (N=82):      {:.12}", n82);
+        eprintln!("A~165 (rare earth): {:.12}", rare_earth);
+        eprintln!("A~195 (N=126):      {:.12}", n126);
 
         // Waiting points
         eprintln!("\n--- Waiting Points (beta-decay bottlenecks) ---");
@@ -129,7 +129,7 @@ mod tests {
             .collect();
         by_a.sort_by_key(|m| m.a);
         for m in &by_a {
-            writeln!(f, "{}\t{:.6e}", m.a, m.abundance).unwrap();
+            writeln!(f, "{}\t{:.12}", m.a, m.abundance).unwrap();
         }
         eprintln!("\nWrote {} entries to {}", by_a.len(), tsv_path);
 
@@ -150,7 +150,7 @@ mod tests {
         for sc in solar {
             writeln!(
                 sf,
-                "{}\t{:.6e}\t{:.6e}\t{:.4}",
+                "{}\t{:.12}\t{:.12}\t{:.4}",
                 sc.a, sc.predicted, sc.solar, sc.ratio
             )
             .unwrap();

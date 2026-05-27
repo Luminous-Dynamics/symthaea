@@ -173,11 +173,7 @@ impl WeightedComponent {
     /// Calculate effective valence considering inversion
     pub fn effective_valence(&self) -> f64 {
         let base = self.component.valence();
-        if self.inverted {
-            -base
-        } else {
-            base
-        }
+        if self.inverted { -base } else { base }
     }
 
     /// Calculate effective arousal (inversion doesn't affect arousal)
@@ -613,11 +609,7 @@ impl EmotionalEncoder {
     fn encode_weighted(&self, wc: &WeightedComponent) -> BinaryHV {
         let base = self.get_component(wc.component);
 
-        if wc.inverted {
-            base.invert()
-        } else {
-            base
-        }
+        if wc.inverted { base.invert() } else { base }
     }
 
     /// Encode a blend of weighted components using HDC bundling

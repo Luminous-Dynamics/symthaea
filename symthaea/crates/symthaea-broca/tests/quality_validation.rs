@@ -18,7 +18,7 @@ use symthaea_broca::gating::GatingConfig;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::tokenizer::BpeTokenizer;
 use symthaea_broca::training::{
-    generate_diverse_thoughts, train_with_adam, TrainingConfig, TrainingDataset, TrainingPair,
+    TrainingConfig, TrainingDataset, TrainingPair, generate_diverse_thoughts, train_with_adam,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -230,7 +230,8 @@ fn test_checkpoint_generation_determinism() {
     // Save checkpoint
     let dir = std::env::temp_dir();
     let path = dir.join("broca_quality_determinism.bin");
-    gen_obj.save_checkpoint(&path, 0, 0.0, None, None, None)
+    gen_obj
+        .save_checkpoint(&path, 0, 0.0, None, None, None)
         .expect("checkpoint save should succeed");
 
     // Load checkpoint
@@ -295,7 +296,8 @@ fn test_checkpoint_training_resume() {
     // Save checkpoint
     let dir = std::env::temp_dir();
     let path = dir.join("broca_quality_resume.bin");
-    gen_obj.save_checkpoint(&path, 10, loss_at_10, adam_state.clone(), None, None)
+    gen_obj
+        .save_checkpoint(&path, 10, loss_at_10, adam_state.clone(), None, None)
         .expect("checkpoint save should succeed");
 
     // Load and resume training
@@ -1149,7 +1151,8 @@ fn test_training_gradient_health_after_diverse_training() {
         ..Default::default()
     };
 
-    let (metrics, adam_state, diag, _, _) = train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
+    let (metrics, adam_state, diag, _, _) =
+        train_with_adam(&mut gen_obj, &dataset, &train_cfg, None);
     assert_eq!(metrics.len(), 10);
 
     // All losses must be finite and non-negative

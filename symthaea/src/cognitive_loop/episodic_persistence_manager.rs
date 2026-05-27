@@ -55,9 +55,10 @@ mod tests {
         let mgr = EpisodicPersistenceManager::new(None);
         assert!(mgr.replay.is_none());
         assert!(mgr.db.is_none());
-        assert!(!mgr
-            .flush_in_progress
-            .load(std::sync::atomic::Ordering::Relaxed));
+        assert!(
+            !mgr.flush_in_progress
+                .load(std::sync::atomic::Ordering::Relaxed)
+        );
         assert!(mgr.last_reasoning_context.is_none());
     }
 }

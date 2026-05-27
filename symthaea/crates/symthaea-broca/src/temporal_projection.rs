@@ -874,7 +874,7 @@ impl TemporalProjection {
         d_hdc: &ContinuousHV,
         lr: f32,
     ) -> anyhow::Result<()> {
-        for chunk_idx in 0..self.num_chunks {
+        for chunk_idx in 0..self.num_chunks.min(ssm_states.len()) {
             let start = chunk_idx * self.stride;
             let g = self.group_for_chunk(chunk_idx);
             let w_up = &mut self.group_w_up[g];

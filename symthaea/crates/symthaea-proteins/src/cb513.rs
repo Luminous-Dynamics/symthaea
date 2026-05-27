@@ -11,7 +11,7 @@
 //!
 //! Total residue count: ~2,000+ — sufficient for training a small RF model.
 
-use crate::amino_acid::{parse_sequence, AminoAcid, SecondaryStructure};
+use crate::amino_acid::{AminoAcid, SecondaryStructure, parse_sequence};
 
 /// A single protein with known secondary structure.
 pub struct ProteinEntry {

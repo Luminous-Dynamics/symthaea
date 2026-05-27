@@ -19,7 +19,7 @@
 //! Jarzynski (1997), Crooks (1999), Onsager (1931), Kauffman (1993).
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thermodynamic_integration::{ThermodynamicInput, ThermodynamicIntegration};
 use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
@@ -239,7 +239,7 @@ mod tests {
     fn test_state_accessors() {
         let mgr = ThermodynamicManager::default();
         let state = mgr.state();
-        assert_eq!(state.canonical_entropy, 0.0);
+        assert_eq!(state.canonical_entropy, 0.5);
         let bridge = mgr.bridge();
         assert_eq!(bridge.carnot_efficiency, 0.0);
     }

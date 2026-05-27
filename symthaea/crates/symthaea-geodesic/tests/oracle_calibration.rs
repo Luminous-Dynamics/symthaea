@@ -10,8 +10,8 @@
 //! convergence, complexity, and state predictions match ground truth.
 
 use symthaea_core::hdc::binary_hv::BinaryHV;
-use symthaea_geodesic::execution_oracle::{ComplexityClass, OperationType};
 use symthaea_geodesic::ExecutionOracle;
+use symthaea_geodesic::execution_oracle::{ComplexityClass, OperationType};
 
 // ---------------------------------------------------------------------------
 // Helper: build a statement sequence from seeds and a single operation type
@@ -174,8 +174,10 @@ fn calibrate_fast_vs_slow() {
 
     println!(
         "[calibrate_fast_vs_slow] fast: steps={}, complexity={:?}  |  slow: steps={}, complexity={:?}",
-        fast_result.convergence_steps, fast_result.complexity_estimate,
-        slow_result.convergence_steps, slow_result.complexity_estimate
+        fast_result.convergence_steps,
+        fast_result.complexity_estimate,
+        slow_result.convergence_steps,
+        slow_result.complexity_estimate
     );
 
     // Fast should converge in fewer steps than slow

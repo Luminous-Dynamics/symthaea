@@ -202,10 +202,7 @@ fn problems() -> Vec<Problem> {
             description: "H = ½(px² + py²) + x² + y² + xy (anisotropic coupled oscillator)",
             energy: add(
                 mul(c(0.5), add(pow(v("px"), 2.0), pow(v("py"), 2.0))),
-                add(
-                    add(pow(v("x"), 2.0), pow(v("y"), 2.0)),
-                    mul(v("x"), v("y")),
-                ),
+                add(add(pow(v("x"), 2.0), pow(v("y"), 2.0)), mul(v("x"), v("y"))),
             ),
             dynamics: vec![
                 ("x", v("px")),
@@ -234,10 +231,7 @@ fn problems() -> Vec<Problem> {
                 add(mul(c(2.0), pow(v("v"), 2.0)), mul(c(2.0), pow(v("x"), 2.0))),
                 pow(v("x"), 4.0),
             ),
-            dynamics: vec![
-                ("x", v("v")),
-                ("v", neg(add(v("x"), pow(v("x"), 3.0)))),
-            ],
+            dynamics: vec![("x", v("v")), ("v", neg(add(v("x"), pow(v("x"), 3.0))))],
             formally_verifiable: true,
         },
         Problem {
@@ -295,7 +289,10 @@ fn problems() -> Vec<Problem> {
             energy: add(
                 add(pow(v("v1"), 2.0), pow(v("v2"), 2.0)),
                 add(
-                    add(mul(c(2.0), pow(v("x1"), 2.0)), mul(c(2.0), pow(v("x2"), 2.0))),
+                    add(
+                        mul(c(2.0), pow(v("x1"), 2.0)),
+                        mul(c(2.0), pow(v("x2"), 2.0)),
+                    ),
                     neg(mul(c(2.0), mul(v("x1"), v("x2")))),
                 ),
             ),

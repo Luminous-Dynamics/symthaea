@@ -59,7 +59,7 @@ use std::process::{Command, ExitCode};
 use std::time::Duration;
 
 use symthaea_lean_bridge::fol_ext_bridge::render_fol_ext_file;
-use symthaea_lean_bridge::minif2f_ingest::{parse_theorem, translate_theorem, IngestError};
+use symthaea_lean_bridge::minif2f_ingest::{IngestError, parse_theorem, translate_theorem};
 
 fn main() -> ExitCode {
     let root = match locate_corpus() {
@@ -209,7 +209,9 @@ fn main() -> ExitCode {
     eprintln!("━━━ Baseline scorecard ━━━");
     eprintln!("  total:                   {total}");
     eprintln!("  parsed:                  {parsed:3} / {total}  ({parse_rate:5.1}%)");
-    eprintln!("  translated (of parsed):  {translated:3} / {parsed:3}  ({translate_rate_over_parsed:5.1}%)");
+    eprintln!(
+        "  translated (of parsed):  {translated:3} / {parsed:3}  ({translate_rate_over_parsed:5.1}%)"
+    );
     eprintln!(
         "  translated (of total):   {translated:3} / {total}  ({translate_rate_overall:5.1}%)"
     );

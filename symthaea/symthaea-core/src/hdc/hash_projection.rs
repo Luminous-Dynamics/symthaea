@@ -83,7 +83,10 @@ mod tests {
         let hv2 = project_to_hv(b"install chromium");
         // Random-like vectors should land near 0.5 similarity.
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.45 && sim < 0.55, "Different inputs should be near-orthogonal (got {sim})");
+        assert!(
+            sim > 0.45 && sim < 0.55,
+            "Different inputs should be near-orthogonal (got {sim})"
+        );
     }
 
     #[test]

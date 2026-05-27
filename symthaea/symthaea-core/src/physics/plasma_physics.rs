@@ -26,7 +26,7 @@
 //! - Stellarator confinement
 //! - Inertial confinement
 
-use super::constants::{EPSILON_0, E_CHARGE, K_BOLTZMANN, M_ELECTRON};
+use super::constants::{E_CHARGE, EPSILON_0, K_BOLTZMANN, M_ELECTRON};
 use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;

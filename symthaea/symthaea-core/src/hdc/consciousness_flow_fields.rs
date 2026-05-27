@@ -190,9 +190,9 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::{GradientComputer, GradientConfig};
 use super::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
+use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -223,7 +223,9 @@ impl CriticalPointType {
     /// Get description
     pub fn description(&self) -> &'static str {
         match self {
-            CriticalPointType::Attractor => "Stable point - flows converge (meditation, sleep, flow)",
+            CriticalPointType::Attractor => {
+                "Stable point - flows converge (meditation, sleep, flow)"
+            }
             CriticalPointType::Repeller => "Unstable point - flows diverge (anxiety, mania)",
             CriticalPointType::Saddle => "Mixed stability - stable in some directions",
         }
@@ -436,7 +438,11 @@ impl ConsciousnessFlowField {
     }
 
     /// Predict trajectory from initial state
-    fn predict_trajectory(&mut self, initial_state: &[BinaryHV], num_steps: usize) -> Vec<Vec<BinaryHV>> {
+    fn predict_trajectory(
+        &mut self,
+        initial_state: &[BinaryHV],
+        num_steps: usize,
+    ) -> Vec<Vec<BinaryHV>> {
         let mut trajectory = vec![initial_state.to_vec()];
         let mut current_state = initial_state.to_vec();
 
@@ -485,7 +491,7 @@ impl ConsciousnessFlowField {
                 critical_points.push(CriticalPoint {
                     location: state.clone(),
                     point_type,
-                    strength: 1.0 - flow_magnitude,  // Lower flow = stronger critical point
+                    strength: 1.0 - flow_magnitude, // Lower flow = stronger critical point
                     basin_size,
                     phi,
                     label: None,
@@ -525,7 +531,7 @@ impl ConsciousnessFlowField {
     fn estimate_basin_size(&self, _attractor: &[BinaryHV]) -> f64 {
         // Simplification: Estimate based on nearby states
         // In reality, would sample state space and test convergence
-        0.5  // Placeholder
+        0.5 // Placeholder
     }
 
     /// Vector magnitude (for per-component flow strengths)
@@ -578,18 +584,22 @@ impl ConsciousnessFlowField {
         let critical_points = self.detect_critical_points();
 
         // Count types
-        let num_attractors = critical_points.iter()
+        let num_attractors = critical_points
+            .iter()
             .filter(|p| p.point_type == CriticalPointType::Attractor)
             .count();
-        let num_repellers = critical_points.iter()
+        let num_repellers = critical_points
+            .iter()
             .filter(|p| p.point_type == CriticalPointType::Repeller)
             .count();
-        let num_saddles = critical_points.iter()
+        let num_saddles = critical_points
+            .iter()
             .filter(|p| p.point_type == CriticalPointType::Saddle)
             .count();
 
         // Find dominant attractor (strongest)
-        let dominant_attractor = critical_points.iter()
+        let dominant_attractor = critical_points
+            .iter()
             .enumerate()
             .filter(|(_, p)| p.point_type == CriticalPointType::Attractor)
             .max_by(|(_, a), (_, b)| a.strength.total_cmp(&b.strength))
@@ -597,7 +607,7 @@ impl ConsciousnessFlowField {
 
         // Compute average flow magnitude
         let mut total_flow = 0.0;
-        let states = self.states.clone();  // Clone to avoid borrow issues
+        let states = self.states.clone(); // Clone to avoid borrow issues
         for state in &states {
             let flow = self.compute_flow_vector(state);
             total_flow += self.vector_magnitude(&flow);
@@ -693,7 +703,9 @@ impl ConsciousnessFlowField {
         if is_ergodic {
             parts.push("Flow is ergodic - consciousness explores full state space".to_string());
         } else {
-            parts.push("Flow is non-ergodic - consciousness trapped in subset of states".to_string());
+            parts.push(
+                "Flow is non-ergodic - consciousness trapped in subset of states".to_string(),
+            );
         }
 
         parts.join(". ")
@@ -789,17 +801,21 @@ mod tests {
 
         // Add states near potential attractor
         for i in 0..20 {
-            let state = vec![BinaryHV::random(5000 + i); 4];  // Similar seeds
+            let state = vec![BinaryHV::random(5000 + i); 4]; // Similar seeds
             flow.add_state(state);
         }
 
         let assessment = flow.analyze();
 
         // Assessment fields should be finite
-        assert!(assessment.avg_flow_magnitude.is_finite(),
-                "Flow magnitude should be finite");
-        assert!(assessment.avg_flow_magnitude >= 0.0,
-                "Flow magnitude should be non-negative");
+        assert!(
+            assessment.avg_flow_magnitude.is_finite(),
+            "Flow magnitude should be finite"
+        );
+        assert!(
+            assessment.avg_flow_magnitude >= 0.0,
+            "Flow magnitude should be non-negative"
+        );
     }
 
     #[test]

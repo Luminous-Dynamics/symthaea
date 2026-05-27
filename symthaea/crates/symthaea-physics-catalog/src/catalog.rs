@@ -1069,9 +1069,11 @@ mod tests {
     #[test]
     fn domains_covered() {
         let catalog = PhysicsCatalog::new();
-        assert!(!catalog
-            .entries_in_domain(Domain::InformationTheory)
-            .is_empty());
+        assert!(
+            !catalog
+                .entries_in_domain(Domain::InformationTheory)
+                .is_empty()
+        );
         assert!(!catalog.entries_in_domain(Domain::Biophysics).is_empty());
         assert!(!catalog.entries_in_domain(Domain::Acoustics).is_empty());
         assert!(!catalog.entries_in_domain(Domain::PlasmaPhysics).is_empty());

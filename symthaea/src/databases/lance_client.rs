@@ -24,8 +24,8 @@ use super::{
     SearchResult,
 };
 use arrow_array::{
-    builder::FixedSizeBinaryBuilder, FixedSizeBinaryArray, Float32Array, Float64Array, Int32Array,
-    Int64Array, RecordBatch, RecordBatchIterator, StringArray,
+    FixedSizeBinaryArray, Float32Array, Float64Array, Int32Array, Int64Array, RecordBatch,
+    RecordBatchIterator, StringArray, builder::FixedSizeBinaryBuilder,
 };
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use async_trait::async_trait;

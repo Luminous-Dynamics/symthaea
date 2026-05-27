@@ -256,11 +256,7 @@ impl SynergisticIntegration {
                 min_mi = mi;
             }
         }
-        if min_mi == f64::MAX {
-            0.0
-        } else {
-            min_mi
-        }
+        if min_mi == f64::MAX { 0.0 } else { min_mi }
     }
 
     /// Greedy MIP search for n > 16: iteratively move the element that reduces MI most.

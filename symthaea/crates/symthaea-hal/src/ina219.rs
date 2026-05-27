@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_ina219_decode_known_current() {
         let decoder = Ina219Decoder::new(0.1); // 100mΩ shunt
-                                               // Shunt voltage = 1000 * 10µV = 10mV → current = 0.01V / 0.1Ω = 0.1A
+        // Shunt voltage = 1000 * 10µV = 10mV → current = 0.01V / 0.1Ω = 0.1A
         let raw = [
             0x03, 0xE8, // shunt = 1000 (big-endian signed)
             0x00, 0x00, // bus = 0

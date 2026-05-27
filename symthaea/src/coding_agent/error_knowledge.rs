@@ -438,9 +438,11 @@ mod tests {
         });
 
         // best_fix requires >= 2 attempts
-        assert!(knowledge
-            .best_fix("E0308", ErrorCategory::TypeMismatch)
-            .is_none());
+        assert!(
+            knowledge
+                .best_fix("E0308", ErrorCategory::TypeMismatch)
+                .is_none()
+        );
 
         // Second attempt
         knowledge.record_fix(CodeErrorFact {

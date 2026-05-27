@@ -41,8 +41,8 @@ use crate::benchmarks::qualia_confidence::helpers::{linear_fit, sigmoid_fit};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 
 /// Number of noise levels in the sweep.
 const NUM_NOISE_LEVELS: usize = 11;

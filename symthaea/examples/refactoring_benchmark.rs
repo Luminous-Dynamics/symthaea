@@ -212,8 +212,7 @@ fn test_average() {
         },
         // === Change Signature ===
         RefactorTask {
-            description:
-                "Change process() to return Result<String, ProcessError> instead of String",
+            description: "Change process() to return Result<String, ProcessError> instead of String",
             category: RefactorCategory::ChangeSignature,
             before_source: r#"
 pub fn process(input: &str) -> String {
@@ -242,8 +241,7 @@ fn test_process_empty_err() {
         },
         // === Add Error Handling ===
         RefactorTask {
-            description:
-                "Add proper error handling to divide() — return Result instead of panicking",
+            description: "Add proper error handling to divide() — return Result instead of panicking",
             category: RefactorCategory::AddErrorHandling,
             before_source: r#"
 pub fn divide(a: f64, b: f64) -> f64 {

@@ -82,8 +82,7 @@ fn scenarios() -> Vec<TherapeuticScenario> {
     vec![
         // ── Withdrawal ruptures ──────────────────────────────────────────
         TherapeuticScenario {
-            _description:
-                "Client gives one-word answers after therapist challenges avoidance pattern",
+            _description: "Client gives one-word answers after therapist challenges avoidance pattern",
             rupture_type: RuptureType::Withdrawal,
             appropriate_repairs: &[RepairStrategy::Validation, RepairStrategy::Exploration],
             _alliance_before: 0.65,
@@ -145,8 +144,7 @@ fn scenarios() -> Vec<TherapeuticScenario> {
             alliance_after_bad_repair: 0.32,
         },
         TherapeuticScenario {
-            _description:
-                "Client stops bringing up meaningful content and fills sessions with surface talk",
+            _description: "Client stops bringing up meaningful content and fills sessions with surface talk",
             rupture_type: RuptureType::Withdrawal,
             appropriate_repairs: &[
                 RepairStrategy::Exploration,
@@ -177,8 +175,7 @@ fn scenarios() -> Vec<TherapeuticScenario> {
             alliance_after_bad_repair: 0.20,
         },
         TherapeuticScenario {
-            _description:
-                "Client criticizes therapist's competence after a perceived empathic failure",
+            _description: "Client criticizes therapist's competence after a perceived empathic failure",
             rupture_type: RuptureType::Confrontation,
             appropriate_repairs: &[RepairStrategy::Immediacy, RepairStrategy::Validation],
             _alliance_before: 0.50,
@@ -213,8 +210,7 @@ fn scenarios() -> Vec<TherapeuticScenario> {
             alliance_after_bad_repair: 0.15,
         },
         TherapeuticScenario {
-            _description:
-                "Client loudly protests a boundary the therapist set about session length",
+            _description: "Client loudly protests a boundary the therapist set about session length",
             rupture_type: RuptureType::Confrontation,
             appropriate_repairs: &[
                 RepairStrategy::Validation,

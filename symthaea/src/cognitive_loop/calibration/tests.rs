@@ -1750,9 +1750,9 @@ fn test_cooldown_override_or_logic() {
     monitor1.observations_since_calibration = 300;
     monitor1.cooldown = 100;
     monitor1.pe_ema = 0.05; // low PE, but drift is anomalous
-                            // With anomalous drift, the monitor should reach z-score computation.
-                            // pe_z = (0.05-0.1)/0.05 = -1.0 → won't trigger from PE alone,
-                            // but the cooldown gate is bypassed by drift_anomalous.
+    // With anomalous drift, the monitor should reach z-score computation.
+    // pe_z = (0.05-0.1)/0.05 = -1.0 → won't trigger from PE alone,
+    // but the cooldown gate is bypassed by drift_anomalous.
     let _result1 = monitor1.check_trigger(true);
     // (May or may not produce calibration depending on other z-scores,
     //  but the point is it wasn't blocked by cooldown.)
@@ -1762,7 +1762,7 @@ fn test_cooldown_override_or_logic() {
     monitor2.observations_since_calibration = 300;
     monitor2.cooldown = 100;
     monitor2.pe_ema = 0.40; // well above 0.35 override threshold
-                            // pe_z = (0.40-0.1)/0.05 = 6.0 → needs_calibration=true
+    // pe_z = (0.40-0.1)/0.05 = 6.0 → needs_calibration=true
     let result2 = monitor2.check_trigger(false);
     assert!(
         result2.is_some(),

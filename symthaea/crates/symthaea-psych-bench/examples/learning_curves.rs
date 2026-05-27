@@ -31,11 +31,7 @@ fn linear_slope(values: &[f64]) -> f64 {
         den += (x - x_mean) * (x - x_mean);
     }
 
-    if den.abs() < 1e-15 {
-        0.0
-    } else {
-        num / den
-    }
+    if den.abs() < 1e-15 { 0.0 } else { num / den }
 }
 
 /// Ratio of final block value to initial block value.

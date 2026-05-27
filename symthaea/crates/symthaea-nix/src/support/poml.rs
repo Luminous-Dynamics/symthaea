@@ -1086,9 +1086,11 @@ mod tests {
         assert!(result.prompt.contains("[s1]"));
         assert!(result.prompt.contains("[s2]"));
         assert!(result.prompt.contains("Input: install firefox"));
-        assert!(result
-            .prompt
-            .contains("Output: {\"intent\": \"install_package\"}"));
+        assert!(
+            result
+                .prompt
+                .contains("Output: {\"intent\": \"install_package\"}")
+        );
         assert!(result.prompt.contains("Output Format:"));
         assert!(result.prompt.contains("Hint: Be precise"));
     }
@@ -1261,9 +1263,11 @@ mod tests {
 
         let ctx = PomlContext::default();
         let result = proc.process("err", &ctx).unwrap();
-        assert!(result
-            .prompt
-            .contains("On ambiguous: Return multiple intents"));
+        assert!(
+            result
+                .prompt
+                .contains("On ambiguous: Return multiple intents")
+        );
         assert!(result.prompt.contains("On unknown: Return unknown intent"));
     }
 

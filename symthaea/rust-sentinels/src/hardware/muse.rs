@@ -283,7 +283,8 @@ impl MuseAdapter {
     fn generate_simulated_sample(&self) -> EegSample {
         use std::f32::consts::PI;
 
-        let timestamp_ms = self.stream_start
+        let timestamp_ms = self
+            .stream_start
             .map(|start| start.elapsed().as_secs_f64() * 1000.0)
             .unwrap_or(0.0);
 
@@ -331,7 +332,9 @@ impl EegDevice for MuseAdapter {
         }
 
         if self.config.address.is_empty() {
-            return Err(DeviceError::InvalidConfig("No address specified".to_string()));
+            return Err(DeviceError::InvalidConfig(
+                "No address specified".to_string(),
+            ));
         }
 
         // In a real implementation, we would establish BLE connection here
@@ -409,20 +412,27 @@ impl EegDevice for MuseAdapter {
     fn get_channels(&self) -> Vec<ChannelInfo> {
         let channel_names = ["TP9", "AF7", "AF8", "TP10"];
 
-        channel_names.iter().enumerate().map(|(i, name)| {
-            ChannelInfo {
-                index: i,
-                name: name.to_string(),
-                enabled: self.config.common.enabled_channels.contains(&i),
-                gain: 1.0, // Muse has fixed gain
-                channel_type: ChannelType::Eeg,
-            }
-        }).collect()
+        channel_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                ChannelInfo {
+                    index: i,
+                    name: name.to_string(),
+                    enabled: self.config.common.enabled_channels.contains(&i),
+                    gain: 1.0, // Muse has fixed gain
+                    channel_type: ChannelType::Eeg,
+                }
+            })
+            .collect()
     }
 
     fn set_channel_enabled(&mut self, channel: usize, enabled: bool) -> Result<(), DeviceError> {
         if channel >= 4 {
-            return Err(DeviceError::InvalidConfig(format!("Invalid channel: {}", channel)));
+            return Err(DeviceError::InvalidConfig(format!(
+                "Invalid channel: {}",
+                channel
+            )));
         }
 
         if enabled {
@@ -431,7 +441,10 @@ impl EegDevice for MuseAdapter {
                 self.config.common.enabled_channels.sort();
             }
         } else {
-            self.config.common.enabled_channels.retain(|&c| c != channel);
+            self.config
+                .common
+                .enabled_channels
+                .retain(|&c| c != channel);
         }
 
         Ok(())
@@ -444,7 +457,9 @@ impl EegDevice for MuseAdapter {
 
     fn set_sample_rate(&mut self, rate: SampleRate) -> Result<(), DeviceError> {
         if rate != SampleRate::Hz256 {
-            return Err(DeviceError::Unsupported("Muse only supports 256 Hz".to_string()));
+            return Err(DeviceError::Unsupported(
+                "Muse only supports 256 Hz".to_string(),
+            ));
         }
         Ok(())
     }

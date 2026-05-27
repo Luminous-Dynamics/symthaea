@@ -76,7 +76,7 @@ impl CodingAgent {
     /// Generate multiple candidate plans and use FEP free-energy minimization to select the best.
     pub(super) fn select_plan_fep(&self) -> Option<(Molecule, PlanProfile)> {
         use crate::action::primitives::{
-            select_best_plan, select_best_plan_with_history, PlanCandidate,
+            PlanCandidate, select_best_plan, select_best_plan_with_history,
         };
 
         let target = self.resolve_target_file();

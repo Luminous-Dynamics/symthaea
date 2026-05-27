@@ -537,14 +537,18 @@ mod tests {
         let plugin = NixOsPlugin;
 
         let entities = plugin.extract_entities("I want to install pkgs.firefox on my system");
-        assert!(entities
-            .iter()
-            .any(|e| e.entity_type == "package" && e.value == "firefox"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "package" && e.value == "firefox")
+        );
 
         let entities = plugin.extract_entities("run nixos-rebuild switch");
-        assert!(entities
-            .iter()
-            .any(|e| e.entity_type == "nix_command" && e.value == "nixos-rebuild"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "nix_command" && e.value == "nixos-rebuild")
+        );
     }
 
     #[test]

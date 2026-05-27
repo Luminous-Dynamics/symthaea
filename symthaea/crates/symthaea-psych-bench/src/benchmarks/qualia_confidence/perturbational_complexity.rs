@@ -35,8 +35,8 @@ use crate::benchmarks::qualia_confidence::helpers::{float_from_seed, normalized_
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 
 /// Baseline cycles before perturbation.
 const BASELINE_CYCLES: usize = 50;

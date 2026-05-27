@@ -29,7 +29,7 @@
 
 #[cfg(feature = "embeddings")]
 fn main() -> anyhow::Result<()> {
-    use symthaea::embeddings::qwen3::{cosine_similarity, Qwen3Config, Qwen3Embedder};
+    use symthaea::embeddings::qwen3::{Qwen3Config, Qwen3Embedder, cosine_similarity};
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║       EMBEDDING MODEL VERIFICATION                          ║");

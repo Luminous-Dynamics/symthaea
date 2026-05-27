@@ -455,7 +455,7 @@ impl HomeManagerBridge {
             output.push_str(&format!("Config: {}\n", config.config_path.display()));
 
             if let Some(r#gen) = config.generation {
-                output.push_str(&format!("Generation: {gen}\n"));
+                output.push_str(&format!("Generation: {r#gen}\n"));
             }
 
             output.push_str(&format!("\nGenerations ({}):\n", self.generations.len()));

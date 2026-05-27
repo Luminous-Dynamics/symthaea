@@ -309,9 +309,11 @@ mod tests {
         let result = CategoricalPerceptionBenchmark.run(&config);
         assert!(result.metrics.contains_key("boundary_slope"));
         assert!(result.metrics.contains_key("boundary_discrimination"));
-        assert!(result
-            .metrics
-            .contains_key("within_category_discrimination"));
+        assert!(
+            result
+                .metrics
+                .contains_key("within_category_discrimination")
+        );
         assert!(result.metrics.contains_key("categorical_index"));
     }
 

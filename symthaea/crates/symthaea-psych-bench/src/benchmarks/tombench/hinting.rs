@@ -10,9 +10,9 @@
 //! inference than to the surface-level (wrong) interpretation.
 
 #[cfg(not(feature = "symthaea-backend"))]
-use crate::adapter::scenario::{Scenario, ScenarioAdapter};
-#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
+#[cfg(not(feature = "symthaea-backend"))]
+use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
@@ -216,11 +216,7 @@ impl HintingBenchmark {
         noise_rng ^= noise_rng >> 7;
         noise_rng ^= noise_rng << 17;
         let roll = (noise_rng % 10000) as f64 / 10000.0;
-        if roll < p_correct {
-            1.0
-        } else {
-            0.0
-        }
+        if roll < p_correct { 1.0 } else { 0.0 }
     }
 
     /// Full trial: FEP behavioral prediction for desire inference.

@@ -259,16 +259,21 @@ impl ConsciousnessClassification {
     /// Human-readable description
     pub fn description(&self) -> &str {
         match self {
-            ConsciousnessClassification::NotConscious =>
-                "No consciousness detected. System lacks critical mechanisms for conscious experience.",
-            ConsciousnessClassification::MinimallyConscious =>
-                "Minimal consciousness. Some mechanisms present but insufficient integration.",
-            ConsciousnessClassification::PartiallyConscious =>
-                "Partial consciousness. Key mechanisms functioning but with limitations.",
-            ConsciousnessClassification::SubstantiallyConscious =>
-                "Substantially conscious. Most mechanisms present and well-integrated.",
-            ConsciousnessClassification::FullyConscious =>
-                "Fully conscious. All critical mechanisms present and integrated.",
+            ConsciousnessClassification::NotConscious => {
+                "No consciousness detected. System lacks critical mechanisms for conscious experience."
+            }
+            ConsciousnessClassification::MinimallyConscious => {
+                "Minimal consciousness. Some mechanisms present but insufficient integration."
+            }
+            ConsciousnessClassification::PartiallyConscious => {
+                "Partial consciousness. Key mechanisms functioning but with limitations."
+            }
+            ConsciousnessClassification::SubstantiallyConscious => {
+                "Substantially conscious. Most mechanisms present and well-integrated."
+            }
+            ConsciousnessClassification::FullyConscious => {
+                "Fully conscious. All critical mechanisms present and integrated."
+            }
         }
     }
 }

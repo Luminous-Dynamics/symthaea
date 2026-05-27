@@ -7,17 +7,6 @@
 //! Including the improved SmartTower with ANM and oracle selection
 
 use symthaea::benchmarks::{
-    discover_by_enhanced_reci,
-    discover_by_final_boss,
-    discover_by_neural,
-    discover_by_oracle,
-    // SmartTower (improved ensemble)
-    discover_by_smart_tower,
-    discover_by_tower,
-    discover_by_ultimate_ensemble,
-    // Previous methods for comparison
-    discover_information_theoretic,
-    discover_majority_voting,
     AnmDiscovery,
     CamDiscovery,
     // Complete System
@@ -37,6 +26,17 @@ use symthaea::benchmarks::{
     SlopeDiscovery,
     TuebingenAdapter,
     UltimateEnsemble,
+    discover_by_enhanced_reci,
+    discover_by_final_boss,
+    discover_by_neural,
+    discover_by_oracle,
+    // SmartTower (improved ensemble)
+    discover_by_smart_tower,
+    discover_by_tower,
+    discover_by_ultimate_ensemble,
+    // Previous methods for comparison
+    discover_information_theoretic,
+    discover_majority_voting,
 };
 
 fn main() {

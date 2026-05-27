@@ -82,7 +82,7 @@ fn test_thermal_downdraft_resistance() {
     // A thermal downdraft can generate ~200N of force on a torpedo AUV
     for i in 0..200 {
         sim.apply_external_force([0.0, 0.0, 200.0]); // Downward force
-                                                     // AUV fights with upward thrust
+        // AUV fights with upward thrust
         let fight_cmd = AuvCommand {
             thrusters: [0.3, 0.3, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0],
         };

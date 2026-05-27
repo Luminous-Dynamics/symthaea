@@ -514,11 +514,7 @@ impl TouchBody {
 
         // Lifting after a long press produces no surprise (expected).
         // Quick tap-and-lift produces mild surprise from the release.
-        if was_long_press {
-            0.0
-        } else {
-            0.1
-        }
+        if was_long_press { 0.0 } else { 0.1 }
     }
 
     fn handle_cancel(&mut self, _event: &TouchEvent) -> f32 {

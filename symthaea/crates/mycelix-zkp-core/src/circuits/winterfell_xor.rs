@@ -14,14 +14,13 @@
 //! - Col 4: running_xor_count (increments by c_bit each step)
 
 use winterfell::{
-    math::{fields::f128::BaseElement, FieldElement, StarkField, ToElements},
+    AcceptableOptions, Air, AirContext, Assertion, BatchingMethod, CompositionPoly,
+    CompositionPolyTrace, DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde,
+    EvaluationFrame, PartitionOptions, Proof, ProofOptions, Prover as WinterfellProver,
+    StarkDomain, Trace, TraceInfo, TracePolyTable, TransitionConstraintDegree,
+    crypto::{DefaultRandomCoin, MerkleTree, hashers::Blake3_256},
+    math::{FieldElement, StarkField, ToElements, fields::f128::BaseElement},
     matrix::ColMatrix,
-    Air, AirContext, Assertion, BatchingMethod, CompositionPoly, CompositionPolyTrace,
-    DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde, EvaluationFrame,
-    PartitionOptions, ProofOptions, Prover as WinterfellProver, StarkDomain, Trace, TraceInfo,
-    TracePolyTable, TransitionConstraintDegree,
-    crypto::{hashers::Blake3_256, DefaultRandomCoin, MerkleTree},
-    AcceptableOptions, Proof,
 };
 
 type Hasher = Blake3_256<BaseElement>;
@@ -48,7 +47,10 @@ pub struct XorPublicInputs {
 
 impl ToElements<BaseElement> for XorPublicInputs {
     fn to_elements(&self) -> Vec<BaseElement> {
-        vec![BaseElement::from(self.total_xor_bits), BaseElement::from(self.num_bits)]
+        vec![
+            BaseElement::from(self.total_xor_bits),
+            BaseElement::from(self.num_bits),
+        ]
     }
 }
 
@@ -134,7 +136,11 @@ impl Air for PrimeFieldXorAir {
     fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>> {
         vec![
             Assertion::single(col::STEP, 0, BaseElement::ZERO),
-            Assertion::single(col::STEP, self.num_bits - 1, BaseElement::from((self.num_bits - 1) as u64)),
+            Assertion::single(
+                col::STEP,
+                self.num_bits - 1,
+                BaseElement::from((self.num_bits - 1) as u64),
+            ),
             Assertion::single(col::XOR_COUNT, 0, BaseElement::ZERO),
         ]
     }
@@ -147,8 +153,12 @@ struct XorTrace {
 
 impl Trace for XorTrace {
     type BaseField = BaseElement;
-    fn info(&self) -> &TraceInfo { &self.info }
-    fn main_segment(&self) -> &ColMatrix<Self::BaseField> { &self.trace }
+    fn info(&self) -> &TraceInfo {
+        &self.info
+    }
+    fn main_segment(&self) -> &ColMatrix<Self::BaseField> {
+        &self.trace
+    }
     fn read_main_frame(&self, row_idx: usize, frame: &mut EvaluationFrame<Self::BaseField>) {
         let next = (row_idx + 1) % self.trace.num_rows();
         self.trace.read_row_into(row_idx, frame.current_mut());
@@ -159,7 +169,11 @@ impl Trace for XorTrace {
 fn build_xor_trace(a_bits: &[u8], b_bits: &[u8]) -> (XorTrace, u64) {
     let num_bits = a_bits.len();
     assert_eq!(a_bits.len(), b_bits.len());
-    assert!(num_bits.is_power_of_two(), "num_bits must be power of 2, got {}", num_bits);
+    assert!(
+        num_bits.is_power_of_two(),
+        "num_bits must be power of 2, got {}",
+        num_bits
+    );
 
     let trace_length = num_bits;
 
@@ -206,25 +220,37 @@ impl WinterfellProver for XorProver {
     type ConstraintEvaluator<'a, E: FieldElement<BaseField = BaseElement>> =
         DefaultConstraintEvaluator<'a, PrimeFieldXorAir, E>;
 
-    fn options(&self) -> &ProofOptions { &self.options }
-    fn get_pub_inputs(&self, _trace: &Self::Trace) -> XorPublicInputs { self.pub_inputs.clone() }
+    fn options(&self) -> &ProofOptions {
+        &self.options
+    }
+    fn get_pub_inputs(&self, _trace: &Self::Trace) -> XorPublicInputs {
+        self.pub_inputs.clone()
+    }
 
     fn new_trace_lde<E: FieldElement<BaseField = BaseElement>>(
-        &self, trace_info: &TraceInfo, main_trace: &ColMatrix<BaseElement>,
-        domain: &StarkDomain<BaseElement>, opts: PartitionOptions,
+        &self,
+        trace_info: &TraceInfo,
+        main_trace: &ColMatrix<BaseElement>,
+        domain: &StarkDomain<BaseElement>,
+        opts: PartitionOptions,
     ) -> (Self::TraceLde<E>, TracePolyTable<E>) {
         DefaultTraceLde::new(trace_info, main_trace, domain, opts)
     }
 
     fn build_constraint_commitment<E: FieldElement<BaseField = BaseElement>>(
-        &self, cpt: CompositionPolyTrace<E>, num_cols: usize,
-        domain: &StarkDomain<BaseElement>, opts: PartitionOptions,
+        &self,
+        cpt: CompositionPolyTrace<E>,
+        num_cols: usize,
+        domain: &StarkDomain<BaseElement>,
+        opts: PartitionOptions,
     ) -> (Self::ConstraintCommitment<E>, CompositionPoly<E>) {
         DefaultConstraintCommitment::new(cpt, num_cols, domain, opts)
     }
 
     fn new_evaluator<'a, E: FieldElement<BaseField = BaseElement>>(
-        &self, air: &'a Self::Air, aux: Option<winterfell::AuxRandElements<E>>,
+        &self,
+        air: &'a Self::Air,
+        aux: Option<winterfell::AuxRandElements<E>>,
         coeffs: winterfell::ConstraintCompositionCoefficients<E>,
     ) -> Self::ConstraintEvaluator<'a, E> {
         DefaultConstraintEvaluator::new(air, aux, coeffs)
@@ -233,9 +259,12 @@ impl WinterfellProver for XorProver {
 
 fn default_options() -> ProofOptions {
     ProofOptions::new(
-        28, 8, 0,
+        28,
+        8,
+        0,
         winterfell::FieldExtension::None,
-        8, 31,
+        8,
+        31,
         BatchingMethod::Linear,
         BatchingMethod::Linear,
     )
@@ -244,14 +273,25 @@ fn default_options() -> ProofOptions {
 pub fn prove_xor(a_bits: &[u8], b_bits: &[u8]) -> Result<(Proof, u64), String> {
     let num_bits = a_bits.len() as u64;
     let (trace, total_xor) = build_xor_trace(a_bits, b_bits);
-    let pub_inputs = XorPublicInputs { total_xor_bits: total_xor, num_bits };
-    let prover = XorProver { options: default_options(), pub_inputs };
-    let proof = prover.prove(trace).map_err(|e| format!("Winterfell XOR prove: {:?}", e))?;
+    let pub_inputs = XorPublicInputs {
+        total_xor_bits: total_xor,
+        num_bits,
+    };
+    let prover = XorProver {
+        options: default_options(),
+        pub_inputs,
+    };
+    let proof = prover
+        .prove(trace)
+        .map_err(|e| format!("Winterfell XOR prove: {:?}", e))?;
     Ok((proof, total_xor))
 }
 
 pub fn verify_xor(proof: Proof, total_xor_bits: u64, num_bits: u64) -> Result<(), String> {
-    let pub_inputs = XorPublicInputs { total_xor_bits, num_bits };
+    let pub_inputs = XorPublicInputs {
+        total_xor_bits,
+        num_bits,
+    };
     let acceptable = AcceptableOptions::OptionSet(vec![default_options()]);
     winterfell::verify::<PrimeFieldXorAir, Hasher, RandCoin, VC>(proof, pub_inputs, &acceptable)
         .map_err(|e| format!("Winterfell XOR verify: {:?}", e))
@@ -276,29 +316,47 @@ pub fn bench_winterfell_xor_sized(num_bits: usize) -> WinterfellXorBench {
 
     assert!(num_bits.is_power_of_two());
 
-    println!("\n=== WINTERFELL (MEASURED): XOR Binding ({} bits) ===\n", num_bits);
+    println!(
+        "\n=== WINTERFELL (MEASURED): XOR Binding ({} bits) ===\n",
+        num_bits
+    );
 
     // Pseudo-random bits (NOT periodic — periodic causes low-degree polynomials)
-    let a_bits: Vec<u8> = (0..num_bits).map(|i| ((i * 7 + 3) % 11 > 5) as u8).collect();
-    let b_bits: Vec<u8> = (0..num_bits).map(|i| ((i * 13 + 7) % 17 > 8) as u8).collect();
+    let a_bits: Vec<u8> = (0..num_bits)
+        .map(|i| ((i * 7 + 3) % 11 > 5) as u8)
+        .collect();
+    let b_bits: Vec<u8> = (0..num_bits)
+        .map(|i| ((i * 13 + 7) % 17 > 8) as u8)
+        .collect();
 
     let constraint_count = 4 * (num_bits - 1);
     println!("  Trace: {} rows × {} columns", num_bits, TRACE_WIDTH);
-    println!("  Transition constraints: 4 per step × {} steps = {}", num_bits - 1, constraint_count);
+    println!(
+        "  Transition constraints: 4 per step × {} steps = {}",
+        num_bits - 1,
+        constraint_count
+    );
 
     let prove_start = Instant::now();
     let (proof, total_xor) = prove_xor(&a_bits, &b_bits).expect("prove failed");
     let prove_time = prove_start.elapsed();
 
     let proof_size = proof.to_bytes().len();
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
     println!("  Prover time: {:.1} ms", prove_time.as_secs_f64() * 1000.0);
 
     let verify_start = Instant::now();
     verify_xor(proof, total_xor, num_bits as u64).expect("verify failed");
     let verify_time = verify_start.elapsed();
 
-    println!("  Verifier time: {:.3} ms", verify_time.as_secs_f64() * 1000.0);
+    println!(
+        "  Verifier time: {:.3} ms",
+        verify_time.as_secs_f64() * 1000.0
+    );
     println!("  Verification: PASSED (real cryptographic proof)");
 
     WinterfellXorBench {
@@ -317,18 +375,27 @@ mod tests {
     #[test]
     fn test_winterfell_xor_prove_verify() {
         // Use pseudo-random bits (NOT periodic — periodic patterns cause low-degree polynomials)
-        let a: Vec<u8> = (0..DEFAULT_NUM_BITS).map(|i| ((i * 7 + 3) % 11 > 5) as u8).collect();
-        let b: Vec<u8> = (0..DEFAULT_NUM_BITS).map(|i| ((i * 13 + 7) % 17 > 8) as u8).collect();
+        let a: Vec<u8> = (0..DEFAULT_NUM_BITS)
+            .map(|i| ((i * 7 + 3) % 11 > 5) as u8)
+            .collect();
+        let b: Vec<u8> = (0..DEFAULT_NUM_BITS)
+            .map(|i| ((i * 13 + 7) % 17 > 8) as u8)
+            .collect();
 
         let (proof, total_xor) = prove_xor(&a, &b).expect("prove");
-        assert!(total_xor > 0 && total_xor < DEFAULT_NUM_BITS as u64,
-            "pseudo-random bits should have some but not all XOR=1, got {}", total_xor);
+        assert!(
+            total_xor > 0 && total_xor < DEFAULT_NUM_BITS as u64,
+            "pseudo-random bits should have some but not all XOR=1, got {}",
+            total_xor
+        );
         verify_xor(proof, total_xor, DEFAULT_NUM_BITS as u64).expect("verify");
     }
 
     #[test]
     fn test_identical_vectors_zero_xor() {
-        let a: Vec<u8> = (0..DEFAULT_NUM_BITS).map(|i| ((i * 7 + 3) % 11 > 5) as u8).collect();
+        let a: Vec<u8> = (0..DEFAULT_NUM_BITS)
+            .map(|i| ((i * 7 + 3) % 11 > 5) as u8)
+            .collect();
         let b = a.clone(); // Same vector
 
         let (proof, total_xor) = prove_xor(&a, &b).expect("prove");
@@ -342,8 +409,13 @@ mod tests {
         assert!(result.prove_time_ms > 0.0);
         assert!(result.proof_size_bytes > 0);
         println!("\n  MEASURED WINTERFELL XOR (256-bit):");
-        println!("    {} constraints, Prove: {:.1}ms, Verify: {:.3}ms, Proof: {} bytes",
-            result.constraint_count, result.prove_time_ms, result.verify_time_ms, result.proof_size_bytes);
+        println!(
+            "    {} constraints, Prove: {:.1}ms, Verify: {:.3}ms, Proof: {} bytes",
+            result.constraint_count,
+            result.prove_time_ms,
+            result.verify_time_ms,
+            result.proof_size_bytes
+        );
     }
 
     #[test]
@@ -354,14 +426,23 @@ mod tests {
         assert!(result.proof_size_bytes > 0);
         assert_eq!(result.num_bits, 16_384);
         println!("\n  MEASURED WINTERFELL XOR (16,384-bit — SAME SCALE AS BINIUS):");
-        println!("    {} constraints, Prove: {:.1}ms, Verify: {:.3}ms, Proof: {} bytes",
-            result.constraint_count, result.prove_time_ms, result.verify_time_ms, result.proof_size_bytes);
+        println!(
+            "    {} constraints, Prove: {:.1}ms, Verify: {:.3}ms, Proof: {} bytes",
+            result.constraint_count,
+            result.prove_time_ms,
+            result.verify_time_ms,
+            result.proof_size_bytes
+        );
     }
 
     #[test]
     fn test_wrong_xor_count_fails() {
-        let a: Vec<u8> = (0..DEFAULT_NUM_BITS).map(|i| ((i * 7 + 3) % 11 > 5) as u8).collect();
-        let b: Vec<u8> = (0..DEFAULT_NUM_BITS).map(|i| ((i * 13 + 7) % 17 > 8) as u8).collect();
+        let a: Vec<u8> = (0..DEFAULT_NUM_BITS)
+            .map(|i| ((i * 7 + 3) % 11 > 5) as u8)
+            .collect();
+        let b: Vec<u8> = (0..DEFAULT_NUM_BITS)
+            .map(|i| ((i * 13 + 7) % 17 > 8) as u8)
+            .collect();
 
         let (proof, total_xor) = prove_xor(&a, &b).expect("prove");
         assert!(total_xor > 0, "should have some XOR bits set");

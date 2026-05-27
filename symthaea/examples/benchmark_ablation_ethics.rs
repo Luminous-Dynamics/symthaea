@@ -21,7 +21,7 @@ use std::time::Instant;
 use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict};
 use symthaea::hdc::moral_parser::MoralParser;
 use symthaea::hdc::moral_prototypes::{
-    MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes, MORAL_PROTO_DIM,
+    MORAL_PROTO_DIM, MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes,
 };
 
 const DATASETS_PATH: &str = "data/moral_datasets";

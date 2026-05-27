@@ -35,18 +35,18 @@ pub mod symmetry_groups;
 // Re-export key items
 pub use constants::*;
 pub use cross_sections::{
-    alpha_em_running, alpha_s_running, r_ratio, sigma_compton, sigma_ee_to_mumu,
-    sigma_ee_to_mumu_with_z, Mandelstam,
+    Mandelstam, alpha_em_running, alpha_s_running, r_ratio, sigma_compton, sigma_ee_to_mumu,
+    sigma_ee_to_mumu_with_z,
 };
 pub use decay_widths::{
-    muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width, w_boson_channels,
-    w_total_width, z_total_width, DecayChannel,
+    DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
+    w_boson_channels, w_total_width, z_total_width,
 };
 pub use renormalization::{
-    approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd, qcd_beta, qed_beta,
-    BetaCoefficients,
+    BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
+    qcd_beta, qed_beta,
 };
 pub use symmetry_groups::{
-    gell_mann_matrix, gell_mann_trace_product, pauli_matrices, su2_casimir, su2_structure_constant,
-    su3_casimir_adjoint, su3_casimir_fundamental, su3_structure_constant, Complex,
+    Complex, gell_mann_matrix, gell_mann_trace_product, pauli_matrices, su2_casimir,
+    su2_structure_constant, su3_casimir_adjoint, su3_casimir_fundamental, su3_structure_constant,
 };

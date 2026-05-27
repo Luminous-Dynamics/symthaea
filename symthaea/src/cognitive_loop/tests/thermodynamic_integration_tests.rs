@@ -214,7 +214,7 @@ fn test_landauer_memory_pressure() {
     // Tight energy budget + high prediction error (lots to consolidate)
     let mut input = healthy_input();
     input.energy_per_cycle = 1e-15; // Extremely tight
-    input.prediction_error = 5.0;   // High error = many bits to write
+    input.prediction_error = 5.0; // High error = many bits to write
     let fb = ti.run_cycle(&input);
 
     assert!(
@@ -468,7 +468,10 @@ fn bench_hdc_encoding_latency() {
     let p95 = latencies_us[94];
     let mean: f64 = latencies_us.iter().sum::<u64>() as f64 / 100.0;
 
-    eprintln!("  [bench] HDC encode (µs): mean={mean:.1} p95={p95} max={}", latencies_us[99]);
+    eprintln!(
+        "  [bench] HDC encode (µs): mean={mean:.1} p95={p95} max={}",
+        latencies_us[99]
+    );
 
     // HDC encoding involves 3 bindings of 16,384D vectors — should be <5ms
     assert!(p95 < 5000, "HDC encode p95 {p95}µs exceeds 5ms budget");
@@ -491,22 +494,40 @@ fn bench_feedback_activation_rates() {
         varied.entropy_production_rate = (0.15 + phase * 0.1).clamp(0.01, 0.6);
 
         let fb = ti.run_cycle(&varied);
-        if fb.insight_detected { insights += 1; }
-        if fb.prigogine_violated { prigogine += 1; }
-        if fb.memory_consolidation_suppressed { memory_sup += 1; }
+        if fb.insight_detected {
+            insights += 1;
+        }
+        if fb.prigogine_violated {
+            prigogine += 1;
+        }
+        if fb.memory_consolidation_suppressed {
+            memory_sup += 1;
+        }
     }
 
     eprintln!("  [bench] Activation rates over {n} cycles:");
-    eprintln!("    Insight: {insights}/{n} ({:.1}%)", insights as f64 / n as f64 * 100.0);
-    eprintln!("    Prigogine: {prigogine}/{n} ({:.1}%)", prigogine as f64 / n as f64 * 100.0);
-    eprintln!("    Memory suppressed: {memory_sup}/{n} ({:.1}%)", memory_sup as f64 / n as f64 * 100.0);
+    eprintln!(
+        "    Insight: {insights}/{n} ({:.1}%)",
+        insights as f64 / n as f64 * 100.0
+    );
+    eprintln!(
+        "    Prigogine: {prigogine}/{n} ({:.1}%)",
+        prigogine as f64 / n as f64 * 100.0
+    );
+    eprintln!(
+        "    Memory suppressed: {memory_sup}/{n} ({:.1}%)",
+        memory_sup as f64 / n as f64 * 100.0
+    );
 
     // At least some feedback should be active (not all loops dead)
     let total_active = insights + prigogine + memory_sup;
     // With sinusoidal variation, we expect at least a few activations
     // With sinusoidal variation over 500 cycles, some feedback loops should fire
     eprintln!("    Total activations: {total_active}");
-    assert!(total_active > 0, "at least some feedback loops should activate over {n} cycles");
+    assert!(
+        total_active > 0,
+        "at least some feedback loops should activate over {n} cycles"
+    );
 }
 
 #[test]

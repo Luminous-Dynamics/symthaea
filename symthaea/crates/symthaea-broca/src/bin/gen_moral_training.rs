@@ -14,7 +14,7 @@
 //! Target text is the original moral text/judgment from each dataset (not synthetic).
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --bin gen-moral-training
+//!   cargo run --release -p symthaea-broca --bin r#gen-moral-training
 //!
 //! Outputs:
 //!   data/training/moral-v1-train.jsonl  (80%)

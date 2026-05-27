@@ -79,8 +79,8 @@ pub mod bert_layer_extractor;
 
 #[cfg(feature = "neural-bridge")]
 pub use bert_layer_extractor::{
-    bert_extraction_status, print_bert_status, BertExtractionStatus, BertExtractorConfig,
-    BertLayerExtractor, BertPreset,
+    BertExtractionStatus, BertExtractorConfig, BertLayerExtractor, BertPreset,
+    bert_extraction_status, print_bert_status,
 };
 
 // Phenomenal Content Detector - Detect phenomenal vs functional content
@@ -110,16 +110,16 @@ pub use phenomenal_detector::{
 // Documents optimal model sizes and angular separation mechanisms
 pub mod scaling_findings;
 pub use scaling_findings::{
-    get_all_optimal_configs, get_optimal_model, get_scaling_findings, recommend_model,
     Architecture, DiscriminationQuality, ModelRecommendation, OptimalModelConfig, ScalingFindings,
-    ScalingMetrics,
+    ScalingMetrics, get_all_optimal_configs, get_optimal_model, get_scaling_findings,
+    recommend_model,
 };
 
 // Multi-Model Extractor Framework - Cross-architecture support
 pub mod multi_model_extractor;
 pub use multi_model_extractor::{
-    all_validation_status, print_support_summary, ModelArchitecture, ModelConfig, ModelPreset,
-    PoolingStrategy, ValidationStatus,
+    ModelArchitecture, ModelConfig, ModelPreset, PoolingStrategy, ValidationStatus,
+    all_validation_status, print_support_summary,
 };
 
 // Epistemic Semantic Vectors - HDC with uncertainty metadata
@@ -145,11 +145,6 @@ pub mod modern_embeddings;
 
 #[cfg(feature = "neural-bridge")]
 pub use modern_embeddings::{
-    activation_to_hv16,
-    all_model_info,
-    print_model_summary,
-    // HDC integration
-    project_to_hv16,
     EmbedderStats,
     // Configuration - note: PoolingMethod conflicts with layer_extractor, use modern_embeddings::PoolingMethod
     EmbeddingConfig,
@@ -168,6 +163,11 @@ pub use modern_embeddings::{
     // ModelArchitecture conflicts with multi_model_extractor, use modern_embeddings::ModelArchitecture
     // Main interface
     UnifiedEmbedder,
+    activation_to_hv16,
+    all_model_info,
+    print_model_summary,
+    // HDC integration
+    project_to_hv16,
 };
 
 // Multi-modal integration (conditionally compiled)

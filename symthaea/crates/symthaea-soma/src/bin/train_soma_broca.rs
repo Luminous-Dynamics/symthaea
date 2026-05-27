@@ -16,7 +16,7 @@ use std::process;
 
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::training::{
-    train_with_adam, CurriculumSchedule, TrainingConfig, TrainingDataset,
+    CurriculumSchedule, TrainingConfig, TrainingDataset, train_with_adam,
 };
 use symthaea_broca::{LanguageControllerConfig, ThoughtChannels};
 use symthaea_core::genesis::GenesisSeed;
@@ -63,7 +63,7 @@ fn main() {
     let (mut generator, adam_state) = if let Some(ref resume_path) = opts.resume_path {
         tracing::info!(path = %resume_path, "Resuming from checkpoint");
         match BrocaGenerator::from_checkpoint(resume_path, &genesis) {
-            Ok((gen, adam, _proj, _lm)) => (gen, adam),
+            Ok((r#gen, adam, _proj, _lm)) => (r#gen, adam),
             Err(e) => {
                 eprintln!("Failed to load checkpoint '{}': {e}", resume_path);
                 process::exit(1);

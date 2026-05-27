@@ -508,7 +508,7 @@ mod tests {
         let mut ti = ThermodynamicIntegration::default();
         let mut input = default_input();
         input.analyzer_temperature = 1.5; // High temp → high Carnot
-                                          // Run several cycles to build up Onsager history and stabilize
+        // Run several cycles to build up Onsager history and stabilize
         for _ in 0..5 {
             ti.run_cycle(&input);
         }

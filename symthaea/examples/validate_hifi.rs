@@ -6,7 +6,7 @@
 //! Run: cargo run --features muse,humanoid --example validate_hifi
 
 use symthaea_muse::{
-    compose, AudioData, MelodyMode, MuseConfig, MusicalState, OutputFormat, ReverbConfig,
+    AudioData, MelodyMode, MuseConfig, MusicalState, OutputFormat, ReverbConfig, compose,
 };
 
 fn main() {

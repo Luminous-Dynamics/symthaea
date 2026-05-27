@@ -15,11 +15,11 @@
 //! - GET /api/v1/health — Health check
 
 use axum::{
+    Router,
     extract::{ConnectInfo, State},
-    http::{header, HeaderValue, Method, StatusCode},
+    http::{HeaderValue, Method, StatusCode, header},
     response::Json,
     routing::{get, post},
-    Router,
 };
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -311,14 +311,18 @@ async fn main() {
             "--help" | "-h" => {
                 eprintln!("Symthaea Eval API (locked down)");
                 eprintln!("Usage:");
-                eprintln!("  eval-api [--bind <ip|localhost>] [--port <port>] [--allow-origin <origin> ...]");
+                eprintln!(
+                    "  eval-api [--bind <ip|localhost>] [--port <port>] [--allow-origin <origin> ...]"
+                );
                 eprintln!();
                 eprintln!("Security defaults:");
                 eprintln!("  - Binds to 127.0.0.1 only");
                 eprintln!("  - CORS restricted to explicit localhost origins");
                 eprintln!();
                 eprintln!("Examples:");
-                eprintln!("  eval-api --port 8090 --allow-origin http://localhost:7777 --allow-origin http://127.0.0.1:7777");
+                eprintln!(
+                    "  eval-api --port 8090 --allow-origin http://localhost:7777 --allow-origin http://127.0.0.1:7777"
+                );
                 return;
             }
             _ => {}

@@ -532,11 +532,7 @@ pub fn window_energy_correction(window: &[f64]) -> f64 {
         return 1.0;
     }
     let mean_sq = window.iter().map(|&w| w * w).sum::<f64>() / window.len() as f64;
-    if mean_sq < 1e-15 {
-        1.0
-    } else {
-        1.0 / mean_sq
-    }
+    if mean_sq < 1e-15 { 1.0 } else { 1.0 / mean_sq }
 }
 
 // ─── 2D FFT ──────────────────────────────────────────────────────────────────

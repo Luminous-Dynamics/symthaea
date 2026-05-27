@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use symthaea::language::learned_idioms::LearnedIdiomCache;
 use symthaea::language::nix_codegen::{
-    classify_nix_intent, generate_nix_with_cache, NixIntent, SelfImproveSource,
+    NixIntent, SelfImproveSource, classify_nix_intent, generate_nix_with_cache,
 };
 
 /// Trimmed corpus — the bottleneck is `try_nix_eval` (~100s per call

@@ -274,27 +274,34 @@ impl ConsciousnessLevel {
 // GLOBAL TEST ORACLE (for easy integration)
 // ============================================================================
 
-use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use std::sync::Mutex;
 
 /// Global test oracle instance
-static GLOBAL_ORACLE: Lazy<Mutex<TestOracle>> = Lazy::new(|| {
-    Mutex::new(TestOracle::default())
-});
+static GLOBAL_ORACLE: Lazy<Mutex<TestOracle>> = Lazy::new(|| Mutex::new(TestOracle::default()));
 
 /// Get Φ from global oracle (for simple test usage)
 pub fn mock_phi(num_components: usize) -> f64 {
-    GLOBAL_ORACLE.lock().expect("lock poisoned").phi(num_components)
+    GLOBAL_ORACLE
+        .lock()
+        .expect("lock poisoned")
+        .phi(num_components)
 }
 
 /// Get free energy from global oracle
 pub fn mock_free_energy(num_components: usize) -> f64 {
-    GLOBAL_ORACLE.lock().expect("lock poisoned").free_energy(num_components)
+    GLOBAL_ORACLE
+        .lock()
+        .expect("lock poisoned")
+        .free_energy(num_components)
 }
 
 /// Get consciousness level from global oracle
 pub fn mock_consciousness_level(num_components: usize) -> ConsciousnessLevel {
-    GLOBAL_ORACLE.lock().expect("lock poisoned").consciousness_level(num_components)
+    GLOBAL_ORACLE
+        .lock()
+        .expect("lock poisoned")
+        .consciousness_level(num_components)
 }
 
 /// Reset global oracle to defaults
@@ -378,7 +385,10 @@ mod tests {
         // Very low components → low Φ → unconscious
         oracle.base_phi = 0.1;
         oracle.phi_per_component = 0.01;
-        assert_eq!(oracle.consciousness_level(2), ConsciousnessLevel::Unconscious);
+        assert_eq!(
+            oracle.consciousness_level(2),
+            ConsciousnessLevel::Unconscious
+        );
 
         // High base → high consciousness
         oracle.base_phi = 0.7;
@@ -414,7 +424,11 @@ mod tests {
     #[test]
     fn test_level_descriptions() {
         assert!(ConsciousnessLevel::Full.description().contains("Full"));
-        assert!(ConsciousnessLevel::Unconscious.description().contains("Unconscious"));
+        assert!(
+            ConsciousnessLevel::Unconscious
+                .description()
+                .contains("Unconscious")
+        );
     }
 
     #[test]

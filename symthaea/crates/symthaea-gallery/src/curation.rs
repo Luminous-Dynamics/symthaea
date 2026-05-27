@@ -79,7 +79,7 @@ pub struct CurationStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{create_entry, ArtModality};
+    use crate::{ArtModality, create_entry};
     use symthaea_aesthetic::AestheticScore;
 
     #[test]

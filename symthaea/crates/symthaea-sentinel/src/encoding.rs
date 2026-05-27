@@ -10,7 +10,7 @@
 //! - `EncoderMode`: Selection between standard and premium encoding
 
 use crate::features::{AudioFeatures, CONTROL_RATE, NUM_MFCC};
-use crate::hdc::{RffProjector, SparseProjector, HDC_DIM, HV, RFF_GAMMA};
+use crate::hdc::{HDC_DIM, HV, RFF_GAMMA, RffProjector, SparseProjector};
 use crate::temporal::{HierarchicalCfc, TemporalWindow};
 
 /// Number of TIMBRE features for sparse projection

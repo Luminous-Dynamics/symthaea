@@ -13,8 +13,8 @@ use proptest::prelude::*;
 
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_nix::encoding::{NixCodebook, UserInputEncoder};
-use symthaea_nix::mind::causal_graph::NixCausalGraph;
 use symthaea_nix::mind::HdcWorldModel;
+use symthaea_nix::mind::causal_graph::NixCausalGraph;
 
 // ── Encoding Determinism ─────────────────────────────────────────────────
 

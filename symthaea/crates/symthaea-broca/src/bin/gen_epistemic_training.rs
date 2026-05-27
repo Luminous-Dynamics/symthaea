@@ -16,7 +16,7 @@
 //! using universal semantic primitives.
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --bin gen-epistemic-training
+//!   cargo run --release -p symthaea-broca --bin r#gen-epistemic-training
 //!
 //! Outputs:
 //!   data/train-epistemic-v1.jsonl  (80%)

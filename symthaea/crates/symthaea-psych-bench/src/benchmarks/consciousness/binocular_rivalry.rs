@@ -124,11 +124,7 @@ impl BinocularRivalryBenchmark {
                 .map(|d| (d - mean).powi(2))
                 .sum::<f64>()
                 / (dominance_durations.len() - 1) as f64;
-            if mean > 0.0 {
-                var.sqrt() / mean
-            } else {
-                0.0
-            }
+            if mean > 0.0 { var.sqrt() / mean } else { 0.0 }
         } else {
             0.0
         };

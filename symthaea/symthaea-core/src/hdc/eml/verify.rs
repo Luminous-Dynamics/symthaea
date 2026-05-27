@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use super::{eval_complex, eval_real_mode, EmlEvalMode, EmlExpr};
+use super::{EmlEvalMode, EmlExpr, eval_complex, eval_real_mode};
 use crate::hdc::arithmetic_engine::{SymbolicOp, TermType};
 use crate::hdc::complex::Complex;
 use crate::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
@@ -117,7 +117,7 @@ fn verify_expr_real_under_assumption(
                     checked,
                     f64::INFINITY,
                     format!("{err:?}"),
-                )
+                );
             }
         };
         let err = (expected - got).abs();
@@ -189,7 +189,7 @@ fn verify_term_real_under_assumption(
                     checked,
                     f64::INFINITY,
                     format!("{err:?}"),
-                )
+                );
             }
         };
         let err = (expected - got).abs();
@@ -227,7 +227,7 @@ fn verify_term_complex(
                     checked,
                     f64::INFINITY,
                     "unsupported complex term".into(),
-                )
+                );
             }
         };
         let got = match eval_complex(compiled, &eml_bindings) {
@@ -239,7 +239,7 @@ fn verify_term_complex(
                     checked,
                     f64::INFINITY,
                     format!("{err:?}"),
-                )
+                );
             }
         };
         let err = ((expected.re - got.re).powi(2) + (expected.im - got.im).powi(2)).sqrt();

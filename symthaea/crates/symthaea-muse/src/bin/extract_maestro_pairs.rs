@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 use symthaea_muse::midi_loader::load_midi;
-use symthaea_muse::training_pairs::{build_pairs, save_pairs, PairConfig};
+use symthaea_muse::training_pairs::{PairConfig, build_pairs, save_pairs};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

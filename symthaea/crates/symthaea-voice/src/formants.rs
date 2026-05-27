@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Phoneme → formant frame conversion with consciousness-shaped prosody.
 
-use crate::g2p::Phoneme;
 use crate::VoiceProsody;
+use crate::g2p::Phoneme;
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
 /// Convert phonemes to formant frames with prosody applied.
@@ -43,9 +43,9 @@ pub fn phonemes_to_frames(
         // F0 contour: sentence-level intonation + stress peaks + phrase boundaries
         let stress_boost = phoneme.stress as f32 * 25.0; // bigger stress peaks
         let declination = -progress * 30.0; // steeper pitch fall
-                                            // Phrase-final rise for questions, fall for statements
+        // Phrase-final rise for questions, fall for statements
         let phrase_contour = if progress > 0.85 { -15.0 } else { 0.0 }; // falling end
-                                                                        // Micro-prosody: vowels slightly higher than consonants
+        // Micro-prosody: vowels slightly higher than consonants
         let vowel_boost = if phoneme.is_vowel { 8.0 } else { -5.0 };
         let f0 = (base_f0 + f0_offset + stress_boost + declination + phrase_contour + vowel_boost)
             .max(60.0);

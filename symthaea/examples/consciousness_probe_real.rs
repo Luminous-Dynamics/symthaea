@@ -289,7 +289,7 @@ fn truncate(s: &str, max_len: usize) -> String {
 
 #[cfg(feature = "neural-bridge")]
 fn create_builtin_phenomenal_corpus() -> ConceptCorpus {
-    use symthaea::perception::{neural_bridge_consciousness_probe::CorpusMetadata, Concept};
+    use symthaea::perception::{Concept, neural_bridge_consciousness_probe::CorpusMetadata};
 
     ConceptCorpus {
         metadata: CorpusMetadata {
@@ -364,7 +364,7 @@ fn create_builtin_phenomenal_corpus() -> ConceptCorpus {
 
 #[cfg(feature = "neural-bridge")]
 fn create_builtin_functional_corpus() -> ConceptCorpus {
-    use symthaea::perception::{neural_bridge_consciousness_probe::CorpusMetadata, Concept};
+    use symthaea::perception::{Concept, neural_bridge_consciousness_probe::CorpusMetadata};
 
     ConceptCorpus {
         metadata: CorpusMetadata {

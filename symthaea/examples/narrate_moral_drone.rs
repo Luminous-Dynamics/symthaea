@@ -286,7 +286,7 @@ fn main() {
             inputs.push(path.to_string_lossy().to_string());
             valid_count += 1;
             let idx = valid_count; // 1-indexed (0 is video)
-                                   // Apply fade-in/fade-out (0.1s each) and slight reverb for spatial presence
+            // Apply fade-in/fade-out (0.1s each) and slight reverb for spatial presence
             filter_parts.push(format!(
                 "[{idx}:a]afade=t=in:st=0:d=0.1,afade=t=out:st=99:d=0.1,\
                  aecho=0.8:0.7:40:0.3,\

@@ -202,7 +202,7 @@ fn main() {
 fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
     if options {
         // HDC semantic search over NixOS options
-        use symthaea_nix::encoding::{search_options, NixCodebook};
+        use symthaea_nix::encoding::{NixCodebook, search_options};
 
         let mut codebook = NixCodebook::new();
 
@@ -458,7 +458,7 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
                     }
                     OutputFormat::Minimal => {
                         println!(
-                            "services={} gen={} store={}",
+                            "services={} r#gen={} store={}",
                             snap.services.len(),
                             snap.generation.map_or("?".into(), |g| g.to_string()),
                             snap.store_size_bytes.unwrap_or(0),
@@ -1197,7 +1197,7 @@ fn cmd_watch(timeout: u64, interval: u64, format: OutputFormat) {
         _ => {
             println!("  Watchdog monitoring started.");
             println!(
-                "  Timeout: {}s, interval: {}s, gen: {}",
+                "  Timeout: {}s, interval: {}s, r#gen: {}",
                 timeout, interval, current_gen
             );
             println!("  Watching for system degradation...");
@@ -1288,7 +1288,7 @@ fn cmd_watch(timeout: u64, interval: u64, format: OutputFormat) {
             symthaea_nix::support::watchdog::WatchdogVerdict::Reverted {
                 reason, pre_gen, ..
             } => {
-                eprintln!("  REVERTED to gen {}: {}", pre_gen, reason);
+                eprintln!("  REVERTED to r#gen {}: {}", pre_gen, reason);
             }
             symthaea_nix::support::watchdog::WatchdogVerdict::Error { message } => {
                 eprintln!("  ERROR: {}", message);

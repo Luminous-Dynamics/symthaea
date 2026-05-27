@@ -23,8 +23,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, LiquidProjection,
-    LiquidProjectionConfig, LtcCell, LtcConfig, RidgeAccumulator, HDC_DIM,
+    AudioConfig, AudioFrontend, HDC_DIM, LiquidProjection, LiquidProjectionConfig, LtcCell,
+    LtcConfig, RidgeAccumulator, id_to_audio_path, load_alignments,
 };
 
 #[derive(Parser)]

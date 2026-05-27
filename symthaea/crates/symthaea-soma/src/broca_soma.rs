@@ -63,7 +63,7 @@ impl BrocaSoma {
         let (generator, checkpoint_loaded) =
             if std::path::Path::new(DEFAULT_CHECKPOINT_PATH).exists() {
                 match BrocaGenerator::from_checkpoint(DEFAULT_CHECKPOINT_PATH, &genesis) {
-                    Ok((gen, _adam, _proj, _lm)) => (gen, true),
+                    Ok((r#gen, _adam, _proj, _lm)) => (r#gen, true),
                     Err(_) => {
                         // Checkpoint exists but failed to load — fall back to untrained
                         (BrocaGenerator::new(&genesis, config), false)
@@ -87,8 +87,8 @@ impl BrocaSoma {
     pub fn load_checkpoint(&mut self, path: &str) -> Result<(), String> {
         let genesis = GenesisSeed::from_phrase("symthaea-soma");
         match BrocaGenerator::from_checkpoint(path, &genesis) {
-            Ok((gen, _adam, _proj, _lm)) => {
-                self.generator = gen;
+            Ok((r#gen, _adam, _proj, _lm)) => {
+                self.generator = r#gen;
                 self.checkpoint_loaded = true;
                 Ok(())
             }
@@ -242,7 +242,7 @@ mod tests {
         // Coherence can be negative (anti-correlated), NaN (no tokens), or positive.
         // The key invariant: generation completes without panic.
         let _coherence = result.final_coherence; // may be any f32
-                                                 // Verify we got some output (even if empty due to heavy gating)
+        // Verify we got some output (even if empty due to heavy gating)
         assert!(result.num_tokens <= 128, "Token count should be bounded");
     }
 

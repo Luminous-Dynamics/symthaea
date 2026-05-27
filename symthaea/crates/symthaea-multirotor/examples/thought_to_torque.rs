@@ -87,9 +87,9 @@ fn main() {
     for i in 0..steps {
         let t = i as f32 / steps.max(1) as f32;
         let phi = 0.05 + 0.9 * t; // 0.05 → 0.95 linearly
-                                  // Synthetic thought HV — deterministic seed per step so users can
-                                  // replicate. A real cognitive loop emits this from perception +
-                                  // prediction + attention.
+        // Synthetic thought HV — deterministic seed per step so users can
+        // replicate. A real cognitive loop emits this from perception +
+        // prediction + attention.
         let hv = ContinuousHV::random(16384, 1000 + i as u64);
         let hv_norm = hv.norm();
         let hv_meanabs =

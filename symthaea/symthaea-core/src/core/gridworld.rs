@@ -33,9 +33,7 @@
 
 use std::fmt;
 
-use crate::core::domain_traits::{
-    Action, DomainAdapter, Goal, HdcEncodable, QualitySignal, State,
-};
+use crate::core::domain_traits::{Action, DomainAdapter, Goal, HdcEncodable, QualitySignal, State};
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -58,7 +56,12 @@ pub struct GridState {
 impl GridState {
     /// Create a new grid state.
     pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     /// Check if position is within bounds.
@@ -517,7 +520,11 @@ mod tests {
         );
 
         // Distant states should still be discriminable (significantly < 1.0)
-        assert!(sim_distant < 0.95, "Distant states should be discriminable: {}", sim_distant);
+        assert!(
+            sim_distant < 0.95,
+            "Distant states should be discriminable: {}",
+            sim_distant
+        );
     }
 
     #[test]

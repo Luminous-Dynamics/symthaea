@@ -11,8 +11,8 @@
 //! 6. Perturbation resilience
 
 use symthaea_core::embodiment::{
-    grounding_label, EmbodimentBridge, MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
-    GROUNDING_TEMPORAL,
+    EmbodimentBridge, GROUNDING_SENSORIMOTOR, GROUNDING_TEMPORAL, MoralGateInput, MotorSafetyLevel,
+    grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;

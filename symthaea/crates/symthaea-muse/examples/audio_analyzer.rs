@@ -11,7 +11,9 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
         eprintln!("Usage: audio_analyzer <wav_files...>");
-        eprintln!("Example: cargo run --release -p symthaea-muse --example audio_analyzer -- audio_output/*.wav");
+        eprintln!(
+            "Example: cargo run --release -p symthaea-muse --example audio_analyzer -- audio_output/*.wav"
+        );
         return;
     }
 
@@ -149,11 +151,7 @@ fn analyze_wav(path: &Path) {
     let dyn_range = if !rms_per_sec.is_empty() {
         let max_r = rms_per_sec.iter().fold(0.0f32, |a, &b| a.max(b));
         let min_r = rms_per_sec.iter().fold(f32::MAX, |a, &b| a.min(b));
-        if min_r > 0.0001 {
-            max_r / min_r
-        } else {
-            0.0
-        }
+        if min_r > 0.0001 { max_r / min_r } else { 0.0 }
     } else {
         0.0
     };

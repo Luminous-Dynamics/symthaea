@@ -12,8 +12,8 @@ use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::{BiotaRightOfWaySignal, VehicleConfig};
 
 pub use symthaea_core::embodiment::{
-    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MoralGateInput, MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
 
 /// Multi-stage emergency fallback for vehicles.

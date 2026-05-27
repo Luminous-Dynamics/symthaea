@@ -1503,9 +1503,11 @@ mod tests {
         assert_eq!(steps.last().unwrap().action, GeodesicPlanAction::Complete);
 
         // No loops or branches
-        assert!(!steps
-            .iter()
-            .any(|s| s.action == GeodesicPlanAction::AddLoop));
+        assert!(
+            !steps
+                .iter()
+                .any(|s| s.action == GeodesicPlanAction::AddLoop)
+        );
     }
 
     #[test]

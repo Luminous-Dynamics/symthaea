@@ -1,4 +1,4 @@
-use crate::types::{QuadrupedState, NUM_STATE_CHANNELS};
+use crate::types::{NUM_STATE_CHANNELS, QuadrupedState};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;

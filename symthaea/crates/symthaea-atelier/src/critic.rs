@@ -11,7 +11,7 @@
 //! work is declared complete. The system knows when to stop.
 
 use symthaea_aesthetic::{
-    golden, information, novelty, AestheticConfig, AestheticScore, AestheticTracker,
+    AestheticConfig, AestheticScore, AestheticTracker, golden, information, novelty,
 };
 use symthaea_canvas::CognitiveSnapshot;
 

@@ -42,7 +42,7 @@ struct BenchmarkResult {
     expects_llm: bool,
 }
 
-fn run_case(gen: &CodeGenerator, ctx: &CodeContext, case: &BenchmarkCase) -> BenchmarkResult {
+fn run_case(r#gen: &CodeGenerator, ctx: &CodeContext, case: &BenchmarkCase) -> BenchmarkResult {
     let intent = CodeIntent::Create {
         target: CodeTarget::new(case.name, EntityKind::Function).with_language(case.language),
         spec: {
@@ -54,7 +54,7 @@ fn run_case(gen: &CodeGenerator, ctx: &CodeContext, case: &BenchmarkCase) -> Ben
         },
     };
 
-    let result = gen.generate(&intent, ctx);
+    let result = r#gen.generate(&intent, ctx);
 
     // For LLM-expected cases, we just verify the function signature exists
     // and that todo!() or NotImplementedError is present
@@ -129,11 +129,11 @@ fn run_case(gen: &CodeGenerator, ctx: &CodeContext, case: &BenchmarkCase) -> Ben
 }
 
 fn run_category(
-    gen: &CodeGenerator,
+    r#gen: &CodeGenerator,
     ctx: &CodeContext,
     cases: &[BenchmarkCase],
 ) -> Vec<BenchmarkResult> {
-    cases.iter().map(|c| run_case(gen, ctx, c)).collect()
+    cases.iter().map(|c| run_case(r#gen, ctx, c)).collect()
 }
 
 fn print_results(category: &str, results: &[BenchmarkResult]) {
@@ -856,7 +856,7 @@ fn build_all_cases() -> Vec<BenchmarkCase> {
 
 #[test]
 fn benchmark_code_generation() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_all_cases();
 
@@ -866,7 +866,7 @@ fn benchmark_code_generation() {
     let mut failures: Vec<(&str, String)> = Vec::new();
 
     for case in &cases {
-        let result = run_case(&gen, &ctx, case);
+        let result = run_case(&r#gen, &ctx, case);
         if result.passed {
             if result.expects_llm {
                 llm_needed += 1;
@@ -901,7 +901,7 @@ fn benchmark_code_generation() {
     let native_passed = native_cases
         .iter()
         .filter(|c| {
-            let r = run_case(&gen, &ctx, c);
+            let r = run_case(&r#gen, &ctx, c);
             r.passed
         })
         .count();
@@ -928,10 +928,10 @@ fn benchmark_code_generation() {
 
 #[test]
 fn benchmark_arithmetic() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_arithmetic_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Arithmetic", &results);
 
@@ -946,10 +946,10 @@ fn benchmark_arithmetic() {
 
 #[test]
 fn benchmark_strings() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_string_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Strings", &results);
 
@@ -964,10 +964,10 @@ fn benchmark_strings() {
 
 #[test]
 fn benchmark_collections() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_collection_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Collections", &results);
 
@@ -982,10 +982,10 @@ fn benchmark_collections() {
 
 #[test]
 fn benchmark_composition() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_composition_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Composition", &results);
 
@@ -1000,10 +1000,10 @@ fn benchmark_composition() {
 
 #[test]
 fn benchmark_python() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_python_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Python", &results);
 
@@ -1018,10 +1018,10 @@ fn benchmark_python() {
 
 #[test]
 fn benchmark_complex_llm() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_complex_llm_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Complex/LLM", &results);
 
@@ -1036,10 +1036,10 @@ fn benchmark_complex_llm() {
 
 #[test]
 fn benchmark_advanced_rust() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let cases = build_advanced_rust_cases();
-    let results = run_category(&gen, &ctx, &cases);
+    let results = run_category(&r#gen, &ctx, &cases);
 
     print_results("Advanced Rust", &results);
 
@@ -1097,7 +1097,7 @@ fn build_all_categories() -> Vec<(&'static str, Vec<BenchmarkCase>)> {
 fn benchmark_compile_verification() {
     use std::io::Write;
 
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
     let categories = build_all_categories();
 
@@ -1126,7 +1126,7 @@ fn benchmark_compile_verification() {
                 },
             };
 
-            let result = gen.generate(&intent, &ctx);
+            let result = r#gen.generate(&intent, &ctx);
 
             // Skip cases with todo! (LLM would fill these)
             if result.source.contains("todo!") {
@@ -1162,7 +1162,7 @@ fn benchmark_compile_verification() {
                     let stderr = String::from_utf8_lossy(&o.stderr);
 
                     // Auto-fix retry: diagnose error and attempt repair
-                    if let Some(fixed_source) = gen.try_auto_fix(&source, &stderr) {
+                    if let Some(fixed_source) = r#gen.try_auto_fix(&source, &stderr) {
                         let _ = std::fs::File::create(&file_path)
                             .and_then(|mut f| f.write_all(fixed_source.as_bytes()));
                         let retry = std::process::Command::new("rustc")
@@ -1220,7 +1220,7 @@ fn benchmark_compile_verification() {
 /// and basic structural invariants hold.
 #[test]
 fn benchmark_fuzz_generation_robustness() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     // Pseudo-random purpose strings — mix of valid, edge-case, and adversarial
@@ -1266,7 +1266,7 @@ fn benchmark_fuzz_generation_robustness() {
             target: CodeTarget::new("fuzz_fn", EntityKind::Function),
             spec,
         };
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
 
         generated += 1;
         if !result.source.is_empty() {
@@ -1302,7 +1302,7 @@ fn benchmark_fuzz_generation_robustness() {
 
 #[test]
 fn benchmark_regression_summary() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     let categories: Vec<(&str, Vec<BenchmarkCase>)> = build_all_categories();
@@ -1313,7 +1313,7 @@ fn benchmark_regression_summary() {
     let mut total_cases = 0usize;
 
     for (cat_name, cases) in &categories {
-        let results = run_category(&gen, &ctx, cases);
+        let results = run_category(&r#gen, &ctx, cases);
         let passed = results.iter().filter(|r| r.passed).count();
         let total = results.len();
         let rate_pct = (passed as f32 / total as f32 * 100.0) as u32;

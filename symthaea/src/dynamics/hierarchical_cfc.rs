@@ -626,11 +626,7 @@ fn mse_loss(output: &Array1<f32>, target: &Array1<f32>) -> f32 {
         .map(|(o, t)| (o - t).powi(2))
         .sum::<f32>()
         / n as f32;
-    if mse.is_finite() {
-        mse
-    } else {
-        1.0
-    }
+    if mse.is_finite() { mse } else { 1.0 }
 }
 
 #[cfg(test)]

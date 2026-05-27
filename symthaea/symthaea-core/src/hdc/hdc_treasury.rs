@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn test_balance_encode_decode_roundtrip() {
         let max_balance: u64 = 1_000_000_000; // 1B micro-SAP
-                                              // Test several values across the range
+        // Test several values across the range
         for &balance in &[0, 1000, 50_000, 1_000_000, 500_000_000, 1_000_000_000] {
             let hv = encode_balance(balance, max_balance);
             let decoded = decode_balance(&hv, max_balance);

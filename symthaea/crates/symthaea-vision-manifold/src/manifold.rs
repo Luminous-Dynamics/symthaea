@@ -2095,6 +2095,16 @@ impl VisionManifold {
     }
 
     /// Reset manifold to initial state.
+    /// Set the subcortical generative bridge for neural hallucination.
+    pub fn set_generative_bridge(&mut self, bridge: GenerativeBridge) {
+        self.generative_bridge = Some(bridge);
+    }
+
+    /// Access the subcortical generative bridge.
+    pub fn generative_bridge(&self) -> Option<&GenerativeBridge> {
+        self.generative_bridge.as_ref()
+    }
+
     pub fn reset(&mut self) {
         self.state = ContinuousHV::zero(self.config.hdc_dim);
         self.last_prediction = None;
@@ -3240,8 +3250,8 @@ mod tests {
         let scene_a = ContinuousHV::random(dim, 100);
         let scene_b = ContinuousHV::random(dim, 200);
 
-        mem.remember(&scene_a, 10);
-        mem.remember(&scene_b, 20);
+        mem.remember(&scene_a, 10, vec![]);
+        mem.remember(&scene_b, 20, vec![]);
         assert_eq!(mem.len(), 2);
 
         // Should recognize scene_a
@@ -3259,7 +3269,7 @@ mod tests {
         let dim = 16_384;
 
         let scene_a = ContinuousHV::random(dim, 100);
-        mem.remember(&scene_a, 10);
+        mem.remember(&scene_a, 10, vec![]);
 
         // A completely different scene should not be recognized
         let unknown = ContinuousHV::random(dim, 999);
@@ -3273,8 +3283,8 @@ mod tests {
         let dim = 16_384;
 
         let scene = ContinuousHV::random(dim, 100);
-        mem.remember(&scene, 10);
-        mem.remember(&scene, 20); // Near-duplicate — should be skipped
+        mem.remember(&scene, 10, vec![]);
+        mem.remember(&scene, 20, vec![]); // Near-duplicate — should be skipped
         assert_eq!(mem.len(), 1, "Should not store near-duplicates");
     }
 
@@ -3285,7 +3295,7 @@ mod tests {
 
         for i in 0..5 {
             let scene = ContinuousHV::random(dim, 100 + i);
-            mem.remember(&scene, i);
+            mem.remember(&scene, i, vec![]);
         }
         assert_eq!(mem.len(), 3, "Should cap at capacity");
     }
@@ -3974,8 +3984,8 @@ mod tests {
 
         let scene_a = ContinuousHV::random(dim, 100);
         let scene_b = ContinuousHV::random(dim, 200);
-        mem.remember(&scene_a, 10);
-        mem.remember(&scene_b, 20);
+        mem.remember(&scene_a, 10, vec![]);
+        mem.remember(&scene_b, 20, vec![]);
 
         let landmarks = mem.export_landmarks();
         assert_eq!(landmarks.len(), 2);
@@ -3989,7 +3999,7 @@ mod tests {
         let dim = 16_384;
 
         for i in 0..4u64 {
-            mem.remember(&ContinuousHV::random(dim, 100 + i), i * 10);
+            mem.remember(&ContinuousHV::random(dim, 100 + i), i * 10, vec![]);
         }
         assert_eq!(mem.len(), 4);
 
@@ -4007,8 +4017,8 @@ mod tests {
 
         let scene_a = ContinuousHV::random(dim, 100);
         let scene_b = ContinuousHV::random(dim, 200);
-        mem.remember(&scene_a, 10);
-        mem.remember(&scene_b, 20);
+        mem.remember(&scene_a, 10, vec![]);
+        mem.remember(&scene_b, 20, vec![]);
 
         let saved = mem.save_state();
         assert_eq!(saved.landmarks.len(), 2);
@@ -4428,7 +4438,7 @@ mod tests {
         let mut m = VisionManifold::new(VisionConfig::default(), 32, 32);
         let pixels = vec![128u8; 32 * 32 * 3];
         m.observe_frame(&pixels, 32, 32, 3, 0.033);
-        let tel2 = m.observe_frame(&pixels, 32, 32, 3, 0.033);
+        let _tel2 = m.observe_frame(&pixels, 32, 32, 3, 0.033);
         let tel3 = m.observe_frame(&pixels, 32, 32, 3, 0.033);
         // Static scene → low imagination surprise
         assert!(

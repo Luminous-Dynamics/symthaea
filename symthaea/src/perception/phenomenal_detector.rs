@@ -49,13 +49,13 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "neural-bridge")]
-use crate::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
+use crate::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
 use crate::perception::modern_embeddings::{EmbeddingConfig, ModelBackend, UnifiedEmbedder};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};

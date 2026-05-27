@@ -153,7 +153,7 @@ pub mod replay_window;
 
 // Re-exports
 pub use config::{
-    AeadAlgorithm, BootstrapConfig, CryptoConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES,
+    AeadAlgorithm, BootstrapConfig, CryptoConfig, MYCELIX_BOOTSTRAP_NODES, PeerConfig, SwarmConfig,
 };
 pub use error::{SwarmError, SwarmResult};
 pub use types::{
@@ -192,9 +192,9 @@ pub use federated_cfc::{DifferentialPrivacyConfig, FederatedAggregator, Gradient
 
 // Federated Network Communication - channel and TCP backends
 pub use federated_network::{
-    create_test_network, CoordinatorEvent, CoordinatorStats, FederatedCoordinator,
-    FederatedMessage, FederatedNetworkConfig, FederatedNode, LocalChannelBackend, NetworkBackend,
-    NetworkError, NetworkResult, NodeAddress, TcpBackend,
+    CoordinatorEvent, CoordinatorStats, FederatedCoordinator, FederatedMessage,
+    FederatedNetworkConfig, FederatedNode, LocalChannelBackend, NetworkBackend, NetworkError,
+    NetworkResult, NodeAddress, TcpBackend, create_test_network,
 };
 
 // Capability Card - BLAKE3-hashed self-description for peer discovery
@@ -202,13 +202,13 @@ pub use capability_card::{CapabilityCard, CardStats};
 mod reputation_bridge;
 pub use reputation_bridge::{ReputationBridge, VouchDecision};
 mod topological_handshake;
-pub use topological_handshake::{evaluate_compatibility, HandshakeConfig};
+pub use topological_handshake::{HandshakeConfig, evaluate_compatibility};
 
 // Federated Learning Checkpointing - fault-tolerant distributed training
 pub use checkpoint::{
-    process_node_rejoin, recover_coordinator, BufferedGradient, CheckpointConfig,
-    CheckpointManager, CheckpointedConfig, FederatedCheckpoint, IncrementalCheckpoint,
-    NodeCheckpoint, NodeRejoinRequest, NodeRejoinResponse, NodeState, RecoveryResult,
+    BufferedGradient, CheckpointConfig, CheckpointManager, CheckpointedConfig, FederatedCheckpoint,
+    IncrementalCheckpoint, NodeCheckpoint, NodeRejoinRequest, NodeRejoinResponse, NodeState,
+    RecoveryResult, process_node_rejoin, recover_coordinator,
 };
 
 // ============================================================================

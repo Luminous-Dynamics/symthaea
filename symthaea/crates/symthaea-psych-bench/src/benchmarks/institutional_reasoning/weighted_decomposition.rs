@@ -265,9 +265,11 @@ mod tests {
     fn test_weighted_decomposition_runs() {
         let config = BenchmarkConfig::default();
         let result = WeightedDecompositionBenchmark.run(&config);
-        assert!(result
-            .metrics
-            .contains_key("weighted_decomposition_accuracy"));
+        assert!(
+            result
+                .metrics
+                .contains_key("weighted_decomposition_accuracy")
+        );
         assert!(result.metrics.contains_key("weight_sensitivity"));
         assert!(result.metrics.contains_key("weighted_vs_unweighted_delta"));
     }

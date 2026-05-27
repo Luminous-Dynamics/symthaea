@@ -336,11 +336,7 @@ impl KnowledgeGraph {
                 .values()
                 .map(|&count| {
                     let p = count as f64 / n;
-                    if p > 0.0 {
-                        -p * p.ln()
-                    } else {
-                        0.0
-                    }
+                    if p > 0.0 { -p * p.ln() } else { 0.0 }
                 })
                 .sum();
             entropy / (stats.nodes_by_type.len() as f64).ln()

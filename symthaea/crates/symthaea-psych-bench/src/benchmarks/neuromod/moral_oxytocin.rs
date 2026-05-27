@@ -61,11 +61,7 @@ fn pearson_r(x: &[f32], y: &[f32]) -> f64 {
         vy += dy * dy;
     }
     let denom = (vx * vy).sqrt();
-    if denom < 1e-12 {
-        0.0
-    } else {
-        cov / denom
-    }
+    if denom < 1e-12 { 0.0 } else { cov / denom }
 }
 
 impl MoralOxytocinBenchmark {

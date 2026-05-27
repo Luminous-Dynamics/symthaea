@@ -42,9 +42,9 @@
 //! coarticulation: faster transitions for rapid speech, slower
 //! for careful articulation. The tau is modulated by LTCPacing.
 
+use crate::voice::LTCPacing;
 use crate::voice::formant_targets::FormantDatabase;
 use crate::voice::phoneme_hdc::PhonemeHdcCodec;
-use crate::voice::LTCPacing;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -526,7 +526,7 @@ fn anticipatory_blend(progress: f32) -> f32 {
         0.0
     } else {
         let x = (progress - 0.7) / 0.3; // 0 to 1 in last 30%
-                                        // Smooth sigmoid-like curve
+        // Smooth sigmoid-like curve
         x * x * (3.0 - 2.0 * x) // Smoothstep
     }
 }

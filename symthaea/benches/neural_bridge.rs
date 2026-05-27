@@ -7,7 +7,7 @@
 
 #![cfg(feature = "neural-bridge")]
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::path::Path;
 
 /// Benchmark uncached encoding (full BGE-M3 + probe pipeline).

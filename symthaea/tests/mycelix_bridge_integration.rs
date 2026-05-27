@@ -19,13 +19,13 @@
 #![cfg(all(feature = "mycelix", feature = "external-mycelix-bridge-tests"))]
 
 use mycelix_bridge_common::consciousness_profile::{
-    continuous_vote_weight, decay_reputation, evaluate_governance_with_reputation,
-    VOTE_WEIGHT_MAX_BP, VOTE_WEIGHT_TEMPERATURE,
+    CivicTier, ConsciousnessCredential, ConsciousnessProfile, REPUTATION_DECAY_PER_DAY,
+    ReputationState, evaluate_governance, requirement_for_basic, requirement_for_constitutional,
+    requirement_for_guardian, requirement_for_proposal, requirement_for_voting,
 };
 use mycelix_bridge_common::consciousness_profile::{
-    evaluate_governance, requirement_for_basic, requirement_for_constitutional,
-    requirement_for_guardian, requirement_for_proposal, requirement_for_voting, CivicTier,
-    ConsciousnessCredential, ConsciousnessProfile, ReputationState, REPUTATION_DECAY_PER_DAY,
+    VOTE_WEIGHT_MAX_BP, VOTE_WEIGHT_TEMPERATURE, continuous_vote_weight, decay_reputation,
+    evaluate_governance_with_reputation,
 };
 
 /// Convenience: a timestamp well before any credential expiry.

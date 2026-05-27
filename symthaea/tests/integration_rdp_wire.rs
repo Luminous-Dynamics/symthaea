@@ -65,7 +65,10 @@ fn full_frame_seal_open_reconstructs() {
     let frames = server.drain_frames();
     assert!(!frames.is_empty(), "first tick must produce a frame");
     let first = &frames[0];
-    assert!(matches!(first, RdpFrame::Full(_)), "first frame must be Full");
+    assert!(
+        matches!(first, RdpFrame::Full(_)),
+        "first frame must be Full"
+    );
 
     // Seal and open.
     let sealed = seal_frame(first, &mut sender_session).expect("seal");

@@ -17,7 +17,7 @@
 //! Run with: cargo run --example scaling_study_demo
 
 use symthaea_core::physics::{
-    RagoneComparison, ReadinessComparison, ScaleAwareComparison, ScalingStudy, POWER_LEVELS_W,
+    POWER_LEVELS_W, RagoneComparison, ReadinessComparison, ScaleAwareComparison, ScalingStudy,
 };
 
 fn main() {

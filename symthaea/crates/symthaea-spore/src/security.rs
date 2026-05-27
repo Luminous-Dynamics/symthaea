@@ -77,7 +77,7 @@ pub fn sanitize_input(s: &str, field_name: &str, allow_slashes: bool) -> Result<
                 return Err(format!(
                     "{} contains invalid character '{}'",
                     field_name, ch
-                ))
+                ));
             }
         }
     }

@@ -48,7 +48,9 @@ fn main() {
     if all_pairs.is_empty() {
         println!("No training data found. Download MIDI datasets first:");
         println!("  cd data/midi");
-        println!("  curl -L -o maestro.zip https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip");
+        println!(
+            "  curl -L -o maestro.zip https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
+        );
         println!("  unzip maestro.zip");
         return;
     }

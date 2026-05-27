@@ -353,11 +353,7 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
         norm_b += bi * bi;
     }
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 1e-10 { dot / denom } else { 0.0 }
 }
 
 // ──── LoopDrivable implementations for 6 benchmarks ────

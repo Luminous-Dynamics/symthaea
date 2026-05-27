@@ -405,7 +405,7 @@ mod tests {
     #[test]
     fn test_drain_outbound_json() {
         let mut bridge = HolonBridge::new(HolonSyncMode::FullSync);
-        bridge.request_task("gen", "hello");
+        bridge.request_task("r#gen", "hello");
         let json = bridge.drain_outbound_json();
         assert!(json.contains("TaskRequest"));
         assert_eq!(bridge.outbound_count(), 0);

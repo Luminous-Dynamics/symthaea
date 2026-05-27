@@ -77,12 +77,15 @@ impl SimulationBackend for OpenFoamBridge {
             .arg("-case")
             .arg(".")
             .arg("-parallel");
-        
+
         let _output = cmd.execute()?;
-        
+
         // In a real implementation, we would parse OpenFOAM logs here.
-        Ok(SimulationResult::converged(&request.id, 0.7)
-            .with_metric("drag_coefficient", 0.30, "dimensionless"))
+        Ok(SimulationResult::converged(&request.id, 0.7).with_metric(
+            "drag_coefficient",
+            0.30,
+            "dimensionless",
+        ))
     }
 }
 

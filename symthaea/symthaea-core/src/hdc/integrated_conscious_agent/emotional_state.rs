@@ -23,10 +23,10 @@ pub struct EmotionalState {
 impl EmotionalState {
     pub fn new() -> Self {
         Self {
-            valence: 0.0,      // Neutral
-            arousal: 0.3,      // Slightly calm
-            dominance: 0.5,    // Balanced
-            momentum: 0.1,     // Slow emotional changes
+            valence: 0.0,   // Neutral
+            arousal: 0.3,   // Slightly calm
+            dominance: 0.5, // Balanced
+            momentum: 0.1,  // Slow emotional changes
             history: VecDeque::with_capacity(20),
         }
     }
@@ -72,9 +72,12 @@ impl EmotionalState {
             return 1.0;
         }
 
-        let variance: f64 = self.history.iter()
+        let variance: f64 = self
+            .history
+            .iter()
             .map(|(v, a)| (v - self.valence).powi(2) + (a - self.arousal).powi(2))
-            .sum::<f64>() / self.history.len() as f64;
+            .sum::<f64>()
+            / self.history.len() as f64;
 
         (1.0 - variance.sqrt()).max(0.0)
     }
@@ -96,18 +99,21 @@ impl EmotionalState {
         focus_effect: f32,
     ) {
         // Hormones are slow-moving, so use gentle integration
-        let hormone_weight = 0.3;  // 30% hormone influence per cycle
+        let hormone_weight = 0.3; // 30% hormone influence per cycle
 
         // Blend hormone effects with current emotional state
         self.valence = (self.valence * (1.0 - hormone_weight as f64)
-            + valence_effect as f64 * hormone_weight as f64).clamp(-1.0, 1.0);
+            + valence_effect as f64 * hormone_weight as f64)
+            .clamp(-1.0, 1.0);
 
         self.arousal = (self.arousal * (1.0 - hormone_weight as f64)
-            + (self.arousal + arousal_effect as f64) * hormone_weight as f64).clamp(0.0, 1.0);
+            + (self.arousal + arousal_effect as f64) * hormone_weight as f64)
+            .clamp(0.0, 1.0);
 
         // Focus affects dominance (sense of control)
         self.dominance = (self.dominance * (1.0 - hormone_weight as f64)
-            + focus_effect as f64 * hormone_weight as f64).clamp(0.0, 1.0);
+            + focus_effect as f64 * hormone_weight as f64)
+            .clamp(0.0, 1.0);
     }
 
     /// Get the emotional quadrant based on valence and arousal

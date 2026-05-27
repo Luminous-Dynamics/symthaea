@@ -14,8 +14,8 @@
 
 use std::sync::{Mutex, OnceLock};
 use symthaea::language::{
-    create_backend_from_env, AnthropicBackend, GenerationParams, LLMBackend, OpenAiBackend,
-    SimulatedBackend,
+    AnthropicBackend, GenerationParams, LLMBackend, OpenAiBackend, SimulatedBackend,
+    create_backend_from_env,
 };
 
 fn env_lock() -> &'static Mutex<()> {

@@ -31,7 +31,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
 use symthaea_broca::tokenizer::BpeTokenizer;
-use symthaea_broca::training::{train, TrainingConfig, TrainingDataset, TrainingPair};
+use symthaea_broca::training::{TrainingConfig, TrainingDataset, TrainingPair, train};
 use symthaea_core::genesis::GenesisSeed;
 
 /// Shape of one line from the harvester output. Must stay in lockstep

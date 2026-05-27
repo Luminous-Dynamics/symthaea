@@ -17,11 +17,11 @@ use std::path::{Path, PathBuf};
 use memmap2::MmapMut;
 use symthaea_core::hdc::BinaryHV;
 
+use crate::HdcStoreError;
 use crate::header::{
-    StoreHeader, ENTRY_HV_OFFSET, ENTRY_SIZE, HEADER_SIZE, STATUS_LIVE, STATUS_TOMBSTONE,
+    ENTRY_HV_OFFSET, ENTRY_SIZE, HEADER_SIZE, STATUS_LIVE, STATUS_TOMBSTONE, StoreHeader,
 };
 use crate::lsh_persistent::LshIndex;
-use crate::HdcStoreError;
 
 /// Configuration for creating a new HdcStore.
 #[derive(Debug, Clone)]

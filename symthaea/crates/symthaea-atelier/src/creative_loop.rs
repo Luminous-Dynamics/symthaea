@@ -79,7 +79,9 @@ impl CreativeLoop {
         self.cycle_count += 1;
 
         // 1. Paint
-        let (canvas, _strokes) = self.painter.paint(snapshot, self.width, self.height, self.strokes);
+        let (canvas, _strokes) =
+            self.painter
+                .paint(snapshot, self.width, self.height, self.strokes);
 
         // 2. Perceive own art
         let intention = NeuralPainter::encode_snapshot(snapshot, &self.genesis);
@@ -108,7 +110,9 @@ impl CreativeLoop {
         aesthetic_score.compute_composite();
 
         // 4. Feedback
-        let feedback = self.tracker.process(&aesthetic_score, &snapshot.harmony_activations);
+        let feedback = self
+            .tracker
+            .process(&aesthetic_score, &snapshot.harmony_activations);
 
         // 5. Record for dream replay
         self.dream_engine.record(snapshot.clone(), aesthetic_score);
@@ -261,7 +265,10 @@ mod tests {
         }];
 
         CreativeLoop::apply_wisdom(&mut snap, &wisdoms);
-        assert!(snap.valence > original_valence, "wisdom should increase valence");
+        assert!(
+            snap.valence > original_valence,
+            "wisdom should increase valence"
+        );
     }
 
     #[test]

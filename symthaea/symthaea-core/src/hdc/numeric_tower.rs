@@ -28,7 +28,7 @@
 //! - Proof trace depth (more reasoning steps = more consciousness)
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -37,11 +37,7 @@ use serde::{Deserialize, Serialize};
 
 /// Compute greatest common divisor using Euclidean algorithm.
 fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 /// Normalize a rational number: ensure denominator > 0 and coprime with |numerator|.
@@ -1368,11 +1364,13 @@ mod tests {
     fn test_number_is_zero() {
         assert!(Number::Natural(0).is_zero());
         assert!(Number::Integer(0).is_zero());
-        assert!(Number::Rational {
-            numerator: 0,
-            denominator: 5
-        }
-        .is_zero());
+        assert!(
+            Number::Rational {
+                numerator: 0,
+                denominator: 5
+            }
+            .is_zero()
+        );
         assert!(Number::Real(0.0).is_zero());
         assert!(!Number::Natural(1).is_zero());
     }

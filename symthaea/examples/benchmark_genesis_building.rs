@@ -9,7 +9,7 @@
 fn main() {
     println!("=== Genesis Mission Challenge 19: Building Systems ===\n");
 
-    use symthaea_fabrication_kernel::building::{BuildingReading, BuildingTwin, BUILDING_HORIZONS};
+    use symthaea_fabrication_kernel::building::{BUILDING_HORIZONS, BuildingReading, BuildingTwin};
 
     let healthy = BuildingReading {
         thermal_load: 0.4,

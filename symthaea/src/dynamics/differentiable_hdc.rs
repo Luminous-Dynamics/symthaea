@@ -381,11 +381,7 @@ impl HDCEncoder {
                     .chunks_exact(4)
                     .map(|chunk| {
                         let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                        if bits & 1 == 0 {
-                            1.0
-                        } else {
-                            -1.0
-                        }
+                        if bits & 1 == 0 { 1.0 } else { -1.0 }
                     })
                     .collect();
 

@@ -12,8 +12,8 @@
 //! - backward_span: 5.1 (longest sequence recalled backward)
 //! - forward_accuracy_at_7: 0.82
 
-use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::sequence::{SequenceAdapter, SequenceItem};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

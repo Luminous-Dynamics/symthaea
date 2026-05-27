@@ -8,12 +8,12 @@
 //! Run: `cargo run --example mujoco_vs_simple_benchmark --features multirotor-mujoco --release`
 
 use symthaea::multirotor::{
+    FlightConfig,
     benchmarks::{
-        run_wind_benchmark, run_wind_benchmark_mujoco, run_wind_benchmark_mujoco_noisy,
-        WindBenchmarkConfig, WindGust,
+        WindBenchmarkConfig, WindGust, run_wind_benchmark, run_wind_benchmark_mujoco,
+        run_wind_benchmark_mujoco_noisy,
     },
     sensory_filter::SensoryFilterConfig,
-    FlightConfig,
 };
 
 fn main() {

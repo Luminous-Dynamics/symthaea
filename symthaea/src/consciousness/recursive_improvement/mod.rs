@@ -62,7 +62,7 @@ pub mod world_prediction;
 
 // Re-export key types from core infrastructure
 pub use types::{
-    calculate_trend, instant_now, ActionContext, InputModality, SemanticInput, TimeWindow,
+    ActionContext, InputModality, SemanticInput, TimeWindow, calculate_trend, instant_now,
 };
 
 pub use core::{
@@ -138,8 +138,8 @@ pub use runtime::{
 
 // Dream Feedback exports (Counterfactual Learning)
 pub use dream_feedback::{
-    hash_context, ActionPrior, ConfidenceAdjustment, DreamFeedbackBridge, DreamFeedbackStats,
-    DreamInsight,
+    ActionPrior, ConfidenceAdjustment, DreamFeedbackBridge, DreamFeedbackStats, DreamInsight,
+    hash_context,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

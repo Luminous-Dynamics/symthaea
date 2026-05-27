@@ -18,8 +18,8 @@
 use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::adapter::reward::{RewardAdapter, RewardOutcome};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::reward::{RewardAdapter, RewardOutcome};
 
 /// A CogBench decision agent backed by `ContinuousMind`.
 ///

@@ -24,7 +24,7 @@
 //! ```
 
 use clap::{Parser, ValueEnum};
-use console::{style, Emoji};
+use console::{Emoji, style};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::fs::File;

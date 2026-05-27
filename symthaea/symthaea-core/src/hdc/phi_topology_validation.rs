@@ -555,7 +555,7 @@ impl MinimalPhiValidation {
             _ => {
                 return Err(PhiValidationError::UnknownTopologyType(
                     topology_type.to_string(),
-                ))
+                ));
             }
         };
 
@@ -625,7 +625,7 @@ impl MinimalPhiValidation {
             _ => {
                 return Err(PhiValidationError::UnknownTopologyType(
                     topology_type.to_string(),
-                ))
+                ));
             }
         };
 

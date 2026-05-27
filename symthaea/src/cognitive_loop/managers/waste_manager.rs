@@ -361,11 +361,7 @@ impl WasteManager {
     /// Sanitize a float input — replace NaN/Inf with 0.0.
     #[inline]
     fn sanitize_f32(v: f32) -> f32 {
-        if v.is_finite() {
-            v
-        } else {
-            0.0
-        }
+        if v.is_finite() { v } else { 0.0 }
     }
 }
 

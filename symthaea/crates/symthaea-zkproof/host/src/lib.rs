@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use anyhow::Result;
-use risc0_zkvm::{default_prover, ExecutorEnv, ProveInfo};
+use risc0_zkvm::{ExecutorEnv, ProveInfo, default_prover};
 use symthaea_zkproof_core::{
     BalanceProofInput, BalanceProofOutput, EvolutionInput, EvolutionOutput,
 };

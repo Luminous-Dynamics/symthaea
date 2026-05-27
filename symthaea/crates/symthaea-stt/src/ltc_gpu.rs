@@ -74,7 +74,7 @@ impl GpuLtcTrainer {
 
         // Copy LTC weights to tensors
         let w_in_data: Vec<f32> = ltc.state().iter().copied().collect(); // placeholder
-                                                                         // We need actual weight access — use the accessor methods
+        // We need actual weight access — use the accessor methods
         let w_in = Tensor::zeros((h, input_size), DType::F32, &device)?;
         let w_rec = Tensor::zeros((h, h), DType::F32, &device)?;
         let bias = Tensor::zeros(h, DType::F32, &device)?;
@@ -166,11 +166,11 @@ impl GpuLtcTrainer {
 
                 // Softmax + cross-entropy
                 let max_logits = logits_scaled.max(0)?;
-            let diff_logits = logits_scaled.broadcast_sub(&max_logits)?;
-            let exp_logits = diff_logits.exp()?;
-            let sum_exp = exp_logits.sum(0)?;
-            let log_sum_exp = sum_exp.log()?;
-            let log_probs = diff_logits.broadcast_sub(&log_sum_exp)?;
+                let diff_logits = logits_scaled.broadcast_sub(&max_logits)?;
+                let exp_logits = diff_logits.exp()?;
+                let sum_exp = exp_logits.sum(0)?;
+                let log_sum_exp = sum_exp.log()?;
+                let log_probs = diff_logits.broadcast_sub(&log_sum_exp)?;
 
                 // Find label index
                 let label_idx = self

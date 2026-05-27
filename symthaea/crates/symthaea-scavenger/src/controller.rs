@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::types::{ScavengerCommand, ScavengerConfig, NUM_ACTUATORS};
+use crate::types::{NUM_ACTUATORS, ScavengerCommand, ScavengerConfig};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 

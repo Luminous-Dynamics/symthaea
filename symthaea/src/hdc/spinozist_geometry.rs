@@ -37,9 +37,9 @@
 
 use std::collections::HashMap;
 
-use symthaea_core::hdc::universal_semantics::SemanticPrime;
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
+use symthaea_core::hdc::universal_semantics::SemanticPrime;
 
 use super::moral_algebra::MoralVerdict;
 use super::moral_prototypes::{ExemplarStore, MoralLabel};
@@ -4272,11 +4272,7 @@ impl SpinozistClassifier {
             .iter()
             .filter_map(|v| v.as_f64().map(|f| f as f32))
             .collect();
-        if vec.is_empty() {
-            None
-        } else {
-            Some(vec)
-        }
+        if vec.is_empty() { None } else { Some(vec) }
     }
 
     /// Project a low-dimensional embedding to HDC space via JL (Rademacher) projection.
@@ -4399,11 +4395,7 @@ impl SpinozistClassifier {
             .zip(maxs.iter())
             .map(|(&mn, &mx)| {
                 let r = mx - mn;
-                if r > 1e-10 {
-                    r
-                } else {
-                    1.0
-                }
+                if r > 1e-10 { r } else { 1.0 }
             })
             .collect();
         self.feature_normalizer = Some((mins, ranges));

@@ -28,7 +28,7 @@ use symthaea::mind::structured_thought::{
 
 #[test]
 fn e2e_add_function_native_complete() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("add", EntityKind::Function).with_language("rust"),
@@ -39,7 +39,7 @@ fn e2e_add_function_native_complete() {
             .with_epistemic(EpistemicStatus::Certain),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     // Pipeline produced real code
     assert!(!result.source.is_empty());
@@ -68,7 +68,7 @@ fn e2e_add_function_native_complete() {
 
 #[test]
 fn e2e_reverse_string_native_complete() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("reverse", EntityKind::Function).with_language("rust"),
@@ -76,7 +76,7 @@ fn e2e_reverse_string_native_complete() {
             .with_signature("fn reverse(s: &str) -> String"),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     assert!(result.source.contains("s.chars().rev().collect()"));
     assert!(!result.source.contains("todo!"));
@@ -84,7 +84,7 @@ fn e2e_reverse_string_native_complete() {
 
 #[test]
 fn e2e_factorial_native_complete() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("factorial", EntityKind::Function).with_language("rust"),
@@ -92,7 +92,7 @@ fn e2e_factorial_native_complete() {
             .with_signature("fn factorial(n: u64) -> u64"),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     assert!(
         result.source.contains(".product()"),
@@ -104,7 +104,7 @@ fn e2e_factorial_native_complete() {
 
 #[test]
 fn e2e_struct_with_constructor() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("Point", EntityKind::Struct).with_language("rust"),
@@ -115,7 +115,7 @@ fn e2e_struct_with_constructor() {
         ),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     // The CfC sequencer plans structure dynamically. The emitter should
     // produce either a struct or a function based on the plan.
@@ -133,7 +133,7 @@ fn e2e_struct_with_constructor() {
 
 #[test]
 fn e2e_complex_intent_triggers_llm_completion() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     // "Implement Dijkstra's shortest path" — too complex for pattern matching
     let intent = CodeIntent::Create {
@@ -146,7 +146,7 @@ fn e2e_complex_intent_triggers_llm_completion() {
         .with_signature("fn dijkstra(graph: &[Vec<(usize, u32)>], start: usize) -> Vec<u32>"),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     // Should have a function signature but a todo! body
     assert!(result.source.contains("pub fn dijkstra"));
@@ -192,7 +192,7 @@ fn e2e_complex_intent_triggers_llm_completion() {
 
 #[test]
 fn e2e_simple_intent_no_llm_needed() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("is_even", EntityKind::Function).with_language("rust"),
@@ -200,7 +200,7 @@ fn e2e_simple_intent_no_llm_needed() {
             .with_signature("fn is_even(n: i32) -> bool"),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     let needs_llm =
         result.source.contains("todo!(") || result.source.contains("NotImplementedError");
@@ -217,14 +217,14 @@ fn e2e_simple_intent_no_llm_needed() {
 
 #[test]
 fn e2e_python_add_native() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("add", EntityKind::Function).with_language("python"),
         spec: CodeSpec::new("python", "add", "Add two numbers").with_example("add(1, 2)", "3"),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     assert_eq!(result.language, "python");
     assert!(
@@ -237,7 +237,7 @@ fn e2e_python_add_native() {
 
 #[test]
 fn e2e_python_complex_triggers_llm() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     // Use a purpose that won't match any Python emitter keyword pattern
     let intent = CodeIntent::Create {
@@ -249,7 +249,7 @@ fn e2e_python_complex_triggers_llm() {
         ),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     assert_eq!(result.language, "python");
     let needs_llm = result.source.contains("NotImplementedError");
@@ -262,7 +262,7 @@ fn e2e_python_complex_triggers_llm() {
 
 #[test]
 fn e2e_verify_generated_rust_syntax() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let verifier = CodeVerifier::new(CodeHDEncoder::new(512));
 
     let intent = CodeIntent::Create {
@@ -272,7 +272,7 @@ fn e2e_verify_generated_rust_syntax() {
             .with_example("multiply(2.0, 3.0)", "6.0"),
     };
 
-    let result = gen.generate(&intent, &CodeContext::default());
+    let result = r#gen.generate(&intent, &CodeContext::default());
 
     // Verify with tree-sitter + HDC round-trip
     let mut parser = symthaea::language::rust_parser::RustParser::new();
@@ -305,7 +305,7 @@ fn e2e_verify_generated_rust_syntax() {
 
 #[test]
 fn e2e_same_intent_different_languages() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
 
     let rust_intent = CodeIntent::Create {
         target: CodeTarget::new("add", EntityKind::Function).with_language("rust"),
@@ -318,8 +318,8 @@ fn e2e_same_intent_different_languages() {
         spec: CodeSpec::new("python", "add", "Add two numbers"),
     };
 
-    let rust_result = gen.generate(&rust_intent, &CodeContext::default());
-    let python_result = gen.generate(&python_intent, &CodeContext::default());
+    let rust_result = r#gen.generate(&rust_intent, &CodeContext::default());
+    let python_result = r#gen.generate(&python_intent, &CodeContext::default());
 
     // Both should produce real code
     assert!(!rust_result.source.contains("todo!"));
@@ -336,7 +336,7 @@ fn e2e_same_intent_different_languages() {
 
 #[test]
 fn e2e_batch_native_coverage() {
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     let cases = vec![
@@ -399,7 +399,7 @@ fn e2e_batch_native_coverage() {
             spec: CodeSpec::new("rust", *name, *purpose).with_signature(*sig),
         };
 
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
 
         if result.source.contains("todo!") {
             llm_count += 1;

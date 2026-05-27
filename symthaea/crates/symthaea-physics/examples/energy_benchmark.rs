@@ -15,12 +15,12 @@ use std::mem;
 use std::time::Instant;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_physics::cmod_adapter::{
-    compute_statistics, generate_synthetic_data, to_cmod_plasma_sample, CModHdcEncoder,
-    DisruptionLabel, SensorNormalizer, SyntheticConfig,
+    CModHdcEncoder, DisruptionLabel, SensorNormalizer, SyntheticConfig, compute_statistics,
+    generate_synthetic_data, to_cmod_plasma_sample,
 };
 use symthaea_physics::fusion_twin::{
-    FusionDigitalTwin, PlasmaFepAgent, PlasmaMultiScalePredictor, PLASMA_HORIZONS,
-    PLASMA_HORIZON_LABELS,
+    FusionDigitalTwin, PLASMA_HORIZON_LABELS, PLASMA_HORIZONS, PlasmaFepAgent,
+    PlasmaMultiScalePredictor,
 };
 
 const WARMUP_ITERATIONS: usize = 100;

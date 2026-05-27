@@ -78,7 +78,7 @@ impl AttentionalBlinkBenchmark {
         let attention_capacity: f64 = (1.0 + wm_bonus - lapse_capacity_penalty).clamp(0.7, 1.3);
         let t1_cost: f64 = 0.75 + config.lapse_rate * 0.30; // lapse increases T1 consolidation cost
         let recovery_rate: f64 = 0.12; // Per-lag recovery
-                                       // Encoding noise degrades target discrimination
+        // Encoding noise degrades target discrimination
         let enc_noise = config.effective_noise() as f32;
 
         // Time pressure: base 0.30 matches ~50% T2|T1 accuracy at lag-2 (Raymond et al., 1992 AB);
@@ -165,7 +165,7 @@ impl AttentionalBlinkBenchmark {
                         // then recovery emerges from state-space dynamics over lags
                         ssm.reset();
                         ssm.step(-1.0); // T1 depletion
-                                        // Step through intervening lags (lag-1 steps of 0-input recovery)
+                        // Step through intervening lags (lag-1 steps of 0-input recovery)
                         let mut ssm_out = 0.0_f32;
                         for _ in 0..(lag - 1) {
                             ssm_out = ssm.step(0.0);

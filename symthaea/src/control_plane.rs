@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::fs::{create_dir_all, OpenOptions};
+use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -136,8 +136,8 @@ impl AuditLog {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_bearer_token, service_known_not_implemented_request_types, AuditLog,
-        SERVICE_PROTOCOL_VERSION,
+        AuditLog, SERVICE_PROTOCOL_VERSION, parse_bearer_token,
+        service_known_not_implemented_request_types,
     };
 
     #[test]

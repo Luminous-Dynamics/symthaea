@@ -125,7 +125,7 @@ pub use assessment::{
 };
 pub use curriculum::{Curriculum, CurriculumBuilder, CurriculumType};
 #[cfg(feature = "web_research_module")]
-pub use curriculum_extender::{CurriculumExtender, ResearchSummary, CURRICULUM_ARCHITECT_PROMPT};
+pub use curriculum_extender::{CURRICULUM_ARCHITECT_PROMPT, CurriculumExtender, ResearchSummary};
 pub use curriculum_loader::{
     CurriculumLoader, CurriculumMeta, CurriculumSpec, CurriculumStore, LoadError, ObjectiveSpec,
 };

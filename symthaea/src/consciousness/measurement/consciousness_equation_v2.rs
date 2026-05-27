@@ -321,7 +321,7 @@ impl Default for PhaseCoherenceTracker {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Maximum amplifier boost (caps the amplifier factor).
-/// Evolved via evolutionary architecture search (pop=20, gen=50):
+/// Evolved via evolutionary architecture search (pop=20, r#gen=50):
 /// 2.27 ceiling outperformed 1.0 by +6.36% composite fitness.
 pub const DEFAULT_AMPLIFIER_CAP: f64 = 1.27;
 

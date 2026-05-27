@@ -389,11 +389,7 @@ fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
         var_y += dy * dy;
     }
     let denom = (var_x * var_y).sqrt();
-    if denom < 1e-15 {
-        0.0
-    } else {
-        cov / denom
-    }
+    if denom < 1e-15 { 0.0 } else { cov / denom }
 }
 
 fn spearman_rank_correlation(x: &[f64], y: &[f64]) -> f64 {

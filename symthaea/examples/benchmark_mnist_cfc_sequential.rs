@@ -899,7 +899,7 @@ fn main() {
     let best_idx = results
         .iter()
         .enumerate()
-        .max_by(|a, b| a.1 .1.partial_cmp(&b.1 .1).unwrap())
+        .max_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap())
         .map(|(i, _)| i)
         .unwrap_or(0);
     if best_idx > 0 {

@@ -11,7 +11,6 @@
 
 use std::time::Duration;
 use symthaea::swarm::{
-    create_test_network,
     CoordinatorEvent,
     DifferentialPrivacyConfig,
     // Federated CfC
@@ -24,6 +23,7 @@ use symthaea::swarm::{
     GradientMessage,
     LocalChannelBackend,
     NodeAddress,
+    create_test_network,
 };
 
 // ============================================================================

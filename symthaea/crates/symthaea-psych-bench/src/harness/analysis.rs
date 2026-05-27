@@ -7,7 +7,7 @@
 //! multiple seed runs. Supports construct validity checks (same-domain
 //! correlations should exceed 0.3).
 
-use super::report::{domain_of, key_metric_for_benchmark, BenchmarkReport};
+use super::report::{BenchmarkReport, domain_of, key_metric_for_benchmark};
 use std::collections::BTreeMap;
 
 /// Cross-benchmark analysis from multi-seed runs.
@@ -741,11 +741,7 @@ pub fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
     }
 
     let denom = (var_x * var_y).sqrt();
-    if denom < 1e-15 {
-        0.0
-    } else {
-        cov / denom
-    }
+    if denom < 1e-15 { 0.0 } else { cov / denom }
 }
 
 /// Simple xorshift64 PRNG for bootstrap resampling.
@@ -903,11 +899,7 @@ pub fn normal_cdf(z: f64) -> f64 {
     let poly = t
         * (0.319381530
             + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-    if z >= 0.0 {
-        1.0 - p * poly
-    } else {
-        p * poly
-    }
+    if z >= 0.0 { 1.0 - p * poly } else { p * poly }
 }
 
 /// Inverse standard normal CDF (rational approximation).
@@ -1210,11 +1202,7 @@ pub fn meta_analysis(effects: &[(f64, f64)]) -> Option<MetaAnalysisResult> {
         .iter()
         .map(|(_, se)| {
             let denom = se * se + tau_sq;
-            if denom > 0.0 {
-                1.0 / denom
-            } else {
-                0.0
-            }
+            if denom > 0.0 { 1.0 / denom } else { 0.0 }
         })
         .collect();
 
@@ -1378,11 +1366,7 @@ fn probit_approx(p: f64) -> f64 {
     let d2 = 0.189269;
     let d3 = 0.001308;
     let z = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
-    if p < 0.5 {
-        -z
-    } else {
-        z
-    }
+    if p < 0.5 { -z } else { z }
 }
 
 /// Compute individual differences summary for a set of participant scores.

@@ -19,8 +19,8 @@
 //!
 //! The server returns JSON `{ "cid": "Qm…", "entry_hash": "…" }` on success.
 
-use std::sync::mpsc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 
 use crate::cognitive_loop::managers::muse_manager::CompositionExport;

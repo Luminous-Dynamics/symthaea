@@ -20,7 +20,7 @@ use symthaea::language::code_parser::EntityKind;
 fn main() {
     println!("=== Symthaea Code Generation Smoke Test ===\n");
 
-    let gen = CodeGenerator::with_default_dim();
+    let r#gen = CodeGenerator::with_default_dim();
     let ctx = CodeContext::default();
 
     // ── Section 1: Native Emitter Tests ──────────────────────────────
@@ -82,7 +82,7 @@ fn main() {
             spec: CodeSpec::new("rust", *name, *purpose).with_signature(*sig),
         };
 
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
         let has_todo = result.source.contains("todo!");
         let has_fragment = result.source.contains(expected_fragment);
 
@@ -133,7 +133,7 @@ fn main() {
             target: CodeTarget::new(*name, EntityKind::Function).with_language("rust"),
             spec: CodeSpec::new("rust", *name, *purpose).with_signature(*sig),
         };
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
         let ok = result.source.contains(expected) && !result.source.contains("todo!");
         println!(
             "  [{}] {} — {}",
@@ -169,7 +169,7 @@ fn main() {
             target: CodeTarget::new(*name, EntityKind::Function).with_language("rust"),
             spec: CodeSpec::new("rust", *name, *purpose).with_signature(*sig),
         };
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
         let needs_llm = result.source.contains("todo!");
         println!(
             "  [{}] {} — {}",
@@ -198,7 +198,7 @@ fn main() {
             target: CodeTarget::new(*name, EntityKind::Function).with_language("python"),
             spec: CodeSpec::new("python", *name, *purpose),
         };
-        let result = gen.generate(&intent, &ctx);
+        let result = r#gen.generate(&intent, &ctx);
         let ok = result.source.contains(expected);
         println!(
             "  [{}] {} (Python) — {}",

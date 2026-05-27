@@ -235,8 +235,10 @@ fn test_causal_mind_phi_increases() {
         "Initial Phi: {:.4}, Final Phi: {:.4}",
         initial_phi, final_phi
     );
-    assert!(final_phi >= initial_phi,
-        "Phi should not decrease after learning causal structure: {initial_phi:.4} -> {final_phi:.4}");
+    assert!(
+        final_phi >= initial_phi,
+        "Phi should not decrease after learning causal structure: {initial_phi:.4} -> {final_phi:.4}"
+    );
 }
 
 // ============================================================================

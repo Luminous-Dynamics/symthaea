@@ -7,7 +7,7 @@
 //! rhythmic regularity, harmonic alignment, voice balance, and form coherence.
 //! Weights shift with neuromodulator state (moral-aesthetic binding).
 
-use crate::{form, Composition, MusicalState, Note};
+use crate::{Composition, MusicalState, Note, form};
 
 /// Music critic verdict.
 #[derive(Debug, Clone)]

@@ -78,7 +78,7 @@ use std::time::SystemTime;
 use crate::consciousness::eight_harmonies::{AlignmentResult, EightHarmonies};
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea_core::hdc::{
-    ConsciousnessTopology as HdcConsciousnessTopology, ContinuousHV, TopologyType, HDC_DIMENSION,
+    ConsciousnessTopology as HdcConsciousnessTopology, ContinuousHV, HDC_DIMENSION, TopologyType,
 };
 
 /// Timestamp type alias

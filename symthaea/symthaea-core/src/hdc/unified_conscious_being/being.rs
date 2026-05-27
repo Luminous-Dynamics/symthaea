@@ -27,7 +27,7 @@ use super::dialogue::{
     ConsciousDialogueGenerator, ConsciousResponse, DialogueContext, DialogueStyle,
 };
 use super::do_calculus::{CounterfactualResult, InterventionResult, StructuralCausalModel};
-use crate::physics::simulation_bridge::{state_to_binary_hv, PhysicsSimulator, SimulationAnalysis};
+use crate::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis, state_to_binary_hv};
 use std::collections::{HashMap, VecDeque};
 
 /// Complete consciousness integration stats

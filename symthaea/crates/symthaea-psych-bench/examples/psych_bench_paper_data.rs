@@ -872,17 +872,9 @@ fn main() {
                     let choice = if r < p0 { 0 } else { 1 };
 
                     let reward = if !in_reversal {
-                        if choice == 0 {
-                            1.0
-                        } else {
-                            0.0
-                        }
+                        if choice == 0 { 1.0 } else { 0.0 }
                     } else {
-                        if choice == 1 {
-                            1.0
-                        } else {
-                            0.0
-                        }
+                        if choice == 1 { 1.0 } else { 0.0 }
                     };
 
                     let rpe = reward - q[choice];

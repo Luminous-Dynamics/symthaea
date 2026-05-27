@@ -119,25 +119,25 @@
 
 // Core HDC types from symthaea-core
 pub use symthaea_core::hdc::{
+    // Causal types
+    CausalDirection,
+    // HDC context for arena-based operations
+    HdcContext,
+    // Real-valued hypervectors
+    // RealHV alias available via real_hv module
+    // LTC neuron count constants
+    LTC_NEURONS,
+    NativeSimilarityIndex,
+    // Native similarity with PackedBipolar
+    PackedBipolar,
+    // Tiered Phi calculation
+    TieredPhi,
     // Binary hypervectors
     binary_hv::BinaryHV,
     // Primitive system
     primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier},
     // Unified hypervector types
     unified_hv::{ContinuousHV, HDC_DIMENSION, HV},
-    // Causal types
-    CausalDirection,
-    // HDC context for arena-based operations
-    HdcContext,
-    NativeSimilarityIndex,
-    // Native similarity with PackedBipolar
-    PackedBipolar,
-    // Tiered Phi calculation
-    TieredPhi,
-    // Real-valued hypervectors
-    // RealHV alias available via real_hv module
-    // LTC neuron count constants
-    LTC_NEURONS,
 };
 
 // Re-export native_similarity module for tests
@@ -154,8 +154,8 @@ pub use symthaea_core::phi_engine::{PhiCalculator, PhiEngine, PhiMethod, PhiResu
 
 // Observability types from symthaea-core
 pub use symthaea_core::observability::{
-    metrics_collector, no_op_observer, DataPoint, MetricsCollector, MetricsSnapshot, NoOpObserver,
-    Observer, PhiComponents, PhiMeasurementEvent, SharedObserver,
+    DataPoint, MetricsCollector, MetricsSnapshot, NoOpObserver, Observer, PhiComponents,
+    PhiMeasurementEvent, SharedObserver, metrics_collector, no_op_observer,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

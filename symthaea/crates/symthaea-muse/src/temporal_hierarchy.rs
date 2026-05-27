@@ -10,9 +10,9 @@
 //! Higher levels set priors for lower levels. Lower levels report prediction
 //! errors upward. This creates hierarchical predictive coding for music.
 
+use crate::MusicalState;
 use crate::audio_feedback::AudioFeatures;
 use crate::musical_inference::{MusicAction, MusicInferenceResult, MusicalInferenceEngine};
-use crate::MusicalState;
 
 /// Timescale at which inference operates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -223,11 +223,7 @@ impl FrameHeader {
     /// PTS in microseconds, or `None` if the [`NO_PTS`] sentinel was sent.
     pub fn pts_micros(&self) -> Option<u64> {
         let masked = self.raw_pts_with_flags & PTS_MASK;
-        if masked == NO_PTS {
-            None
-        } else {
-            Some(masked)
-        }
+        if masked == NO_PTS { None } else { Some(masked) }
     }
 }
 

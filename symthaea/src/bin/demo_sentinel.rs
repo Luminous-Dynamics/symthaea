@@ -30,8 +30,8 @@
 
 use anyhow::Result;
 use std::io::{self, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use symthaea::perception::video::{
@@ -489,7 +489,9 @@ impl SentinelDemo {
                 }
                 None => continue,
                 _ => {
-                    println!("Unknown command. Use A-F to learn, D to detect, S for summary, R to reset, Q to quit.");
+                    println!(
+                        "Unknown command. Use A-F to learn, D to detect, S for summary, R to reset, Q to quit."
+                    );
                 }
             }
         }

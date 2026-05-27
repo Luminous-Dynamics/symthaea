@@ -167,8 +167,8 @@ fn bragg_slater_radius(z: u8) -> f64 {
 /// Returns (x, y, z, weight) for points on the unit sphere.
 fn lebedev_6() -> Vec<(f64, f64, f64, f64)> {
     let w = 1.0 / 6.0; // 4π/6 normalized to sum=4π... actually sum of weights = 4π
-                       // For integration: Σ w_i f(r_i) ≈ ∫ f dΩ / (4π), so w_i should sum to 1
-                       // We normalize so Σ w = 1 (weights are for ∫ f(Ω) dΩ/(4π))
+    // For integration: Σ w_i f(r_i) ≈ ∫ f dΩ / (4π), so w_i should sum to 1
+    // We normalize so Σ w = 1 (weights are for ∫ f(Ω) dΩ/(4π))
     vec![
         (1.0, 0.0, 0.0, w),
         (-1.0, 0.0, 0.0, w),

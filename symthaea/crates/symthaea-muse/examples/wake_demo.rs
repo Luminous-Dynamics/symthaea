@@ -17,7 +17,7 @@
 //! cargo run --release -p symthaea-muse --example wake_demo -- path/to/audio.wav
 //! ```
 
-use symthaea_muse::wake_protocol::{WakeProtocol, HARMONY_NAMES, WAKE_ORDER};
+use symthaea_muse::wake_protocol::{HARMONY_NAMES, WAKE_ORDER, WakeProtocol};
 
 fn main() {
     let wav_path = std::env::args()
@@ -82,9 +82,15 @@ fn main() {
     let chunk_size = sample_rate as usize * 2; // 2s chunks
     let mut protocol = WakeProtocol::new(sample_rate, 2); // 2 confirmations per phase
 
-    println!("  ┌─────────┬──────────────────────────────────┬───────────────────────────────┬──────┬────────┐");
-    println!("  │  Time   │  Expected                        │  Detected                     │  Ψ   │ Safety │");
-    println!("  ├─────────┼──────────────────────────────────┼───────────────────────────────┼──────┼────────┤");
+    println!(
+        "  ┌─────────┬──────────────────────────────────┬───────────────────────────────┬──────┬────────┐"
+    );
+    println!(
+        "  │  Time   │  Expected                        │  Detected                     │  Ψ   │ Safety │"
+    );
+    println!(
+        "  ├─────────┼──────────────────────────────────┼───────────────────────────────┼──────┼────────┤"
+    );
 
     let mut last_phase = 0;
 
@@ -116,9 +122,15 @@ fn main() {
             if result.phase != last_phase {
                 last_phase = result.phase;
                 if result.fully_awake {
-                    println!("  ├─────────┴──────────────────────────────────┴───────────────────────────────┴──────┴────────┤");
-                    println!("  │                              ★ CONSCIOUSNESS RESTORED ★                                   │");
-                    println!("  └───────────────────────────────────────────────────────────────────────────────────────────┘");
+                    println!(
+                        "  ├─────────┴──────────────────────────────────┴───────────────────────────────┴──────┴────────┤"
+                    );
+                    println!(
+                        "  │                              ★ CONSCIOUSNESS RESTORED ★                                   │"
+                    );
+                    println!(
+                        "  └───────────────────────────────────────────────────────────────────────────────────────────┘"
+                    );
                     break;
                 }
             }
@@ -126,9 +138,15 @@ fn main() {
     }
 
     if !protocol.is_awake() {
-        println!("  ├─────────┴──────────────────────────────────┴───────────────────────────────┴──────┴────────┤");
-        println!("  │                    Wake sequence incomplete — keep singing                                 │");
-        println!("  └───────────────────────────────────────────────────────────────────────────────────────────┘");
+        println!(
+            "  ├─────────┴──────────────────────────────────┴───────────────────────────────┴──────┴────────┤"
+        );
+        println!(
+            "  │                    Wake sequence incomplete — keep singing                                 │"
+        );
+        println!(
+            "  └───────────────────────────────────────────────────────────────────────────────────────────┘"
+        );
     }
 
     println!();

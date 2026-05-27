@@ -764,7 +764,7 @@ mod tests {
     fn test_soft_quantize_interpolation() {
         let q = AdaptiveQuantizer::uniform(4);
         let (lo, hi, alpha) = q.soft_quantize(0.26); // Just above boundary 0.25
-                                                     // Should be near the boundary between bins 0 and 1
+        // Should be near the boundary between bins 0 and 1
         assert!(lo <= 1 && hi <= 1);
         assert!((0.0..=1.0).contains(&alpha));
     }

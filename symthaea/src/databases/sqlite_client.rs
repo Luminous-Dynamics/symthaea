@@ -79,7 +79,7 @@ use crate::infrastructure::lock_guard::ResilientMutex;
 #[cfg(feature = "school_learning")]
 use crate::school::Curriculum;
 use async_trait::async_trait;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use symthaea_core::hdc::binary_hv::BinaryHV;

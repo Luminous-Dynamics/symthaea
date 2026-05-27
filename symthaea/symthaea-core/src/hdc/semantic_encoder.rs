@@ -34,8 +34,8 @@
 //! let hv = encoder.encode("I helped an old lady cross the street");
 //! ```
 
-use super::unified_hv::ContinuousHV;
 use super::HDC_DIMENSION;
+use super::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -1087,15 +1087,16 @@ pub fn create_encoder(encoder_type: EncoderType) -> Box<dyn SemanticEncoder> {
         EncoderType::WordEmbedding => Box::new(WordEmbeddingEncoder::new(300)),
         EncoderType::MoralSemantic => Box::new(MoralSemanticEncoder::new(42)),
         #[cfg(feature = "embeddings")]
-        EncoderType::OnnxSemantic => {
-            match onnx::OnnxSemanticEncoder::new() {
-                Ok(encoder) => Box::new(encoder),
-                Err(e) => {
-                    eprintln!("Warning: Failed to create ONNX encoder ({}), falling back to MoralSemantic", e);
-                    Box::new(MoralSemanticEncoder::new(42))
-                }
+        EncoderType::OnnxSemantic => match onnx::OnnxSemanticEncoder::new() {
+            Ok(encoder) => Box::new(encoder),
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to create ONNX encoder ({}), falling back to MoralSemantic",
+                    e
+                );
+                Box::new(MoralSemanticEncoder::new(42))
             }
-        }
+        },
     }
 }
 

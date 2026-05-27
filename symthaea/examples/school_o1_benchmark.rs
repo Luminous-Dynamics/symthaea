@@ -23,8 +23,8 @@
 //! ```
 
 use std::time::{Duration, Instant};
-use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::school::{Difficulty, Domain, LearningObjective, School, SchoolConfig};
 
 // ═══════════════════════════════════════════════════════════════════════════════

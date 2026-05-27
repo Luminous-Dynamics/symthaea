@@ -303,9 +303,11 @@ mod tests {
         // Should have dependency edges from root
         assert!(edges.iter().any(|e| e.from == "root" && e.to == "nixpkgs"));
         // Should have follows edge
-        assert!(edges
-            .iter()
-            .any(|e| e.from == "home-manager" && e.relation == "follows"));
+        assert!(
+            edges
+                .iter()
+                .any(|e| e.from == "home-manager" && e.relation == "follows")
+        );
     }
 
     #[test]

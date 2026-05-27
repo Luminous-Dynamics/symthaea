@@ -162,8 +162,8 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
 use super::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
+use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -291,9 +291,7 @@ impl ComplexQualia {
         let encoding = if primitives.is_empty() {
             BinaryHV::random(0)
         } else {
-            let encodings: Vec<BinaryHV> = primitives.iter()
-                .map(|p| p.encoding.clone())
-                .collect();
+            let encodings: Vec<BinaryHV> = primitives.iter().map(|p| p.encoding.clone()).collect();
             BinaryHV::bundle(&encodings)
         };
 
@@ -326,16 +324,17 @@ impl ComplexQualia {
         if self.components.is_empty() {
             0.0
         } else {
-            self.components.iter().map(|c| c.valence).sum::<f64>()
-                / self.components.len() as f64
+            self.components.iter().map(|c| c.valence).sum::<f64>() / self.components.len() as f64
         }
     }
 
     /// Phenomenal magnitude
     pub fn phenomenal_magnitude(&self) -> f64 {
-        self.components.iter()
+        self.components
+            .iter()
             .map(|c| c.phenomenal_magnitude())
-            .sum::<f64>() * self.integration
+            .sum::<f64>()
+            * self.integration
     }
 }
 
@@ -468,7 +467,11 @@ impl QualiaEncoder {
     }
 
     /// Create complex qualia from primitives
-    pub fn compose_qualia(&mut self, name: impl Into<String>, component_names: Vec<String>) -> Option<ComplexQualia> {
+    pub fn compose_qualia(
+        &mut self,
+        name: impl Into<String>,
+        component_names: Vec<String>,
+    ) -> Option<ComplexQualia> {
         let name = name.into();
         let mut components = Vec::new();
 
@@ -515,9 +518,7 @@ impl QualiaEncoder {
         }
 
         // Total phenomenal magnitude
-        let total_magnitude = active.iter()
-            .map(|q| q.phenomenal_magnitude())
-            .sum();
+        let total_magnitude = active.iter().map(|q| q.phenomenal_magnitude()).sum();
 
         // Average valence
         let avg_valence = if !active.is_empty() {
@@ -534,9 +535,7 @@ impl QualiaEncoder {
         };
 
         // Richness (diversity of modalities)
-        let modalities: std::collections::HashSet<_> = active.iter()
-            .map(|q| q.modality)
-            .collect();
+        let modalities: std::collections::HashSet<_> = active.iter().map(|q| q.modality).collect();
         let richness = modalities.len() as f64 / 8.0; // 8 possible modalities
 
         // Binding strength (integration across qualia)
@@ -559,7 +558,8 @@ impl QualiaEncoder {
         for q in &active {
             *modality_counts.entry(q.modality).or_insert(0) += 1;
         }
-        let dominant_modality = modality_counts.iter()
+        let dominant_modality = modality_counts
+            .iter()
             .max_by_key(|(_, count)| *count)
             .map(|(modality, _)| *modality);
 
@@ -571,7 +571,8 @@ impl QualiaEncoder {
             0.0
         };
 
-        let is_zombie = phi > self.config.zombie_phi_threshold && total_magnitude < self.config.intensity_threshold;
+        let is_zombie = phi > self.config.zombie_phi_threshold
+            && total_magnitude < self.config.intensity_threshold;
 
         // Explanation
         let explanation = self.generate_explanation(
@@ -688,7 +689,8 @@ mod tests {
     #[test]
     fn test_qualia_similarity() {
         let red = PrimitiveQualia::new("red", QualiaModality::Visual, 1000, 0.5, 0.6, 0.8, 0.9);
-        let orange = PrimitiveQualia::new("orange", QualiaModality::Visual, 1001, 0.6, 0.7, 0.7, 0.8);
+        let orange =
+            PrimitiveQualia::new("orange", QualiaModality::Visual, 1001, 0.6, 0.7, 0.7, 0.8);
         let blue = PrimitiveQualia::new("blue", QualiaModality::Visual, 5000, 0.2, 0.3, 0.7, 0.8);
 
         // Red should be more similar to orange than blue (close seeds)
@@ -745,8 +747,10 @@ mod tests {
 
     #[test]
     fn test_valence_classification() {
-        let pleasant = PrimitiveQualia::new("joy", QualiaModality::Affective, 1000, 0.8, 0.7, 0.9, 0.9);
-        let unpleasant = PrimitiveQualia::new("pain", QualiaModality::Bodily, 2000, -0.8, 0.9, 0.9, 0.9);
+        let pleasant =
+            PrimitiveQualia::new("joy", QualiaModality::Affective, 1000, 0.8, 0.7, 0.9, 0.9);
+        let unpleasant =
+            PrimitiveQualia::new("pain", QualiaModality::Bodily, 2000, -0.8, 0.9, 0.9, 0.9);
 
         assert!(pleasant.is_pleasant());
         assert!(!pleasant.is_unpleasant());

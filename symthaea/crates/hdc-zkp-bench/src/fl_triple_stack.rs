@@ -23,12 +23,11 @@
 
 use std::time::Instant;
 
-use binius_core::word::Word;
 use binius_core::verify::verify_constraints;
+use binius_core::word::Word;
 use binius_frontend::CircuitBuilder;
 use binius_prover::{
-    OptimalPackedB128, Prover,
-    hash::parallel_compression::ParallelCompressionAdaptor,
+    OptimalPackedB128, Prover, hash::parallel_compression::ParallelCompressionAdaptor,
 };
 use binius_transcript::{ProverTranscript, VerifierTranscript};
 use binius_verifier::{
@@ -65,7 +64,11 @@ pub fn bench_fl_triple_stack(participants: usize, dim_words: usize) -> FlTripleS
 
     // Private: encrypted gradient from each participant
     let ciphertexts: Vec<Vec<_>> = (0..participants)
-        .map(|_| (0..dim_words).map(|_| builder.add_witness()).collect::<Vec<_>>())
+        .map(|_| {
+            (0..dim_words)
+                .map(|_| builder.add_witness())
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     // Public: the encrypted aggregate (majority vote of ciphertexts)
@@ -116,7 +119,10 @@ pub fn bench_fl_triple_stack(participants: usize, dim_words: usize) -> FlTripleS
     let circuit = builder.build();
     let stat = binius_frontend::CircuitStat::collect(&circuit);
 
-    println!("  AND constraints: {} (majority vote reduction)", stat.n_and_constraints);
+    println!(
+        "  AND constraints: {} (majority vote reduction)",
+        stat.n_and_constraints
+    );
     println!("  XOR operations: all FREE (OTP encryption + vote counting)");
     println!("  Privacy: plaintext gradients NEVER revealed");
 
@@ -126,11 +132,13 @@ pub fn bench_fl_triple_stack(participants: usize, dim_words: usize) -> FlTripleS
     // Each participant: plaintext gradient → OTP encrypt → ciphertext
     let mut ct_vals: Vec<Vec<u64>> = Vec::new();
     for p in 0..participants {
-        let vals: Vec<u64> = (0..dim_words).map(|_| {
-            let plaintext: u64 = rand::random();
-            let mask: u64 = rand::random();
-            plaintext ^ mask // OTP encryption (XOR)
-        }).collect();
+        let vals: Vec<u64> = (0..dim_words)
+            .map(|_| {
+                let plaintext: u64 = rand::random();
+                let mask: u64 = rand::random();
+                plaintext ^ mask // OTP encryption (XOR)
+            })
+            .collect();
         for w in 0..dim_words {
             witness[ciphertexts[p][w]] = Word(vals[w]);
         }
@@ -165,7 +173,9 @@ pub fn bench_fl_triple_stack(participants: usize, dim_words: usize) -> FlTripleS
         witness[aggregate[w]] = Word(agg);
     }
 
-    circuit.populate_wire_witness(&mut witness).expect("witness failed");
+    circuit
+        .populate_wire_witness(&mut witness)
+        .expect("witness failed");
 
     let cs = circuit.constraint_system();
     let witness_vec = witness.into_value_vec();
@@ -189,21 +199,36 @@ pub fn bench_fl_triple_stack(participants: usize, dim_words: usize) -> FlTripleS
     let prove_time = prove_start.elapsed();
 
     let proof_size = proof.len();
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
     println!("  Prover time: {:.1} ms", prove_time.as_secs_f64() * 1000.0);
 
     let verify_start = Instant::now();
     let mut vt = VerifierTranscript::new(challenger, proof);
-    verifier.verify(&public_words, &mut vt).expect("verify failed");
+    verifier
+        .verify(&public_words, &mut vt)
+        .expect("verify failed");
     vt.finalize().expect("finalize failed");
     let verify_time = verify_start.elapsed();
 
-    println!("  Verifier time: {:.3} ms", verify_time.as_secs_f64() * 1000.0);
+    println!(
+        "  Verifier time: {:.3} ms",
+        verify_time.as_secs_f64() * 1000.0
+    );
     println!("  Verification: PASSED (real cryptographic proof)");
 
     println!("\n  TRIPLE STACK FL VERIFIED:");
-    println!("  ✓ {} participants' gradients encrypted (OTP = XOR, FREE)", participants);
-    println!("  ✓ Aggregate proven correct ({} AND constraints)", stat.n_and_constraints);
+    println!(
+        "  ✓ {} participants' gradients encrypted (OTP = XOR, FREE)",
+        participants
+    );
+    println!(
+        "  ✓ Aggregate proven correct ({} AND constraints)",
+        stat.n_and_constraints
+    );
     println!("  ✓ Individual gradients never revealed");
     println!("  ✓ No participant can forge or tamper with aggregate");
 

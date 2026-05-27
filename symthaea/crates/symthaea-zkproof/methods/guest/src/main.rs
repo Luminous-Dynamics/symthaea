@@ -1,5 +1,4 @@
 #![no_main]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -37,7 +36,13 @@ fn run_consciousness_attestation() {
             continue;
         }
         let mean = episode.iter().sum::<f32>() / episode.len() as f32;
-        let variance = episode.iter().map(|x| { let d = x - mean; d * d }).sum::<f32>();
+        let variance = episode
+            .iter()
+            .map(|x| {
+                let d = x - mean;
+                d * d
+            })
+            .sum::<f32>();
         let phi = variance * input.tau_scale;
         total_phi += phi;
     }

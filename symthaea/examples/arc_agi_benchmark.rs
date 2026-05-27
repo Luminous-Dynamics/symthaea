@@ -53,7 +53,7 @@ fn main() {
 
 fn run_synthetic_benchmark() {
     use symthaea_psych_bench::benchmarks::reasoning::arc_strict::ArcStrictBenchmark;
-    use symthaea_psych_bench::harness::{config::BenchmarkConfig, PsychBenchmark};
+    use symthaea_psych_bench::harness::{PsychBenchmark, config::BenchmarkConfig};
 
     println!("━━━ Synthetic ARC Tasks (Strict Scoring) ━━━\n");
 

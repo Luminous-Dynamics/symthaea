@@ -11,7 +11,7 @@
 
 use std::collections::HashMap;
 use symthaea_logparse::cluster::{hdbscan_cluster, nearest_centroid, purity};
-use symthaea_logparse::encoder::{bundle, encode, Hdv};
+use symthaea_logparse::encoder::{Hdv, bundle, encode};
 use symthaea_logparse::fixtures::generate_synthetic_corpus;
 
 /// Nearest-centroid baseline on synthetic fixtures.

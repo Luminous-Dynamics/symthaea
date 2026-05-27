@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::computational_geometry::{GeometryEngine, Point2D, Polygon};
-use symthaea_core::hdc::constraint_solver::{CSPSolver, CSP};
+use symthaea_core::hdc::constraint_solver::{CSP, CSPSolver};
 use symthaea_core::hdc::differential_equations::DifferentialEquationsEngine;
 use symthaea_core::hdc::fft::FftEngine;
 use symthaea_core::hdc::graph_theory::Graph;
@@ -575,7 +575,15 @@ impl MathService {
 
         let answer = format!(
             "n={}, mean={:.4}, var={:.4}, std={:.4}, median={:.4}, Q1={:.4}, Q3={:.4}, skew={:.4}, kurt={:.4}",
-            data.len(), m, v, s, med, q1, q3, sk, ku
+            data.len(),
+            m,
+            v,
+            s,
+            med,
+            q1,
+            q3,
+            sk,
+            ku
         );
 
         let phi = MATH_STATISTICS_PHI_BASELINE;

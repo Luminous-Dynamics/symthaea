@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-use super::unified_hv::ContinuousHV;
 use super::HdcDimensionality;
+use super::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// The atomic primitive unit of Symthaea.

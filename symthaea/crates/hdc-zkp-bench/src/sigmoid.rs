@@ -15,12 +15,11 @@
 
 use std::time::Instant;
 
-use binius_core::word::Word;
 use binius_core::verify::verify_constraints;
+use binius_core::word::Word;
 use binius_frontend::CircuitBuilder;
 use binius_prover::{
-    OptimalPackedB128, Prover,
-    hash::parallel_compression::ParallelCompressionAdaptor,
+    OptimalPackedB128, Prover, hash::parallel_compression::ParallelCompressionAdaptor,
 };
 use binius_transcript::{ProverTranscript, VerifierTranscript};
 use binius_verifier::{
@@ -49,7 +48,10 @@ pub struct SigmoidBenchResult {
 /// This adds ~2 AND per neuron per step for the sigmoid approximation,
 /// compared to 1 AND per step without sigmoid.
 pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchResult {
-    println!("\n=== BINIUS: CfC with Sigmoid ({} neurons × {} steps) ===\n", neurons, timesteps);
+    println!(
+        "\n=== BINIUS: CfC with Sigmoid ({} neurons × {} steps) ===\n",
+        neurons, timesteps
+    );
 
     let builder = CircuitBuilder::new();
 
@@ -103,10 +105,15 @@ pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchR
     let circuit = builder.build();
 
     let stat = binius_frontend::CircuitStat::collect(&circuit);
-    println!("  AND constraints: {} (sigmoid + CfC update)", stat.n_and_constraints);
+    println!(
+        "  AND constraints: {} (sigmoid + CfC update)",
+        stat.n_and_constraints
+    );
     println!("  MUL constraints: {}", stat.n_mul_constraints);
-    println!("  Expected: ~{} AND (2 per neuron per step: sigmoid + update)",
-        2 * neurons * timesteps);
+    println!(
+        "  Expected: ~{} AND (2 per neuron per step: sigmoid + update)",
+        2 * neurons * timesteps
+    );
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
     // Fill witness
@@ -141,7 +148,9 @@ pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchR
         witness[final_h_wires[n]] = Word(h_state[n]);
     }
 
-    circuit.populate_wire_witness(&mut witness).expect("witness failed");
+    circuit
+        .populate_wire_witness(&mut witness)
+        .expect("witness failed");
 
     let cs = circuit.constraint_system();
     let witness_vec = witness.into_value_vec();
@@ -165,16 +174,25 @@ pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchR
     let prove_time = prove_start.elapsed();
 
     let proof_size = proof.len();
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
     println!("  Prover time: {:.1} ms", prove_time.as_secs_f64() * 1000.0);
 
     let verify_start = Instant::now();
     let mut vt = VerifierTranscript::new(challenger, proof);
-    verifier.verify(&public_words, &mut vt).expect("verify failed");
+    verifier
+        .verify(&public_words, &mut vt)
+        .expect("verify failed");
     vt.finalize().expect("finalize failed");
     let verify_time = verify_start.elapsed();
 
-    println!("  Verifier time: {:.3} ms", verify_time.as_secs_f64() * 1000.0);
+    println!(
+        "  Verifier time: {:.3} ms",
+        verify_time.as_secs_f64() * 1000.0
+    );
     println!("  Verification: PASSED (real cryptographic proof)");
 
     println!("\n  vs CfC WITHOUT sigmoid: 1 AND per neuron per step");

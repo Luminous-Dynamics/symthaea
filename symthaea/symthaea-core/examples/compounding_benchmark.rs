@@ -16,8 +16,8 @@
 //! Level 2 — Run on harder physics targets
 //!           Compare 3 conditions:
 //!             - Cold (no macros)
-//!             - Primed with M₁ (first-gen only)
-//!             - Primed with M₂ (first + second gen)
+//!             - Primed with M₁ (first-r#gen only)
+//!             - Primed with M₂ (first + second r#gen)
 //!           Compounding = primed_M₂ > primed_M₁ on level 2
 //! ```
 //!
@@ -38,15 +38,15 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use symthaea_core::hdc::abstract_thought::macro_quality::{
-    evaluate_common_metrics, maybe_enforce, nonsemantic_constants, print_report,
-    MacroQualityReport, MacroQualityThresholds,
+    MacroQualityReport, MacroQualityThresholds, evaluate_common_metrics, maybe_enforce,
+    nonsemantic_constants, print_report,
 };
 use symthaea_core::hdc::conjecture_engine::{
-    observe_balmer_series, observe_fibonacci_ratios, observe_hydrogen_energy_levels,
-    observe_inverse_square_law, observe_kepler_third_law, observe_partitions,
-    observe_quantum_harmonic_oscillator, observe_relativistic_kinetic_energy,
-    observe_stefan_boltzmann, ConjectureEngine, ConjectureStatus, Expr, MathDomain,
-    ObservedSequence, RegressorConfig, SeedSpecializationStats, SymbolicRegressor,
+    ConjectureEngine, ConjectureStatus, Expr, MathDomain, ObservedSequence, RegressorConfig,
+    SeedSpecializationStats, SymbolicRegressor, observe_balmer_series, observe_fibonacci_ratios,
+    observe_hydrogen_energy_levels, observe_inverse_square_law, observe_kepler_third_law,
+    observe_partitions, observe_quantum_harmonic_oscillator, observe_relativistic_kinetic_energy,
+    observe_stefan_boltzmann,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -410,7 +410,9 @@ fn main() {
         dk_total, dk_sqrt, dk_best_mse
     );
     if dk_sqrt == 0 {
-        println!("    ⚠ REGRESSION: no sqrt-family conjectures — hierarchical fitness or template may have drifted");
+        println!(
+            "    ⚠ REGRESSION: no sqrt-family conjectures — hierarchical fitness or template may have drifted"
+        );
     } else {
         println!("    ✓ distance-kernel primitive reachable");
     }

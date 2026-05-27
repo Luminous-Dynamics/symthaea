@@ -17,12 +17,14 @@ use super::super::*;
 fn voice_coherence_bridge_default_state() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Bridge should start with zero smoothed coherence
-    assert!(service
-        .language_comm
-        .voice_coherence
-        .bridge
-        .smoothed_coherence()
-        .is_finite());
+    assert!(
+        service
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence()
+            .is_finite()
+    );
     // Voice feedback should start with default quality
     let summary = service.language_comm.voice_coherence.voice.summary();
     assert!(summary.articulation_quality.is_finite());
@@ -41,12 +43,14 @@ fn voice_coherence_bridge_reset_restores_clean_state() {
     // Reset
     service.reset();
     // State should be clean
-    assert!(service
-        .language_comm
-        .voice_coherence
-        .bridge
-        .smoothed_coherence()
-        .is_finite());
+    assert!(
+        service
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence()
+            .is_finite()
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -111,11 +115,13 @@ fn social_manager_phi_dyad_disabled_by_default() {
 fn gwt_manager_default_flags() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Memory flag should be false initially
-    assert!(!service
-        .consciousness
-        .gwt_mgr
-        .memory_flag
-        .load(std::sync::atomic::Ordering::Relaxed));
+    assert!(
+        !service
+            .consciousness
+            .gwt_mgr
+            .memory_flag
+            .load(std::sync::atomic::Ordering::Relaxed)
+    );
     // Perception count should be 0
     assert_eq!(
         service
@@ -174,12 +180,14 @@ fn full_service_reset_restores_all_managers() {
     // All managers should be at clean state
     assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
     assert!((service.behavior.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
-    assert!(service
-        .language_comm
-        .voice_coherence
-        .bridge
-        .smoothed_coherence()
-        .is_finite());
+    assert!(
+        service
+            .language_comm
+            .voice_coherence
+            .bridge
+            .smoothed_coherence()
+            .is_finite()
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

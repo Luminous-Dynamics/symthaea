@@ -48,10 +48,10 @@ pub use encoder::{VocalTractHdcEncoder, VoiceCognitiveState, VoiceCognitiveState
 pub use fep::{
     FepTelemetry, VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation,
 };
-pub use metrics::{compute_hnr, compute_spectral_tilt, PerceptualMetrics, VocalTractMetrics};
+pub use metrics::{PerceptualMetrics, VocalTractMetrics, compute_hnr, compute_spectral_tilt};
 pub use pipeline::{
-    detect_syllable_boundaries, is_consonant_phoneme, is_vowel_phoneme, predict_duration,
-    Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
+    Intonation, PitchAccent, ProsodyContext, VocalTractPipeline, detect_syllable_boundaries,
+    is_consonant_phoneme, is_vowel_phoneme, predict_duration,
 };
 pub use types::{FormantFrame, FormantTarget};
 

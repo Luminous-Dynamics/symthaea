@@ -44,7 +44,7 @@
 
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
-use crate::dimensional_inference::{infer_dimensions, UnitMap};
+use crate::dimensional_inference::{UnitMap, infer_dimensions};
 use crate::query::{PhysicsSearchEngine, SearchWeights};
 use crate::symmetry_inference::infer_symmetry;
 #[allow(unused_imports)] // DimensionalSignature is used in rustdoc links

@@ -50,8 +50,8 @@ use serde::{Deserialize, Serialize};
 
 use symthaea::hdc::tiered_phi::{ApproximationTier, TieredPhi};
 use symthaea::physics::cmod_adapter::{
-    compute_statistics, generate_synthetic_data, load_csv, to_cmod_plasma_sample, CModHdcEncoder,
-    CModSample, CModShot, DisruptionLabel, SensorNormalizer, SyntheticConfig,
+    CModHdcEncoder, CModSample, CModShot, DisruptionLabel, SensorNormalizer, SyntheticConfig,
+    compute_statistics, generate_synthetic_data, load_csv, to_cmod_plasma_sample,
 };
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
@@ -675,7 +675,9 @@ fn print_statistical_comparison(comparison: &StatisticalComparison) {
     if comparison.phi_earlier_than_threshold || comparison.phi_earlier_than_rate {
         println!("HYPOTHESIS SUPPORTED: Phi-based method provides earlier warnings!");
     } else {
-        println!("HYPOTHESIS NOT SUPPORTED: Phi-based method did not provide significantly earlier warnings.");
+        println!(
+            "HYPOTHESIS NOT SUPPORTED: Phi-based method did not provide significantly earlier warnings."
+        );
         println!("(This may be due to insufficient data or suboptimal Phi thresholds)");
     }
     println!();

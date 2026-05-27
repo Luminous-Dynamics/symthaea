@@ -1,7 +1,6 @@
 use symthaea_core::hdc::conjecture_engine::{
-    analyze_growth, discover_cross_sequence_relations, observe_gr_correction,
-    verify_formula_derivative, BinOp, Expr, GrowthClass, MathDomain, ObservedSequence,
-    RelationType,
+    BinOp, Expr, GrowthClass, MathDomain, ObservedSequence, RelationType, analyze_growth,
+    discover_cross_sequence_relations, observe_gr_correction, verify_formula_derivative,
 };
 
 #[test]

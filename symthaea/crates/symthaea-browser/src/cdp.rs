@@ -11,10 +11,10 @@
 //! Use `BrowserAgentConfig` to specify the connection URL.
 
 use anyhow::{Context, Result};
+use chromiumoxide::Page;
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::accessibility::GetFullAxTreeParams;
 use chromiumoxide::handler::viewport::Viewport;
-use chromiumoxide::Page;
 use futures::StreamExt;
 use tokio::sync::Mutex;
 use tracing::debug;

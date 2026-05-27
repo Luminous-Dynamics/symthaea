@@ -18,14 +18,14 @@
 mod live_impl {
     use anyhow::Result;
     use std::io::{self, Write};
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::{Duration, Instant};
 
     use symthaea_sentinel::{
-        compute_mfcc, compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
-        compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory, AudioConfig,
-        AudioFeatures, AudioPump, AudioSentinel, FREQ_BINS, MEL_BANDS, NUM_MFCC,
+        AudioCategory, AudioConfig, AudioFeatures, AudioPump, AudioSentinel, FREQ_BINS, MEL_BANDS,
+        NUM_MFCC, compute_mfcc, compute_onset_strength, compute_spectral_centroid,
+        compute_spectral_flatness, compute_temporal_regularity, spectrum_to_mel_bands,
     };
 
     pub fn run() -> Result<()> {

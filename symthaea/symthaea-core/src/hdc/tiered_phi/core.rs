@@ -1313,7 +1313,9 @@ impl TieredPhi {
         if n > 12 {
             eprintln!(
                 "[WARNING] Exact Φ calculation for {} components may be slow (O(2^{}) = {} partitions)",
-                n, n, 1u64 << n
+                n,
+                n,
+                1u64 << n
             );
         }
 

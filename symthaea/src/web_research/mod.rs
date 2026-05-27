@@ -108,8 +108,8 @@ pub use verifier::{
 };
 
 /// Convenience function to create a full epistemic research system
-pub fn create_epistemic_system(
-) -> anyhow::Result<(WebResearcher, KnowledgeIntegrator, EpistemicLearner)> {
+pub fn create_epistemic_system()
+-> anyhow::Result<(WebResearcher, KnowledgeIntegrator, EpistemicLearner)> {
     let researcher = WebResearcher::new()?;
     let integrator = KnowledgeIntegrator::new();
     let learner = EpistemicLearner::new();

@@ -188,8 +188,8 @@ pub fn restricted_hartree_fock(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::basis::sto3g::Sto3g;
     use crate::basis::BasisSetProvider;
+    use crate::basis::sto3g::Sto3g;
 
     #[test]
     fn test_heh_plus_sto3g() {

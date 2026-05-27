@@ -12,14 +12,13 @@
 //! Trace: 4 columns × 32 rows (2 phases × 16 bits, padded to power of 2).
 
 use winterfell::{
-    math::{fields::f128::BaseElement, FieldElement, StarkField, ToElements},
+    AcceptableOptions, Air, AirContext, Assertion, BatchingMethod, CompositionPoly,
+    CompositionPolyTrace, DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde,
+    EvaluationFrame, PartitionOptions, Proof, ProofOptions, Prover as WinterfellProver,
+    StarkDomain, Trace, TraceInfo, TracePolyTable, TransitionConstraintDegree,
+    crypto::{DefaultRandomCoin, MerkleTree, hashers::Blake3_256},
+    math::{FieldElement, StarkField, ToElements, fields::f128::BaseElement},
     matrix::ColMatrix,
-    Air, AirContext, Assertion, BatchingMethod, CompositionPoly, CompositionPolyTrace,
-    DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde, EvaluationFrame,
-    PartitionOptions, ProofOptions, Prover as WinterfellProver, StarkDomain, Trace, TraceInfo,
-    TracePolyTable, TransitionConstraintDegree,
-    crypto::{hashers::Blake3_256, DefaultRandomCoin, MerkleTree},
-    AcceptableOptions, Proof,
 };
 
 const TRACE_WIDTH: usize = 4;
@@ -126,11 +125,7 @@ impl Trace for RangeTrace {
         &self.trace
     }
 
-    fn read_main_frame(
-        &self,
-        row_idx: usize,
-        frame: &mut EvaluationFrame<Self::BaseField>,
-    ) {
+    fn read_main_frame(&self, row_idx: usize, frame: &mut EvaluationFrame<Self::BaseField>) {
         let next_row_idx = (row_idx + 1) % self.trace.num_rows();
         self.trace.read_row_into(row_idx, frame.current_mut());
         self.trace.read_row_into(next_row_idx, frame.next_mut());
@@ -239,9 +234,12 @@ impl WinterfellProver for RangeProver {
 
 fn default_options() -> ProofOptions {
     ProofOptions::new(
-        28, 8, 0,
+        28,
+        8,
+        0,
         winterfell::FieldExtension::None,
-        8, 31,
+        8,
+        31,
         BatchingMethod::Linear,
         BatchingMethod::Linear,
     )
@@ -255,9 +253,18 @@ pub fn prove_range(
     value_commitment: [u8; 32],
 ) -> Result<Proof, String> {
     let trace = build_trace(value, min, max);
-    let pub_inputs = RangePublicInputs { min_value: min, max_value: max, value_commitment };
-    let prover = RangeProver { options: default_options(), pub_inputs };
-    prover.prove(trace).map_err(|e| format!("Proving failed: {:?}", e))
+    let pub_inputs = RangePublicInputs {
+        min_value: min,
+        max_value: max,
+        value_commitment,
+    };
+    let prover = RangeProver {
+        options: default_options(),
+        pub_inputs,
+    };
+    prover
+        .prove(trace)
+        .map_err(|e| format!("Proving failed: {:?}", e))
 }
 
 /// Verify a STARK range proof.
@@ -267,7 +274,11 @@ pub fn verify_range(
     max: u64,
     value_commitment: [u8; 32],
 ) -> Result<(), String> {
-    let pub_inputs = RangePublicInputs { min_value: min, max_value: max, value_commitment };
+    let pub_inputs = RangePublicInputs {
+        min_value: min,
+        max_value: max,
+        value_commitment,
+    };
     let acceptable = AcceptableOptions::OptionSet(vec![default_options()]);
     winterfell::verify::<HealthRangeAir, Hasher, RandCoin, VC>(proof, pub_inputs, &acceptable)
         .map_err(|e| format!("Verification failed: {:?}", e))

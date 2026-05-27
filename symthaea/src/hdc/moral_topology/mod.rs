@@ -19,10 +19,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::consciousness_topology::{
     BettiNumbers, PersistentFeature, TopologicalFeature,
 };
-use symthaea_core::hdc::ContinuousHV;
 
 use super::geometric_ops::{HypersphereOps, PGAResult};
 use super::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
@@ -41,11 +41,11 @@ mod homology;
 pub use anomaly::{AdaptiveAnomalyState, MoralAnomalyReport};
 pub use attribution::{AttributionEntry, CausalAttribution};
 pub use calibration::{
-    calibrate_convergence_threshold, CalibrationResult, CalibrationScenario, RocPoint,
+    CalibrationResult, CalibrationScenario, RocPoint, calibrate_convergence_threshold,
 };
 pub use convergence::{
-    correlate_peer_trajectories, ConvergenceExplanation, PeerCorrelation, SignalBreakdown,
-    TrajectoryConvergenceReport,
+    ConvergenceExplanation, PeerCorrelation, SignalBreakdown, TrajectoryConvergenceReport,
+    correlate_peer_trajectories,
 };
 pub use hazard::{
     EscalationAuditEntry, EscalationAuditLog, EscalationLevel, EscalationPolicy, HazardSignature,

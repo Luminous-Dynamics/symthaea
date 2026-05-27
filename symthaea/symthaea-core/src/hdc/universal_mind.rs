@@ -78,7 +78,7 @@
 
 use super::binary_hv::BinaryHV;
 use super::causal_encoder::CausalSpace;
-use super::causal_mind::{CausalMind, CausalDirection, CausalDiscoveryResult};
+use super::causal_mind::{CausalDirection, CausalDiscoveryResult, CausalMind};
 use std::collections::HashMap;
 
 // =============================================================================
@@ -346,9 +346,9 @@ impl UniversalMind {
         }
 
         // Create deterministic vector from name
-        let seed = name.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
+        let seed = name
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
         let hv = BinaryHV::random(seed);
         self.concepts.insert(name.to_string(), hv.clone());
         hv
@@ -366,7 +366,8 @@ impl UniversalMind {
 
     /// Query: Why did X happen?
     pub fn query_why(&self, concept: &str) -> Vec<String> {
-        self.causal_mind.query_why(concept)
+        self.causal_mind
+            .query_why(concept)
             .iter()
             .map(|e| e.explanation.clone())
             .collect()
@@ -374,7 +375,8 @@ impl UniversalMind {
 
     /// Query: What if X happens?
     pub fn query_what_if(&self, concept: &str) -> Vec<String> {
-        self.causal_mind.query_what_if(concept)
+        self.causal_mind
+            .query_what_if(concept)
             .iter()
             .map(|p| p.prediction.clone())
             .collect()
@@ -397,7 +399,9 @@ impl UniversalMind {
     /// Generate response through integrated reasoning
     fn integrated_response(&self, input: &Thought) -> UniversalResponse {
         // Find similar thoughts in workspace
-        let similar: Vec<_> = self.workspace.iter()
+        let similar: Vec<_> = self
+            .workspace
+            .iter()
             .filter(|t| t.timestamp != input.timestamp)
             .map(|t| (t, input.similarity(t)))
             .filter(|(_, sim)| *sim > 0.3)

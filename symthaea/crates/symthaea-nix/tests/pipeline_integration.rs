@@ -11,11 +11,11 @@
 
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_nix::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
+use symthaea_nix::mind::NixWorldModel;
 use symthaea_nix::mind::active_inference::NixActiveInference;
 use symthaea_nix::mind::causal_graph::NixCausalGraph;
 use symthaea_nix::mind::episodic_memory::EpisodeOutcome;
 use symthaea_nix::mind::world_model::ActionCategory;
-use symthaea_nix::mind::NixWorldModel;
 use symthaea_nix::plugin::pipeline_integration::{NixConsciousnessQuadrant, NixPipelineProcessor};
 
 /// Helper: build a mock system snapshot with configurable services.

@@ -346,9 +346,11 @@ mod tests {
             ..Default::default()
         };
         let result = TopologicalCoherenceBenchmark.run(&config);
-        assert!(result
-            .metrics
-            .contains_key("pearson_r_fragmentation_consciousness_var"));
+        assert!(
+            result
+                .metrics
+                .contains_key("pearson_r_fragmentation_consciousness_var")
+        );
     }
 
     #[test]

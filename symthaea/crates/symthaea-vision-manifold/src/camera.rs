@@ -40,12 +40,12 @@ pub struct CapturedFrame {
 #[cfg(feature = "camera")]
 mod real_camera {
     use super::CapturedFrame;
+    use v4l::Device;
+    use v4l::FourCC;
     use v4l::buffer::Type;
     use v4l::io::mmap::Stream;
     use v4l::io::traits::CaptureStream;
     use v4l::video::Capture;
-    use v4l::Device;
-    use v4l::FourCC;
 
     /// Live camera source backed by V4L2 (Video4Linux2).
     ///

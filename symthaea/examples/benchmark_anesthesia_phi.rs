@@ -141,7 +141,13 @@ fn main() {
 
         println!(
             "  {:25} │ True Φ = {:.6} │ Spectral = {:.6} │ λ₂ = {:.6} │ coupling={:.2} noise={:.2} (avg of {} trials)",
-            state.name, true_phi_avg, spectral_avg, algebraic_avg, state.coupling, state.noise, N_TRIALS
+            state.name,
+            true_phi_avg,
+            spectral_avg,
+            algebraic_avg,
+            state.coupling,
+            state.noise,
+            N_TRIALS
         );
 
         state_phis.push((state.name, true_phi_avg, spectral_avg, algebraic_avg));

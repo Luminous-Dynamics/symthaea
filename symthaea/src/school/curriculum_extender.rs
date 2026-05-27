@@ -388,10 +388,7 @@ impl CurriculumExtender {
         // 3. Prepare LLM Query for synthesis
         let prompt = format!(
             "DOCUMENTATION CONTENT:\n{}\n\nTASK:\nExtract a curriculum for '{}'.\nMinimum objectives required: {}.\nReturn at least {} objectives.",
-            aggregate_content,
-            topic,
-            required_min,
-            required_min
+            aggregate_content, topic, required_min, required_min
         );
 
         let query = LLMQuery {
@@ -460,10 +457,7 @@ impl CurriculumExtender {
                         if attempts + 1 < total_attempts {
                             let repair_prompt = format!(
                                 "Semantic collapse detected in the curriculum objectives.\n{}\n\nRedundant pairs:\n{}\nAction:\n- Merge each redundant pair into a single objective.\n- Replace each removed objective with a NEW objective that introduces a distinct causal variable from the documentation.\n- Ensure at least {} objectives.\nReturn ONLY valid JSON.\n\nJSON:\n{}",
-                                err_msg,
-                                pair_lines,
-                                required_min,
-                                candidate_json
+                                err_msg, pair_lines, required_min, candidate_json
                             );
                             let repair_query = LLMQuery {
                                 query_type: QueryType::Code,
@@ -513,7 +507,7 @@ impl CurriculumExtender {
                                     total_objectives: target_curriculum.objectives.len(),
                                     confidence: 0.8,
                                     warnings: vec![
-                                        "All objectives suppressed by global HDC sweep".to_string()
+                                        "All objectives suppressed by global HDC sweep".to_string(),
                                     ],
                                 });
                             }
@@ -569,11 +563,9 @@ impl CurriculumExtender {
                             dimensionality_retries += 1;
 
                             let repair_prompt = format!(
-                            "The previous JSON was too compressed.\n{}\n\nExpand the curriculum to at least {} objectives.\nEnsure coverage across: Core Theory, Algorithmic Structure, Implementation Constraints, Thermodynamic Impact.\nReturn ONLY valid JSON.\n\nJSON:\n{}",
-                            err_msg,
-                            required_min,
-                            candidate_json
-                        );
+                                "The previous JSON was too compressed.\n{}\n\nExpand the curriculum to at least {} objectives.\nEnsure coverage across: Core Theory, Algorithmic Structure, Implementation Constraints, Thermodynamic Impact.\nReturn ONLY valid JSON.\n\nJSON:\n{}",
+                                err_msg, required_min, candidate_json
+                            );
 
                             let repair_query = LLMQuery {
                                 query_type: QueryType::Code,
@@ -591,10 +583,9 @@ impl CurriculumExtender {
 
                         if objectives_added < required_min && json_objective_count >= required_min {
                             warn!(
-                            "   ⚠️ Objective count met in JSON ({}), but only {} were new (possible duplicates). Accepting.",
-                            json_objective_count,
-                            objectives_added
-                        );
+                                "   ⚠️ Objective count met in JSON ({}), but only {} were new (possible duplicates). Accepting.",
+                                json_objective_count, objectives_added
+                            );
                         }
 
                         info!("   ✨ Successfully extended curriculum with new objectives.");
@@ -646,11 +637,11 @@ impl CurriculumExtender {
                         }
 
                         let repair_prompt = format!(
-                        "The previous JSON failed with error:\n{}\n\nFix it for topic '{}' and return ONLY valid JSON.\n\nJSON:\n{}",
-                        last_error.as_deref().unwrap_or("unknown error"),
-                        topic,
-                        candidate_json
-                    );
+                            "The previous JSON failed with error:\n{}\n\nFix it for topic '{}' and return ONLY valid JSON.\n\nJSON:\n{}",
+                            last_error.as_deref().unwrap_or("unknown error"),
+                            topic,
+                            candidate_json
+                        );
 
                         let repair_query = LLMQuery {
                             query_type: QueryType::Code,
@@ -673,8 +664,7 @@ impl CurriculumExtender {
             if last_error.as_deref() == Some("Placeholder objective id detected (kebab-case-id)") {
                 let repair_prompt = format!(
                     "The previous JSON used placeholder IDs.\nGenerate unique kebab-case ids for each objective, and ensure at least {} objectives.\nReturn ONLY valid JSON.\n\nJSON:\n{}",
-                    required_min,
-                    candidate_json
+                    required_min, candidate_json
                 );
                 let repair_query = LLMQuery {
                     query_type: QueryType::Code,

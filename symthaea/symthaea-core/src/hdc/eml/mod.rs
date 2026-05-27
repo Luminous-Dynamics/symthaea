@@ -11,13 +11,13 @@ mod eval;
 mod verify;
 
 pub use compile::{
-    compile_expr, compile_expr_constructive, compile_term, compile_term_constructive,
-    EmlCompileError,
+    EmlCompileError, compile_expr, compile_expr_constructive, compile_term,
+    compile_term_constructive,
 };
-pub use eval::{eval_complex, eval_real, eval_real_mode, EmlEvalError, EmlEvalMode};
+pub use eval::{EmlEvalError, EmlEvalMode, eval_complex, eval_real, eval_real_mode};
 pub use verify::{
-    verify_expr_compilation, verify_term_compilation, EmlRealDomainAssumption,
-    EmlVerificationReport,
+    EmlRealDomainAssumption, EmlVerificationReport, verify_expr_compilation,
+    verify_term_compilation,
 };
 
 use serde::{Deserialize, Serialize};

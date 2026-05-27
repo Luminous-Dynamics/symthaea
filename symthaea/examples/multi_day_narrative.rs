@@ -20,6 +20,7 @@
 //! cargo run --release --example multi_day_narrative
 //! ```
 
+use symthaea::HippocampusActor;
 use symthaea::brain::{
     AffectiveBridge, AffectiveBridgeConfig, BridgeConfig as PrefrontalBridgeConfig,
     ConsciousnessBridge, HippocampusBridge, HippocampusBridgeConfig,
@@ -27,7 +28,6 @@ use symthaea::brain::{
 use symthaea::consciousness::recursive_improvement::{
     ActionContext, DreamConfig, DreamMode, SemanticBridge, SemanticBridgeConfig, SemanticInput,
 };
-use symthaea::HippocampusActor;
 
 /// A simulated "day" of activity
 struct Day {

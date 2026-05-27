@@ -668,15 +668,21 @@ mod tests {
         let bridge = MfdiBridge::with_signing_key(config, signing_key);
 
         // Default identity has score 0.5 (E2)
-        assert!(bridge
-            .check_capability(CognitiveCapability::FullCycle)
-            .is_ok());
-        assert!(bridge
-            .check_capability(CognitiveCapability::FederatedLearning)
-            .is_ok());
-        assert!(bridge
-            .check_capability(CognitiveCapability::WeightUpdate)
-            .is_err());
+        assert!(
+            bridge
+                .check_capability(CognitiveCapability::FullCycle)
+                .is_ok()
+        );
+        assert!(
+            bridge
+                .check_capability(CognitiveCapability::FederatedLearning)
+                .is_ok()
+        );
+        assert!(
+            bridge
+                .check_capability(CognitiveCapability::WeightUpdate)
+                .is_err()
+        );
     }
 
     #[test]

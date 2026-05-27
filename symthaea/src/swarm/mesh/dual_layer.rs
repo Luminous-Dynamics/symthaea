@@ -27,7 +27,7 @@
 //! to the next available layer (LoRa → Yggdrasil → B.A.T.M.A.N.).
 
 use super::{
-    fragment, LoRaFragment, MeshError, MeshUrgency, WisdomPacket, LORA_MTU, WISDOM_PACKET_SIZE,
+    LORA_MTU, LoRaFragment, MeshError, MeshUrgency, WISDOM_PACKET_SIZE, WisdomPacket, fragment,
 };
 use std::sync::Mutex;
 

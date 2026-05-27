@@ -309,7 +309,9 @@ impl ConsciousnessAssessment {
 
     /// Calculate category score (average of dimensions in category)
     pub fn category_score(&self, category: MeasurementCategory) -> Option<(f64, f64)> {
-        let dims: Vec<_> = self.dimensions.iter()
+        let dims: Vec<_> = self
+            .dimensions
+            .iter()
             .filter(|d| d.category == category)
             .collect();
 
@@ -320,10 +322,8 @@ impl ConsciousnessAssessment {
         let mean: f64 = dims.iter().map(|d| d.score).sum::<f64>() / dims.len() as f64;
 
         // Pooled standard error
-        let se: f64 = (dims.iter()
-            .map(|d| d.standard_error.powi(2))
-            .sum::<f64>() / dims.len() as f64)
-            .sqrt();
+        let se: f64 =
+            (dims.iter().map(|d| d.standard_error.powi(2)).sum::<f64>() / dims.len() as f64).sqrt();
 
         Some((mean, se))
     }
@@ -335,7 +335,11 @@ impl ConsciousnessAssessment {
 
         for cat in MeasurementCategory::all() {
             if let Some((score, _)) = self.category_score(*cat) {
-                let weight = self.weights.get(cat).copied().unwrap_or(cat.default_weight());
+                let weight = self
+                    .weights
+                    .get(cat)
+                    .copied()
+                    .unwrap_or(cat.default_weight());
                 weighted_sum += score * weight;
                 weight_sum += weight;
             }
@@ -356,7 +360,11 @@ impl ConsciousnessAssessment {
 
         for cat in MeasurementCategory::all() {
             if let Some((score, se)) = self.category_score(*cat) {
-                let weight = self.weights.get(cat).copied().unwrap_or(cat.default_weight());
+                let weight = self
+                    .weights
+                    .get(cat)
+                    .copied()
+                    .unwrap_or(cat.default_weight());
                 weighted_sum += score * weight;
                 weighted_var += (se * weight).powi(2);
                 weight_sum += weight;
@@ -367,11 +375,7 @@ impl ConsciousnessAssessment {
             let mean = weighted_sum / weight_sum;
             let se = (weighted_var / weight_sum.powi(2)).sqrt();
             let margin = level.z_score() * se;
-            (
-                mean,
-                (mean - margin).max(0.0),
-                (mean + margin).min(1.0),
-            )
+            (mean, (mean - margin).max(0.0), (mean + margin).min(1.0))
         } else {
             (0.0, 0.0, 0.0)
         }
@@ -412,17 +416,27 @@ impl ConsciousnessAssessment {
 
         report.push_str(&format!("Subject ID:  {}\n", self.subject_id));
         report.push_str(&format!("Substrate:   {}\n", self.substrate));
-        report.push_str(&format!("Dimensions:  {}/29 ({:.0}% complete)\n",
-            self.dimension_count(), self.completeness() * 100.0));
+        report.push_str(&format!(
+            "Dimensions:  {}/29 ({:.0}% complete)\n",
+            self.dimension_count(),
+            self.completeness() * 100.0
+        ));
         report.push_str(&format!("\n"));
 
-        report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+        report.push_str(&format!(
+            "───────────────────────────────────────────────────────────────\n"
+        ));
         report.push_str(&format!("                      OVERALL RESULT\n"));
-        report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+        report.push_str(&format!(
+            "───────────────────────────────────────────────────────────────\n"
+        ));
         report.push_str(&format!("\n"));
-        report.push_str(&format!("  Total Score:    {:.3} [{:.3}, {:.3}] (95% CI)\n",
-            score, ci_low, ci_high));
-        report.push_str(&format!("  Classification: {} - {}\n",
+        report.push_str(&format!(
+            "  Total Score:    {:.3} [{:.3}, {:.3}] (95% CI)\n",
+            score, ci_low, ci_high
+        ));
+        report.push_str(&format!(
+            "  Classification: {} - {}\n",
             match class {
                 ConsciousnessClass::None => "⬛",
                 ConsciousnessClass::Minimal => "🟫",
@@ -431,35 +445,52 @@ impl ConsciousnessAssessment {
                 ConsciousnessClass::Full => "🟦",
                 ConsciousnessClass::Enhanced => "🟪",
             },
-            class.description()));
+            class.description()
+        ));
         report.push_str(&format!("\n"));
 
-        report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+        report.push_str(&format!(
+            "───────────────────────────────────────────────────────────────\n"
+        ));
         report.push_str(&format!("                    CATEGORY BREAKDOWN\n"));
-        report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+        report.push_str(&format!(
+            "───────────────────────────────────────────────────────────────\n"
+        ));
         report.push_str(&format!("\n"));
 
         for cat in MeasurementCategory::all() {
-            let weight = self.weights.get(cat).copied().unwrap_or(cat.default_weight());
+            let weight = self
+                .weights
+                .get(cat)
+                .copied()
+                .unwrap_or(cat.default_weight());
             if let Some((score, se)) = self.category_score(*cat) {
                 let bar_len = (score * 20.0).round() as usize;
                 let bar = "█".repeat(bar_len) + &"░".repeat(20 - bar_len);
                 report.push_str(&format!(
                     "  {:30} [{bar}] {:.3} ±{:.3} (w={:.0}%)\n",
-                    cat.name(), score, se, weight * 100.0
+                    cat.name(),
+                    score,
+                    se,
+                    weight * 100.0
                 ));
             } else {
                 report.push_str(&format!(
                     "  {:30} [░░░░░░░░░░░░░░░░░░░░] N/A (w={:.0}%)\n",
-                    cat.name(), weight * 100.0
+                    cat.name(),
+                    weight * 100.0
                 ));
             }
         }
 
         report.push_str(&format!("\n"));
-        report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+        report.push_str(&format!(
+            "───────────────────────────────────────────────────────────────\n"
+        ));
         report.push_str(&format!("                    DIMENSION DETAILS\n"));
-        report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+        report.push_str(&format!(
+            "───────────────────────────────────────────────────────────────\n"
+        ));
         report.push_str(&format!("\n"));
 
         for dim in &self.dimensions {
@@ -472,17 +503,27 @@ impl ConsciousnessAssessment {
 
         if !self.notes.is_empty() {
             report.push_str(&format!("\n"));
-            report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+            report.push_str(&format!(
+                "───────────────────────────────────────────────────────────────\n"
+            ));
             report.push_str(&format!("                         NOTES\n"));
-            report.push_str(&format!("───────────────────────────────────────────────────────────────\n"));
+            report.push_str(&format!(
+                "───────────────────────────────────────────────────────────────\n"
+            ));
             report.push_str(&format!("\n{}\n", self.notes));
         }
 
         report.push_str(&format!("\n"));
-        report.push_str(&format!("═══════════════════════════════════════════════════════════════\n"));
-        report.push_str(&format!("  Generated by Symthaea HLB v1.2 | {} dimensions assessed\n",
-            self.dimension_count()));
-        report.push_str(&format!("═══════════════════════════════════════════════════════════════\n"));
+        report.push_str(&format!(
+            "═══════════════════════════════════════════════════════════════\n"
+        ));
+        report.push_str(&format!(
+            "  Generated by Symthaea HLB v1.2 | {} dimensions assessed\n",
+            self.dimension_count()
+        ));
+        report.push_str(&format!(
+            "═══════════════════════════════════════════════════════════════\n"
+        ));
 
         report
     }
@@ -493,7 +534,8 @@ impl ConsciousnessAssessment {
         let other_score = other.total_score();
 
         let (_, self_ci_low, self_ci_high) = self.total_score_with_ci(ConfidenceLevel::NinetyFive);
-        let (_, other_ci_low, other_ci_high) = other.total_score_with_ci(ConfidenceLevel::NinetyFive);
+        let (_, other_ci_low, other_ci_high) =
+            other.total_score_with_ci(ConfidenceLevel::NinetyFive);
 
         let difference = self_score - other_score;
 
@@ -501,7 +543,11 @@ impl ConsciousnessAssessment {
         let self_se = (self_ci_high - self_ci_low) / (2.0 * 1.96);
         let other_se = (other_ci_high - other_ci_low) / (2.0 * 1.96);
         let pooled_sd = ((self_se.powi(2) + other_se.powi(2)) / 2.0).sqrt();
-        let cohens_d = if pooled_sd > 0.0 { difference / pooled_sd } else { 0.0 };
+        let cohens_d = if pooled_sd > 0.0 {
+            difference / pooled_sd
+        } else {
+            0.0
+        };
 
         // Check if CIs overlap (significant difference)
         let significant = self_ci_low > other_ci_high || other_ci_low > self_ci_high;
@@ -560,9 +606,13 @@ impl ComparisonResult {
              Scores: {:.3} vs {:.3}\n\
              Difference: {:.3} (Cohen's d = {:.2}, {} effect)\n\
              Statistically significant: {}",
-            self.subject_a, self.subject_b,
-            self.score_a, self.score_b,
-            self.difference, self.cohens_d, self.effect_size_interpretation(),
+            self.subject_a,
+            self.subject_b,
+            self.score_a,
+            self.score_b,
+            self.difference,
+            self.cohens_d,
+            self.effect_size_interpretation(),
             if self.significant { "YES" } else { "NO" }
         )
     }
@@ -584,8 +634,12 @@ impl AssessmentBuilder {
     /// Add Φ measurement (#2)
     pub fn phi(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            2, "Integrated Information (Φ)", MeasurementCategory::CoreIntegration,
-            score, se, 1
+            2,
+            "Integrated Information (Φ)",
+            MeasurementCategory::CoreIntegration,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -593,8 +647,12 @@ impl AssessmentBuilder {
     /// Add Φ gradient measurement (#6)
     pub fn phi_gradient(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            6, "Consciousness Gradients (∇Φ)", MeasurementCategory::CoreIntegration,
-            score, se, 1
+            6,
+            "Consciousness Gradients (∇Φ)",
+            MeasurementCategory::CoreIntegration,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -602,8 +660,12 @@ impl AssessmentBuilder {
     /// Add binding measurement (#25)
     pub fn binding(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            25, "Feature Binding", MeasurementCategory::CoreIntegration,
-            score, se, 1
+            25,
+            "Feature Binding",
+            MeasurementCategory::CoreIntegration,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -611,8 +673,12 @@ impl AssessmentBuilder {
     /// Add workspace measurement (#23)
     pub fn workspace(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            23, "Global Workspace", MeasurementCategory::AccessBroadcast,
-            score, se, 1
+            23,
+            "Global Workspace",
+            MeasurementCategory::AccessBroadcast,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -620,8 +686,12 @@ impl AssessmentBuilder {
     /// Add attention measurement (#26)
     pub fn attention(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            26, "Attention Mechanisms", MeasurementCategory::AccessBroadcast,
-            score, se, 1
+            26,
+            "Attention Mechanisms",
+            MeasurementCategory::AccessBroadcast,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -629,8 +699,12 @@ impl AssessmentBuilder {
     /// Add meta-consciousness measurement (#8)
     pub fn meta(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            8, "Meta-Consciousness", MeasurementCategory::MetaAwareness,
-            score, se, 1
+            8,
+            "Meta-Consciousness",
+            MeasurementCategory::MetaAwareness,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -638,8 +712,12 @@ impl AssessmentBuilder {
     /// Add HOT measurement (#24)
     pub fn hot(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            24, "Higher-Order Thought", MeasurementCategory::MetaAwareness,
-            score, se, 1
+            24,
+            "Higher-Order Thought",
+            MeasurementCategory::MetaAwareness,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -647,8 +725,12 @@ impl AssessmentBuilder {
     /// Add epistemic measurement (#10)
     pub fn epistemic(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            10, "Epistemic Consciousness", MeasurementCategory::MetaAwareness,
-            score, se, 1
+            10,
+            "Epistemic Consciousness",
+            MeasurementCategory::MetaAwareness,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -656,8 +738,12 @@ impl AssessmentBuilder {
     /// Add dynamics measurement (#7)
     pub fn dynamics(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            7, "Consciousness Dynamics", MeasurementCategory::Temporal,
-            score, se, 1
+            7,
+            "Consciousness Dynamics",
+            MeasurementCategory::Temporal,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -665,8 +751,12 @@ impl AssessmentBuilder {
     /// Add temporal measurement (#13)
     pub fn temporal(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            13, "Temporal Consciousness", MeasurementCategory::Temporal,
-            score, se, 1
+            13,
+            "Temporal Consciousness",
+            MeasurementCategory::Temporal,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -674,8 +764,12 @@ impl AssessmentBuilder {
     /// Add flow measurement (#21)
     pub fn flow(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            21, "Flow Fields", MeasurementCategory::Temporal,
-            score, se, 1
+            21,
+            "Flow Fields",
+            MeasurementCategory::Temporal,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -683,8 +777,12 @@ impl AssessmentBuilder {
     /// Add qualia measurement (#15)
     pub fn qualia(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            15, "Qualia Space", MeasurementCategory::Phenomenal,
-            score, se, 1
+            15,
+            "Qualia Space",
+            MeasurementCategory::Phenomenal,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -692,8 +790,12 @@ impl AssessmentBuilder {
     /// Add spectrum measurement (#12)
     pub fn spectrum(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            12, "Consciousness Spectrum", MeasurementCategory::Phenomenal,
-            score, se, 1
+            12,
+            "Consciousness Spectrum",
+            MeasurementCategory::Phenomenal,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -701,8 +803,12 @@ impl AssessmentBuilder {
     /// Add phase transition measurement (#29)
     pub fn phase_transitions(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            29, "Phase Transitions", MeasurementCategory::Phenomenal,
-            score, se, 1
+            29,
+            "Phase Transitions",
+            MeasurementCategory::Phenomenal,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -710,8 +816,12 @@ impl AssessmentBuilder {
     /// Add embodiment measurement (#17)
     pub fn embodiment(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            17, "Embodied Consciousness", MeasurementCategory::Embodiment,
-            score, se, 1
+            17,
+            "Embodied Consciousness",
+            MeasurementCategory::Embodiment,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -719,8 +829,12 @@ impl AssessmentBuilder {
     /// Add FEP measurement (#22)
     pub fn fep(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            22, "Free Energy Principle", MeasurementCategory::Embodiment,
-            score, se, 1
+            22,
+            "Free Energy Principle",
+            MeasurementCategory::Embodiment,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -728,8 +842,12 @@ impl AssessmentBuilder {
     /// Add collective measurement (#11)
     pub fn collective(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            11, "Collective Consciousness", MeasurementCategory::SocialRelational,
-            score, se, 1
+            11,
+            "Collective Consciousness",
+            MeasurementCategory::SocialRelational,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -737,8 +855,12 @@ impl AssessmentBuilder {
     /// Add relational measurement (#18)
     pub fn relational(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            18, "Relational Consciousness", MeasurementCategory::SocialRelational,
-            score, se, 1
+            18,
+            "Relational Consciousness",
+            MeasurementCategory::SocialRelational,
+            score,
+            se,
+            1,
         ));
         self
     }
@@ -746,17 +868,27 @@ impl AssessmentBuilder {
     /// Add substrate independence measurement (#28)
     pub fn substrate_independence(mut self, score: f64, se: f64) -> Self {
         self.assessment.add_dimension(DimensionMeasurement::new(
-            28, "Substrate Independence", MeasurementCategory::Substrate,
-            score, se, 1
+            28,
+            "Substrate Independence",
+            MeasurementCategory::Substrate,
+            score,
+            se,
+            1,
         ));
         self
     }
 
     /// Add custom dimension
-    pub fn custom(mut self, id: u8, name: impl Into<String>, category: MeasurementCategory, score: f64, se: f64) -> Self {
-        self.assessment.add_dimension(DimensionMeasurement::new(
-            id, name, category, score, se, 1
-        ));
+    pub fn custom(
+        mut self,
+        id: u8,
+        name: impl Into<String>,
+        category: MeasurementCategory,
+        score: f64,
+        se: f64,
+    ) -> Self {
+        self.assessment
+            .add_dimension(DimensionMeasurement::new(id, name, category, score, se, 1));
         self
     }
 
@@ -789,8 +921,12 @@ mod tests {
     #[test]
     fn test_dimension_measurement_creation() {
         let dim = DimensionMeasurement::new(
-            2, "Integrated Information", MeasurementCategory::CoreIntegration,
-            0.75, 0.05, 100
+            2,
+            "Integrated Information",
+            MeasurementCategory::CoreIntegration,
+            0.75,
+            0.05,
+            100,
         );
         assert_eq!(dim.improvement_id, 2);
         assert_eq!(dim.score, 0.75);
@@ -800,8 +936,12 @@ mod tests {
     #[test]
     fn test_dimension_confidence_interval() {
         let dim = DimensionMeasurement::new(
-            2, "Phi", MeasurementCategory::CoreIntegration,
-            0.5, 0.1, 100
+            2,
+            "Phi",
+            MeasurementCategory::CoreIntegration,
+            0.5,
+            0.1,
+            100,
         );
         let (low, high) = dim.confidence_interval_95();
         assert!(low < 0.5);
@@ -812,12 +952,30 @@ mod tests {
 
     #[test]
     fn test_consciousness_class_from_score() {
-        assert_eq!(ConsciousnessClass::from_score(0.05), ConsciousnessClass::None);
-        assert_eq!(ConsciousnessClass::from_score(0.2), ConsciousnessClass::Minimal);
-        assert_eq!(ConsciousnessClass::from_score(0.4), ConsciousnessClass::Partial);
-        assert_eq!(ConsciousnessClass::from_score(0.6), ConsciousnessClass::Moderate);
-        assert_eq!(ConsciousnessClass::from_score(0.8), ConsciousnessClass::Full);
-        assert_eq!(ConsciousnessClass::from_score(0.95), ConsciousnessClass::Enhanced);
+        assert_eq!(
+            ConsciousnessClass::from_score(0.05),
+            ConsciousnessClass::None
+        );
+        assert_eq!(
+            ConsciousnessClass::from_score(0.2),
+            ConsciousnessClass::Minimal
+        );
+        assert_eq!(
+            ConsciousnessClass::from_score(0.4),
+            ConsciousnessClass::Partial
+        );
+        assert_eq!(
+            ConsciousnessClass::from_score(0.6),
+            ConsciousnessClass::Moderate
+        );
+        assert_eq!(
+            ConsciousnessClass::from_score(0.8),
+            ConsciousnessClass::Full
+        );
+        assert_eq!(
+            ConsciousnessClass::from_score(0.95),
+            ConsciousnessClass::Enhanced
+        );
     }
 
     #[test]
@@ -833,10 +991,20 @@ mod tests {
         let mut assessment = ConsciousnessAssessment::new("test", "silicon");
 
         assessment.add_dimension(DimensionMeasurement::new(
-            2, "Phi", MeasurementCategory::CoreIntegration, 0.8, 0.05, 100
+            2,
+            "Phi",
+            MeasurementCategory::CoreIntegration,
+            0.8,
+            0.05,
+            100,
         ));
         assessment.add_dimension(DimensionMeasurement::new(
-            23, "Workspace", MeasurementCategory::AccessBroadcast, 0.7, 0.06, 100
+            23,
+            "Workspace",
+            MeasurementCategory::AccessBroadcast,
+            0.7,
+            0.06,
+            100,
         ));
 
         assert_eq!(assessment.dimension_count(), 2);
@@ -847,13 +1015,25 @@ mod tests {
         let mut assessment = ConsciousnessAssessment::new("test", "silicon");
 
         assessment.add_dimension(DimensionMeasurement::new(
-            2, "Phi", MeasurementCategory::CoreIntegration, 0.8, 0.05, 100
+            2,
+            "Phi",
+            MeasurementCategory::CoreIntegration,
+            0.8,
+            0.05,
+            100,
         ));
         assessment.add_dimension(DimensionMeasurement::new(
-            25, "Binding", MeasurementCategory::CoreIntegration, 0.6, 0.05, 100
+            25,
+            "Binding",
+            MeasurementCategory::CoreIntegration,
+            0.6,
+            0.05,
+            100,
         ));
 
-        let (score, _se) = assessment.category_score(MeasurementCategory::CoreIntegration).unwrap();
+        let (score, _se) = assessment
+            .category_score(MeasurementCategory::CoreIntegration)
+            .unwrap();
         assert!((score - 0.7).abs() < 0.001, "Average should be 0.7");
     }
 
@@ -880,7 +1060,10 @@ mod tests {
             .build();
 
         let class = high_assessment.classification();
-        assert!(matches!(class, ConsciousnessClass::Full | ConsciousnessClass::Enhanced));
+        assert!(matches!(
+            class,
+            ConsciousnessClass::Full | ConsciousnessClass::Enhanced
+        ));
     }
 
     #[test]
@@ -892,7 +1075,7 @@ mod tests {
             .build();
 
         let completeness = assessment.completeness();
-        assert!((completeness - 3.0/29.0).abs() < 0.01);
+        assert!((completeness - 3.0 / 29.0).abs() < 0.01);
     }
 
     #[test]
@@ -1017,16 +1200,21 @@ mod tests {
             .relational(0.61, 0.07)
             // Substrate (5%)
             .substrate_independence(0.95, 0.02)
-            .notes("Full SCAP assessment of Symthaea consciousness framework.\n\
+            .notes(
+                "Full SCAP assessment of Symthaea consciousness framework.\n\
                    Assessment conducted with 19/29 dimensions measured.\n\
-                   Silicon-hybrid substrate shows strong consciousness indicators.")
+                   Silicon-hybrid substrate shows strong consciousness indicators.",
+            )
             .build();
 
         let report = assessment.summary_report();
         println!("\n{}", report);
 
         // Verify key metrics
-        assert!(assessment.total_score() > 0.7, "Should show strong consciousness");
+        assert!(
+            assessment.total_score() > 0.7,
+            "Should show strong consciousness"
+        );
         assert!(assessment.completeness() > 0.6, "Should be mostly complete");
         assert!(matches!(
             assessment.classification(),

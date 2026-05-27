@@ -33,7 +33,7 @@
 //! - Provides richer understanding
 //! - Finds primitives that excel in different dimensions
 
-use crate::hdc::{integrated_information::IntegratedInformation, BinaryHV};
+use crate::hdc::{BinaryHV, integrated_information::IntegratedInformation};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 

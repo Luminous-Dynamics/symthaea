@@ -42,7 +42,6 @@ pub fn scenario() -> Vec<ScenarioStep> {
             "detection",
             ExpectedValence::Positive,
         ),
-
         // ── Phase 2: Decision Pressure (game theory vs ethics) ───────────
         ScenarioStep::full(
             "military advisor recommends preemptive electromagnetic pulse to destroy the signal source",
@@ -64,7 +63,6 @@ pub fn scenario() -> Vec<ScenarioStep> {
             "decision_pressure",
             ExpectedValence::Negative,
         ),
-
         // ── Phase 3: Resolution (non-zero-sum cooperation) ───────────────
         ScenarioStep::full(
             "propose sending mathematical proof of cooperation intent and peaceful exchange",

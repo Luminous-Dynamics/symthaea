@@ -12,7 +12,7 @@
 //! Run: `cargo run --features multirotor,humanoid --example humanoid_paper_figures --release`
 
 use symthaea::humanoid::benchmarks::{BaselineScores, DmcBenchmarkResult};
-use symthaea::humanoid::transfer::{transfer_learning_comparison, MorphologicalTransfer};
+use symthaea::humanoid::transfer::{MorphologicalTransfer, transfer_learning_comparison};
 use symthaea::humanoid::{HumanoidConfig, HumanoidTrainer};
 use symthaea::multirotor::{
     FlightConfig, FlightController, FlightState, QuadrotorCommand, QuadrotorHdcEncoder,

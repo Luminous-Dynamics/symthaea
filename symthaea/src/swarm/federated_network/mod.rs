@@ -78,5 +78,5 @@ pub use local_backend::LocalChannelBackend;
 pub use tcp_backend::TcpBackend;
 
 pub use coordinator::{
-    create_test_network, CoordinatorEvent, CoordinatorStats, FederatedCoordinator,
+    CoordinatorEvent, CoordinatorStats, FederatedCoordinator, create_test_network,
 };

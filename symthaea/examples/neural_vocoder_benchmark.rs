@@ -19,11 +19,11 @@ use std::f32::consts::PI;
 use std::time::Instant;
 use symthaea::voice::neural_vocoder::NeuralVocoderConfig;
 use symthaea::voice::{
+    FormantFrame,
     vocal_tract_controller::VocalTractController,
     vocal_tract_encoder::VoiceCognitiveState,
-    vocal_tract_fep::{populate_manner_map, StreamingVocalTract},
+    vocal_tract_fep::{StreamingVocalTract, populate_manner_map},
     vocoder::{FormantVocoder, VocoderConfig},
-    FormantFrame,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_vocal_tract::formant_to_mel::{

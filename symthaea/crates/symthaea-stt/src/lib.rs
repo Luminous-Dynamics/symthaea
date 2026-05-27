@@ -102,7 +102,7 @@ pub mod sleep_sentinel;
 // Re-exports for convenience
 pub use adaptation::{AdaptationEngine, SpeakerDiarizer, SpeakerProfile};
 pub use alignment_loader::{
-    id_to_audio_path, load_alignments, PhonemeSegment, UtteranceAlignment, WordSegment,
+    PhonemeSegment, UtteranceAlignment, WordSegment, id_to_audio_path, load_alignments,
 };
 pub use articulatory::{
     AcousticArticulatoryDetector, ArticulatoryFeatures, ArticulatoryHDC, ArticulatoryMapper,
@@ -121,10 +121,10 @@ pub use discovery::{DiscoveryConfig, DiscoveryPipeline, DiscoveryResult, OnlineC
 pub use dtw_align::{AlignedSegment, DtwAligner, DtwAlignment, DtwTrainer};
 pub use edf_loader::{EdfFile, EdfHeader, EdfSignal, SleepStage};
 pub use eval::{
-    character_error_rate, phoneme_error_rate, word_error_rate, Alignment, ConfusionMatrix,
-    EvalResult, EvaluationReport,
+    Alignment, ConfusionMatrix, EvalResult, EvaluationReport, character_error_rate,
+    phoneme_error_rate, word_error_rate,
 };
-pub use hdc::{bundle, weighted_bundle, CORE_HDC_DIM, EXPANSION_FACTOR, HDC_DIM, HV16};
+pub use hdc::{CORE_HDC_DIM, EXPANSION_FACTOR, HDC_DIM, HV16, bundle, weighted_bundle};
 pub use lexicon::{CmuDictionary, TextToPhonemes};
 pub use linguistic::{PhonemeClasses, PhonemeFeatures, PhonotacticConstraints};
 pub use liquid_projection::{

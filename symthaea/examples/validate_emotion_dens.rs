@@ -229,7 +229,9 @@ fn main() {
         println!();
         println!("Please run the extraction script first:");
         println!("  nix-shell -p python3 python3Packages.scipy python3Packages.numpy \\");
-        println!("    --run \"python3 scripts/extract_eeglab.py data/ds003751/sub-mit003/eeg/sub-mit003_task-Emotion_eeg.set data/ds003751/sub-mit003_eeg\"");
+        println!(
+            "    --run \"python3 scripts/extract_eeglab.py data/ds003751/sub-mit003/eeg/sub-mit003_task-Emotion_eeg.set data/ds003751/sub-mit003_eeg\""
+        );
         return;
     }
 

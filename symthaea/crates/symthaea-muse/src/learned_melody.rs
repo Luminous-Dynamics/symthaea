@@ -237,7 +237,7 @@ mod tests {
         let pred = MelodyPredictor::new();
         let scale = vec![261.63, 293.66, 329.63, 349.23, 392.00, 440.00];
         let result = pred.interval_to_freq(261.63, 4.5, &scale); // ~4.5 semitones up from C
-                                                                 // Should snap to E (329.63) which is 4 semitones up
+        // Should snap to E (329.63) which is 4 semitones up
         assert!((result - 329.63).abs() < 1.0, "should snap to E: {result}");
     }
 }

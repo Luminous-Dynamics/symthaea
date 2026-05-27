@@ -220,8 +220,12 @@ fn main() {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     println!("🎵 WISDOM HARMONICS VERIFICATION:\n");
-    println!("  ✓ Coherence:     Does the diagnosis hang together? YES - mode collapse explains all symptoms");
-    println!("  ✓ Flourishing:   Does fixing this serve flourishing? YES - hearing enables communication");
+    println!(
+        "  ✓ Coherence:     Does the diagnosis hang together? YES - mode collapse explains all symptoms"
+    );
+    println!(
+        "  ✓ Flourishing:   Does fixing this serve flourishing? YES - hearing enables communication"
+    );
     println!(
         "  ✓ Wisdom:        What don't we know? The optimal similarity threshold for this corpus"
     );

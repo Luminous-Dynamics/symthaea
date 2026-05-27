@@ -74,14 +74,18 @@ fn main() {
         if i % 10 == 0 || i == 29 {
             println!(
                 "  frame {:>2}: pred_err={:.4}, coherence={:.4}, motion={:.4}, salient={}, training={}",
-                i, tel.prediction_error, tel.manifold_coherence, tel.motion_surprise,
-                tel.num_salient_patches, tel.training_triggered,
+                i,
+                tel.prediction_error,
+                tel.manifold_coherence,
+                tel.motion_surprise,
+                tel.num_salient_patches,
+                tel.training_triggered,
             );
         }
 
         // Store scene at frame 15 (mid-stripe)
         if i == 15 {
-            memory.remember(&hv, i as u64);
+            memory.remember(&hv, i as u64, vec![]);
             println!("  >> Stored scene landmark at frame {i}");
         }
     }
@@ -105,7 +109,7 @@ fn main() {
 
         // Store solid scene
         if i == 40 {
-            memory.remember(&hv, i as u64);
+            memory.remember(&hv, i as u64, vec![]);
             println!("  >> Stored scene landmark at frame {i}");
         }
     }
@@ -135,7 +139,12 @@ fn main() {
 
             println!(
                 "  frame {:>2}: spot@({cx},{cy}), motion_surprise={:.4}, mf_norm={:.4}, active_patches={}/{}, max_mag={:.4}",
-                i, tel.motion_surprise, tel.motion_field_norm, active_count, vectors.len(), max_mag,
+                i,
+                tel.motion_surprise,
+                tel.motion_field_norm,
+                active_count,
+                vectors.len(),
+                max_mag,
             );
         }
     }

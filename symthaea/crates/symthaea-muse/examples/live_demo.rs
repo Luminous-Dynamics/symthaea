@@ -10,8 +10,8 @@
 //! Cycles through 6 emotional states (10s each) to demonstrate how
 //! cognitive state drives timbre, tempo, harmony, and roughness.
 
-use symthaea_muse::live_output::LiveMuseOutput;
 use symthaea_muse::MusicalState;
+use symthaea_muse::live_output::LiveMuseOutput;
 
 /// Named emotional phase with full neuromodulator prescription.
 struct Phase {

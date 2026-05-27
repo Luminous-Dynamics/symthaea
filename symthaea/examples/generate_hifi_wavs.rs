@@ -9,7 +9,7 @@
 //! Run: cargo run --features muse,humanoid --example generate_hifi_wavs
 //! Output: audio_output/*.wav
 
-use symthaea_muse::{compose, AudioData, MelodyMode, MuseConfig, MusicalState, OutputFormat};
+use symthaea_muse::{AudioData, MelodyMode, MuseConfig, MusicalState, OutputFormat, compose};
 
 fn main() {
     let dir = std::path::Path::new("audio_output");

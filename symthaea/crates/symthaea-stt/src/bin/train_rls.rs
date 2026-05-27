@@ -15,8 +15,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, CrystalReservoir,
-    DirectClassifier, DirectClassifierConfig, FastRlsClassifier, RFActivation, RandomProjection,
+    AudioConfig, AudioFrontend, CrystalReservoir, DirectClassifier, DirectClassifierConfig,
+    FastRlsClassifier, RFActivation, RandomProjection, id_to_audio_path, load_alignments,
 };
 
 #[derive(Parser)]
@@ -537,5 +537,8 @@ fn main() {
         "{}",
         style("═══════════════════════════════════════════════════════════").yellow()
     );
-    println!("\n  Next: eval-direct --classifier {:?} --skip-reservoir --use-deltas --viterbi-penalty 0.95", cli.output);
+    println!(
+        "\n  Next: eval-direct --classifier {:?} --skip-reservoir --use-deltas --viterbi-penalty 0.95",
+        cli.output
+    );
 }

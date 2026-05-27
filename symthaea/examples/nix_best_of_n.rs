@@ -129,11 +129,7 @@ fn score_sample(generated: &str, golden: &str) -> (u32, usize) {
                 .iter()
                 .any(|gold| gp == gold || gold.starts_with(&format!("{}.", gp)))
         });
-        if overlap {
-            1
-        } else {
-            0
-        }
+        if overlap { 1 } else { 0 }
     } else {
         0
     };

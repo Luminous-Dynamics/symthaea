@@ -17,7 +17,7 @@
 //! 7. Tensor determinant (Schwarzschild metric)
 //! 8. Jarzynski free energy difference (10k samples)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::physics::{

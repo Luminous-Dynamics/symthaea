@@ -21,7 +21,7 @@ use super::condensed_matter::CMEncoder;
 use super::constants::{HBAR, K_BOLTZMANN, M_ELECTRON};
 use super::cosmology::CosmologyEncoder;
 use super::decoherence::{
-    simulate_decoherence, Complex64, DecoherenceChannel, DensityMatrix, LindbladEvolution,
+    Complex64, DecoherenceChannel, DensityMatrix, LindbladEvolution, simulate_decoherence,
 };
 use super::electromagnetism::EMEncoder;
 use super::fluid_dynamics::FluidEncoder;
@@ -36,7 +36,7 @@ use super::phonon_dynamics::CrystalStructure;
 use super::plasma_physics::PlasmaEncoder;
 use super::quantum_tunneling::TunnelingCalculator;
 use super::radiation_damage::FusionReaction;
-use super::standard_model::{GaugeBoson, QuarkFlavor, StandardModel, PHYSICS_DIM};
+use super::standard_model::{GaugeBoson, PHYSICS_DIM, QuarkFlavor, StandardModel};
 use super::thermodynamics::ThermoEncoder;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;

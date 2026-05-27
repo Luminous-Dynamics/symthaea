@@ -73,9 +73,9 @@ pub struct AttentionConfig {
 impl Default for AttentionConfig {
     fn default() -> Self {
         Self {
-            theta_threshold: 0.20,           // 20% relative theta power
+            theta_threshold: 0.20,             // 20% relative theta power
             alpha_suppression_threshold: 0.30, // 30% alpha = baseline
-            beta_threshold: 0.15,            // 15% beta for alertness
+            beta_threshold: 0.15,              // 15% beta for alertness
             index_thresholds: [0.5, 1.0, 2.0], // Distracted < 0.5, Normal < 1.0, Focused < 2.0, DeepFocus >= 2.0
         }
     }
@@ -179,12 +179,7 @@ impl AttentionSentinel {
 
         let total = delta + theta + alpha + beta + gamma + 1e-10;
 
-        (
-            theta / total,
-            alpha / total,
-            beta / total,
-            gamma / total,
-        )
+        (theta / total, alpha / total, beta / total, gamma / total)
     }
 
     /// Classify attention state from index
@@ -222,7 +217,11 @@ impl Default for AttentionSentinel {
 mod tests {
     use super::*;
 
-    fn generate_attention_signal(n_samples: usize, sample_rate: f32, attention_level: f32) -> Vec<f32> {
+    fn generate_attention_signal(
+        n_samples: usize,
+        sample_rate: f32,
+        attention_level: f32,
+    ) -> Vec<f32> {
         use std::f32::consts::PI;
         (0..n_samples)
             .map(|i| {

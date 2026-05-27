@@ -22,7 +22,7 @@
 //! ```
 
 use clap::{Parser, Subcommand, ValueEnum};
-use console::{style, Emoji};
+use console::{Emoji, style};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::fs::{self, File};

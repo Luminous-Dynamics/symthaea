@@ -15,8 +15,8 @@ Verifies structural invariants across the 10 math benchmark types:
 use proptest::prelude::*;
 
 use crate::benchmarks::mathematics::*;
-use crate::harness::config::BenchmarkConfig;
 use crate::harness::PsychBenchmark;
+use crate::harness::config::BenchmarkConfig;
 
 fn config_with_seed(seed: u64) -> BenchmarkConfig {
     BenchmarkConfig {

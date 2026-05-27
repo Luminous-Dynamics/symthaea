@@ -579,7 +579,7 @@ impl CognitivePacing {
                 pacing.sentence_pause *= pause_factor;
                 // Softer energy: reduce emphasis proportionally
                 pacing.emphasis *= 1.0 - (self.client_distress - 0.3) * 0.3; // 0.79–1.0
-                                                                             // More breath pauses when client is distressed (models attentive presence)
+                // More breath pauses when client is distressed (models attentive presence)
                 pacing.breath_probability += self.client_distress * 0.15;
                 pacing.breath_probability = pacing.breath_probability.min(0.5);
             }

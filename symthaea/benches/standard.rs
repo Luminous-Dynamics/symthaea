@@ -19,11 +19,10 @@
 //! cargo bench --bench standard
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use symthaea::hdc::{
-    binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
+    HDC_DIMENSION, binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
     phi_resonant::ResonantPhiCalculator, spectral_connectivity::ConnectivityCalculator,
-    HDC_DIMENSION,
 };
 // Note: temporal_primitives module is not yet implemented - benchmark removed
 

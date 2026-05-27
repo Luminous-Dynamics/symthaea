@@ -6,9 +6,9 @@
 //! Basic factual question answering with known ground truth.
 //! Tests whether HDC representations encode factual knowledge.
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 
 pub struct SimpleQAAdapter;

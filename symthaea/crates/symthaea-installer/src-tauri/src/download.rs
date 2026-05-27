@@ -22,10 +22,7 @@ const ISO_SHA256: &str = "";
 ///
 /// Emits `download-progress` events with `{ downloaded, total, percent }` payload.
 /// If the ISO already exists and its hash matches, the download is skipped.
-pub async fn download_iso(
-    app: tauri::AppHandle,
-    dest_dir: &Path,
-) -> Result<PathBuf, String> {
+pub async fn download_iso(app: tauri::AppHandle, dest_dir: &Path) -> Result<PathBuf, String> {
     let dest = dest_dir.join("nixforhumanity.iso");
 
     // If already downloaded, optionally verify hash and skip re-download
@@ -44,9 +41,7 @@ pub async fn download_iso(
             // Hash mismatch — re-download
         } else {
             // No hash to verify; assume cached ISO is good
-            let size = std::fs::metadata(&dest)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let size = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
             if size > 100_000_000 {
                 let _ = app.emit(
                     "download-progress",
@@ -65,10 +60,7 @@ pub async fn download_iso(
         .map_err(|e| format!("Download failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!(
-            "Download failed: HTTP {}",
-            response.status()
-        ));
+        return Err(format!("Download failed: HTTP {}", response.status()));
     }
 
     let total = response.content_length().unwrap_or(0);

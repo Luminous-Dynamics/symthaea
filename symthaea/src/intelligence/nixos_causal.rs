@@ -273,11 +273,7 @@ impl NixOSCausalAnalyzer {
 
     /// Encode a boolean as numeric
     pub fn encode_bool(value: bool) -> f64 {
-        if value {
-            1.0
-        } else {
-            0.0
-        }
+        if value { 1.0 } else { 0.0 }
     }
 }
 

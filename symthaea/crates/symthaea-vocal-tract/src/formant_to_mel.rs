@@ -11,7 +11,7 @@
 //! 2. Append to internal audio buffer
 //! 3. Extract mel frames whenever buffer >= n_fft, advancing by hop_length
 
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 use std::sync::Arc;
 

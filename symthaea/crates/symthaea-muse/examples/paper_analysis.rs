@@ -457,11 +457,7 @@ fn pearson_12(chroma: &[f32; 12], profile: &[f32; 12], shift: usize) -> f32 {
         vy += dy * dy;
     }
     let d = (vx * vy).sqrt();
-    if d > 1e-8 {
-        cov / d
-    } else {
-        0.0
-    }
+    if d > 1e-8 { cov / d } else { 0.0 }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -486,11 +482,7 @@ fn pearson_r(x: &[f32], y: &[f32]) -> f32 {
         vy += dy * dy;
     }
     let d = (vx * vy).sqrt();
-    if d > 1e-8 {
-        cov / d
-    } else {
-        0.0
-    }
+    if d > 1e-8 { cov / d } else { 0.0 }
 }
 
 /// Two-tailed t-test p-value for Pearson r, df = n-2.
@@ -746,8 +738,10 @@ fn main() {
             "   "
         };
 
-        println!("{:<20} | {:>+10.3} | {:>9.2e} | {:>4} | {:>+10.3} | {:>9.2e} | {:>4} | [{:>+.2},{:>+.2}]",
-            name, r_a, p_a, sig_a, r_v, p_v, sig_v, ci_lo, ci_hi);
+        println!(
+            "{:<20} | {:>+10.3} | {:>9.2e} | {:>4} | {:>+10.3} | {:>9.2e} | {:>4} | [{:>+.2},{:>+.2}]",
+            name, r_a, p_a, sig_a, r_v, p_v, sig_v, ci_lo, ci_hi
+        );
     }
 
     println!();

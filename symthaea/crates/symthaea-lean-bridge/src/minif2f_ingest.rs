@@ -645,7 +645,7 @@ impl<'a> Parser<'a> {
                     expected: "theorem name",
                     found: format!("{other}"),
                     offset: self.offset(),
-                })
+                });
             }
         };
         // Binders: zero or more `(IDENT+ : BODY)` groups.
@@ -853,7 +853,7 @@ impl<'a> Parser<'a> {
                     expected: "relation operator (= ≠ < ≤ > ≥ ∣)",
                     found: format!("{other}"),
                     offset: self.offset(),
-                })
+                });
             }
         };
         self.advance();

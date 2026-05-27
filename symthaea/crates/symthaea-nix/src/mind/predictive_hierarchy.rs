@@ -185,7 +185,9 @@ mod tests {
         assert!(
             error3 <= error2 || error2 <= error1,
             "Prediction error should generally decrease with repeated observations: {:.3} → {:.3} → {:.3}",
-            error1, error2, error3,
+            error1,
+            error2,
+            error3,
         );
     }
 

@@ -3,10 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! HDC + Active Inference benchmarks for symthaea-nix.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use symthaea_nix::encoding::{NixCodebook, OptionEncoder, UserInputEncoder};
-use symthaea_nix::mind::{causal_graph::NixCausalGraph, NixActiveInference};
+use symthaea_nix::mind::{NixActiveInference, causal_graph::NixCausalGraph};
 
 /// Benchmark encoding a NixOS option path into HDC space.
 /// Target: <1μs

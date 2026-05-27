@@ -30,7 +30,7 @@
 //! a ContinuousHV suitable for gradient-based operations and fine-grained similarity.
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Neg, Sub};

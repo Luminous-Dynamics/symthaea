@@ -13,7 +13,7 @@ use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::modern_embeddings::{
-    print_model_summary, EmbeddingConfig, ModelBackend, PhenomenalLayerAnalyzer, UnifiedEmbedder,
+    EmbeddingConfig, ModelBackend, PhenomenalLayerAnalyzer, UnifiedEmbedder, print_model_summary,
 };
 
 fn main() -> Result<()> {

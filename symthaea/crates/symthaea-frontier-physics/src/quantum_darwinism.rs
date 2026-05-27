@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_plateau_detection() {
         let h_s = 1.0; // System entropy
-                       // Classical: plateau at H(S) for most fractions
+        // Classical: plateau at H(S) for most fractions
         let profile: Vec<(f64, f64)> = (1..=10)
             .map(|i| {
                 let f = i as f64 / 10.0;

@@ -1360,10 +1360,10 @@ impl StreamingSynth {
 
             // Collect for MIDI export — hard clamp to singable MIDI range
             let midi_freq = note.frequency.clamp(196.0, 988.0); // G3 (MIDI 55) to B5 (MIDI 83)
-                                                                // Quantize start_time to the nearest 8th-note grid position.
-                                                                // Without quantization, notes land at chunk boundaries (arbitrary),
-                                                                // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
-                                                                // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
+            // Quantize start_time to the nearest 8th-note grid position.
+            // Without quantization, notes land at chunk boundaries (arbitrary),
+            // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
+            // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
             let raw_time = self.total_samples_rendered as f32 / self.sample_rate as f32;
             let beat_dur = 60.0 / self.muse_stream.tempo().max(30.0); // seconds per beat
             let grid_unit = beat_dur * 0.5; // 8th-note grid

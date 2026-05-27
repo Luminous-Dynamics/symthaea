@@ -13,7 +13,7 @@
 //! - binary_to_continuous_pooled: BinaryHV → ContinuousHV pool conversion
 //! - find_similar: Threshold-filtered similarity search
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::consciousness_integration::{ConsciousnessPipeline, IntegrationConfig};
 use symthaea_core::hdc::consciousness_perf;

@@ -368,7 +368,7 @@ mod tests {
     fn test_self_tuning_runs() {
         let n = 10;
         let base = build_hierarchical(n, 1.0); // Normalized base coupling
-                                               // Renormalize so base represents topology, g scales it
+        // Renormalize so base represents topology, g scales it
         let max_c = base.iter().cloned().fold(0.0_f64, f64::max).max(1e-10);
         let normalized: Vec<f64> = base.iter().map(|c| c / max_c).collect();
         let drives = uniform_drives(n);

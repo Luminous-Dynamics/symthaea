@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::types::{ClimeState, AIR_QUALITY, CO2_LOAD, THERMAL_STRESS, UTILITY_RESERVE};
+use crate::types::{AIR_QUALITY, CO2_LOAD, ClimeState, THERMAL_STRESS, UTILITY_RESERVE};
 
 pub struct ClimeFepResult {
     pub tau_factor: f32,

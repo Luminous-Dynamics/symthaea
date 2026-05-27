@@ -28,7 +28,7 @@
 use super::chemistry::Chemistry;
 use super::hadrons::Hadrons;
 use super::periodic_table::PeriodicTable;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
+use super::standard_model::{PHYSICS_DIM, StandardModel};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};

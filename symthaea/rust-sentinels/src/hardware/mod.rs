@@ -23,13 +23,13 @@
 //! }
 //! ```
 
-mod traits;
-mod openbci;
 mod muse;
+mod openbci;
+mod traits;
 
-pub use traits::{
-    EegDevice, EegSample, DeviceConfig, DeviceInfo, DeviceError,
-    ChannelInfo, SampleRate, DeviceState,
-};
-pub use openbci::{OpenBciAdapter, OpenBciConfig, OpenBciBoard};
 pub use muse::{MuseAdapter, MuseConfig, MuseModel};
+pub use openbci::{OpenBciAdapter, OpenBciBoard, OpenBciConfig};
+pub use traits::{
+    ChannelInfo, DeviceConfig, DeviceError, DeviceInfo, DeviceState, EegDevice, EegSample,
+    SampleRate,
+};

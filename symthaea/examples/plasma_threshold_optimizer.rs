@@ -34,7 +34,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 use symthaea::physics::cmod_adapter::{
-    generate_synthetic_data, label_samples, CModShot, DisruptionLabel, LabelConfig, SyntheticConfig,
+    CModShot, DisruptionLabel, LabelConfig, SyntheticConfig, generate_synthetic_data, label_samples,
 };
 use symthaea::physics::plasma_control::{PlasmaControlConfig, StabilityRegime};
 
@@ -89,15 +89,15 @@ impl ThresholdConfig {
     /// Generate a random valid configuration
     pub fn random(rng: &mut impl Rng) -> Self {
         loop {
-            let phi_stable = rng.gen_range(Self::PHI_STABLE_BOUNDS.0..=Self::PHI_STABLE_BOUNDS.1);
+            let phi_stable = rng.r#gen_range(Self::PHI_STABLE_BOUNDS.0..=Self::PHI_STABLE_BOUNDS.1);
             let phi_warning =
-                rng.gen_range(Self::PHI_WARNING_BOUNDS.0..=Self::PHI_WARNING_BOUNDS.1);
+                rng.r#gen_range(Self::PHI_WARNING_BOUNDS.0..=Self::PHI_WARNING_BOUNDS.1);
             let phi_critical =
-                rng.gen_range(Self::PHI_CRITICAL_BOUNDS.0..=Self::PHI_CRITICAL_BOUNDS.1);
+                rng.r#gen_range(Self::PHI_CRITICAL_BOUNDS.0..=Self::PHI_CRITICAL_BOUNDS.1);
             let phi_rate_threshold =
-                rng.gen_range(Self::PHI_RATE_BOUNDS.0..=Self::PHI_RATE_BOUNDS.1);
+                rng.r#gen_range(Self::PHI_RATE_BOUNDS.0..=Self::PHI_RATE_BOUNDS.1);
             let volatility_threshold =
-                rng.gen_range(Self::VOLATILITY_BOUNDS.0..=Self::VOLATILITY_BOUNDS.1);
+                rng.r#gen_range(Self::VOLATILITY_BOUNDS.0..=Self::VOLATILITY_BOUNDS.1);
 
             if let Some(config) = Self::new(
                 phi_stable,
@@ -569,7 +569,7 @@ fn bayesian_optimization(shots: &[CModShot], n_iterations: usize, seed: u64) -> 
         } else {
             // Pick from top quartile with some randomness
             let top_k = (sorted_evals.len() / 4).max(1);
-            let idx = rng.gen_range(0..top_k);
+            let idx = rng.r#gen_range(0..top_k);
             sorted_evals[idx].0
         };
 
@@ -610,7 +610,7 @@ fn perturb_config(base: &ThresholdConfig, scale: f32, rng: &mut impl Rng) -> Thr
     loop {
         let mut perturb = |val: f32, bounds: (f32, f32)| -> f32 {
             let range = bounds.1 - bounds.0;
-            let delta = (rng.gen::<f32>() - 0.5) * 2.0 * scale * range;
+            let delta = (rng.r#gen::<f32>() - 0.5) * 2.0 * scale * range;
             (val + delta).clamp(bounds.0, bounds.1)
         };
 
@@ -659,7 +659,7 @@ fn train_val_split(shots: &[CModShot], seed: u64) -> (Vec<CModShot>, Vec<CModSho
 
     // Fisher-Yates shuffle
     for i in (1..indices.len()).rev() {
-        let j = rng.gen_range(0..=i);
+        let j = rng.r#gen_range(0..=i);
         indices.swap(i, j);
     }
 

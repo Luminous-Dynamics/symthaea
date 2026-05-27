@@ -319,11 +319,7 @@ impl MockVideoSource {
                     let frames_per_beat = (fps * 60.0) / bpm as f32;
                     let beat_position = (seq as f32 % frames_per_beat) / frames_per_beat;
                     // Sharp on/off at 50% duty cycle
-                    if beat_position < 0.5 {
-                        255
-                    } else {
-                        50
-                    }
+                    if beat_position < 0.5 { 255 } else { 50 }
                 }
                 MockPattern::MovingGradient => (seq % 256) as u8,
                 MockPattern::Noise => {
@@ -381,11 +377,7 @@ impl MockVideoSource {
                     let frames_per_beat = (fps * 60.0) / current_bpm;
                     let beat_position = (seq as f32 % frames_per_beat) / frames_per_beat;
 
-                    if beat_position < 0.5 {
-                        255
-                    } else {
-                        50
-                    }
+                    if beat_position < 0.5 { 255 } else { 50 }
                 }
 
                 MockPattern::Triplet { bpm } => {
@@ -413,11 +405,7 @@ impl MockVideoSource {
                     let gap = hash % (avg_gap_frames as u64 * 2);
 
                     // Burst when sequence aligns with hash-based timing
-                    if seq % (gap.max(1)) < 3 {
-                        255
-                    } else {
-                        50
-                    }
+                    if seq % (gap.max(1)) < 3 { 255 } else { 50 }
                 }
 
                 MockPattern::Morse { unit_frames } => {
@@ -442,11 +430,7 @@ impl MockVideoSource {
                             || (p >= 18 * unit && p < 21 * unit)
                     };
 
-                    if in_dot(pos) || in_dash(pos) {
-                        255
-                    } else {
-                        50
-                    }
+                    if in_dot(pos) || in_dash(pos) { 255 } else { 50 }
                 }
             }
         };

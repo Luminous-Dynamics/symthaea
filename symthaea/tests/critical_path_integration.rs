@@ -315,19 +315,23 @@ fn test_all_primitive_feedback_loops_synergy() {
         let result = service.cycle(input_for_cycle(i));
 
         // All feedback-related metadata must be finite
-        assert!(result
-            .metadata
-            .quality
-            .equation_v2_consciousness
-            .is_finite());
+        assert!(
+            result
+                .metadata
+                .quality
+                .equation_v2_consciousness
+                .is_finite()
+        );
         assert!(result.metadata.quality.hierarchical_ltc_phi.is_finite());
         assert!(result.metadata.temporal.holographic_unity.is_finite());
         assert!(result.metadata.temporal.holographic_binding.is_finite());
-        assert!(result
-            .metadata
-            .consciousness
-            .consciousness_gradient_magnitude
-            .is_finite());
+        assert!(
+            result
+                .metadata
+                .consciousness
+                .consciousness_gradient_magnitude
+                .is_finite()
+        );
         assert!(result.prediction_error.is_finite());
 
         // Prediction confidence must stay in [0, 1]

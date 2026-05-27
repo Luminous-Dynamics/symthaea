@@ -14,7 +14,7 @@
 //! cargo bench -p symthaea-core --bench hdc_simd_compare
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::native_similarity::PackedBipolar;
 use symthaea_core::hdc::simd_detect::SimdCapabilities;

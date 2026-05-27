@@ -1020,7 +1020,7 @@ mod tests {
 
     #[test]
     fn tuning_selection_from_consciousness() {
-        use symthaea_muse::pitch::{select_tuning_system, TuningSystem};
+        use symthaea_muse::pitch::{TuningSystem, select_tuning_system};
         // High consciousness → Just Intonation
         let mut state = MusicalState::default();
         state.consciousness_level = 0.8;
@@ -1042,7 +1042,7 @@ mod tests {
 
     #[test]
     fn tuning_name_format_nonempty() {
-        use symthaea_muse::pitch::{select_tuning_system, TuningSystem};
+        use symthaea_muse::pitch::{TuningSystem, select_tuning_system};
         let state = MusicalState::default();
         let tuning = select_tuning_system(&state);
         let name = format!("{tuning:?}");

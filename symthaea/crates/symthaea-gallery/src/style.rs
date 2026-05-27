@@ -191,11 +191,7 @@ fn linear_slope(values: &[f32]) -> f32 {
         num += (x - x_mean) * (y - y_mean);
         den += (x - x_mean) * (x - x_mean);
     }
-    if den.abs() < 0.0001 {
-        0.0
-    } else {
-        num / den
-    }
+    if den.abs() < 0.0001 { 0.0 } else { num / den }
 }
 
 #[cfg(test)]

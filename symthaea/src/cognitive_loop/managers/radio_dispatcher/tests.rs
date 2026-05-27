@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-use super::super::super::subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot};
+use super::super::super::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, output_flags};
 use super::super::super::thresholds::{
     RADIO_BEACON_INTERVAL_CYCLES, RADIO_BEACON_SIZE, RADIO_CRYPTO_NONCE_SIZE,
     RADIO_SYNTHETIC_SNR_BASE, RADIO_SYNTHETIC_SNR_ISOLATED,
@@ -344,11 +344,7 @@ fn test_spectrum_manager_interval_coprime() {
 }
 
 fn gcd(a: u32, b: u32) -> u32 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 #[test]

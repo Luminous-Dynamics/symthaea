@@ -13,12 +13,16 @@ use symthaea::gui_bridge::*;
 #[test]
 fn test_bridge_creation() {
     let bridge = GuiBridge::new();
-    assert!(bridge
-        .bindings_for_category(ConfigCategory::Services)
-        .is_empty());
-    assert!(bridge
-        .bindings_for_category(ConfigCategory::Packages)
-        .is_empty());
+    assert!(
+        bridge
+            .bindings_for_category(ConfigCategory::Services)
+            .is_empty()
+    );
+    assert!(
+        bridge
+            .bindings_for_category(ConfigCategory::Packages)
+            .is_empty()
+    );
 }
 
 #[test]

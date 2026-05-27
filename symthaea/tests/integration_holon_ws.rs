@@ -41,7 +41,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
 
-use symthaea::api::holon::{holon_router, HolonHttpState};
+use symthaea::api::holon::{HolonHttpState, holon_router};
 use symthaea::swarm::rdp_codec::TILE_SIZE;
 use symthaea::swarm::rdp_holon_bridge::HolonRdpViewer;
 use symthaea::swarm::rdp_protocol::{
@@ -452,7 +452,10 @@ async fn ws_input_reverse_path_reaches_server_rdp_inbound() {
 
     // Drain rdp_inbound and assert the sealed bytes arrived unchanged.
     let received = state.drain_rdp_inbound();
-    assert!(!received.is_empty(), "server should have received the input frame");
+    assert!(
+        !received.is_empty(),
+        "server should have received the input frame"
+    );
     assert_eq!(
         received[0].len(),
         sealed.len(),
@@ -464,7 +467,13 @@ async fn ws_input_reverse_path_reaches_server_rdp_inbound() {
     let opened = open_input(&received[0], &mut receiver_session).expect("open input");
     assert_eq!(opened.sequence, 1);
     assert_eq!(opened.events.len(), 1);
-    if let InputEvent::Pointer { x, y, button, pressed } = opened.events[0] {
+    if let InputEvent::Pointer {
+        x,
+        y,
+        button,
+        pressed,
+    } = opened.events[0]
+    {
         assert!((x - 0.5).abs() < 1e-6);
         assert!((y - 0.5).abs() < 1e-6);
         assert_eq!(button, 1);

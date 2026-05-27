@@ -8,11 +8,11 @@
 
 use super::acoustics::AcousticsEncoder;
 use super::astrophysics::StellarEncoder;
-use super::chaos_dynamics::{systems, AttractorAnalyzer, LyapunovCalculator};
+use super::chaos_dynamics::{AttractorAnalyzer, LyapunovCalculator, systems};
 use super::condensed_matter::CMEncoder;
-use super::constants::{C, EPSILON_0, E_CHARGE, G, H, HBAR, K_BOLTZMANN, M_ELECTRON};
+use super::constants::{C, E_CHARGE, EPSILON_0, G, H, HBAR, K_BOLTZMANN, M_ELECTRON};
 use super::cosmology::CosmologyEncoder;
-use super::decoherence::{simulate_decoherence, Complex64, DecoherenceChannel, DensityMatrix};
+use super::decoherence::{Complex64, DecoherenceChannel, DensityMatrix, simulate_decoherence};
 use super::electromagnetism::{EMEncoder, Polarization, SpectrumRegion};
 use super::fluid_dynamics::FluidEncoder;
 use super::general_relativity::GREncoder;
@@ -775,11 +775,7 @@ fn inverse_normal_cdf(p: f64) -> f64 {
 
     let approx = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
 
-    if p < 0.5 {
-        -approx
-    } else {
-        approx
-    }
+    if p < 0.5 { -approx } else { approx }
 }
 
 #[test]

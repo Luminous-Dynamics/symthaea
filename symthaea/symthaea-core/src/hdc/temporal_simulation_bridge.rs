@@ -39,7 +39,7 @@
 //! ```
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::dynamical_system::{state_to_hv, SimulationResult};
+use crate::hdc::dynamical_system::{SimulationResult, state_to_hv};
 use crate::hdc::temporal_binding::{
     TemporalBindingConfig, TemporalBindingEngine, TemporalIntegration,
 };

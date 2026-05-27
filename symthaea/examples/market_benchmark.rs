@@ -13,8 +13,8 @@
 
 use std::collections::HashMap;
 use symthaea::markets::{
-    MarketRegime, MarketSimulator, MarketStateEncoder, PatternMemory, SimulatorConfig,
-    TechnicalIndicators, OHLCV,
+    MarketRegime, MarketSimulator, MarketStateEncoder, OHLCV, PatternMemory, SimulatorConfig,
+    TechnicalIndicators,
 };
 
 fn main() {

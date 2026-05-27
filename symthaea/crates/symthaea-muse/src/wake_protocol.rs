@@ -25,7 +25,7 @@
 //! Each correct phase lifts consciousness by ~0.1 and reduces safety by one tier.
 //! An incorrect harmony resets progress by one step (forgiveness, not punishment).
 
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 
 /// The Eight Harmonies in wake order (index into harmony_activations[]).
 pub const WAKE_ORDER: [usize; 8] = [7, 0, 2, 4, 5, 1, 6, 3];

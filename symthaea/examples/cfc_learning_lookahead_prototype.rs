@@ -37,8 +37,8 @@ use std::time::Instant;
 
 // Symthaea imports
 use symthaea::cfc::CfCNetwork;
-use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::phi_engine::PhiEngine;
 
 // ═══════════════════════════════════════════════════════════════════════════════

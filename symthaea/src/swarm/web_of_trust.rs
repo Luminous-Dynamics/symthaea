@@ -509,7 +509,7 @@ mod tests {
         let mut g = TrustGraph::new();
         g.set_trust("a", "b", 0.5, true);
         g.set_trust("a", "b", 0.7, false); // Update without PQ
-                                           // PQ flag should still be true (sticky)
+        // PQ flag should still be true (sticky)
         let edges = g.edges.get("a").unwrap();
         assert!(edges[0].pq_verified);
     }

@@ -466,7 +466,9 @@ mod tests {
             "=".repeat(15),
             "=".repeat(15)
         );
-        eprintln!("3-point neutron pairing gap: D3(N) = (-1)^N * [BE(Z,N+1) - 2*BE(Z,N) + BE(Z,N-1)] / 2\n");
+        eprintln!(
+            "3-point neutron pairing gap: D3(N) = (-1)^N * [BE(Z,N+1) - 2*BE(Z,N) + BE(Z,N-1)] / 2\n"
+        );
 
         // Extract pairing gaps across the chart
         eprintln!("--- Neutron Pairing Gap vs A (Z=50 Sn chain) ---");

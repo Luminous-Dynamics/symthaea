@@ -892,7 +892,7 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::{primitive_system::PrimitiveTier, BinaryHV};
+    use crate::hdc::{BinaryHV, primitive_system::PrimitiveTier};
 
     #[test]
     fn test_causal_model_creation() {
@@ -954,7 +954,7 @@ mod tests {
 
     #[test]
     fn test_epistemic_tier_evolution() {
-        use crate::hdc::{primitive_system::PrimitiveTier, BinaryHV};
+        use crate::hdc::{BinaryHV, primitive_system::PrimitiveTier};
 
         let mut model = CausalModel::new();
 

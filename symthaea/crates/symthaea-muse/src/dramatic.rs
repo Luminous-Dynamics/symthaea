@@ -5,8 +5,8 @@
 //! Strategic silence, tempo breathing, key modulation, sub-bass,
 //! texture layering, and strong endings.
 
-use crate::composer_mind::SectionArc;
 use crate::MusicalState;
+use crate::composer_mind::SectionArc;
 
 /// Dramatic state tracked across the composition.
 pub struct DramaticState {
@@ -75,7 +75,7 @@ impl DramaticState {
             }
             SectionArc::Climax => {
                 self.target_density = 0.8 + psi * 0.2; // nearly full
-                                                       // Slight accelerando at peak
+                // Slight accelerando at peak
                 self.tempo_factor = 1.05 + arousal * 0.05;
                 // Key modulation: up a half step for emotional lift
                 self.target_key_shift = 1;

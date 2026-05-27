@@ -79,7 +79,7 @@ fn test_difficulty_zero_matches_default() {
 
 #[test]
 fn test_difficulty_model_registry() {
-    use symthaea_psych_bench::harness::difficulty::{difficulty_model_for, DifficultyModelType};
+    use symthaea_psych_bench::harness::difficulty::{DifficultyModelType, difficulty_model_for};
 
     // Interference benchmarks
     let stroop = difficulty_model_for("Executive::Stroop");

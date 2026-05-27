@@ -33,7 +33,7 @@ impl SiliconArchitect {
     /// Autonomously synthesize Verilog RTL from a functional goal.
     pub fn synthesize_rtl(&self, goal: &str, ppa_target: SiliconPPA) -> SiliconArtifact {
         tracing::info!("🔌 Synthesizing Silicon RTL for goal: {}", goal);
-        
+
         // In a real implementation, Broca would generate the Verilog.
         // This is a stub showing the structural transformation.
         let verilog = format!(
@@ -54,10 +54,10 @@ impl SiliconArchitect {
     /// Autonomously derive electrical SMT safety gates from a timing report.
     pub fn derive_timing_invariants(&self, artifact: &SiliconArtifact) -> Vec<String> {
         let mut invariants = Vec::new();
-        
+
         // Setup/Hold Time Invariant: slack must be non-negative
         invariants.push(format!(
-            "(assert (>= slack_ns {:.4}))", 
+            "(assert (>= slack_ns {:.4}))",
             artifact.ppa_target.slack_ns
         ));
 
@@ -72,8 +72,12 @@ impl SiliconArchitect {
 
     /// Map a Silicon Artifact to an Engineering Concept for the FEP engine.
     pub fn to_engineering_concept(&self, artifact: &SiliconArtifact) -> EngineeringConcept {
-        let mut concept = EngineeringConcept::new(&artifact.id, &artifact.label, symthaea_sim_bridge::EngineeringDomain::Electrical);
-        
+        let mut concept = EngineeringConcept::new(
+            &artifact.id,
+            &artifact.label,
+            symthaea_sim_bridge::EngineeringDomain::Electrical,
+        );
+
         concept.add_requirement(EngineeringRequirement::new(
             "REQ-PPA-001",
             symthaea_sim_bridge::EngineeringDomain::Electrical,
@@ -87,22 +91,25 @@ impl SiliconArchitect {
 
     /// Formally prove that the PowerDistributionLogic algorithm is Deadlock-Free.
     ///
-    /// Uses Z3 to verify that for all demand levels, there exists a 
+    /// Uses Z3 to verify that for all demand levels, there exists a
     /// satisfiable routing state where active_loads_mw > 0 if power is available.
     pub fn prove_deadlock_freedom(&self, logic: &PowerDistributionLogic) -> Result<bool, String> {
         let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
-        
+
         let mut smt = String::new();
         smt.push_str("(declare-const demand Real)\n");
         smt.push_str("(declare-const available Real)\n");
         smt.push_str("(declare-const active_loads Real)\n");
         smt.push_str("(declare-const min_critical Real)\n");
-        
+
         // 1. Setup: Define the algorithm and physical bounds
-        smt.push_str(&format!("(assert (= min_critical {:.4}))\n", logic.min_critical_mw));
+        smt.push_str(&format!(
+            "(assert (= min_critical {:.4}))\n",
+            logic.min_critical_mw
+        ));
         smt.push_str("(assert (> demand 0.1))\n");
         smt.push_str("(assert (> available 0.1))\n");
-        
+
         let stress_logic = "(ite (< available min_critical) (* available 0.99) min_critical)";
         let normal_logic = "(ite (< demand available) demand available)";
         smt.push_str(&format!(
@@ -113,14 +120,16 @@ impl SiliconArchitect {
         // 2. Goal: Prove active_loads > 0
         // We assert the NEGATION: active_loads <= 0
         smt.push_str("(assert (<= active_loads 0.0))\n");
-        
+
         smt.push_str("(check-sat)");
-        
+
         // 3. Check for UNSAT (Negation is impossible -> Goal is always true)
         let result = z3.verify_satisfiable(&smt);
-        
+
         if result.is_unsat() {
-            tracing::info!("✅ Silicon Sanity Verified: PowerDistributionLogic is mathematically Deadlock-Free.");
+            tracing::info!(
+                "✅ Silicon Sanity Verified: PowerDistributionLogic is mathematically Deadlock-Free."
+            );
             Ok(true)
         } else {
             Err("❌ Deadlock Proof Failed: Algorithm may result in zero-load state despite available power.".into())

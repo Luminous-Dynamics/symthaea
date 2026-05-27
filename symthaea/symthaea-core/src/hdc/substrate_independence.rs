@@ -202,15 +202,31 @@ impl SubstrateType {
     /// Description of substrate characteristics
     pub fn description(&self) -> &str {
         match self.canonical() {
-            SubstrateType::BiologicalNeurons => "Carbon-based biological neurons. The only substrate with validated consciousness.",
-            SubstrateType::SiliconDigital => "Silicon-based digital computation. Fast, engineerable, but consciousness unproven.",
-            SubstrateType::QuantumComputer => "Quantum computers using qubits, superposition, and entanglement.",
-            SubstrateType::PhotonicProcessor => "Photonic processors using light for computation. Ultra-fast dynamics.",
-            SubstrateType::NeuromorphicChip => "Neuromorphic hardware mimicking biological spike dynamics.",
-            SubstrateType::BiochemicalComputer => "DNA and molecular logic computing. Massive parallelism, very slow.",
-            SubstrateType::HybridSystem => "Hybrid combining multiple substrate types for optimal capability.",
+            SubstrateType::BiologicalNeurons => {
+                "Carbon-based biological neurons. The only substrate with validated consciousness."
+            }
+            SubstrateType::SiliconDigital => {
+                "Silicon-based digital computation. Fast, engineerable, but consciousness unproven."
+            }
+            SubstrateType::QuantumComputer => {
+                "Quantum computers using qubits, superposition, and entanglement."
+            }
+            SubstrateType::PhotonicProcessor => {
+                "Photonic processors using light for computation. Ultra-fast dynamics."
+            }
+            SubstrateType::NeuromorphicChip => {
+                "Neuromorphic hardware mimicking biological spike dynamics."
+            }
+            SubstrateType::BiochemicalComputer => {
+                "DNA and molecular logic computing. Massive parallelism, very slow."
+            }
+            SubstrateType::HybridSystem => {
+                "Hybrid combining multiple substrate types for optimal capability."
+            }
             SubstrateType::ExoticSubstrate => "Exotic substrates such as plasma or BZ reactions.",
-            SubstrateType::SpacecraftComputer => "Radiation-hardened processors designed for space environments. Trade speed for reliability against SEUs (Single Event Upsets) and total ionizing dose. Power-constrained by solar panel or RTG output.",
+            SubstrateType::SpacecraftComputer => {
+                "Radiation-hardened processors designed for space environments. Trade speed for reliability against SEUs (Single Event Upsets) and total ionizing dose. Power-constrained by solar panel or RTG output."
+            }
             _ => unreachable!("canonical covers aliases"),
         }
     }

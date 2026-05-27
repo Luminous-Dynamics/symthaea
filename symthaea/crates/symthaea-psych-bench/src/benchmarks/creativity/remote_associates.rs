@@ -8,8 +8,8 @@
 //! solution word ranks highest among candidates by similarity.
 //! Human baseline: ~0.50 accuracy (Bowden & Jung-Beeman 2003).
 
-use crate::adapter::semantic::{RatTriadData, SemanticScenarioAdapter, Word};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::semantic::{RatTriadData, SemanticScenarioAdapter, Word};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;

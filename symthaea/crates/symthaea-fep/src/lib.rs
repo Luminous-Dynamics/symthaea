@@ -173,6 +173,6 @@ pub use motor::MotorSystem;
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
 
 pub use markov_blanket::{
-    identify_coalitions, BlanketPermeability, BlanketTelemetry, MarkovBoundaryOperator,
-    MarkovPartition, PermeabilityInputs, SwarmCoalition, TopologyBoundaryInputs,
+    BlanketPermeability, BlanketTelemetry, MarkovBoundaryOperator, MarkovPartition,
+    PermeabilityInputs, SwarmCoalition, TopologyBoundaryInputs, identify_coalitions,
 };

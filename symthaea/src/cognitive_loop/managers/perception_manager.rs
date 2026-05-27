@@ -19,7 +19,7 @@
 //! Proposes arousal/confidence/exploration adjustments based on perceptual quality.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds::{
     self, PERCEPTION_BINDING_HIGH, PERCEPTION_BINDING_LOW, PERCEPTION_COHERENCE_HIGH,

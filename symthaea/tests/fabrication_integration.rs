@@ -9,8 +9,8 @@
 #![cfg(feature = "advanced-manufacturing")]
 
 use symthaea::cognitive_loop::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, FabricationEvent, FabricationEventKind,
-    FabricationManager,
+    CognitiveSubsystem, CycleSnapshot, FabricationEvent, FabricationEventKind, FabricationManager,
+    output_flags,
 };
 use symthaea_fabrication_kernel::manufacturing::ManufacturingSafetyLevel;
 

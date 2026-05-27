@@ -29,8 +29,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use symthaea_stt::{
-    AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, DtwTrainer, TextToPhonemes,
-    TrainedPrototypes, HV16,
+    AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, DtwTrainer, HV16,
+    TextToPhonemes, TrainedPrototypes,
 };
 
 #[derive(Parser)]

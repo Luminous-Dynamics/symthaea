@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::types::{SurgicalState, NUM_STATE_CHANNELS};
+use crate::types::{NUM_STATE_CHANNELS, SurgicalState};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;

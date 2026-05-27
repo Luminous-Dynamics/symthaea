@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Power telemetry SSM sensor (INA219 or simulated).
 
+use anyhow::Result;
 #[cfg(feature = "ssm-power-hal")]
 use anyhow::anyhow;
-use anyhow::Result;
 use std::collections::HashMap;
 #[cfg(feature = "ssm-power-hal")]
 use std::sync::Mutex;

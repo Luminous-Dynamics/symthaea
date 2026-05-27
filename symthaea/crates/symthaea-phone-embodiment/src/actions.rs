@@ -103,9 +103,11 @@ mod tests {
     #[test]
     fn test_tap_is_mutating() {
         assert!(PhoneAction::Tap { x: 100, y: 200 }.is_mutating());
-        assert!(PhoneAction::Type {
-            text: "hello".into()
-        }
-        .is_mutating());
+        assert!(
+            PhoneAction::Type {
+                text: "hello".into()
+            }
+            .is_mutating()
+        );
     }
 }

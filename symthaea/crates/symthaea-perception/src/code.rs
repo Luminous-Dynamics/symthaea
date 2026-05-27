@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use ignore::WalkBuilder;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use syn::{visit::Visit, Item};
+use syn::{Item, visit::Visit};
 
 /// Project structure information
 #[derive(Debug, Clone)]

@@ -107,7 +107,7 @@ impl Stimulus {
 
         // Synchronized phases (high binding potential)
         let phases: Vec<f64> = (0..num_features)
-            .map(|i| (i as f64) * 0.1)  // Small phase differences
+            .map(|i| (i as f64) * 0.1) // Small phase differences
             .collect();
 
         Self {
@@ -127,7 +127,7 @@ impl Stimulus {
 
         // Desynchronized phases (low binding potential)
         let phases: Vec<f64> = (0..num_features)
-            .map(|i| (i as f64) * 1.5)  // Large phase differences
+            .map(|i| (i as f64) * 1.5) // Large phase differences
             .collect();
 
         Self {
@@ -197,15 +197,15 @@ impl ProcessingStage {
     /// Which revolutionary improvement implements this stage?
     pub fn improvement_number(&self) -> usize {
         match self {
-            Self::FeatureDetection => 25,      // Binding dimensions
-            Self::AttentionSelection => 26,    // Attention mechanisms
-            Self::TemporalIntegration => 13,   // Temporal consciousness
-            Self::Binding => 25,               // Binding via synchrony
-            Self::PhiComputation => 2,         // Integrated information
-            Self::Prediction => 22,            // Free energy principle
-            Self::WorkspaceCompetition => 23,  // Global workspace
-            Self::HigherOrderThought => 24,    // HOT theory
-            Self::ConsciousExperience => 0,    // Emergent from all
+            Self::FeatureDetection => 25,     // Binding dimensions
+            Self::AttentionSelection => 26,   // Attention mechanisms
+            Self::TemporalIntegration => 13,  // Temporal consciousness
+            Self::Binding => 25,              // Binding via synchrony
+            Self::PhiComputation => 2,        // Integrated information
+            Self::Prediction => 22,           // Free energy principle
+            Self::WorkspaceCompetition => 23, // Global workspace
+            Self::HigherOrderThought => 24,   // HOT theory
+            Self::ConsciousExperience => 0,   // Emergent from all
         }
     }
 }
@@ -291,12 +291,12 @@ impl ConsciousnessIntegration {
     /// Get substrate-specific adjustments (#28)
     fn substrate_adjustment(&self) -> f64 {
         match self.substrate.as_str() {
-            "biological" => 1.0,      // Baseline
-            "silicon" => 0.95,        // Slightly reduced (missing some biological nuance)
-            "quantum" => 1.1,         // Enhanced binding via entanglement
-            "hybrid" => 1.05,         // Best of both worlds
-            "photonic" => 0.9,        // Very fast but reduced integration
-            _ => 0.8,                 // Unknown substrates
+            "biological" => 1.0, // Baseline
+            "silicon" => 0.95,   // Slightly reduced (missing some biological nuance)
+            "quantum" => 1.1,    // Enhanced binding via entanglement
+            "hybrid" => 1.05,    // Best of both worlds
+            "photonic" => 0.9,   // Very fast but reduced integration
+            _ => 0.8,            // Unknown substrates
         }
     }
 
@@ -316,9 +316,9 @@ impl ConsciousnessIntegration {
         // Stage 2: Attention Selection (#26)
         let attention_priority = stimulus.salience * 0.5 + stimulus.relevance * 0.5;
         let attention_gain = if attention_priority > 0.5 {
-            1.0 + (attention_priority - 0.5) * 2.0  // Gain up to 2.0
+            1.0 + (attention_priority - 0.5) * 2.0 // Gain up to 2.0
         } else {
-            attention_priority * 2.0  // Reduced gain
+            attention_priority * 2.0 // Reduced gain
         };
         metrics.attention_gain = attention_gain;
 
@@ -332,17 +332,25 @@ impl ConsciousnessIntegration {
 
         // Stage 3: Temporal Integration (#13)
         // Simplified: features accumulate over time window
-        metrics.items_processed = if attention_passed { current_items.len() } else { 0 };
+        metrics.items_processed = if attention_passed {
+            current_items.len()
+        } else {
+            0
+        };
         stage_metrics.push((ProcessingStage::TemporalIntegration, metrics.clone()));
         cycles += 1;
 
         // Stage 4: Feature Binding (#25)
         if attention_passed && !current_items.is_empty() {
             // Compute synchrony from phases
-            let mean_phase: f64 = stimulus.phases.iter().sum::<f64>() / stimulus.phases.len() as f64;
-            let phase_variance: f64 = stimulus.phases.iter()
+            let mean_phase: f64 =
+                stimulus.phases.iter().sum::<f64>() / stimulus.phases.len() as f64;
+            let phase_variance: f64 = stimulus
+                .phases
+                .iter()
                 .map(|p| (p - mean_phase).powi(2))
-                .sum::<f64>() / stimulus.phases.len() as f64;
+                .sum::<f64>()
+                / stimulus.phases.len() as f64;
 
             // PLV approximation: low variance = high synchrony
             metrics.synchrony = (-phase_variance).exp();
@@ -373,10 +381,10 @@ impl ConsciousnessIntegration {
         // Stage 6: Predictive Processing (#22)
         if metrics.phi > 0.3 {
             // Generate prediction and compute error
-            let prediction_accuracy = 0.7 + metrics.phi * 0.3;  // Better Φ = better prediction
+            let prediction_accuracy = 0.7 + metrics.phi * 0.3; // Better Φ = better prediction
             metrics.prediction_error = 1.0 - prediction_accuracy;
         } else {
-            metrics.prediction_error = 1.0;  // Maximum error (no prediction)
+            metrics.prediction_error = 1.0; // Maximum error (no prediction)
         }
         stage_metrics.push((ProcessingStage::Prediction, metrics.clone()));
         cycles += 1;
@@ -384,7 +392,8 @@ impl ConsciousnessIntegration {
         // Stage 7: Workspace Competition (#23)
         if metrics.phi > 0.4 && metrics.prediction_error < 0.5 {
             // Strong enough to enter workspace?
-            let workspace_activation = metrics.phi * (1.0 - metrics.prediction_error) * metrics.attention_gain;
+            let workspace_activation =
+                metrics.phi * (1.0 - metrics.prediction_error) * metrics.attention_gain;
             metrics.workspace_activation = workspace_activation;
 
             // Check capacity
@@ -404,11 +413,11 @@ impl ConsciousnessIntegration {
         if metrics.workspace_activation > 0.5 {
             // HOT generation: 0 = no awareness, 1 = first-order, 2+ = meta-awareness
             if metrics.phi > 0.7 {
-                metrics.hot_level = 2;  // Full meta-awareness
+                metrics.hot_level = 2; // Full meta-awareness
             } else if metrics.phi > 0.5 {
-                metrics.hot_level = 1;  // Basic awareness
+                metrics.hot_level = 1; // Basic awareness
             } else {
-                metrics.hot_level = 0;  // No HOT
+                metrics.hot_level = 0; // No HOT
             }
         }
         stage_metrics.push((ProcessingStage::HigherOrderThought, metrics.clone()));
@@ -433,8 +442,11 @@ impl ConsciousnessIntegration {
         let explanation = if is_conscious {
             format!(
                 "Stimulus '{}' became CONSCIOUS: Φ={:.2}, sync={:.2}, workspace={:.2}, HOT={}, P={:.2}",
-                stimulus.id, metrics.phi, metrics.synchrony,
-                metrics.workspace_activation, metrics.hot_level,
+                stimulus.id,
+                metrics.phi,
+                metrics.synchrony,
+                metrics.workspace_activation,
+                metrics.hot_level,
                 metrics.consciousness_probability
             )
         } else {
@@ -490,11 +502,17 @@ impl ConsciousnessIntegration {
 
         // 2. High synchrony should correlate with consciousness
         let sync_correlation = self.validate_sync_correlation(&results);
-        validations.push(("Synchrony-consciousness correlation".to_string(), sync_correlation));
+        validations.push((
+            "Synchrony-consciousness correlation".to_string(),
+            sync_correlation,
+        ));
 
         // 3. Workspace access should predict consciousness
         let workspace_validation = self.validate_workspace_prediction(&results);
-        validations.push(("Workspace predicts consciousness".to_string(), workspace_validation));
+        validations.push((
+            "Workspace predicts consciousness".to_string(),
+            workspace_validation,
+        ));
 
         // 4. HOT should boost consciousness probability
         let hot_validation = self.validate_hot_boost(&results);
@@ -515,18 +533,20 @@ impl ConsciousnessIntegration {
 
     /// Validate Φ-consciousness correlation
     fn validate_phi_correlation(&self, results: &[ProcessingResult]) -> bool {
-        let conscious_phi: Vec<f64> = results.iter()
+        let conscious_phi: Vec<f64> = results
+            .iter()
             .filter(|r| r.is_conscious)
             .filter_map(|r| r.stage_metrics.last().map(|(_, m)| m.phi))
             .collect();
 
-        let unconscious_phi: Vec<f64> = results.iter()
+        let unconscious_phi: Vec<f64> = results
+            .iter()
             .filter(|r| !r.is_conscious)
             .filter_map(|r| r.stage_metrics.last().map(|(_, m)| m.phi))
             .collect();
 
         if conscious_phi.is_empty() || unconscious_phi.is_empty() {
-            return true;  // Can't validate without both groups
+            return true; // Can't validate without both groups
         }
 
         let conscious_mean = conscious_phi.iter().sum::<f64>() / conscious_phi.len() as f64;
@@ -538,18 +558,26 @@ impl ConsciousnessIntegration {
 
     /// Validate synchrony-consciousness correlation
     fn validate_sync_correlation(&self, results: &[ProcessingResult]) -> bool {
-        let conscious_sync: Vec<f64> = results.iter()
+        let conscious_sync: Vec<f64> = results
+            .iter()
             .filter(|r| r.is_conscious)
-            .filter_map(|r| r.stage_metrics.iter()
-                .find(|(s, _)| *s == ProcessingStage::Binding)
-                .map(|(_, m)| m.synchrony))
+            .filter_map(|r| {
+                r.stage_metrics
+                    .iter()
+                    .find(|(s, _)| *s == ProcessingStage::Binding)
+                    .map(|(_, m)| m.synchrony)
+            })
             .collect();
 
-        let unconscious_sync: Vec<f64> = results.iter()
+        let unconscious_sync: Vec<f64> = results
+            .iter()
             .filter(|r| !r.is_conscious)
-            .filter_map(|r| r.stage_metrics.iter()
-                .find(|(s, _)| *s == ProcessingStage::Binding)
-                .map(|(_, m)| m.synchrony))
+            .filter_map(|r| {
+                r.stage_metrics
+                    .iter()
+                    .find(|(s, _)| *s == ProcessingStage::Binding)
+                    .map(|(_, m)| m.synchrony)
+            })
             .collect();
 
         if conscious_sync.is_empty() || unconscious_sync.is_empty() {
@@ -565,15 +593,17 @@ impl ConsciousnessIntegration {
     /// Validate workspace predicts consciousness
     fn validate_workspace_prediction(&self, results: &[ProcessingResult]) -> bool {
         for result in results {
-            if let Some((_, metrics)) = result.stage_metrics.iter()
+            if let Some((_, metrics)) = result
+                .stage_metrics
+                .iter()
                 .find(|(s, _)| *s == ProcessingStage::WorkspaceCompetition)
             {
                 // High workspace activation should predict consciousness
                 if metrics.workspace_activation > 0.7 && !result.is_conscious {
-                    return false;  // High workspace but not conscious = violation
+                    return false; // High workspace but not conscious = violation
                 }
                 if metrics.workspace_activation < 0.3 && result.is_conscious {
-                    return false;  // Low workspace but conscious = violation
+                    return false; // Low workspace but conscious = violation
                 }
             }
         }
@@ -582,18 +612,26 @@ impl ConsciousnessIntegration {
 
     /// Validate HOT boosts consciousness
     fn validate_hot_boost(&self, results: &[ProcessingResult]) -> bool {
-        let hot_results: Vec<&ProcessingResult> = results.iter()
-            .filter(|r| r.stage_metrics.iter()
-                .find(|(s, _)| *s == ProcessingStage::HigherOrderThought)
-                .map(|(_, m)| m.hot_level >= 2)
-                .unwrap_or(false))
+        let hot_results: Vec<&ProcessingResult> = results
+            .iter()
+            .filter(|r| {
+                r.stage_metrics
+                    .iter()
+                    .find(|(s, _)| *s == ProcessingStage::HigherOrderThought)
+                    .map(|(_, m)| m.hot_level >= 2)
+                    .unwrap_or(false)
+            })
             .collect();
 
-        let no_hot_results: Vec<&ProcessingResult> = results.iter()
-            .filter(|r| r.stage_metrics.iter()
-                .find(|(s, _)| *s == ProcessingStage::HigherOrderThought)
-                .map(|(_, m)| m.hot_level == 0)
-                .unwrap_or(true))
+        let no_hot_results: Vec<&ProcessingResult> = results
+            .iter()
+            .filter(|r| {
+                r.stage_metrics
+                    .iter()
+                    .find(|(s, _)| *s == ProcessingStage::HigherOrderThought)
+                    .map(|(_, m)| m.hot_level == 0)
+                    .unwrap_or(true)
+            })
             .collect();
 
         if hot_results.is_empty() || no_hot_results.is_empty() {
@@ -601,10 +639,10 @@ impl ConsciousnessIntegration {
         }
 
         // HOT should increase consciousness rate
-        let hot_conscious_rate = hot_results.iter()
-            .filter(|r| r.is_conscious).count() as f64 / hot_results.len() as f64;
-        let no_hot_conscious_rate = no_hot_results.iter()
-            .filter(|r| r.is_conscious).count() as f64 / no_hot_results.len() as f64;
+        let hot_conscious_rate =
+            hot_results.iter().filter(|r| r.is_conscious).count() as f64 / hot_results.len() as f64;
+        let no_hot_conscious_rate = no_hot_results.iter().filter(|r| r.is_conscious).count() as f64
+            / no_hot_results.len() as f64;
 
         hot_conscious_rate >= no_hot_conscious_rate
     }
@@ -629,9 +667,15 @@ impl ConsciousnessIntegration {
         report.push_str("# Consciousness Integration Test Report\n\n");
         report.push_str(&format!("Substrate: {}\n", self.substrate));
         report.push_str(&format!("Total cycles: {}\n", self.total_cycles));
-        report.push_str(&format!("Working memory: {}/{}\n",
-            self.working_memory.len(), self.config.workspace_capacity));
-        report.push_str(&format!("History: {} stimuli processed\n\n", self.history.len()));
+        report.push_str(&format!(
+            "Working memory: {}/{}\n",
+            self.working_memory.len(),
+            self.config.workspace_capacity
+        ));
+        report.push_str(&format!(
+            "History: {} stimuli processed\n\n",
+            self.history.len()
+        ));
 
         report.push_str("## Processing History\n\n");
         for (i, result) in self.history.iter().enumerate() {
@@ -698,7 +742,7 @@ mod tests {
         assert_eq!(stimulus.features.len(), 4);
         // Check phases are spread out
         let phase_spread = stimulus.phases.last().unwrap() - stimulus.phases.first().unwrap();
-        assert!(phase_spread > 1.0);  // Significant phase difference
+        assert!(phase_spread > 1.0); // Significant phase difference
     }
 
     #[test]
@@ -711,8 +755,14 @@ mod tests {
 
     #[test]
     fn test_stage_names() {
-        assert_eq!(ProcessingStage::FeatureDetection.name(), "Feature Detection");
-        assert_eq!(ProcessingStage::ConsciousExperience.name(), "Conscious Experience");
+        assert_eq!(
+            ProcessingStage::FeatureDetection.name(),
+            "Feature Detection"
+        );
+        assert_eq!(
+            ProcessingStage::ConsciousExperience.name(),
+            "Conscious Experience"
+        );
     }
 
     #[test]
@@ -770,7 +820,7 @@ mod tests {
         // May or may not be conscious depending on synchrony threshold
         // But should have lower consciousness probability
         let last_metrics = &result.stage_metrics.last().unwrap().1;
-        assert!(last_metrics.synchrony < 0.5);  // Low synchrony
+        assert!(last_metrics.synchrony < 0.5); // Low synchrony
     }
 
     #[test]
@@ -782,13 +832,13 @@ mod tests {
         assert!((system.substrate_adjustment() - 1.0).abs() < 0.01);
 
         system.set_substrate("quantum");
-        assert!(system.substrate_adjustment() > 1.0);  // Quantum boost
+        assert!(system.substrate_adjustment() > 1.0); // Quantum boost
 
         system.set_substrate("silicon");
-        assert!(system.substrate_adjustment() < 1.0);  // Slight reduction
+        assert!(system.substrate_adjustment() < 1.0); // Slight reduction
 
         system.set_substrate("hybrid");
-        assert!(system.substrate_adjustment() > 1.0);  // Best of both
+        assert!(system.substrate_adjustment() > 1.0); // Best of both
     }
 
     #[test]
@@ -823,8 +873,8 @@ mod tests {
         let result = system.run_integration_test(&stimuli);
 
         assert_eq!(result.total_stimuli, 4);
-        assert!(result.conscious_count > 0);  // At least one should be conscious
-        assert!(result.validations.len() >= 4);  // All validations run
+        assert!(result.conscious_count > 0); // At least one should be conscious
+        assert!(result.validations.len() >= 4); // All validations run
     }
 
     #[test]
@@ -848,7 +898,9 @@ mod tests {
         let result = system.run_integration_test(&all_stimuli);
 
         // Φ-consciousness correlation should pass
-        let phi_validation = result.validations.iter()
+        let phi_validation = result
+            .validations
+            .iter()
             .find(|(name, _)| name == "Φ-consciousness correlation");
         assert!(phi_validation.is_some());
     }
@@ -898,7 +950,9 @@ mod tests {
         let stimulus = Stimulus::new("hot", 4, 0.99, 0.99, 42);
         let result = system.process(&stimulus);
 
-        let hot_metrics = result.stage_metrics.iter()
+        let hot_metrics = result
+            .stage_metrics
+            .iter()
             .find(|(s, _)| *s == ProcessingStage::HigherOrderThought);
 
         assert!(hot_metrics.is_some());

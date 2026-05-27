@@ -20,7 +20,7 @@
 //! Instead, it models the *meta-level* memory dynamics that affect the cognitive cycle.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
 

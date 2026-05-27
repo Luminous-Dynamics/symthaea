@@ -10,12 +10,12 @@
 //! - simulation_bridge: PhysicsSimulator for each system type
 //! - Cross-bridge: full pipeline (simulate → encode → process)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::dynamical_system::HarmonicOscillator;
 use symthaea_core::hdc::math_bridge::{MathValue, UnifiedMathEngine};
 use symthaea_core::physics::simulation_bridge::{
-    state_to_binary_hv, PhysicsSimulator, SimulationAnalysis,
+    PhysicsSimulator, SimulationAnalysis, state_to_binary_hv,
 };
 
 // =============================================================================

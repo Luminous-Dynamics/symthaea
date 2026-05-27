@@ -30,9 +30,9 @@ use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 #[allow(unused_imports)]
 use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 
 /// ARC-AGI strict (pixel-perfect) scoring benchmark.
 pub struct ArcStrictBenchmark;

@@ -192,7 +192,7 @@ impl Drop for PhaseTimer {
 ///
 /// Reads `RUST_LOG` env var for filter directives (default: `info`).
 pub fn init_tracing() {
-    use tracing_subscriber::{fmt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt};
 
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 

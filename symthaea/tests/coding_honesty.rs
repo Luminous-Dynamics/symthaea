@@ -50,10 +50,12 @@ fn simulated_code_learning_session_reports_simulation() {
     assert_eq!(summary.compile_rate(), 0.0);
     assert_eq!(summary.pass_rate(), 0.0);
     assert_eq!(summary.simulated_rate(), 100.0);
-    assert!(summary
-        .outcomes
-        .iter()
-        .all(|outcome| outcome.simulated_execution));
+    assert!(
+        summary
+            .outcomes
+            .iter()
+            .all(|outcome| outcome.simulated_execution)
+    );
     assert!(summary.outcomes.iter().all(|outcome| !outcome.compiled));
 }
 

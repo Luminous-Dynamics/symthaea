@@ -535,8 +535,8 @@ impl CognitiveLoopService {
                         * super::super::thresholds::HFE_EXPLORATION_DAMPING))
                 as f32;
             self.behavior.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
-                                                                // Boost LR proportional to free energy (poor model → learn harder)
-                                                                // Capped at +10% to avoid overshooting in short ablation windows
+            // Boost LR proportional to free energy (poor model → learn harder)
+            // Capped at +10% to avoid overshooting in short ablation windows
             let hfe_lr_boost = (1.0
                 + (hierarchical_total_free_energy * super::super::thresholds::HFE_LR_BOOST_SCALE)
                     .min(super::super::thresholds::HFE_LR_BOOST_MAX))

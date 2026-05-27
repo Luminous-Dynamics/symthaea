@@ -89,11 +89,7 @@ impl InstrumentalLearningBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 {
-                    0.9
-                } else {
-                    0.1
-                }
+                if rng_state % 100 < 80 { 0.9 } else { 0.1 }
             } else if rng_state % 100 < 20 {
                 0.9
             } else {
@@ -143,11 +139,7 @@ impl InstrumentalLearningBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 {
-                    0.5
-                } else {
-                    0.1
-                }
+                if rng_state % 100 < 80 { 0.5 } else { 0.1 }
             } else if rng_state % 100 < 20 {
                 0.5
             } else {
@@ -304,17 +296,9 @@ impl InstrumentalLearningMindBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 {
-                    0.9
-                } else {
-                    0.1
-                }
+                if rng_state % 100 < 80 { 0.9 } else { 0.1 }
             } else {
-                if rng_state % 100 < 20 {
-                    0.9
-                } else {
-                    0.1
-                }
+                if rng_state % 100 < 20 { 0.9 } else { 0.1 }
             };
 
             agent.perceive_reward(chosen, reward);
@@ -332,17 +316,9 @@ impl InstrumentalLearningMindBenchmark {
             rng_state ^= rng_state << 17;
 
             let reward = if chosen == 0 {
-                if rng_state % 100 < 80 {
-                    0.5
-                } else {
-                    0.1
-                }
+                if rng_state % 100 < 80 { 0.5 } else { 0.1 }
             } else {
-                if rng_state % 100 < 20 {
-                    0.5
-                } else {
-                    0.1
-                }
+                if rng_state % 100 < 20 { 0.5 } else { 0.1 }
             };
 
             agent.perceive_reward(chosen, reward);

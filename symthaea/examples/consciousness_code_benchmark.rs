@@ -27,14 +27,38 @@ const PHI_LEVELS: &[(&str, usize)] = &[
 
 /// Task definitions — same tasks run at each Phi level.
 const TASKS: &[(&str, &str)] = &[
-    ("Write a function `add(a: i32, b: i32) -> i32` that adds two numbers", "add"),
-    ("Write a function `factorial(n: u64) -> u64` that computes factorial recursively", "factorial"),
-    ("Write a function `is_palindrome(s: &str) -> bool` that checks if a string is a palindrome", "is_palindrome"),
-    ("Write a function `fibonacci(n: usize) -> Vec<u64>` that returns the first n Fibonacci numbers", "fibonacci"),
-    ("Write a function `reverse_words(s: &str) -> String` that reverses word order", "reverse_words"),
-    ("Write a function `max_element(arr: &[i32]) -> Option<i32>` that finds the maximum", "max_element"),
-    ("Write a function `count_vowels(s: &str) -> usize` that counts vowels", "count_vowels"),
-    ("Write a function `gcd(a: u64, b: u64) -> u64` using Euclidean algorithm", "gcd"),
+    (
+        "Write a function `add(a: i32, b: i32) -> i32` that adds two numbers",
+        "add",
+    ),
+    (
+        "Write a function `factorial(n: u64) -> u64` that computes factorial recursively",
+        "factorial",
+    ),
+    (
+        "Write a function `is_palindrome(s: &str) -> bool` that checks if a string is a palindrome",
+        "is_palindrome",
+    ),
+    (
+        "Write a function `fibonacci(n: usize) -> Vec<u64>` that returns the first n Fibonacci numbers",
+        "fibonacci",
+    ),
+    (
+        "Write a function `reverse_words(s: &str) -> String` that reverses word order",
+        "reverse_words",
+    ),
+    (
+        "Write a function `max_element(arr: &[i32]) -> Option<i32>` that finds the maximum",
+        "max_element",
+    ),
+    (
+        "Write a function `count_vowels(s: &str) -> usize` that counts vowels",
+        "count_vowels",
+    ),
+    (
+        "Write a function `gcd(a: u64, b: u64) -> u64` using Euclidean algorithm",
+        "gcd",
+    ),
 ];
 
 #[derive(Debug)]

@@ -33,12 +33,12 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use symthaea_phone_embodiment::scrcpy::wire::{
-    parse_device_meta, parse_frame_header, parse_video_header, DEVICE_NAME_LEN, FRAME_HEADER_LEN,
-    VIDEO_HEADER_LEN,
+    DEVICE_NAME_LEN, FRAME_HEADER_LEN, VIDEO_HEADER_LEN, parse_device_meta, parse_frame_header,
+    parse_video_header,
 };
 use symthaea_phone_embodiment::scrcpy::{
-    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyOptions, DEVICE_JAR_PATH,
-    VENDORED_JAR_NAME,
+    DEVICE_JAR_PATH, ScrcpyOptions, VENDORED_JAR_NAME, accept_from_server, bind_host_listener,
+    start_scrcpy,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

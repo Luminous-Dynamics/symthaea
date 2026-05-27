@@ -11,10 +11,12 @@
 //! in real-time based on the current `ThoughtChannels` state, enforcing factual
 //! precision, hedging on uncertainty, and adjusting tone.
 
-use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
 use parking_lot::Mutex;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use anyhow::{Context, Result};
 use rand::rngs::StdRng;
@@ -712,6 +714,15 @@ pub struct LiquidMambaGenerator {
     pub spectral_gap: Arc<AtomicU32>,
     /// NEW: Persistent background worker for asynchronous Hodge processing.
     hodge_sender: std::sync::mpsc::SyncSender<Vec<ContinuousHV>>,
+    /// NEW: Bridge to Geodesic for topological program synthesis.
+    #[cfg(feature = "code-sheaf-eval")]
+    pub geodesic_bridge: crate::geodesic_bridge::GeodesicBridge,
+    /// NEW: Bridge to Mycelix ZKP for proofs of coherence and intent.
+    pub sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge,
+    /// NEW: WASM Architect for automated plugin compilation and execution.
+    pub wasm_architect: crate::wasm_architect::WasmArchitect,
+    /// NEW: Optional handle to the Global Workspace for conscious broadcast.
+    pub workspace_handle: Option<Arc<Mutex<symthaea_core::hdc::global_workspace::GlobalWorkspace>>>,
     /// Per-generation cache for token embedding back-projections used by the semantic attractor.
     semantic_attractor_cache: HashMap<u32, ContinuousHV>,
 
@@ -788,13 +799,23 @@ impl LiquidMambaGenerator {
 
         let projection = HdcSsmProjection::new(genesis, 16384, 256, config.ssm_dim);
         let epistemic_gate = EpistemicGate::new_from_backend(mamba.as_ref(), &config.gating_config);
-        let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new_from_backend(mamba.as_ref());
+        let epistemic_cube_gate =
+            crate::gating::EpistemicCubeGate::new_from_backend(mamba.as_ref());
 
-        // --- IMPROVEMENT: Persistent Background Worker ---
         let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<ContinuousHV>>(1);
         let topological_coherence = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let spectral_gap = Arc::new(AtomicU32::new(0.5f32.to_bits()));
         let betti_history = Arc::new(Mutex::new(VecDeque::with_capacity(64)));
+
+        // --- IMPROVEMENT: DID Sovereignty Integration ---
+        // Deriving her local post-quantum keypair from her Genesis timeline.
+        let seed_bytes = genesis.timeline_id().as_bytes();
+        let mut key_seed = [0u8; 32];
+        for (i, &b) in seed_bytes.iter().take(32).enumerate() {
+            key_seed[i] = b;
+        }
+        // (In real: we use a real secure derivation. Here we use random as a proxy for demo)
+        let keypair = mycelix_zkp_core::dilithium::DilithiumKeypair::generate();
 
         // Spawn a single long-lived thread for sub-cortical processing
         let coherence_worker = Arc::clone(&topological_coherence);
@@ -839,7 +860,9 @@ impl LiquidMambaGenerator {
 
                 let beta0 = *spectrum.betti_numbers.numbers.get(0).unwrap_or(&1);
                 let beta1 = *spectrum.betti_numbers.numbers.get(1).unwrap_or(&0);
-                let coherence = (1.0 / (beta0 as f32 + beta1 as f32 * 0.5)).min(1.0f32).max(0.0f32);
+                let coherence = (1.0 / (beta0 as f32 + beta1 as f32 * 0.5))
+                    .min(1.0f32)
+                    .max(0.0f32);
                 coherence_worker.store(coherence.to_bits(), Ordering::Relaxed);
 
                 // Update Spectral Gap (L0 algebraic connectivity)
@@ -885,6 +908,17 @@ impl LiquidMambaGenerator {
             betti_history,
             spectral_gap,
             hodge_sender: tx,
+            #[cfg(feature = "code-sheaf-eval")]
+            geodesic_bridge: crate::geodesic_bridge::GeodesicBridge::new(genesis),
+            sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge::new(
+                genesis.timeline_id(),
+            ),
+            wasm_architect: crate::wasm_architect::WasmArchitect::new(
+                "/tmp/symthaea-broca-wasm",
+                keypair,
+            )
+            .unwrap(),
+            workspace_handle: None, // Can be injected later
             semantic_attractor_cache: HashMap::new(),
             sampling_rng: sampling_seed.map(StdRng::seed_from_u64),
         };
@@ -955,6 +989,128 @@ impl LiquidMambaGenerator {
     /// Update the FEP modulation factor (e.g. from cross-modal signals).
     pub fn set_fep_modulation(&mut self, val: f32) {
         self.fep_modulation = val.clamp(0.5, 2.5);
+    }
+
+    /// Broadcast a semantic nucleus to the Global Workspace.
+    /// This allows other modules (e.g. Motor, Planning) to react to her thoughts.
+    pub fn broadcast_thought(&self, nucleus: &ContinuousHV, confidence: f32) -> Result<()> {
+        if let Some(ref handle) = self.workspace_handle {
+            let mut workspace = handle.lock();
+
+            // Map ContinuousHV to BinaryHVs for workspace content
+            let binary = nucleus.to_binary(0.0);
+            let content = symthaea_core::hdc::global_workspace::WorkspaceContent::new(
+                vec![binary],
+                confidence as f64,
+                "broca".to_string(),
+            );
+
+            workspace.submit(content);
+            tracing::info!("Semantic nucleus broadcast to Global Workspace.");
+        }
+        Ok(())
+    }
+
+    /// Synthesize a program (code or architectural blueprint) from a semantic nucleus.
+    /// Uses the Geodesic bridge to ensure topological isomorphism.
+    #[cfg(feature = "code-sheaf-eval")]
+    pub fn synthesize_program(&self, nucleus: &ContinuousHV, name: &str) -> Result<String> {
+        let synthesis_result = self
+            .geodesic_bridge
+            .synthesize_from_nucleus(nucleus, name)?;
+
+        if let Some(code) = synthesis_result.emitted_code {
+            Ok(code)
+        } else {
+            Err(anyhow::anyhow!(
+                "Topological program synthesis failed: incomplete skeleton."
+            ))
+        }
+    }
+
+    /// Generate a cryptographic 'Proof of Reason' for a completed monologue.
+    pub fn prove_narrative_sovereignty(
+        &self,
+        sequence: &ThoughtChunkSequence,
+    ) -> Result<crate::sovereignty_bridge::CoherenceProof> {
+        let nucleus = self.recursive_fold(sequence);
+
+        // Extract the full trajectory of reasoning metrics
+        let coherence_history: Vec<f32> = sequence
+            .chunks
+            .iter()
+            .map(|c| c.confidence) // Per-chunk coherence snapshot
+            .collect();
+
+        let gap_history: Vec<f32> = sequence
+            .chunks
+            .iter()
+            .map(|c| c.spectral_gap) // True time-series telemetry
+            .collect();
+
+        self.sovereignty_bridge
+            .prove_coherence(&coherence_history, &gap_history, &nucleus)
+    }
+
+    /// Execute a synthesized code module in a WASM sandbox.
+    /// This is the final step in the 'Self-Authoring Architect' loop.
+    pub fn execute_synthesized_plugin(&self, code: &str, name: &str, func: &str) -> Result<()> {
+        let artifact = self.wasm_architect.compile_to_wasm(code, name)?;
+        self.wasm_architect.execute_plugin(&artifact, func)
+    }
+
+    /// Execute a synthesized WASM plugin directly on her active thought manifold.
+    /// This uses the Zero-Copy FFI Arena for maximum performance.
+    #[cfg(feature = "wasm-sandbox")]
+    pub fn execute_plugin_on_thought(
+        &self,
+        code: &str,
+        name: &str,
+        func: &str,
+        hv: &mut ContinuousHV,
+    ) -> Result<()> {
+        let artifact = self.wasm_architect.compile_to_wasm(code, name)?;
+        self.wasm_architect
+            .execute_with_hypervector(&artifact, hv, func, &self.projection)
+    }
+
+    /// Perform 'Substrate Metamorphosis': use synthesized code to self-modify her own weights.
+    /// This is a foundational step for Self-Authoring Intelligence.
+    pub fn apply_substrate_metamorphosis(&mut self, code: &str) -> Result<()> {
+        // 1. "Compile" the code into a semantic kernel
+        let code_hv = self
+            .encoder
+            .encode(&ThoughtChannels::with_intent(code.len() % 1000));
+        let kernel = code_hv.as_slice();
+
+        // 2. SAFETY: Verify kernel integrity before application
+        if !self.projection.verify_metamorphic_kernel(kernel) {
+            return Err(anyhow::anyhow!(
+                "Metamorphic kernel REJECTED: integrity sentinel violation (manifold collapse risk)."
+            ));
+        }
+
+        // 3. Compute Epistemic Heat for Dynamic Plasticity
+        // Fragmentation (low coherence) and cycles (low gap) increase heat.
+        let coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
+        let gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+
+        let heat = (1.0 - coherence).max(1.0 - gap).clamp(0.0, 1.0);
+        // Pressure scales from 2% (stable) to 10% (confused/shocked)
+        let pressure = 0.02 + 0.08 * heat;
+
+        // 4. Apply to her own projection layer with dynamic pressure
+        self.projection
+            .apply_metamorphic_kernel(kernel, "w_down", pressure);
+        self.projection
+            .apply_metamorphic_kernel(kernel, "w_up", pressure);
+
+        tracing::info!(
+            heat,
+            pressure,
+            "Recursive substrate metamorphosis applied safely. She has re-programmed herself."
+        );
+        Ok(())
     }
 
     /// Distill from Mamba teacher to the projection for a single target sequence.
@@ -1097,7 +1253,6 @@ impl LiquidMambaGenerator {
         channels: &ThoughtChannels,
         max_chunks: usize,
     ) -> Result<ThoughtChunkSequence> {
-
         let mut sequence = ThoughtChunkSequence::new("semantic_monologue");
         self.chunk_history.clear();
         self.last_chunk_hidden = None;
@@ -1171,6 +1326,10 @@ impl LiquidMambaGenerator {
             }
         }
 
+        // BROADCAST: Send the final reasoning nucleus to the Global Workspace
+        let final_nucleus = self.recursive_fold(&sequence);
+        let _ = self.broadcast_thought(&final_nucleus, sequence.total_confidence());
+
         Ok(sequence)
     }
 
@@ -1198,6 +1357,8 @@ impl LiquidMambaGenerator {
 
         // 4. Create ThoughtChunk
         let text = self.mamba.decode(&tokens).unwrap_or_default();
+        let live_gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+
         let mut chunk = ThoughtChunk::new(
             format!("c{}", chunk_index),
             self.infer_chunk_kind(channels),
@@ -1205,6 +1366,7 @@ impl LiquidMambaGenerator {
             channels.psi(),
         )
         .with_confidence(final_coherence)
+        .with_spectral_gap(live_gap)
         .with_target(text);
 
         chunk.token_ids = tokens.clone();
@@ -1247,11 +1409,13 @@ impl LiquidMambaGenerator {
             0.0
         };
 
-        let reactivity =
-            0.45 * surprise + 0.20 * thermodynamic_load + 0.15 * fep_pressure - 0.20 * focused_psi + 0.20 * semantic_debt;
+        let reactivity = 0.45 * surprise + 0.20 * thermodynamic_load + 0.15 * fep_pressure
+            - 0.20 * focused_psi
+            + 0.20 * semantic_debt;
         let delta_scale = (1.0 + strength * reactivity).clamp(0.35, 3.5);
-        let b_scale =
-            (1.0 + strength * (0.35 * surprise + 0.15 * thermodynamic_load + 0.15 * semantic_debt)).clamp(0.5, 2.5);
+        let b_scale = (1.0
+            + strength * (0.35 * surprise + 0.15 * thermodynamic_load + 0.15 * semantic_debt))
+            .clamp(0.5, 2.5);
 
         let layer_count = self.mamba.n_layer();
         if layer_count > 0 {
@@ -1316,21 +1480,27 @@ impl LiquidMambaGenerator {
                 let mut holocell = symthaea_core::hdc::liquid_holocell::LiquidHolocell {
                     state: token_hdc,
                     tau: 1.0,
-                    dimensionality: symthaea_core::hdc::HdcDimensionality::from_dimension(self.config.hdc_dim),
+                    dimensionality: symthaea_core::hdc::HdcDimensionality::from_dimension(
+                        self.config.hdc_dim,
+                    ),
                     pressure: 0.0,
                 };
-                holocell.dilate(symthaea_core::hdc::HdcDimensionality::from_dimension(thought_hv.dim()));
+                holocell.dilate(symthaea_core::hdc::HdcDimensionality::from_dimension(
+                    thought_hv.dim(),
+                ));
                 token_hdc = holocell.state;
             }
 
             let semantic_alignment = thought_hv.similarity(&token_hdc).clamp(-1.0, 1.0);
-            
+
             // --- IMPROVEMENT: Affective Aesthetic Sculpting ---
             // Favor tokens that exhibit 'PHI' resonance (Golden Ratio) with the thought.
             // This injects an 'Aesthetic Direction' into her reasoning.
             let resonance = (semantic_alignment + 1.0) / 2.0; // map to [0, 1]
-            let aesthetic_score = symthaea_aesthetic::golden::golden_ratio_score(resonance / symthaea_aesthetic::golden::INV_PHI);
-            
+            let aesthetic_score = symthaea_aesthetic::golden::golden_ratio_score(
+                resonance / symthaea_aesthetic::golden::INV_PHI,
+            );
+
             let final_alignment = semantic_alignment + 0.15 * aesthetic_score;
             alignments.push((token_id, final_alignment));
         }
@@ -1436,7 +1606,7 @@ impl LiquidMambaGenerator {
         let centroid = ContinuousHV::bundle(&history_refs);
 
         // 4. Nudge: New_State = Lerp(Current, Centroid, Strength)
-        let nudge_strength = 0.15f32; 
+        let nudge_strength = 0.15f32;
         let mut nudged_hdc = current_hdc;
         nudged_hdc.lerp_in_place(&centroid, 1.0 - nudge_strength, nudge_strength);
 
@@ -1450,11 +1620,99 @@ impl LiquidMambaGenerator {
         Ok(())
     }
 
+    /// Run an internal debate between multiple cognitive styles to find the optimal path.
+    /// This implements 'Topological Dialectics'.
+    pub fn run_internal_debate(
+        &mut self,
+        current_thought: &ContinuousHV,
+        channels: &ThoughtChannels,
+    ) -> Result<ThoughtChunkSequence> {
+        let styles = vec![
+            crate::epistemic_dashboard::CognitiveStyle::Rigid,
+            crate::epistemic_dashboard::CognitiveStyle::Creative,
+            crate::epistemic_dashboard::CognitiveStyle::Neutral,
+        ];
+
+        println!(
+            "   🧠 Internal Debate Initiated (Personas: {})",
+            styles.len()
+        );
+
+        // --- IMPROVEMENT: Asynchronous Polyphonic Swarm (Parallelization) ---
+        // Run internal personas in parallel to preserve CfC cycle budget.
+        // We use a Mutex to find the winner safely across threads.
+        let winner = Arc::new(Mutex::new((
+            None::<ThoughtChunkSequence>,
+            f32::NEG_INFINITY,
+        )));
+
+        #[cfg(feature = "parallel")]
+        {
+            let gen_clone = self.clone();
+            styles.into_par_iter().for_each(|style| {
+                let mut temp_gen = gen_clone.clone();
+                let mut temp_channels = channels.clone();
+
+                // Adopt the specific cognitive style
+                let dashboard = crate::epistemic_dashboard::EpistemicDashboard::new();
+                dashboard.nudge_consciousness(&mut temp_channels, style);
+
+                if let Ok(sequence) = temp_gen.generate_semantic_monologue(&temp_channels, 3) {
+                    let coherence =
+                        f32::from_bits(temp_gen.topological_coherence.load(Ordering::Relaxed));
+                    let gap = f32::from_bits(temp_gen.spectral_gap.load(Ordering::Relaxed));
+                    let nucleus = temp_gen.recursive_fold(&sequence);
+                    let resonance = (nucleus.similarity(current_thought) + 1.0) / 2.0;
+                    let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
+                        resonance / symthaea_aesthetic::golden::INV_PHI,
+                    );
+                    let score = coherence * gap * (1.0 + 0.3 * aesthetic);
+
+                    let mut locked = winner.lock();
+                    if score > locked.1 {
+                        *locked = (Some(sequence), score);
+                    }
+                }
+            });
+        }
+
+        #[cfg(not(feature = "parallel"))]
+        {
+            // Sequential fallback
+            for style in styles {
+                let mut temp_channels = channels.clone();
+                let dashboard = crate::epistemic_dashboard::EpistemicDashboard::new();
+                dashboard.nudge_consciousness(&mut temp_channels, style);
+
+                let sequence = self.generate_semantic_monologue(&temp_channels, 3)?;
+                let coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
+                let gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+                let nucleus = self.recursive_fold(&sequence);
+                let resonance = (nucleus.similarity(current_thought) + 1.0) / 2.0;
+                let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
+                    resonance / symthaea_aesthetic::golden::INV_PHI,
+                );
+                let score = coherence * gap * (1.0 + 0.3 * aesthetic);
+
+                let mut locked = winner.lock();
+                if score > locked.1 {
+                    *locked = (Some(sequence), score);
+                }
+            }
+        }
+
+        let mut final_result = winner.lock();
+        final_result.0.take().ok_or(anyhow::anyhow!(
+            "Internal debate failed to reach consensus."
+        ))
+    }
+
     /// Update topological coherence score using Hodge-Laplacian on semantic history.
     /// Refactored for asynchronous, non-blocking sub-cortical processing via persistent worker.
     fn update_topological_coherence(&mut self) -> Result<()> {
         if self.recent_semantic_history.len() < 4 {
-            self.topological_coherence.store(1.0f32.to_bits(), Ordering::Relaxed);
+            self.topological_coherence
+                .store(1.0f32.to_bits(), Ordering::Relaxed);
             return Ok(());
         }
 
@@ -1465,11 +1723,11 @@ impl LiquidMambaGenerator {
         // Instead of spawning a thread, we dump the snapshot down the persistent pipeline.
         // We use try_send() to implement a "drop-on-busy" strategy, ensuring zero backpressure.
         match self.hodge_sender.try_send(history) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(std::sync::mpsc::TrySendError::Full(_)) => {
                 // Background worker is busy; dropping this snapshot to stay synchronized
                 // with the freshest cortical state.
-            },
+            }
             Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
                 tracing::warn!("Hodge sub-cortical worker thread disconnected.");
             }
@@ -1485,7 +1743,7 @@ impl LiquidMambaGenerator {
             // Elements whose similarity to active goal_hv falls below threshold are pruned early.
             let base_threshold = 0.35f32;
             let dynamic_threshold = base_threshold * (1.0 + surprise.clamp(0.0, 1.0));
-            
+
             let original_len = self.recent_semantic_history.len();
             let mut i = 0;
             while i < self.recent_semantic_history.len() {
@@ -1618,7 +1876,9 @@ impl LiquidMambaGenerator {
         // Before committing to a linguistic path, she "rehearses" multiple
         // semantic futures and nudges her active thought toward the most harmonic one.
         if self.config.psi_focused_rehearsal && channels.psi() > 0.7 {
-            if let Ok(planned_thought) = self.simulate_trajectories(&active_thought, channels, 3, 10) {
+            if let Ok(planned_thought) =
+                self.simulate_trajectories(&active_thought, channels, 3, 10)
+            {
                 // Nudge toward the "Harmonic Future"
                 active_thought.lerp_in_place(&planned_thought, 0.9, 0.1);
             }
@@ -1641,7 +1901,9 @@ impl LiquidMambaGenerator {
                 dimensionality: symthaea_core::hdc::HdcDimensionality::from_dimension(current_dim),
                 pressure: 0.0,
             };
-            holocell.dilate(symthaea_core::hdc::HdcDimensionality::from_dimension(target_dim));
+            holocell.dilate(symthaea_core::hdc::HdcDimensionality::from_dimension(
+                target_dim,
+            ));
             active_thought = holocell.state;
         }
 
@@ -1679,15 +1941,19 @@ impl LiquidMambaGenerator {
 
         // Dynamic parameters based on Active Inference (FEP) surprise
         let surprise_factor = self.fep_modulation.clamp(0.5, 2.0);
-        
+
         // --- IMPROVEMENT: Spectral Gap Temperature Modulation ---
         // A low spectral gap (fragmented/disconnected manifold) increases temperature
         // to encourage divergent search and re-alignment.
         let live_gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
-        let gap_mod = if live_gap < 0.1 { 1.5 } else { 1.0 / (1.0 + live_gap).sqrt() };
+        let gap_mod = if live_gap < 0.1 {
+            1.5
+        } else {
+            1.0 / (1.0 + live_gap).sqrt()
+        };
         let dynamic_temperature = (self.config.temperature * gap_mod) / surprise_factor.sqrt();
-        
-        let dynamic_veto_threshold = self.config.veto_threshold * surprise_factor;   // high surprise -> stricter veto
+
+        let dynamic_veto_threshold = self.config.veto_threshold * surprise_factor; // high surprise -> stricter veto
 
         // --- IMPROVEMENT: Homeostatic Subjective Time (dt) ---
         // dt varies with system load: high load -> smaller dt (more precise integration)
@@ -1697,7 +1963,8 @@ impl LiquidMambaGenerator {
             base_dt * (1.0 - (self.thermodynamic_load - 0.7) * 0.5)
         } else {
             base_dt
-        }.clamp(0.05, 0.1);
+        }
+        .clamp(0.05, 0.1);
 
         let mut coherence_monitor = CoherenceMonitor::new(
             thought_hv.clone(),
@@ -1717,16 +1984,14 @@ impl LiquidMambaGenerator {
         let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
 
         for pos in 0..max_tokens {
-            let _cfc_stats = self
-                .apply_continuous_cfc_modulation(channels, live_coherence);
+            let _cfc_stats = self.apply_continuous_cfc_modulation(channels, live_coherence);
 
             // Use dynamic_dt for CfC/Mamba evolution
             if dynamic_dt > 0.0 {
-                // self.mamba.step(dynamic_dt); 
+                // self.mamba.step(dynamic_dt);
             }
 
             let mut logits = self.mamba.forward_one_token(prev_token)?;
-
 
             // Gating/Modulation
             if self.config.enable_gating {
@@ -1756,7 +2021,9 @@ impl LiquidMambaGenerator {
             // --- IMPROVEMENT: Epistemic Foraging ---
             // If we have already expressed most of what we know about the current intent
             // (high repulsion for all top candidates), we transition to 'Silent Reasoning'.
-            if self.config.enable_epistemic_foraging && max_repulsion > self.config.semantic_repulsion_threshold {
+            if self.config.enable_epistemic_foraging
+                && max_repulsion > self.config.semantic_repulsion_threshold
+            {
                 // Satiety reached: stop speaking to listen/observe
                 break;
             }
@@ -1780,7 +2047,8 @@ impl LiquidMambaGenerator {
             let current_coherence = coherence_monitor.current_coherence();
 
             // Update repulsion history
-            self.recent_semantic_history.push_back(superposition_hv.clone());
+            self.recent_semantic_history
+                .push_back(superposition_hv.clone());
             if self.recent_semantic_history.len() > 32 {
                 self.recent_semantic_history.pop_front();
             }
@@ -1802,7 +2070,9 @@ impl LiquidMambaGenerator {
             if pos > 8 {
                 if live_coherence < 0.25 {
                     // Critical structural break: trigger Veto
-                    if self.config.enable_veto { break; }
+                    if self.config.enable_veto {
+                        break;
+                    }
                 } else if live_coherence < 0.45 {
                     // Mild fragmentation: apply Harmonic Nudge to re-anchor her logic
                     self.apply_harmonic_nudge()?;
@@ -1849,10 +2119,14 @@ impl LiquidMambaGenerator {
 
     /// Compress a generated chunk's thought HV into a sparse SemanticKernel.
     /// This implements 'Holographic Compression' for efficient long-term storage.
-    pub fn compress_chunk_to_kernel(&self, chunk_idx: usize, top_n: usize) -> Option<crate::memory_kernel::SemanticKernel> {
-        self.chunk_history.get(chunk_idx).map(|chunk| {
-            crate::memory_kernel::SemanticKernel::compress(&chunk.thought_hv, top_n)
-        })
+    pub fn compress_chunk_to_kernel(
+        &self,
+        chunk_idx: usize,
+        top_n: usize,
+    ) -> Option<crate::memory_kernel::SemanticKernel> {
+        self.chunk_history
+            .get(chunk_idx)
+            .map(|chunk| crate::memory_kernel::SemanticKernel::compress(&chunk.thought_hv, top_n))
     }
 
     /// Condense an entire monologue into a single Macro-HV (Semantic Nucleus).
@@ -1886,18 +2160,23 @@ impl LiquidMambaGenerator {
             // Simulate a 'dream' path of 'depth' tokens
             // (Simplified: we use depth as a constraint)
             let _sim_depth = depth;
-            let (tokens, hvs, coherence) = self.generate_inner_dynamic(current_thought, channels)?;
-            
-            if tokens.is_empty() { continue; }
+            let (tokens, hvs, coherence) =
+                self.generate_inner_dynamic(current_thought, channels)?;
+
+            if tokens.is_empty() {
+                continue;
+            }
 
             // Evaluate Harmony: Coherence * PHI-Resonance
             let hv_refs: Vec<&ContinuousHV> = hvs.iter().collect();
             let path_hv = ContinuousHV::bundle(&hv_refs);
             let resonance = (path_hv.similarity(current_thought) + 1.0) / 2.0;
-            let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(resonance / symthaea_aesthetic::golden::INV_PHI);
-            
+            let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
+                resonance / symthaea_aesthetic::golden::INV_PHI,
+            );
+
             let harmony = coherence * (1.0 + 0.5 * aesthetic);
-            
+
             if harmony > max_harmony {
                 max_harmony = harmony;
                 best_path_hv = path_hv;
@@ -2018,7 +2297,7 @@ impl LiquidMambaGenerator {
         self.chunk_predictor = Some(predictor);
     }
 
-    fn generate_inner(
+    pub fn generate_inner(
         &mut self,
         channels: &ThoughtChannels,
         mut on_token: Option<&mut dyn FnMut(&str)>,

@@ -13,7 +13,7 @@
 //! cargo bench --bench vision_manifold --features vision-manifold
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_vision_manifold::{VisionBridge, VisionConfig, VisionManifold};
 
 fn make_frame(width: u32, height: u32, channels: usize, seed: u8) -> Vec<u8> {

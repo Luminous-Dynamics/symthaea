@@ -8,7 +8,7 @@
 //! This demonstrates the full Cetacean Scorer system on real whale recordings.
 
 use std::path::Path;
-use symthaea_stt::cetacean_classifier::{collapse_to_segments, CetaceanClassifier, CetaceanConfig};
+use symthaea_stt::cetacean_classifier::{CetaceanClassifier, CetaceanConfig, collapse_to_segments};
 use symthaea_stt::cetacean_scorer::{CetaceanManner, CetaceanPlace, CetaceanScorer, CetaceanUnit};
 
 fn main() -> std::io::Result<()> {

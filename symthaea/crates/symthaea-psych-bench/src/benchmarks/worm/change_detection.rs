@@ -6,8 +6,8 @@
 //! Present an array of K visual objects, brief delay, then probe with
 //! the original or a modified array. Tests maintenance capacity.
 
-use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

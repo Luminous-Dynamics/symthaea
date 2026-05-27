@@ -10,10 +10,10 @@
 //!
 //! This example validates the relationship using different topology-generated signals.
 
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use symthaea::hdc::reservoir::HybridEnsemblePredictor;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
-use symthaea::hdc::HDC_DIMENSION;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");

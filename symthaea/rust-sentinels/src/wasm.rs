@@ -24,14 +24,14 @@
 
 #![cfg(feature = "wasm")]
 
-use wasm_bindgen::prelude::*;
 use js_sys::{Float32Array, Object, Reflect};
+use wasm_bindgen::prelude::*;
 
 use crate::sentinels::{
-    EmotionSentinel, SleepSentinel, MeditationSentinel,
-    AttentionSentinel, FlowSentinel, EngagementSentinel,
+    AttentionSentinel, EmotionSentinel, EngagementSentinel, FlowSentinel, MeditationSentinel,
+    SleepSentinel,
 };
-use crate::types::{EmotionQuadrant, SleepStage, MeditationState};
+use crate::types::{EmotionQuadrant, MeditationState, SleepStage};
 
 /// WASM wrapper for EmotionSentinel
 #[wasm_bindgen]
@@ -60,7 +60,11 @@ impl WasmEmotionSentinel {
         Reflect::set(&obj, &"valence".into(), &score.valence.into())?;
         Reflect::set(&obj, &"arousal".into(), &score.arousal.into())?;
         Reflect::set(&obj, &"confidence".into(), &score.confidence.into())?;
-        Reflect::set(&obj, &"quadrant".into(), &quadrant_to_string(score.quadrant()).into())?;
+        Reflect::set(
+            &obj,
+            &"quadrant".into(),
+            &quadrant_to_string(score.quadrant()).into(),
+        )?;
 
         Ok(obj.into())
     }
@@ -142,11 +146,19 @@ impl WasmMeditationSentinel {
 
         let obj = Object::new();
         Reflect::set(&obj, &"depth".into(), &score.depth.into())?;
-        Reflect::set(&obj, &"state".into(), &meditation_state_to_string(score.state()).into())?;
+        Reflect::set(
+            &obj,
+            &"state".into(),
+            &meditation_state_to_string(score.state()).into(),
+        )?;
         Reflect::set(&obj, &"alpha_power".into(), &score.alpha_power.into())?;
         Reflect::set(&obj, &"theta_power".into(), &score.theta_power.into())?;
         Reflect::set(&obj, &"stability".into(), &score.stability.into())?;
-        Reflect::set(&obj, &"meditation_index".into(), &score.meditation_index.into())?;
+        Reflect::set(
+            &obj,
+            &"meditation_index".into(),
+            &score.meditation_index.into(),
+        )?;
 
         Ok(obj.into())
     }
@@ -227,7 +239,10 @@ impl WasmFlowSentinel {
     /// Check if currently in flow state (based on last analysis)
     #[wasm_bindgen]
     pub fn in_flow(&self) -> bool {
-        self.last_score.as_ref().map(|s| s.in_flow()).unwrap_or(false)
+        self.last_score
+            .as_ref()
+            .map(|s| s.in_flow())
+            .unwrap_or(false)
     }
 }
 
@@ -256,7 +271,11 @@ impl WasmEngagementSentinel {
         let score = self.inner.analyze(&vec, sample_rate);
 
         let obj = Object::new();
-        Reflect::set(&obj, &"engagement_index".into(), &score.engagement_index.into())?;
+        Reflect::set(
+            &obj,
+            &"engagement_index".into(),
+            &score.engagement_index.into(),
+        )?;
         Reflect::set(&obj, &"level".into(), &format!("{:?}", score.level).into())?;
         Reflect::set(&obj, &"cognitive".into(), &score.cognitive.into())?;
         Reflect::set(&obj, &"emotional".into(), &score.emotional.into())?;
@@ -271,7 +290,10 @@ impl WasmEngagementSentinel {
     /// Check if user needs a break (based on last analysis)
     #[wasm_bindgen]
     pub fn needs_break(&self) -> bool {
-        self.last_score.as_ref().map(|s| s.needs_break()).unwrap_or(false)
+        self.last_score
+            .as_ref()
+            .map(|s| s.needs_break())
+            .unwrap_or(false)
     }
 }
 
@@ -297,59 +319,122 @@ pub fn analyze_consciousness(data: &Float32Array, sample_rate: f32) -> Result<Js
     let engagement_score = engagement.analyze(&vec, sample_rate);
 
     // Compute overall consciousness level
-    let consciousness_level = (
-        emotion_score.confidence +
-        attention_score.confidence +
-        meditation_score.depth +
-        flow_score.flow_index * 0.5 +
-        engagement_score.engagement_index * 0.5
-    ) / 3.5;
+    let consciousness_level = (emotion_score.confidence
+        + attention_score.confidence
+        + meditation_score.depth
+        + flow_score.flow_index * 0.5
+        + engagement_score.engagement_index * 0.5)
+        / 3.5;
 
     // Build result object
     let obj = Object::new();
 
     // Emotion
     let emotion_obj = Object::new();
-    Reflect::set(&emotion_obj, &"valence".into(), &emotion_score.valence.into())?;
-    Reflect::set(&emotion_obj, &"arousal".into(), &emotion_score.arousal.into())?;
-    Reflect::set(&emotion_obj, &"quadrant".into(), &quadrant_to_string(emotion_score.quadrant()).into())?;
+    Reflect::set(
+        &emotion_obj,
+        &"valence".into(),
+        &emotion_score.valence.into(),
+    )?;
+    Reflect::set(
+        &emotion_obj,
+        &"arousal".into(),
+        &emotion_score.arousal.into(),
+    )?;
+    Reflect::set(
+        &emotion_obj,
+        &"quadrant".into(),
+        &quadrant_to_string(emotion_score.quadrant()).into(),
+    )?;
     Reflect::set(&obj, &"emotion".into(), &emotion_obj.into())?;
 
     // Sleep
     let sleep_obj = Object::new();
-    Reflect::set(&sleep_obj, &"stage".into(), &stage_to_string(sleep_score.stage).into())?;
-    Reflect::set(&sleep_obj, &"quality".into(), &sleep_score.sleep_quality.into())?;
+    Reflect::set(
+        &sleep_obj,
+        &"stage".into(),
+        &stage_to_string(sleep_score.stage).into(),
+    )?;
+    Reflect::set(
+        &sleep_obj,
+        &"quality".into(),
+        &sleep_score.sleep_quality.into(),
+    )?;
     Reflect::set(&obj, &"sleep".into(), &sleep_obj.into())?;
 
     // Meditation
     let meditation_obj = Object::new();
-    Reflect::set(&meditation_obj, &"depth".into(), &meditation_score.depth.into())?;
-    Reflect::set(&meditation_obj, &"state".into(), &meditation_state_to_string(meditation_score.state()).into())?;
+    Reflect::set(
+        &meditation_obj,
+        &"depth".into(),
+        &meditation_score.depth.into(),
+    )?;
+    Reflect::set(
+        &meditation_obj,
+        &"state".into(),
+        &meditation_state_to_string(meditation_score.state()).into(),
+    )?;
     Reflect::set(&obj, &"meditation".into(), &meditation_obj.into())?;
 
     // Attention
     let attention_obj = Object::new();
-    Reflect::set(&attention_obj, &"sustained".into(), &attention_score.sustained.into())?;
-    Reflect::set(&attention_obj, &"selective".into(), &attention_score.selective.into())?;
-    Reflect::set(&attention_obj, &"state".into(), &format!("{:?}", attention_score.state).into())?;
+    Reflect::set(
+        &attention_obj,
+        &"sustained".into(),
+        &attention_score.sustained.into(),
+    )?;
+    Reflect::set(
+        &attention_obj,
+        &"selective".into(),
+        &attention_score.selective.into(),
+    )?;
+    Reflect::set(
+        &attention_obj,
+        &"state".into(),
+        &format!("{:?}", attention_score.state).into(),
+    )?;
     Reflect::set(&obj, &"attention".into(), &attention_obj.into())?;
 
     // Flow
     let flow_obj = Object::new();
-    Reflect::set(&flow_obj, &"flow_index".into(), &flow_score.flow_index.into())?;
-    Reflect::set(&flow_obj, &"state".into(), &format!("{:?}", flow_score.state).into())?;
+    Reflect::set(
+        &flow_obj,
+        &"flow_index".into(),
+        &flow_score.flow_index.into(),
+    )?;
+    Reflect::set(
+        &flow_obj,
+        &"state".into(),
+        &format!("{:?}", flow_score.state).into(),
+    )?;
     Reflect::set(&flow_obj, &"in_flow".into(), &flow_score.in_flow().into())?;
     Reflect::set(&obj, &"flow".into(), &flow_obj.into())?;
 
     // Engagement
     let engagement_obj = Object::new();
-    Reflect::set(&engagement_obj, &"index".into(), &engagement_score.engagement_index.into())?;
-    Reflect::set(&engagement_obj, &"level".into(), &format!("{:?}", engagement_score.level).into())?;
-    Reflect::set(&engagement_obj, &"needs_break".into(), &engagement_score.needs_break().into())?;
+    Reflect::set(
+        &engagement_obj,
+        &"index".into(),
+        &engagement_score.engagement_index.into(),
+    )?;
+    Reflect::set(
+        &engagement_obj,
+        &"level".into(),
+        &format!("{:?}", engagement_score.level).into(),
+    )?;
+    Reflect::set(
+        &engagement_obj,
+        &"needs_break".into(),
+        &engagement_score.needs_break().into(),
+    )?;
     Reflect::set(&obj, &"engagement".into(), &engagement_obj.into())?;
 
     // Overall
-    Reflect::set(&obj, &"consciousness_level".into(), &consciousness_level.into())?;
+    Reflect::set(
+        &obj,
+        &"consciousness_level".into(),
+        &consciousness_level.into(),
+    )?;
     Reflect::set(&obj, &"timestamp".into(), &js_sys::Date::now().into())?;
 
     Ok(obj.into())
@@ -365,7 +450,11 @@ pub fn quick_emotion(data: &Float32Array, sample_rate: f32) -> Result<JsValue, J
     let obj = Object::new();
     Reflect::set(&obj, &"valence".into(), &score.valence.into())?;
     Reflect::set(&obj, &"arousal".into(), &score.arousal.into())?;
-    Reflect::set(&obj, &"quadrant".into(), &quadrant_to_string(score.quadrant()).into())?;
+    Reflect::set(
+        &obj,
+        &"quadrant".into(),
+        &quadrant_to_string(score.quadrant()).into(),
+    )?;
 
     Ok(obj.into())
 }

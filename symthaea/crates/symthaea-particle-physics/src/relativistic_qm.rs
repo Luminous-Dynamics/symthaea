@@ -24,11 +24,7 @@ pub fn gamma_matrix(mu: usize, i: usize, j: usize) -> (f64, f64) {
         0 => {
             // γ⁰ = diag(1, 1, -1, -1)
             if i == j {
-                if i < 2 {
-                    (1.0, 0.0)
-                } else {
-                    (-1.0, 0.0)
-                }
+                if i < 2 { (1.0, 0.0) } else { (-1.0, 0.0) }
             } else {
                 (0.0, 0.0)
             }

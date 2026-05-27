@@ -90,8 +90,8 @@ pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
 pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
 pub use road::{Road, RoadSegment};
 pub use scenarios::{
-    default_scenarios, results_to_csv, run_all_scenarios, run_scenario, ScenarioConfig,
-    ScenarioResult,
+    ScenarioConfig, ScenarioResult, default_scenarios, results_to_csv, run_all_scenarios,
+    run_scenario,
 };
 pub use simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 pub use subterranean::{CaveRelayDecision, SubterraneanBridge, SurveyAnchor, TunnelRelayNode};

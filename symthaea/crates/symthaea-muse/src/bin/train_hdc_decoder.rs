@@ -55,7 +55,9 @@ struct Args {
 fn parse_args() -> Args {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() < 2 {
-        eprintln!("Usage: train_hdc_decoder <pairs_dir> <ckpt_path> [--epochs N] [--hidden N] [--lr F] [--max-files N]");
+        eprintln!(
+            "Usage: train_hdc_decoder <pairs_dir> <ckpt_path> [--epochs N] [--hidden N] [--lr F] [--max-files N]"
+        );
         std::process::exit(1);
     }
     let pairs_dir = PathBuf::from(args.remove(0));

@@ -1347,7 +1347,7 @@ mod tests {
 
         assert!(
             (b * 1e3 - 2.898).abs() < 0.001,
-            "Wien constant should be 2.898e-3 m·K, got {:.6e}",
+            "Wien constant should be 2.898e-3 m·K, got {:.12}",
             b
         );
     }

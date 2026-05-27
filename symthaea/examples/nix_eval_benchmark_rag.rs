@@ -21,9 +21,9 @@ use std::path::PathBuf;
 
 use symthaea::language::learned_idioms::LearnedIdiomCache;
 use symthaea::language::nix_codegen::{
-    generate_nix_with_rag_fast_using, NixGenSource, NixIntent, SelfImproveSource,
+    NixGenSource, NixIntent, SelfImproveSource, generate_nix_with_rag_fast_using,
 };
-use symthaea::language::nix_eval_corpus::{problems, NixProblem};
+use symthaea::language::nix_eval_corpus::{NixProblem, problems};
 
 #[derive(Default)]
 struct ScoreCard {

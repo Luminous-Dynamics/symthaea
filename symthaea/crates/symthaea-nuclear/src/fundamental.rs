@@ -469,11 +469,7 @@ pub fn neutron_pairing_gap(predictor: &MlMassPredictor, z: u16, n: u16) -> f64 {
 /// Empirical pairing gap estimate: 12/√A MeV.
 pub fn empirical_pairing_gap(z: u16, n: u16) -> f64 {
     let a = (z + n) as f64;
-    if a > 0.0 {
-        12.0 / a.sqrt()
-    } else {
-        0.0
-    }
+    if a > 0.0 { 12.0 / a.sqrt() } else { 0.0 }
 }
 
 /// Map pairing gaps across the nuclear chart.

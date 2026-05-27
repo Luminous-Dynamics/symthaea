@@ -45,7 +45,9 @@ fn test_arc_grid_through_cognitive_loop() {
     assert!(
         second_half_mean <= first_half_mean * 2.0 + 0.15,
         "Prediction error should stabilize, not diverge: first_half={:.4}, second_half={:.4}, errors={:?}",
-        first_half_mean, second_half_mean, errors
+        first_half_mean,
+        second_half_mean,
+        errors
     );
 }
 

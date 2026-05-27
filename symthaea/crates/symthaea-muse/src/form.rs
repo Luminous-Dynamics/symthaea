@@ -8,8 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::structure::SectionType;
 use crate::MusicalState;
+use crate::structure::SectionType;
 
 /// Index of InfinitePlay in the 8-harmony activation array.
 pub const HARMONY_PLAY: usize = 3;
@@ -165,10 +165,11 @@ mod tests {
         };
         let form = plan_form(&state, 9.0);
         assert_eq!(form.sections.len(), 3);
-        assert!(form
-            .sections
-            .iter()
-            .all(|s| s.section_type == SectionType::Ambient));
+        assert!(
+            form.sections
+                .iter()
+                .all(|s| s.section_type == SectionType::Ambient)
+        );
     }
 
     #[test]

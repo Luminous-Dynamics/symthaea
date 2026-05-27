@@ -224,9 +224,11 @@ mod tests {
         let result = InstitutionalStabilityBenchmark.run(&config);
         assert!(result.metrics.contains_key("institutional_stability"));
         assert!(result.metrics.contains_key("institutional_min_stability"));
-        assert!(result
-            .metrics
-            .contains_key("institutional_stability_variance"));
+        assert!(
+            result
+                .metrics
+                .contains_key("institutional_stability_variance")
+        );
     }
 
     #[test]

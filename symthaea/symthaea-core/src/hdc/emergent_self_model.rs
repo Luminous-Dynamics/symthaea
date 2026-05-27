@@ -311,11 +311,7 @@ impl SelfAwareConsciousness {
                 .collect();
             let first = recent.first().unwrap_or(&0.5);
             let last = recent.last().unwrap_or(&0.5);
-            if first > last {
-                0.8
-            } else {
-                0.5
-            }
+            if first > last { 0.8 } else { 0.5 }
         } else {
             0.6
         };

@@ -35,7 +35,7 @@ pub mod session;
 pub mod synesthesia;
 pub mod valence_arousal;
 
-pub use valence_arousal::{from_core_affect, lerp_va, MusicalParams, ValenceArousal};
+pub use valence_arousal::{MusicalParams, ValenceArousal, from_core_affect, lerp_va};
 
 use serde::{Deserialize, Serialize};
 

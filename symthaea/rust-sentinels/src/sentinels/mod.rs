@@ -17,25 +17,25 @@
 
 // Consciousness Trilogy
 mod emotion;
-mod sleep;
 mod meditation;
+mod sleep;
 
 // Extended Proofs
 mod attention;
-mod flow;
 mod engagement;
+mod flow;
 
 // Re-export Trilogy Sentinels
 pub use emotion::EmotionSentinel;
-pub use sleep::{SleepSentinel, SleepConfig, SpectralRatios, SpindleEvent, KComplexEvent};
 pub use meditation::MeditationSentinel;
+pub use sleep::{KComplexEvent, SleepConfig, SleepSentinel, SpectralRatios, SpindleEvent};
 
 // Re-export Trilogy types from crate::types
-pub use crate::types::{EmotionScore, EmotionQuadrant};
-pub use crate::types::{SleepScore, SleepStage};
+pub use crate::types::{EmotionQuadrant, EmotionScore};
 pub use crate::types::{MeditationScore, MeditationState};
+pub use crate::types::{SleepScore, SleepStage};
 
 // Re-export Extended Proofs
-pub use attention::{AttentionSentinel, AttentionScore, AttentionState, AttentionConfig};
-pub use flow::{FlowSentinel, FlowScore, FlowState, FlowConfig};
-pub use engagement::{EngagementSentinel, EngagementScore, EngagementLevel, EngagementConfig};
+pub use attention::{AttentionConfig, AttentionScore, AttentionSentinel, AttentionState};
+pub use engagement::{EngagementConfig, EngagementLevel, EngagementScore, EngagementSentinel};
+pub use flow::{FlowConfig, FlowScore, FlowSentinel, FlowState};

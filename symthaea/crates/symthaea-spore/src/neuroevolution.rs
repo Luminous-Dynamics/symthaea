@@ -621,7 +621,7 @@ mod tests {
             }
         }
         // Champion swap happens when a new best is found
-        // (first gen always swaps since champion_fitness starts at NEG_INFINITY)
+        // (first r#gen always swaps since champion_fitness starts at NEG_INFINITY)
         assert!(swapped, "First generation should swap champion");
     }
 

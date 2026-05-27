@@ -11,8 +11,8 @@ use symthaea_psych_bench::benchmarks::{
     worm::NBackBenchmark,
 };
 use symthaea_psych_bench::harness::{
-    staircase::{run_staircase, StaircaseConfig, StaircaseRule},
     BenchmarkConfig, PsychBenchmark,
+    staircase::{StaircaseConfig, StaircaseRule, run_staircase},
 };
 
 fn base_config() -> BenchmarkConfig {

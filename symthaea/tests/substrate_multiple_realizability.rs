@@ -212,8 +212,7 @@ fn test_consciousness_survives_substrate_transfer() {
         "Tau should differ between Silicon and Biological: Si={silicon_tau:.4}, Bio={bio_tau:.4}"
     );
     assert!(
-        (silicon_tau - photonic_tau).abs() > 0.001
-            || (bio_tau - photonic_tau).abs() > 0.001,
+        (silicon_tau - photonic_tau).abs() > 0.001 || (bio_tau - photonic_tau).abs() > 0.001,
         "Tau should vary across substrates: Si={silicon_tau:.4}, Bio={bio_tau:.4}, Ph={photonic_tau:.4}"
     );
 

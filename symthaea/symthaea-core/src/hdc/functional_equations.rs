@@ -207,11 +207,7 @@ pub fn involution_residual(samples: &[(f64, f64)]) -> f64 {
             tested += 1;
         }
     }
-    if tested == 0 {
-        0.0
-    } else {
-        max_resid
-    }
+    if tested == 0 { 0.0 } else { max_resid }
 }
 
 /// Result of a classification attempt: the kind, the fitted constant
@@ -267,11 +263,7 @@ pub fn cauchy_residual(samples: &[(f64, f64)]) -> f64 {
             }
         }
     }
-    if tested == 0 {
-        0.0
-    } else {
-        max_resid
-    }
+    if tested == 0 { 0.0 } else { max_resid }
 }
 
 /// Verify multiplicativity `f(x·y) ≈ f(x)·f(y)` on positive samples.
@@ -295,11 +287,7 @@ pub fn multiplicative_residual(samples: &[(f64, f64)]) -> f64 {
             }
         }
     }
-    if tested == 0 {
-        0.0
-    } else {
-        max_resid
-    }
+    if tested == 0 { 0.0 } else { max_resid }
 }
 
 /// Verify exponentiation law `f(x + y) ≈ f(x)·f(y)`.
@@ -320,11 +308,7 @@ pub fn exponential_residual(samples: &[(f64, f64)]) -> f64 {
             }
         }
     }
-    if tested == 0 {
-        0.0
-    } else {
-        max_resid
-    }
+    if tested == 0 { 0.0 } else { max_resid }
 }
 
 /// Verify the log law `f(x·y) ≈ f(x) + f(y)` on positives.
@@ -348,11 +332,7 @@ pub fn logarithmic_residual(samples: &[(f64, f64)]) -> f64 {
             }
         }
     }
-    if tested == 0 {
-        0.0
-    } else {
-        max_resid
-    }
+    if tested == 0 { 0.0 } else { max_resid }
 }
 
 // ─── Classification ──────────────────────────────────────────────────────────

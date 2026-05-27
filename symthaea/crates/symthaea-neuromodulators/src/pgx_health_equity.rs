@@ -1897,10 +1897,11 @@ mod tests {
             e.cpic_guidelines.len()
         );
         // Verify codeine UM guideline exists.
-        assert!(e
-            .cpic_guidelines
-            .iter()
-            .any(|g| g.drug == "codeine" && g.phenotype == MetabolizerPhenotype::UltraRapid));
+        assert!(
+            e.cpic_guidelines
+                .iter()
+                .any(|g| g.drug == "codeine" && g.phenotype == MetabolizerPhenotype::UltraRapid)
+        );
     }
 
     #[test]

@@ -90,12 +90,12 @@ pub fn quick_consciousness_assessment(
     molecule: &crate::molecule::Molecule,
     temperature: f64,
 ) -> PhysicsConsciousnessState {
-    use crate::basis::sto3g::Sto3g;
     use crate::basis::BasisSetProvider;
+    use crate::basis::sto3g::Sto3g;
     use crate::emergent_consciousness::consciousness_from_first_principles;
     use crate::integrals::eri::compute_eri_tensor;
     use crate::post_hf::mp2::mp2_correlation_energy;
-    use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
+    use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
     let basis = Sto3g::build(molecule);
     let rhf = restricted_hartree_fock(molecule, &basis, &RhfConfig::default());

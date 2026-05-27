@@ -4,11 +4,21 @@ pub mod brain {
         #[derive(Debug, Clone, Default)]
         pub struct AttentionBid;
         impl AttentionBid {
-            pub fn new<A, B>(_name: A, _payload: B) -> Self { Self }
-            pub fn with_salience(self, _s: f32) -> Self { self }
-            pub fn with_urgency(self, _u: f32) -> Self { self }
-            pub fn with_tags(self, _t: Vec<String>) -> Self { self }
-            pub fn with_hdc_semantic<T>(self, _v: Option<std::sync::Arc<T>>) -> Self { self }
+            pub fn new<A, B>(_name: A, _payload: B) -> Self {
+                Self
+            }
+            pub fn with_salience(self, _s: f32) -> Self {
+                self
+            }
+            pub fn with_urgency(self, _u: f32) -> Self {
+                self
+            }
+            pub fn with_tags(self, _t: Vec<String>) -> Self {
+                self
+            }
+            pub fn with_hdc_semantic<T>(self, _v: Option<std::sync::Arc<T>>) -> Self {
+                self
+            }
         }
     }
 }
@@ -16,12 +26,18 @@ pub mod embeddings {
     #[derive(Debug, Clone, Default)]
     pub struct Qwen3Config;
     #[derive(Debug, Clone, Default)]
-    pub struct Qwen3EmbedderResult { pub embedding: Vec<f32> }
+    pub struct Qwen3EmbedderResult {
+        pub embedding: Vec<f32>,
+    }
     #[derive(Debug, Clone, Default)]
     pub struct Qwen3Embedder;
     impl Qwen3Embedder {
-        pub fn new(_c: Qwen3Config) -> anyhow::Result<Self> { Ok(Self) }
-        pub fn embed(&mut self, _t: &str) -> anyhow::Result<Qwen3EmbedderResult> { Ok(Qwen3EmbedderResult::default()) }
+        pub fn new(_c: Qwen3Config) -> anyhow::Result<Self> {
+            Ok(Self)
+        }
+        pub fn embed(&mut self, _t: &str) -> anyhow::Result<Qwen3EmbedderResult> {
+            Ok(Qwen3EmbedderResult::default())
+        }
     }
 }
 
@@ -237,7 +253,7 @@ impl PerceptionBridge {
             ModalityType::Voice => 0.7,  // Voice input needs quick response
             ModalityType::Code => 0.3,   // Code analysis can wait
             ModalityType::Ocr => 0.4,
-                _ => 0.5,    // OCR is informational
+            _ => 0.5, // OCR is informational
         };
 
         let bid = AttentionBid::new("Perception", content)

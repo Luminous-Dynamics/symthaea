@@ -10,8 +10,8 @@
 
 use symthaea::multirotor::formation::{FormationController, FormationShape, FormationState};
 use symthaea::multirotor::{
-    pd_baseline, FlightConfig, FlightController, FlightSetpoint, PdGains, PhysicsSimulator,
-    QuadrotorHdcEncoder, SimplePhysicsSimulator,
+    FlightConfig, FlightController, FlightSetpoint, PdGains, PhysicsSimulator, QuadrotorHdcEncoder,
+    SimplePhysicsSimulator, pd_baseline,
 };
 use symthaea::symthaea_core::genesis::GenesisSeed;
 

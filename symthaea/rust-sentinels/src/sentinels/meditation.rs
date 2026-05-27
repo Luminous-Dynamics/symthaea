@@ -21,7 +21,7 @@ pub struct MeditationSentinel {
 impl Default for MeditationSentinel {
     fn default() -> Self {
         Self {
-            baseline_index: 1.0,  // Default baseline
+            baseline_index: 1.0, // Default baseline
             calibrated: false,
         }
     }

@@ -827,8 +827,10 @@ mod tests {
 
         let summary = tracker.calibration_summary();
         assert_eq!(summary.total_predictions, 10);
-        assert!(summary
-            .domain_stats
-            .contains_key(&PredictionDomain::CodeExecution));
+        assert!(
+            summary
+                .domain_stats
+                .contains_key(&PredictionDomain::CodeExecution)
+        );
     }
 }

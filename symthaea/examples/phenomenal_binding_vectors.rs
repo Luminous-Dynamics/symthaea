@@ -34,7 +34,9 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example phenomenal_binding_vectors --features neural-bridge --release");
+        println!(
+            "Run with: cargo run --example phenomenal_binding_vectors --features neural-bridge --release"
+        );
         Ok(())
     }
 

@@ -17,8 +17,8 @@
 //! - Lorenz, E. N. (1963). Deterministic nonperiodic flow. *JAS*, 20, 130–141.
 //! - Clifford Pickover: `x' = sin(a*y) + c*cos(a*x)`, `y' = sin(b*x) + d*cos(b*y)`
 
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use symthaea_canvas::{CognitiveSnapshot, SceneNode};
 
 // ─── Attractor types ─────────────────────────────────────────────────────────

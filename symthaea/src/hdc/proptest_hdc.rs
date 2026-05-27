@@ -17,8 +17,8 @@ operations hold across randomly generated inputs.
 6. **Binding preserves structure**: sim(bind(a,c), bind(b,c)) ≈ sim(a, b)
 */
 
-use super::native_similarity::PackedBipolar;
 use super::HdcContext;
+use super::native_similarity::PackedBipolar;
 use proptest::prelude::*;
 
 /// Generate random bipolar vector of given dimension
@@ -56,11 +56,7 @@ fn bundle(vectors: &[&[i8]]) -> Vec<i8> {
     (0..dim)
         .map(|i| {
             let sum: i32 = vectors.iter().map(|v| v[i] as i32).sum();
-            if sum > threshold {
-                1
-            } else {
-                -1
-            }
+            if sum > threshold { 1 } else { -1 }
         })
         .collect()
 }

@@ -25,8 +25,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use symthaea_stt::{
-    AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, PhonemeDecoder,
-    PhonemeInventory, PhonemeResonator, TrainedPrototypes, HV16,
+    AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, HV16, PhonemeDecoder,
+    PhonemeInventory, PhonemeResonator, TrainedPrototypes,
 };
 
 // ============================================================================

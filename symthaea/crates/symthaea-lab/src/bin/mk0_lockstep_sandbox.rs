@@ -10,13 +10,15 @@
 //! - mk0-fabricator (Autonomous 3D Print Farm)
 //! - mk0-manipulator (7-DOF Rapier3D Mechanical Arm)
 
-use symthaea_engineering::EngineeringManager;
-use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
-use symthaea_infrastructure::simulator::{SimpleInfrastructureSimulator, InfrastructurePhysicsSimulator};
-use symthaea_silicon::PowerDistributionLogic;
-use symthaea_manipulator::types::{ManipulatorState, ManipulatorCommand};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use symthaea_engineering::EngineeringManager;
+use symthaea_infrastructure::simulator::{
+    InfrastructurePhysicsSimulator, SimpleInfrastructureSimulator,
+};
+use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
+use symthaea_manipulator::types::{ManipulatorCommand, ManipulatorState};
+use symthaea_silicon::PowerDistributionLogic;
 
 /// Mock Mycelix IPC resource for TendBalance ledger.
 /// Uses request_id correlation map to simulate asynchronous, non-blocking IPC.
@@ -52,9 +54,9 @@ pub struct Mk0LockstepSandbox {
     pub ledger: MycelixIpcMock,
     pub dt: f64,
     pub frames: u64,
-    
+
     // Mk0 Metabolic Inputs
-    pub solar_flux: f32, // Helios input
+    pub solar_flux: f32,     // Helios input
     pub recycler_yield: f32, // Detritivore output
     pub grid_load_mw: f32,
 }
@@ -84,20 +86,25 @@ impl Mk0LockstepSandbox {
         // 2. FABRICATION METABOLISM (Energy Out)
         // Robotic arm torque increases load
         let arm_load = 0.5 + (self.arm_state.end_effector_force[2].abs() as f32 * 0.1);
-        self.grid_load_mw = 4.0 + arm_load; 
+        self.grid_load_mw = 4.0 + arm_load;
 
         // 3. SILICON BRAIN: Conscious Accelerator v1
         // Optimize grid routing and execute safety vetoes
-        let surprise = self.town.power_grid.optimize_routing(self.grid_load_mw, generation_mw);
+        let surprise = self
+            .town
+            .power_grid
+            .optimize_routing(self.grid_load_mw, generation_mw);
 
         // 4. PHYSICAL DYNAMICS (Rapier3D/MuJoCo Simulation)
         self.update_mechanical_joints();
 
         // 5. INFRASTRUCTURE DYNAMICS (Town Fluid/Thermal)
         self.town.step(self.grid_load_mw, generation_mw);
-        
+
         // 6. ECONOMIC LEDGER (Non-blocking IPC)
-        let tx_id = self.ledger.submit_transaction(&format!("tend_{}_watts", self.grid_load_mw));
+        let tx_id = self
+            .ledger
+            .submit_transaction(&format!("tend_{}_watts", self.grid_load_mw));
         if self.frames % 2 == 0 {
             let _ = self.ledger.poll_ledger(tx_id - 1);
         }
@@ -164,6 +171,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sandbox.tick();
     }
 
-    println!("\n✨ Mk0 Co-Simulation Verified: Logical immune system successfully mitigated cascades.");
+    println!(
+        "\n✨ Mk0 Co-Simulation Verified: Logical immune system successfully mitigated cascades."
+    );
     Ok(())
 }

@@ -300,7 +300,7 @@ mod tests {
     fn test_r_ratio_below_charm() {
         // Below charm threshold: R = N_c × (Q_u² + Q_d² + Q_s²) = 3×(4/9+1/9+1/9) = 2
         let r = r_ratio(1.5); // √s = 1.5 GeV (below charm)
-                              // R₀ = 2.0 × (1 + α_s/π) ≈ 2.0 × 1.1 = 2.2 with QCD correction
+        // R₀ = 2.0 × (1 + α_s/π) ≈ 2.0 × 1.1 = 2.2 with QCD correction
         assert!(
             (r - 2.0).abs() < 0.4,
             "R below charm = {:.3}, expected ≈ 2.0-2.2 (with QCD correction)",

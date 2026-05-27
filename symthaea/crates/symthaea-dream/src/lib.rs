@@ -40,7 +40,7 @@ println!("Gained {} insights from dreaming", insights);
 pub mod motor_trajectory;
 
 use anyhow::Result;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
 /// Trait for actions that can be dreamed about

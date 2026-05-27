@@ -242,40 +242,56 @@ mod tests {
     fn test_yellow_increases_monitoring() {
         let actions = propose_defense_actions(SafetyLevel::Yellow, 100);
         assert!(!actions.is_empty());
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::IncreasePeerScoring { .. })));
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::BoostVigilance { .. })));
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::IncreasePeerScoring { .. }))
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::BoostVigilance { .. }))
+        );
     }
 
     #[test]
     fn test_orange_restricts_governance_and_motor() {
         let actions = propose_defense_actions(SafetyLevel::Orange, 200);
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals)));
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::RestrictMotorToReadOnly)));
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::SuspendNonGuardianProposals))
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::RestrictMotorToReadOnly))
+        );
     }
 
     #[test]
     fn test_red_emergency_halt() {
         let actions = propose_defense_actions(SafetyLevel::Red, 300);
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::EmergencyGovernanceFreeze)));
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::HaltMotor)));
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::DisconnectUntrusted)));
-        assert!(actions
-            .iter()
-            .any(|a| matches!(a.kind, DefenseActionKind::EmergencyBeacon)));
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::EmergencyGovernanceFreeze))
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::HaltMotor))
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::DisconnectUntrusted))
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a.kind, DefenseActionKind::EmergencyBeacon))
+        );
     }
 
     #[test]

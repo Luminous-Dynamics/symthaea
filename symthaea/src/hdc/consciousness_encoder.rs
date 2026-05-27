@@ -14,8 +14,8 @@
 //!   final 16,384D state used for k-NN classification
 
 use super::moral_text_encoder::TextHdcEncoder;
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Permutation-based word-order encoder at full 16,384D.
 ///

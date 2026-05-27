@@ -35,13 +35,13 @@ pub mod ws;
 use crate::api::state::AppState;
 use crate::control_plane::parse_bearer_token;
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
-    extract::{ws::WebSocketUpgrade, Request, State},
+    extract::{Request, State, ws::WebSocketUpgrade},
     http::{HeaderMap, Method, StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
 };
 use std::path::PathBuf;
 use std::sync::Arc;

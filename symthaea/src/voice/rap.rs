@@ -20,13 +20,13 @@
 //! - Flow pattern selection (boom bap, triplet, double-time)
 //! - Prosodic emphasis on rhyming syllables
 
+use super::LTCPacing;
 use super::articulatory_synthesizer::{
     ArticulatoryConfig, ArticulatorySynthesizer, FormantFrame, TimedPhoneme,
 };
 use super::beat_sync::{BeatSync, FlowPattern, SyllableTiming};
 use super::rhyme_hdc::{RhymeEncoder, RhymeScheme};
 use super::vocoder::{FormantVocoder, VocoderConfig};
-use super::LTCPacing;
 
 use serde::{Deserialize, Serialize};
 

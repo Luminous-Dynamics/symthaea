@@ -12,8 +12,8 @@ use symthaea_vocal_tract::controller::{VocalTractConfig, VocalTractController};
 use symthaea_vocal_tract::encoder::VocalTractHdcEncoder;
 use symthaea_vocal_tract::types::FormantFrame;
 
-use crate::g2p::Phoneme;
 use crate::VoiceProsody;
+use crate::g2p::Phoneme;
 
 /// LTC-driven voice synthesizer.
 ///

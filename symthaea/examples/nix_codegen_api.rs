@@ -26,7 +26,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 use symthaea::language::nix_codegen::{
-    generate_nix_with_rag_fast, shared_learned_cache, NixIntent, SelfImproveSource,
+    NixIntent, SelfImproveSource, generate_nix_with_rag_fast, shared_learned_cache,
 };
 
 /// Minimal JSON encoder for our response shape.

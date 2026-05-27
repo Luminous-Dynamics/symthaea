@@ -14,7 +14,7 @@ use symthaea_fep::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation, TemporalDifferenceLearningConfig,
 };
 
-use crate::types::{VehicleCommand, VehicleState, VehicleTask, NUM_ACTUATORS};
+use crate::types::{NUM_ACTUATORS, VehicleCommand, VehicleState, VehicleTask};
 
 /// Result of a cognitive tick from the vehicle FEP agent.
 #[derive(Debug, Clone)]

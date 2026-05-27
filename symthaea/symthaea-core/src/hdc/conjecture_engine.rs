@@ -63,10 +63,10 @@ pub use dynamics::observe_gr_correction;
 use dynamics::*;
 pub use expressions::*;
 use gp_support::{
-    collect_constants, compute_mse, contains_structural_match, count_prior_subtrees, crossover,
-    expr_uses_only_vars, fd_gradient, fingerprint_expr, gram_schmidt, lie_derivative_variance,
-    macro_usage_key, optimize_constants, orthogonal_fraction, seed_macro_variants,
-    specialize_seed_constants, SpecializationBudget,
+    SpecializationBudget, collect_constants, compute_mse, contains_structural_match,
+    count_prior_subtrees, crossover, expr_uses_only_vars, fd_gradient, fingerprint_expr,
+    gram_schmidt, lie_derivative_variance, macro_usage_key, optimize_constants,
+    orthogonal_fraction, seed_macro_variants, specialize_seed_constants,
 };
 pub use observers::*;
 pub use regressor::*;
@@ -1251,7 +1251,9 @@ mod tests {
             assert!(
                 (predicted - phi).abs() < 0.5 || best.training_mse < 0.1,
                 "best fibonacci ratio conjecture should approximate φ: predicted={}, mse={}, formula={}",
-                predicted, best.training_mse, best.formula_str,
+                predicted,
+                best.training_mse,
+                best.formula_str,
             );
         }
     }
@@ -1440,7 +1442,9 @@ mod tests {
                 "  >>> PREDICTION for n=6: obstruction_ratio ≈ {:.4}",
                 pred_6
             );
-            eprintln!("  >>> (This prediction is UNTESTED — verify by computing check_obstruction_conjecture(6, 36))");
+            eprintln!(
+                "  >>> (This prediction is UNTESTED — verify by computing check_obstruction_conjecture(6, 36))"
+            );
         }
 
         // Must produce at least some data
@@ -4088,14 +4092,18 @@ mod tests {
 
         assert!(!invariants.is_empty());
         assert_eq!(engine.conjectures.len(), before + invariants.len());
-        assert!(engine
-            .conjectures
-            .iter()
-            .any(|c| c.source == "kepler_feedback"));
-        assert!(engine
-            .autonomous_macro_templates_for_vars(&["x", "y", "vx", "vy"])
-            .iter()
-            .all(|expr| expr_uses_only_vars(expr, &["x", "y", "vx", "vy"])));
+        assert!(
+            engine
+                .conjectures
+                .iter()
+                .any(|c| c.source == "kepler_feedback")
+        );
+        assert!(
+            engine
+                .autonomous_macro_templates_for_vars(&["x", "y", "vx", "vy"])
+                .iter()
+                .all(|expr| expr_uses_only_vars(expr, &["x", "y", "vx", "vy"]))
+        );
     }
 
     #[cfg(feature = "abstract_thought")]
@@ -5013,11 +5021,7 @@ mod tests {
                     let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
                     let l = x * vy - y * vx;
                     let r = (x * x + y * y).sqrt();
-                    if r > 1e-10 {
-                        vy * l - x / r
-                    } else {
-                        f64::NAN
-                    }
+                    if r > 1e-10 { vy * l - x / r } else { f64::NAN }
                 }) as Box<dyn Fn(&[f64]) -> f64>,
             ),
             // LRL y-component: Ay = -vx·L - y/r
@@ -5027,11 +5031,7 @@ mod tests {
                     let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
                     let l = x * vy - y * vx;
                     let r = (x * x + y * y).sqrt();
-                    if r > 1e-10 {
-                        -vx * l - y / r
-                    } else {
-                        f64::NAN
-                    }
+                    if r > 1e-10 { -vx * l - y / r } else { f64::NAN }
                 }) as Box<dyn Fn(&[f64]) -> f64>,
             ),
             // |A|² = 1 + 2EL² (magnitude — should also be conserved)
@@ -5295,7 +5295,7 @@ mod tests {
     #[test]
     fn test_gr_correction_discovery() {
         let l = 10.0; // larger L makes the -L²/r³ correction more prominent
-                      // Small r range where the 1/r³ correction varies by orders of magnitude
+        // Small r range where the 1/r³ correction varies by orders of magnitude
         let seq = observe_gr_correction(l, 3.0, 15.0, 100);
 
         let mut engine = ConjectureEngine::with_config(RegressorConfig {
@@ -5445,11 +5445,7 @@ mod tests {
         // Potential: V = -1/r (k=1)
         let potential = |s: &[f64]| {
             let r = (s[0] * s[0] + s[1] * s[1]).sqrt();
-            if r > 1e-10 {
-                -1.0 / r
-            } else {
-                0.0
-            }
+            if r > 1e-10 { -1.0 / r } else { 0.0 }
         };
 
         // Use a large window to capture multi-period behavior
@@ -6348,9 +6344,11 @@ mod tests {
         unconstrained.training_mse = 0.0;
         unconstrained.fitness = 0.0;
         attach_eml_metadata(&mut unconstrained);
-        assert!(unconstrained
-            .eml_real_domain
-            .is_some_and(EmlRealDomainAssumption::is_unconstrained));
+        assert!(
+            unconstrained
+                .eml_real_domain
+                .is_some_and(EmlRealDomainAssumption::is_unconstrained)
+        );
 
         let mut constrained = make_backend_test_conjecture(
             Expr::BinOp(
@@ -6364,9 +6362,11 @@ mod tests {
         constrained.training_mse = 0.0;
         constrained.fitness = 0.0;
         attach_eml_metadata(&mut constrained);
-        assert!(constrained
-            .eml_real_domain
-            .is_some_and(|d| !d.is_unconstrained()));
+        assert!(
+            constrained
+                .eml_real_domain
+                .is_some_and(|d| !d.is_unconstrained())
+        );
 
         engine.conjectures.push(constrained);
         engine.conjectures.push(unconstrained);

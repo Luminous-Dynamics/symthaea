@@ -7,8 +7,8 @@
 //! creating organic cellular textures. Persistence (death - birth) controls
 //! circle radius, creating a visual representation of topological significance.
 
-use rand::rngs::StdRng;
 use rand::Rng;
+use rand::rngs::StdRng;
 use symthaea_canvas::scene_graph::Style;
 use symthaea_canvas::{CognitiveSnapshot, Color, SceneNode};
 

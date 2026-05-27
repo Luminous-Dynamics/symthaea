@@ -283,8 +283,8 @@ fn test_neuromod_snapshot_fires_every_10_cycles() {
         service.cycle("more warmup for snapshot");
     }
     let _r = service.cycle("snapshot at cycle 31... actually 30 + warmup"); // cycle 31
-                                                                            // Cycle 31 won't be a snapshot (31 % 10 != 0), so run to 40
-                                                                            // total_cycles is now 31, run 9 more to reach 40
+    // Cycle 31 won't be a snapshot (31 % 10 != 0), so run to 40
+    // total_cycles is now 31, run 9 more to reach 40
     for _ in 0..8 {
         service.cycle("filler cycle");
     }

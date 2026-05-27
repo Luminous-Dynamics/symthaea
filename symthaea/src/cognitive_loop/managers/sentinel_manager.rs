@@ -24,7 +24,7 @@
 //! changes via `SubsystemOutput`. It does NOT mutate CognitiveLoopService directly.
 
 use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
+    CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
 use serde::{Deserialize, Serialize};
@@ -933,10 +933,11 @@ mod tests {
         let snap = make_snapshot(100);
         mgr.process(&snap);
 
-        assert!(mgr
-            .active_threats()
-            .iter()
-            .any(|t| t.kind == ThreatSignalKind::ProposalFlood));
+        assert!(
+            mgr.active_threats()
+                .iter()
+                .any(|t| t.kind == ThreatSignalKind::ProposalFlood)
+        );
         assert!(mgr.threat_level() > 0.0);
     }
 
@@ -958,10 +959,11 @@ mod tests {
         let snap = make_snapshot(200);
         mgr.process(&snap);
 
-        assert!(mgr
-            .active_threats()
-            .iter()
-            .any(|t| t.kind == ThreatSignalKind::ConsciousnessManipulation));
+        assert!(
+            mgr.active_threats()
+                .iter()
+                .any(|t| t.kind == ThreatSignalKind::ConsciousnessManipulation)
+        );
     }
 
     #[test]
@@ -982,10 +984,11 @@ mod tests {
         let snap = make_snapshot(300);
         mgr.process(&snap);
 
-        assert!(mgr
-            .active_threats()
-            .iter()
-            .any(|t| t.kind == ThreatSignalKind::DispatchLoop));
+        assert!(
+            mgr.active_threats()
+                .iter()
+                .any(|t| t.kind == ThreatSignalKind::DispatchLoop)
+        );
     }
 
     #[test]
@@ -1093,10 +1096,11 @@ mod tests {
 
         mgr.process(&make_snapshot(400));
 
-        assert!(mgr
-            .active_threats()
-            .iter()
-            .any(|t| t.kind == ThreatSignalKind::VoteClustering));
+        assert!(
+            mgr.active_threats()
+                .iter()
+                .any(|t| t.kind == ThreatSignalKind::VoteClustering)
+        );
     }
 
     #[test]
@@ -1121,10 +1125,11 @@ mod tests {
 
         mgr.process(&make_snapshot(500));
 
-        assert!(mgr
-            .active_threats()
-            .iter()
-            .any(|t| t.kind == ThreatSignalKind::GradientFingerprint));
+        assert!(
+            mgr.active_threats()
+                .iter()
+                .any(|t| t.kind == ThreatSignalKind::GradientFingerprint)
+        );
     }
 
     #[test]

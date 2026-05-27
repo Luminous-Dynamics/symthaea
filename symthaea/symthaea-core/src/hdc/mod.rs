@@ -292,10 +292,10 @@ pub mod statistical_retrieval;
 pub mod temporal_encoder;
 pub mod text_encoder; // Revolutionary Enhancement: Text → HDC encoding
 pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnifiedNetwork // HV → Primitive sequence (generative direction) - THE MOUTH
-                             // DISABLED: depends on crate::learnable_ltc which doesn't exist in symthaea-core
-                             // pub mod hd_ltc_codec;      // Bidirectional HDC ↔ LTC translation - THE THROAT
-                             // DISABLED: depends on hd_ltc_codec which is disabled
-                             // pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
+// DISABLED: depends on crate::learnable_ltc which doesn't exist in symthaea-core
+// pub mod hd_ltc_codec;      // Bidirectional HDC ↔ LTC translation - THE THROAT
+// DISABLED: depends on hd_ltc_codec which is disabled
+// pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
 pub mod config; // Centralized HDC configuration (runtime dimension management)
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
@@ -437,8 +437,8 @@ pub mod conjecture_engine; // Automated conjecture generation via symbolic regre
 pub mod frontier_math; // Frontier mathematics: Montgomery pair correlation, Ramsey bounds, knot invariants, abc conjecture
 pub mod langlands; // Computational Langlands: elliptic curve L-functions, modular forms, modularity verification
 pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
-                       // pub mod topology_comparison; // TEMP: file removed by concurrent session
-                       // pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
+// pub mod topology_comparison; // TEMP: file removed by concurrent session
+// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 
 // ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
 pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture
@@ -472,7 +472,7 @@ pub mod hierarchical_bundle; // Per-region bundling with role-based binding for 
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
-                              // pub mod topology_comparison; // TEMP: file removed by concurrent session
+// pub mod topology_comparison; // TEMP: file removed by concurrent session
 pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track: Neural Validation — TRIBE v2 fMRI comparison (feature-gated)
@@ -490,8 +490,8 @@ pub mod grounded_understanding; // True understanding via semantic primes + embo
 pub mod unified_conscious_being; // Complete unified being: A+B+C+D+E+F integration
 pub mod unified_understanding; // Complete understanding pipeline (predictive + narrative + ToM)
 pub mod universal_semantics; // Universal semantic primes (Wierzbicka)
-                             // DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
-                             // pub mod infrastructure_bridge;             // Bridge to real persistence (Hippocampus/UnifiedMind/Kokoro)
+// DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
+// pub mod infrastructure_bridge;             // Bridge to real persistence (Hippocampus/UnifiedMind/Kokoro)
 pub mod causal_encoder; // Causal relation encoding
 pub mod causal_mind; // Causal reasoning (core causal cognition)
 pub mod consciousness_creativity; // Creativity for conversation
@@ -509,7 +509,7 @@ pub mod predictive_encoder; // Attention-modulated HDC encoding with LTC predict
 
 // Novel Algorithm Modules (Dec 2025)
 pub mod autodiff_phi; // Reverse-mode autodiff for consciousness optimization (Jan 2026)
-                      // pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
+// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 pub mod cross_modal_binding; // Cross-modal binding for multi-sensory integration
 pub mod differentiable_phi; // Soft-partitioned differentiable Φ for gradient optimization
 pub mod metacognitive_monitor; // Real-time consciousness monitoring with self-reflection
@@ -536,8 +536,8 @@ pub mod process_topology; // Process topology structures
 pub mod temporal_binding; // Temporal stream binding for continuous experience
 pub mod topology_synergy;
 pub mod unified_consciousness_engine; // Core consciousness engine with Φ-guided processing // Topology-consciousness synergy
-                                      // DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
-                                      // pub mod integrated_conscious_agent;        // Complete conscious agent with Symthaea integration
+// DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
+// pub mod integrated_conscious_agent;        // Complete conscious agent with Symthaea integration
 pub mod consciousness_physics; // Consciousness-aware physics simulation observer (Φ + emergence + active inference)
 pub mod consciousness_visualizer; // Consciousness visualization tools
 pub mod deep_integration; // Deep integration bridge for Φ-guided processing
@@ -552,8 +552,8 @@ pub use unified_hv::{ContinuousHV, HV};
 
 // Re-export configuration types (dimension unification)
 pub use config::{
-    hdc_config, hdc_dim, is_hdc_configured, set_hdc_config, stt_expansion_factor,
-    try_set_hdc_config, DimensionMapping, HdcConfig, STT_DIMENSION,
+    DimensionMapping, HdcConfig, STT_DIMENSION, hdc_config, hdc_dim, is_hdc_configured,
+    set_hdc_config, stt_expansion_factor, try_set_hdc_config,
 };
 
 // Re-export projection layers
@@ -565,27 +565,27 @@ pub use statistical_retrieval::{
     StatisticalRetriever,
 };
 
-pub use sequence_encoder::{bind, bundle, permute, unpermute, SequenceEncoder};
+pub use sequence_encoder::{SequenceEncoder, bind, bundle, permute, unpermute};
 
 pub use resonator::{
     Constraint, Factor, MultiConstraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution,
 };
 
 pub use morphogenetic::{
-    corrupt_vector, random_vector, Attractor, FieldHealth, FieldStats, MorphogeneticConfig,
-    MorphogeneticField, PositionEncoding, RepairResult,
+    Attractor, FieldHealth, FieldStats, MorphogeneticConfig, MorphogeneticField, PositionEncoding,
+    RepairResult, corrupt_vector, random_vector,
 };
 
 pub use hebbian::{
-    ActivationRecord, HebbianAssociativeMemory, HebbianAssociativeStats, HebbianConfig,
-    HebbianEngine, HebbianStats, Synapse, DEFAULT_DECAY_RATE, DEFAULT_LEARNING_RATE,
-    HOMEOSTATIC_TAU, STDP_A_MINUS, STDP_A_PLUS, STDP_TAU_MINUS, STDP_TAU_PLUS, TARGET_ACTIVITY,
+    ActivationRecord, DEFAULT_DECAY_RATE, DEFAULT_LEARNING_RATE, HOMEOSTATIC_TAU,
+    HebbianAssociativeMemory, HebbianAssociativeStats, HebbianConfig, HebbianEngine, HebbianStats,
+    STDP_A_MINUS, STDP_A_PLUS, STDP_TAU_MINUS, STDP_TAU_PLUS, Synapse, TARGET_ACTIVITY,
 };
 
 pub use sdm::{
-    add_noise, hamming_similarity, random_bipolar_vector, EpisodicSDM, HardLocation,
-    IterativeReadResult, ReadResult, SDMConfig, SDMStats, SparseDistributedMemory, WriteResult,
-    COUNTER_MAX, COUNTER_MIN, DEFAULT_ACTIVATION_RADIUS, DEFAULT_NUM_HARD_LOCATIONS,
+    COUNTER_MAX, COUNTER_MIN, DEFAULT_ACTIVATION_RADIUS, DEFAULT_NUM_HARD_LOCATIONS, EpisodicSDM,
+    HardLocation, IterativeReadResult, ReadResult, SDMConfig, SDMStats, SparseDistributedMemory,
+    WriteResult, add_noise, hamming_similarity, random_bipolar_vector,
 };
 
 pub use temporal_encoder::TemporalEncoder;
@@ -593,12 +593,12 @@ pub use text_encoder::{TextEncoder, TextEncoderConfig, TextEncoderStats};
 
 // Re-export Primitive System types (9-tier ontological primitives)
 pub use primitive_system::{
-    seed_from_name, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier,
+    DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier, seed_from_name,
 };
 
 // Re-export UCL Cross-Domain Frame types (6 missing frames from gap analysis)
 pub use ucl_cross_domain_frames::{
-    concept_hv, CrossDomainFrame, FrameInstance, FrameSlot, UCLFrameSystem,
+    CrossDomainFrame, FrameInstance, FrameSlot, UCLFrameSystem, concept_hv,
 };
 
 // Re-export Primitive Dashboard types (real-time monitoring)
@@ -654,7 +654,6 @@ pub use liquid_holocell::LiquidHolocell;
 
 // Re-export unified network Phi measurement types
 pub use unified_network_phi::{
-    demo_phi_evolution,
     NetworkStateExtractor,
     PhiCalculationMethod,
     PhiComparator,
@@ -669,6 +668,7 @@ pub use unified_network_phi::{
     UnifiedNetworkPhiMeasurer,
     UnifiedPhiConfig,
     ValidationResult,
+    demo_phi_evolution,
 };
 
 // Sleep and altered states
@@ -863,8 +863,8 @@ pub use sensorimotor_contingencies::{
 
 // Re-export HV memory pool types (10-100x faster allocation for hot paths)
 pub use hv_pool::{
-    pooled_bind, pooled_similarity, BinaryHVPool, ContinuousHVPool, PoolStats as HVPoolStats,
-    PooledBinaryHV, PooledContinuousHV,
+    BinaryHVPool, ContinuousHVPool, PoolStats as HVPoolStats, PooledBinaryHV, PooledContinuousHV,
+    pooled_bind, pooled_similarity,
 };
 
 // Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)

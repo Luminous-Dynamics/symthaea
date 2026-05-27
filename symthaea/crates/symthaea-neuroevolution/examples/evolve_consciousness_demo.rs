@@ -9,8 +9,8 @@
 //! Run: cargo run -p symthaea-neuroevolution --example evolve_consciousness_demo
 
 use symthaea_neuroevolution::phi_fitness::{
-    run_evolution, ConsciousnessGenome, ConsciousnessSpecies, EvolutionConfig,
-    EvolutionaryLandscape,
+    ConsciousnessGenome, ConsciousnessSpecies, EvolutionConfig, EvolutionaryLandscape,
+    run_evolution,
 };
 
 fn main() {

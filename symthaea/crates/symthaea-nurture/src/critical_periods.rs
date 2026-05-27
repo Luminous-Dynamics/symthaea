@@ -288,8 +288,10 @@ mod tests {
             // Sample at peak + declining region
             for month in (0..=120).step_by(6) {
                 let p = CriticalPeriodModel::analytical_plasticity(domain, month as f64);
-                assert!(p <= prev + 1e-10,
-                    "{domain:?} plasticity should be monotonically non-increasing: {prev} -> {p} at {month}mo");
+                assert!(
+                    p <= prev + 1e-10,
+                    "{domain:?} plasticity should be monotonically non-increasing: {prev} -> {p} at {month}mo"
+                );
                 prev = p;
             }
         }

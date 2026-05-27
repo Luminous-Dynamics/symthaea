@@ -21,7 +21,7 @@
 
 use std::collections::HashMap;
 use symthaea_logparse::cluster::{hdbscan_cluster, nearest_centroid, purity};
-use symthaea_logparse::encoder::{bundle, encode, Hdv};
+use symthaea_logparse::encoder::{Hdv, bundle, encode};
 use symthaea_logparse::fixtures::generate_noisy_corpus;
 
 fn main() {
@@ -122,6 +122,8 @@ fn main() {
              separation breaks here. This is the honest number for real data."
         );
     } else {
-        println!("HDBSCAN held >=75% purity across the entire sweep — unsupervised separability is robust.");
+        println!(
+            "HDBSCAN held >=75% purity across the entire sweep — unsupervised separability is robust."
+        );
     }
 }

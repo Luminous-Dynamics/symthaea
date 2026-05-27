@@ -9,7 +9,7 @@
 //!
 //! Run: `cargo bench -p symthaea-core --bench cantor_cleanup_bench`
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::cantor_recursive_hv::CantorRecursiveHV;
 use symthaea_core::hdc::cantor_resonator_cleanup::{

@@ -15,8 +15,8 @@
 
 use symthaea::language::algorithm_encoder::{AlgorithmClass, AlgorithmEncoder};
 use symthaea::language::algorithm_training::{
-    build_channels_from_purpose_public, build_training_pairs, hybrid_classify, hybrid_classify_knn,
-    knn_hdc_classify, strong_keyword_class, train_linear_classifier, LearnedProjection,
+    LearnedProjection, build_channels_from_purpose_public, build_training_pairs, hybrid_classify,
+    hybrid_classify_knn, knn_hdc_classify, strong_keyword_class, train_linear_classifier,
 };
 
 struct HEvProblem {

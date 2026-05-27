@@ -10,7 +10,7 @@
 //!
 //! Run: `cargo run -p symthaea-multirotor --features swarm --example mujoco_swarm_validation --release`
 
-use symthaea_multirotor::swarm::{train_swarm, SwarmConfig};
+use symthaea_multirotor::swarm::{SwarmConfig, train_swarm};
 use symthaea_multirotor::types::FlightConfig;
 
 fn main() {

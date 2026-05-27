@@ -14,7 +14,7 @@
 //! primitives (Wierzbicka 1972).
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --bin gen-nsm-training-data
+//!   cargo run --release -p symthaea-broca --bin r#gen-nsm-training-data
 //!
 //! Outputs:
 //!   data/train-nsm-v1.jsonl  (80%)

@@ -29,8 +29,8 @@
 //! - `lsh_simhash.rs` for locality-preserving hashing
 //! - Pre-computed LSH signatures for O(1) approximate similarity
 
-use super::binary_hv::BinaryHV;
 use super::HDC_DIMENSION;
+use super::binary_hv::BinaryHV;
 use std::collections::HashSet;
 
 /// Sparse representation of a 16,384-bit hypervector

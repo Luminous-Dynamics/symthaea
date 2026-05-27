@@ -11,7 +11,7 @@
 use embedded_hal::i2c::I2c;
 use tracing::warn;
 
-use crate::error::{i2c_error_detail, HalError, HalResult};
+use crate::error::{HalError, HalResult, i2c_error_detail};
 
 // ============================================================================
 // SENSOR ADAPTER TRAIT

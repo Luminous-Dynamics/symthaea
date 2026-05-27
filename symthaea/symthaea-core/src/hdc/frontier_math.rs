@@ -510,11 +510,7 @@ pub fn search_abc_triples(max_c: u64, min_quality: f64) -> Vec<AbcTriple> {
 }
 
 fn gcd_u64(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
-    } else {
-        gcd_u64(b, a % b)
-    }
+    if b == 0 { a } else { gcd_u64(b, a % b) }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1669,7 +1665,9 @@ mod tests {
 
         if class_matches.is_empty() {
             eprintln!("    No cross-domain matches found.");
-            eprintln!("    (Class numbers are deeply arithmetic — simple formula matching may not capture their structure)");
+            eprintln!(
+                "    (Class numbers are deeply arithmetic — simple formula matching may not capture their structure)"
+            );
         } else {
             for m in &class_matches {
                 eprintln!("    >>> {}", m);

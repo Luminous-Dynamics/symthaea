@@ -5,7 +5,7 @@
 //!
 //! Validates 50Hz (20ms budget) feasibility for real frame sizes.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea_vision_manifold::encoder::MotionField;
 use symthaea_vision_manifold::{
     MultiScaleEncoder, PatchHdcEncoder, VisionBridge, VisionConfig, VisionManifold,

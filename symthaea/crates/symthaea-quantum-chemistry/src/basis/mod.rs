@@ -9,7 +9,7 @@
 pub mod basis_631g;
 pub mod sto3g;
 
-use crate::constants::{double_factorial, PI_CONST};
+use crate::constants::{PI_CONST, double_factorial};
 use crate::molecule::Molecule;
 use serde::{Deserialize, Serialize};
 

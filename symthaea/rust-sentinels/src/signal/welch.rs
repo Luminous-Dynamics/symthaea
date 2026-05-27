@@ -146,10 +146,13 @@ mod tests {
     #[test]
     fn test_band_power() {
         let freqs: Vec<f32> = (0..=30).map(|i| i as f32).collect();
-        let psd: Vec<f32> = freqs.iter().map(|&f| {
-            // Peak at 10 Hz (alpha)
-            (-(f - 10.0).powi(2) / 4.0).exp()
-        }).collect();
+        let psd: Vec<f32> = freqs
+            .iter()
+            .map(|&f| {
+                // Peak at 10 Hz (alpha)
+                (-(f - 10.0).powi(2) / 4.0).exp()
+            })
+            .collect();
 
         let alpha_power = band_power(&freqs, &psd, 8.0, 13.0);
         let delta_power = band_power(&freqs, &psd, 0.5, 4.0);

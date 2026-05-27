@@ -4,7 +4,7 @@
 //! # Production-grade Generic EML Symbolic Regression with Parallel Search
 
 use super::autodiff::{
-    ad_begin_c64, ad_begin_f64, ad_end, ad_gradient_c64, ad_gradient_f64, GenericVar, Scalar,
+    GenericVar, Scalar, ad_begin_c64, ad_begin_f64, ad_end, ad_gradient_c64, ad_gradient_f64,
 };
 use num_complex::Complex64;
 use rand::Rng;

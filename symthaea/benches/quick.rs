@@ -20,10 +20,10 @@
 //! cargo bench --bench quick -- --baseline main --compare
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use symthaea::hdc::{
-    binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
+    HDC_DIMENSION, binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator,
 };
 
 // =============================================================================

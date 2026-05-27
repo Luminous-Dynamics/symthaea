@@ -10,7 +10,7 @@ use symthaea_psych_bench::benchmarks::{
     sustained_attention::{CptBenchmark, SartBenchmark},
     worm::NBackBenchmark,
 };
-use symthaea_psych_bench::harness::{sat_curves::SatBattery, BenchmarkConfig, PsychBenchmark};
+use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark, sat_curves::SatBattery};
 
 fn sat_config() -> BenchmarkConfig {
     BenchmarkConfig {

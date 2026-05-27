@@ -161,7 +161,7 @@ impl SigLipModel {
     /// Initialize the model (download if needed, load into memory)
     #[cfg(feature = "vision")]
     pub fn initialize(&mut self) -> Result<()> {
-        use ort::session::{builder::GraphOptimizationLevel, Session};
+        use ort::session::{Session, builder::GraphOptimizationLevel};
 
         let model_dir = self
             .model_path
@@ -198,7 +198,8 @@ impl SigLipModel {
             tracing::warn!(
                 "SigLIP model not found in {:?}, using stub embeddings. \
                 Download with: optimum-cli export onnx --model google/siglip-so400m-patch14-384 {:?}/onnx/",
-                model_dir, model_dir
+                model_dir,
+                model_dir
             );
             self.initialized = true;
         }
@@ -460,7 +461,7 @@ impl MoondreamModel {
     /// Initialize the model (load ONNX files)
     #[cfg(feature = "vision")]
     pub fn initialize(&mut self) -> Result<()> {
-        use ort::session::{builder::GraphOptimizationLevel, Session};
+        use ort::session::{Session, builder::GraphOptimizationLevel};
 
         let model_dir = self
             .model_path

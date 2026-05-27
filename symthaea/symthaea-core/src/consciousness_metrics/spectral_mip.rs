@@ -651,11 +651,7 @@ fn covariance_to_correlation(cov: &mut [f64], n: usize) {
     let inv_std: Vec<f64> = (0..n)
         .map(|i| {
             let var = cov[i * n + i];
-            if var > 0.0 {
-                1.0 / var.sqrt()
-            } else {
-                1.0
-            }
+            if var > 0.0 { 1.0 / var.sqrt() } else { 1.0 }
         })
         .collect();
 

@@ -13,9 +13,9 @@
 #![cfg(feature = "api_module")]
 
 use axum::{
-    body::Body,
-    http::{header, Request, StatusCode},
     Router,
+    body::Body,
+    http::{Request, StatusCode, header},
 };
 use tower::util::ServiceExt; // for `oneshot`
 

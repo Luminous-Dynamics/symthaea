@@ -21,8 +21,8 @@
 //! ```
 
 use symthaea::consciousness::recursive_improvement::{
-    tier_name, ActionContext, DreamConfig, DreamMode, PrimitiveSemanticBridge,
-    PrimitiveSemanticBridgeConfig, SemanticBridge, SemanticBridgeConfig, SemanticInput,
+    ActionContext, DreamConfig, DreamMode, PrimitiveSemanticBridge, PrimitiveSemanticBridgeConfig,
+    SemanticBridge, SemanticBridgeConfig, SemanticInput, tier_name,
 };
 use symthaea::hdc::primitive_system::PrimitiveSystem;
 

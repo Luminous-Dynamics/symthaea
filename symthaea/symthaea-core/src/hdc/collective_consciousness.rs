@@ -746,7 +746,7 @@ mod tests {
         let assessment = collective.assess();
         assert_eq!(assessment.num_agents, 3);
         assert!((assessment.phi_sum - 1.2).abs() < 0.001); // Floating point tolerance
-                                                           // No communication = no integration boost
+        // No communication = no integration boost
         assert!(assessment.phi_collective <= 1.3);
         assert!(assessment.emergence <= 1.1);
     }

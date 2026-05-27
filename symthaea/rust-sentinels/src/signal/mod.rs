@@ -5,7 +5,7 @@
 
 mod welch;
 
-pub use welch::{welch_psd, band_power};
+pub use welch::{band_power, welch_psd};
 
 /// Standard EEG frequency bands
 pub mod bands {

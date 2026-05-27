@@ -348,7 +348,7 @@ fn test_trained_concept_similarity() {
 #[test]
 fn test_epistemic_metadata() {
     use symthaea::perception::epistemic_vector::EpistemicSemanticVector;
-    use symthaea_core::hdc::{PackedBipolar, HDC_DIMENSION};
+    use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar};
 
     // Create a vector with high margin (high confidence)
     let high_margin: Vec<f32> = (0..HDC_DIMENSION)

@@ -44,7 +44,7 @@
 //!   Case of Music. Trends in Cognitive Sciences, 23(1), 63-77.
 //! - Russell (1980). A Circumplex Model of Affect. J. Personality & Social Psych.
 
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::io::BufRead;
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};

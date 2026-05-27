@@ -45,17 +45,13 @@ use std::collections::HashMap;
 
 use crate::hdc::{
     HDC_DIMENSION,
-    unified_hv::ContinuousHV,
+    arithmetic_engine::ArithmeticOp,
     hdc_ltc_neuron::HdcLtcNeuron,
     liquid_arithmetic::{
-        LiquidArithmeticReasoner, LiquidArithmeticConfig,
-        LiquidReasoningResult, NumberEncoder,
+        LiquidArithmeticConfig, LiquidArithmeticReasoner, LiquidReasoningResult, NumberEncoder,
     },
-    arithmetic_engine::ArithmeticOp,
-    resonator::{
-        ResonatorNetwork, ResonatorConfig, Constraint,
-        ResonatorSolution, SymbolEntry,
-    },
+    resonator::{Constraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution, SymbolEntry},
+    unified_hv::ContinuousHV,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -277,10 +273,8 @@ impl ResonantLiquidReasoner {
         let encoder = NumberEncoder::new(dimension, config.liquid_config.seed);
 
         // Create strategy resonator
-        let mut strategy_resonator = ResonatorNetwork::with_config(
-            dimension,
-            config.resonator_config.clone(),
-        )?;
+        let mut strategy_resonator =
+            ResonatorNetwork::with_config(dimension, config.resonator_config.clone())?;
 
         // Create strategy vectors and add to codebook
         let mut strategy_vectors = HashMap::new();
@@ -291,16 +285,12 @@ impl ResonantLiquidReasoner {
         }
 
         // Create cleanup resonator (starts empty, populated during reasoning)
-        let cleanup_resonator = ResonatorNetwork::with_config(
-            dimension,
-            config.resonator_config.clone(),
-        )?;
+        let cleanup_resonator =
+            ResonatorNetwork::with_config(dimension, config.resonator_config.clone())?;
 
         // Create factor resonator with small primes
-        let mut factor_resonator = ResonatorNetwork::with_config(
-            dimension,
-            config.resonator_config.clone(),
-        )?;
+        let mut factor_resonator =
+            ResonatorNetwork::with_config(dimension, config.resonator_config.clone())?;
 
         // Add small primes to factor codebook
         for &prime in &config.prime_codebook {
@@ -366,8 +356,7 @@ impl ResonantLiquidReasoner {
         // Update running average of strategy confidence
         let n = self.stats.strategy_selections as f64;
         self.stats.avg_strategy_confidence =
-            self.stats.avg_strategy_confidence * (n - 1.0) / n
-            + strategy_confidence as f64 / n;
+            self.stats.avg_strategy_confidence * (n - 1.0) / n + strategy_confidence as f64 / n;
 
         // 2. Run liquid reasoning with periodic cleanup
         let liquid_result = self.reason_with_cleanup(op, a, b, strategy);
@@ -376,8 +365,9 @@ impl ResonantLiquidReasoner {
         let answer_value = liquid_result.answer.as_ref().map(|h| h.value).unwrap_or(0);
 
         // 3. Find factors if applicable (for multiply/power)
-        let factors = if self.config.enable_factor_finding &&
-                        matches!(op, ArithmeticOp::Multiply | ArithmeticOp::Power) {
+        let factors = if self.config.enable_factor_finding
+            && matches!(op, ArithmeticOp::Multiply | ArithmeticOp::Power)
+        {
             self.find_factors(answer_value)
         } else {
             Vec::new()
@@ -402,17 +392,17 @@ impl ResonantLiquidReasoner {
 
         // Get recommended strategy as prior
         let recommended = ProofStrategy::recommended_for(op, a, b);
-        let recommended_vec = self.strategy_vectors.get(&recommended)
+        let recommended_vec = self
+            .strategy_vectors
+            .get(&recommended)
             .cloned()
             .unwrap_or_else(|| vec![0.0; self.config.liquid_config.dimension]);
 
         // Create constraint: problem ⊛ X ≈ recommended
         // This biases toward the recommended strategy but allows resonator to find alternatives
-        let constraint = Constraint::named(
-            "strategy_selection",
-            problem_vec.clone(),
-            recommended_vec,
-        ).with_weight(0.7);
+        let constraint =
+            Constraint::named("strategy_selection", problem_vec.clone(), recommended_vec)
+                .with_weight(0.7);
 
         // Also add a "similarity to problem" constraint
         // This helps find strategies that match the problem structure
@@ -420,10 +410,14 @@ impl ResonantLiquidReasoner {
             "problem_similarity",
             problem_vec,
             self.create_operation_signature(op),
-        ).with_weight(0.3);
+        )
+        .with_weight(0.3);
 
         // Solve for best strategy
-        match self.strategy_resonator.solve(&[constraint, similarity_constraint], Some(30)) {
+        match self
+            .strategy_resonator
+            .solve(&[constraint, similarity_constraint], Some(30))
+        {
             Ok(solution) => {
                 // Find which strategy the solution matches
                 let mut best_strategy = recommended;
@@ -575,7 +569,8 @@ impl ResonantLiquidReasoner {
     /// Add a custom prime to the factor codebook
     pub fn add_factor_prime(&mut self, prime: u64) -> anyhow::Result<()> {
         let prime_vec = self.encoder.encode(prime).values.clone();
-        self.factor_resonator.add_symbol(&prime.to_string(), prime_vec)
+        self.factor_resonator
+            .add_symbol(&prime.to_string(), prime_vec)
     }
 }
 
@@ -601,20 +596,17 @@ mod tests {
         let dim = 1024;
         let seed = 42;
 
-        let vec1 = ResonantLiquidReasoner::create_strategy_vector(
-            &ProofStrategy::Direct, dim, seed
-        );
-        let vec2 = ResonantLiquidReasoner::create_strategy_vector(
-            &ProofStrategy::Direct, dim, seed
-        );
+        let vec1 =
+            ResonantLiquidReasoner::create_strategy_vector(&ProofStrategy::Direct, dim, seed);
+        let vec2 =
+            ResonantLiquidReasoner::create_strategy_vector(&ProofStrategy::Direct, dim, seed);
 
         // Same strategy + seed should give identical vectors
         assert_eq!(vec1, vec2);
 
         // Different strategies should give different vectors
-        let vec3 = ResonantLiquidReasoner::create_strategy_vector(
-            &ProofStrategy::Induction, dim, seed
-        );
+        let vec3 =
+            ResonantLiquidReasoner::create_strategy_vector(&ProofStrategy::Induction, dim, seed);
         assert_ne!(vec1, vec3);
     }
 
@@ -647,7 +639,10 @@ mod tests {
         // Test resonator-based selection
         let (strategy, confidence) = reasoner.select_strategy(ArithmeticOp::Add, 5, 3);
         assert!(confidence > 0.0);
-        println!("Selected strategy: {:?} with confidence {:.4}", strategy, confidence);
+        println!(
+            "Selected strategy: {:?} with confidence {:.4}",
+            strategy, confidence
+        );
     }
 
     #[test]
@@ -666,14 +661,18 @@ mod tests {
         // Test addition
         let result = reasoner.reason(ArithmeticOp::Add, 3, 4);
         assert_eq!(result.answer, 7);
-        println!("3 + 4 = {} (strategy: {:?}, Φ: {:.4})",
-                 result.answer, result.strategy, result.total_phi);
+        println!(
+            "3 + 4 = {} (strategy: {:?}, Φ: {:.4})",
+            result.answer, result.strategy, result.total_phi
+        );
 
         // Test multiplication
         let result = reasoner.reason(ArithmeticOp::Multiply, 3, 4);
         assert_eq!(result.answer, 12);
-        println!("3 * 4 = {} (strategy: {:?}, factors: {:?})",
-                 result.answer, result.strategy, result.factors);
+        println!(
+            "3 * 4 = {} (strategy: {:?}, factors: {:?})",
+            result.answer, result.strategy, result.factors
+        );
     }
 
     #[test]

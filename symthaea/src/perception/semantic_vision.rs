@@ -258,7 +258,7 @@ impl OcrSystem {
             .chars()
             .map(|_| {
                 let jitter: f32 = if let Some(ref mut rng) = self.seeded_rng {
-                    rand::Rng::gen(rng)
+                    rand::Rng::r#gen(rng)
                 } else {
                     rand::random::<f32>()
                 };
@@ -371,7 +371,7 @@ impl SemanticVision {
         for concept in [
             "person", "animal", "vehicle", "building", "nature", "object", "text",
         ] {
-            let seed: u64 = rand::Rng::gen(&mut rng);
+            let seed: u64 = rand::Rng::r#gen(&mut rng);
             concept_embeddings.insert(concept.to_string(), ContinuousHV::random(dim, seed));
         }
 

@@ -55,15 +55,14 @@ pub fn bench_winterfell_baseline() -> WinterfellBaseline {
         };
 
         let prove_start = Instant::now();
-        let proof = range_proof::prove_range(value, min, max, commit)
-            .expect("Winterfell prove failed");
+        let proof =
+            range_proof::prove_range(value, min, max, commit).expect("Winterfell prove failed");
         total_prove += prove_start.elapsed();
 
         proof_size = proof.to_bytes().len();
 
         let verify_start = Instant::now();
-        range_proof::verify_range(proof, min, max, commit)
-            .expect("Winterfell verify failed");
+        range_proof::verify_range(proof, min, max, commit).expect("Winterfell verify failed");
         total_verify += verify_start.elapsed();
     }
 
@@ -76,9 +75,16 @@ pub fn bench_winterfell_baseline() -> WinterfellBaseline {
 
     println!("  Bits decomposed: {} (2 phases × 16 bits)", bits_proven);
     println!("  Transition constraints: {}", transition_constraints);
-    println!("  Avg prover time: {:.2} ms ({} iterations)", avg_prove_ms, iterations);
+    println!(
+        "  Avg prover time: {:.2} ms ({} iterations)",
+        avg_prove_ms, iterations
+    );
     println!("  Avg verifier time: {:.3} ms", avg_verify_ms);
-    println!("  Proof size: {} bytes ({:.1} KB)", proof_size, proof_size as f64 / 1024.0);
+    println!(
+        "  Proof size: {} bytes ({:.1} KB)",
+        proof_size,
+        proof_size as f64 / 1024.0
+    );
 
     // Extrapolate to 16,384-bit XOR binding:
     // XOR of 16,384 bits requires:
@@ -94,7 +100,10 @@ pub fn bench_winterfell_baseline() -> WinterfellBaseline {
     println!("\n  Extrapolation to 16,384-bit XOR ({:.0}× scale):", scale);
     println!("    Constraints: {}", extrapolated_constraints);
     println!("    Estimated prover time: {:.0} ms", extrapolated_prove);
-    println!("    (Based on measured {:.2} ms / {} constraints)", avg_prove_ms, transition_constraints);
+    println!(
+        "    (Based on measured {:.2} ms / {} constraints)",
+        avg_prove_ms, transition_constraints
+    );
 
     WinterfellBaseline {
         bits_proven,

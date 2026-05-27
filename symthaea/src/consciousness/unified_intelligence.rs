@@ -37,8 +37,8 @@ use crate::consciousness::primitive_evolution::{
     CandidatePrimitive, EvolutionConfig, PrimitiveEvolution, PrimitiveEvolutionResult,
 };
 use crate::consciousness::primitive_reasoning::ReasoningChain;
-use crate::hdc::primitive_system::PrimitiveTier;
 use crate::hdc::BinaryHV;
+use crate::hdc::primitive_system::PrimitiveTier;
 use crate::physiology::social_coherence::CollectivePrimitiveEvolution;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

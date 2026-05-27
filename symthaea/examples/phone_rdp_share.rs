@@ -89,7 +89,10 @@ fn main() {
     // We tick it once per loop iteration, so cycle_hz = fps (1 tick per frame).
     let mut soma_rdp = SomaRdpServer::new(1008, 2244, fps, fps as u32);
     soma_rdp.start();
-    println!("[OK] SomaRdpServer started ({}×{} @ {}fps)", 1008, 2244, fps);
+    println!(
+        "[OK] SomaRdpServer started ({}×{} @ {}fps)",
+        1008, 2244, fps
+    );
 
     // RdpSession with the placeholder [0x42; 32] key matching the
     // holon_rdp_viewer example. Phase I.A.5 Track 2.5 (real PQC KEM
@@ -248,8 +251,12 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════╝");
     println!();
     println!("Wall time:       {:.1}s", watch_time);
-    println!("Full frames:     {full_count} (sealed: {bytes_full_sealed} B, json: {bytes_full_json} B)");
-    println!("Delta frames:    {delta_count} (sealed: {bytes_delta_sealed} B, json: {bytes_delta_json} B)");
+    println!(
+        "Full frames:     {full_count} (sealed: {bytes_full_sealed} B, json: {bytes_full_json} B)"
+    );
+    println!(
+        "Delta frames:    {delta_count} (sealed: {bytes_delta_sealed} B, json: {bytes_delta_json} B)"
+    );
     println!("Total patches:   {total_patches}");
     if delta_count > 0 {
         println!(

@@ -583,8 +583,10 @@ mod tests {
     #[test]
     fn test_empty_values_rejected() {
         let adapter = IoTSensorAdapter::new();
-        assert!(adapter
-            .parse_message("topic", r#"{"text": "hello"}"#, 0)
-            .is_none());
+        assert!(
+            adapter
+                .parse_message("topic", r#"{"text": "hello"}"#, 0)
+                .is_none()
+        );
     }
 }

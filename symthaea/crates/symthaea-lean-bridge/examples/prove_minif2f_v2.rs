@@ -33,7 +33,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use symthaea_lean_bridge::runner::{check_with_lean4, CheckOutcome};
+use symthaea_lean_bridge::runner::{CheckOutcome, check_with_lean4};
 
 fn data_dir() -> Option<PathBuf> {
     env::var("MINIF2F_V2_DIR").ok().map(PathBuf::from)

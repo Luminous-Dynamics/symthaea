@@ -15,10 +15,10 @@
 //! periodic pattern recognition from ~50% to 80%+ accuracy.
 
 use std::collections::VecDeque;
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use symthaea::hdc::cycle_detector::CycleAwareLtcRecognizer;
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::HDC_DIMENSION;
 
 /// Pattern generator trait
 trait PatternGenerator {

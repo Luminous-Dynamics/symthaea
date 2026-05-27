@@ -81,15 +81,15 @@ impl EmotionSentinel {
         // For single-channel, use alpha/beta balance as proxy
         // Higher alpha relative to beta suggests more positive state
         let ratio = powers.alpha / (powers.beta + 1e-10);
-        let raw_valence = (ratio - 1.0) / 2.0;  // Center around 0
+        let raw_valence = (ratio - 1.0) / 2.0; // Center around 0
 
-        raw_valence.tanh()  // Bound to [-1, 1]
+        raw_valence.tanh() // Bound to [-1, 1]
     }
 
     fn estimate_arousal(&self, powers: &crate::signal::BandPowers) -> f32 {
         // Beta indicates arousal, alpha+theta indicate calm
         let arousal_raw = powers.beta / (powers.alpha + powers.theta + 1e-10);
-        (arousal_raw / 2.0).min(1.0)  // Normalize to [0, 1]
+        (arousal_raw / 2.0).min(1.0) // Normalize to [0, 1]
     }
 }
 

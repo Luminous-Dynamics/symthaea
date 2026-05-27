@@ -1211,7 +1211,7 @@ mod tests {
         // Simple check: Li < Be, Na < Mg, etc.
         assert!(element(3).ionization_energy < element(4).ionization_energy); // Li < Be
         assert!(element(11).ionization_energy < element(12).ionization_energy); // Na < Mg
-                                                                                // Noble gases have the highest IE in their period
+        // Noble gases have the highest IE in their period
         assert!(element(10).ionization_energy > element(9).ionization_energy); // Ne > F
     }
 

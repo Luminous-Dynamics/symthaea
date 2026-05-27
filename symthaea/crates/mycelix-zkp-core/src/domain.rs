@@ -133,7 +133,8 @@ mod tests {
         for i in 0..tags.len() {
             for j in (i + 1)..tags.len() {
                 assert_ne!(
-                    tags[i], tags[j],
+                    tags[i],
+                    tags[j],
                     "Domain tags must be unique: {} vs {}",
                     tags[i].as_str(),
                     tags[j].as_str()

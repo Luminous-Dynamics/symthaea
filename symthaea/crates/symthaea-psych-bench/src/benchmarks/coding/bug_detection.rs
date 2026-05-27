@@ -119,7 +119,6 @@ fn bug_snippets() -> Vec<BugSnippet> {
             bug_line: 3,
             bug_description: "Loop iterates one extra time, swapping middle element with itself (odd) or double-swapping (even)",
         },
-
         // ── Type mismatch errors (5) ──
         BugSnippet {
             buggy_code: "fn avg(values: &[i32]) -> i32 {\n    let sum: i32 = values.iter().sum();\n    sum / values.len() as i32\n}",
@@ -156,7 +155,6 @@ fn bug_snippets() -> Vec<BugSnippet> {
             bug_line: 2,
             bug_description: "Truncation to i32 loses decimal precision in temperature conversion",
         },
-
         // ── Logic errors (5) ──
         BugSnippet {
             buggy_code: "fn is_leap_year(year: u32) -> bool {\n    year % 4 == 0 && year % 100 != 0 || year % 400 == 0\n}",
@@ -193,7 +191,6 @@ fn bug_snippets() -> Vec<BugSnippet> {
             bug_line: 3,
             bug_description: "Inner loop starts at 0, not i+1; compares element with itself, always returns true",
         },
-
         // ── Null/None handling errors (5) ──
         BugSnippet {
             buggy_code: "fn first_char(s: &str) -> char {\n    s.chars().next().unwrap()\n}",
@@ -230,7 +227,6 @@ fn bug_snippets() -> Vec<BugSnippet> {
             bug_line: 3,
             bug_description: "Index [1] panics when string has fewer than two words",
         },
-
         // ── Resource leak errors (5) ──
         BugSnippet {
             buggy_code: "fn read_config(path: &str) -> String {\n    let file = std::fs::File::open(path).unwrap();\n    let mut buf = String::new();\n    std::io::Read::read_to_string(&mut &file, &mut buf).unwrap();\n    buf\n    // file handle leaked if error between open and read\n}",
@@ -267,7 +263,6 @@ fn bug_snippets() -> Vec<BugSnippet> {
             bug_line: 4,
             bug_description: "Mutex guard held across sleep; blocks concurrent access unnecessarily",
         },
-
         // ── Boundary violation errors (5) ──
         BugSnippet {
             buggy_code: "fn safe_divide(a: f64, b: f64) -> f64 {\n    a / b\n}",

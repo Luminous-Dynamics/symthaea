@@ -174,7 +174,11 @@ impl LevinRemappingController {
 
     /// Evaluates if high-dimensional variational free energy spikes require
     /// an algebraic rotation/remapping of the underlying embedding space.
-    pub fn evaluate_remapping_necessity(&mut self, components: &FreeEnergyComponents, running_avg: f64) -> bool {
+    pub fn evaluate_remapping_necessity(
+        &mut self,
+        components: &FreeEnergyComponents,
+        running_avg: f64,
+    ) -> bool {
         if components.surprise > (running_avg * 2.5).max(5.0) {
             self.persistent_error_ticks += 1;
         } else {

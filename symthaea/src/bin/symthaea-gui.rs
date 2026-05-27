@@ -45,7 +45,7 @@ use symthaea::gui_bridge::{
     WidgetValue,
 };
 use symthaea::shell::ipc_client::{
-    discover_socket, ConnectionState, MetricsSnapshot, ShellIpcClient,
+    ConnectionState, MetricsSnapshot, ShellIpcClient, discover_socket,
 };
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
@@ -1083,10 +1083,10 @@ impl SymthaeaGui {
             ));
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                for gen in self.generation_timeline.generations.clone() {
-                    let selected = self.generation_timeline.selected == Some(gen.number);
-                    let is_current = gen.is_current;
-                    let is_booted = gen.is_booted;
+                for r#gen in self.generation_timeline.generations.clone() {
+                    let selected = self.generation_timeline.selected == Some(r#gen.number);
+                    let is_current = r#gen.is_current;
+                    let is_booted = r#gen.is_booted;
 
                     let bg_color = if is_booted {
                         egui::Color32::from_rgb(50, 80, 50)
@@ -1100,11 +1100,11 @@ impl SymthaeaGui {
 
                     egui::Frame::none().fill(bg_color).show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(format!("Gen {}", gen.number));
+                            ui.label(format!("Gen {}", r#gen.number));
 
                             ui.colored_label(
                                 egui::Color32::GRAY,
-                                gen.created_at.format("%Y-%m-%d %H:%M").to_string(),
+                                r#gen.created_at.format("%Y-%m-%d %H:%M").to_string(),
                             );
 
                             if is_booted {
@@ -1114,11 +1114,11 @@ impl SymthaeaGui {
                             }
 
                             if ui.button("Select").clicked() {
-                                self.generation_timeline.selected = Some(gen.number);
+                                self.generation_timeline.selected = Some(r#gen.number);
                             }
 
                             if !is_booted && ui.button("Rollback").clicked() {
-                                if let Err(e) = self.generation_timeline.rollback_to(gen.number) {
+                                if let Err(e) = self.generation_timeline.rollback_to(r#gen.number) {
                                     self.status_message = Some((
                                         format!("Rollback failed: {}", e),
                                         StatusLevel::Error,

@@ -7,8 +7,8 @@
 //! vs remembering features independently. Compares binding accuracy
 //! against feature-only accuracy (partial-feature lure detection).
 
-use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::spatial::{VisualObject, VisualObjectAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

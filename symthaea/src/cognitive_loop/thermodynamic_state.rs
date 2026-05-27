@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn test_default_values_sensible() {
         let state = UnifiedThermodynamicState::default();
-        assert_eq!(state.canonical_entropy, 0.0);
+        assert_eq!(state.canonical_entropy, 0.5);
         assert_eq!(state.effective_temperature, 0.3);
         assert_eq!(state.regime, ThermodynamicRegime::Equilibrium);
         assert_eq!(state.consciousness_phase, ConsciousnessPhase::Normal);

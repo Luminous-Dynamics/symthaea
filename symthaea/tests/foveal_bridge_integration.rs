@@ -169,11 +169,7 @@ mod vision_signal_tests {
             .map(|i| {
                 let x = i % 32;
                 let y = i / 32;
-                if (x + y) % 2 == 0 {
-                    255
-                } else {
-                    0
-                }
+                if (x + y) % 2 == 0 { 255 } else { 0 }
             })
             .collect();
 

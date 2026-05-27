@@ -616,7 +616,9 @@ fn test_predictive_affective_crossmodal_synergy() {
         }
     }
 
-    println!("Synergy check: affective={saw_affective}, predictive={saw_predictive}, binding={saw_binding}");
+    println!(
+        "Synergy check: affective={saw_affective}, predictive={saw_predictive}, binding={saw_binding}"
+    );
 
     // Over 100 cycles, all three modules should have produced non-default output
     assert!(
@@ -862,11 +864,13 @@ fn test_dream_replay_produces_insights() {
     // Dream replay is stochastic (depends on Cruise urgency), so just verify no panics
     // and that the metadata fields are always finite
     let final_result = service.cycle("final check");
-    assert!(final_result
-        .metadata
-        .memory
-        .dream_phi_improvement
-        .is_finite());
+    assert!(
+        final_result
+            .metadata
+            .memory
+            .dream_phi_improvement
+            .is_finite()
+    );
     println!(
         "Dream observed: {saw_dream}, wisdom_count: {}",
         final_result.metadata.memory.dream_wisdom_count
@@ -6950,8 +6954,7 @@ fn test_physics_bridge_exploration_feedback() {
     // They should differ (physics domain feedback changes exploration).
     // We can't predict direction deterministically, but they should not be identical.
     assert!(
-        (urge_with - urge_without).abs() > 1e-10
-            || urge_with == 0.0, // both zero is acceptable if error is low
+        (urge_with - urge_without).abs() > 1e-10 || urge_with == 0.0, // both zero is acceptable if error is low
         "Physics bridge should modulate exploration differently: with={urge_with}, without={urge_without}"
     );
 }

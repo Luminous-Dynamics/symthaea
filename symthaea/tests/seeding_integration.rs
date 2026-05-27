@@ -7,11 +7,11 @@
 //! epistemic classification for known concepts while maintaining safety
 //! for unknown concepts.
 
+use symthaea::Symthaea;
 use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
 use symthaea::mind::intent::IntentClassifier;
 use symthaea::mind::structured_thought::EpistemicStatus;
 use symthaea::mind::{ContinuousMind, DomainKnowledge, MindConfig};
-use symthaea::Symthaea;
 
 // =============================================================================
 // BASIC SEEDING TESTS

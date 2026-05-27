@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(cm[0][0], 1); // H->H
         assert_eq!(cm[1][1], 1); // E->E
         assert_eq!(cm[2][2], 1); // C->C
-                                 // Off-diagonal should be zero
+        // Off-diagonal should be zero
         assert_eq!(cm[0][1], 0);
         assert_eq!(cm[0][2], 0);
         assert_eq!(cm[1][0], 0);

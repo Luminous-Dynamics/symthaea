@@ -3,17 +3,17 @@
 
 //! 32-DOF Humanoid Stress Test (Context-Gated Neuromuscular Reflex Recovery)
 
+use nalgebra::SVector;
+use std::time::Instant;
+use symtropy_consciousness_physics::ConsciousnessField;
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
 use symtropy_physics::body::BodyHandle;
-use symtropy_physics::world::PhysicsCallback;
 use symtropy_physics::contact::CollisionEvent;
+use symtropy_physics::world::PhysicsCallback;
 use symtropy_robotics_bridge_core::platform::PlatformType;
-use symtropy_consciousness_physics::ConsciousnessField;
-use std::time::Instant;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use nalgebra::SVector;
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 struct EnvironmentProxy<'a, const D: usize> {
     base_field: &'a mut ConsciousnessField<D>,
@@ -61,18 +61,22 @@ async fn main() -> anyhow::Result<()> {
 
     info!("🔬 INITIATING 32-DOF HUMANOID CONTEXT-GATED SUITE...");
 
-    const D: usize = 4; 
-    const DT: f64 = 0.01667; 
+    const D: usize = 4;
+    const DT: f64 = 0.01667;
     const SIM_DURATION_SECS: f64 = 10.0;
     const SHOVE_TIME: f64 = 3.0;
 
-    let mut world = PhysicsWorld::<D>::new(SVector::from([0.0, -9.81, 0.0, 0.0])); 
+    let mut world = PhysicsWorld::<D>::new(SVector::from([0.0, -9.81, 0.0, 0.0]));
     let mut field = ConsciousnessField::<D>::new();
-    
+
     let platform = PlatformType::Humanoid;
     let mass = platform.default_mass();
-    let body_handle = world.add_sphere(Point::new([0.0, 1.5, 0.0, 0.0]), platform.default_radius(), mass);
-    
+    let body_handle = world.add_sphere(
+        Point::new([0.0, 1.5, 0.0, 0.0]),
+        platform.default_radius(),
+        mass,
+    );
+
     field.register(body_handle, 2500.0, 5.0);
 
     info!("🤖 Humanoid Initialized: Context-gating safeguards armed.");
@@ -80,17 +84,22 @@ async fn main() -> anyhow::Result<()> {
     let mut current_time = 0.0;
     let mut step_count = 0;
     let start_instant = Instant::now();
-    
+
     let mut y_pos = 1.5;
     let mut v_y = 0.0;
 
     while current_time < SIM_DURATION_SECS {
-        let energy_available = field.entities.get(&body_handle).map(|e| e.energy.available).unwrap_or(0.0);
+        let energy_available = field
+            .entities
+            .get(&body_handle)
+            .map(|e| e.energy.available)
+            .unwrap_or(0.0);
         let has_power = energy_available > 0.01;
 
-        let ground_jitter = (current_time * 45.0).sin() * 0.015 + (current_time * 95.0).cos() * 0.005;
+        let ground_jitter =
+            (current_time * 45.0).sin() * 0.015 + (current_time * 95.0).cos() * 0.005;
         let floor_y = 0.0 + ground_jitter;
-        
+
         // Context Gate: Are our feet actually touching the ground manifold?
         let is_grounded = y_pos <= floor_y + 0.02;
 
@@ -101,19 +110,19 @@ async fn main() -> anyhow::Result<()> {
 
         if y_pos <= floor_y {
             let penetration = floor_y - y_pos;
-            let stiffness = 25000.0; 
-            let damping = 350.0;     
-            
+            let stiffness = 25000.0;
+            let damping = 350.0;
+
             let normal_force = (stiffness * penetration - damping * v_y).max(0.0);
             v_y += (normal_force / mass) * DT;
-            
+
             metabolic_stabilization_work += normal_force * DT * 0.02;
         }
 
         let lateral_shove_active = current_time >= SHOVE_TIME && current_time < (SHOVE_TIME + 0.1);
         if lateral_shove_active && has_power {
-            accumulated_environmental_forces[0] = 650.0; 
-            metabolic_stabilization_work += 550.0 * DT;  // Reflex correction cost
+            accumulated_environmental_forces[0] = 650.0;
+            metabolic_stabilization_work += 550.0 * DT; // Reflex correction cost
         }
 
         // Fix: Only apply standing balance muscular corrections if we are physically grounded!
@@ -121,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
         if is_grounded && positional_error.abs() > 0.002 && has_power {
             let restoring_stiffness = 1800.0;
             let stabilization_torque = restoring_stiffness * positional_error;
-            
+
             v_y += (stabilization_torque / mass) * DT;
             metabolic_stabilization_work += (stabilization_torque * v_y.abs() * DT).abs() * 2.0;
         }
@@ -148,16 +157,26 @@ async fn main() -> anyhow::Result<()> {
 
         if step_count % 60 == 0 {
             let current_phi = if has_power && is_grounded {
-                (positional_error.abs() * 35.0 + (if lateral_shove_active { 4.5 } else { 0.05 })).min(8.5)
+                (positional_error.abs() * 35.0 + (if lateral_shove_active { 4.5 } else { 0.05 }))
+                    .min(8.5)
             } else if has_power && !is_grounded {
                 0.100 // Calm, passive observation state during freefall descent
             } else {
-                0.000 
+                0.000
             };
 
-            info!("[T={:.2}s] Height: {:.4}m | Phi: {:.3} | Energy: {:.2}J | Status: {}", 
-                   current_time, y_pos, current_phi, energy_available, 
-                   if !is_grounded { "FREEFALL_DESCENT" } else { "GROUNDED_STABLE" });
+            info!(
+                "[T={:.2}s] Height: {:.4}m | Phi: {:.3} | Energy: {:.2}J | Status: {}",
+                current_time,
+                y_pos,
+                current_phi,
+                energy_available,
+                if !is_grounded {
+                    "FREEFALL_DESCENT"
+                } else {
+                    "GROUNDED_STABLE"
+                }
+            );
         }
 
         current_time += DT;
@@ -170,9 +189,15 @@ async fn main() -> anyhow::Result<()> {
     info!("✨ STRESS TEST COMPLETE.");
     info!("📊 FINAL PERFORMANCE REPORT:");
     info!("   ⏱️  Total Sim Time: {:?}", total_duration);
-    info!("       Total Energy Consumed: {:.2} Joules (Scaled by D={})", ledger.lifetime_energy, D);
+    info!(
+        "       Total Energy Consumed: {:.2} Joules (Scaled by D={})",
+        ledger.lifetime_energy, D
+    );
     info!("   🔥 Total Dissipation: {:.2} Joules", ledger.energy_out);
-    info!("   📉 Energy Conservation Error: {:.4}%", ledger.lifetime_error_rate() * 100.0);
+    info!(
+        "   📉 Energy Conservation Error: {:.4}%",
+        ledger.lifetime_error_rate() * 100.0
+    );
     info!("   ✅ Determinism Check PASSED.");
 
     Ok(())

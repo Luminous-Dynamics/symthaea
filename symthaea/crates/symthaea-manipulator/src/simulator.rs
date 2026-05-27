@@ -117,7 +117,7 @@ impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
             self.state.end_effector_force[i] = self.external_forces[i];
         }
         self.external_forces = [0.0; 3]; // Reset after application
-                                         // Update gripper
+        // Update gripper
         self.state.gripper_opening = cmd.gripper as f64;
     }
 

@@ -28,8 +28,8 @@
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Type of metric
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -776,9 +776,11 @@ mod tests {
         assert!(registry.get("symthaea_timing_core_hdc_encode_us").is_some());
         assert!(registry.get("symthaea_timing_core_cfc_step_us").is_some());
         assert!(registry.get("symthaea_timing_core_training_us").is_some());
-        assert!(registry
-            .get("symthaea_timing_consciousness_engine_us")
-            .is_some());
+        assert!(
+            registry
+                .get("symthaea_timing_consciousness_engine_us")
+                .is_some()
+        );
         assert!(registry.get("symthaea_timing_ethics_engine_us").is_some());
         assert!(registry.get("symthaea_timing_total_cycle_us").is_some());
     }

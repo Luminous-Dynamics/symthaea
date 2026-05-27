@@ -746,7 +746,8 @@ mod tests {
         assert!(
             eq_similarity > neq_eq_similarity,
             "Higher entropy production should decrease similarity to equilibrium: eq_sim={} neq_eq_sim={}",
-            eq_similarity, neq_eq_similarity
+            eq_similarity,
+            neq_eq_similarity
         );
 
         // Also verify the encoded vectors have correct dimension

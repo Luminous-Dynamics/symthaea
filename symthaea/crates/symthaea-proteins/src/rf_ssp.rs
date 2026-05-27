@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::amino_acid::{AminoAcid, SecondaryStructure};
 use crate::cb513::load_cb513_subset;
 use crate::chou_fasman::{predict_chou_fasman, q3_accuracy};
-use crate::features::{extract_features, N_FEATURES};
+use crate::features::{N_FEATURES, extract_features};
 
 /// Number of SS classes (H, E, C).
 const N_CLASSES: usize = 3;

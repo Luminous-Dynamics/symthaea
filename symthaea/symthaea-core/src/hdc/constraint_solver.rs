@@ -1144,11 +1144,7 @@ mod tests {
         let assigned = vec![None, None];
         let constraints: Vec<Box<dyn Fn(usize, usize, usize, usize) -> bool>> = vec![Box::new(
             |v1, val1, v2, val2| {
-                if v1 == v2 {
-                    true
-                } else {
-                    val1 != val2
-                }
+                if v1 == v2 { true } else { val1 != val2 }
             },
         )];
         let ordered = lcv_order_values(0, &domains[0], &domains, &assigned, &constraints);

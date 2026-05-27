@@ -17,7 +17,7 @@
 //! - **Peer discovery**: Learns about peers from received data.
 //! - **Telemetry**: Fragment loss rates, FEC recovery stats, peer visibility.
 
-use super::{FragmentAssembler, LoRaFragment, WisdomPacket, WISDOM_PACKET_SIZE};
+use super::{FragmentAssembler, LoRaFragment, WISDOM_PACKET_SIZE, WisdomPacket};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -593,7 +593,7 @@ impl Default for MeshReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::swarm::mesh::{MeshUrgency, PayloadType, LORA_MTU};
+    use crate::swarm::mesh::{LORA_MTU, MeshUrgency, PayloadType};
     use symthaea_core::hdc::BinaryHV;
 
     fn test_hv(seed: u8) -> BinaryHV {
@@ -968,7 +968,7 @@ mod tests {
 
     #[test]
     fn test_receive_whole_compressed_envelope() {
-        use crate::swarm::mesh::{compress_packet, COMPRESS_NONE, WISDOM_PACKET_SIZE};
+        use crate::swarm::mesh::{COMPRESS_NONE, WISDOM_PACKET_SIZE, compress_packet};
         let mut receiver = MeshReceiver::new();
         let packet = test_packet(10, PEER_A, 0xCC);
         let raw = packet.to_bytes();

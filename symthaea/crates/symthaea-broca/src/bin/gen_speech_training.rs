@@ -9,7 +9,7 @@
 //!   Phase C: Re-encode all utterances with LEARNED encoder → output Broca JSONL
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --features speech-data --bin gen-speech-training
+//!   cargo run --release -p symthaea-broca --features speech-data --bin r#gen-speech-training
 //!
 //! Outputs:
 //!   data/training/speech-v1-train.jsonl  (80%)

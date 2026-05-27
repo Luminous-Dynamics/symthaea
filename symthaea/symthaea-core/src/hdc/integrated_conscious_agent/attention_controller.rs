@@ -80,7 +80,9 @@ impl SelfDirectedAttentionController {
 
         // Update habituation for current target
         if let Some(target) = focused_target {
-            let state = self.habituation.entry(target.to_string())
+            let state = self
+                .habituation
+                .entry(target.to_string())
                 .or_insert(HabituationState {
                     exposure: 0,
                     level: 0.0,
@@ -142,13 +144,15 @@ impl SelfDirectedAttentionController {
 
     /// Get attention weight adjustment for a target
     pub fn get_weight_adjustment(&self, target_name: &str, base_priority: f64) -> f64 {
-        let habituation_penalty = self.habituation.get(target_name)
+        let habituation_penalty = self
+            .habituation
+            .get(target_name)
             .map(|h| h.level)
             .unwrap_or(0.0);
 
         let strategy_modifier = match self.strategy {
             AttentionStrategy::GoalDirected => 1.0,
-            AttentionStrategy::NoveltyDriven => 0.5,  // Reduce goal-directed weight
+            AttentionStrategy::NoveltyDriven => 0.5, // Reduce goal-directed weight
             AttentionStrategy::Exploratory => 0.3,
             AttentionStrategy::Recovery => 0.1,
             AttentionStrategy::Balanced => 0.8,
@@ -164,7 +168,7 @@ impl SelfDirectedAttentionController {
             AttentionStrategy::NoveltyDriven => novelty > 0.3,
             AttentionStrategy::Exploratory => novelty > 0.2,
             AttentionStrategy::Balanced => novelty > 0.6,
-            _ => novelty > 0.8,  // Very high novelty always captures attention
+            _ => novelty > 0.8, // Very high novelty always captures attention
         }
     }
 
@@ -260,7 +264,9 @@ impl IntegratedConsciousAgent {
         match force_mode {
             AttentionMode::Spotlight => {
                 // Force high focus on highest priority goal
-                if let Some(goal) = self.goals.iter()
+                if let Some(goal) = self
+                    .goals
+                    .iter()
                     .filter(|g| g.active)
                     .max_by(|a, b| a.priority.total_cmp(&b.priority))
                 {

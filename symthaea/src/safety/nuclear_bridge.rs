@@ -12,7 +12,7 @@
 //! Requires both `safety-agents` and `nuclear-forensics` features.
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
-use super::gate::{safety_gate, SafetyGateResult};
+use super::gate::{SafetyGateResult, safety_gate};
 use symthaea_nuclear_forensics::{AttributionResult, BackdatedResult};
 
 /// Input bundle for a single nuclear safety assessment.

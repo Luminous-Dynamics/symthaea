@@ -64,13 +64,22 @@ impl BenchmarkPair {
         format!(
             "  {:<25} | acc: {:.3} → {:.3} (Δ{:+.3}) | PE: {:.4} → {:.4} (Δ{:+.4}) | DA: {:.3}/{:.3} NE: {:.3}/{:.3} 5HT: {:.3}/{:.3} ACh: {:.3}/{:.3} | R: {:.3}/{:.3}",
             self.name,
-            self.sequential.accuracy, self.consensus.accuracy, self.accuracy_delta(),
-            self.sequential.mean_prediction_error, self.consensus.mean_prediction_error, self.prediction_error_delta(),
-            self.sequential.mean_da, self.consensus.mean_da,
-            self.sequential.mean_ne, self.consensus.mean_ne,
-            self.sequential.mean_sht, self.consensus.mean_sht,
-            self.sequential.mean_ach, self.consensus.mean_ach,
-            self.sequential.mean_reward, self.consensus.mean_reward,
+            self.sequential.accuracy,
+            self.consensus.accuracy,
+            self.accuracy_delta(),
+            self.sequential.mean_prediction_error,
+            self.consensus.mean_prediction_error,
+            self.prediction_error_delta(),
+            self.sequential.mean_da,
+            self.consensus.mean_da,
+            self.sequential.mean_ne,
+            self.consensus.mean_ne,
+            self.sequential.mean_sht,
+            self.consensus.mean_sht,
+            self.sequential.mean_ach,
+            self.consensus.mean_ach,
+            self.sequential.mean_reward,
+            self.consensus.mean_reward,
         )
     }
 }
@@ -122,9 +131,15 @@ fn consensus_vs_sequential_psych_bench() {
     ];
 
     // Print comparison table
-    eprintln!("\n╔══════════════════════════════════════════════════════════════════════════════════════════════════════╗");
-    eprintln!("║ Consensus vs Sequential A/B Comparison                                                            ║");
-    eprintln!("╠══════════════════════════════════════════════════════════════════════════════════════════════════════╣");
+    eprintln!(
+        "\n╔══════════════════════════════════════════════════════════════════════════════════════════════════════╗"
+    );
+    eprintln!(
+        "║ Consensus vs Sequential A/B Comparison                                                            ║"
+    );
+    eprintln!(
+        "╠══════════════════════════════════════════════════════════════════════════════════════════════════════╣"
+    );
     for pair in &pairs {
         eprintln!("║{}║", pair.format_comparison());
     }
@@ -141,12 +156,16 @@ fn consensus_vs_sequential_psych_bench() {
     let seq_total_ms: u64 = pairs.iter().map(|p| p.sequential.elapsed_ms).sum();
     let con_total_ms: u64 = pairs.iter().map(|p| p.consensus.elapsed_ms).sum();
 
-    eprintln!("╠══════════════════════════════════════════════════════════════════════════════════════════════════════╣");
+    eprintln!(
+        "╠══════════════════════════════════════════════════════════════════════════════════════════════════════╣"
+    );
     eprintln!(
         "║  Mean accuracy delta: {:+.4}  |  Mean PE delta: {:+.5}  |  Time: {}ms / {}ms",
         mean_acc_delta, mean_pe_delta, seq_total_ms, con_total_ms
     );
-    eprintln!("╚══════════════════════════════════════════════════════════════════════════════════════════════════════╝\n");
+    eprintln!(
+        "╚══════════════════════════════════════════════════════════════════════════════════════════════════════╝\n"
+    );
 
     // Assertions: all metrics must be finite
     for pair in &pairs {

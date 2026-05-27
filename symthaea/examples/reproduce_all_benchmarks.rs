@@ -9,7 +9,7 @@
 //! Usage: `cargo run --example reproduce_all_benchmarks`
 
 use symthaea::benchmarks::fep_temporal_benchmark::{
-    run_t_maze, FepTemporalBenchmark, FepTemporalBenchmarkConfig, TMazeConfig,
+    FepTemporalBenchmark, FepTemporalBenchmarkConfig, TMazeConfig, run_t_maze,
 };
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 

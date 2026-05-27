@@ -249,14 +249,18 @@ mod tests {
         let harmonies = [0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8];
         let session = derive_session(&harmonies, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5);
         // Should have InfinitePlay + SacredStillness themes
-        assert!(session
-            .thematic_vocabulary
-            .iter()
-            .any(|t| t == "dance" || t == "wonder"));
-        assert!(session
-            .thematic_vocabulary
-            .iter()
-            .any(|t| t == "silence" || t == "breath"));
+        assert!(
+            session
+                .thematic_vocabulary
+                .iter()
+                .any(|t| t == "dance" || t == "wonder")
+        );
+        assert!(
+            session
+                .thematic_vocabulary
+                .iter()
+                .any(|t| t == "silence" || t == "breath")
+        );
     }
 
     #[test]

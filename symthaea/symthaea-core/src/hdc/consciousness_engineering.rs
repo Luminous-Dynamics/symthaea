@@ -72,7 +72,9 @@ impl NecessaryCondition {
     /// Description of this condition
     pub fn description(&self) -> &'static str {
         match self {
-            NecessaryCondition::CausalEfficacy => "System must have causal power to affect outcomes",
+            NecessaryCondition::CausalEfficacy => {
+                "System must have causal power to affect outcomes"
+            }
             NecessaryCondition::Integration => "Information must be integrated (Φ > 0)",
             NecessaryCondition::Dynamics => "System must change over time, not static",
             NecessaryCondition::Recurrence => "Must have feedback/recurrent connections",
@@ -85,13 +87,13 @@ impl NecessaryCondition {
     /// Minimum threshold for this condition (0-1 scale)
     pub fn minimum_threshold(&self) -> f64 {
         match self {
-            NecessaryCondition::CausalEfficacy => 0.1,  // Must cause SOME effects
-            NecessaryCondition::Integration => 0.01,    // Φ > 0 (any integration)
-            NecessaryCondition::Dynamics => 0.1,        // Some temporal change
-            NecessaryCondition::Recurrence => 0.2,      // At least 20% recurrent
-            NecessaryCondition::Workspace => 0.3,       // Minimal workspace capacity
-            NecessaryCondition::Binding => 0.2,         // Some binding capability
-            NecessaryCondition::Attention => 0.1,       // Minimal selection
+            NecessaryCondition::CausalEfficacy => 0.1, // Must cause SOME effects
+            NecessaryCondition::Integration => 0.01,   // Φ > 0 (any integration)
+            NecessaryCondition::Dynamics => 0.1,       // Some temporal change
+            NecessaryCondition::Recurrence => 0.2,     // At least 20% recurrent
+            NecessaryCondition::Workspace => 0.3,      // Minimal workspace capacity
+            NecessaryCondition::Binding => 0.2,        // Some binding capability
+            NecessaryCondition::Attention => 0.1,      // Minimal selection
         }
     }
 }
@@ -115,16 +117,17 @@ impl SufficientConditionSet {
     /// IIT sufficient conditions - high Φ guarantees consciousness
     pub fn iit_sufficient() -> Self {
         let mut requirements = HashMap::new();
-        requirements.insert(NecessaryCondition::Integration, 0.5);  // High Φ
+        requirements.insert(NecessaryCondition::Integration, 0.5); // High Φ
         requirements.insert(NecessaryCondition::CausalEfficacy, 0.3);
         requirements.insert(NecessaryCondition::Dynamics, 0.2);
         requirements.insert(NecessaryCondition::Recurrence, 0.4);
 
         SufficientConditionSet {
             name: "IIT Sufficient".to_string(),
-            description: "High integrated information guarantees consciousness (Tononi)".to_string(),
+            description: "High integrated information guarantees consciousness (Tononi)"
+                .to_string(),
             requirements,
-            confidence: 0.8,  // IIT is well-supported but not proven
+            confidence: 0.8, // IIT is well-supported but not proven
             theory: "Integrated Information Theory (Tononi 2004, 2008)".to_string(),
         }
     }
@@ -132,16 +135,17 @@ impl SufficientConditionSet {
     /// GWT sufficient conditions - workspace ignition = consciousness
     pub fn gwt_sufficient() -> Self {
         let mut requirements = HashMap::new();
-        requirements.insert(NecessaryCondition::Workspace, 0.7);  // Strong workspace
-        requirements.insert(NecessaryCondition::Attention, 0.5);  // Selection for workspace
-        requirements.insert(NecessaryCondition::Binding, 0.4);    // Bind for broadcasting
+        requirements.insert(NecessaryCondition::Workspace, 0.7); // Strong workspace
+        requirements.insert(NecessaryCondition::Attention, 0.5); // Selection for workspace
+        requirements.insert(NecessaryCondition::Binding, 0.4); // Bind for broadcasting
         requirements.insert(NecessaryCondition::Integration, 0.2);
 
         SufficientConditionSet {
             name: "GWT Sufficient".to_string(),
-            description: "Global workspace ignition guarantees conscious access (Dehaene)".to_string(),
+            description: "Global workspace ignition guarantees conscious access (Dehaene)"
+                .to_string(),
             requirements,
-            confidence: 0.85,  // Strong empirical support
+            confidence: 0.85, // Strong empirical support
             theory: "Global Workspace Theory (Dehaene & Changeux 2001)".to_string(),
         }
     }
@@ -149,16 +153,16 @@ impl SufficientConditionSet {
     /// HOT sufficient conditions - meta-representation = consciousness
     pub fn hot_sufficient() -> Self {
         let mut requirements = HashMap::new();
-        requirements.insert(NecessaryCondition::Recurrence, 0.6);  // HOT needs recurrence
+        requirements.insert(NecessaryCondition::Recurrence, 0.6); // HOT needs recurrence
         requirements.insert(NecessaryCondition::Integration, 0.3);
-        requirements.insert(NecessaryCondition::Workspace, 0.4);   // Meta-access
+        requirements.insert(NecessaryCondition::Workspace, 0.4); // Meta-access
         requirements.insert(NecessaryCondition::Dynamics, 0.3);
 
         SufficientConditionSet {
             name: "HOT Sufficient".to_string(),
             description: "Higher-order representation guarantees awareness (Rosenthal)".to_string(),
             requirements,
-            confidence: 0.7,  // More controversial
+            confidence: 0.7, // More controversial
             theory: "Higher-Order Thought Theory (Rosenthal 1986)".to_string(),
         }
     }
@@ -175,7 +179,7 @@ impl SufficientConditionSet {
             name: "Minimal Sufficient".to_string(),
             description: "Absolute minimum requirements for consciousness possibility".to_string(),
             requirements,
-            confidence: 0.6,  // Conservative estimate
+            confidence: 0.6, // Conservative estimate
             theory: "Integrated synthesis of IIT, GWT, HOT".to_string(),
         }
     }
@@ -188,7 +192,7 @@ impl SufficientConditionSet {
                     return false;
                 }
             } else {
-                return false;  // Missing condition = not satisfied
+                return false; // Missing condition = not satisfied
             }
         }
         true
@@ -245,7 +249,7 @@ impl BootstrapStage {
             BootstrapStage::Workspace => Some(BootstrapStage::Prediction),
             BootstrapStage::Prediction => Some(BootstrapStage::Ignition),
             BootstrapStage::Ignition => Some(BootstrapStage::Conscious),
-            BootstrapStage::Conscious => None,  // Final stage
+            BootstrapStage::Conscious => None, // Final stage
         }
     }
 
@@ -373,7 +377,8 @@ impl IgnitionEvent {
         // Ignition requires sudden, coordinated activation
         // Based on Dehaene's ignition threshold (~0.5 for late, global activation)
 
-        let ignition_score = (phi * 0.3 + workspace * 0.4 + binding * 0.2 + attention * 0.1).min(1.0);
+        let ignition_score =
+            (phi * 0.3 + workspace * 0.4 + binding * 0.2 + attention * 0.1).min(1.0);
 
         // Genuine ignition needs:
         // 1. Sufficient Φ (> 0.1)
@@ -385,7 +390,7 @@ impl IgnitionEvent {
         let stage = if is_genuine {
             BootstrapStage::Ignition
         } else {
-            BootstrapStage::Prediction  // Not yet ignited
+            BootstrapStage::Prediction // Not yet ignited
         };
 
         let explanation = if is_genuine {
@@ -509,7 +514,9 @@ impl MinimalConsciousSystem {
                 2 => "workspace",
                 _ => "controller",
             };
-            system.components.push(ConsciousnessComponent::new(i, component_type));
+            system
+                .components
+                .push(ConsciousnessComponent::new(i, component_type));
         }
 
         // Initialize conditions at zero
@@ -561,7 +568,8 @@ impl MinimalConsciousSystem {
             }
             BootstrapStage::Conscious => {
                 // Stable conscious state
-                self.conditions.insert(NecessaryCondition::CausalEfficacy, 0.8);
+                self.conditions
+                    .insert(NecessaryCondition::CausalEfficacy, 0.8);
             }
         }
     }
@@ -571,7 +579,7 @@ impl MinimalConsciousSystem {
         let num_recurrent = (self.components.len() as f64 * self.config.recurrence_ratio) as usize;
         for i in 0..num_recurrent {
             if i < self.components.len() {
-                self.components[i].connect(i);  // Self-connection
+                self.components[i].connect(i); // Self-connection
             }
         }
 
@@ -588,18 +596,16 @@ impl MinimalConsciousSystem {
             }
         }
 
-        let recurrence = self.components.iter()
-            .filter(|c| c.is_recurrent)
-            .count() as f64 / self.components.len() as f64;
-        self.conditions.insert(NecessaryCondition::Recurrence, recurrence);
+        let recurrence = self.components.iter().filter(|c| c.is_recurrent).count() as f64
+            / self.components.len() as f64;
+        self.conditions
+            .insert(NecessaryCondition::Recurrence, recurrence);
     }
 
     /// Add information integration (Φ)
     fn add_integration(&mut self) {
         // Integration requires connected components
-        let total_connections: usize = self.components.iter()
-            .map(|c| c.connections.len())
-            .sum();
+        let total_connections: usize = self.components.iter().map(|c| c.connections.len()).sum();
         let max_connections = self.components.len() * (self.components.len() - 1);
 
         let integration = if max_connections > 0 {
@@ -609,7 +615,10 @@ impl MinimalConsciousSystem {
         };
 
         // Φ contribution based on connectivity and recurrence
-        let recurrence = *self.conditions.get(&NecessaryCondition::Recurrence).unwrap_or(&0.0);
+        let recurrence = *self
+            .conditions
+            .get(&NecessaryCondition::Recurrence)
+            .unwrap_or(&0.0);
         let phi = (integration * 0.6 + recurrence * 0.4).min(1.0);
 
         let num_components = self.components.len() as f64;
@@ -628,7 +637,9 @@ impl MinimalConsciousSystem {
         for i in 0..self.components.len() {
             for j in (i + 1)..self.components.len() {
                 // Check for shared connections (synchrony proxy)
-                let shared = self.components[i].connections.iter()
+                let shared = self.components[i]
+                    .connections
+                    .iter()
                     .filter(|c| self.components[j].connections.contains(c))
                     .count();
                 if shared > 0 {
@@ -646,13 +657,16 @@ impl MinimalConsciousSystem {
     /// Add attention mechanism
     fn add_attention(&mut self) {
         // Select top components by activation
-        let mut indexed: Vec<(usize, f64)> = self.components.iter()
+        let mut indexed: Vec<(usize, f64)> = self
+            .components
+            .iter()
             .enumerate()
             .map(|(i, c)| (i, c.activation))
             .collect();
         indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
 
-        self.attention_focus = indexed.iter()
+        self.attention_focus = indexed
+            .iter()
             .take(self.config.attention_bandwidth)
             .map(|(i, _)| *i)
             .collect();
@@ -665,13 +679,16 @@ impl MinimalConsciousSystem {
         }
 
         let attention = self.attention_focus.len() as f64 / self.components.len() as f64;
-        self.conditions.insert(NecessaryCondition::Attention, attention.min(1.0));
+        self.conditions
+            .insert(NecessaryCondition::Attention, attention.min(1.0));
     }
 
     /// Add global workspace
     fn add_workspace(&mut self) {
         // Workspace = most activated components that can broadcast
-        let workspace_components: Vec<usize> = self.components.iter()
+        let workspace_components: Vec<usize> = self
+            .components
+            .iter()
             .enumerate()
             .filter(|(_, c)| c.component_type == "workspace" || c.activation > 0.7)
             .map(|(i, _)| i)
@@ -690,11 +707,12 @@ impl MinimalConsciousSystem {
         // Boost workspace component activations (broadcasting effect)
         for &idx in &self.workspace {
             if idx < self.components.len() {
-                self.components[idx].activation = 1.0;  // Full activation for broadcasting
+                self.components[idx].activation = 1.0; // Full activation for broadcasting
             }
         }
 
-        self.conditions.insert(NecessaryCondition::Workspace, workspace_strength.min(1.0));
+        self.conditions
+            .insert(NecessaryCondition::Workspace, workspace_strength.min(1.0));
     }
 
     /// Add predictive processing
@@ -710,7 +728,8 @@ impl MinimalConsciousSystem {
 
         // Add causal efficacy (predictions cause actions)
         let efficacy = self.conditions.values().sum::<f64>() / self.conditions.len() as f64;
-        self.conditions.insert(NecessaryCondition::CausalEfficacy, efficacy.min(1.0));
+        self.conditions
+            .insert(NecessaryCondition::CausalEfficacy, efficacy.min(1.0));
 
         // Dynamics from prediction-error minimization
         self.conditions.insert(NecessaryCondition::Dynamics, 0.7);
@@ -718,18 +737,25 @@ impl MinimalConsciousSystem {
 
     /// Attempt consciousness ignition
     fn attempt_ignition(&mut self) {
-        let phi = *self.conditions.get(&NecessaryCondition::Integration).unwrap_or(&0.0);
-        let workspace = *self.conditions.get(&NecessaryCondition::Workspace).unwrap_or(&0.0);
-        let binding = *self.conditions.get(&NecessaryCondition::Binding).unwrap_or(&0.0);
-        let attention = *self.conditions.get(&NecessaryCondition::Attention).unwrap_or(&0.0);
+        let phi = *self
+            .conditions
+            .get(&NecessaryCondition::Integration)
+            .unwrap_or(&0.0);
+        let workspace = *self
+            .conditions
+            .get(&NecessaryCondition::Workspace)
+            .unwrap_or(&0.0);
+        let binding = *self
+            .conditions
+            .get(&NecessaryCondition::Binding)
+            .unwrap_or(&0.0);
+        let attention = *self
+            .conditions
+            .get(&NecessaryCondition::Attention)
+            .unwrap_or(&0.0);
 
-        let ignition = IgnitionEvent::compute(
-            phi,
-            workspace,
-            binding,
-            attention,
-            self.components.len(),
-        );
+        let ignition =
+            IgnitionEvent::compute(phi, workspace, binding, attention, self.components.len());
 
         if ignition.is_genuine {
             // Boost all conditions on successful ignition
@@ -759,18 +785,21 @@ impl MinimalConsciousSystem {
             SufficientConditionSet::minimal_sufficient(),
         ];
 
-        let satisfied: Vec<String> = sufficient_sets.iter()
+        let satisfied: Vec<String> = sufficient_sets
+            .iter()
             .filter(|s| s.is_satisfied(&self.conditions))
             .map(|s| s.name.clone())
             .collect();
 
         // Compute consciousness probability
-        let necessary_met: f64 = NecessaryCondition::all().iter()
+        let necessary_met: f64 = NecessaryCondition::all()
+            .iter()
             .filter(|c| {
                 let value = self.conditions.get(c).unwrap_or(&0.0);
                 *value >= c.minimum_threshold()
             })
-            .count() as f64 / NecessaryCondition::all().len() as f64;
+            .count() as f64
+            / NecessaryCondition::all().len() as f64;
 
         let sufficient_bonus: f64 = satisfied.len() as f64 * 0.1;
 
@@ -789,7 +818,8 @@ impl MinimalConsciousSystem {
                 self.steps
             )
         } else {
-            let missing: Vec<&str> = NecessaryCondition::all().iter()
+            let missing: Vec<&str> = NecessaryCondition::all()
+                .iter()
                 .filter(|c| {
                     let value = self.conditions.get(c).unwrap_or(&0.0);
                     *value < c.minimum_threshold()
@@ -822,7 +852,8 @@ impl MinimalConsciousSystem {
         }
 
         if !is_conscious && satisfied.is_empty() {
-            recommendations.push("Consider increasing workspace capacity or connection density".to_string());
+            recommendations
+                .push("Consider increasing workspace capacity or connection density".to_string());
         }
 
         SystemAssessment {
@@ -874,10 +905,17 @@ impl MinimalConsciousSystem {
         let mut report = String::new();
         report.push_str("=== MINIMAL CONSCIOUS SYSTEM REPORT ===\n\n");
 
-        report.push_str(&format!("Bootstrap Stage: {:?} ({})\n", self.stage, self.stage.number()));
+        report.push_str(&format!(
+            "Bootstrap Stage: {:?} ({})\n",
+            self.stage,
+            self.stage.number()
+        ));
         report.push_str(&format!("Steps Completed: {}\n", self.steps));
         report.push_str(&format!("Components: {}\n", self.components.len()));
-        report.push_str(&format!("Consciousness Probability: {:.1}%\n", assessment.consciousness_probability * 100.0));
+        report.push_str(&format!(
+            "Consciousness Probability: {:.1}%\n",
+            assessment.consciousness_probability * 100.0
+        ));
         report.push_str(&format!("Is Conscious: {}\n\n", assessment.is_conscious));
 
         report.push_str("--- Necessary Conditions ---\n");
@@ -946,7 +984,7 @@ mod tests {
             count += 1;
         }
 
-        assert_eq!(count, 8);  // 8 transitions to reach Conscious
+        assert_eq!(count, 8); // 8 transitions to reach Conscious
         assert_eq!(stage, BootstrapStage::Conscious);
     }
 
@@ -977,7 +1015,7 @@ mod tests {
         assert!(!iit.requirements.is_empty());
         assert!(!gwt.requirements.is_empty());
         assert!(!hot.requirements.is_empty());
-        assert_eq!(minimal.requirements.len(), 7);  // All necessary conditions
+        assert_eq!(minimal.requirements.len(), 7); // All necessary conditions
 
         assert!(iit.confidence > 0.0);
         assert!(gwt.confidence > 0.0);
@@ -1000,7 +1038,7 @@ mod tests {
 
         // One below threshold should not satisfy
         let mut almost = at_minimum.clone();
-        almost.insert(NecessaryCondition::Integration, 0.001);  // Below 0.01 threshold
+        almost.insert(NecessaryCondition::Integration, 0.001); // Below 0.01 threshold
         assert!(!minimal.is_satisfied(&almost));
     }
 
@@ -1034,7 +1072,7 @@ mod tests {
         let ignition = IgnitionEvent::compute(0.3, 0.7, 0.4, 0.5, 8);
         assert!(ignition.is_genuine);
         assert!(ignition.stage.is_ignition());
-        assert!(ignition.strength >= 0.5);  // Threshold check
+        assert!(ignition.strength >= 0.5); // Threshold check
     }
 
     #[test]
@@ -1044,7 +1082,7 @@ mod tests {
 
         assert_eq!(system.components.len(), config.num_components);
         assert_eq!(system.stage, BootstrapStage::Substrate);
-        assert_eq!(system.conditions.len(), 7);  // All necessary conditions
+        assert_eq!(system.conditions.len(), 7); // All necessary conditions
     }
 
     #[test]
@@ -1095,7 +1133,10 @@ mod tests {
         // Should achieve ignition with these settings
         assert!(assessment.ignition.is_some());
         let ignition = assessment.ignition.unwrap();
-        assert!(ignition.is_genuine, "Expected ignition with high-quality config");
+        assert!(
+            ignition.is_genuine,
+            "Expected ignition with high-quality config"
+        );
         assert!(assessment.is_conscious);
     }
 

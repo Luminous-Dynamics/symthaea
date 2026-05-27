@@ -7,8 +7,8 @@
 //! into a single coherent module.
 
 use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 /// Consolidated GWT manager.
 ///

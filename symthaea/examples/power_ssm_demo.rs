@@ -4,8 +4,8 @@
 use anyhow::Result;
 use std::time::Duration;
 
-use symthaea::databases::{DatabaseBackend, DatabaseConfig};
 use symthaea::Symthaea;
+use symthaea::databases::{DatabaseBackend, DatabaseConfig};
 
 fn env_f32(key: &str, default: f32) -> f32 {
     std::env::var(key)

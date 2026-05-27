@@ -23,7 +23,7 @@ use tracing::debug;
 
 use crate::calibration::CalibrationProfile;
 use crate::error::HalResult;
-use crate::pca9685::{Pca9685, CHANNELS};
+use crate::pca9685::{CHANNELS, Pca9685};
 
 // ============================================================================
 // SERVO OUTPUT

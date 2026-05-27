@@ -482,7 +482,12 @@ impl ConsciousnessSelfAssessment {
 
         let self_report = format!(
             "Self-assessment at t={}: level={:?}, Φ_self={:.2}, continuity={:.2}, depth={}, score={:.2}%",
-            self.timestep, level, phi_self, continuity, meta_depth, score * 100.0
+            self.timestep,
+            level,
+            phi_self,
+            continuity,
+            meta_depth,
+            score * 100.0
         );
 
         let result = SelfAssessmentResult {

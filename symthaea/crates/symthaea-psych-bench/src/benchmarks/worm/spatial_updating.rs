@@ -6,8 +6,8 @@
 //! Track an object's position across a grid as it receives movement updates.
 //! Tests the updating component of WM in the spatial domain.
 
-use crate::adapter::spatial::{GridPosition, SpatialAdapter};
 use crate::adapter::StimulusAdapter;
+use crate::adapter::spatial::{GridPosition, SpatialAdapter};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};

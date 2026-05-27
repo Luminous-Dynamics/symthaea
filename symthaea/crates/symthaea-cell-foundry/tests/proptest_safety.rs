@@ -11,8 +11,8 @@
 
 use proptest::prelude::*;
 use symthaea_cell_foundry::{
-    assess_quality, CellState, CultureEnvironment, EpigeneticProfile, EthicsGate, GermCellStage,
-    IvgProtocol,
+    CellState, CultureEnvironment, EpigeneticProfile, EthicsGate, GermCellStage, IvgProtocol,
+    assess_quality,
 };
 
 proptest! {

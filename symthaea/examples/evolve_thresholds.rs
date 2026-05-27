@@ -128,7 +128,7 @@ fn main() {
     );
     println!("{}", "-".repeat(65));
 
-    for gen in 0..NUM_GENERATIONS {
+    for r#gen in 0..NUM_GENERATIONS {
         // Sort by fitness (descending)
         population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
 
@@ -139,7 +139,7 @@ fn main() {
 
         println!(
             "{:>5}  {:>8.4}  {:>8.4}  {:>8.4}  {:>10.2}  {:>10}",
-            gen, best, mean, worst, best_pheno.fep_surprise_scale, best_pheno.dream_base_interval,
+            r#gen, best, mean, worst, best_pheno.fep_surprise_scale, best_pheno.dream_base_interval,
         );
 
         // Elitism: keep top 20%

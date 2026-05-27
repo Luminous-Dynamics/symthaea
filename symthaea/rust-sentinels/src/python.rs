@@ -9,12 +9,16 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::sentinels::{
-    // Trilogy Sentinels
-    EmotionSentinel, SleepSentinel, MeditationSentinel,
     // Extended Sentinels
-    AttentionSentinel, FlowSentinel, EngagementSentinel,
+    AttentionSentinel,
+    // Trilogy Sentinels
+    EmotionSentinel,
+    EngagementSentinel,
+    FlowSentinel,
+    MeditationSentinel,
+    SleepSentinel,
 };
-use crate::{analyze_consciousness, analyze_extended, AnalysisMode};
+use crate::{AnalysisMode, analyze_consciousness, analyze_extended};
 
 // ============================================================================
 // Python-compatible wrapper structs
@@ -30,7 +34,9 @@ pub struct PyEmotionSentinel {
 impl PyEmotionSentinel {
     #[new]
     pub fn new() -> Self {
-        Self { inner: EmotionSentinel::default() }
+        Self {
+            inner: EmotionSentinel::default(),
+        }
     }
 
     /// Calibrate baseline from resting state data (two-channel for asymmetry)
@@ -40,7 +46,12 @@ impl PyEmotionSentinel {
 
     /// Analyze emotional state from EEG data (single channel)
     /// Returns dict with valence, arousal, confidence, quadrant
-    pub fn analyze(&self, py: Python<'_>, data: Vec<f32>, sample_rate: f32) -> PyResult<Py<PyDict>> {
+    pub fn analyze(
+        &self,
+        py: Python<'_>,
+        data: Vec<f32>,
+        sample_rate: f32,
+    ) -> PyResult<Py<PyDict>> {
         let score = self.inner.analyze(&data, sample_rate);
         let dict = PyDict::new_bound(py);
         dict.set_item("valence", score.valence)?;
@@ -61,12 +72,19 @@ pub struct PySleepSentinel {
 impl PySleepSentinel {
     #[new]
     pub fn new() -> Self {
-        Self { inner: SleepSentinel::default() }
+        Self {
+            inner: SleepSentinel::default(),
+        }
     }
 
     /// Analyze sleep stage from EEG data
     /// Returns dict with stage, confidence, delta_power, sleep_quality
-    pub fn analyze(&self, py: Python<'_>, data: Vec<f32>, sample_rate: f32) -> PyResult<Py<PyDict>> {
+    pub fn analyze(
+        &self,
+        py: Python<'_>,
+        data: Vec<f32>,
+        sample_rate: f32,
+    ) -> PyResult<Py<PyDict>> {
         let score = self.inner.analyze(&data, sample_rate);
         let dict = PyDict::new_bound(py);
         dict.set_item("stage", score.stage.name())?;
@@ -89,7 +107,9 @@ pub struct PyMeditationSentinel {
 impl PyMeditationSentinel {
     #[new]
     pub fn new() -> Self {
-        Self { inner: MeditationSentinel::default() }
+        Self {
+            inner: MeditationSentinel::default(),
+        }
     }
 
     /// Calibrate baseline from resting state
@@ -99,7 +119,12 @@ impl PyMeditationSentinel {
 
     /// Analyze meditation state from EEG data
     /// Returns dict with depth, stability, alpha_power, theta_power, meditation_index, state
-    pub fn analyze(&self, py: Python<'_>, data: Vec<f32>, sample_rate: f32) -> PyResult<Py<PyDict>> {
+    pub fn analyze(
+        &self,
+        py: Python<'_>,
+        data: Vec<f32>,
+        sample_rate: f32,
+    ) -> PyResult<Py<PyDict>> {
         let score = self.inner.analyze(&data, sample_rate);
         let dict = PyDict::new_bound(py);
         dict.set_item("depth", score.depth)?;
@@ -122,7 +147,9 @@ pub struct PyAttentionSentinel {
 impl PyAttentionSentinel {
     #[new]
     pub fn new() -> Self {
-        Self { inner: AttentionSentinel::default() }
+        Self {
+            inner: AttentionSentinel::default(),
+        }
     }
 
     /// Calibrate baseline from resting state
@@ -132,7 +159,12 @@ impl PyAttentionSentinel {
 
     /// Analyze attention state from EEG data
     /// Returns dict with sustained, selective, alertness, cognitive_load, attention_index, state, confidence
-    pub fn analyze(&self, py: Python<'_>, data: Vec<f32>, sample_rate: f32) -> PyResult<Py<PyDict>> {
+    pub fn analyze(
+        &self,
+        py: Python<'_>,
+        data: Vec<f32>,
+        sample_rate: f32,
+    ) -> PyResult<Py<PyDict>> {
         let score = self.inner.analyze(&data, sample_rate);
         let dict = PyDict::new_bound(py);
         dict.set_item("sustained", score.sustained)?;
@@ -157,7 +189,9 @@ pub struct PyFlowSentinel {
 impl PyFlowSentinel {
     #[new]
     pub fn new() -> Self {
-        Self { inner: FlowSentinel::default() }
+        Self {
+            inner: FlowSentinel::default(),
+        }
     }
 
     /// Calibrate baseline from resting state
@@ -167,7 +201,12 @@ impl PyFlowSentinel {
 
     /// Analyze flow state from EEG data
     /// Returns dict with immersion, effortlessness, time_dilation, performance, flow_index, state, confidence
-    pub fn analyze(&self, py: Python<'_>, data: Vec<f32>, sample_rate: f32) -> PyResult<Py<PyDict>> {
+    pub fn analyze(
+        &self,
+        py: Python<'_>,
+        data: Vec<f32>,
+        sample_rate: f32,
+    ) -> PyResult<Py<PyDict>> {
         let score = self.inner.analyze(&data, sample_rate);
         let dict = PyDict::new_bound(py);
         dict.set_item("immersion", score.immersion)?;
@@ -193,7 +232,9 @@ pub struct PyEngagementSentinel {
 impl PyEngagementSentinel {
     #[new]
     pub fn new() -> Self {
-        Self { inner: EngagementSentinel::default() }
+        Self {
+            inner: EngagementSentinel::default(),
+        }
     }
 
     /// Calibrate baseline from resting/neutral state
@@ -203,7 +244,12 @@ impl PyEngagementSentinel {
 
     /// Analyze engagement state from EEG data
     /// Returns dict with cognitive, emotional, interest, fatigue, workload, engagement_index, level, confidence
-    pub fn analyze(&self, py: Python<'_>, data: Vec<f32>, sample_rate: f32) -> PyResult<Py<PyDict>> {
+    pub fn analyze(
+        &self,
+        py: Python<'_>,
+        data: Vec<f32>,
+        sample_rate: f32,
+    ) -> PyResult<Py<PyDict>> {
         let score = self.inner.analyze(&data, sample_rate);
         let dict = PyDict::new_bound(py);
         dict.set_item("cognitive", score.cognitive)?;
@@ -228,7 +274,12 @@ impl PyEngagementSentinel {
 /// Analyze consciousness state with automatic mode selection
 #[pyfunction]
 #[pyo3(name = "analyze", signature = (data, sample_rate, mode = "auto"))]
-pub fn py_analyze_consciousness(py: Python<'_>, data: Vec<f32>, sample_rate: f32, mode: &str) -> PyResult<Py<PyDict>> {
+pub fn py_analyze_consciousness(
+    py: Python<'_>,
+    data: Vec<f32>,
+    sample_rate: f32,
+    mode: &str,
+) -> PyResult<Py<PyDict>> {
     let analysis_mode = match mode.to_lowercase().as_str() {
         "auto" => AnalysisMode::Auto,
         "trilogy" => AnalysisMode::Trilogy,
@@ -239,9 +290,12 @@ pub fn py_analyze_consciousness(py: Python<'_>, data: Vec<f32>, sample_rate: f32
         "flow" => AnalysisMode::Flow,
         "engagement" => AnalysisMode::Engagement,
         "extended" => AnalysisMode::Extended,
-        _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("Unknown mode: {}. Valid modes: auto, trilogy, emotion, sleep, meditation, attention, flow, engagement, extended", mode)
-        )),
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unknown mode: {}. Valid modes: auto, trilogy, emotion, sleep, meditation, attention, flow, engagement, extended",
+                mode
+            )));
+        }
     };
 
     match analyze_consciousness(&data, sample_rate, analysis_mode) {
@@ -280,15 +334,23 @@ pub fn py_analyze_consciousness(py: Python<'_>, data: Vec<f32>, sample_rate: f32
             }
 
             Ok(dict.unbind())
-        },
-        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))),
+        }
+        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+            "{}",
+            e
+        ))),
     }
 }
 
 /// Analyze with Extended Proofs (all six Sentinels)
 #[pyfunction]
 #[pyo3(name = "analyze_extended", signature = (data, sample_rate, mode = "extended"))]
-pub fn py_analyze_extended(py: Python<'_>, data: Vec<f32>, sample_rate: f32, mode: &str) -> PyResult<Py<PyDict>> {
+pub fn py_analyze_extended(
+    py: Python<'_>,
+    data: Vec<f32>,
+    sample_rate: f32,
+    mode: &str,
+) -> PyResult<Py<PyDict>> {
     let analysis_mode = match mode.to_lowercase().as_str() {
         "attention" => AnalysisMode::Attention,
         "flow" => AnalysisMode::Flow,
@@ -366,8 +428,11 @@ pub fn py_analyze_extended(py: Python<'_>, data: Vec<f32>, sample_rate: f32, mod
             }
 
             Ok(dict.unbind())
-        },
-        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))),
+        }
+        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+            "{}",
+            e
+        ))),
     }
 }
 

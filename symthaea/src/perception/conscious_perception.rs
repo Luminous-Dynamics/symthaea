@@ -62,8 +62,8 @@ use crate::perception::{
     ImageCaption, ImageEmbedding, ModalityType, MultiModalPerception, OcrSystem, PerceptionInput,
     SemanticVision, VisionConfig, VisualCortex, VisualCortexConfig, VisualFeatures,
 };
-use symthaea_core::hdc::causal_mind::{CausalMind, GroundedCausalLearning};
 use symthaea_core::hdc::ContinuousHV as HdcVector;
+use symthaea_core::hdc::causal_mind::{CausalMind, GroundedCausalLearning};
 
 /// Configuration for the conscious perception system
 #[derive(Debug, Clone)]
@@ -813,9 +813,11 @@ mod tests {
         assert!(result.text.is_some());
         assert_eq!(perception.stats.texts_processed, 1);
         assert!(!result.used_fallback);
-        assert!(result
-            .capabilities_used
-            .contains(&"text_encoding".to_string()));
+        assert!(
+            result
+                .capabilities_used
+                .contains(&"text_encoding".to_string())
+        );
     }
 
     #[test]
@@ -887,12 +889,16 @@ mod tests {
         let result = perception.perceive_image(&image).unwrap();
 
         assert!(!result.capabilities_used.is_empty());
-        assert!(result
-            .capabilities_used
-            .contains(&"visual_features".to_string()));
-        assert!(result
-            .capabilities_used
-            .contains(&"image_embedding".to_string()));
+        assert!(
+            result
+                .capabilities_used
+                .contains(&"visual_features".to_string())
+        );
+        assert!(
+            result
+                .capabilities_used
+                .contains(&"image_embedding".to_string())
+        );
         assert!(result.coherence_score.is_some());
     }
 

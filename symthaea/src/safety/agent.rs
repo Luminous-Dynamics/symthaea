@@ -704,10 +704,10 @@ mod tests {
 
     #[test]
     fn test_assess_snapshot_healthy() {
+        use crate::cognitive_loop::ActionHint;
         use crate::cognitive_loop::drives::SelfAssessment;
         use crate::cognitive_loop::routing::CognitiveDepth;
         use crate::cognitive_loop::snapshot::ConsciousnessSnapshot;
-        use crate::cognitive_loop::ActionHint;
         use crate::consciousness::consciousness_unification::{EmotionalPattern, UnifiedEmotion};
         use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
@@ -780,10 +780,10 @@ mod tests {
 
     #[test]
     fn test_assess_snapshot_nan_clamped() {
+        use crate::cognitive_loop::ActionHint;
         use crate::cognitive_loop::drives::SelfAssessment;
         use crate::cognitive_loop::routing::CognitiveDepth;
         use crate::cognitive_loop::snapshot::ConsciousnessSnapshot;
-        use crate::cognitive_loop::ActionHint;
         use crate::consciousness::consciousness_unification::{EmotionalPattern, UnifiedEmotion};
         use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
@@ -950,10 +950,11 @@ mod tests {
     fn test_green_reasons_message() {
         let mut agent = SafetyAgent::new();
         let a = agent.assess(metrics(0.8, 0.1, 0.7));
-        assert!(a
-            .reasons
-            .iter()
-            .any(|r| r.contains("all metrics within normal range")));
+        assert!(
+            a.reasons
+                .iter()
+                .any(|r| r.contains("all metrics within normal range"))
+        );
     }
 
     #[test]

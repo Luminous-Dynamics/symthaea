@@ -1848,7 +1848,7 @@ pub fn train_with_adam(
             if let Some(parent) = std::path::Path::new(auto_path).parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            
+
             let _ = generator.save_checkpoint(
                 auto_path,
                 epoch,

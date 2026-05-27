@@ -15,11 +15,11 @@
 //! cargo run -p symthaea-atelier --example autopoietic_practice
 //! ```
 
-use symthaea_atelier::critic::{auto_improve, PerceptualInput, SelfCritic};
-use symthaea_atelier::{create_artwork, AtelierConfig};
+use symthaea_atelier::critic::{PerceptualInput, SelfCritic, auto_improve};
+use symthaea_atelier::{AtelierConfig, create_artwork};
 use symthaea_canvas::CognitiveSnapshot;
 use symthaea_gallery::evolution::analyze_evolution;
-use symthaea_gallery::style::{compute_style, StyleEmbedding};
+use symthaea_gallery::style::{StyleEmbedding, compute_style};
 use symthaea_gallery::{ArtModality, GalleryEntry, GalleryIndex};
 
 fn main() {
@@ -167,9 +167,15 @@ fn main() {
         style.vector[6],
         style.vector[7]
     );
-    println!("    Aesthetic means: order={:.2}, complexity={:.2}, surprise={:.2}, harmony={:.2}, birkhoff={:.2}, composite={:.2}",
-        style.vector[8], style.vector[9], style.vector[10], style.vector[11],
-        style.vector[12], style.vector[13]);
+    println!(
+        "    Aesthetic means: order={:.2}, complexity={:.2}, surprise={:.2}, harmony={:.2}, birkhoff={:.2}, composite={:.2}",
+        style.vector[8],
+        style.vector[9],
+        style.vector[10],
+        style.vector[11],
+        style.vector[12],
+        style.vector[13]
+    );
     println!(
         "    Score trend:     {:.3} (>0.5 = improving)",
         style.vector[14]

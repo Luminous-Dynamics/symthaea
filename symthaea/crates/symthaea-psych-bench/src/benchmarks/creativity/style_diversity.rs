@@ -51,9 +51,7 @@ impl StyleDiversityBenchmark {
         let mut rng_state = config.seed.wrapping_add(trial_idx as u64 * 6991);
 
         // Generate concept seeds (shared across moods — same "material")
-        let concept_seeds: Vec<u64> = (0..n_concepts)
-            .map(|_| next_seed(&mut rng_state))
-            .collect();
+        let concept_seeds: Vec<u64> = (0..n_concepts).map(|_| next_seed(&mut rng_state)).collect();
 
         // Generate outputs from different moods
         let outputs: Vec<BinaryHV> = (0..n_moods)
@@ -72,13 +70,15 @@ impl StyleDiversityBenchmark {
             }
         }
 
-        let mean_dissim =
-            dissimilarities.iter().sum::<f64>() / dissimilarities.len().max(1) as f64;
+        let mean_dissim = dissimilarities.iter().sum::<f64>() / dissimilarities.len().max(1) as f64;
 
         // Variance of dissimilarities (low variance = consistent diversity, not random)
         let var = if dissimilarities.len() > 1 {
             let mean = mean_dissim;
-            dissimilarities.iter().map(|d| (d - mean).powi(2)).sum::<f64>()
+            dissimilarities
+                .iter()
+                .map(|d| (d - mean).powi(2))
+                .sum::<f64>()
                 / (dissimilarities.len() - 1) as f64
         } else {
             0.0

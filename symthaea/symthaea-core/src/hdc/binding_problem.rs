@@ -189,16 +189,18 @@ impl BoundObject {
     /// Compute synchrony from phase coherence
     fn compute_synchrony(features: &[FeatureValue]) -> f64 {
         if features.len() < 2 {
-            return 1.0;  // Single feature = perfectly synchronized
+            return 1.0; // Single feature = perfectly synchronized
         }
 
         // Measure phase coherence (circular variance)
-        let mean_cos: f64 = features.iter().map(|f| f.phase.cos()).sum::<f64>() / features.len() as f64;
-        let mean_sin: f64 = features.iter().map(|f| f.phase.sin()).sum::<f64>() / features.len() as f64;
+        let mean_cos: f64 =
+            features.iter().map(|f| f.phase.cos()).sum::<f64>() / features.len() as f64;
+        let mean_sin: f64 =
+            features.iter().map(|f| f.phase.sin()).sum::<f64>() / features.len() as f64;
 
         // Resultant vector length = synchrony measure
         let r = (mean_cos * mean_cos + mean_sin * mean_sin).sqrt();
-        r  // [0,1]: 1 = perfect synchrony, 0 = random phases
+        r // [0,1]: 1 = perfect synchrony, 0 = random phases
     }
 
     /// Check if object is consciously perceived (bound + synchronized)
@@ -257,8 +259,8 @@ impl Default for BindingConfig {
             synchrony_threshold: 0.7,
             binding_threshold: 0.5,
             attention_binding: true,
-            gamma_frequency: 40.0,  // Typical gamma
-            window_ms: 25.0,         // ~40 Hz period
+            gamma_frequency: 40.0, // Typical gamma
+            window_ms: 25.0,       // ~40 Hz period
         }
     }
 }
@@ -308,7 +310,8 @@ impl BindingSystem {
 
         // Create bound objects from synchronized groups
         for group in groups {
-            if group.len() > 1 {  // Need at least 2 features to bind
+            if group.len() > 1 {
+                // Need at least 2 features to bind
                 let bound = BoundObject::from_features(group);
                 self.bound_objects.push(bound);
             }
@@ -345,8 +348,9 @@ impl BindingSystem {
                 }
 
                 // Check phase proximity
-                let phase_diff = (self.unbound_features[i].phase - self.unbound_features[j].phase).abs();
-                let synchronized = phase_diff < 0.2;  // Threshold for synchrony
+                let phase_diff =
+                    (self.unbound_features[i].phase - self.unbound_features[j].phase).abs();
+                let synchronized = phase_diff < 0.2; // Threshold for synchrony
 
                 if synchronized {
                     group.push(self.unbound_features[j].clone());
@@ -362,40 +366,49 @@ impl BindingSystem {
 
     /// Assess binding state
     fn assess(&self) -> BindingAssessment {
-        let total_features: usize = self.bound_objects.iter()
+        let total_features: usize = self
+            .bound_objects
+            .iter()
             .map(|obj| obj.features.len())
             .sum();
 
         let bound_objects = self.bound_objects.len();
 
         let avg_binding_strength = if !self.bound_objects.is_empty() {
-            self.bound_objects.iter().map(|obj| obj.binding_strength).sum::<f64>()
+            self.bound_objects
+                .iter()
+                .map(|obj| obj.binding_strength)
+                .sum::<f64>()
                 / self.bound_objects.len() as f64
         } else {
             0.0
         };
 
         let avg_synchrony = if !self.bound_objects.is_empty() {
-            self.bound_objects.iter().map(|obj| obj.synchrony).sum::<f64>()
+            self.bound_objects
+                .iter()
+                .map(|obj| obj.synchrony)
+                .sum::<f64>()
                 / self.bound_objects.len() as f64
         } else {
             0.0
         };
 
-        let conscious_objects = self.bound_objects.iter()
+        let conscious_objects = self
+            .bound_objects
+            .iter()
             .filter(|obj| obj.is_conscious())
             .count();
 
         // Detect illusory conjunctions (low synchrony but bound)
-        let illusory_conjunctions = self.bound_objects.iter()
+        let illusory_conjunctions = self
+            .bound_objects
+            .iter()
             .filter(|obj| obj.synchrony < 0.5 && obj.binding_strength > 0.3)
             .count();
 
-        let explanation = self.generate_explanation(
-            conscious_objects,
-            illusory_conjunctions,
-            avg_synchrony,
-        );
+        let explanation =
+            self.generate_explanation(conscious_objects, illusory_conjunctions, avg_synchrony);
 
         BindingAssessment {
             total_features,
@@ -409,12 +422,7 @@ impl BindingSystem {
     }
 
     /// Generate human-readable explanation
-    fn generate_explanation(
-        &self,
-        conscious: usize,
-        illusory: usize,
-        synchrony: f64,
-    ) -> String {
+    fn generate_explanation(&self, conscious: usize, illusory: usize, synchrony: f64) -> String {
         let mut parts = Vec::new();
 
         if conscious > 0 {
@@ -456,22 +464,15 @@ mod tests {
 
     #[test]
     fn test_feature_value_creation() {
-        let feature = FeatureValue::new(
-            FeatureDimension::Color,
-            BinaryHV::ones(),
-            0.8,
-        );
+        let feature = FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.8);
         assert_eq!(feature.dimension, FeatureDimension::Color);
         assert_eq!(feature.activation, 0.8);
     }
 
     #[test]
     fn test_feature_with_phase() {
-        let feature = FeatureValue::new(
-            FeatureDimension::Color,
-            BinaryHV::ones(),
-            0.8,
-        ).with_phase(0.5);
+        let feature =
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.8).with_phase(0.5);
 
         assert_eq!(feature.phase, 0.5);
     }
@@ -491,36 +492,30 @@ mod tests {
     #[test]
     fn test_perfect_synchrony() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
-                .with_phase(0.0),
-            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
-                .with_phase(0.0),  // Same phase = synchronized
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9).with_phase(0.0),
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8).with_phase(0.0), // Same phase = synchronized
         ];
 
         let bound = BoundObject::from_features(features);
-        assert!(bound.synchrony > 0.95);  // Near perfect
+        assert!(bound.synchrony > 0.95); // Near perfect
     }
 
     #[test]
     fn test_no_synchrony() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
-                .with_phase(0.0),
-            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
-                .with_phase(3.14),  // Opposite phase = desynchronized
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9).with_phase(0.0),
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8).with_phase(3.14), // Opposite phase = desynchronized
         ];
 
         let bound = BoundObject::from_features(features);
-        assert!(bound.synchrony < 0.5);  // Low synchrony
+        assert!(bound.synchrony < 0.5); // Low synchrony
     }
 
     #[test]
     fn test_conscious_object() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
-                .with_phase(0.0),
-            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
-                .with_phase(0.1),  // Slightly different but synchronized
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9).with_phase(0.0),
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8).with_phase(0.1), // Slightly different but synchronized
         ];
 
         let bound = BoundObject::from_features(features);
@@ -537,11 +532,7 @@ mod tests {
     #[test]
     fn test_detect_feature() {
         let mut system = BindingSystem::new(BindingConfig::default());
-        let feature = FeatureValue::new(
-            FeatureDimension::Color,
-            BinaryHV::ones(),
-            0.8,
-        );
+        let feature = FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.8);
         system.detect_feature(feature);
 
         assert_eq!(system.unbound_features.len(), 1);
@@ -553,12 +544,10 @@ mod tests {
 
         // Add synchronized features
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
-                .with_phase(0.0)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9).with_phase(0.0),
         );
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
-                .with_phase(0.1)  // Close phase
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8).with_phase(0.1), // Close phase
         );
 
         let assessment = system.bind();
@@ -574,27 +563,27 @@ mod tests {
 
         // Add desynchronized features
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
-                .with_phase(0.0)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9).with_phase(0.0),
         );
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
-                .with_phase(3.0)  // Far phase
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8).with_phase(3.0), // Far phase
         );
 
         let assessment = system.bind();
 
         // Should NOT bind (different groups)
         // Each feature forms its own "group" (singleton)
-        assert_eq!(assessment.bound_objects, 0);  // Singles discarded (need >= 2 to bind)
+        assert_eq!(assessment.bound_objects, 0); // Singles discarded (need >= 2 to bind)
     }
 
     #[test]
     fn test_clear() {
         let mut system = BindingSystem::new(BindingConfig::default());
-        system.detect_feature(
-            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.8)
-        );
+        system.detect_feature(FeatureValue::new(
+            FeatureDimension::Color,
+            BinaryHV::ones(),
+            0.8,
+        ));
         system.bind();
 
         system.clear();

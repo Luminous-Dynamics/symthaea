@@ -13,8 +13,8 @@ use symthaea_psych_bench::benchmarks::qualia_confidence::{
     PerturbationalComplexityBenchmark, PhaseTransitionBenchmark, QualiaConfidenceScore,
     SomaticInterferenceBenchmark, UnconsciousPrimingBenchmark,
 };
-use symthaea_psych_bench::harness::config::BenchmarkConfig;
 use symthaea_psych_bench::harness::PsychBenchmark;
+use symthaea_psych_bench::harness::config::BenchmarkConfig;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

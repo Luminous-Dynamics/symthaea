@@ -11,7 +11,7 @@
 
 #[cfg(any(feature = "multirotor-mujoco", feature = "flight-mujoco"))]
 fn main() {
-    use symthaea::multirotor::scenarios::{run_kinetic_sacrifice, KineticSacrificeConfig};
+    use symthaea::multirotor::scenarios::{KineticSacrificeConfig, run_kinetic_sacrifice};
 
     println!("The Kinetic Sacrifice — FEP-Emergent Moral Reasoning");
     println!();

@@ -11,10 +11,10 @@
 //!
 //! Science: Clark (1937) — Occupancy theory; Hill (1910) — dose-response curves.
 
+use crate::harness::PsychBenchmark;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
-use crate::harness::PsychBenchmark;
 use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 

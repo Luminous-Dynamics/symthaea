@@ -16,7 +16,7 @@
 //! # Output: data/muse_wav/01_contentment.wav, 02_excitement.wav, etc.
 //! ```
 
-use symthaea_muse::{compose, export, MuseConfig, MusicalState};
+use symthaea_muse::{MuseConfig, MusicalState, compose, export};
 
 struct Phase {
     name: &'static str,

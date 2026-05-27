@@ -598,23 +598,29 @@ mod tests {
         assert_eq!(cmd, "sh");
 
         // Commands without rollback
-        assert!(NixOSCommand::Search {
-            query: "x".into(),
-            json: false
-        }
-        .rollback_command()
-        .is_none());
-        assert!(NixOSCommand::CollectGarbage {
-            older_than_days: None,
-            delete_all: false
-        }
-        .rollback_command()
-        .is_none());
-        assert!(NixOSCommand::Channel {
-            operation: ChannelOperation::List
-        }
-        .rollback_command()
-        .is_none());
+        assert!(
+            NixOSCommand::Search {
+                query: "x".into(),
+                json: false
+            }
+            .rollback_command()
+            .is_none()
+        );
+        assert!(
+            NixOSCommand::CollectGarbage {
+                older_than_days: None,
+                delete_all: false
+            }
+            .rollback_command()
+            .is_none()
+        );
+        assert!(
+            NixOSCommand::Channel {
+                operation: ChannelOperation::List
+            }
+            .rollback_command()
+            .is_none()
+        );
     }
 
     #[tokio::test]

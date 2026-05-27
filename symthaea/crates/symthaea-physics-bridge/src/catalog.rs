@@ -14,13 +14,13 @@
 
 use crate::dimensional::DimensionalEncoder;
 use crate::equation_ast::{
-    make_const, make_diffop, make_equals, make_field, make_product, make_sum, EquationEncoder,
+    EquationEncoder, make_const, make_diffop, make_equals, make_field, make_product, make_sum,
 };
 use crate::recognize::expr_to_equation_node;
 use crate::symmetry::SymmetryEncoder;
 use crate::types::*;
-use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 /// Build a complete catalog entry `ast` (LHS + RHS wrapped in Equals) from a
 /// ConjectureEngine `Expr`, routing through the same `expr_to_equation_node`
@@ -5175,9 +5175,11 @@ mod tests {
     fn spark_engine_equations_present() {
         let catalog = PhysicsCatalog::new();
         assert!(catalog.find_by_name("Gamow Peak Integral").is_some());
-        assert!(catalog
-            .find_by_name("Coulomb Screening Enhancement")
-            .is_some());
+        assert!(
+            catalog
+                .find_by_name("Coulomb Screening Enhancement")
+                .is_some()
+        );
         assert!(catalog.find_by_name("D-D Branching Ratio").is_some());
         assert!(catalog.find_by_name("Thermal-Gamow Coupling").is_some());
     }

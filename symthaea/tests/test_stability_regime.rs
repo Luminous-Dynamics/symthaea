@@ -7,9 +7,9 @@ use symthaea::consciousness::primitive_consciousness::ConsciousnessPrimitiveProc
 use symthaea::consciousness::stability_regime::{
     CfCPrimitive, StabilityRegimeConfig, StabilityRegimeProcessor, StabilityRegimeType,
 };
+use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveTier};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::BinaryHV;
 
 fn make_prim(name: &str, tier: PrimitiveTier) -> Primitive {
     Primitive {

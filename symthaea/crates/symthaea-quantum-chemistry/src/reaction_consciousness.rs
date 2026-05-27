@@ -13,7 +13,7 @@
 
 use crate::molecule::{Atom, Molecule};
 use crate::multi_theory::{
-    compute_theory_scores, theory_correlation_matrix, TheoryScores, N_THEORIES,
+    N_THEORIES, TheoryScores, compute_theory_scores, theory_correlation_matrix,
 };
 
 /// A single point on the reaction-consciousness curve.
@@ -240,11 +240,7 @@ fn pearson(x: &[f64], y: &[f64]) -> f64 {
         return 0.0;
     }
     let r = cov / (vx * vy).sqrt();
-    if r.is_nan() {
-        0.0
-    } else {
-        r.clamp(-1.0, 1.0)
-    }
+    if r.is_nan() { 0.0 } else { r.clamp(-1.0, 1.0) }
 }
 
 #[cfg(test)]

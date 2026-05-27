@@ -4,10 +4,10 @@
 //! Inspect the frequency signatures learned from audio files
 
 use symthaea_sentinel::{
-    compute_ioi_variance, compute_mfcc, compute_onset_strength, compute_spectral_centroid,
-    compute_spectral_flatness, compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory,
-    AudioFeatures, AudioSentinel, FileAudioConfig, FileAudioPump, CONTROL_RATE, FREQ_BINS,
-    MEL_BANDS,
+    AudioCategory, AudioFeatures, AudioSentinel, CONTROL_RATE, FREQ_BINS, FileAudioConfig,
+    FileAudioPump, MEL_BANDS, compute_ioi_variance, compute_mfcc, compute_onset_strength,
+    compute_spectral_centroid, compute_spectral_flatness, compute_temporal_regularity,
+    spectrum_to_mel_bands,
 };
 
 fn process_and_learn(path: &str, name: &str, sentinel: &mut AudioSentinel) {

@@ -35,23 +35,21 @@ use std::time::{Duration, Instant};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph, Wrap},
-    Frame, Terminal,
 };
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use symthaea::action::DestructivenessLevel;
 use symthaea::shell::{
-    classify_command_destructiveness,
-    ipc_client::{discover_socket, ConnectionState, MetricsSnapshot, ShellIpcClient},
     CommandContext,
     Completion,
     CompletionKind,
@@ -77,6 +75,8 @@ use symthaea::shell::{
     WhatIfResult,
     // B9: What-If Simulation
     WhatIfSimulator,
+    classify_command_destructiveness,
+    ipc_client::{ConnectionState, MetricsSnapshot, ShellIpcClient, discover_socket},
 };
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
@@ -882,7 +882,7 @@ impl App {
                             });
                             // Fall back to local simulation
                             let drift_raw: f64 = if let Some(ref mut rng) = self.viz_rng {
-                                rand::Rng::gen(rng)
+                                rand::Rng::r#gen(rng)
                             } else {
                                 rand::random::<f64>()
                             };
@@ -908,7 +908,7 @@ impl App {
         } else {
             // Local mode: Natural Phi drift simulation
             let drift_raw: f64 = if let Some(ref mut rng) = self.viz_rng {
-                rand::Rng::gen(rng)
+                rand::Rng::r#gen(rng)
             } else {
                 rand::random::<f64>()
             };

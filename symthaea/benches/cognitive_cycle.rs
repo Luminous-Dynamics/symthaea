@@ -17,7 +17,7 @@
 //! cargo bench --bench cognitive_cycle -- --save-baseline main
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
 
 /// Warm up a service by running a few cycles

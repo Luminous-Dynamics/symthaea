@@ -88,7 +88,7 @@ pub fn apply_grammar(
     if ctx.phrase_position > 0.85 && !chord_tones.is_empty() {
         let root = chord_tones[0]; // resolve to root
         let leading_tone = root / 2.0f32.powf(1.0 / 12.0); // half step below
-                                                           // If we're close to phrase end, move toward the leading tone
+        // If we're close to phrase end, move toward the leading tone
         if ctx.phrase_position > 0.92 {
             return nearest(root, chord_tones, scale_tones); // final resolution
         }
@@ -165,17 +165,9 @@ fn preferred_direction(ctx: &MelodicContext, seed: u32) -> i32 {
     } else {
         // Random with slight ascending bias (melodies tend to rise then fall)
         if ctx.phrase_position < 0.5 {
-            if (seed >> 8) % 3 < 2 {
-                1
-            } else {
-                -1
-            } // 67% ascending in first half
+            if (seed >> 8) % 3 < 2 { 1 } else { -1 } // 67% ascending in first half
         } else {
-            if (seed >> 8) % 3 < 2 {
-                -1
-            } else {
-                1
-            } // 67% descending in second half
+            if (seed >> 8) % 3 < 2 { -1 } else { 1 } // 67% descending in second half
         }
     }
 }

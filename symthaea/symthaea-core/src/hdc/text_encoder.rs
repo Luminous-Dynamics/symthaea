@@ -23,13 +23,13 @@
 // ==================================================================================
 
 use anyhow::Result;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use super::primitive_system::PrimitiveSystem;
 use super::HDC_DIMENSION;
+use super::primitive_system::PrimitiveSystem;
 
 /// Text encoder configuration
 #[derive(Debug, Clone)]

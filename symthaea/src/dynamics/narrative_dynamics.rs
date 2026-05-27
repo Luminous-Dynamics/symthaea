@@ -27,7 +27,7 @@ use symthaea_core::hdc::ContinuousHV;
 
 use super::hierarchical_cfc::{HierarchicalCfC, HierarchicalCfCConfig};
 use crate::hdc::narrative_algebra::{
-    ArcPhase, NarrativeAlgebra, NarrativeMood, TensionLevel, NARRATIVE_DIM,
+    ArcPhase, NARRATIVE_DIM, NarrativeAlgebra, NarrativeMood, TensionLevel,
 };
 
 // ============================================================================
@@ -668,11 +668,7 @@ impl StoryArcDynamics {
                     | (NarrativeMood::Melancholy, NarrativeMood::Triumphant)
                     | (NarrativeMood::Hopeful, NarrativeMood::Tense)
             );
-            if sharp {
-                1.5
-            } else {
-                1.2
-            }
+            if sharp { 1.5 } else { 1.2 }
         }
     }
 

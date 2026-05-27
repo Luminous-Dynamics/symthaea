@@ -6,7 +6,7 @@
 
 use symthaea_psych_bench::benchmarks::neuromod::*;
 use symthaea_psych_bench::harness::normative_comparison::NormativeReport;
-use symthaea_psych_bench::harness::report::{key_metric_for_benchmark, BenchmarkReport};
+use symthaea_psych_bench::harness::report::{BenchmarkReport, key_metric_for_benchmark};
 use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
 
 #[test]

@@ -130,10 +130,12 @@ fn test_snapshot_round_trip() {
         "Round-trip comparison should have no regressions"
     );
     assert_eq!(report.summary.total_metrics, 2);
-    assert!(report
-        .results
-        .iter()
-        .all(|r| r.severity == RegressionSeverity::Pass));
+    assert!(
+        report
+            .results
+            .iter()
+            .all(|r| r.severity == RegressionSeverity::Pass)
+    );
 
     let _ = std::fs::remove_file(&path);
 }

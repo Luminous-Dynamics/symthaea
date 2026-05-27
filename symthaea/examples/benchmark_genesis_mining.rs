@@ -10,7 +10,7 @@ fn main() {
     println!("=== Genesis Mission Challenge 18: Critical Minerals ===\n");
 
     use symthaea_materials::mining::{
-        MiningHdcEncoder, MiningPredictor, MiningReading, MINING_HORIZONS,
+        MINING_HORIZONS, MiningHdcEncoder, MiningPredictor, MiningReading,
     };
 
     let encoder = MiningHdcEncoder::new();

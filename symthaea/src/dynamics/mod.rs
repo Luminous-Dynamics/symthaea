@@ -260,7 +260,6 @@ pub enum DynamicsError {
 
 // Re-export key types
 pub use cfc::{
-    compute_phi_attention_weights,
     // Activation types
     ActivationType,
     CfCCell,
@@ -272,13 +271,14 @@ pub use cfc::{
     OnlineLearningStats,
     // Phi-gated attention
     PhiGatedConfig,
+    compute_phi_attention_weights,
 };
 pub use cfc_coherence::{
     CfCCoherenceBridge, CoherenceConfig, CoherenceSummary, TemporalCoherenceMetrics,
 };
 pub use cfc_gpu::{GpuBackend, GpuCfcConfig, GpuCfcNetwork, GpuCfcStats};
 pub use hierarchical_cfc::{
-    HierarchicalCfC, HierarchicalCfCConfig, HierarchicalOutput, DEFAULT_TIME_CONSTANTS,
+    DEFAULT_TIME_CONSTANTS, HierarchicalCfC, HierarchicalCfCConfig, HierarchicalOutput,
 };
 pub use temporal_signatures::{
     ConsciousnessPattern, SignatureConfig, TemporalSignatureEncoder, TemporalStateSummary,
@@ -306,7 +306,7 @@ pub use stability_analysis::{
 };
 
 // ODE solvers for continuous-time neural dynamics
-pub use ode_solvers::{newton_solve, OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
+pub use ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem, newton_solve};
 
 // Frequency-domain spectral analysis
 pub use spectral_analysis::{

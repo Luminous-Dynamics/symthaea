@@ -13,7 +13,7 @@ use symthaea::dynamics::narrative_dynamics::NarrativeSignal;
 use symthaea::dynamics::story_session::StorySession;
 use symthaea::hdc::narrative_algebra::NarrativeMood;
 use symthaea::language::narrative_compiler::{
-    generate_narrative, NarrativeThought, PointOfView, TargetLength, Tense,
+    NarrativeThought, PointOfView, TargetLength, Tense, generate_narrative,
 };
 
 fn print_signal(label: &str, signal: &NarrativeSignal) {

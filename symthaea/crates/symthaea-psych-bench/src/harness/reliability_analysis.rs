@@ -14,9 +14,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::PsychBenchmark;
 use super::config::BenchmarkConfig;
 use super::report::key_metric_for_benchmark;
-use super::PsychBenchmark;
 
 // ──── Practice direction ────
 
@@ -282,11 +282,11 @@ impl ReliabilityBattery {
                 let subject_noise = base_config.encoding_noise + t * 0.30;
                 let subject_wm = 4 + ((1.0 - t) * 5.0) as usize; // 9 down to 4
                 let subject_dim = 256 + ((1.0 - t) * 768.0) as usize; // 1024 down to 256
-                                                                      // Attention lapse rate: models individual differences in sustained
-                                                                      // attention (Wichmann & Hill, 2001). This is the primary driver of
-                                                                      // between-subject variance in psychometric reliability. Ranges from
-                                                                      // 0% (perfect attention) to 20% (high lapse rate), creating stable
-                                                                      // individual differences that persist across sessions.
+                // Attention lapse rate: models individual differences in sustained
+                // attention (Wichmann & Hill, 2001). This is the primary driver of
+                // between-subject variance in psychometric reliability. Ranges from
+                // 0% (perfect attention) to 20% (high lapse rate), creating stable
+                // individual differences that persist across sessions.
                 let subject_lapse = t * 0.25; // 0.0 to 0.25
                 for (s, session) in session_data.iter_mut().enumerate().take(n_sessions) {
                     let config = BenchmarkConfig {

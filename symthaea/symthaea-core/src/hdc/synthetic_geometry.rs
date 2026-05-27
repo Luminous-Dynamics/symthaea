@@ -937,14 +937,16 @@ mod tests {
         s.add_fact(GeomPredicate::Midpoint("M".into(), "A".into(), "B".into()));
         let added = s.saturate(10);
         assert!(added >= 2, "expected collinear + equal-length derivations");
-        assert!(s
-            .facts
-            .iter()
-            .any(|f| matches!(f, GeomPredicate::Collinear(_, _, _))));
-        assert!(s
-            .facts
-            .iter()
-            .any(|f| matches!(f, GeomPredicate::EqualLength(_, _, _, _))));
+        assert!(
+            s.facts
+                .iter()
+                .any(|f| matches!(f, GeomPredicate::Collinear(_, _, _)))
+        );
+        assert!(
+            s.facts
+                .iter()
+                .any(|f| matches!(f, GeomPredicate::EqualLength(_, _, _, _)))
+        );
         assert!(s.facts_consistent());
     }
 
@@ -995,10 +997,11 @@ mod tests {
         ));
         let added = s.saturate(10);
         assert!(added > 0, "inscribed-angle rule should fire");
-        assert!(s
-            .facts
-            .iter()
-            .any(|f| matches!(f, GeomPredicate::AngleEq(_, _, _, _, _, _))));
+        assert!(
+            s.facts
+                .iter()
+                .any(|f| matches!(f, GeomPredicate::AngleEq(_, _, _, _, _, _)))
+        );
         assert!(s.facts_consistent());
     }
 

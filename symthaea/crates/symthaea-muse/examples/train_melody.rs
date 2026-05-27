@@ -8,15 +8,17 @@
 //! ```
 
 use std::path::Path;
-use symthaea_muse::training::{save_projections, train_projections, TrainingConfig};
 use symthaea_muse::MuseConfig;
+use symthaea_muse::training::{TrainingConfig, save_projections, train_projections};
 
 fn main() {
     let maestro_dir = Path::new("data/midi-training/maestro/maestro-v3.0.0");
 
     if !maestro_dir.exists() {
         eprintln!("MAESTRO dataset not found at {:?}", maestro_dir);
-        eprintln!("Download: wget https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip");
+        eprintln!(
+            "Download: wget https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
+        );
         return;
     }
 

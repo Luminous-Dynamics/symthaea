@@ -10,8 +10,8 @@
 //! - Unbinding for reverse translation
 
 use super::widget_mapper::{NixPath, WidgetBinding, WidgetId};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 

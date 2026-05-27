@@ -12,7 +12,7 @@
 //!
 //! Without arguments, runs the 5-prompt user-authorized demo set.
 
-use symthaea::language::nix_codegen::{classify_nix_intent, generate_nix, NixGenSource};
+use symthaea::language::nix_codegen::{NixGenSource, classify_nix_intent, generate_nix};
 
 fn print_separator(title: &str) {
     println!("\n┌─────────────────────────────────────────────────────────");

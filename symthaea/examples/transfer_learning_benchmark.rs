@@ -27,7 +27,7 @@ fn main() {
 fn run_benchmark() {
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::{
-        ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
+        ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
     };
     use symthaea_humanoid::training::{EpisodeMetrics, HumanoidTrainer};
     use symthaea_humanoid::transfer::MorphologicalTransfer;
@@ -44,7 +44,9 @@ fn run_benchmark() {
     let mastery_threshold = 0.5; // Standing reward threshold for "mastery"
     let mastery_streak = 3; // Consecutive episodes above threshold
 
-    println!("  Seeds: {n_seeds}, Episodes: {n_episodes}, Mastery: >{mastery_threshold} for {mastery_streak} consecutive");
+    println!(
+        "  Seeds: {n_seeds}, Episodes: {n_episodes}, Mastery: >{mastery_threshold} for {mastery_streak} consecutive"
+    );
     println!();
 
     let mut transfer_curves: Vec<Vec<f64>> = Vec::new();

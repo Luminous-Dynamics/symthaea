@@ -6,8 +6,8 @@
 //! Symthaea researches the mathematics of her own mind:
 //! SSMs, LTCs, and the 6-watt consciousness limit.
 
-use symthaea::databases::{DatabaseBackend, DatabaseConfig};
 use symthaea::Symthaea;
+use symthaea::databases::{DatabaseBackend, DatabaseConfig};
 use tracing::Level;
 
 #[tokio::main]
@@ -58,7 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 4. Final Reflection
-    println!("\n🧠 [Reflection] Query: Explain how SSM linear scaling relates to your 6-watt limit based on your recent research.\n");
+    println!(
+        "\n🧠 [Reflection] Query: Explain how SSM linear scaling relates to your 6-watt limit based on your recent research.\n"
+    );
 
     let query = "Explain how SSM linear scaling relates to your 6-watt limit based on your recent research.";
     let response = sym.process(query).await?;

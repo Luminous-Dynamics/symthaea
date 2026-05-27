@@ -387,11 +387,7 @@ impl PacAnalyzer {
         let mvl = (mean_re * mean_re + mean_im * mean_im).sqrt();
         let mean_amp = sum_amp / len as f64;
 
-        if mean_amp > 0.0 {
-            mvl / mean_amp
-        } else {
-            0.0
-        }
+        if mean_amp > 0.0 { mvl / mean_amp } else { 0.0 }
     }
 
     // -----------------------------------------------------------------------

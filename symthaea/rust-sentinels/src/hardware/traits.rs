@@ -253,7 +253,10 @@ pub trait EegDevice: Send {
 
     /// Check if device is connected
     fn is_connected(&self) -> bool {
-        matches!(self.get_state(), DeviceState::Connected | DeviceState::Streaming)
+        matches!(
+            self.get_state(),
+            DeviceState::Connected | DeviceState::Streaming
+        )
     }
 
     /// Get channel information
@@ -287,7 +290,8 @@ pub trait EegDevice: Send {
 
         // Flatten to single channel (channel 0) for simplicity
         // In practice, you'd want to handle multi-channel data differently
-        Ok(samples.iter()
+        Ok(samples
+            .iter()
             .filter_map(|s| s.channels.first().copied())
             .collect())
     }

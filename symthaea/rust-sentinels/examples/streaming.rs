@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Streaming analysis example - simulates real-time EEG processing
 
-use sentinels::{analyze_consciousness, AnalysisMode};
+use sentinels::{AnalysisMode, analyze_consciousness};
 use std::time::{Duration, Instant};
 
 fn main() {
@@ -21,7 +21,10 @@ fn main() {
     println!("Epoch Duration: {} seconds", epoch_duration);
     println!("Total Epochs: {}", n_epochs);
     println!();
-    println!("{:<8} {:<15} {:<12} {:<12}", "Epoch", "State", "Conscious", "Wellbeing");
+    println!(
+        "{:<8} {:<15} {:<12} {:<12}",
+        "Epoch", "State", "Conscious", "Wellbeing"
+    );
     println!("{}", "-".repeat(50));
 
     for epoch in 0..n_epochs {

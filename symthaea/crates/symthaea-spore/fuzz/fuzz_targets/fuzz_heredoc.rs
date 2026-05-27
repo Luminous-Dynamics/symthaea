@@ -11,8 +11,12 @@ fuzz_target!(|data: &str| {
         let result = sanitize_heredoc(data, delim);
         // Invariant: no line in the output should be exactly the delimiter
         for line in result.lines() {
-            assert_ne!(line.trim(), *delim,
-                "sanitize_heredoc failed to strip delimiter '{}' from input", delim);
+            assert_ne!(
+                line.trim(),
+                *delim,
+                "sanitize_heredoc failed to strip delimiter '{}' from input",
+                delim
+            );
         }
     }
 });

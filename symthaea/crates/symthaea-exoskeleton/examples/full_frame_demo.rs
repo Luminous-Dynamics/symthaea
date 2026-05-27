@@ -21,7 +21,7 @@
 
 use symthaea_exoskeleton::full_frame::{FullFrameSimulator, HumanLoadModel, NUM_FULL_FRAME_JOINTS};
 use symthaea_exoskeleton::hal_bridge::{
-    full_frame_to_humanoid_command, run_bridged_session, HalBridgeConfig,
+    HalBridgeConfig, full_frame_to_humanoid_command, run_bridged_session,
 };
 
 fn main() {

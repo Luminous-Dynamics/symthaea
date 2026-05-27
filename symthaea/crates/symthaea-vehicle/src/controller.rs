@@ -12,10 +12,10 @@
 use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
-    ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig, HDC_DIMENSION,
+    ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
-use crate::types::{VehicleCommand, VehicleConfig, ACT_STEERING, NUM_ACTUATORS};
+use crate::types::{ACT_STEERING, NUM_ACTUATORS, VehicleCommand, VehicleConfig};
 
 /// Serializable checkpoint for saving/loading trained controllers.
 #[derive(Serialize, Deserialize)]

@@ -119,7 +119,7 @@ fn make_dataset(tok: &BpeTokenizer) -> TrainingDataset {
 fn run_eval(genesis: &GenesisSeed, bench: &BenchRun, dataset: &TrainingDataset) -> EvalResult {
     let mut cfg = base_config();
     (bench.setup)(&mut cfg);
-    let mut gen = BrocaGenerator::new(genesis, cfg);
+    let mut r#gen = BrocaGenerator::new(genesis, cfg);
     let eval_cfg = EvalConfig {
         dataset: dataset.clone(),
         compute_perplexity: true,
@@ -130,7 +130,7 @@ fn run_eval(genesis: &GenesisSeed, bench: &BenchRun, dataset: &TrainingDataset) 
         progress: false,
         compute_contrastive_intent: true,
     };
-    evaluation::evaluate(&mut gen, &eval_cfg)
+    evaluation::evaluate(&mut r#gen, &eval_cfg)
 }
 
 fn print_table(results: &[(&str, EvalResult)]) {
@@ -181,7 +181,7 @@ fn main() {
     if epochs > 0 {
         eprintln!("=== Phase 1: Train baseline ({epochs} epochs), eval with flags ===");
         let cfg = base_config();
-        let mut gen = BrocaGenerator::new(&genesis, cfg);
+        let mut r#gen = BrocaGenerator::new(&genesis, cfg);
         let tc = TrainingConfig {
             epochs,
             learning_rate: 0.01,
@@ -192,7 +192,7 @@ fn main() {
             embedding_target_norm: 128.0,
             ..Default::default()
         };
-        let m = training::train(&mut gen, &dataset, &tc);
+        let m = training::train(&mut r#gen, &dataset, &tc);
         eprintln!(
             "  Final loss: {:.4}\n",
             m.last().map(|m| m.avg_loss).unwrap_or(0.0)
@@ -238,7 +238,7 @@ fn main() {
         cfg.controller.adaptive_compositional_alpha = true;
         cfg.controller.enable_adaptive_dt = true;
         cfg.gating.enable_algebraic_correction = true;
-        let mut gen = BrocaGenerator::new(&genesis, cfg);
+        let mut r#gen = BrocaGenerator::new(&genesis, cfg);
         let tc = TrainingConfig {
             epochs,
             learning_rate: 0.01,
@@ -251,7 +251,7 @@ fn main() {
             fusion_warmup_epochs: epochs / 4, // First 25% without fusion
             ..Default::default()
         };
-        let m = training::train(&mut gen, &dataset, &tc);
+        let m = training::train(&mut r#gen, &dataset, &tc);
         eprintln!(
             "  Fusion-trained final loss: {:.4}",
             m.last().map(|m| m.avg_loss).unwrap_or(0.0)
@@ -277,7 +277,7 @@ fn main() {
             progress: false,
             compute_contrastive_intent: true,
         };
-        let r = evaluation::evaluate(&mut gen, &eval_cfg);
+        let r = evaluation::evaluate(&mut r#gen, &eval_cfg);
         eprintln!(
             "  Fusion-trained eval: ppl={:.1} eng={:.3} coh={:.4}",
             r.perplexity, r.english_word_ratio, r.avg_coherence

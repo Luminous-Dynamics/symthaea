@@ -42,7 +42,7 @@ pub use hippocampus::{
     EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
 };
 pub use memory_coordinator::{
-    content_hash, CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator,
-    MemorySignals, MemorySource,
+    CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
+    MemorySource, content_hash,
 };
 pub use semantic_memory::{SemanticEntry, SemanticMemory, SemanticMemoryStats};
