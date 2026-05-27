@@ -10,6 +10,7 @@
 #[cfg(feature = "analytical")]
 pub mod analytical;
 pub mod autonomy_loop;
+pub mod blueprint;
 pub mod bsp;
 pub mod building;
 pub mod csg;
@@ -39,15 +40,15 @@ pub mod step_import;
 pub use bsp::{csg_intersect, csg_subtract};
 pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};
 pub use export::{export_3mf, export_stl};
-pub use import::{parse_ascii_stl, parse_binary_stl, parse_stl, StlError};
-pub use infill::{generate_infill, generate_infill_for_layer, InfillConfig, InfillPattern};
+pub use import::{StlError, parse_ascii_stl, parse_binary_stl, parse_stl};
+pub use infill::{InfillConfig, InfillPattern, generate_infill, generate_infill_for_layer};
 pub use mesh::TriangleMesh;
 pub use primitives::*;
 pub use simulator::{ForceHV, PhysicsBackend, SimState};
-pub use slicer::{slice_mesh, slice_mesh_at_z, Contour, Point2, Segment2, SliceConfig, SliceLayer};
+pub use slicer::{Contour, Point2, Segment2, SliceConfig, SliceLayer, slice_mesh, slice_mesh_at_z};
 pub use thought::GeometricThought;
-pub use toolpath::{generate_gcode, GCodeCommand, GCodeProgram, ToolpathConfig};
-pub use validate::{validate_mesh, ValidationReport};
+pub use toolpath::{GCodeCommand, GCodeProgram, ToolpathConfig, generate_gcode};
+pub use validate::{ValidationReport, validate_mesh};
 
 pub use cincinnati_live::{
     AnomalyAlert, AnomalyType, ChannelStats, CincinnatiMonitor, CincinnatiMonitorConfig,

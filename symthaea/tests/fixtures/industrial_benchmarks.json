@@ -1,0 +1,32 @@
+[
+  {
+    "id": "DrivAer-Sedan-001",
+    "name": "CAE-ML Automotive",
+    "domain": "Aerospace",
+    "solver": "ComputationalFluidDynamics",
+    "ground_truth": {
+      "drag_coefficient": 0.285
+    },
+    "source": "CAE-ML"
+  },
+  {
+    "id": "Tsunami-Impact-Wall-01",
+    "name": "NHERI Wave Impact",
+    "domain": "Civil",
+    "solver": "FiniteElement",
+    "ground_truth": {
+      "max_drift": 12.5
+    },
+    "source": "NHERI SimCenter"
+  },
+  {
+    "id": "Sky130-Processor-Core",
+    "name": "OpenLane VLSI",
+    "domain": "Electrical",
+    "solver": "Circuit",
+    "ground_truth": {
+      "timing_slack": 0.15
+    },
+    "source": "SkyWater 130nm"
+  }
+]

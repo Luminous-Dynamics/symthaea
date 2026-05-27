@@ -12,6 +12,11 @@ keywords = ["engineering", "reasoning", "simulation", "safety", "digital-twin"]
 categories = ["science", "simulation"]
 
 [dependencies]
+symthaea-materials = { path = "../symthaea-materials" }
+uuid = { version = "1.0", features = ["v4"] }
+serde_json = "1.0"
+
+
 uom.workspace = true
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-broca = { path = "../symthaea-broca" }
@@ -28,4 +33,3 @@ symthaea-swarm = { path = "../symthaea-swarm" }
 symthaea-types = { path = "../symthaea-types" }
 serde = { workspace = true }
 tracing = { workspace = true }
-

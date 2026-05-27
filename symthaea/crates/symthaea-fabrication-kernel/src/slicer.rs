@@ -12,7 +12,7 @@
 //! - Contour closure validation with gap-closing search
 //! - Orientation enforcement (outer CCW, inner CW)
 
-use crate::infill::{generate_infill_for_layer, InfillConfig};
+use crate::infill::{InfillConfig, generate_infill_for_layer};
 use crate::mesh::TriangleMesh;
 use std::collections::HashMap;
 

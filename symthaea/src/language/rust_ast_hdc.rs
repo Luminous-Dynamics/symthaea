@@ -25,9 +25,10 @@ pub struct RustAstHdcEncoding {
 impl RustAstHdcEncoding {
     /// Autonomously synthesize SMT safety gates for this code.
     pub fn derive_code_invariants(&self) -> Vec<String> {
-        self.structural_invariants.iter().map(|inv| {
-            format!("(assert {})", inv)
-        }).collect()
+        self.structural_invariants
+            .iter()
+            .map(|inv| format!("(assert {})", inv))
+            .collect()
     }
 }
 
@@ -444,10 +445,8 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
                     self.bump("semantic:division");
                     let divisor = quote::ToTokens::to_token_stream(&binary.right).to_string();
                     // Automated SMT invariant: (assert (not (= divisor 0)))
-                    self.invariants.push(format!(
-                        "(not (= {} 0))",
-                        normalize_token_text(&divisor)
-                    ));
+                    self.invariants
+                        .push(format!("(not (= {} 0))", normalize_token_text(&divisor)));
                 }
             }
             _ => {}
@@ -689,7 +688,11 @@ mod tests {
 
         assert!(encoded.features.contains_key("semantic:lifetime"));
         assert!(encoded.features.contains_key("semantic:generic:lifetime"));
-        assert!(encoded.features.contains_key("semantic:generic:type_bounded"));
+        assert!(
+            encoded
+                .features
+                .contains_key("semantic:generic:type_bounded")
+        );
         assert!(encoded.features.contains_key("semantic:param_has_lifetime"));
         assert!(encoded.features.contains_key("semantic:type_ref_shared"));
     }
@@ -724,8 +727,18 @@ mod tests {
             }
         "#;
         let encoded = encode_rust_ast_hdc(source, 512).unwrap();
-        
-        assert!(encoded.structural_invariants.iter().any(|inv| inv.contains("< i (length data)")));
-        assert!(encoded.structural_invariants.iter().any(|inv| inv.contains("not (= divisor 0)")));
+
+        assert!(
+            encoded
+                .structural_invariants
+                .iter()
+                .any(|inv| inv.contains("< i (length data)"))
+        );
+        assert!(
+            encoded
+                .structural_invariants
+                .iter()
+                .any(|inv| inv.contains("not (= divisor 0)"))
+        );
     }
 }

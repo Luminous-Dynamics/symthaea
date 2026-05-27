@@ -16,6 +16,7 @@ pub mod fep_agent;
 pub mod perturbations;
 pub mod plugin;
 pub mod simulator;
+pub mod town_simpoiesis;
 pub mod training;
 pub mod types;
 

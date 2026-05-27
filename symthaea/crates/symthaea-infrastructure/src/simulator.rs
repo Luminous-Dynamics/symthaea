@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! First-pass infrastructure / microgrid simulator.
 use crate::types::{
-    InfrastructureCommand, InfrastructureOperatingMode, InfrastructureState, BROWNOUT_RISK,
-    COMMUNITY_DEMAND, COOLANT_TEMP_C, CRITICAL_LOAD_FRACTION, DEADLOCK_RISK, GRID_STRESS,
-    ISLANDING_CAPABILITY, ISLANDING_RISK, QUEUE_DEPTH, RECOVERY_MARGIN, RELAY_HEALTH,
+    BROWNOUT_RISK, COMMUNITY_DEMAND, COOLANT_TEMP_C, CRITICAL_LOAD_FRACTION, DEADLOCK_RISK,
+    GRID_STRESS, ISLANDING_CAPABILITY, ISLANDING_RISK, InfrastructureCommand,
+    InfrastructureOperatingMode, InfrastructureState, QUEUE_DEPTH, RECOVERY_MARGIN, RELAY_HEALTH,
     SERVICE_INTEGRITY, SHED_LOAD_RATIO, STORAGE_RATIO, SWITCHGEAR_WEAR, THERMAL_LOAD,
     THERMAL_RUNAWAY_RISK, UNSERVED_DEMAND_RATIO, VOLTAGE_STABILITY,
 };
+use tracing;
 
 pub trait InfrastructurePhysicsSimulator {
     fn step(&mut self, cmd: &InfrastructureCommand, dt: f64);
@@ -194,6 +195,89 @@ impl InfrastructurePhysicsSimulator for SimpleInfrastructureSimulator {
 impl Default for SimpleInfrastructureSimulator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// The master orchestrator for a deterministic lockstep town simulation.
+///
+/// Synchronizes the silicon brain, physical infrastructure, and fluid metabolism
+/// into a single temporal frame (default dt = 16.67ms).
+pub struct SympoiesisSandbox {
+    pub town: crate::town_simpoiesis::TownSympoiesis,
+    pub simulator: SimpleInfrastructureSimulator,
+    pub dt: f64,
+    pub total_frames: u64,
+    pub anomalies: Vec<String>,
+}
+
+impl SympoiesisSandbox {
+    /// Create a new sandbox for a town.
+    pub fn new(town: crate::town_simpoiesis::TownSympoiesis) -> Self {
+        Self {
+            town,
+            simulator: SimpleInfrastructureSimulator::new(),
+            dt: 1.0 / 60.0, // 60 FPS lockstep
+            total_frames: 0,
+            anomalies: Vec::new(),
+        }
+    }
+
+    /// Execute one deterministic lockstep frame.
+    pub fn tick(&mut self, demand_mw: f32, available_mw: f32) -> f32 {
+        self.total_frames += 1;
+
+        // 1. Update metabolism (Silicon + Fluid)
+        let surprise = self.town.step(demand_mw, available_mw);
+
+        // 2. Update physical infrastructure physics
+
+        let mut cmd = InfrastructureCommand::zero();
+        // Feedback loop: Higher surprise throttles the charge bus to protect the grid
+        cmd.torques[0] = (1.0 - surprise / 10.0).clamp(0.1, 1.0);
+        self.simulator.step(&cmd, self.dt);
+
+        surprise
+    }
+
+    /// Inject an adversarial "Black-Swan" anomaly into the simulation.
+    pub fn inject_anomaly(&mut self, profile: &str) {
+        tracing::warn!("🔥 CHAOS ENGINE: Injecting anomaly profile: {}", profile);
+        match profile {
+            "solar_flare" => {
+                self.town.power_grid.renewable_ratio = 0.05;
+                self.anomalies
+                    .push("Solar Flare: Grid collapse initiated.".into());
+            }
+            "structural_fracture" => {
+                // Simulate mass loss in water clarity/infrastructure
+                self.town.water_clarity *= 0.5;
+                self.anomalies
+                    .push("Structural Fracture: Fluid loop integrity compromised.".into());
+            }
+            _ => {
+                self.anomalies.push(format!("Unknown anomaly: {}", profile));
+            }
+        }
+    }
+
+    /// Display the real-time Diagnostics Matrix in the terminal.
+    pub fn print_diagnostics(&self) {
+        let state = self.simulator.state();
+        println!(
+            "[{:>6}] SURP:{:>5.2} | WATER:{:>5.2} | GRID:{:>5.2} | PPA:{:>5.2} | MODE:{:?}",
+            self.total_frames,
+            self.town.power_grid.renewable_ratio, // Proxy for surprise/health in this view
+            self.town.water_clarity,
+            state.voltage_stability(),
+            self.town.power_grid.active_loads_mw,
+            state.inferred_mode()
+        );
+
+        if !self.anomalies.is_empty() {
+            for a in &self.anomalies {
+                println!("  ⚠️  ALERT: {}", a);
+            }
+        }
     }
 }
 

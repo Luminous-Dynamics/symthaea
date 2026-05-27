@@ -17,8 +17,8 @@ use symthaea_fabrication_kernel::{
     infill::{InfillConfig, InfillPattern},
     mesh::resolve_to_mesh,
     printer_control::{MockPrinter, PrinterApi},
-    slicer::{slice_mesh, SliceConfig},
-    toolpath::{generate_gcode, ToolpathConfig},
+    slicer::{SliceConfig, slice_mesh},
+    toolpath::{ToolpathConfig, generate_gcode},
 };
 
 // ── Report types ─────────────────────────────────────────────────────────

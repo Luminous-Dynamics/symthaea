@@ -55,6 +55,7 @@ members = [
     "crates/symthaea-quadruped",
     "crates/symthaea-subterranean",
     "crates/symthaea-infrastructure",
+    "crates/symthaea-silicon",
     "crates/symthaea-scavenger",
     "crates/symthaea-agribot",
     "crates/symthaea-biota",
@@ -974,6 +975,8 @@ default-mind = [
 
 
 [dev-dependencies]
+symthaea-formal-safety = { path = "crates/symthaea-formal-safety" }
+
 criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"

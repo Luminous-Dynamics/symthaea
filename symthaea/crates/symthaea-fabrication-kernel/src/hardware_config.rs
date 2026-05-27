@@ -276,14 +276,16 @@ mod tests {
         let _guard = ENV_LOCK.lock().unwrap();
 
         // Clear all env vars to ensure mock defaults.
-        std::env::remove_var("FAB_PRINTER_BACKEND");
-        std::env::remove_var("FAB_PRINTER_URL");
-        std::env::remove_var("FAB_PRINTER_API_KEY");
-        std::env::remove_var("FAB_CINCINNATI_ENABLED");
-        std::env::remove_var("FAB_CINCINNATI_POLL_MS");
-        std::env::remove_var("FAB_CINCINNATI_THRESHOLD");
-        std::env::remove_var("FAB_CINCINNATI_CHANNELS");
-        std::env::remove_var("FAB_SIMULATION_MODE");
+        unsafe {
+            std::env::remove_var("FAB_PRINTER_BACKEND");
+            std::env::remove_var("FAB_PRINTER_URL");
+            std::env::remove_var("FAB_PRINTER_API_KEY");
+            std::env::remove_var("FAB_CINCINNATI_ENABLED");
+            std::env::remove_var("FAB_CINCINNATI_POLL_MS");
+            std::env::remove_var("FAB_CINCINNATI_THRESHOLD");
+            std::env::remove_var("FAB_CINCINNATI_CHANNELS");
+            std::env::remove_var("FAB_SIMULATION_MODE");
+        }
 
         let config = HardwareConfig::from_env();
         assert_eq!(config.printer.backend, PrinterBackend::Mock);
@@ -379,17 +381,19 @@ mod tests {
     fn from_env_with_channels() {
         let _guard = ENV_LOCK.lock().unwrap();
 
-        std::env::set_var("FAB_PRINTER_BACKEND", "moonraker");
-        std::env::set_var("FAB_PRINTER_URL", "http://klipper:7125");
-        std::env::remove_var("FAB_PRINTER_API_KEY");
-        std::env::set_var("FAB_CINCINNATI_ENABLED", "true");
-        std::env::set_var("FAB_CINCINNATI_POLL_MS", "250");
-        std::env::set_var("FAB_CINCINNATI_THRESHOLD", "1.8");
-        std::env::set_var(
-            "FAB_CINCINNATI_CHANNELS",
-            "temperature_nozzle, vibration_x, extrusion_pressure",
-        );
-        std::env::set_var("FAB_SIMULATION_MODE", "false");
+        unsafe {
+            std::env::set_var("FAB_PRINTER_BACKEND", "moonraker");
+            std::env::set_var("FAB_PRINTER_URL", "http://klipper:7125");
+            std::env::remove_var("FAB_PRINTER_API_KEY");
+            std::env::set_var("FAB_CINCINNATI_ENABLED", "true");
+            std::env::set_var("FAB_CINCINNATI_POLL_MS", "250");
+            std::env::set_var("FAB_CINCINNATI_THRESHOLD", "1.8");
+            std::env::set_var(
+                "FAB_CINCINNATI_CHANNELS",
+                "temperature_nozzle, vibration_x, extrusion_pressure",
+            );
+            std::env::set_var("FAB_SIMULATION_MODE", "false");
+        }
 
         let config = HardwareConfig::from_env();
 
@@ -410,13 +414,15 @@ mod tests {
         assert_eq!(config.cincinnati.sensor_channels[2], "extrusion_pressure");
 
         // Cleanup.
-        std::env::remove_var("FAB_PRINTER_BACKEND");
-        std::env::remove_var("FAB_PRINTER_URL");
-        std::env::remove_var("FAB_CINCINNATI_ENABLED");
-        std::env::remove_var("FAB_CINCINNATI_POLL_MS");
-        std::env::remove_var("FAB_CINCINNATI_THRESHOLD");
-        std::env::remove_var("FAB_CINCINNATI_CHANNELS");
-        std::env::remove_var("FAB_SIMULATION_MODE");
+        unsafe {
+            std::env::remove_var("FAB_PRINTER_BACKEND");
+            std::env::remove_var("FAB_PRINTER_URL");
+            std::env::remove_var("FAB_CINCINNATI_ENABLED");
+            std::env::remove_var("FAB_CINCINNATI_POLL_MS");
+            std::env::remove_var("FAB_CINCINNATI_THRESHOLD");
+            std::env::remove_var("FAB_CINCINNATI_CHANNELS");
+            std::env::remove_var("FAB_SIMULATION_MODE");
+        }
     }
 
     #[test]

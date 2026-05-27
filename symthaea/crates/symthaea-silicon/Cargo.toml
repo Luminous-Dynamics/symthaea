@@ -1,25 +1,19 @@
 [package]
-name = "symthaea-infrastructure"
+name = "symthaea-silicon"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "HDC-LTC + FEP Active Inference Infrastructure platform"
+description = "Autonomous Silicon Architect: RTL generation, PPA optimization, and EDA loop integration."
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
-symthaea-fep = { path = "../symthaea-fep" }
-symthaea-silicon = { path = "../symthaea-silicon" }
+symthaea-runtime = { path = "../symthaea-runtime" }
 symthaea-engineering = { path = "../symthaea-engineering" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
-rand = { workspace = true }
-
-[dev-dependencies]
-proptest = "1"
-
-[features]
-default = []
+uuid = { workspace = true }
+anyhow = { workspace = true }

@@ -3,13 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Benchmark: slice a complex mesh at fine layer height.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use symthaea_fabrication_kernel::{
     csg::{BooleanOp, CSGNode, Primitive, Transform3D},
     infill::{InfillConfig, InfillPattern},
     mesh::resolve_to_mesh,
-    slicer::{slice_mesh, SliceConfig},
-    toolpath::{generate_gcode, ToolpathConfig},
+    slicer::{SliceConfig, slice_mesh},
+    toolpath::{ToolpathConfig, generate_gcode},
 };
 
 fn complex_design() -> CSGNode {

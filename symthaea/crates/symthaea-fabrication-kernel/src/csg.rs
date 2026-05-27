@@ -215,5 +215,24 @@ mod tests {
 }
 
 impl CSGNode {
-    pub fn scale(&self, _x: f64, _y: f64, _z: f64) -> Self { self.clone() }
+    pub fn scale(self, x: f64, y: f64, z: f64) -> Self {
+        self.with_transform(Transform3D {
+            scale: [x as f32, y as f32, z as f32],
+            ..Default::default()
+        })
+    }
+
+    pub fn rotate(self, x: f64, y: f64, z: f64) -> Self {
+        self.with_transform(Transform3D {
+            rotate: [x as f32, y as f32, z as f32],
+            ..Default::default()
+        })
+    }
+
+    pub fn translate(self, x: f64, y: f64, z: f64) -> Self {
+        self.with_transform(Transform3D {
+            translate: [x as f32, y as f32, z as f32],
+            ..Default::default()
+        })
+    }
 }

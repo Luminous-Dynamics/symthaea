@@ -5,7 +5,7 @@
 
 use proptest::prelude::*;
 use symthaea_fabrication_kernel::{
-    infill::{generate_infill, InfillConfig, InfillPattern},
+    infill::{InfillConfig, InfillPattern, generate_infill},
     slicer::{Contour, Point2, SliceLayer},
 };
 

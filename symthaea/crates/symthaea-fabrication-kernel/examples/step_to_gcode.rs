@@ -14,7 +14,7 @@ use symthaea_fabrication_kernel::csg::CSGNode;
 use symthaea_fabrication_kernel::mesh::resolve_to_mesh;
 use symthaea_fabrication_kernel::step_import::parse_step;
 use symthaea_fabrication_kernel::{
-    generate_gcode, slice_mesh, validate_mesh, GCodeCommand, SliceConfig, ToolpathConfig,
+    GCodeCommand, SliceConfig, ToolpathConfig, generate_gcode, slice_mesh, validate_mesh,
 };
 
 /// A realistic STEP file defining a 10x10x5 mm box using six bilinear

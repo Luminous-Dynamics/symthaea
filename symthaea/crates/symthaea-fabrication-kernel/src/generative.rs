@@ -9,7 +9,7 @@
 
 use crate::analytical::{AnalyticalBackend, CrossSection, MaterialProperties};
 use crate::csg::CSGNode;
-use crate::mesh::{resolve_to_mesh, TriangleMesh};
+use crate::mesh::{TriangleMesh, resolve_to_mesh};
 use crate::validate::validate_mesh;
 
 /// Default transverse load (Newtons) for structural fitness evaluation.
@@ -45,11 +45,7 @@ fn beam_length_from_mesh(mesh: &TriangleMesh) -> f64 {
     let dz = (max_z - min_z) as f64;
     // Use the longest axis as the effective beam length
     let longest = dx.max(dy).max(dz);
-    if longest < 1e-10 {
-        0.1
-    } else {
-        longest
-    }
+    if longest < 1e-10 { 0.1 } else { longest }
 }
 
 /// Cross-section approximation from mesh bounding box.

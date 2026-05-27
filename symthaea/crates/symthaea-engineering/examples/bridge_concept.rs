@@ -1,8 +1,13 @@
-
 // Inline compilation helper trait
 #[allow(dead_code)]
 trait RequestSimulationFallback {
-    fn request_simulation(&self, _a: impl serde::Serialize, _b: impl serde::Serialize, _c: impl serde::Serialize) {}
+    fn request_simulation(
+        &self,
+        _a: impl serde::Serialize,
+        _b: impl serde::Serialize,
+        _c: impl serde::Serialize,
+    ) {
+    }
 }
 impl RequestSimulationFallback for symthaea_engineering::EngineeringConcept {}
 
@@ -10,9 +15,9 @@ impl RequestSimulationFallback for symthaea_engineering::EngineeringConcept {}
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use symthaea_engineering::{
+    EngineeringConcept, EngineeringRequirement, EngineeringReview, RequirementCriticality,
     formal_safety::{EvidenceKind, SafetyCase, SafetyCaseTemplate},
     sim_bridge::{EngineeringDomain, SolverKind, UncertaintyEstimate},
-    EngineeringConcept, EngineeringRequirement, EngineeringReview, RequirementCriticality,
 };
 
 fn main() {

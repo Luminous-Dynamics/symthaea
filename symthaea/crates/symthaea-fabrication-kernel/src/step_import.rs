@@ -592,8 +592,8 @@ ENDSEC;";
     fn full_pipeline_step_to_gcode() {
         use crate::csg::CSGNode;
         use crate::mesh::resolve_to_mesh;
-        use crate::slicer::{slice_mesh, SliceConfig};
-        use crate::toolpath::{generate_gcode, GCodeCommand, ToolpathConfig};
+        use crate::slicer::{SliceConfig, slice_mesh};
+        use crate::toolpath::{GCodeCommand, ToolpathConfig, generate_gcode};
         use crate::validate::validate_mesh;
 
         // ── Stage 1: Parse STEP ─────────────────────────────────────────

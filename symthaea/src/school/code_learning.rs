@@ -23,7 +23,7 @@
 
 use std::collections::HashMap;
 
-use crate::language::code_executor::{try_auto_fix, CodeExecutor, ExecutionResult};
+use crate::language::code_executor::{CodeExecutor, ExecutionResult, try_auto_fix};
 use crate::language::code_generator::{CodeContext, CodeGenerator};
 use crate::language::code_intent::{CodeIntent, CodeSpec, CodeTarget, EntityKind};
 
@@ -1102,6 +1102,46 @@ impl CodeLearningEngine {
                 used_llm = true;
                 energy_spent += ENERGY_TIER2_LLM_CALL;
             }
+        }
+
+        // 3.5. Proactive Symbolic Gating (Track 4)
+        // Autonomously derive safety invariants and run Z3 checks before execution.
+        let mut symbolic_veto = false;
+        if let Ok(encoding) = crate::language::rust_ast_hdc::encode_rust_ast_hdc(&source, 512) {
+            let invariants = encoding.derive_code_invariants();
+            if !invariants.is_empty() {
+                let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
+                for inv in invariants {
+                    // Try to find a counterexample (negate the safety invariant)
+                    let query = format!("(assert (not {}))", inv.trim_start_matches("(assert ").trim_end_matches(')'));
+                    if z3.verify_satisfiable(&query).is_sat() {
+                        tracing::warn!("🚨 Symbolic Safety Veto: Potential invariant violation detected: {}", inv);
+                        symbolic_veto = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if symbolic_veto {
+            return LessonOutcome {
+                objective_id: lesson.objective_id.clone(),
+                source,
+                simulated_execution: true,
+                compiled: false,
+                tests_passed: 0,
+                tests_failed: 0,
+                surprise: 1.0, // Maximum surprise for safety violation
+                retries_used: 0,
+                plan_coverage: 0.0,
+                phi_score: 0.0,
+                used_llm,
+                llm_retries_used: 0,
+                distillation_eligible: false,
+                energy_spent,
+                predicted_quality,
+                actual_quality: 0.0,
+            };
         }
 
         // 4. Execute and auto-fix retry loop
