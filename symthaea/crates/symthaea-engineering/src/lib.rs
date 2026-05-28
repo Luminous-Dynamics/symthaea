@@ -642,6 +642,87 @@ impl EngineeringManager {
         shape_hv.bind(matter_hv)
     }
 
+    /// Run a "Fast-Forward" mental simulation to predict future amodal sensations.
+    ///
+    /// Extrapolates current trends and causal influences to estimate the
+    /// Variational Free Energy (surprise) of the future settlement state.
+    pub fn predict_future_sensation(
+        &self,
+        current_sensation: &symthaea_core::hdc::ContinuousHV,
+        horizon_steps: u32,
+    ) -> (symthaea_core::hdc::ContinuousHV, f64) {
+        // In a real implementation, this would use a temporal VAE or LTC network.
+        // Here we simulate temporal drift and causal influence.
+        let mut predicted = current_sensation.clone();
+        let mut predicted_surprise = 0.0;
+
+        if let Some(ref scm) = self.causal_model {
+            // Sample the "safety" outcome distribution from the SCM
+            if let Some(target_node) = scm.dag.nodes.iter().find(|n| n.name == "safety") {
+                if let Some(dist) = scm.conditional_tables.get(&target_node.id) {
+                    // P(failed) is the first element
+                    predicted_surprise = *dist.get(0).unwrap_or(&0.0) * horizon_steps as f64 * 0.01;
+                }
+            }
+        }
+
+        // Apply temporal noise to the hypervector
+        let noise = symthaea_core::hdc::ContinuousHV::random(current_sensation.values.len(), 99);
+        predicted = symthaea_core::hdc::ContinuousHV::bundle(&[&predicted, &noise]);
+
+        tracing::info!(
+            "🔮 Future Sensation Predicted (h={}): Est. Surprise = {:.4}",
+            horizon_steps,
+            predicted_surprise
+        );
+        (predicted, predicted_surprise)
+    }
+
+    /// Search for "Counterfactual Catastrophes" — specific combinations of
+    /// events that would trigger a systemic collapse.
+    pub fn search_for_catastrophes(
+        &self,
+        base_sensation: &symthaea_core::hdc::ContinuousHV,
+    ) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        // Scenario A: Energy/Mechanical Resonance
+        let (_, s_a) = self.predict_future_sensation(base_sensation, 100);
+        if s_a > 0.8 {
+            warnings
+                .push("Resonant Collapse Risk: High mechanical load during power deficit.".into());
+        }
+
+        // Scenario B: Metabolic Exhaustion
+        if self.causal_model.is_some() {
+            // Simulate an intervention: do(material_strength = low)
+            if let Some(prob_fail) = self.predict_intervention_ext("material_strength", 0, "safety")
+            {
+                if prob_fail > 0.7 {
+                    warnings.push(
+                        "Metabolic Veto: Current material aging curve leads to structural unsat core."
+                            .into(),
+                    );
+                }
+            }
+        }
+
+        warnings
+    }
+
+    fn predict_intervention_ext(
+        &self,
+        variable: &str,
+        value_idx: usize,
+        target: &str,
+    ) -> Option<f64> {
+        let scm = self.causal_model.as_ref()?;
+        let x = scm.dag.nodes.iter().find(|n| n.name == variable)?.id;
+        let y = scm.dag.nodes.iter().find(|n| n.name == target)?.id;
+        let result = scm.intervene(x, value_idx, y)?;
+        Some(*result.distribution.get(0).unwrap_or(&0.0)) // P(failed)
+    }
+
     /// Calculate the absolute minimum geometric adjustment required to make a design satisfiable.
     ///
     /// If Z3 proves a design is unmanufacturable (unsat), this method identifies the

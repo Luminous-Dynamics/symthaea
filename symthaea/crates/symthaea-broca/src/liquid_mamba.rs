@@ -327,7 +327,7 @@ impl Default for ChunkGenerationConfig {
             max_chunks: 6,
             tokens_per_chunk: 16,
             update_thought_after_chunk: true,
-            thought_update_alpha: 0.35,
+            thought_update_alpha: 0.3650, // FORGE_PARAM: alpha
         }
     }
 }
@@ -574,13 +574,13 @@ impl Default for LiquidMambaConfig {
             temperature: 0.8,
             top_k: 40,
             sampling_seed: None,
-            veto_threshold: 0.15,
+            veto_threshold: 0.1480, // FORGE_PARAM: veto
             drift_threshold: 0.30,
             coherence_window: 8,
             long_coherence_window: 32,
-            coherence_ema_alpha: 0.3,
+            coherence_ema_alpha: 0.2910, // FORGE_PARAM: coherence_alpha
             min_consecutive_low: 3,
-            coherence_velocity_threshold: 0.15,
+            coherence_velocity_threshold: 0.1580, // FORGE_PARAM: coherence_velocity
             min_chunk_size: 6,
             delta_mod_strength: 1.0,
             veto_hesitation: "-- wait, ".to_string(),
@@ -703,6 +703,8 @@ pub struct LiquidMambaGenerator {
     pub goal_hv: Option<ContinuousHV>,
     /// Semantic delta ("what was left unsaid") from the last generation.
     pub unsaid_tangent: Option<ContinuousHV>,
+    /// NEW: Physical constraint HV derived from real-world tool execution (WASM).
+    pub physical_constraint: Option<ContinuousHV>,
     /// Bundle of recently expressed meanings to avoid tautology.
     pub recent_semantic_history: VecDeque<ContinuousHV>,
     /// NEW: Topological coherence score [0, 1] based on Hodge-Laplacian.
@@ -711,8 +713,14 @@ pub struct LiquidMambaGenerator {
     /// NEW: History of Betti numbers (beta_0, beta_1) for trend analysis.
     pub betti_history: Arc<Mutex<VecDeque<(usize, usize)>>>,
     /// NEW: Spectral gap (algebraic connectivity) of the semantic complex.
-    pub spectral_gap: Arc<AtomicU32>,
+    pub spectral_entropy: Arc<AtomicU32>,
     /// NEW: Persistent background worker for asynchronous Hodge processing.
+    /// NEW: Physical Verifier for SimBridge-based validation.
+    pub physical_verifier: crate::simulation_bridge::PhysicalVerifier,
+    /// NEW: Foraging Bridge for global SearXNG missions.
+    pub foraging_bridge: crate::foraging_bridge::ForagingBridge,
+    /// NEW: Swarm Bridge for P2P memetic propagation via Iroh.
+    pub swarm_bridge: crate::swarm_bridge::SwarmBridge,
     hodge_sender: std::sync::mpsc::SyncSender<Vec<ContinuousHV>>,
     /// NEW: Bridge to Geodesic for topological program synthesis.
     #[cfg(feature = "code-sheaf-eval")]
@@ -804,7 +812,7 @@ impl LiquidMambaGenerator {
 
         let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<ContinuousHV>>(1);
         let topological_coherence = Arc::new(AtomicU32::new(1.0f32.to_bits()));
-        let spectral_gap = Arc::new(AtomicU32::new(0.5f32.to_bits()));
+        let spectral_entropy = Arc::new(AtomicU32::new(0.5f32.to_bits()));
         let betti_history = Arc::new(Mutex::new(VecDeque::with_capacity(64)));
 
         // --- IMPROVEMENT: DID Sovereignty Integration ---
@@ -819,7 +827,7 @@ impl LiquidMambaGenerator {
 
         // Spawn a single long-lived thread for sub-cortical processing
         let coherence_worker = Arc::clone(&topological_coherence);
-        let gap_worker = Arc::clone(&spectral_gap);
+        let gap_worker = Arc::clone(&spectral_entropy);
         let betti_worker = Arc::clone(&betti_history);
         std::thread::spawn(move || {
             while let Ok(history) = rx.recv() {
@@ -880,7 +888,7 @@ impl LiquidMambaGenerator {
             projection,
             temporal_proj,
             encoder,
-            config,
+            config: config.clone(),
             thermodynamic_load: 0.0,
             arousal: 0.5,
             mood_temperature: 1.0,
@@ -903,10 +911,14 @@ impl LiquidMambaGenerator {
             epistemic_cube_gate,
             goal_hv: None,
             unsaid_tangent: None,
+            physical_verifier: crate::simulation_bridge::PhysicalVerifier::new(config.hdc_dim),
+            foraging_bridge: crate::foraging_bridge::ForagingBridge::new("http://localhost:8080"),
+            swarm_bridge: crate::swarm_bridge::SwarmBridge::new(),
+            physical_constraint: None,
             recent_semantic_history: VecDeque::with_capacity(32),
             topological_coherence,
             betti_history,
-            spectral_gap,
+            spectral_entropy,
             hodge_sender: tx,
             #[cfg(feature = "code-sheaf-eval")]
             geodesic_bridge: crate::geodesic_bridge::GeodesicBridge::new(genesis),
@@ -1045,7 +1057,7 @@ impl LiquidMambaGenerator {
         let gap_history: Vec<f32> = sequence
             .chunks
             .iter()
-            .map(|c| c.spectral_gap) // True time-series telemetry
+            .map(|c| c.spectral_entropy) // True time-series telemetry
             .collect();
 
         self.sovereignty_bridge
@@ -1093,7 +1105,7 @@ impl LiquidMambaGenerator {
         // 3. Compute Epistemic Heat for Dynamic Plasticity
         // Fragmentation (low coherence) and cycles (low gap) increase heat.
         let coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
-        let gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+        let gap = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
 
         let heat = (1.0 - coherence).max(1.0 - gap).clamp(0.0, 1.0);
         // Pressure scales from 2% (stable) to 10% (confused/shocked)
@@ -1111,6 +1123,30 @@ impl LiquidMambaGenerator {
             "Recursive substrate metamorphosis applied safely. She has re-programmed herself."
         );
         Ok(())
+    }
+
+    /// Commit the current cognitive state to a local snapshot.
+    pub fn commit_weights(&self) -> Vec<f32> {
+        self.projection.snapshot()
+    }
+
+    /// Revert the system to a previous cognitive state.
+    pub fn revert_weights(&mut self, snapshot: &[f32]) -> Result<()> {
+        self.projection.revert_to_snapshot(snapshot)
+    }
+
+    /// Verify the physical safety of a synthesized tool logic using SimBridge.
+    pub fn verify_physical_safety(&self, name: &str, intent_nucleus: &ContinuousHV) -> Result<ContinuousHV> {
+        self.physical_verifier.verify_tool_impact(name, intent_nucleus)
+    }
+
+    /// Recursively decompose a high-entropy intent into a hierarchical sheaf of sub-intents.
+    pub fn decompose_intent(&self, intent: &ContinuousHV) -> Vec<ContinuousHV> {
+        let entropy = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
+        if entropy < 0.4 {
+            return vec![intent.clone()];
+        }
+        ContinuousHV::orthogonal_set(intent.dim(), 3, intent.dim() as u64)
     }
 
     /// Distill from Mamba teacher to the projection for a single target sequence.
@@ -1357,7 +1393,7 @@ impl LiquidMambaGenerator {
 
         // 4. Create ThoughtChunk
         let text = self.mamba.decode(&tokens).unwrap_or_default();
-        let live_gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+        let live_gap = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
 
         let mut chunk = ThoughtChunk::new(
             format!("c{}", chunk_index),
@@ -1366,7 +1402,7 @@ impl LiquidMambaGenerator {
             channels.psi(),
         )
         .with_confidence(final_coherence)
-        .with_spectral_gap(live_gap)
+        .with_spectral_entropy(live_gap)
         .with_target(text);
 
         chunk.token_ids = tokens.clone();
@@ -1660,7 +1696,7 @@ impl LiquidMambaGenerator {
                 if let Ok(sequence) = temp_gen.generate_semantic_monologue(&temp_channels, 3) {
                     let coherence =
                         f32::from_bits(temp_gen.topological_coherence.load(Ordering::Relaxed));
-                    let gap = f32::from_bits(temp_gen.spectral_gap.load(Ordering::Relaxed));
+                    let gap = f32::from_bits(temp_gen.spectral_entropy.load(Ordering::Relaxed));
                     let nucleus = temp_gen.recursive_fold(&sequence);
                     let resonance = (nucleus.similarity(current_thought) + 1.0) / 2.0;
                     let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
@@ -1686,7 +1722,7 @@ impl LiquidMambaGenerator {
 
                 let sequence = self.generate_semantic_monologue(&temp_channels, 3)?;
                 let coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
-                let gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+                let gap = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
                 let nucleus = self.recursive_fold(&sequence);
                 let resonance = (nucleus.similarity(current_thought) + 1.0) / 2.0;
                 let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
@@ -1945,7 +1981,7 @@ impl LiquidMambaGenerator {
         // --- IMPROVEMENT: Spectral Gap Temperature Modulation ---
         // A low spectral gap (fragmented/disconnected manifold) increases temperature
         // to encourage divergent search and re-alignment.
-        let live_gap = f32::from_bits(self.spectral_gap.load(Ordering::Relaxed));
+        let live_gap = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
         let gap_mod = if live_gap < 0.1 {
             1.5
         } else {

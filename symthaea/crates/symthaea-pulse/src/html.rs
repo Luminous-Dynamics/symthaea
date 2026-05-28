@@ -3162,7 +3162,7 @@ fn write_neuroevolution_pane(html: &mut String, ne: &super::NeuroevolutionInfo) 
   <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
 </div>
 <table style="width:100%;font-size:0.88em">
-<tr><td>Generation</td><td style="text-align:right">{r#gen}</td></tr>
+<tr><td>Generation</td><td style="text-align:right">{gen}</td></tr>
 <tr><td>Best Fitness</td><td style="text-align:right;color:{fit_color}">{fitness:+.4}</td></tr>
 <tr><td>Diversity</td><td style="text-align:right;color:{div_color}">{diversity:.3}</td></tr>
 <tr><td>Species</td><td style="text-align:right">{species}</td></tr>

@@ -18,7 +18,7 @@ mod gated_run {
     use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
     use symthaea_materials::{MaterialProperty, encoder::MaterialHdcEncoder};
     use symthaea_mujoco_bridge::MuJoCoBridge;
-    use symthaea_silicon::{SiliconArchitect, SiliconPPA};
+    use symthaea_silicon::{PowerDistributionLogic, SiliconArchitect, SiliconPPA};
     use symthaea_sim_bridge::{EngineeringDomain, MetricEncoder, SimulationRequest, SolverKind};
 
     pub fn run_iteration(
@@ -27,9 +27,8 @@ mod gated_run {
         assistant: &mut EngineeringAssistant,
         _genesis: &GenesisSeed,
         goal: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<symthaea_core::hdc::ContinuousHV, Box<dyn std::error::Error>> {
         println!("\n🔄 STARTING ITERATION {} --------------------", iteration);
-
         // 0. Recall Design Wisdom
         let goal_hv = symthaea_sim_bridge::embed_text(goal, 16384);
         manager.last_goal_hv = Some(goal_hv.clone());
@@ -154,7 +153,7 @@ mod gated_run {
             report_path
         );
 
-        Ok(())
+        Ok(physical_state_hv)
     }
 
     pub fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -178,7 +177,7 @@ mod gated_run {
         let goal = "High-strength multirotor arm (< 100g, > 50N)";
 
         // Run Iteration 1: The AI learns, fuses, and compensates
-        run_iteration(1, &mut manager, &mut assistant, &genesis, goal)?;
+        let physical_state_hv = run_iteration(1, &mut manager, &mut assistant, &genesis, goal)?;
 
         // 9. Robotic Platform Synthesis
         println!("\n🤖 Step 9: Synthesizing Autonomous Robotic Platform...");
@@ -234,6 +233,26 @@ mod gated_run {
             silicon_invariants.len()
         );
 
+        // 11.5 Formal Silicon Sanity: Deadlock Proof
+        println!("📜 Step 11.5: Proving Silicon Sanity (Deadlock-Freedom)...");
+        let silicon_brain = PowerDistributionLogic {
+            grid_frequency_hz: 60.0,
+            renewable_ratio: 0.8,
+            active_loads_mw: 10.0,
+            battery_reserve_mwh: 100.0,
+            min_critical_mw: 2.0,
+        };
+        match silicon.prove_deadlock_freedom(&silicon_brain) {
+            Ok(_) => {
+                println!("   ✅ Proof Discharged: Power logic algorithm is mathematically sane.")
+            }
+            Err(e) => println!("   ❌ Proof Failed: {}", e),
+        }
+
+        for inv in &silicon_invariants {
+            println!("     -> SMT Gate: {}", inv);
+        }
+
         // 12. Closed-Loop Town Sympoiesis
         println!("\n🏡 Step 12: Establishing Closed-Loop Town Sympoiesis...");
         let mut town = TownSympoiesis::new("Sympoiesis Outpost 1", &mut manager);
@@ -246,19 +265,10 @@ mod gated_run {
             "   - Fluid State: Water Clarity={:.2}, Nutrient Advection={:.2}",
             town.water_clarity, town.nutrient_advection
         );
-
-        // Formal Silicon Sanity: Deadlock Proof (Step 11.5 - Corrected variable access)
-        println!("📜 Step 11.5: Proving Silicon Sanity (Deadlock-Freedom)...");
-        match silicon.prove_deadlock_freedom(&town.power_grid) {
-            Ok(_) => {
-                println!("   ✅ Proof Discharged: Power logic algorithm is mathematically sane.")
-            }
-            Err(e) => println!("   ❌ Proof Failed: {}", e),
-        }
-
-        for inv in &silicon_invariants {
-            println!("     -> SMT Gate: {}", inv);
-        }
+        println!(
+            "   - Economic Ledger: {:.2} Tend (Physical Endorsement)",
+            town.economic_ledger.current_balance()
+        );
 
         let town_surprise = town.step(12.5, 15.0); // Increase load, available 15MW
         println!("🧪 Town Metabolic Step: Surprise={:.2}", town_surprise);
@@ -266,7 +276,10 @@ mod gated_run {
             "   - Updated Fluid State: Water Clarity={:.2}, Nutrient Advection={:.2}",
             town.water_clarity, town.nutrient_advection
         );
-
+        println!(
+            "   - Economic Shift: {:.2} Tend (Minted from Production)",
+            town.economic_ledger.current_balance()
+        );
         // 13. Deterministic Co-Simulation Sandbox: Stress Test
         println!("\n🌪️  Step 13: Initializing Deterministic Sandbox Stress Test...");
         let mut sandbox = SympoiesisSandbox::new(town);
@@ -294,6 +307,29 @@ mod gated_run {
         println!(
             "\n✨ Simulation Complete: Symthaea's logical immune system maintained 100% uptime."
         );
+
+        // 14. Predictive Future-Dreaming: Sentinel Layer (NEW)
+        println!("\n🔮 Step 14: Engaging Predictive Future-Dreaming (Sentinel Layer)...");
+        let current_sensation = physical_state_hv; // Use fused sensation from iteration 1
+
+        let (future_hv, future_surprise) = manager.predict_future_sensation(&current_sensation, 50);
+        println!(
+            "   - Current Sensation Norm: {:.4}",
+            current_sensation.norm()
+        );
+        println!("   - Predicted Future Norm:  {:.4}", future_hv.norm());
+        println!("   - Predicted Future Surprise: {:.4}", future_surprise);
+
+        let catastrophes = manager.search_for_catastrophes(&current_sensation);
+        if catastrophes.is_empty() {
+            println!(
+                "   ✅ Sentinel: No counterfactual catastrophes detected in the next 100 cycles."
+            );
+        } else {
+            for warning in catastrophes {
+                println!("   ⚠️  SENTINEL ALERT: {}", warning);
+            }
+        }
 
         Ok(())
     }

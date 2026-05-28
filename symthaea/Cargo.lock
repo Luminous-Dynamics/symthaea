@@ -18794,11 +18794,13 @@ dependencies = [
  "symthaea-lean-bridge",
  "symthaea-sim-bridge",
  "symthaea-stt",
+ "symthaea-swarm",
  "symthaea-vision-manifold",
  "syn 2.0.117",
  "sysinfo",
  "tempfile",
  "tokenizers",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "tree-sitter",
@@ -18806,6 +18808,7 @@ dependencies = [
  "tree-sitter-python",
  "tree-sitter-rust",
  "ureq 2.12.1",
+ "urlencoding",
  "uuid",
  "walkdir",
  "wasmtime",
@@ -18974,6 +18977,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-domotic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "symthaea-dream"
 version = "0.1.0"
 dependencies = [
@@ -19131,6 +19146,7 @@ dependencies = [
  "proptest",
  "serde",
  "symthaea-core",
+ "tracing",
 ]
 
 [[package]]
@@ -19317,6 +19333,7 @@ name = "symthaea-lab"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "iroh",
  "nalgebra 0.34.2",
  "serde",
  "serde_json",
@@ -19325,6 +19342,7 @@ dependencies = [
  "symthaea-core",
  "symthaea-engineering",
  "symthaea-fabrication-kernel",
+ "symthaea-fep",
  "symthaea-humanoid",
  "symthaea-infrastructure",
  "symthaea-manipulator",
@@ -19334,6 +19352,7 @@ dependencies = [
  "symthaea-runtime",
  "symthaea-silicon",
  "symthaea-sim-bridge",
+ "symthaea-swarm",
  "symtropy-consciousness-physics",
  "symtropy-math 0.2.0",
  "symtropy-physics",
@@ -19341,6 +19360,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -20206,7 +20226,10 @@ dependencies = [
 name = "symtropy-robotics-bridge-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "nalgebra 0.34.2",
+ "serde",
  "symtropy-consciousness-physics",
  "symtropy-math 0.2.0",
  "symtropy-physics",

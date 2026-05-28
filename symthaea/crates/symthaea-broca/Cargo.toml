@@ -14,7 +14,10 @@ symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hodge = { path = "../symthaea-hodge" }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 symthaea-hdc-store = { path = "../symthaea-hdc-store" }
+mycelix-zkp-core = { path = "../mycelix-zkp-core", features = ["dilithium"] }
 symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"], optional = true }
@@ -46,22 +49,23 @@ pqcrypto-traits = "0.3"
 tree-sitter-rust = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
-mycelix-zkp-core = { path = "../mycelix-zkp-core", features = ["dilithium"] }
 symthaea-lean-bridge = { path = "../symthaea-lean-bridge" }
-symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 
-# Distillation collection (optional)
-ureq = { version = "2.9", optional = true }
+# Distillation collection
+ureq = { version = "2.9" }
 
 # Candle ML framework (GPU-accelerated training + inference)
 candle-core = { workspace = true }
 candle-nn = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }
+urlencoding = "2.1"
 tokenizers = { version = "0.21", optional = true }
 wasmtime = { version = "29.0", optional = true }
 rustyline = "14.0"
 bytemuck = "1.25.0"
 lru.workspace = true
+uuid = "1"
+tokio = { workspace = true, features = ["sync"] }
 
 # WASM support — getrandom + uuid need explicit features on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -175,6 +179,8 @@ default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
 gpu = ["candle-core/cuda", "dep:candle-nn", "candle-nn/cuda"]
 parallel = ["dep:rayon", "symthaea-core/parallel"]
+# P2P Swarm networking
+networking = ["symthaea-swarm/networking"]
 # WASM sandboxing support via wasmtime
 wasm-sandbox = ["dep:wasmtime"]
 # Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
@@ -186,7 +192,7 @@ gpu-logits = []
 # Legacy alias
 cuda = ["mamba"]
 hf-tokenizer = ["dep:tokenizers"]
-collect = ["dep:ureq"]
+collect = []
 simd = ["symthaea-core/simd"]
 test-helpers = ["mamba-cpu"]
 therapeutic = []

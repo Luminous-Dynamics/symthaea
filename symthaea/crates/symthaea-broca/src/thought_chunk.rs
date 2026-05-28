@@ -28,7 +28,7 @@ pub struct ThoughtChunk {
     pub token_span: Option<(usize, usize)>,
     pub psi: f32,
     pub confidence: f32,
-    pub spectral_gap: f32,
+    pub spectral_entropy: f32,
     pub target: Option<String>,
 }
 
@@ -47,7 +47,7 @@ impl ThoughtChunk {
             token_span: None,
             psi: psi.clamp(0.0, 1.0),
             confidence: 0.0,
-            spectral_gap: 0.5,
+            spectral_entropy: 0.5,
             target: None,
         }
     }
@@ -57,8 +57,8 @@ impl ThoughtChunk {
         self
     }
 
-    pub fn with_spectral_gap(mut self, val: f32) -> Self {
-        self.spectral_gap = val;
+    pub fn with_spectral_entropy(mut self, val: f32) -> Self {
+        self.spectral_entropy = val;
         self
     }
 

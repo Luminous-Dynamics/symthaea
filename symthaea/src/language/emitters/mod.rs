@@ -20,6 +20,7 @@
 mod nix;
 mod python;
 mod rust;
+pub mod driver;
 
 pub use nix::NixEmitter;
 pub use python::PythonEmitter;

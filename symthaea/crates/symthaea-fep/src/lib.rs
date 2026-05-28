@@ -140,7 +140,8 @@
 mod agent;
 mod bridge;
 pub mod free_energy;
-mod generative_model;
+pub mod generative_model;
+pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;

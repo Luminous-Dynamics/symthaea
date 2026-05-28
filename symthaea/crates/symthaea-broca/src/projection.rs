@@ -738,6 +738,25 @@ impl HdcSsmProjection {
         ContinuousHV::from_vec(values)
     }
 
+    /// Take a snapshot of the current projection weights.
+    pub fn snapshot(&self) -> Vec<f32> {
+        let mut snapshot = Vec::with_capacity(self.w_down.len() + self.w_up.len());
+        snapshot.extend_from_slice(&self.w_down);
+        snapshot.extend_from_slice(&self.w_up);
+        snapshot
+    }
+
+    /// Revert weights to a previous snapshot.
+    pub fn revert_to_snapshot(&mut self, snapshot: &[f32]) -> anyhow::Result<()> {
+        if snapshot.len() != self.w_down.len() + self.w_up.len() {
+            return Err(anyhow::anyhow!("Snapshot size mismatch: cannot revert."));
+        }
+        let (down, up) = snapshot.split_at(self.w_down.len());
+        self.w_down.copy_from_slice(down);
+        self.w_up.copy_from_slice(up);
+        Ok(())
+    }
+
     /// Verify a metamorphic kernel before application.
     /// Ensures it doesn't cause manifold collapse or magnitude explosion.
     pub fn verify_metamorphic_kernel(&self, kernel: &[f32]) -> bool {

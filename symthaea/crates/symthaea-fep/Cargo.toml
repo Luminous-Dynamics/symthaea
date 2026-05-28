@@ -19,6 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 argmin.workspace = true
 serde = { workspace = true }
 symthaea-core = { version = "0.5.0", path = "../../symthaea-core" }
+tracing.workspace = true
 
 [dev-dependencies]
 proptest = "1"

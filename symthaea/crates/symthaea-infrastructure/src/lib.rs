@@ -10,12 +10,14 @@
 //! - provide the anchor point for future civic dispatch and city metabolism sims
 
 pub mod controller;
+pub mod economy;
 pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
 pub mod plugin;
 pub mod simulator;
+pub mod spatial_metabolism;
 pub mod town_simpoiesis;
 pub mod training;
 pub mod types;

@@ -132,7 +132,16 @@ pub mod networking {
             })
         }
 
+        pub fn endpoint(&self) -> &Endpoint {
+            &self._endpoint
+        }
+
+        pub fn node_id(&self) -> iroh::PublicKey {
+            self._endpoint.id()
+        }
+
         pub async fn run(self) -> Result<(), anyhow::Error> {
+
             let topic = self.gossip.subscribe(self.topic_id, vec![]).await?;
             let (sender, mut receiver) = topic.split();
             {

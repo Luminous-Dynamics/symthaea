@@ -10,14 +10,21 @@
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-          config.android_sdk.accept_license = true;
-          config.allowUnfree = true;
-        };
+    let
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      
+      symthaea-overlay = final: prev: {
+        nix-mind-daemon = self.packages.${final.system}.nix-mind-daemon;
+      };
+
+      eachSystem = flake-utils.lib.eachDefaultSystem (system:
+        let
+          overlays = [ (import rust-overlay) ];
+          pkgs = import nixpkgs {
+            inherit system overlays;
+            config.android_sdk.accept_license = true;
+            config.allowUnfree = true;
+          };
 
         # Rust toolchain - stable with extensions
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
@@ -365,6 +372,7 @@ EOF
             "crates/serde-core-shim"
             "crates/symthaea-stt"
             "crates/symthaea-broca"
+            "crates/symthaea-domotic"
           ];
           extraCopies = [
             "vendor/cudarc-0.13.9-cuda129"
@@ -722,6 +730,21 @@ EOF
           };
         };
 
+        packages.nix-mind-daemon = pkgs.rustPlatform.buildRustPackage {
+          pname = "nix-mind-daemon";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            allowBuiltinFetchGit = true;
+          };
+          buildInputs = rustBuildInputs;
+          nativeBuildInputs = nativeBuildInputs;
+          buildFeatures = [ "daemon" ];
+          cargoBuildFlags = [ "-p" "symthaea-nix" "--bin" "nix-mind-daemon" ];
+          doCheck = false;
+        };
+
         # Apps
         apps = {
           default = flake-utils.lib.mkApp {
@@ -848,4 +871,16 @@ EOF
         formatter = pkgs.nixpkgs-fmt;
       }
     );
+in
+eachSystem // {
+  nixosConfigurations.mk0-seed-node = nixpkgs.lib.nixosSystem {
+    system = "x86_64-linux";
+    modules = [
+      ({ ... }: {
+        nixpkgs.overlays = [ symthaea-overlay ];
+      })
+      ./deployment/mk0-seed-node/configuration.nix
+    ];
+  };
+};
 }

@@ -19,6 +19,8 @@ use symthaea_infrastructure::simulator::{
 use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
 use symthaea_manipulator::types::{ManipulatorCommand, ManipulatorState};
 use symthaea_silicon::PowerDistributionLogic;
+use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
+use symthaea_fep::hierarchical::HierarchicalFepManager;
 
 /// Mock Mycelix IPC resource for TendBalance ledger.
 /// Uses request_id correlation map to simulate asynchronous, non-blocking IPC.
@@ -51,6 +53,7 @@ pub struct Mk0LockstepSandbox {
     pub town: TownSympoiesis,
     pub infrastructure_sim: SimpleInfrastructureSimulator,
     pub arm_state: ManipulatorState,
+    pub fep: HierarchicalFepManager,
     pub ledger: MycelixIpcMock,
     pub dt: f64,
     pub frames: u64,
@@ -63,10 +66,22 @@ pub struct Mk0LockstepSandbox {
 
 impl Mk0LockstepSandbox {
     pub fn new(manager: &mut EngineeringManager) -> Self {
+        let cortex = ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
+            state_dim: 8,
+            obs_dim: 4,
+            ..Default::default()
+        });
+        let motor = ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
+            state_dim: 14,
+            obs_dim: 7,
+            ..Default::default()
+        });
+
         Self {
             town: TownSympoiesis::new("Mk0-Outpost-Delta", manager),
             infrastructure_sim: SimpleInfrastructureSimulator::new(),
             arm_state: ManipulatorState::home(),
+            fep: HierarchicalFepManager::new(cortex, motor),
             ledger: MycelixIpcMock::new(),
             dt: 16.67 / 1000.0, // 60Hz lockstep
             frames: 0,

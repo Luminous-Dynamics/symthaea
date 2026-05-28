@@ -171,6 +171,9 @@ pub use projection::{
 pub use temporal_projection::TemporalProjection;
 pub mod cross_modal_bridge;
 pub mod geodesic_bridge;
+pub mod simulation_bridge;
+pub mod foraging_bridge;
+pub mod swarm_bridge;
 pub mod invariant_guard;
 pub mod memory_kernel;
 pub mod memory_ring;

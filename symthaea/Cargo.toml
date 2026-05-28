@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/symthaea-domotic",
     ".",
     "symthaea-core",
     "crates/symthaea-nix",
@@ -133,6 +134,7 @@ exclude = [
 ]
 # Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
 default-members = [
+    "crates/symthaea-domotic",
     ".",
     "symthaea-core",
 ]
@@ -1181,6 +1183,10 @@ required-features = ["code_generation"]
 
 [[test]]
 name = "polyglot_executor_honesty"
+required-features = ["code_generation"]
+
+[[test]]
+name = "hardware_stress"
 required-features = ["code_generation"]
 
 [[example]]

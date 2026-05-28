@@ -16,6 +16,7 @@ symthaea-engineering = { path = "../symthaea-engineering" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+h3o = "0.7"
 rand = { workspace = true }
 
 [dev-dependencies]
