@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea-hlb"
 keywords = ["audio", "hdc", "ltc", "classification", "environmental-sound"]
 categories = ["multimedia::audio", "science", "algorithms"]
-rust-version = "1.95"
+rust-version = "1.94"
 
 [lib]
 name = "symthaea_sentinel"

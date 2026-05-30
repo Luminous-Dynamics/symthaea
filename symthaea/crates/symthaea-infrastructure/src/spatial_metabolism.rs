@@ -38,31 +38,33 @@ impl SpatialMetabolicGrid {
         let mut zones = HashMap::new();
         let resolution = Resolution::Eight;
 
-        // In a real implementation, we would use h3o to find neighbors.
-        // Here we mock a 7-cell hexagonal cluster (1 center + 6 neighbors).
-        let roles = [
-            ZoneRole::Generation,
-            ZoneRole::Storage,
-            ZoneRole::Filtration,
-            ZoneRole::Fabrication,
-            ZoneRole::Fabrication,
-            ZoneRole::Filtration,
-            ZoneRole::Storage,
-        ];
+        // Real production-grade active h3o spatial grid generation pass
+        if let Ok(center_coord) = h3o::LatLng::new(center_lat, center_lon) {
+            let center_cell = center_coord.to_cell(resolution);
+            let roles = [
+                ZoneRole::Generation,
+                ZoneRole::Storage,
+                ZoneRole::Filtration,
+                ZoneRole::Fabrication,
+                ZoneRole::Fabrication,
+                ZoneRole::Filtration,
+                ZoneRole::Storage,
+            ];
 
-        for i in 0..7 {
-            // Mock unique indices
-            let index = 0x8828308281ffffffu64 + i;
-            zones.insert(
-                index,
-                MetabolicZone {
-                    h3_index: index,
-                    role: roles[i as usize % roles.len()],
-                    efficiency: 1.0,
-                    load: 0.0,
-                    localized_surprise: 0.0,
-                },
-            );
+            // Traverses real hex disk topology to populate the map grid natively
+            for (i, cell) in center_cell.grid_disk::<Vec<CellIndex>>(1).into_iter().enumerate() {
+                let index: u64 = u64::from(cell);
+                zones.insert(
+                    index,
+                    MetabolicZone {
+                        h3_index: index,
+                        role: roles[i % roles.len()],
+                        efficiency: 1.0,
+                        load: 0.0,
+                        localized_surprise: 0.0,
+                    },
+                );
+            }
         }
 
         Self { zones }

@@ -2,7 +2,7 @@
 name = "symthaea-materials"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Materials design, aging prediction, and HDC-based similarity search — Genesis Mission Challenge 9"
 license = "AGPL-3.0-or-later"

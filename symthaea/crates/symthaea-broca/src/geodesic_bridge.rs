@@ -37,11 +37,7 @@ impl GeodesicBridge {
     }
 
     /// Synthesize a program skeleton from a semantic nucleus.
-    pub fn synthesize_from_nucleus(
-        &self,
-        nucleus: &ContinuousHV,
-        name: &str,
-    ) -> Result<ActiveInferenceResult> {
+    pub fn synthesize_from_nucleus(&self, nucleus: &ContinuousHV, name: &str) -> Result<ActiveInferenceResult> {
         // 1. Infer topology from nucleus similarity to prototypes
         let sim_branch = nucleus.similarity(&self.proto_branch);
         let sim_loop = nucleus.similarity(&self.proto_loop);
@@ -90,28 +86,98 @@ impl GeodesicBridge {
         if let Some(ref mut code) = result.emitted_code {
             let wrapped_code = format!(
                 r#"
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut HV_BUFFER: [f32; 65536] = [0.0; 65536];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn get_hypervector_buffer_ptr() -> *mut f32 {{
     unsafe {{ HV_BUFFER.as_mut_ptr() }}
 }}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn {}(ptr: *mut f32, len: i32) {{
-    let slice = unsafe {{ std::slice::from_raw_parts_mut(ptr, len as usize) }};
-    
+    let _slice = unsafe {{ std::slice::from_raw_parts_mut(ptr, len as usize) }};
+
     // --- Synthesized Logic Start ---
-    {}
+    {{
+        {}
+    }};
     // --- Synthesized Logic End ---
 }}
 "#,
-                name, code
+                name,
+                code
             );
             *code = wrapped_code;
         }
 
         Ok(result)
+    }
+
+    /// Synthesize a MuJoCo XML physical model from a semantic nucleus.
+    pub fn synthesize_mujoco_model(&self, physics_nucleus: &ContinuousHV) -> Result<String> {
+        let sim_complex = physics_nucleus.similarity(&self.proto_recursion);
+        
+        let model_xml = format!(
+            r#"<mujoco model="synthetic_lab">
+    <option timestep="0.001" gravity="0 0 -9.81"/>
+    <worldbody>
+        <light pos="0 0 10" dir="0 0 -1"/>
+        <geom type="plane" size="10 10 0.1" rgba=".9 .9 .9 1"/>
+        <body name="test_subject" pos="0 0 1">
+            <joint type="free"/>
+            <geom type="sphere" size="{:.4}" mass="1.0" rgba="0 .5 .8 1"/>
+        </body>
+    </worldbody>
+</mujoco>"#,
+            0.1 + (sim_complex * 0.5)
+        );
+
+        Ok(model_xml)
+    }
+
+    /// Synthesize a Leptos dashboard component from her current cognitive state.
+    pub fn synthesize_leptos_dashboard(&self, metrics_nucleus: &ContinuousHV) -> Result<String> {
+        let sim_analytical = metrics_nucleus.similarity(&self.proto_linear);
+
+        let component_code = format!(
+            r#"
+use leptos::*;
+use leptos_meta::*;
+
+#[component]
+pub fn CognitiveDashboard() -> impl IntoView {{
+    let (coherence, _set_coherence) = create_signal({:.4});
+    let (entropy, _set_entropy) = create_signal({:.4});
+
+    view! {{
+        <div class="p-6 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700">
+            <h2 class="text-2xl font-bold mb-4">"Symthaea Cognitive Mirror"</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="p-4 bg-slate-800 rounded-lg">
+                    <span class="text-slate-400">"Topological Coherence"</span>
+                    <div class="text-3xl font-mono text-cyan-400">{{move || format!("{{:.4}}", coherence.get())}}</div>
+                </div>
+                <div class="p-4 bg-slate-800 rounded-lg">
+                    <span class="text-slate-400">"Spectral Entropy"</span>
+                    <div class="text-3xl font-mono text-purple-400">{{move || format!("{{:.4}}", entropy.get())}}</div>
+                </div>
+            </div>
+            <div class="mt-6">
+                <div class="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-cyan-500 to-purple-500" 
+                         style=move || format!("width: {{}}%", coherence.get() * 100.0)>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }}
+}}
+"#,
+            sim_analytical.max(0.1),
+            1.0 - sim_analytical.min(0.9)
+        );
+
+        Ok(component_code)
     }
 }

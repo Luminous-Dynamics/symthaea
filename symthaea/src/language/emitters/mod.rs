@@ -21,6 +21,8 @@ mod nix;
 mod python;
 mod rust;
 pub mod driver;
+pub mod causal_bridge;
+pub mod hdl;
 
 pub use nix::NixEmitter;
 pub use python::PythonEmitter;

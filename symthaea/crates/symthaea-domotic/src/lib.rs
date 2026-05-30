@@ -3,8 +3,8 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tokio::net::UdpSocket;
 use symthaea_core::hdc::ContinuousHV;
+use tokio::net::UdpSocket;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct EnvironmentalTelemetry {
@@ -44,7 +44,6 @@ impl DomoticBridge {
         loop {
             let (size, _) = socket.recv_from(&mut buffer).await?;
             if let Ok(frame) = serde_json::from_slice::<EnvironmentalTelemetry>(&buffer[..size]) {
-                
                 // 1. Map Temperature along a continuous geometric axis [0°C to 50°C]
                 let temp_ratio = frame.temp_celsius.clamp(0.0, 50.0) / 50.0;
                 let mut temp_hv = self.min_temp_anchor.clone();
@@ -56,11 +55,12 @@ impl DomoticBridge {
                 lux_hv.lerp_in_place(&self.bright_lux_anchor, 1.0 - lux_ratio, lux_ratio);
 
                 // 3. Map Spatial boundaries [0.0 = Closed, 1.0 = Fully Open]
-                let spatial_hv = ContinuousHV::random(self.dimension, (frame.open_ratio * 100.0) as u64);
+                let spatial_hv =
+                    ContinuousHV::random(self.dimension, (frame.open_ratio * 100.0) as u64);
 
                 // 4. Collapse the independent environmental channels into a clean batch superposition
                 self.active_state = ContinuousHV::bundle(&[&lux_hv, &temp_hv, &spatial_hv]);
-                
+
                 tracing::info!(
                     "✔ Metric Frame -> Lux: {:.1}, Temp: {:.1}°C, Open: {:.2}. State Manifold Integrated.",
                     frame.lux, frame.temp_celsius, frame.open_ratio

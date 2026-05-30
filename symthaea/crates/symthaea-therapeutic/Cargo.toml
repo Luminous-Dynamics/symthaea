@@ -2,7 +2,7 @@
 name = "symthaea-therapeutic"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Therapeutic Psychology — client model, alliance, safety, affect regulation, narrative"
 license = "AGPL-3.0-or-later"

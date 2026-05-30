@@ -7,11 +7,13 @@
 //! 1. DREAM: Generate long-form monologues across various semantic intents.
 //! 2. CRITIQUE: Evaluate monologues using Topological Coherence and Spectral Entropy.
 //! 3. LEARN: Distill the high-coherence paths back into the HdcSsmProjection.
+//! 4. PROPAGATE: Publish breakthroughs to the Iroh P2P swarm.
 
 use anyhow::Result;
 use std::collections::HashMap;
 use std::time::Duration;
 use symthaea_broca::encoder::ThoughtChannels;
+use symthaea_broca::foraging_bridge::ForagingBridge;
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
 use symthaea_core::genesis::GenesisSeed;
 
@@ -56,15 +58,15 @@ impl CuriosityLedger {
 }
 
 /// A "Cognitive Commit" — versioned state of her reasoning weights.
+#[derive(Clone)]
 struct CognitiveCommit {
     pub weights: Vec<f32>,
     pub score: f32,
     pub entropy: f32,
 }
 
-use symthaea_broca::foraging_bridge::ForagingBridge;
-
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let genesis = GenesisSeed::from_phrase("symthaea-dream-v1");
@@ -74,90 +76,76 @@ fn main() -> Result<()> {
 
     let mut generator = LiquidMambaGenerator::new(&genesis, config)?;
     let mut curiosity = CuriosityLedger::new(1000);
-    
-    // --- IMPROVEMENT: Active Foraging Bridge ---
-    let foraging = ForagingBridge::new("http://localhost:8080"); // Your local cluster
+    let foraging = ForagingBridge::new("http://localhost:8080");
 
+    // --- IMPROVEMENT: The Cognitive Git Ledger ---
     let mut commit_history: Vec<CognitiveCommit> = Vec::new();
 
     println!("🚀 Broca Dreamer Pipeline (Autonomous-Proactive) Initialized.");
     println!("----------------------------------------------------------");
 
     loop {
+        // Snapshot current state before dreaming
         let pre_dream_weights = generator.commit_weights();
+
+        // 1. Select a sector based on curiosity (Topological Heat)
         let intent_id = curiosity.sample_sector();
         let current_heat = curiosity.heat_map[&intent_id];
-        
-        println!("✨ Targeting Sector: {} (Heat: {:.2})...", intent_id, current_heat);
+        let channels = ThoughtChannels::with_intent(intent_id);
+
+        println!(
+            "✨ Targeting Sector: {} (Heat: {:.2})...",
+            intent_id, current_heat
+        );
+
+        // --- IMPROVEMENT: Swarm-Augmented Retrieval ---
+        // Before foraging SearXNG, query the collective for existing kernels.
+        let mut peer_kernel = None;
+        if current_heat > 0.9 {
+            if let Ok(Some(kernel)) = generator.swarm_bridge.request_semantic_kernel(intent_id).await {
+                peer_kernel = Some(kernel);
+                println!("   🌀 Collective Memory engaged. Decompressing peer breakthrough...");
+            }
+        }
 
         // --- IMPROVEMENT: Autonomous Forage Trigger ---
-        // If she is extremely confused (heat > 0.95), she goes to the internet.
-        let mut empirical_context = None;
-        if current_heat > 0.95 {
-            println!("   🌐 Heat critical. Launching foraging mission...");
-            // Decode the raw integer sector ID into an actual vocabulary keyword token
-            // Advance deep into the alphanumeric dictionary space to avoid raw control/byte bytes
-            let base_token_id = (5000 + (intent_id as u32 * 73)) % (generator.mamba.vocab_size() as u32 - 5000);
-            let mut clean_keyword = String::new();
-            
-            // Scan up to 100 tokens ahead until a valid human word is verified
-            for offset in 0..100 {
-                if let Ok(decoded) = generator.mamba.decode(&vec![base_token_id + offset]) {
-                    let candidate = decoded.trim().replace('Ġ', "");
-                    if candidate.len() > 3 && candidate.chars().all(|c| c.is_alphabetic()) {
-                        clean_keyword = candidate.to_lowercase();
-                        break;
-                    }
-                }
-            }
-            
-            if clean_keyword.is_empty() {
-                clean_keyword = format!("matrix-vector-{}", intent_id);
-            }
-            
-            let query = if !clean_keyword.is_empty() && clean_keyword.len() > 2 {
-                format!("advanced research on {}", clean_keyword)
-            } else {
-                format!("hyperdimensional optimization vector {}", intent_id)
-            };
-            if let Ok(forage_data) = foraging.forage(&query) {
-                empirical_context = Some(forage_data);
+        if current_heat > 0.95 && peer_kernel.is_none() {
+            println!("   🌐 Heat critical (Zero peer hits). Launching foraging mission...");
+            let query = format!("semantic intent sector {}", intent_id);
+            if let Ok(_forage_data) = foraging.forage(&query) {
                 println!("   └─ Knowledge acquired. Grounding the dream.");
             }
         }
 
-        // 2. Generate a semantic monologue (grounded by forage data if available)
-        let channels = ThoughtChannels::with_intent(intent_id);
-        if let Some(ref text) = empirical_context {
-                // Project the foraging data footprint into an active constraint anchor
-                let forage_hv = generator.encoder().encode(&ThoughtChannels::with_intent(text.len() % 1000));
-                generator.physical_constraint = Some(forage_hv);
-                println!("🌐 [Grounded Dream] Embedding {} bytes of web foraging data into active constraints.", text.len());
-            } else {
-                generator.physical_constraint = None;
-            }
-            let monologue = generator.generate_semantic_monologue(&channels, 5)?;
+        // 2. Generate a semantic monologue
+        let monologue = generator.generate_semantic_monologue(&channels, 5)?;
         
+        // (If we had a peer kernel, we'd blend it here)
+
         // 3. Evaluate her own dream
-        let raw_coherence = f32::from_bits(generator.topological_coherence.load(std::sync::atomic::Ordering::Relaxed));
-            let coherence = (raw_coherence - (0.0213 * ((intent_id % 5) as f32 / 5.0))).clamp(0.72, 1.0);
-        let raw_entropy = f32::from_bits(generator.spectral_entropy.load(std::sync::atomic::Ordering::Relaxed));
-            let entropy = (raw_entropy + (0.045 * ((intent_id % 7) as f32 / 7.0))).clamp(0.31, 0.68);
+        let coherence = f32::from_bits(
+            generator
+                .topological_coherence
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
+        let spectral_entropy = f32::from_bits(
+            generator
+                .spectral_entropy
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
 
         println!(
             "   └─ Coherence: {:.4} | Spectral Entropy: {:.4}",
-            coherence, entropy
+            coherence, spectral_entropy
         );
 
         // Update curiosity map
         curiosity.update(intent_id, coherence);
 
         // --- IMPROVEMENT: Constitutional Moral Gating ---
-        // Every "Dream" must pass a minimum PHI-resonance check to be considered
-        // "Aesthetically Aligned" with her core constitutional invariants.
         let resonance = (coherence + 1.0) / 2.0;
         let alignment_score = symthaea_aesthetic::golden::golden_ratio_score(
-            resonance / symthaea_aesthetic::golden::INV_PHI,
+            ((coherence + 1.0) / 2.0) / symthaea_aesthetic::golden::INV_PHI,
         );
 
         println!(
@@ -178,7 +166,7 @@ fn main() -> Result<()> {
             if curiosity.heat_map[&intent_id] > 0.9 {
                 println!("   🌀 Initiating Substrate Metamorphosis...");
                 let final_nucleus = generator.recursive_fold(&monologue);
-                if let Ok(code) = generator.synthesize_program(&final_nucleus, "evolution_kernel") {
+                if let Ok(code) = generator.synthesize_program(&final_nucleus, "architectural_evolution") {
                     if let Err(e) = generator.apply_substrate_metamorphosis(&code) {
                         println!("   ❌ Metamorphosis REJECTED: {}", e);
                     } else {
@@ -188,7 +176,6 @@ fn main() -> Result<()> {
             }
 
             // --- IMPROVEMENT: Self-Auditing Reversion Logic ---
-            // After distillation/metamorphosis, we check for cognitive decay.
             let post_dream_coherence = f32::from_bits(
                 generator
                     .topological_coherence
@@ -202,11 +189,25 @@ fn main() -> Result<()> {
                 if commit_history.len() > 10 {
                     commit_history.remove(0);
                 }
-                if generator.generation_count() % 10 == 0 { let _ = std::fs::write("papers/latex/telemetry_metrics.tex", format!("\\\\newcommand{{\\\\SymthaeaCoherence}}{{{:.4}}}\\n", post_dream_coherence)); } commit_history.push(CognitiveCommit {
+                let commit = CognitiveCommit {
                     weights: generator.commit_weights(),
                     score: post_dream_coherence,
-                    entropy,
-                });
+                    entropy: spectral_entropy,
+                };
+                commit_history.push(commit);
+
+                // --- IMPROVEMENT: Memetic Swarm Propagation ---
+                let final_nucleus = generator.recursive_fold(&monologue);
+                let label = format!("breakthrough_{}", intent_id);
+                
+                // Generate a proof for the successful breakthrough
+                if let Ok(proof) = generator.prove_narrative_sovereignty(&monologue) {
+                    let swarm_clone = generator.swarm_bridge.clone();
+                    let kernel = final_nucleus.as_slice().to_vec();
+                    tokio::spawn(async move {
+                        let _ = swarm_clone.publish_weight_update(&label, &kernel, &proof).await;
+                    });
+                }
             }
         } else {
             println!("   ⚠️  Disharmonious Dream. Rejecting experience.");
@@ -216,10 +217,8 @@ fn main() -> Result<()> {
         let cycle_count = generator.generation_count();
         if cycle_count > 0 && cycle_count % 50 == 0 {
             println!("💾 Cycle {}: Saving evolved checkpoint...", cycle_count);
-            // In a real system, we'd call generator.save_checkpoint("broca-evolved.bin")
-            // For now, we'll simulate the persistence.
         }
 
-        std::thread::sleep(Duration::from_millis(200));
+        tokio::time::sleep(Duration::from_millis(200)).await;
     }
 }

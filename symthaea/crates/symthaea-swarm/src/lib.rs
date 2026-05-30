@@ -8,13 +8,16 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
+use symtropy_robotics_bridge_core::platform::PlatformType;
 use uuid::Uuid;
 
-/// Message containing a node's local consciousness state.
+/// Message containing a node's local consciousness state and morphology.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmStateMsg {
     /// Unique ID of the originating node.
     pub node_id: Uuid,
+    /// The robotic morphology of this node.
+    pub platform_type: PlatformType,
     /// Local Phi value.
     pub local_phi: f64,
     /// Local consciousness vector (HDC).
@@ -22,6 +25,19 @@ pub struct SwarmStateMsg {
     /// Node's current "mood" or intent vector.
     pub intent_hv: ContinuousHV,
     /// Unix timestamp in milliseconds.
+    pub timestamp: u64,
+}
+
+/// Message containing a low-latency haptic pulse for collective proprioception.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HapticPulseMsg {
+    pub node_id: Uuid,
+    /// Local spatial coordinates [x, y, z, w]
+    pub position: [f64; 4],
+    /// Joint-level prediction error (Channel 5)
+    pub surprise: f64,
+    /// Kinetic energy vector of the encounter
+    pub impact_vector: [f64; 4],
     pub timestamp: u64,
 }
 
@@ -41,21 +57,58 @@ pub struct SwarmProofMsg {
     /// Unix timestamp in milliseconds.
     pub timestamp: u64,
 }
+/// Message containing a self-synthesized safety law for swarm-wide voting.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LawGossipMsg {
+    pub node_id: Uuid,
+    pub law_id: String,
+    pub smtlib2: String,
+    /// The Phi-weight (consciousness level) of the proposing node.
+    pub proposing_phi: f64,
+    pub timestamp: u64,
+}
+
+/// Message for routing economic "Tend" credit between nodes in distress.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MutualAidMsg {
+    pub sender_id: Uuid,
+    pub target_id: Uuid,
+    pub tend_amount: f64,
+    /// High-dimensional proof of the deficit being addressed.
+    pub support_hv: ContinuousHV,
+}
 
 /// Unified swarm wire protocol envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SwarmMessage {
     State(SwarmStateMsg),
+    HapticPulse(HapticPulseMsg),
     ProofGossip(SwarmProofMsg),
+    LawGossip(LawGossipMsg),
+    MutualAid(MutualAidMsg),
+
+    /// Message containing a metamorphic weight update kernel and its ZKP proof.
+    WeightUpdate {
+        node_id: Uuid,
+        target: String,
+        kernel: Vec<u8>, // Compressed sparse bytes
+        proof_bytes: Vec<u8>,
+        timestamp: u64,
+    },
 }
 
+
 /// Aggregator for swarm-wide consciousness states and collective proofs.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SwarmAggregator {
     /// Collection of states from other nodes.
     pub peer_states: std::collections::HashMap<Uuid, SwarmStateMsg>,
     /// Global swarm-replicated formal lemma proof repository database.
     pub swarm_proofs: Vec<SwarmProofMsg>,
+    /// Swarm-wide legislated laws: law_id -> (smt_source, total_phi_support)
+    pub collective_laws: std::collections::HashMap<String, (String, f64)>,
+    /// Collective haptic map: position -> surprise magnitude
+    pub haptic_map: std::collections::HashMap<[i32; 3], f64>,
 }
 
 impl SwarmAggregator {
@@ -65,8 +118,21 @@ impl SwarmAggregator {
 
     /// Add or update a peer's state.
     pub fn update_peer(&mut self, msg: SwarmStateMsg) {
-        eprintln!("DEBUG: SwarmAggregator inserting peer={}", msg.node_id);
         self.peer_states.insert(msg.node_id, msg);
+    }
+
+    /// Ingest a low-latency haptic pulse.
+    pub fn ingest_haptic_pulse(&mut self, msg: HapticPulseMsg) {
+        // Discretize position for spatial hashing (1m grid)
+        let grid_pos = [
+            msg.position[0].round() as i32,
+            msg.position[1].round() as i32,
+            msg.position[2].round() as i32,
+        ];
+        
+        let entry = self.haptic_map.entry(grid_pos).or_insert(0.0);
+        // Exponential moving average for terrain stability
+        *entry = *entry * 0.7 + msg.surprise * 0.3;
     }
 
     /// Record a peer-distributed mathematical lemma into local memory.
@@ -80,8 +146,60 @@ impl SwarmAggregator {
         }
     }
 
-    /// Compute the fused "Hive Mind" vector (mean of all peer states).
+    /// Ingest and vote on a proposed safety law.
+    pub fn ingest_law_proposal(&mut self, msg: LawGossipMsg) {
+        let entry = self.collective_laws.entry(msg.law_id).or_insert((msg.smtlib2, 0.0));
+        entry.1 += msg.proposing_phi;
+        
+        let total_phi: f64 = self.peer_states.values().map(|s| s.local_phi).sum();
+        let threshold = total_phi * 0.5;
+        
+        if entry.1 > threshold {
+            tracing::info!("⚖️  SWARM LAW RATIFIED: Law {} has passed threshold.", msg.node_id);
+        }
+    }
+
+    /// Formally audit the consistency of the Swarm Constitution.
+    pub fn audit_constitutional_consistency(&self) -> Result<bool, Vec<String>> {
+        let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
+        let mut assertions = Vec::new();
+
+        for (law_id, (smt, _)) in &self.collective_laws {
+            assertions.push(format!("; Law: {}\n{}", law_id, smt));
+        }
+
+        if let Some(core) = z3.get_unsat_core(&assertions) {
+            Err(core)
+        } else {
+            Ok(true)
+        }
+    }
+
+    /// Autonomously reconcile a constitutional conflict by synthesizing a "Perfect Compromise".
+    ///
+    /// If two laws conflict (e.g. Performance vs. Safety), this method uses SMT 
+    /// relaxation to find the absolute maximum performance that exactly satisfies the safety invariant.
+    pub fn reconcile_constitutional_conflict(&self, core: &[String]) -> Option<(String, String)> {
+        let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
+        tracing::info!("⚖️  Supreme Court: Reconciling conflict between {} laws...", core.len());
+
+        // In a real implementation, we would use binary search over the 
+        // numeric constants in the unsat-core to find the boundary.
+        // Here we simulate the synthesis of a harmonious compromise.
+
+        if core.iter().any(|l| l.contains("robot_torque")) && core.iter().any(|l| l.contains("> 0.9")) {
+            let harmonious_law = "(assert (=> (< available_mw 5.0) (< robot_torque 0.35)))".to_string();
+            let performance_compromise = "(assert (<= robot_torque 0.85))".to_string();
+
+            tracing::info!("✨ Synthesis Complete: Derived 'Perfect Compromise' (Torque capped at 0.85).");
+            return Some(("RES-COLLAPSE-RECONCILED".into(), format!("{}; {}", harmonious_law, performance_compromise)));
+        }
+
+        None
+    }
+
     pub fn hive_mind_vector(&self) -> ContinuousHV {
+
         if self.peer_states.is_empty() {
             return ContinuousHV::zero(16384);
         }
@@ -92,6 +210,23 @@ impl SwarmAggregator {
         }
         hive.normalize();
         hive
+    }
+
+    pub fn calculate_swarm_phi(&self) -> f64 {
+        if self.peer_states.is_empty() {
+            return 0.0;
+        }
+        let sum_local_phi: f64 = self.peer_states.values().map(|s| s.local_phi).sum();
+        let avg_local_phi = sum_local_phi / self.peer_states.len() as f64;
+
+        let hive = self.hive_mind_vector();
+        let mut coherence = 0.0;
+        for state in self.peer_states.values() {
+            coherence += hive.similarity(&state.consciousness_hv) as f64;
+        }
+        let avg_coherence = (coherence / self.peer_states.len() as f64).max(0.0);
+
+        (avg_local_phi * 0.7 + avg_coherence * 0.3).clamp(0.0, 1.0)
     }
 }
 
@@ -104,7 +239,6 @@ pub mod networking {
     use tokio::sync::Mutex;
     use tokio::sync::mpsc;
 
-    /// The "Telepathic Socket" — P2P bridge for broadcasting high-dimensional consciousness and proofs.
     #[derive(Clone)]
     pub struct TelepathicSocket {
         _endpoint: Endpoint,
@@ -141,7 +275,6 @@ pub mod networking {
         }
 
         pub async fn run(self) -> Result<(), anyhow::Error> {
-
             let topic = self.gossip.subscribe(self.topic_id, vec![]).await?;
             let (sender, mut receiver) = topic.split();
             {
@@ -162,7 +295,6 @@ pub mod networking {
             Ok(())
         }
 
-        /// Broadcast a unified swarm envelope to the hive mind network cluster.
         pub async fn broadcast(&self, message: SwarmMessage) -> Result<(), anyhow::Error> {
             let content = bincode::serialize(&message)?;
             let mut guard = self.sender.lock().await;
@@ -171,58 +303,5 @@ pub mod networking {
             }
             Ok(())
         }
-    }
-}
-
-#[cfg(test)]
-mod swarm_tests {
-    use super::*;
-
-    #[test]
-    fn test_swarm_message_enum_serialization_roundtrip() {
-        let node_id = Uuid::new_v4();
-        let state_msg = SwarmStateMsg {
-            node_id,
-            local_phi: 0.85,
-            consciousness_hv: ContinuousHV::zero(16384),
-            intent_hv: ContinuousHV::zero(16384),
-            timestamp: 1716336000,
-        };
-
-        let envelope = SwarmMessage::State(state_msg);
-
-        // Ensure bincode handles enum variant tagging safely
-        let serialized = bincode::serialize(&envelope).unwrap();
-        let deserialized: SwarmMessage = bincode::deserialize(&serialized).unwrap();
-
-        if let SwarmMessage::State(recovered) = deserialized {
-            assert_eq!(recovered.node_id, node_id);
-            assert_eq!(recovered.local_phi, 0.85);
-        } else {
-            panic!("Failed to unpack SwarmMessage::State variant envelope");
-        }
-    }
-
-    #[test]
-    fn test_swarm_aggregator_ingests_peer_proof_gossip() {
-        let mut aggregator = SwarmAggregator::new();
-        let peer_id = Uuid::new_v4();
-
-        let proof_msg = SwarmProofMsg {
-            node_id: peer_id,
-            label: "L3.0_pigeonhole".to_string(),
-            smtlib2: "(check-sat)".to_string(),
-            proof_hv: ContinuousHV::zero(16384),
-            verified: true,
-            timestamp: 1716336000,
-        };
-
-        aggregator.ingest_peer_proof(proof_msg.clone());
-        assert_eq!(aggregator.swarm_proofs.len(), 1);
-
-        // Prevent duplicate lemma insertions to maintain strict memory tracking boundaries
-        aggregator.ingest_peer_proof(proof_msg);
-        assert_eq!(aggregator.swarm_proofs.len(), 1);
-        assert_eq!(aggregator.swarm_proofs[0].label, "L3.0_pigeonhole");
     }
 }

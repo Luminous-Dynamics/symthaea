@@ -2,7 +2,7 @@
 name = "symthaea-continuum-physics"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Continuum physics from first principles: Maxwell FDTD, Navier-Stokes, wave equations, acoustics, plasma MHD, coarse-graining, open quantum systems"
 license = "AGPL-3.0-or-later"

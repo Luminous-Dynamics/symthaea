@@ -212,11 +212,6 @@ impl Z3Bridge {
     /// Check validity: a formula φ is valid iff ¬φ is unsatisfiable.
     pub fn verify_valid(&self, smtlib2: &str) -> VerificationResult {
         // Add negation assertion and check-sat
-        let negated = format!(
-            "{}\n(assert (not (and true)))\n(check-sat)",
-            smtlib2.trim_end_matches('\n')
-        );
-        // More correct: wrap the check as (not <all-assertions>) which requires extracting them.
         // Practical approach: ask if `(not φ)` is sat by adding an explicit negation wrapper.
         let query = build_validity_check(smtlib2);
         if let Some(output) = self.run_z3(&query) {

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <style>
+    @keyframes breathe {
+      0%, 100% { transform: scale(0.85); }
+      50% { transform: scale(1.15); }
+    }
+    @keyframes orbit {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes particle-orbit {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    #bloom { animation: breathe 2.0s ease-in-out infinite; transform-origin: center; }
+    #rings > ellipse { animation: orbit 8.0s linear infinite; transform-origin: center; }
+    #particles > circle { animation: particle-orbit 3.0s linear infinite; transform-origin: center; }
+  </style>
+  <g id="aura">
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(100.0,100.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(220.0,100.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(340.0,100.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(160.0,200.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(280.0,200.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(400.0,200.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+    <circle cx="0.0" cy="0.0" r="50.0" transform="translate(100.0,300.0)" fill="rgba(0,255,255,0.60)" stroke="#ffffff" stroke-width="2.00"/>
+  </g>
+</svg>

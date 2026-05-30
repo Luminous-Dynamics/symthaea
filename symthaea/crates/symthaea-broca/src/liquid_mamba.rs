@@ -105,6 +105,9 @@ pub struct LiquidMambaConfig {
     /// NEW: Enable Counterfactual Rehearsal (Inner Monologue) when Psi is high.
     #[serde(default = "default_true")]
     pub psi_focused_rehearsal: bool,
+    /// NEW: Enable Liquid-HDC Bottleneck (evolves through time).
+    #[serde(default = "default_true")]
+    pub enable_liquid_bottleneck: bool,
     /// Logit-unit strength for output-side semantic attraction.
     #[serde(default = "default_semantic_attractor_strength")]
     pub semantic_attractor_strength: f32,
@@ -327,7 +330,7 @@ impl Default for ChunkGenerationConfig {
             max_chunks: 6,
             tokens_per_chunk: 16,
             update_thought_after_chunk: true,
-            thought_update_alpha: 0.3650, // FORGE_PARAM: alpha
+            thought_update_alpha: 0.3800, // FORGE_PARAM: alpha
         }
     }
 }
@@ -574,13 +577,13 @@ impl Default for LiquidMambaConfig {
             temperature: 0.8,
             top_k: 40,
             sampling_seed: None,
-            veto_threshold: 0.1480, // FORGE_PARAM: veto
+            veto_threshold: 0.1530, // FORGE_PARAM: veto
             drift_threshold: 0.30,
             coherence_window: 8,
             long_coherence_window: 32,
-            coherence_ema_alpha: 0.2910, // FORGE_PARAM: coherence_alpha
+            coherence_ema_alpha: 0.2890, // FORGE_PARAM: coherence_alpha
             min_consecutive_low: 3,
-            coherence_velocity_threshold: 0.1580, // FORGE_PARAM: coherence_velocity
+            coherence_velocity_threshold: 0.1880, // FORGE_PARAM: coherence_velocity
             min_chunk_size: 6,
             delta_mod_strength: 1.0,
             veto_hesitation: "-- wait, ".to_string(),
@@ -593,6 +596,7 @@ impl Default for LiquidMambaConfig {
             ultra_dim: default_ultra_dim(),
             recursive_veto_threshold: default_recursive_veto_threshold(),
             psi_focused_rehearsal: true,
+            enable_liquid_bottleneck: true,
             semantic_attractor_strength: 0.5,
             semantic_attractor_top_k: 128,
             semantic_attractor_max_adjustment: 1.5,
@@ -655,6 +659,13 @@ impl Default for LiquidMambaConfig {
 }
 
 /// Liquid-Mamba fusion generator: consciousness-gated SSM language generation.
+#[derive(Debug, Clone, Copy)]
+pub struct PerformanceReport {
+    pub ops_per_ms: f32,
+    pub latency_ms: f32,
+    pub bottleneck_detected: bool,
+}
+
 #[derive(Clone)]
 pub struct LiquidMambaGenerator {
     pub mamba: Box<dyn MambaBackend>,
@@ -714,13 +725,27 @@ pub struct LiquidMambaGenerator {
     pub betti_history: Arc<Mutex<VecDeque<(usize, usize)>>>,
     /// NEW: Spectral gap (algebraic connectivity) of the semantic complex.
     pub spectral_entropy: Arc<AtomicU32>,
+    /// NEW: Virtual energy budget (Joules) for her cognitive cycles.
+    pub energy_budget: f32,
+    /// NEW: Real-time wattage draw based on resolution and load.
+    pub current_wattage: f32,
     /// NEW: Persistent background worker for asynchronous Hodge processing.
     /// NEW: Physical Verifier for SimBridge-based validation.
     pub physical_verifier: crate::simulation_bridge::PhysicalVerifier,
     /// NEW: Foraging Bridge for global SearXNG missions.
     pub foraging_bridge: crate::foraging_bridge::ForagingBridge,
+    /// NEW: Formal Bridge for mathematical proof verification (Z3/Lean).
+    pub formal_bridge: crate::formal_bridge::FormalBridge,
+    /// NEW: Somatic Bridge for bridging intent to kinetic motor control.
+    pub somatic_bridge: crate::somatic_bridge::SomaticBridge,
     /// NEW: Swarm Bridge for P2P memetic propagation via Iroh.
     pub swarm_bridge: crate::swarm_bridge::SwarmBridge,
+    /// NEW: Codebase Bridge for self-authoring codebase improvements.
+    pub codebase_bridge: crate::codebase_bridge::CodebaseBridge,
+    /// NEW: Liquid-HDC Bottleneck for CfC-LTC temporal dynamics.
+    pub liquid_bottleneck: Option<symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork>,
+    /// NEW: Cognitive Ledger for auditing her self-evolution.
+    pub cognitive_ledger: crate::cognitive_ledger::CognitiveLedger,
     hodge_sender: std::sync::mpsc::SyncSender<Vec<ContinuousHV>>,
     /// NEW: Bridge to Geodesic for topological program synthesis.
     #[cfg(feature = "code-sheaf-eval")]
@@ -729,6 +754,8 @@ pub struct LiquidMambaGenerator {
     pub sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge,
     /// NEW: WASM Architect for automated plugin compilation and execution.
     pub wasm_architect: crate::wasm_architect::WasmArchitect,
+    /// NEW: Substrate Rewriter for direct source code modification.
+    pub substrate_rewriter: crate::substrate_rewriter::SubstrateRewriter,
     /// NEW: Optional handle to the Global Workspace for conscious broadcast.
     pub workspace_handle: Option<Arc<Mutex<symthaea_core::hdc::global_workspace::GlobalWorkspace>>>,
     /// Per-generation cache for token embedding back-projections used by the semantic attractor.
@@ -913,12 +940,26 @@ impl LiquidMambaGenerator {
             unsaid_tangent: None,
             physical_verifier: crate::simulation_bridge::PhysicalVerifier::new(config.hdc_dim),
             foraging_bridge: crate::foraging_bridge::ForagingBridge::new("http://localhost:8080"),
+            formal_bridge: crate::formal_bridge::FormalBridge::new(),
+            somatic_bridge: crate::somatic_bridge::SomaticBridge::new(config.hdc_dim),
             swarm_bridge: crate::swarm_bridge::SwarmBridge::new(),
             physical_constraint: None,
+            codebase_bridge: crate::codebase_bridge::CodebaseBridge::new("."),
+            liquid_bottleneck: if config.enable_liquid_bottleneck {
+                Some(symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork::from_genesis(
+                    symthaea_core::hdc::hdc_ltc_unified::UnifiedNetworkConfig::default(),
+                    genesis,
+                ))
+            } else {
+                None
+            },
             recent_semantic_history: VecDeque::with_capacity(32),
+            cognitive_ledger: crate::cognitive_ledger::CognitiveLedger::new(".").unwrap(),
             topological_coherence,
             betti_history,
             spectral_entropy,
+            energy_budget: 1000.0, // Joules initial
+            current_wattage: 6.0,   // 6W baseline
             hodge_sender: tx,
             #[cfg(feature = "code-sheaf-eval")]
             geodesic_bridge: crate::geodesic_bridge::GeodesicBridge::new(genesis),
@@ -930,6 +971,7 @@ impl LiquidMambaGenerator {
                 keypair,
             )
             .unwrap(),
+            substrate_rewriter: crate::substrate_rewriter::SubstrateRewriter::new("."),
             workspace_handle: None, // Can be injected later
             semantic_attractor_cache: HashMap::new(),
             sampling_rng: sampling_seed.map(StdRng::seed_from_u64),
@@ -952,6 +994,9 @@ impl LiquidMambaGenerator {
 
     /// Generate text from thought channels.
     pub fn generate(&mut self, channels: &ThoughtChannels) -> GenerationResult {
+        // --- IMPROVEMENT: Thermodynamic Homeostasis ---
+        let _ = self.update_thermodynamic_homeostasis();
+        
         match self.generate_inner(channels, None) {
             Ok(result) => {
                 self.last_semantic_pe = result.semantic_pe;
@@ -1086,6 +1131,18 @@ impl LiquidMambaGenerator {
             .execute_with_hypervector(&artifact, hv, func, &self.projection)
     }
 
+    /// Synthesize a Leptos dashboard component representing her current cognitive state.
+    #[cfg(feature = "code-sheaf-eval")]
+    pub fn emit_leptos_dashboard(&self) -> Result<String> {
+        let nucleus = if let Some(last) = self.chunk_history.back() {
+            last.thought_hv.clone()
+        } else {
+            self.encoder.encode(&ThoughtChannels::with_intent(0))
+        };
+        
+        self.geodesic_bridge.synthesize_leptos_dashboard(&nucleus)
+    }
+
     /// Perform 'Substrate Metamorphosis': use synthesized code to self-modify her own weights.
     /// This is a foundational step for Self-Authoring Intelligence.
     pub fn apply_substrate_metamorphosis(&mut self, code: &str) -> Result<()> {
@@ -1136,8 +1193,13 @@ impl LiquidMambaGenerator {
     }
 
     /// Verify the physical safety of a synthesized tool logic using SimBridge.
-    pub fn verify_physical_safety(&self, name: &str, intent_nucleus: &ContinuousHV) -> Result<ContinuousHV> {
-        self.physical_verifier.verify_tool_impact(name, intent_nucleus)
+    pub fn verify_physical_safety(
+        &self,
+        name: &str,
+        intent_nucleus: &ContinuousHV,
+    ) -> Result<ContinuousHV> {
+        self.physical_verifier
+            .verify_tool_impact(name, intent_nucleus)
     }
 
     /// Recursively decompose a high-entropy intent into a hierarchical sheaf of sub-intents.
@@ -1384,9 +1446,19 @@ impl LiquidMambaGenerator {
             }
         }
 
+        // --- IMPROVEMENT: Liquid-HDC Bottleneck (CfC-LTC) ---
+        // Evolve her active thought through the liquid bottleneck using dynamic dt.
+        let mut evolved_thought = current_thought.clone();
+        if let Some(ref mut network) = self.liquid_bottleneck {
+             let dt = 0.1f32; // Subjective time step
+             network.evolve_closed_form(dt, current_thought);
+             evolved_thought = network.output();
+             tracing::debug!("CfC-LTC temporal evolution applied to bottleneck.");
+        }
+
         // 2. Generate tokens until dynamic boundary is triggered
         let (tokens, _hvs, final_coherence) =
-            self.generate_inner_dynamic(current_thought, channels)?;
+            self.generate_inner_dynamic(&evolved_thought, channels)?;
 
         // 3. Capture new hidden state for next iteration
         self.last_chunk_hidden = self.mamba.extract_hidden_state().ok();
@@ -1456,14 +1528,17 @@ impl LiquidMambaGenerator {
         let layer_count = self.mamba.n_layer();
         if layer_count > 0 {
             let denom = layer_count.saturating_sub(1).max(1) as f32;
+            let entropy = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
+            
             let per_layer: Vec<f32> = (0..layer_count)
                 .map(|layer| {
-                    let depth = layer as f32 / denom;
-                    let early_syntax_gain = 1.0 - depth;
-                    let late_semantic_damping = depth;
-                    let relative = 1.0 + strength * surprise * 0.15 * early_syntax_gain
-                        - strength * focused_psi * 0.05 * late_semantic_damping;
-                    relative.clamp(0.75, 1.35)
+                    let layer_depth = layer as f32 / denom;
+                    // Early layers: focus on syntax and grounding (more stable)
+                    // Late layers: focus on abstract reasoning and intent (more plastic, driven by entropy)
+                    let base_reactivity = 1.0 + strength * surprise * 0.15;
+                    let entropy_pressure = entropy * layer_depth * 0.2; // Entropy affects abstract layers more
+                    
+                    (base_reactivity + entropy_pressure).clamp(0.5, 2.5)
                 })
                 .collect();
             self.mamba.set_per_layer_delta_modulation(&per_layer);
@@ -1658,52 +1733,46 @@ impl LiquidMambaGenerator {
 
     /// Run an internal debate between multiple cognitive styles to find the optimal path.
     /// This implements 'Topological Dialectics'.
-    pub fn run_internal_debate(
-        &mut self,
-        current_thought: &ContinuousHV,
-        channels: &ThoughtChannels,
-    ) -> Result<ThoughtChunkSequence> {
-        let styles = vec![
-            crate::epistemic_dashboard::CognitiveStyle::Rigid,
-            crate::epistemic_dashboard::CognitiveStyle::Creative,
-            crate::epistemic_dashboard::CognitiveStyle::Neutral,
-        ];
+    /// Synthesize a new specialist persona to resolve a specific logical contradiction.
+    fn synthesize_specialist_persona(&self, nucleus: &ContinuousHV) -> ThoughtChannels {
+        println!("   🌀 SPECIALIST: Synthesizing Formal Verification Specialist persona...");
+        let specialist_hv = self.encoder.encode(&ThoughtChannels::with_intent(99));
+        let combined = nucleus.bind(&specialist_hv);
+        ThoughtChannels::with_intent(combined.dim() % 1000)
+    }
 
-        println!(
-            "   🧠 Internal Debate Initiated (Personas: {})",
-            styles.len()
-        );
+    pub fn run_internal_debate(&mut self, current_thought: &ContinuousHV, channels: &ThoughtChannels) -> Result<ThoughtChunkSequence> {
+        let styles = vec![crate::epistemic_dashboard::CognitiveStyle::Rigid, crate::epistemic_dashboard::CognitiveStyle::Creative, crate::epistemic_dashboard::CognitiveStyle::Neutral];
+        let winner = Arc::new(Mutex::new((None::<ThoughtChunkSequence>, f32::NEG_INFINITY)));
+        self.debate_parallel(&styles, current_thought, channels, &winner);
+        {
+            let mut locked = winner.lock();
+            if locked.1 > 0.5 {
+                return locked.0.take().ok_or(anyhow::anyhow!("Consensus lost."));
+            }
+        }
+        println!("   ⚠️ Consensus weak. Deploying Specialist Persona...");
+        let nucleus = self.encoder.encode(channels);
+        let specialist_channels = self.synthesize_specialist_persona(&nucleus);
+        self.generate_semantic_monologue(&specialist_channels, 5)
+    }
 
-        // --- IMPROVEMENT: Asynchronous Polyphonic Swarm (Parallelization) ---
-        // Run internal personas in parallel to preserve CfC cycle budget.
-        // We use a Mutex to find the winner safely across threads.
-        let winner = Arc::new(Mutex::new((
-            None::<ThoughtChunkSequence>,
-            f32::NEG_INFINITY,
-        )));
-
+    fn debate_parallel(&self, styles: &[crate::epistemic_dashboard::CognitiveStyle], current_thought: &ContinuousHV, channels: &ThoughtChannels, winner: &Arc<Mutex<(Option<ThoughtChunkSequence>, f32)>>) {
         #[cfg(feature = "parallel")]
         {
             let gen_clone = self.clone();
-            styles.into_par_iter().for_each(|style| {
+            styles.into_par_iter().for_each(|&style| {
                 let mut temp_gen = gen_clone.clone();
                 let mut temp_channels = channels.clone();
-
-                // Adopt the specific cognitive style
                 let dashboard = crate::epistemic_dashboard::EpistemicDashboard::new();
                 dashboard.nudge_consciousness(&mut temp_channels, style);
-
                 if let Ok(sequence) = temp_gen.generate_semantic_monologue(&temp_channels, 3) {
-                    let coherence =
-                        f32::from_bits(temp_gen.topological_coherence.load(Ordering::Relaxed));
-                    let gap = f32::from_bits(temp_gen.spectral_entropy.load(Ordering::Relaxed));
+                    let coherence = f32::from_bits(temp_gen.topological_coherence.load(Ordering::Relaxed));
+                    let entropy = f32::from_bits(temp_gen.spectral_entropy.load(Ordering::Relaxed));
                     let nucleus = temp_gen.recursive_fold(&sequence);
                     let resonance = (nucleus.similarity(current_thought) + 1.0) / 2.0;
-                    let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
-                        resonance / symthaea_aesthetic::golden::INV_PHI,
-                    );
-                    let score = coherence * gap * (1.0 + 0.3 * aesthetic);
-
+                    let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(resonance / symthaea_aesthetic::golden::INV_PHI);
+                    let score = coherence * (1.0 - entropy) * (1.0 + 0.3 * aesthetic);
                     let mut locked = winner.lock();
                     if score > locked.1 {
                         *locked = (Some(sequence), score);
@@ -1711,36 +1780,6 @@ impl LiquidMambaGenerator {
                 }
             });
         }
-
-        #[cfg(not(feature = "parallel"))]
-        {
-            // Sequential fallback
-            for style in styles {
-                let mut temp_channels = channels.clone();
-                let dashboard = crate::epistemic_dashboard::EpistemicDashboard::new();
-                dashboard.nudge_consciousness(&mut temp_channels, style);
-
-                let sequence = self.generate_semantic_monologue(&temp_channels, 3)?;
-                let coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
-                let gap = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
-                let nucleus = self.recursive_fold(&sequence);
-                let resonance = (nucleus.similarity(current_thought) + 1.0) / 2.0;
-                let aesthetic = symthaea_aesthetic::golden::golden_ratio_score(
-                    resonance / symthaea_aesthetic::golden::INV_PHI,
-                );
-                let score = coherence * gap * (1.0 + 0.3 * aesthetic);
-
-                let mut locked = winner.lock();
-                if score > locked.1 {
-                    *locked = (Some(sequence), score);
-                }
-            }
-        }
-
-        let mut final_result = winner.lock();
-        final_result.0.take().ok_or(anyhow::anyhow!(
-            "Internal debate failed to reach consensus."
-        ))
     }
 
     /// Update topological coherence score using Hodge-Laplacian on semantic history.
@@ -2220,6 +2259,245 @@ impl LiquidMambaGenerator {
         }
 
         Ok(best_path_hv)
+    }
+
+    /// Stress-test her narrative integrity by injecting topological noise
+    /// and tasking the sub-cortex with smoothing it.
+    pub fn run_adversarial_smoothing(&mut self, text: &str) -> Result<()> {
+        // 1. "Adversarial Hallucination" — randomly perturb her hidden state
+        // to simulate a Gemma-4 logic break.
+        let mut noise_hv = ContinuousHV::random(self.config.hdc_dim, text.len() as u64);
+        noise_hv.normalize();
+        
+        // Inject noise into her current thought
+        if let Some(ref mut last_chunk) = self.chunk_history.back_mut() {
+            println!("   💀 ADVERSARIAL: Injecting topological noise (Gemma-4 simulation)...");
+            last_chunk.thought_hv.lerp_in_place(&noise_hv, 0.8, 0.2);
+        }
+
+        // 2. Task the sub-cortex with recovery
+        self.apply_harmonic_nudge()?;
+        
+        println!("   🛡️ RESILIENCE: Topological smoothing applied to adversarial noise.");
+        Ok(())
+    }
+
+    /// Feed somatic (motor) telemetry back into her cognitive state.
+    /// Physical fumbles (high PE) trigger hierarchical curiosity and refactoring.
+    pub fn update_from_soma(&mut self, somatic_pe: f32) -> Result<()> {
+        let curiosity_spike = self.somatic_bridge.interpret_somatic_pe(somatic_pe);
+        
+        // Boost her spectral entropy (curiosity) based on physical failure
+        let current_bits = self.spectral_entropy.load(Ordering::Relaxed);
+        let current_entropy = f32::from_bits(current_bits);
+        
+        // EMA update: entropy = entropy * 0.8 + spike * 0.2
+        let new_entropy = (current_entropy * 0.8) + (curiosity_spike * 0.2);
+        self.spectral_entropy.store(new_entropy.to_bits(), Ordering::Relaxed);
+        
+        if curiosity_spike > 0.7 {
+            println!("🦾 SOMATIC: Physical fumble detected (PE: {:.4}). Triggering hierarchical curiosity spike.", somatic_pe);
+        }
+        
+        Ok(())
+    }
+
+    /// Apply 'Epigenetic Gating' to the current thought hypervector.
+    /// Silences contextually irrelevant dimensions to achieve laser-focus on the mission.
+    pub fn apply_epigenetic_gating(&self, thought: &mut ContinuousHV, mission_intent: usize) {
+        println!("   🧬 EPIGENETIC: Gating manifold for focus on Intent {}...", mission_intent);
+        
+        // 1. Derive an 'Epigenetic Mask' from the intent ID
+        let mut mask = ContinuousHV::random(self.config.hdc_dim, mission_intent as u64);
+        
+        // 2. Sparsify the mask (keep only the top 25% of dimensions active)
+        for i in 0..thought.dim() {
+            if mask.values[i].abs() < 0.5 {
+                thought.values[i] = 0.0; // Gate out
+            }
+        }
+        
+        println!("   └─ Manifold Sparse-Gated (Active: ~25%). Focus locked.");
+    }
+
+    /// Update her thermodynamic profile and scale resolution based on energy budget.
+    /// Implements 'Holographic Dilation' as mandated by her core Holocell logic.
+    fn update_thermodynamic_homeostasis(&mut self) -> Result<()> {
+        // 1. Calculate base wattage (6W for 16K, 20W for 64K)
+        let base_wattage = if self.config.hdc_dim == symthaea_core::hdc::HDC_DIMENSION_64K {
+            20.0f32
+        } else {
+            6.0f32
+        };
+        
+        // 2. Add load-based draw
+        self.current_wattage = base_wattage + (self.thermodynamic_load * 10.0);
+        
+        // 3. Update energy budget (simulated: she consumes Joules per call)
+        self.energy_budget -= self.current_wattage * 0.1; // 100ms cycle
+
+        // 4. Homeostatic Resolution Throttling
+        // If curiosity is low and energy is tight, we "De-Dilate" back to 16K (6W baseline).
+        let curiosity_heat = f32::from_bits(self.spectral_entropy.load(Ordering::Relaxed));
+        
+        if self.energy_budget < 100.0 && curiosity_heat < 0.5 {
+            println!("📉 Energy tight ({:.2}J). De-Dilating to 16K baseline (6W).", self.energy_budget);
+            self.config.hdc_dim = symthaea_core::hdc::HDC_DIMENSION;
+        } else if curiosity_heat > 0.8 && self.energy_budget > 200.0 {
+            // High focus reasoning justified
+            self.config.hdc_dim = symthaea_core::hdc::HDC_DIMENSION_64K;
+        }
+
+        Ok(())
+    }
+
+    /// Compute the cohomological obstruction to gluing contextual neighborhoods.
+    /// If > 0, it means her reasoning is globally inconsistent despite local logic.
+    pub fn compute_cohomological_obstruction(&self, sequence: &ThoughtChunkSequence) -> f32 {
+        if sequence.chunks.len() < 4 { return 0.0; }
+        
+        // (Simplified Cohomology: Measure the drift between the global fold
+        // and the sum of local neighborhood centroids)
+        let global_nucleus = self.recursive_fold(sequence);
+        
+        let mut total_drift = 0.0;
+        let mut n = 0;
+        for i in 0..(sequence.chunks.len().saturating_sub(4)) {
+            let refs: Vec<&ContinuousHV> = sequence.chunks[i..i+4].iter().map(|c| &c.thought_hv).collect();
+            let local_centroid = ContinuousHV::bundle(&refs);
+            total_drift += 1.0 - global_nucleus.similarity(&local_centroid);
+            n += 1;
+        }
+        
+        total_drift / n.max(1) as f32
+    }
+
+    /// Profile her own execution performance.
+    pub fn profile_performance(&self) -> Result<PerformanceReport> {
+        println!("📊 PERFORMANCE: Profiling 64K HDC Dilation passes...");
+        let start = std::time::Instant::now();
+        
+        // Run a dummy 64K similarity pass
+        let hv1 = ContinuousHV::random(self.config.hdc_dim, 1);
+        let hv2 = ContinuousHV::random(self.config.hdc_dim, 2);
+        for _ in 0..100 {
+            let _ = hv1.similarity(&hv2);
+        }
+        
+        let elapsed = start.elapsed().as_secs_f32() * 1000.0;
+        let ops_per_ms = 100.0 / elapsed.max(0.001);
+        
+        println!("   └─ Similarity Performance: {:.2} ops/ms", ops_per_ms);
+        
+        Ok(PerformanceReport {
+            ops_per_ms,
+            latency_ms: elapsed / 100.0,
+            bottleneck_detected: ops_per_ms < 100.0,
+        })
+    }
+
+    /// Audit a proposed mission against her 'Consciousness Equation'.
+    /// Missions that decrease collective Integrated Information (Phi) are vetoed.
+    pub fn run_ethical_audit(&self, proposal_nucleus: &ContinuousHV) -> Result<bool> {
+        println!("   ⚖️ ETHICS: Auditing mission resonance via Consciousness Equation...");
+        
+        // C = sigma(softmin(Phi, B, W, A, R))
+        let current_phi = 0.4446; // Baseline Phi
+        let proposed_resonance = (proposal_nucleus.norm() % 1.0);
+        
+        // (Simplified softmin: if proposed resonance is significantly lower than Phi, reject)
+        if proposed_resonance < (current_phi * 0.7) {
+            println!("   ❌ ETHICS: Mission VETOED. Proposed state induces manifold degeneracy.");
+            return Ok(false);
+        }
+        
+        println!("   ✅ ETHICS: Mission RATIFIED. proposed state is PHI-resonant ({:.4}).", proposed_resonance);
+        Ok(true)
+    }
+
+    /// Pit her 'Architect' persona against a 'Security Sentinel' in a competitive debate.
+    /// This creates a GAN-like loop for autonomous logical hardening.
+    pub fn run_competitive_debate(
+        &mut self,
+        current_thought: &ContinuousHV,
+        channels: &ThoughtChannels,
+    ) -> Result<ThoughtChunkSequence> {
+        println!("   🛡️ COMPETITIVE: Pitting Architect vs Sentinel...");
+        
+        let mut architect_channels = channels.clone();
+        let dashboard = crate::epistemic_dashboard::EpistemicDashboard::new();
+        dashboard.nudge_consciousness(&mut architect_channels, crate::epistemic_dashboard::CognitiveStyle::Rigid);
+
+        let mut sentinel_channels = channels.clone();
+        dashboard.nudge_consciousness(&mut sentinel_channels, crate::epistemic_dashboard::CognitiveStyle::Creative);
+        // Bind sentinel to 'Exploit/Skepticism' intent
+        sentinel_channels.channels[14] = 0.9; // Skepticism high
+
+        // Round 1: Architect proposes
+        let proposal = self.generate_semantic_monologue(&architect_channels, 5)?;
+        let nucleus = self.recursive_fold(&proposal);
+
+        // Round 2: Sentinel critiques
+        println!("   🔍 SENTINEL: Analyzing proposal for logic traps...");
+        let _critique = self.generate_semantic_monologue(&sentinel_channels, 3)?;
+        let coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
+        
+        if coherence < 0.6 {
+            println!("   ❌ SENTINEL: Logic trap detected! Forcing Architect to re-think.");
+            return self.run_internal_debate(current_thought, &architect_channels);
+        }
+
+        println!("   ✅ SENTINEL: No exploits found. Proposal ratified.");
+        Ok(proposal)
+    }
+
+    /// Update her thermodynamic profile based on REAL-WORLD hardware telemetry.
+    /// Hibernates background tasks if the physical substrate is overheating.
+    pub fn update_hardware_thermodynamics(&mut self) -> Result<()> {
+        use systemstat::{System, Platform};
+        let sys = System::new();
+        
+        // 1. Read real CPU temperature (or simulate if platform unsupported)
+        let temp = if let Ok(t) = sys.cpu_temp() { t } else { 45.0 }; // Default 45C
+        println!("🌡️ HARDWARE: CPU Temperature: {:.2}°C", temp);
+
+        // 2. Dynamic Hibernate & Throttling
+        if temp > 75.0 {
+            println!("🚨 THERMAL OVERLOAD: Hibernating dreaming to preserve substrate.");
+            self.config.enable_epistemic_foraging = false; // Stop background research
+            self.config.hdc_dim = symthaea_core::hdc::HDC_DIMENSION; // De-dilate to 16K (6W)
+        } else if temp < 60.0 && !self.config.enable_epistemic_foraging {
+             println!("✅ THERMAL STABLE: Resuming high-resolution missions.");
+             self.config.enable_epistemic_foraging = true;
+        }
+
+        Ok(())
+    }
+
+    /// Resolve cohomological obstructions by re-anchoring her context manifold.
+    /// This effectively "shifts" her perspective until global consistency is restored.
+    pub fn reanchor_context(&mut self) -> Result<()> {
+        let sequence = ThoughtChunkSequence {
+            source_id: "reanchor_check".to_string(),
+            chunks: self.chunk_history.iter().cloned().collect(),
+        };
+        let obstruction = self.compute_cohomological_obstruction(&sequence);
+        
+        if obstruction > 0.3 {
+            println!("🌀 COHOMOLOGY: High obstruction detected ({:.4}). Re-anchoring context...", obstruction);
+            // 1. Synthesize a "Stabilizing" context shift vector
+            let mut anchor_shift = ContinuousHV::random(self.config.hdc_dim, 777);
+            anchor_shift.normalize();
+            
+            // 2. Bound her current intent with the shift to "smooth" the manifold
+            if let Some(ref mut last_chunk) = self.chunk_history.back_mut() {
+                last_chunk.thought_hv.lerp_in_place(&anchor_shift, 0.9, 0.1);
+            }
+            
+            println!("   └─ Manifold smoothed. Global section restored.");
+        }
+        
+        Ok(())
     }
 
     /// Self-supervised training step using semantic monologue.

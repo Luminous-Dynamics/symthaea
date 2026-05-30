@@ -2,7 +2,7 @@
 name = "symthaea-engineering"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Engineering reasoning facade: requirements, concepts, simulations, digital twins, and safety cases"
 license = "AGPL-3.0-or-later"
@@ -31,5 +31,6 @@ symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
 symthaea-harmonies = { path = "../symthaea-harmonies" }
 symthaea-swarm = { path = "../symthaea-swarm" }
 symthaea-types = { path = "../symthaea-types" }
+symtropy-robotics-bridge-core = { path = "../../../symtropy/crates/symtropy-robotics-bridge-core" }
 serde = { workspace = true }
 tracing = { workspace = true }

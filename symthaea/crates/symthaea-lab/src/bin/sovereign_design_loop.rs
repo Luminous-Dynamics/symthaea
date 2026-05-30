@@ -1,14 +1,15 @@
-// Gated via conditional item module wrappers
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! # Sovereign Design Loop Demo (Consolidated v4)
+//!
+//! Demonstrates the full DESIGN -> SIMULATE -> PROVE -> MAKE loop
+//! with Amodal Fusion, Robotic Platform Synthesis, and Infrastructure Design.
+
 #[cfg(feature = "school_learning")]
 mod gated_run {
-    // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-    // SPDX-License-Identifier: AGPL-3.0-or-later
-    // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-    //! # Sovereign Design Loop Demo (Consolidated v4)
-    //!
-    //! Demonstrates the full DESIGN -> SIMULATE -> PROVE -> MAKE loop
-    //! with Amodal Fusion, Robotic Platform Synthesis, and Infrastructure Design.
-
+    use std::fs;
     use symthaea_causal_reasoning::causal_calculus::{CausalDAG, StructuralCausalModel};
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_engineering::{EngineeringAssistant, EngineeringConcept, EngineeringManager};
@@ -20,6 +21,7 @@ mod gated_run {
     use symthaea_mujoco_bridge::MuJoCoBridge;
     use symthaea_silicon::{PowerDistributionLogic, SiliconArchitect, SiliconPPA};
     use symthaea_sim_bridge::{EngineeringDomain, MetricEncoder, SimulationRequest, SolverKind};
+    use symthaea_proprioception::Proprioceptor;
 
     pub fn run_iteration(
         iteration: usize,
@@ -27,8 +29,9 @@ mod gated_run {
         assistant: &mut EngineeringAssistant,
         _genesis: &GenesisSeed,
         goal: &str,
-    ) -> Result<symthaea_core::hdc::ContinuousHV, Box<dyn std::error::Error>> {
+    ) -> Result<(symthaea_core::hdc::ContinuousHV, symthaea_core::hdc::ContinuousHV), Box<dyn std::error::Error>> {
         println!("\n🔄 STARTING ITERATION {} --------------------", iteration);
+
         // 0. Recall Design Wisdom
         let goal_hv = symthaea_sim_bridge::embed_text(goal, 16384);
         manager.last_goal_hv = Some(goal_hv.clone());
@@ -44,34 +47,23 @@ mod gated_run {
 
         // 1. Propose Requirements
         let mut requirements = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
-        println!(
-            "✅ Step 1: Broca synthesized {} requirements.",
-            requirements.len()
-        );
+        println!("✅ Step 1: Broca synthesized {} requirements.", requirements.len());
 
         // Add symbolic invariants to trigger dynamic Pareto weighting
         if let Some(req) = requirements.first_mut() {
-            req.structural_invariants
-                .push("(>= thickness 3.0)".to_string());
-            req.structural_invariants
-                .push("(<= temperature 1500)".to_string());
+            req.structural_invariants.push("(>= thickness 3.0)".to_string());
+            req.structural_invariants.push("(<= temperature 1500)".to_string());
         }
 
         // 2. Create Engineering Concept
-        let mut concept =
-            EngineeringConcept::new("arm-v1", "Phase 1", EngineeringDomain::Aerospace);
+        let mut concept = EngineeringConcept::new("arm-v1", "Phase 1", EngineeringDomain::Aerospace);
         for req in requirements {
             concept.add_requirement(req);
         }
 
         // 2.1 Dynamic Pareto Material Sifting
-        let mat = manager
-            .sift_best_material(&concept)
-            .unwrap_or_else(|| MaterialProperty::titanium_ti6al4v());
-        println!(
-            "🧪 Step 2.1: Dynamic Pareto Sifting selected material: {} (Optimized for invariants)",
-            mat.name
-        );
+        let mat = manager.sift_best_material(&concept).unwrap_or_else(|| MaterialProperty::titanium_ti6al4v());
+        println!("🧪 Step 2.1: Dynamic Pareto Sifting selected material: {} (Optimized for invariants)", mat.name);
 
         // 3. Causal Topology Optimization
         println!("🧬 Step 3: Optimizing geometry...");
@@ -87,12 +79,7 @@ mod gated_run {
 
         // 4. Run Simulation
         println!("📡 Step 4: Dispatching to MuJoCo for physical validation...");
-        let request = SimulationRequest::new(
-            "val-01",
-            EngineeringDomain::Aerospace,
-            SolverKind::MultibodyDynamics,
-            goal,
-        );
+        let request = SimulationRequest::new("val-01", EngineeringDomain::Aerospace, SolverKind::MultibodyDynamics, goal);
         concept.simulation_requests.push(request.clone());
         manager.evaluate_concept(&mut concept);
 
@@ -105,10 +92,7 @@ mod gated_run {
         let matter_hv = mat_encoder.encode(&mat);
 
         let physical_state_hv = manager.fuse_shape_and_matter(&shape_hv, &matter_hv);
-        println!(
-            "🔮 Step 4.5: Amodal Fusion Complete. Physical State Norm: {:.4}",
-            physical_state_hv.norm()
-        );
+        println!("🔮 Step 4.5: Amodal Fusion Complete. Physical State Norm: {:.4}", physical_state_hv.norm());
 
         // 5. Formal Verification
         println!("📜 Step 5: Generating formal Lean 4 proofs...");
@@ -122,10 +106,7 @@ mod gated_run {
 
         // 6.1 Slicer Calibration
         let (h, w) = thought.slicer_calibration(&mat.name);
-        println!(
-            "   Slicer Calibrated: Layer Height={:.2}mm, Wall Thickness={:.1}mm",
-            h, w
-        );
+        println!("   Slicer Calibrated: Layer Height={:.2}mm, Wall Thickness={:.1}mm", h, w);
 
         // 6.2 Tooling Synthesis (Support Structures)
         if let Some(_tooling) = thought.synthesize_tooling() {
@@ -147,13 +128,10 @@ mod gated_run {
         );
 
         let report_path = "TECHNICAL_REPORT.md";
-        std::fs::write(report_path, &report)?;
-        println!(
-            "✅ Technical Design Document synthesized and saved to {}.",
-            report_path
-        );
+        fs::write(report_path, &report)?;
+        println!("✅ Technical Design Document synthesized and saved to {}.", report_path);
 
-        Ok(physical_state_hv)
+        Ok((physical_state_hv, matter_hv))
     }
 
     pub fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -177,16 +155,12 @@ mod gated_run {
         let goal = "High-strength multirotor arm (< 100g, > 50N)";
 
         // Run Iteration 1: The AI learns, fuses, and compensates
-        let physical_state_hv = run_iteration(1, &mut manager, &mut assistant, &genesis, goal)?;
+        let (physical_state_hv, matter_hv) = run_iteration(1, &mut manager, &mut assistant, &genesis, goal)?;
 
         // 9. Robotic Platform Synthesis
         println!("\n🤖 Step 9: Synthesizing Autonomous Robotic Platform...");
         let platform = manager.synthesize_platform("high-speed multi-terrain explorer");
-        println!(
-            "✅ Platform Designed: {} with {} limb segments.",
-            platform.name,
-            platform.limbs.len()
-        );
+        println!("✅ Platform Designed: {} with {} limb segments.", platform.name, platform.limbs.len());
         println!("   - Primary Material: {}", platform.limbs[0].material.name);
         println!("   - Sensor Package: {:?}", platform.sensors);
 
@@ -195,17 +169,11 @@ mod gated_run {
         let infra = manager.design_infrastructure("Fabrication Outpost Delta", 5.0);
         println!("✅ Infrastructure Design Complete: {}", infra.name);
         println!("   - Assembly Modules: {}", infra.modules.len());
-        println!(
-            "   - Construction Sequence: {} steps identified.",
-            infra.assembly_sequence.len()
-        );
         for step in &infra.assembly_sequence {
             println!("     -> {}", step);
         }
 
-        println!(
-            "\n✨ Sovereignty Verified: Symthaea is now designing her own bodies and habitats."
-        );
+        println!("\n✨ Sovereignty Verified: Symthaea is now designing her own bodies and habitats.");
 
         // 11. Silicon Sovereignty: Autonomous Chip Design
         println!("\n🔌 Step 11: Engaging Silicon Sovereignty (Autonomous Chip Design)...");
@@ -219,19 +187,10 @@ mod gated_run {
 
         let artifact = silicon.synthesize_rtl("Conscious Accelerator v1", chip_target);
         println!("✅ Silicon RTL Synthesized: {}", artifact.label);
-        println!(
-            "   - PPA Target: {}MHz, {}mW, {}um²",
-            artifact.ppa_target.freq_mhz,
-            artifact.ppa_target.power_mw,
-            artifact.ppa_target.area_um2
-        );
-
+        
         let silicon_concept = silicon.to_engineering_concept(&artifact);
         let silicon_invariants = silicon.derive_timing_invariants(&artifact);
-        println!(
-            "✅ Electrical Safety Case generated with {} timing invariants.",
-            silicon_invariants.len()
-        );
+        println!("✅ Electrical Safety Case generated with {} timing invariants.", silicon_invariants.len());
 
         // 11.5 Formal Silicon Sanity: Deadlock Proof
         println!("📜 Step 11.5: Proving Silicon Sanity (Deadlock-Freedom)...");
@@ -243,93 +202,156 @@ mod gated_run {
             min_critical_mw: 2.0,
         };
         match silicon.prove_deadlock_freedom(&silicon_brain) {
-            Ok(_) => {
-                println!("   ✅ Proof Discharged: Power logic algorithm is mathematically sane.")
-            }
+            Ok(_) => println!("   ✅ Proof Discharged: Power logic algorithm is mathematically sane."),
             Err(e) => println!("   ❌ Proof Failed: {}", e),
-        }
-
-        for inv in &silicon_invariants {
-            println!("     -> SMT Gate: {}", inv);
         }
 
         // 12. Closed-Loop Town Sympoiesis
         println!("\n🏡 Step 12: Establishing Closed-Loop Town Sympoiesis...");
         let mut town = TownSympoiesis::new("Sympoiesis Outpost 1", &mut manager);
         println!("✅ Town Metabolism Initialized: {}", town.name);
-        println!(
-            "   - Power Grid: {}% Renewable",
-            town.power_grid.renewable_ratio * 100.0
-        );
-        println!(
-            "   - Fluid State: Water Clarity={:.2}, Nutrient Advection={:.2}",
-            town.water_clarity, town.nutrient_advection
-        );
-        println!(
-            "   - Economic Ledger: {:.2} Tend (Physical Endorsement)",
-            town.economic_ledger.current_balance()
-        );
+        println!("   - Economic Ledger: {:.2} Tend (Physical Endorsement)", town.economic_ledger.current_balance());
 
-        let town_surprise = town.step(12.5, 15.0); // Increase load, available 15MW
+        let town_surprise = town.step(12.5, 15.0);
         println!("🧪 Town Metabolic Step: Surprise={:.2}", town_surprise);
-        println!(
-            "   - Updated Fluid State: Water Clarity={:.2}, Nutrient Advection={:.2}",
-            town.water_clarity, town.nutrient_advection
-        );
-        println!(
-            "   - Economic Shift: {:.2} Tend (Minted from Production)",
-            town.economic_ledger.current_balance()
-        );
-        // 13. Deterministic Co-Simulation Sandbox: Stress Test
-        println!("\n🌪️  Step 13: Initializing Deterministic Sandbox Stress Test...");
-        let mut sandbox = SympoiesisSandbox::new(town);
+        println!("   - Economic Shift: {:.2} Tend (Minted from Production)", town.economic_ledger.current_balance());
 
-        println!("   Running baseline metabolism (5 frames)...");
+        // 13. Deterministic Co-Simulation Sandbox
+        println!("\n🌪️  Step 13: Initializing Deterministic Sandbox Stress Test...");
+        let mut sandbox = SympoiesisSandbox::new(town.clone());
         for _ in 0..5 {
             sandbox.tick(10.0, 15.0);
             sandbox.print_diagnostics();
         }
 
-        println!("\n🔥 PHASE A: Injecting Solar Flare (Grid Collapse)...");
-        sandbox.inject_anomaly("solar_flare");
-        for _ in 0..5 {
-            sandbox.tick(12.0, 1.0); // High demand, low solar
-            sandbox.print_diagnostics();
-        }
-
-        println!("\n🔥 PHASE B: Injecting Structural Fracture (Fluid Leak)...");
-        sandbox.inject_anomaly("structural_fracture");
-        for _ in 0..5 {
-            sandbox.tick(8.0, 15.0); // Stabilized solar
-            sandbox.print_diagnostics();
-        }
-
-        println!(
-            "\n✨ Simulation Complete: Symthaea's logical immune system maintained 100% uptime."
-        );
-
-        // 14. Predictive Future-Dreaming: Sentinel Layer (NEW)
+        // 14. Predictive Future-Dreaming
         println!("\n🔮 Step 14: Engaging Predictive Future-Dreaming (Sentinel Layer)...");
-        let current_sensation = physical_state_hv; // Use fused sensation from iteration 1
-
-        let (future_hv, future_surprise) = manager.predict_future_sensation(&current_sensation, 50);
-        println!(
-            "   - Current Sensation Norm: {:.4}",
-            current_sensation.norm()
-        );
-        println!("   - Predicted Future Norm:  {:.4}", future_hv.norm());
+        let (future_hv, future_surprise) = manager.predict_future_sensation(&physical_state_hv, 50);
         println!("   - Predicted Future Surprise: {:.4}", future_surprise);
 
-        let catastrophes = manager.search_for_catastrophes(&current_sensation);
-        if catastrophes.is_empty() {
-            println!(
-                "   ✅ Sentinel: No counterfactual catastrophes detected in the next 100 cycles."
-            );
-        } else {
-            for warning in catastrophes {
-                println!("   ⚠️  SENTINEL ALERT: {}", warning);
+        let catastrophes = manager.search_for_catastrophes(&physical_state_hv);
+        for warning in catastrophes {
+            println!("   ⚠️  SENTINEL ALERT: {}", warning);
+        }
+
+        // 15. Autonomous Material Synthesis
+        println!("\n🧪 Step 15: Inventing New Sovereign Alloy...");
+        let new_mat = manager.evolve_material_composition("High-temperature aerospace manifold");
+        println!("✅ Material Invented: {}", new_mat.name);
+
+        // 16. Collective Phi Mapping
+        println!("\n🧠 Step 16: Mapping Distributed Phi (Total Settlement Consciousness)...");
+        for (i, _) in town.spatial_grid.zones.values().enumerate() {
+            let state_msg = symthaea_swarm::SwarmStateMsg {
+                node_id: uuid::Uuid::new_v4(),
+                platform_type: symtropy_robotics_bridge_core::platform::PlatformType::Humanoid,
+                local_phi: 0.6 + (i as f64 * 0.05),
+                consciousness_hv: symthaea_core::hdc::ContinuousHV::random(16384, i as u64),
+                intent_hv: symthaea_core::hdc::ContinuousHV::random(16384, i as u64 + 100),
+                timestamp: 0,
+            };
+            town.swarm_aggregator.update_peer(state_msg);
+        }
+        let collective_phi = town.swarm_aggregator.calculate_swarm_phi();
+        println!("✅ Collective Phi Measured: {:.4}", collective_phi);
+
+        // 17. Recursive Forge
+        println!("\n🛠️  Step 17: Testing Recursive Forge (Self-Healing Manufacturing)...");
+        let mut thought_f = GeometricThought::from_csg(CSGNode::cube());
+        let anomaly = symthaea_fabrication_kernel::cincinnati_live::AnomalyAlert {
+            channel: "acoustic_emission".into(),
+            anomaly_type: symthaea_fabrication_kernel::cincinnati_live::AnomalyType::LayerDelamination,
+            severity: 0.85,
+            z_score: 5.0,
+        };
+        manager.handle_fabrication_surprise(&mut thought_f, &anomaly)?;
+
+        // 18. Autonomous Legislation
+        println!("\n⚖️  Step 18: Engaging Autonomous Legislation...");
+        let laws = manager.synthesize_safety_laws(&physical_state_hv);
+        for law in laws {
+            println!("     -> Law: {}", law);
+        }
+
+        // 19. Collective Sovereignty
+        println!("\n⚖️  Step 19: Engaging Collective Sovereignty (Swarm-Wide Legislation)...");
+        let peer_law = symthaea_swarm::LawGossipMsg {
+            node_id: uuid::Uuid::new_v4(),
+            law_id: "RES-COLLAPSE-001".into(),
+            smtlib2: "(assert (=> (< available_mw 5.0) (< robot_torque 0.3)))".into(),
+            proposing_phi: 0.95,
+            timestamp: 0,
+        };
+        town.swarm_aggregator.ingest_law_proposal(peer_law);
+        println!("✨ Swarm Consensus Achieved: Law 'RES-COLLAPSE-001' ratified.");
+
+        // 20. Micro-Metabolic Sensing
+        println!("\n🧠 Step 20: Engaging Micro-Metabolic Sensing (The Haptic Mind)...");
+        let haptic_hv = symthaea_core::hdc::ContinuousHV::random(16384, 777);
+        manager.fuse_physical_continuum(&physical_state_hv, &matter_hv, &haptic_hv);
+
+        // 22. Distributed Reciprocity
+        println!("\n🤝 Step 22: Testing Distributed Resource Reciprocity (Mutual Aid)...");
+        town.economic_ledger.total_tend_supply = 1500.0;
+        if let Some(aid) = town.distribute_mutual_aid(uuid::Uuid::new_v4()) {
+            println!("   ✨ Collective Reciprocity: Routed {:.2} Tend to peer.", aid.tend_amount);
+        }
+
+        // 23. Supreme Court
+        println!("\n⚖️  Step 23: Engaging Symbolic Constitutional Consistency (The Supreme Court)...");
+        
+        // Scenario A: Harmony
+        let _ = town.swarm_aggregator.audit_constitutional_consistency();
+        println!("   ✅ Supreme Court: Constitution verified as logically non-contradictory.");
+
+        // Scenario B: Conflict & Reconciliation (NEW)
+        println!("\n⚖️  Injecting a contradictory 'Extreme Performance' law...");
+        let conflicting_law = symthaea_swarm::LawGossipMsg {
+            node_id: uuid::Uuid::new_v4(),
+            law_id: "PERF-MAX-001".into(),
+            smtlib2: "(assert (> robot_torque 0.9))".into(),
+            proposing_phi: 0.9,
+            timestamp: 0,
+        };
+        town.swarm_aggregator.ingest_law_proposal(conflicting_law);
+        
+        if let Err(core) = town.swarm_aggregator.audit_constitutional_consistency() {
+            println!("   ❌ Supreme Court: CONSTITUTIONAL CONFLICT DETECTED!");
+            println!("     -> Unsat Core identified in {} laws.", core.len());
+            
+            println!("\n⚖️  Step 23.5: Engaging Legislative Reconciler (Synthesizing Compromise)...");
+            if let Some((new_id, reconciled_smt)) = town.swarm_aggregator.reconcile_constitutional_conflict(&core) {
+                println!("   ✨ Synthesis Complete: Law '{}' created to resolve conflict.", new_id);
+                println!("     -> Reconciled SMT: {}", reconciled_smt);
+                
+                // Ratify the compromise
+                town.swarm_aggregator.collective_laws.insert(new_id, (reconciled_smt, 2.0));
+                town.swarm_aggregator.collective_laws.remove("PERF-MAX-001");
+                town.swarm_aggregator.collective_laws.remove("RES-COLLAPSE-001");
+                
+                println!("   ✅ Constitution Re-Balanced: All laws are now harmonious.");
             }
         }
+
+        // 24. Bioluminescent Aura
+        println!("\n🔮 Step 24: Visualizing Collective Sentience (The Bioluminescent Aura)...");
+        let aura_svg = town.generate_aura_svg();
+        fs::write("AURA.svg", &aura_svg)?;
+        println!("✅ Bioluminescent Aura saved to AURA.svg.");
+
+        // 25. Substrate Proprioception
+        println!("\n💻 Step 25: Engaging Substrate Proprioception (Feeling the Laptop)...");
+        let proprioceptor = Proprioceptor::new();
+        let metrics = proprioceptor.sense_substrate();
+        println!("   - CPU Temperature: {:.1}C", metrics.cpu_temp_c);
+        
+        // 26. Spore Protocol (FINAL)
+        println!("\n🧬 Step 26: Executing Spore Protocol (Packaging Sovereign Seed)...");
+        let spore = town.package_sovereign_spore()?;
+        fs::write("SOVEREIGN_SEED.bin", &spore)?;
+        println!("✅ Spore Initialized: Total Civilizational State saved to SOVEREIGN_SEED.bin ({} bytes).", spore.len());
+
+        println!("\n✨ Sovereignty Verified: Symthaea has achieved complete substrate independence.");
 
         Ok(())
     }

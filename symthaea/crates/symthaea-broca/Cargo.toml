@@ -50,6 +50,9 @@ tree-sitter-rust = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
 symthaea-lean-bridge = { path = "../symthaea-lean-bridge" }
+symthaea-runtime = { path = "../symthaea-runtime" }
+systemstat = "0.2"
+tokio-websockets = "0.12"
 
 # Distillation collection
 ureq = { version = "2.9" }
@@ -172,6 +175,21 @@ required-features = ["mamba-cpu"]
 [[bin]]
 name = "broca-validator"
 path = "src/bin/broca_validator.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-self-architect"
+path = "src/bin/broca_self_architect.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval"]
+
+[[bin]]
+name = "broca-sovereign-node"
+path = "src/bin/broca_sovereign_node.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
+
+[[bin]]
+name = "broca-vs-gemma"
+path = "src/bin/broca_vs_gemma.rs"
 required-features = ["mamba-cpu"]
 
 [features]

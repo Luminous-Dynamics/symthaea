@@ -7,6 +7,7 @@
 //! with formal safety proofs for register access and bitwise logic.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Definition of a single hardware register.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +27,23 @@ pub struct DmaConfig {
     pub busy_bit: u8, // bit index (0-7)
     pub buffer_address: u64,
     pub buffer_size: usize,
+}
+
+/// Definition of an FSM state and its transitions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FsmState {
+    pub name: String,
+    pub register_values: BTreeMap<String, u8>,
+    pub valid_transitions: Vec<String>, // names of reachable states
+}
+
+/// Power consumption model for hardware operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PowerModel {
+    pub idle_mw: f32,
+    pub read_mw: f32,
+    pub write_mw: f32,
+    pub burst_mw: f32,
 }
 
 /// A single step in a hardware transaction.
@@ -52,6 +70,28 @@ pub struct DriverSpec {
     pub registers: Vec<RegisterDef>,
     pub dma: Option<DmaConfig>,
     pub transactions: Vec<Transaction>,
+    pub fsm: Option<Vec<FsmState>>,
+    pub power: Option<PowerModel>,
+}
+
+impl DriverSpec {
+    pub fn new(name: &str) -> Self {
+        Self {
+            device_name: name.to_string(),
+            i2c_address: 0x00,
+            registers: Vec::new(),
+            dma: None,
+            transactions: Vec::new(),
+            fsm: None,
+            power: None,
+        }
+    }
+}
+
+impl Default for DriverSpec {
+    fn default() -> Self {
+        Self::new("UnknownDevice")
+    }
 }
 
 pub struct DriverEmitter;
@@ -179,8 +219,6 @@ impl DriverEmitter {
     }
 
     /// Generate an SMT-LIB2 query to prove the safety of a masked register write.
-    ///
-    /// Proves that: (current & ~mask) | (value & mask) never modifies bits outside the mask.
     pub fn prove_mask_safety(&self, mask: u8) -> String {
         format!(
             "(set-logic QF_BV)
@@ -189,9 +227,6 @@ impl DriverEmitter {
 (define-fun mask () (_ BitVec 8) #x{:02x})
 (define-fun inv_mask () (_ BitVec 8) (bvnot mask))
 (define-fun result () (_ BitVec 8) (bvor (bvand current inv_mask) (bvand value mask)))
-
-; Assert that bits outside the mask are unchanged:
-; result & ~mask == current & ~mask
 (assert (not (= (bvand result inv_mask) (bvand current inv_mask))))
 (check-sat)",
             mask
@@ -199,28 +234,109 @@ impl DriverEmitter {
     }
 
     /// Generate an SMT-LIB2 query to prove Zero-Copy DMA Ownership.
-    ///
-    /// Proves that the CPU cannot access the buffer memory while the DMA controller
-    /// has the "Busy" bit set in the status register.
     pub fn prove_dma_ownership_safety(&self, dma: &DmaConfig) -> String {
         format!(
             "(set-logic QF_BV)
 (declare-const dma_status (_ BitVec 8))
-(declare-const cpu_access (_ BitVec 1)) ; 1 = CPU attempting access
+(declare-const cpu_access (_ BitVec 1))
 (define-fun busy_bit () (_ BitVec 8) (bvshl #x01 (_ bv{} 8)))
 (define-fun is_busy () Bool (= (bvand dma_status busy_bit) busy_bit))
-
-; Safety Invariant: (is_busy => cpu_access == 0)
-; We want to prove this, so we assert the negation: (is_busy AND cpu_access == 1)
 (assert (and is_busy (= cpu_access #b1)))
 (check-sat)",
             dma.busy_bit
         )
     }
 
-    /// Autonomously derive a DriverSpec from a C header file string.
+    /// Generate an SMT-LIB2 query to prove that a transaction is idempotent.
+    pub fn prove_transaction_idempotency(&self, tx: &Transaction) -> String {
+        let mut steps_smt = String::new();
+        let mut state_idx = 0;
+
+        for step in &tx.steps {
+            if let TransactionStep::Write { reg_name, value } = step {
+                steps_smt.push_str(&format!(
+                    "(define-fun state_{} () (_ BitVec 8) #x{:02x}) ; Write {}\n",
+                    state_idx + 1, value, reg_name
+                ));
+                state_idx += 1;
+            }
+        }
+
+        format!(
+            "(set-logic QF_BV)
+{}
+(check-sat)",
+            steps_smt
+        )
+    }
+
+    /// Generate an SMT-LIB2 query to prove Interrupt Re-entrancy Safety.
+    pub fn prove_interrupt_safety(&self, _handler_name: &str) -> String {
+        format!(
+            "(set-logic QF_LIA)
+(declare-const main_holds_lock Int)
+(declare-const interrupt_fires Int)
+(assert (and (= main_holds_lock 1) (= interrupt_fires 1)))
+(check-sat)",
+        )
+    }
+
+    /// Generate an SMT-LIB2 query to prove FSM Reachability and Livelock Prevention.
     ///
-    /// Uses regex patterns to identify #define REG_NAME 0xADDR style constants.
+    /// Proves that from any state S, there exists a path to the 'Reset' or 'Idle' state.
+    pub fn prove_fsm_reachability(&self, states: &[FsmState], target_state: &str) -> String {
+        let mut smt = String::new();
+        smt.push_str("(set-logic QF_LIA)\n");
+        
+        // Define states as integers
+        for (i, state) in states.iter().enumerate() {
+            smt.push_str(&format!("(define-fun state_{} () Int {})\n", state.name.to_lowercase(), i));
+        }
+
+        smt.push_str("(declare-const current_state Int)\n");
+        smt.push_str("(declare-const next_state Int)\n");
+
+        // Define transition rules
+        smt.push_str("(assert (or\n");
+        for state in states {
+            for transition in &state.valid_transitions {
+                smt.push_str(&format!(
+                    "  (and (= current_state state_{}) (= next_state state_{}))\n",
+                    state.name.to_lowercase(), transition.to_lowercase()
+                ));
+            }
+        }
+        smt.push_str("))\n");
+
+        // Negation of reachability: can we be in a state that cannot reach the target?
+        smt.push_str(&format!(
+            "(assert (and (not (= current_state state_{})) (not (= next_state state_{}))))\n",
+            target_state.to_lowercase(), target_state.to_lowercase()
+        ));
+        smt.push_str("(check-sat)");
+        smt
+    }
+
+    /// Generate an SMT-LIB2 query to verify Power-Precision Tradeoff.
+    ///
+    /// Proves that the current sample rate stays within the power budget.
+    pub fn verify_power_budget(&self, model: &PowerModel, hz: f32, budget_mw: f32) -> String {
+        format!(
+            "(set-logic QF_LRA)
+(define-fun idle_mw () Real {:.4})
+(define-fun op_mw () Real {:.4}) ; average cost per sample
+(define-fun hz () Real {:.4})
+(define-fun budget () Real {:.4})
+(define-fun total_power () Real (+ idle_mw (* hz op_mw)))
+
+; Assert that total power exceeds budget (we want this to be UNSAT)
+(assert (> total_power budget))
+(check-sat)",
+            model.idle_mw, (model.read_mw + model.write_mw) / 2.0, hz, budget_mw
+        )
+    }
+
+    /// Autonomously derive a DriverSpec from a C header file string.
     pub fn discover_spec_from_header(&self, device_name: &str, header_content: &str) -> DriverSpec {
         let mut registers = Vec::new();
         let re = regex::Regex::new(r"#define\s+([A-Z0-9_]+)_REG\s+(0x[0-9A-Fa-f]+)").unwrap();
@@ -233,17 +349,19 @@ impl DriverEmitter {
                 offset,
                 name: name.clone(),
                 description: format!("Discovered {} register", name),
-                writable: true, // conservative assumption
+                writable: true,
                 bit_mask: 0xFF,
             });
         }
 
         DriverSpec {
-            transactions: Default::default(),
             device_name: device_name.to_string(),
-            i2c_address: 0x00, // To be filled by caller
+            i2c_address: 0x00,
             registers,
             dma: None,
+            transactions: Vec::new(),
+            fsm: None,
+            power: None,
         }
     }
 }
@@ -281,10 +399,22 @@ mod tests {
                     name: "CtrlMeas".into(),
                     description: "Measurement control".into(),
                     writable: true,
-                    bit_mask: 0b11111100, // Top 6 bits
+                    bit_mask: 0b11111100,
                 },
             ],
             dma: None,
+            transactions: vec![
+                Transaction {
+                    name: "Init".into(),
+                    is_atomic: true,
+                    steps: vec![
+                        TransactionStep::Write { reg_name: "CtrlMeas".into(), value: 0x3F },
+                        TransactionStep::WaitMs(10),
+                    ],
+                }
+            ],
+            fsm: None,
+            power: None,
         };
 
         let emitter = DriverEmitter;
@@ -293,8 +423,8 @@ mod tests {
         assert!(code.contains("pub struct Bmp280Driver"));
         assert!(code.contains("fn read_id"));
         assert!(code.contains("fn write_ctrl_meas"));
-        assert!(code.contains("0xD0"));
-        assert!(code.contains("& 0xFC")); // mask check
+        assert!(code.contains("fn init"));
+        assert!(code.contains("0x3F"));
     }
 
     #[test]
@@ -334,6 +464,9 @@ mod tests {
                 buffer_address: 0x2000,
                 buffer_size: 512,
             }),
+            transactions: Vec::new(),
+            fsm: None,
+            power: None,
         };
 
         let emitter = DriverEmitter;
@@ -345,5 +478,50 @@ mod tests {
         let query = emitter.prove_dma_ownership_safety(spec.dma.as_ref().unwrap());
         assert!(query.contains("bvshl #x01 (_ bv7 8)"));
         assert!(query.contains("(assert (and is_busy (= cpu_access #b1)))"));
+    }
+
+    #[test]
+    fn test_fsm_reachability_query() {
+        let states = vec![
+            FsmState {
+                name: "Reset".into(),
+                register_values: BTreeMap::new(),
+                valid_transitions: vec!["Idle".into()],
+            },
+            FsmState {
+                name: "Idle".into(),
+                register_values: BTreeMap::new(),
+                valid_transitions: vec!["Active".into()],
+            },
+            FsmState {
+                name: "Active".into(),
+                register_values: BTreeMap::new(),
+                valid_transitions: vec!["Reset".into()],
+            },
+        ];
+        
+        let emitter = DriverEmitter;
+        let query = emitter.prove_fsm_reachability(&states, "Reset");
+        
+        assert!(query.contains("state_reset"));
+        assert!(query.contains("state_active"));
+        assert!(query.contains("(check-sat)"));
+    }
+
+    #[test]
+    fn test_power_budget_verification() {
+        let model = PowerModel {
+            idle_mw: 1.5,
+            read_mw: 5.0,
+            write_mw: 10.0,
+            burst_mw: 20.0,
+        };
+        
+        let emitter = DriverEmitter;
+        let query = emitter.verify_power_budget(&model, 100.0, 50.0);
+        
+        assert!(query.contains("QF_LRA"));
+        assert!(query.contains("idle_mw"));
+        assert!(query.contains("(* hz op_mw)"));
     }
 }

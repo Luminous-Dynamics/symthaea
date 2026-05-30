@@ -13,14 +13,14 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use symthaea_engineering::EngineeringManager;
+use symthaea_fep::hierarchical::HierarchicalFepManager;
+use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 use symthaea_infrastructure::simulator::{
     InfrastructurePhysicsSimulator, SimpleInfrastructureSimulator,
 };
 use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
 use symthaea_manipulator::types::{ManipulatorCommand, ManipulatorState};
 use symthaea_silicon::PowerDistributionLogic;
-use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
-use symthaea_fep::hierarchical::HierarchicalFepManager;
 
 /// Mock Mycelix IPC resource for TendBalance ledger.
 /// Uses request_id correlation map to simulate asynchronous, non-blocking IPC.

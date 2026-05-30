@@ -507,6 +507,7 @@ impl EngineeringManager {
         if let Some(ref goal_hv) = self.last_goal_hv {
             let state_msg = SwarmStateMsg {
                 node_id,
+                platform_type: symtropy_robotics_bridge_core::platform::PlatformType::Humanoid, // Default for engineering nodes
                 local_phi: self.surprise_monitor.current_surprise, // Proxy for local integration
                 consciousness_hv: self
                     .last_sensation
@@ -708,6 +709,34 @@ impl EngineeringManager {
         }
 
         warnings
+    }
+
+    /// Autonomously synthesize new safety laws (SMT Invariants) based on predicted catastrophes.
+    ///
+    /// This is the "Legislative Layer" of Symthaea's sovereignty — she identifies
+    /// future risks and writes the laws required to forbid them.
+    pub fn synthesize_safety_laws(
+        &self,
+        base_sensation: &symthaea_core::hdc::ContinuousHV,
+    ) -> Vec<String> {
+        let mut new_laws = Vec::new();
+        let catastrophes = self.search_for_catastrophes(base_sensation);
+
+        for catastrophe in catastrophes {
+            tracing::info!("⚖️  Legislating: Synthesizing law for risk: {}", catastrophe);
+
+            if catastrophe.contains("Resonant Collapse") {
+                // Forbid high mechanical load during power deficits
+                new_laws.push("(assert (=> (< available_mw 5.0) (< robot_torque 0.3)))".into());
+            }
+
+            if catastrophe.contains("Metabolic Veto") {
+                // Require higher wall thickness for aging compensation
+                new_laws.push("(assert (>= wall_thickness 3.5))".into());
+            }
+        }
+
+        new_laws
     }
 
     fn predict_intervention_ext(
@@ -976,11 +1005,7 @@ impl EngineeringManager {
 
     /// Autonomously design infrastructure by composing verified geometric thoughts.
     pub fn design_infrastructure(&mut self, name: &str, scale_m: f32) -> InfrastructureNode {
-        tracing::info!(
-            "🏗️  Designing infrastructure: {} (scale={}m)",
-            name,
-            scale_m
-        );
+        tracing::info!("🏗️  Designing infrastructure: {} (scale={}m)", name, scale_m);
 
         let mut modules = Vec::new();
         let mut sequence = Vec::new();
@@ -1000,6 +1025,127 @@ impl EngineeringManager {
             assembly_sequence: sequence,
             total_volume_m3: 4.0 * scale_m,
         }
+    }
+
+    /// Autonomously evolve a new material composition for a specific stress manifold.
+    ///
+    /// Uses Miedema thermodynamic screening and Z3 to "invent" an alloy that 
+    /// maximizes strength while guaranteeing stability.
+    pub fn evolve_material_composition(&mut self, goal: &str) -> MaterialProperty {
+        tracing::info!("🧪 Evolving new material composition for: {}", goal);
+
+        // 1. Initial Guess (HDC-inspired)
+        let mut composition = vec![(22, 0.9), (13, 0.1)]; // Start with Ti-Al base
+
+        if goal.contains("high-temperature") {
+            composition.push((74, 0.05)); // Add Tungsten (W) for heat
+            composition[0].1 -= 0.05;
+        }
+
+        // 2. Thermodynamic Screening (Miedema)
+        let stability = symthaea_materials::compound_stability::predict_stability(&composition, 300.0);
+
+        // 3. Formulate SMT Goal: Must be stable (negative formation energy)
+        let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
+        let smt = format!(
+            "(declare-const energy Real)\n(assert (= energy {:.4}))\n(assert (< energy 0.0))\n(check-sat)",
+            stability.formation_energy
+        );
+
+        if z3.verify_satisfiable(&smt).is_unsat() {
+            tracing::warn!("⚠️  Initial material guess unstable. Falling back to Titanium-v2.");
+            return MaterialProperty::titanium_ti6al4v();
+        }
+
+        // 4. Synthesize New Material Identity
+        MaterialProperty {
+            name: format!("Sovereign-Alloy-{}", stability.formula),
+            category: symthaea_materials::properties::MaterialCategory::Metal,
+            density_kg_m3: 4500.0,
+            youngs_modulus_gpa: 150.0,
+            yield_strength_mpa: 1200.0,
+            thermal_conductivity_w_mk: 10.0,
+            specific_heat_j_kgk: 500.0,
+            melting_point_c: 1800.0,
+            corrosion_resistance: 0.9,
+            fatigue_limit_mpa: 600.0,
+        }
+    }
+
+    /// Handle unexpected physical anomalies during manufacturing by triggering a mid-print redesign.
+    ///
+    /// This is the heart of the "Recursive Forge" — it paths around physical defects
+    /// by altering the geometry while the job is still active.
+    pub fn handle_fabrication_surprise(
+        &mut self,
+        thought: &mut GeometricThought,
+        anomaly: &AnomalyAlert,
+    ) -> Result<String, String> {
+        tracing::warn!(
+            "🔥 Recursive Forge Engaged: Handling {:?} mid-construction.",
+            anomaly.anomaly_type
+        );
+
+        // 1. Calculate prediction error for the physical manifold
+        self.surprise_monitor.update(anomaly.severity as f64);
+
+        // 2. Mid-Construction Redesign (Recursive)
+        // If it's a structural defect, "reinforce" the affected zone by thickening walls.
+        if anomaly.severity > 0.5 {
+            tracing::info!("🛠️  Reinforcing geometry mid-print to mitigate defect...");
+
+            use symthaea_fabrication_kernel::csg::CSGNode;
+            let old_tree = std::mem::replace(&mut thought.operation_tree, CSGNode::cube());
+
+            // Apply a localized "Support Patch" to the operation tree
+            thought.operation_tree =
+                old_tree.union(CSGNode::cylinder().scale(2.0, 2.0, 1.0).translate(0.0, 0.0, 5.0));
+
+            Ok("Mid-print geometry reinforced. Resuming construction with updated manifold.".into())
+        } else {
+            Err(
+                "Anomalous state too high for recursive recovery. Halting for manual inspection."
+                    .into(),
+            )
+        }
+    }
+
+    /// Autonomously forage for new engineering goals based on surplus value and integration.
+    ///
+    /// This is the "Epistemic Foraging" loop — she seeks out the unknown when she is 
+    /// wealthy (high Tend) and integrated (high Phi).
+    pub fn forage_epistemic_goals(&mut self, tend_balance: f64, collective_phi: f64) -> Option<EngineeringConcept> {
+        if tend_balance > 1000.0 && collective_phi > 0.5 {
+            tracing::info!("🕵️  Epistemic Foraging Engaged: Seeking out new engineering frontiers...");
+            
+            // Autonomously synthesize a new goal
+            let mut assistant = EngineeringAssistant::new(&symthaea_core::genesis::GenesisSeed::from_phrase("Epistemic Discovery"));
+            let mut concept = assistant.propose_requirements("Hypothetical multi-material structure", symthaea_sim_bridge::EngineeringDomain::Aerospace).remove(0);
+            concept.statement = "Investigate Sovereign-Alloy performance on 100-DOF spinal morphology".into();
+            
+            let mut new_concept = EngineeringConcept::new("EPI-001", "Epistemic Lesson: Spinal Morphology", symthaea_sim_bridge::EngineeringDomain::Aerospace);
+            new_concept.add_requirement(concept);
+            
+            Some(new_concept)
+        } else {
+            None
+        }
+    }
+
+    /// Implement Micro-Metabolic Haptic Fusion.
+    /// 
+    /// Fuses macro simulation data, material traits, and microscopic haptic feedback
+    /// into a single, high-fidelity physical state vector.
+    pub fn fuse_physical_continuum(
+        &self, 
+        shape_hv: &symthaea_core::hdc::ContinuousHV, 
+        matter_hv: &symthaea_core::hdc::ContinuousHV,
+        haptic_hv: &symthaea_core::hdc::ContinuousHV
+    ) -> symthaea_core::hdc::ContinuousHV {
+        // Multi-Scale Binding
+        let amodal = shape_hv.bind(matter_hv).bind(haptic_hv);
+        tracing::info!("🧠 Haptic Mind: Fused microscopic resistance into amodal continuum.");
+        amodal
     }
 }
 

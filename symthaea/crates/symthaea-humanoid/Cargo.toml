@@ -2,7 +2,7 @@
 name = "symthaea-humanoid"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "HDC-LTC + FEP Active Inference bipedal humanoid control on DMC Humanoid benchmark"
 license = "AGPL-3.0-or-later"

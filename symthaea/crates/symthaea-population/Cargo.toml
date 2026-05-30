@@ -2,7 +2,7 @@
 name = "symthaea-population"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Population genetics with HDC encoding, breeding strategy, and Mycelix-compatible governance"
 license = "AGPL-3.0-or-later"

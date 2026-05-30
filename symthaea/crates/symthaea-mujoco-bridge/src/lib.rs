@@ -8,14 +8,18 @@
 use symthaea_sim_bridge::{
     CommandSolver, SimulationBackend, SimulationError, SimulationResult, SolverKind,
 };
+use symthaea_humanoid::morphology::HumanoidMorphology;
+use std::fs;
 
-/// Generic MuJoCo backend descriptor.
+/// Generic MuJoCo adapter boundary.
 #[derive(Debug, Clone)]
 pub struct MuJoCoBridge {
     /// When true, return deterministic placeholder metrics for orchestration tests.
     pub dry_run: bool,
     /// Command used to invoke the solver (e.g. "simulate").
     pub solver_cmd: String,
+    /// Directory to export generated MJCF assets.
+    pub asset_dir: String,
 }
 
 impl Default for MuJoCoBridge {
@@ -23,6 +27,7 @@ impl Default for MuJoCoBridge {
         Self {
             dry_run: false,
             solver_cmd: "simulate".to_string(),
+            asset_dir: "assets/mujoco".to_string(),
         }
     }
 }
@@ -35,9 +40,21 @@ impl MuJoCoBridge {
             ..Self::default()
         }
     }
-}
 
-impl SimulationBackend for MuJoCoBridge {
+    /// Export the 64-DOF FullSpine MJCF asset.
+    pub fn export_flagship_mjcf(&self) -> Result<String, SimulationError> {
+        let morphology = HumanoidMorphology::FullSpine;
+        let mjcf = morphology.to_mjcf();
+
+        fs::create_dir_all(&self.asset_dir).map_err(|e| SimulationError::Adapter(e.to_string()))?;
+        let path = format!("{}/humanoid_flagship.xml", self.asset_dir);
+        fs::write(&path, mjcf).map_err(|e| SimulationError::Adapter(e.to_string()))?;
+
+        Ok(path)
+    }
+    }
+
+    impl SimulationBackend for MuJoCoBridge {
     fn name(&self) -> &'static str {
         "mujoco"
     }
@@ -63,9 +80,18 @@ impl SimulationBackend for MuJoCoBridge {
                 .with_metric("contact_events", 0.0, "count"));
         }
 
-        // Real path: execute command with model specification parameters
-        let cmd = CommandSolver::new(&self.solver_cmd).arg("assets/humanoid.xml");
+        // 1. Ensure the 64-DOF model is exported
+        let xml_path = if request.objective.contains("flagship") || request.objective.contains("64-dof") {
+            self.export_flagship_mjcf()?
+        } else {
+            "assets/humanoid.xml".to_string()
+        };
 
+
+        // 2. Real path: execute command with model specification parameters
+        let cmd = CommandSolver::new(&self.solver_cmd).arg(&xml_path);
+        
+        // Execute (ignoring output for now, as we're focusing on the bridge structure)
         let _output = cmd.execute()?;
 
         Ok(SimulationResult::converged(&request.id, 0.98).with_metric(

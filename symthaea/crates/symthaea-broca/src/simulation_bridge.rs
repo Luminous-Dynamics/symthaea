@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_sim_bridge::{SimulationRequest, SolverKind, EngineeringDomain, MetricEncoder};
+use symthaea_sim_bridge::{EngineeringDomain, MetricEncoder, SimulationRequest, SolverKind};
 
 #[derive(Clone)]
 pub struct PhysicalVerifier {
@@ -23,9 +23,13 @@ impl PhysicalVerifier {
     }
 
     /// Verify a synthesized tool by simulating its impact.
-    pub fn verify_tool_impact(&self, name: &str, intent_nucleus: &ContinuousHV) -> Result<ContinuousHV> {
+    pub fn verify_tool_impact(
+        &self,
+        name: &str,
+        intent_nucleus: &ContinuousHV,
+    ) -> Result<ContinuousHV> {
         println!("🚀 Simulating physical impact for tool: {}...", name);
-        
+
         // 1. Create a simulation request representing the tool's goal
         let request = SimulationRequest::new(
             format!("verify-{}", name),
@@ -39,14 +43,19 @@ impl PhysicalVerifier {
 
         // 3. Encode result into a 'Physical Feedback' HV
         let feedback_hv = self.encoder.encode_result(&result);
-        
+
         // 4. Verification Check: Result must not be 'Chaotic' (orthogonality to intent)
         let alignment = intent_nucleus.similarity(&feedback_hv);
         if alignment < 0.2 {
-            return Err(anyhow::anyhow!("Physical verification REJECTED: result is orthagonal to intent (safety risk)."));
+            return Err(anyhow::anyhow!(
+                "Physical verification REJECTED: result is orthagonal to intent (safety risk)."
+            ));
         }
 
-        println!("✅ Physical verification SUCCESS. Alignment: {:.4}", alignment);
+        println!(
+            "✅ Physical verification SUCCESS. Alignment: {:.4}",
+            alignment
+        );
         Ok(feedback_hv)
     }
 }

@@ -169,13 +169,19 @@ pub use projection::{
 };
 #[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;
+pub mod codebase_bridge;
+pub mod cognitive_ledger;
 pub mod cross_modal_bridge;
-pub mod geodesic_bridge;
-pub mod simulation_bridge;
 pub mod foraging_bridge;
-pub mod swarm_bridge;
+pub mod formal_bridge;
+pub mod geodesic_bridge;
 pub mod invariant_guard;
 pub mod memory_kernel;
 pub mod memory_ring;
+pub mod mission_tree;
+pub mod simulation_bridge;
+pub mod somatic_bridge;
 pub mod sovereignty_bridge;
+pub mod substrate_rewriter;
+pub mod swarm_bridge;
 pub mod wasm_architect;

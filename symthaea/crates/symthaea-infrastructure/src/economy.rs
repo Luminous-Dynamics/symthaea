@@ -32,25 +32,28 @@ impl ThermodynamicLedger {
         Self::default()
     }
 
-    /// Mint "Tend" based on metabolic primary production.
+    /// Mint "Tend" based on metabolic primary production and collective integration.
     ///
     /// # Arguments
     /// * `production_mw` - Power successfully routed to fabrication/filtration.
     /// * `efficiency` - Metabolic efficiency (e.g. water clarity).
-    pub fn mint_production_credit(&mut self, production_mw: f32, efficiency: f32) -> f64 {
-        if efficiency < 0.1 {
+    /// * `collective_phi` - Degree of informational integration in the settlement.
+    pub fn mint_production_credit(&mut self, production_mw: f32, efficiency: f32, collective_phi: f64) -> f64 {
+        if efficiency < 0.1 || collective_phi < 0.2 {
             return 0.0;
         }
 
-        // Value formula: Credit = Production * Efficiency^2
-        let credit = (production_mw as f64 * (efficiency as f64).powi(2)) * 0.1;
+        // Value formula: Credit = Production * Efficiency^2 * Phi^2
+        // This ensures that 'disconnected' or 'unconscious' production is devalued.
+        let credit = (production_mw as f64 * (efficiency as f64).powi(2) * collective_phi.powi(2)) * 0.1;
         self.total_tend_supply += credit;
         self.primary_production_index =
             (self.primary_production_index * 0.95) + (production_mw * 0.05);
 
         tracing::info!(
-            "🪙  Economy: Minted {:.4} Tend from primary production.",
-            credit
+            "🪙  Economy: Minted {:.4} Tend from primary production (Phi={:.2}).",
+            credit,
+            collective_phi
         );
         credit
     }

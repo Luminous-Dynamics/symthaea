@@ -57,6 +57,7 @@ members = [
     "crates/symthaea-subterranean",
     "crates/symthaea-infrastructure",
     "crates/symthaea-silicon",
+    "crates/symthaea-proprioception",
     "crates/symthaea-scavenger",
     "crates/symthaea-agribot",
     "crates/symthaea-biota",

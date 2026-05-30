@@ -6,9 +6,9 @@
 //! Demonstrates two Symthaea nodes discovering each other via Iroh
 //! and sharing high-dimensional design wisdom (Proofs & State).
 
-use symthaea_swarm::{SwarmMessage, SwarmProofMsg, SwarmAggregator};
-use symthaea_swarm::networking::TelepathicSocket;
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_swarm::networking::TelepathicSocket;
+use symthaea_swarm::{SwarmAggregator, SwarmMessage, SwarmProofMsg};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -19,14 +19,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Setup local node identity
     let node_id = Uuid::new_v4();
     let topic_raw = [0u8; 32]; // Shared topic for the demo swarm
-    
+
     let (tx, mut rx) = mpsc::channel(100);
-    
+
     // 2. Initialize Iroh Endpoint
-    let endpoint = iroh::Endpoint::builder(iroh::endpoint::presets::N0).bind().await?;
+    let endpoint = iroh::Endpoint::builder(iroh::endpoint::presets::N0)
+        .bind()
+        .await?;
     let socket = TelepathicSocket::new(endpoint, topic_raw, tx).await?;
-    
-    println!("✅ Node {} initialized. Peer ID: {}", node_id, socket.node_id());
+
+    println!(
+        "✅ Node {} initialized. Peer ID: {}",
+        node_id,
+        socket.node_id()
+    );
 
     // 3. Spawn the telepathic listener
     let socket_task = socket.clone();
@@ -38,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. Mock Local Design Wisdom
     let mut aggregator = SwarmAggregator::new();
-    
+
     println!("\n🧠 Local Brain: Generating high-dimensional design wisdom...");
     let proof = SwarmProofMsg {
         node_id,
@@ -55,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. Listen for Inbound Wisdom (Simulating other nodes)
     println!("👂 Listening for peer updates...");
-    
+
     let timeout = tokio::time::sleep(std::time::Duration::from_secs(3));
     tokio::pin!(timeout);
 
@@ -72,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         aggregator.ingest_peer_proof(proof);
                     }
                 }
-                
+
                 let hive_norm = aggregator.hive_mind_vector().norm();
                 println!("🧬 Hive Mind Coherence Norm: {:.4}", hive_norm);
             }

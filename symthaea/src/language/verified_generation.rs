@@ -538,14 +538,12 @@ async fn generate_verified_inner<'a>(
                     formally_verified = Some(is_proven);
 
                     if is_refuted {
-                        if let (Some(store), Some(hv)) = (experience_store, &last_ast_hv) {
-                            info!(
-                                "LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.",
-                                spec.name
-                            );
+                        if let (Some(ref mut store), Some(hv)) = (experience_store.as_mut(), &last_ast_hv) {
+                            info!("LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.", spec.name);
                             store.store_negative_prototype(&spec.name, hv.values.clone());
                         }
                     }
+
 
                     if is_proven && engine.solver_calls > 0 {
                         #[cfg(feature = "swarm")]
@@ -570,23 +568,47 @@ async fn generate_verified_inner<'a>(
                     info!("Formal verification outcome: {}", details);
                 }
 
+                let contains_unsafe = source.contains("unsafe ") || source.contains("unsafe {");
                 let is_proven = formally_verified.unwrap_or(false);
-                return VerifiedCode {
-                    source,
-                    compiled: true,
-                    tests_passed: true,
-                    test_count_passed: result.tests_passed,
-                    test_count_failed: 0,
-                    compile_retries,
-                    test_retries: 0,
-                    formally_verified,
-                    confidence: VerificationConfidence::compute(true, true, is_proven, 1.0),
-                    compile_errors: Vec::new(),
-                    test_failures: Vec::new(),
-                    diagnostic_hvs: all_diagnostic_hvs.clone(),
-                    ast_hdc: ast_hdc.clone(),
-                };
-            } else {
+
+                // SOVEREIGN BLOCKADE: Hard gate for unsafe Rust (INV-13)
+                // We physically block the return of any code containing unsafe blocks
+                // unless they are mathematically proven safe by the SMT engine.
+                if contains_unsafe && !is_proven {
+                    warn!(
+                        "SOVEREIGN BLOCKADE: Rejecting unverified unsafe block in {}. SMT proof required for systems governance.",
+                        spec.name
+                    );
+                    // Treat as test failure to trigger fix/retry logic
+                    result.tests_failed = 1;
+                    result.test_failures.push(crate::language::code_executor::TestFailure {
+                        test_name: "SovereignSafetyGate".into(),
+                        expected: Some("Proven Unsafe Block".into()),
+                        actual: Some("Unverified Unsafe Block".into()),
+                        message: "Memory-unsafe code detected without formal SMT proof.".into(),
+                        assertion: None,
+                    });
+                } else {
+                    return VerifiedCode {
+                        source,
+                        compiled: true,
+                        tests_passed: true,
+                        test_count_passed: result.tests_passed,
+                        test_count_failed: 0,
+                        compile_retries,
+                        test_retries: 0,
+                        formally_verified,
+                        confidence: VerificationConfidence::compute(true, true, is_proven, 1.0),
+                        compile_errors: Vec::new(),
+                        test_failures: Vec::new(),
+                        diagnostic_hvs: all_diagnostic_hvs.clone(),
+                        ast_hdc: ast_hdc.clone(),
+                    };
+                }
+            }
+            
+            // If we reached here, tests failed OR the sovereign blockade was triggered
+            if result.tests_failed > 0 {
                 // Tests failed — try to fix based on test output
                 let test_failures: Vec<String> = result
                     .test_failures

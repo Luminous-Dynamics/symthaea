@@ -9,18 +9,22 @@ pub struct GaitGenome {
     pub climb_v: f32,
     pub climb_s: f32,
     pub climb_k: f32,
-    pub vel_gain: f32,    
-    pub stride_gain: f32, 
+    pub vel_gain: f32,
+    pub stride_gain: f32,
 }
 
 impl GaitGenome {
     pub fn default() -> Self {
         Self {
             // UPGRADED: Scaled base target values to match high-frequency liquid neural oscillations
-            walk_v: 3.25, walk_s: 0.32, walk_k: 0.45, 
-            climb_v: 2.10, climb_s: 0.38, climb_k: 0.55,
-            vel_gain: 0.45,    
-            stride_gain: 0.08, 
+            walk_v: 3.25,
+            walk_s: 0.32,
+            walk_k: 0.45,
+            climb_v: 2.10,
+            climb_s: 0.38,
+            climb_k: 0.55,
+            vel_gain: 0.45,
+            stride_gain: 0.08,
         }
     }
 }

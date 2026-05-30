@@ -28,6 +28,8 @@ const COST_CLOUD_LLM: f64 = 50.0;
 pub enum BackendTier {
     /// Native HDC+CfC code generation (zero external calls).
     Native,
+    /// Specialized Hardware Driver Emitter (I2C/MMIO).
+    Hardware,
     /// Local LLM (e.g., qwen2.5-coder:7b via Ollama).
     LocalLlm,
     /// Cloud LLM (e.g., Claude via Anthropic API).
@@ -40,6 +42,7 @@ impl std::fmt::Display for BackendTier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Native => write!(f, "Native"),
+            Self::Hardware => write!(f, "Hardware"),
             Self::LocalLlm => write!(f, "LocalLLM"),
             Self::CloudLlm => write!(f, "CloudLLM"),
             Self::Simulated => write!(f, "Simulated"),
@@ -101,6 +104,7 @@ pub enum CodeTaskCategory {
     ErrorHandling,
     StructDefinition,
     TraitDefinition,
+    HardwareDriver,
     General,
 }
 
@@ -108,7 +112,15 @@ impl CodeTaskCategory {
     /// Infer the category from a purpose string.
     pub fn from_purpose(purpose: &str) -> Self {
         let p = purpose.to_lowercase();
-        if p.contains("sort") || p.contains("order") || p.contains("arrange") {
+        if p.contains("i2c")
+            || p.contains("register")
+            || p.contains("driver")
+            || p.contains("sensor")
+            || p.contains("mmio")
+            || p.contains("hardware")
+        {
+            Self::HardwareDriver
+        } else if p.contains("sort") || p.contains("order") || p.contains("arrange") {
             Self::Sorting
         } else if p.contains("search") || p.contains("find") || p.contains("lookup") {
             Self::Search
@@ -323,7 +335,18 @@ impl IntelligentDispatcher {
         prediction_error: f64,
         consciousness_level: f64,
     ) -> DispatchResult {
-        let tier = self.select_tier(epistemic, prediction_error, consciousness_level);
+        // Use purpose text if available in params or prompt to detect hardware
+        let category = if prompt.to_lowercase().contains("driver") || prompt.to_lowercase().contains("i2c") {
+            CodeTaskCategory::HardwareDriver
+        } else {
+            CodeTaskCategory::General
+        };
+
+        let tier = if category == CodeTaskCategory::HardwareDriver {
+            BackendTier::Hardware
+        } else {
+            self.select_tier(epistemic, prediction_error, consciousness_level)
+        };
 
         let (output, success, cost) = match tier {
             BackendTier::Native => {
@@ -331,6 +354,10 @@ impl IntelligentDispatcher {
                 // Return a signal that the caller should use native path.
                 self.native_stats.record(true);
                 ("[NATIVE: use CodeGenerator]".to_string(), true, COST_NATIVE)
+            }
+            BackendTier::Hardware => {
+                // Hardware generation is handled externally by DriverEmitter.
+                ("[HARDWARE: use DriverEmitter]".to_string(), true, COST_NATIVE)
             }
             BackendTier::LocalLlm => match self.local_llm.generate(prompt, params).await {
                 Ok(output) => {
@@ -415,6 +442,7 @@ impl IntelligentDispatcher {
     pub fn success_rate(&self, tier: BackendTier) -> f64 {
         match tier {
             BackendTier::Native => self.native_stats.success_rate(),
+            BackendTier::Hardware => 1.0, // specialized emitter is deterministic
             BackendTier::LocalLlm => self.local_stats.success_rate(),
             BackendTier::CloudLlm => self.cloud_stats.success_rate(),
             BackendTier::Simulated => 1.0,
@@ -434,6 +462,7 @@ impl IntelligentDispatcher {
     pub fn record_outcome(&mut self, tier: BackendTier, success: bool) {
         match tier {
             BackendTier::Native => self.native_stats.record(success),
+            BackendTier::Hardware => {} // no tracking needed for deterministic emitter
             BackendTier::LocalLlm => self.local_stats.record(success),
             BackendTier::CloudLlm => self.cloud_stats.record(success),
             BackendTier::Simulated => {} // no tracking for simulated
@@ -464,6 +493,11 @@ impl IntelligentDispatcher {
         purpose: &str,
     ) -> BackendTier {
         let category = CodeTaskCategory::from_purpose(purpose);
+
+        // Hardware intents are routed directly to the specialized emitter (INV-13)
+        if category == CodeTaskCategory::HardwareDriver {
+            return BackendTier::Hardware;
+        }
 
         // Get base routing decision
         let base_tier = self.select_tier(epistemic, prediction_error, consciousness_level);
@@ -581,7 +615,7 @@ impl IntelligentDispatcher {
             BackendTier::Native => &self.native_stats,
             BackendTier::LocalLlm => &self.local_stats,
             BackendTier::CloudLlm => &self.cloud_stats,
-            BackendTier::Simulated => return tier,
+            BackendTier::Simulated | BackendTier::Hardware => return tier,
         };
 
         if stats.attempts < 5 || stats.success_rate() >= 0.3 {
@@ -592,7 +626,7 @@ impl IntelligentDispatcher {
             BackendTier::Native => vec![BackendTier::LocalLlm, BackendTier::CloudLlm],
             BackendTier::LocalLlm => vec![BackendTier::CloudLlm, BackendTier::Native],
             BackendTier::CloudLlm => vec![BackendTier::LocalLlm, BackendTier::Native],
-            BackendTier::Simulated => return tier,
+            BackendTier::Simulated | BackendTier::Hardware => return tier,
         };
 
         for alt in alternatives {
@@ -605,7 +639,7 @@ impl IntelligentDispatcher {
                     }
                     self.cloud_stats.success_rate()
                 }
-                BackendTier::Simulated => continue,
+                BackendTier::Simulated | BackendTier::Hardware => continue,
             };
             if alt_rate > stats.success_rate() {
                 tracing::info!(
