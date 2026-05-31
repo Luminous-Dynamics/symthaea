@@ -6,8 +6,8 @@
 //! Bridges Causal Discovery with Hardware Driver Generation to autonomously
 //! diagnose and fix functional protocol errors.
 
-use crate::causal::loop_integration::{CausalEnhancerConfig, CausalLoopEnhancer};
 use super::driver::{DriverSpec, RegisterDef};
+use crate::causal::loop_integration::{CausalEnhancerConfig, CausalLoopEnhancer};
 use symthaea_core::hdc::ContinuousHV;
 
 pub struct CausalDriverTuner {
@@ -50,7 +50,10 @@ impl CausalDriverTuner {
                 // In a real implementation, we'd map Dim i back to a specific RegisterDef.
                 // For this prototype, we'll suggest a general clock-speed reduction
                 // if high-Phi dimensions are causally linked to signal degradation.
-                repair_notes.push(format!("Detected causal interference on dimension {}.", edge.from));
+                repair_notes.push(format!(
+                    "Detected causal interference on dimension {}.",
+                    edge.from
+                ));
             }
         }
 
@@ -63,7 +66,10 @@ impl CausalDriverTuner {
                     }
                 }
             }
-            return Some(format!("Repaired functional protocol: {}", repair_notes.join(" ")));
+            return Some(format!(
+                "Repaired functional protocol: {}",
+                repair_notes.join(" ")
+            ));
         }
 
         None

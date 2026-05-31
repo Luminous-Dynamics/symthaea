@@ -19,7 +19,9 @@ symthaea-manipulator = { path = "../symthaea-manipulator" }
 symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
 symthaea-silicon = { path = "../symthaea-silicon" }
 symthaea-proprioception = { path = "../symthaea-proprioception" }
+symthaea-workspace = { path = "../symthaea-workspace" }
 symthaea-fep = { path = "../symthaea-fep" }
+symthaea-phi-search = { path = "../symthaea-phi-search" }
 symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
 symthaea-infrastructure = { path = "../symthaea-infrastructure" }
 symthaea-materials = { path = "../symthaea-materials" }

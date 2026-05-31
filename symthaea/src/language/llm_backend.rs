@@ -609,7 +609,7 @@ pub fn simulated_backend() -> Arc<dyn LLMBackend> {
 /// Create a backend based on environment configuration.
 ///
 /// Priority:
-/// 1. `SYMTHAEA_LLM_PROVIDER` env var (`ollama`, `openai`, `anthropic`)
+/// 1. `SYMTHAEA_LLM_PROVIDER` env var (`ollama`, `openai`, `anthropic`, `deepswe`)
 /// 2. OpenAI (if `OPENAI_API_KEY` is set)
 /// 3. Anthropic (if `ANTHROPIC_API_KEY` is set)
 /// 4. Ollama (default, works offline with local models)
@@ -632,6 +632,19 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                 tracing::warn!(
                     "SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama"
                 );
+            }
+            "deepswe" => {
+                let api_key = std::env::var("DEEPSWE_API_KEY")
+                    .or_else(|_| std::env::var("OPENAI_API_KEY"))
+                    .unwrap_or_else(|_| "EMPTY".to_string());
+                let model = std::env::var("DEEPSWE_MODEL")
+                    .unwrap_or_else(|_| "agentica-org/DeepSWE-Preview".to_string());
+                let base_url = std::env::var("DEEPSWE_BASE_URL")
+                    .or_else(|_| std::env::var("OPENAI_BASE_URL"))
+                    .unwrap_or_else(|_| "http://localhost:8000/v1".to_string());
+                return Arc::new(super::openai_backend::OpenAiBackend::new(
+                    api_key, model, base_url,
+                ));
             }
             "ollama" => {
                 let model =

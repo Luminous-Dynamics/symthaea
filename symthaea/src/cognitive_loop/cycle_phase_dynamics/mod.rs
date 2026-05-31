@@ -2749,6 +2749,7 @@ impl CognitiveLoopService {
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
                     code_context: self.carryover.injected_code_context.take(),
                     negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
+                    substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel::default(),
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);

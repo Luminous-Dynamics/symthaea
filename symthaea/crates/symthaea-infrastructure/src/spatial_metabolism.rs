@@ -52,7 +52,11 @@ impl SpatialMetabolicGrid {
             ];
 
             // Traverses real hex disk topology to populate the map grid natively
-            for (i, cell) in center_cell.grid_disk::<Vec<CellIndex>>(1).into_iter().enumerate() {
+            for (i, cell) in center_cell
+                .grid_disk::<Vec<CellIndex>>(1)
+                .into_iter()
+                .enumerate()
+            {
                 let index: u64 = u64::from(cell);
                 zones.insert(
                     index,

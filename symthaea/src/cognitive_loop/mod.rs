@@ -181,6 +181,8 @@ pub(crate) mod substrate_manager;
 pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
+pub mod observability;
+pub mod safety_supervisor;
 pub(crate) mod subsystem_trait;
 pub(crate) mod threshold_overrides;
 pub(crate) mod thresholds;
@@ -974,12 +976,6 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "epistemic_auditor")]
     pub(crate) epistemic_auditor: Option<epistemic_auditor::EpistemicAuditor>,
 
-    /// NRC-style safety agent for consciousness monitoring and operational gating.
-    #[cfg(feature = "safety-agents")]
-    pub(crate) safety_agent: crate::safety::SafetyAgent,
-    /// Physical guardian posture state machine.
-    #[cfg(feature = "safety-agents")]
-    pub(crate) guardian_state: guardian::GuardianState,
     #[cfg(feature = "sentinel")]
     pub(crate) sentinel_manager: managers::SentinelManager,
     #[cfg(feature = "sentinel")]
@@ -1006,6 +1002,12 @@ pub struct CognitiveLoopService {
 
     /// Aggregate security telemetry for the crypto/swarm stack.
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
+
+    /// Safety Supervisor: Centralized immune system orchestration.
+    pub(crate) safety_supervisor: safety_supervisor::SafetySupervisor,
+
+    /// Cognitive Tracer: High-resolution thought observability.
+    pub(crate) tracer: observability::CognitiveTracer,
 
     /// Scientific-method engine: observe → hypothesize → predict → test → update_beliefs.
     /// Accumulates Bayesian belief updates across cycles. Feature-gated behind

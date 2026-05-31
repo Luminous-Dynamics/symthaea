@@ -22,6 +22,7 @@
 
 #![allow(clippy::needless_range_loop)]
 
+pub mod co_assembly;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
@@ -35,4 +36,5 @@ pub mod training;
 pub mod types;
 pub mod workspace_safety;
 
+pub use co_assembly::{AssemblyTask, CooperativeGrip};
 pub use types::*;

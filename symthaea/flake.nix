@@ -77,6 +77,7 @@
         rustBuildInputs = with pkgs; [
           # Rust toolchain
           rustToolchain
+          trunk
           z3
                     cargo-watch
           cargo-edit
@@ -606,6 +607,7 @@ EOF
         # Usage: nix develop .#mobile
         devShells.mobile = pkgs.mkShell {
           buildInputs = [
+          pkgs.trunk
             rustToolchainMobile
             androidSdk
             pkgs.pkg-config

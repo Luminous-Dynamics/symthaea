@@ -254,6 +254,7 @@ impl ConsciousReasoningEngine {
                     &config,
                     &budget,
                     &self.negative_bank,
+                    &ctx.substrate_cost_model,
                 )
             } else if r >= thresholds::R_EPISTEMIC_MIN {
                 // Epistemic rollouts only

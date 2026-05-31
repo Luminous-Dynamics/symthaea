@@ -2,22 +2,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Unified Swarm Labor Benchmark (Drone-Humanoid-Arm Heterogeneous Swarm)
-//! 
+//!
 //! Simulates a heterogeneous swarm working together on a construction task.
 //! - Drone: Performs aerial terrain mapping (Haptic Gossip).
 //! - Humanoid: Performs heavy labor, using drone data to stabilize gait.
 //! - Manipulator: Receives heavy components from the humanoid, adjusting for load.
 
-use symthaea_swarm::{SwarmAggregator, SwarmMessage, HapticPulseMsg, SwarmStateMsg};
+use anyhow::Result;
+use symthaea_core::genesis::GenesisSeed;
 use symthaea_humanoid::controller::HumanoidController;
 use symthaea_humanoid::morphology::HumanoidMorphology;
 use symthaea_humanoid::types::{HumanoidConfig, HumanoidState};
-use symthaea_core::genesis::GenesisSeed;
+use symthaea_swarm::{HapticPulseMsg, SwarmAggregator, SwarmMessage, SwarmStateMsg};
 use symtropy_robotics_bridge_core::platform::PlatformType;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use uuid::Uuid;
-use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     // 1. Initialize Swarm Infrastructure
     let mut swarm = SwarmAggregator::new();
     let genesis = GenesisSeed::from_phrase("Unified Labor Seed v1");
-    
+
     let drone_id = Uuid::new_v4();
     let humanoid_id = Uuid::new_v4();
     let arm_id = Uuid::new_v4();
@@ -59,7 +59,9 @@ async fn main() -> Result<()> {
         // --- PHASE A: DRONE RECONNAISSANCE ---
         // Drone detects a "Haptic Anomaly" (Wind spike / obstacle)
         if step == 20 {
-            info!("🛸 [Drone] Detected terrain anomaly at [10, 0, 5]. Broadcasting Haptic Pulse...");
+            info!(
+                "🛸 [Drone] Detected terrain anomaly at [10, 0, 5]. Broadcasting Haptic Pulse..."
+            );
             let pulse = HapticPulseMsg {
                 node_id: drone_id,
                 position: [10.0, 0.0, 5.0, 0.0],
@@ -78,18 +80,21 @@ async fn main() -> Result<()> {
             current_pos[1].round() as i32,
             current_pos[2].round() as i32,
         ];
-        
+
         let swarm_surprise = swarm.haptic_map.get(&grid_pos).cloned().unwrap_or(0.0);
-        
+
         if swarm_surprise > 1.0 {
-            info!("🚶 [Humanoid] Received Haptic Empathy from Drone. Pre-adjusting gait for anomaly (Surprise: {:.2})", swarm_surprise);
+            info!(
+                "🚶 [Humanoid] Received Haptic Empathy from Drone. Pre-adjusting gait for anomaly (Surprise: {:.2})",
+                swarm_surprise
+            );
         }
 
         // --- PHASE C: HAPTIC HAND-OFF ---
         // Humanoid reaches the Manipulator Arm to hand off a payload
         if step == 80 {
             info!("🤝 [Swarm] Initiating Payload Hand-off: Humanoid -> Manipulator");
-            
+
             // Humanoid broadcasts its current intent (using a stable seed vector)
             let humanoid_state = SwarmStateMsg {
                 node_id: humanoid_id,
@@ -100,15 +105,21 @@ async fn main() -> Result<()> {
                 timestamp: step as u64,
             };
             swarm.update_peer(humanoid_state);
-            
-            info!("🦾 [Manipulator] Feeling Humanoid strain. Synchronizing PID gains for soft capture.");
+
+            info!(
+                "🦾 [Manipulator] Feeling Humanoid strain. Synchronizing PID gains for soft capture."
+            );
         }
 
         // --- PHASE D: COLLECTIVE PHI CALCULATION ---
         if step % 25 == 0 {
             let swarm_phi = swarm.calculate_swarm_phi();
-            info!("[T={:.2}s] Swarm Coherence: {:.3} | Active Haptic Nodes: {}", 
-                  t, swarm_phi, swarm.haptic_map.len());
+            info!(
+                "[T={:.2}s] Swarm Coherence: {:.3} | Active Haptic Nodes: {}",
+                t,
+                swarm_phi,
+                swarm.haptic_map.len()
+            );
         }
     }
 

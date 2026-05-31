@@ -229,7 +229,18 @@ pub fn generate_iac_with_self_repair(
     let mut consecutive_failures = 0;
 
     // Detect intent and set initial gate
-    let intent = if let Some(gate) = registry.detect_intent(channels) {
+    let prompt_lower = prompt.to_lowercase();
+    let intent = if prompt_lower.contains("kubernetes") || prompt_lower.contains("k8s") {
+        "Kubernetes".to_string()
+    } else if prompt_lower.contains("ansible") {
+        "Ansible".to_string()
+    } else if prompt_lower.contains("cloudformation") || prompt_lower.contains("cfn") {
+        "CloudFormation".to_string()
+    } else if prompt_lower.contains("pulumi") {
+        "Pulumi".to_string()
+    } else if prompt_lower.contains("terraform") || prompt_lower.contains("hcl") {
+        "Terraform".to_string()
+    } else if let Some(gate) = registry.detect_intent(channels) {
         gate.name.clone()
     } else {
         "general".to_string()

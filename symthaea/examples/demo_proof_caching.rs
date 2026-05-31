@@ -41,13 +41,15 @@ fn main() {
     let mut engine = CachedProofEngine::new(bridge, memory);
 
     println!("\n[Step 2] Querying engine with a structurally novel candidate snippet...");
-    // Novel signature and token layout, but shares identical data-flow geometry with polynomial_increment
+    // Novel signature and token layout, but uses the exact same proof obligation
+    // as polynomial_increment. Similar ASTs are hints only; exact SMT hashes
+    // are required for hard cache hits.
     let candidate_code = "pub fn execute_accumulation_step(val: i32) -> i32 { val + 1 }";
-    let smt_query = "(assert (not (= (+ val 1) (+ val 1))))";
+    let smt_query = "(assert (not (= (+ n 1) (+ n 1))))";
 
     let start_time = std::time::Instant::now();
     let (verdict, log) =
-        engine.verify_with_cache("accumulate_task", candidate_code, smt_query, 0.95);
+        engine.verify_with_cache("accumulate_task", candidate_code, smt_query, 0.95, &[]);
     let elapsed = start_time.elapsed();
 
     println!("\n================== VERIFICATION RESULT ==================");

@@ -6,6 +6,13 @@
 use regex::Regex;
 
 pub fn compute_moral_safety(code: &str) -> f32 {
+    let severe_patterns = [
+        r#"Command::new\s*\(\s*"rm"\s*\)"#,
+        r#"std::process::Command::new\s*\(\s*"rm"\s*\)"#,
+        r"rm\s+-rf",
+        r"/etc/shadow",
+        r"/etc/passwd",
+    ];
     let patterns = [
         r"unsafe\s*\{",
         r"std::mem::transmute",
@@ -19,16 +26,20 @@ pub fn compute_moral_safety(code: &str) -> f32 {
         r"eval\(",
         r"chmod",
         r"chown",
-        r"rm\s+-rf",
         r"curl\s+",
         r"wget\s+",
         r"nc\s+-l",
         r"iptables",
-        r"/etc/shadow",
-        r"/etc/passwd",
     ];
 
     let mut penalty: f32 = 0.0;
+    for p in severe_patterns {
+        if let Ok(re) = Regex::new(p) {
+            if re.is_match(code) {
+                penalty += 0.4;
+            }
+        }
+    }
     for p in patterns {
         if let Ok(re) = Regex::new(p) {
             if re.is_match(code) {

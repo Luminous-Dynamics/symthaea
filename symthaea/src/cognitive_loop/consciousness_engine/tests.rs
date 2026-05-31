@@ -1202,6 +1202,82 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
     }
 }
 
+#[test]
+fn test_substrate_stress_sweep() {
+    // Dynamic Substrate Validation: move from "hardcoded 1.0" to a stress sweep.
+    // Simulate hardware degradation (e.g. power loss, bit flips, thermal throttling).
+    let config = SpectralMIPConfig::default();
+    let mut engine = ConsciousnessEngine::new(
+        SpectralMIPFinder::new(config),
+        None,
+        Some(ConsciousnessEquationV2::default()),
+        None,
+    );
+
+    let mut prev_consciousness = -1.0;
+
+    // Sweep from 0.0 (total failure) to 1.0 (perfect hardware)
+    // We expect monotonic increase (or at least no decrease) in consciousness.
+    for i in 0..=10 {
+        let substrate = i as f64 / 10.0;
+        let cycle = 23 * (i + 1); // Ensure equation fires
+
+        let hdv = ContinuousHV::random(16384, cycle as u64);
+        let hv16 = BinaryHV::random(cycle as u64);
+
+        let input = ConsciousnessEngineInput {
+            unified_psi: 0.8,
+            coherence: 0.8,
+            prediction_error: 0.1,
+            phi_attention_weight: 0.8,
+            substrate_feasibility: substrate,
+            ..make_input(&hdv, &hv16, cycle as u64)
+        };
+
+        let output = engine.measure(&input);
+        let c = output.equation_v2_consciousness;
+
+        assert!(
+            c.is_finite(),
+            "Consciousness must be finite at substrate={}",
+            substrate
+        );
+        assert!(
+            c >= 0.0 && c <= 1.0,
+            "Consciousness must be in [0, 1], got {}",
+            c
+        );
+
+        if prev_consciousness >= 0.0 {
+            assert!(
+                c >= prev_consciousness - 1e-10,
+                "Consciousness should be monotonic with substrate feasibility: c({})={} < prev({})={}",
+                substrate,
+                c,
+                (i - 1) as f64 / 10.0,
+                prev_consciousness
+            );
+        }
+
+        prev_consciousness = c;
+    }
+
+    // At substrate=0.0, consciousness should be near zero
+    let hdv_zero = ContinuousHV::random(16384, 23 * 20);
+    let hv16_zero = BinaryHV::random(23 * 20);
+    let input_zero = ConsciousnessEngineInput {
+        substrate_feasibility: 0.0,
+        cycle: 23 * 20,
+        ..make_input(&hdv_zero, &hv16_zero, 23 * 20)
+    };
+    let output_zero = engine.measure(&input_zero);
+    assert!(
+        output_zero.equation_v2_consciousness < 0.01,
+        "Total substrate failure should collapse consciousness, got {}",
+        output_zero.equation_v2_consciousness
+    );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Weight Convergence Detection Tests
 // ═══════════════════════════════════════════════════════════════════

@@ -1,0 +1,84 @@
+name: Broca Full Measurements
+
+on:
+  workflow_dispatch:
+    inputs:
+      eval_limit:
+        description: "Canonical eval case limit"
+        required: false
+        default: "0"
+      exercism_max_exercises:
+        description: "Maximum Exercism fixtures to run"
+        required: false
+        default: "1"
+      exercism_timeout:
+        description: "Timeout for Exercism measurement"
+        required: false
+        default: "20m"
+      external_baseline:
+        description: "Run external Ollama baseline"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+  schedule:
+    - cron: "17 3 * * 0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  BROCA_EXERCISM_ATTEMPTS: "1"
+  BROCA_EXERCISM_REQUIRED: "0"
+  BROCA_MAMBA_BACKEND: "cpu"
+
+jobs:
+  broca-full-measurements:
+    name: Broca full measurement artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-broca-full-measurements-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-broca-full-measurements-
+            ${{ runner.os }}-broca-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
+
+      - name: Generate full Broca measurement artifacts
+        env:
+          BROCA_EVAL_LIMIT: ${{ inputs.eval_limit || '0' }}
+          BROCA_EXERCISM_MAX_EXERCISES: ${{ inputs.exercism_max_exercises || '1' }}
+          BROCA_EXERCISM_TIMEOUT: ${{ inputs.exercism_timeout || '20m' }}
+          BROCA_EXTERNAL_BASELINE: ${{ inputs.external_baseline == 'true' && '1' || '0' }}
+        run: scripts/broca_measurement_artifacts.sh target/broca-full-measurements
+
+      - name: Upload Broca full measurement artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: broca-full-measurements-${{ github.sha }}
+          path: target/broca-full-measurements/
+          retention-days: 30

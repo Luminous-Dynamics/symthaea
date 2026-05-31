@@ -981,10 +981,6 @@ impl CognitiveLoopService {
             conjecture_engine: symthaea_core::hdc::conjecture_engine::ConjectureEngine::new(),
             #[cfg(feature = "epistemic_auditor")]
             epistemic_auditor: None,
-            #[cfg(feature = "safety-agents")]
-            safety_agent: crate::safety::SafetyAgent::new(),
-            #[cfg(feature = "safety-agents")]
-            guardian_state: super::guardian::GuardianState::default(),
             #[cfg(feature = "sentinel")]
             sentinel_manager: super::managers::SentinelManager::default(),
             #[cfg(feature = "sentinel")]
@@ -1012,6 +1008,8 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             last_mental_movie: None,
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
+            safety_supervisor: super::safety_supervisor::SafetySupervisor::new(),
+            tracer: super::observability::CognitiveTracer::new(1000),
             #[cfg(feature = "scientific_method")]
             scientific_method_engine: crate::scientific_method::ScientificMethodEngine::new(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),

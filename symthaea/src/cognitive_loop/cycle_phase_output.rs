@@ -1637,9 +1637,10 @@ impl CognitiveLoopService {
         // ── Immune system telemetry ──
         #[cfg(feature = "safety-agents")]
         {
-            let level = self.safety_agent.current_level();
+            let level = self.safety_supervisor.agent.current_level();
             metadata.immune_safety_level = level.as_str_upper().to_string();
             let telem = self
+                .safety_supervisor
                 .guardian_state
                 .telemetry(self.stats.total_cycles as usize);
             metadata.immune_guardian_posture = telem.posture;

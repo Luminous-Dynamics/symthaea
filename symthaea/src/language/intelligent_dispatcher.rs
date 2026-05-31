@@ -336,11 +336,12 @@ impl IntelligentDispatcher {
         consciousness_level: f64,
     ) -> DispatchResult {
         // Use purpose text if available in params or prompt to detect hardware
-        let category = if prompt.to_lowercase().contains("driver") || prompt.to_lowercase().contains("i2c") {
-            CodeTaskCategory::HardwareDriver
-        } else {
-            CodeTaskCategory::General
-        };
+        let category =
+            if prompt.to_lowercase().contains("driver") || prompt.to_lowercase().contains("i2c") {
+                CodeTaskCategory::HardwareDriver
+            } else {
+                CodeTaskCategory::General
+            };
 
         let tier = if category == CodeTaskCategory::HardwareDriver {
             BackendTier::Hardware
@@ -357,7 +358,11 @@ impl IntelligentDispatcher {
             }
             BackendTier::Hardware => {
                 // Hardware generation is handled externally by DriverEmitter.
-                ("[HARDWARE: use DriverEmitter]".to_string(), true, COST_NATIVE)
+                (
+                    "[HARDWARE: use DriverEmitter]".to_string(),
+                    true,
+                    COST_NATIVE,
+                )
             }
             BackendTier::LocalLlm => match self.local_llm.generate(prompt, params).await {
                 Ok(output) => {

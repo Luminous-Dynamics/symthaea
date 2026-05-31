@@ -3,7 +3,7 @@
 
 //! Somatic Bridge — Bridges Broca's strategic intent to Soma's kinetic execution.
 //!
-//! Allows the Sovereign Architect to synthesize and broadcast motor-control 
+//! Allows the Sovereign Architect to synthesize and broadcast motor-control
 //! hypervectors to the robotic substrate.
 
 use anyhow::Result;
@@ -24,7 +24,10 @@ impl SomaticBridge {
         println!("🦾 Somatic Bridge: Broadcasting Kinetic Nucleus to Soma engine...");
         // (In real: we would push this to an Iceoryx2 ring-buffer for the motor controller)
         let norm = nucleus.norm();
-        println!("   └─ Kinetic Energy: {:.4} | Dimension: {}", norm, self.hdc_dim);
+        println!(
+            "   └─ Kinetic Energy: {:.4} | Dimension: {}",
+            norm, self.hdc_dim
+        );
         Ok(())
     }
 

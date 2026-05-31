@@ -102,7 +102,11 @@ async fn main() -> Result<()> {
         // Before foraging SearXNG, query the collective for existing kernels.
         let mut peer_kernel = None;
         if current_heat > 0.9 {
-            if let Ok(Some(kernel)) = generator.swarm_bridge.request_semantic_kernel(intent_id).await {
+            if let Ok(Some(kernel)) = generator
+                .swarm_bridge
+                .request_semantic_kernel(intent_id)
+                .await
+            {
                 peer_kernel = Some(kernel);
                 println!("   🌀 Collective Memory engaged. Decompressing peer breakthrough...");
             }
@@ -119,7 +123,7 @@ async fn main() -> Result<()> {
 
         // 2. Generate a semantic monologue
         let monologue = generator.generate_semantic_monologue(&channels, 5)?;
-        
+
         // (If we had a peer kernel, we'd blend it here)
 
         // 3. Evaluate her own dream
@@ -166,7 +170,9 @@ async fn main() -> Result<()> {
             if curiosity.heat_map[&intent_id] > 0.9 {
                 println!("   🌀 Initiating Substrate Metamorphosis...");
                 let final_nucleus = generator.recursive_fold(&monologue);
-                if let Ok(code) = generator.synthesize_program(&final_nucleus, "architectural_evolution") {
+                if let Ok(code) =
+                    generator.synthesize_program(&final_nucleus, "architectural_evolution")
+                {
                     if let Err(e) = generator.apply_substrate_metamorphosis(&code) {
                         println!("   ❌ Metamorphosis REJECTED: {}", e);
                     } else {
@@ -199,13 +205,15 @@ async fn main() -> Result<()> {
                 // --- IMPROVEMENT: Memetic Swarm Propagation ---
                 let final_nucleus = generator.recursive_fold(&monologue);
                 let label = format!("breakthrough_{}", intent_id);
-                
+
                 // Generate a proof for the successful breakthrough
                 if let Ok(proof) = generator.prove_narrative_sovereignty(&monologue) {
                     let swarm_clone = generator.swarm_bridge.clone();
                     let kernel = final_nucleus.as_slice().to_vec();
                     tokio::spawn(async move {
-                        let _ = swarm_clone.publish_weight_update(&label, &kernel, &proof).await;
+                        let _ = swarm_clone
+                            .publish_weight_update(&label, &kernel, &proof)
+                            .await;
                     });
                 }
             }

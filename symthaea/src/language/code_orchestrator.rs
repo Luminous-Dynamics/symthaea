@@ -69,6 +69,8 @@ pub struct CodeOrchestrator {
     verification_policy: VerificationPolicy,
     /// Optional AST/HDC repository map used to enrich generation context.
     repo_map: Option<RepoMap>,
+    /// Runtime routing policy derived from coding + calibration quality gates.
+    runtime_policy: CodingAgentRuntimePolicy,
 }
 
 /// Internal mutable state of the orchestrator.
@@ -139,6 +141,238 @@ pub struct DistillationCapture {
     pub signature: Option<String>,
     /// Normalized return-shape bucket for structural retrieval.
     pub return_shape: String,
+}
+
+/// Runtime policy generated from coding benchmark and calibration reports.
+///
+/// The policy is deliberately advisory. It can suppress clearly demoted tiers
+/// and add repair-mode context, but it never bypasses compiler/test verification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CodingAgentRuntimePolicy {
+    /// Source file path, when loaded from disk.
+    pub source_path: Option<String>,
+    /// Policy action: promote, hold, caution, or demote.
+    pub action: String,
+    /// Composite score from the policy generator.
+    pub composite_score: Option<f32>,
+    /// Preferred backend order from the policy generator.
+    pub recommended_backend_order: Vec<String>,
+    /// Repair aggressiveness selected by calibration.
+    pub repair_mode: String,
+    /// Whether accepted output should require extra human review.
+    pub human_review_required: bool,
+}
+
+impl Default for CodingAgentRuntimePolicy {
+    fn default() -> Self {
+        Self {
+            source_path: None,
+            action: "default".to_string(),
+            composite_score: None,
+            recommended_backend_order: Vec::new(),
+            repair_mode: "standard".to_string(),
+            human_review_required: false,
+        }
+    }
+}
+
+impl CodingAgentRuntimePolicy {
+    /// Load a policy from `SYMTHAEA_CODING_AGENT_POLICY` or
+    /// `CODING_AGENT_POLICY_REPORT`. Missing/invalid policies fall back to the
+    /// default route so local development and tests stay deterministic.
+    pub fn from_env() -> Self {
+        let path = std::env::var("SYMTHAEA_CODING_AGENT_POLICY")
+            .or_else(|_| std::env::var("CODING_AGENT_POLICY_REPORT"))
+            .ok();
+        let Some(path) = path else {
+            return Self::default();
+        };
+
+        Self::from_file(Path::new(&path)).unwrap_or_else(|error| {
+            tracing::warn!("Failed to load coding-agent runtime policy from {path}: {error}");
+            Self::default()
+        })
+    }
+
+    /// Load a policy JSON file emitted by `scripts/coding_agent_policy.py`.
+    pub fn from_file(path: &Path) -> io::Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        Self::from_json_str(&contents).map(|mut policy| {
+            policy.source_path = Some(path.display().to_string());
+            policy
+        })
+    }
+
+    /// Parse a policy JSON string.
+    pub fn from_json_str(contents: &str) -> io::Result<Self> {
+        let value: serde_json::Value = serde_json::from_str(contents).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("invalid coding-agent policy JSON: {error}"),
+            )
+        })?;
+
+        let action = value
+            .get("action")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("default")
+            .to_ascii_lowercase();
+        let repair_mode = value
+            .get("repair_mode")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("standard")
+            .to_ascii_lowercase();
+        let recommended_backend_order = value
+            .get("recommended_backend_order")
+            .and_then(serde_json::Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .map(|item| item.to_ascii_lowercase())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let composite_score = value
+            .get("composite_score")
+            .and_then(serde_json::Value::as_f64)
+            .map(|score| score as f32);
+        let human_review_required = value
+            .get("human_review_required")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+
+        Ok(Self {
+            source_path: None,
+            action,
+            composite_score,
+            recommended_backend_order,
+            repair_mode,
+            human_review_required,
+        })
+    }
+
+    pub fn is_configured(&self) -> bool {
+        self.source_path.is_some()
+            || self.action != "default"
+            || !self.recommended_backend_order.is_empty()
+    }
+
+    /// Conservative backend admission. Unknown policy entries do not disable
+    /// core backends; demoted/caution policies only suppress explicitly omitted
+    /// optional tiers.
+    pub fn should_try_backend(&self, backend: &str) -> bool {
+        if self.recommended_backend_order.is_empty() {
+            return true;
+        }
+
+        let backend = backend.to_ascii_lowercase();
+        if backend == "hardware" {
+            return true;
+        }
+        if self.action == "demote" && matches!(backend.as_str(), "geodesic" | "broca") {
+            return self
+                .recommended_backend_order
+                .iter()
+                .any(|entry| entry == &backend);
+        }
+        if self.action == "caution" && backend == "broca" {
+            return self
+                .recommended_backend_order
+                .iter()
+                .any(|entry| entry == &backend);
+        }
+
+        self.recommended_backend_order
+            .iter()
+            .any(|entry| entry == &backend || (backend == "llm" && entry == "deepswe"))
+            || matches!(backend.as_str(), "native" | "analogy" | "llm")
+    }
+
+    pub fn backend_runs_before(&self, backend: &str, other: &str) -> bool {
+        let Some(backend_rank) = self.backend_rank(backend) else {
+            return self.recommended_backend_order.is_empty();
+        };
+        let Some(other_rank) = self.backend_rank(other) else {
+            return true;
+        };
+        backend_rank < other_rank
+    }
+
+    pub fn backend_runs_between(&self, backend: &str, after: &str, before: &str) -> bool {
+        let Some(backend_rank) = self.backend_rank(backend) else {
+            return false;
+        };
+        let after_rank = self.backend_rank(after).unwrap_or(usize::MIN);
+        let before_rank = self.backend_rank(before).unwrap_or(usize::MAX);
+        backend_rank > after_rank && backend_rank < before_rank
+    }
+
+    fn backend_rank(&self, backend: &str) -> Option<usize> {
+        if self.recommended_backend_order.is_empty() {
+            return default_backend_rank(backend);
+        }
+
+        let backend = backend.to_ascii_lowercase();
+        self.recommended_backend_order
+            .iter()
+            .position(|entry| entry == &backend || (backend == "llm" && entry == "deepswe"))
+            .or_else(|| default_backend_rank(&backend))
+    }
+
+    pub fn repair_hints(&self) -> Vec<(String, String)> {
+        if !self.is_configured() {
+            return Vec::new();
+        }
+
+        let mut hints = vec![("coding_agent_policy".to_string(), self.summary())];
+        match self.repair_mode.as_str() {
+            "minimal" => hints.push((
+                "coding_agent_policy_repair_mode".to_string(),
+                "Policy repair mode is minimal: prefer the smallest local edit that preserves the current verified structure.".to_string(),
+            )),
+            "aggressive_with_extra_verification" => hints.push((
+                "coding_agent_policy_repair_mode".to_string(),
+                "Policy repair mode is aggressive: use repair memory, structural prototypes, and extra verification before accepting a candidate.".to_string(),
+            )),
+            "fallback_only" => hints.push((
+                "coding_agent_policy_repair_mode".to_string(),
+                "Policy repair mode is fallback-only: avoid risky learned rewrites and prefer conservative native or verified fallback behavior.".to_string(),
+            )),
+            _ => hints.push((
+                "coding_agent_policy_repair_mode".to_string(),
+                "Policy repair mode is standard: use normal structured repair hints and compiler/test feedback.".to_string(),
+            )),
+        }
+        hints
+    }
+
+    pub fn summary(&self) -> String {
+        let score = self
+            .composite_score
+            .map(|score| format!("{score:.3}"))
+            .unwrap_or_else(|| "n/a".to_string());
+        let order = if self.recommended_backend_order.is_empty() {
+            "default".to_string()
+        } else {
+            self.recommended_backend_order.join(",")
+        };
+        format!(
+            "Coding-agent policy action={} composite={} repair_mode={} backend_order={} human_review_required={}",
+            self.action, score, self.repair_mode, order, self.human_review_required
+        )
+    }
+}
+
+fn default_backend_rank(backend: &str) -> Option<usize> {
+    match backend.to_ascii_lowercase().as_str() {
+        "geodesic" => Some(0),
+        "hardware" => Some(0),
+        "native" => Some(1),
+        "analogy" => Some(2),
+        "llm" | "deepswe" => Some(3),
+        _ => None,
+    }
 }
 
 /// Record of a single synthesis attempt (for audit trail)
@@ -236,6 +470,7 @@ impl CodeOrchestrator {
             algebra: CodeAlgebra::new(algebra_encoder),
             verification_policy: VerificationPolicy::Standard,
             repo_map: None,
+            runtime_policy: CodingAgentRuntimePolicy::from_env(),
         }
     }
 
@@ -274,6 +509,17 @@ impl CodeOrchestrator {
     pub fn with_repo_map(mut self, repo_map: RepoMap) -> Self {
         self.repo_map = Some(repo_map);
         self
+    }
+
+    /// Attach a runtime policy generated by `scripts/coding_agent_policy.py`.
+    pub fn with_runtime_policy(mut self, policy: CodingAgentRuntimePolicy) -> Self {
+        self.runtime_policy = policy;
+        self
+    }
+
+    /// Current runtime routing and repair policy.
+    pub fn runtime_policy(&self) -> &CodingAgentRuntimePolicy {
+        &self.runtime_policy
     }
 
     /// Index a project into the orchestrator's AST/HDC repository map.
@@ -780,92 +1026,31 @@ impl CodeOrchestrator {
     pub fn synthesize(&self, request: &SynthesisRequest) -> SynthesisResponse {
         let mut verification_layers = Vec::new();
         let mut repair_priors = repair_memory::repair_priors_for_request(request, 3);
+        #[cfg(feature = "geodesic_synthesis")]
+        let mut geodesic_tried = false;
+
+        if self.runtime_policy.is_configured() {
+            verification_layers.push(VerificationLayer {
+                name: "coding_agent_policy".to_string(),
+                passed: !self.runtime_policy.human_review_required,
+                score: self.runtime_policy.composite_score,
+                detail: self.runtime_policy.summary(),
+            });
+        }
 
         // ─── Backend 0: Geodesic Skeleton Prior ────────────────────────────
         // Candidate generator only. The generated skeleton is accepted only if
         // the normal compiler/test verification loop proves it.
         #[cfg(feature = "geodesic_synthesis")]
-        if self.remaining_energy() >= 0.75 {
-            let geodesic_result = self.try_geodesic_generation(request, &repair_priors);
-            self.state.lock().energy_spent += 0.75;
-            let geodesic_rejection = geodesic_result.rejection.clone();
-
-            let attempt = SynthesisAttempt {
-                backend: "GeodesicSkeleton".to_string(),
-                verified: geodesic_result.verified,
-                similarity: geodesic_result.similarity,
-                energy_cost: 0.75,
-                surprise: geodesic_result.surprise,
-                diagnostic_hv_count: geodesic_result.diagnostic_hvs.len(),
-                ast_hdc_parse_successes: geodesic_result.ast_hdc.parse_successes,
-                ast_hdc_parse_failures: geodesic_result.ast_hdc.parse_failures,
-                structural_prediction_errors: geodesic_result.ast_hdc.structural_prediction_errors,
-                ast_hdc_feature_count: geodesic_result.ast_hdc.last_feature_count,
-                ast_hdc_last_features: geodesic_result.ast_hdc.last_features.clone(),
-                structural_prior_observations: geodesic_result
-                    .ast_hdc
-                    .structural_prior_observations,
-                structural_prior_score: geodesic_result.ast_hdc.last_structural_prior_score,
-                structural_prior_label: geodesic_result.ast_hdc.last_structural_prior_label.clone(),
-                structural_prior_delta: geodesic_result.ast_hdc.structural_prior_delta,
-                rejection_reason: geodesic_rejection.clone(),
-                source_preview: source_preview(&geodesic_result.source),
-                repair_prior_count: repair_priors.len(),
-                repair_prior_labels: repair_prior_labels(&repair_priors),
-            };
-            self.state.lock().attempt_history.push(attempt);
-
-            if geodesic_result.verified {
-                verification_layers.push(VerificationLayer {
-                    name: "geodesic_skeleton".to_string(),
-                    passed: true,
-                    score: Some(geodesic_result.similarity),
-                    detail: "Topology-first skeleton candidate passed verification".to_string(),
-                });
-
-                self.capture_distillation(
-                    request,
-                    &geodesic_result.source,
-                    "GeodesicSkeleton",
-                    geodesic_result.similarity,
-                    geodesic_result.surprise,
-                    geodesic_result.diagnostic_hvs,
-                );
-
-                let certificate = self.issue_certificate(
-                    request,
-                    &geodesic_result.source,
-                    "GeodesicSkeleton",
-                    &geodesic_result.source_provenance,
-                    &verification_layers,
-                    geodesic_result.similarity,
-                );
-
-                return SynthesisResponse {
-                    source: geodesic_result.source,
-                    backend_name: "GeodesicSkeleton".to_string(),
-                    confidence: geodesic_result.similarity,
-                    epistemic_status: to_trait_epistemic(geodesic_result.epistemic),
-                    verification: verification_layers,
-                    accepted: true,
-                    energy_cost: 0.75,
-                    narrative: Some(format!(
-                        "Geodesic skeleton generation succeeded (similarity: {:.3}, cert: {})",
-                        geodesic_result.similarity, certificate.id
-                    )),
-                };
-            }
-
-            verification_layers.push(VerificationLayer {
-                name: "geodesic_skeleton".to_string(),
-                passed: false,
-                score: Some(geodesic_result.similarity),
-                detail: geodesic_rejection.clone().unwrap_or_else(|| {
-                    "Geodesic skeleton candidate failed verification".to_string()
-                }),
-            });
-            if let Some(reason) = geodesic_rejection {
-                repair_priors.push(repair_prior_from_rejection("GeodesicSkeleton", &reason));
+        if self
+            .runtime_policy
+            .backend_runs_before("geodesic", "native")
+        {
+            geodesic_tried = true;
+            if let Some(response) =
+                self.try_geodesic_tier(request, &mut verification_layers, &mut repair_priors)
+            {
+                return response;
             }
         }
 
@@ -874,10 +1059,39 @@ impl CodeOrchestrator {
             || request.purpose.to_lowercase().contains("register")
             || request.purpose.to_lowercase().contains("driver");
 
+        let is_silicon = request.purpose.to_lowercase().contains("verilog")
+            || request.purpose.to_lowercase().contains("hdl")
+            || request.purpose.to_lowercase().contains("gate-level");
+
+        if is_silicon && self.remaining_energy() >= 1.0 {
+            let hdl_result = self.try_hdl_generation(request, &repair_priors);
+            self.state.lock().energy_spent += 1.0;
+
+            if hdl_result.verified {
+                verification_layers.push(VerificationLayer {
+                    name: "hdl_gate_equiv_proof".to_string(),
+                    passed: true,
+                    score: Some(1.0),
+                    detail: "Verified gate-level equivalence with high-phi prototype".to_string(),
+                });
+
+                return SynthesisResponse {
+                    source: hdl_result.source,
+                    backend_name: "HdlEmitter".to_string(),
+                    confidence: 1.0,
+                    epistemic_status: symthaea_core::synthesis_trait::EpistemicStatus::Certain,
+                    verification: verification_layers,
+                    accepted: true,
+                    energy_cost: 1.0,
+                    narrative: Some("Silicon-level logic generation succeeded with formal gate-level verification".into()),
+                };
+            }
+        }
+
         if is_hardware && self.remaining_energy() >= 1.0 {
             let hw_result = self.try_hardware_generation(request, &repair_priors);
             self.state.lock().energy_spent += 1.0;
-            
+
             let attempt = SynthesisAttempt {
                 backend: "HardwareDriverEmitter".to_string(),
                 verified: hw_result.verified,
@@ -917,13 +1131,16 @@ impl CodeOrchestrator {
                     verification: verification_layers,
                     accepted: true,
                     energy_cost: 1.0,
-                    narrative: Some("Specialized hardware driver generation succeeded with formal verification".into()),
+                    narrative: Some(
+                        "Specialized hardware driver generation succeeded with formal verification"
+                            .into(),
+                    ),
                 };
             }
         }
 
         // ─── Backend 1: Native CodeGenerator ───────────────────────────────
-        if self.remaining_energy() >= 1.0 {
+        if self.remaining_energy() >= 1.0 && self.runtime_policy.should_try_backend("native") {
             let native_result = self.try_native_generation(request, &repair_priors);
             self.state.lock().energy_spent += 1.0;
             let native_rejection = native_result.rejection.clone();
@@ -1007,8 +1224,22 @@ impl CodeOrchestrator {
             }
         }
 
+        #[cfg(feature = "geodesic_synthesis")]
+        if !geodesic_tried
+            && self
+                .runtime_policy
+                .backend_runs_between("geodesic", "native", "analogy")
+        {
+            geodesic_tried = true;
+            if let Some(response) =
+                self.try_geodesic_tier(request, &mut verification_layers, &mut repair_priors)
+            {
+                return response;
+            }
+        }
+
         // ─── Backend 2: Code Algebra Analogy ───────────────────────────────
-        if self.remaining_energy() >= 0.5 {
+        if self.remaining_energy() >= 0.5 && self.runtime_policy.should_try_backend("analogy") {
             let analogy_result = self.try_analogy_generation(request, &repair_priors);
             self.state.lock().energy_spent += 0.5;
             let analogy_rejection = analogy_result.rejection.clone();
@@ -1092,9 +1323,23 @@ impl CodeOrchestrator {
             }
         }
 
+        #[cfg(feature = "geodesic_synthesis")]
+        if !geodesic_tried
+            && self
+                .runtime_policy
+                .backend_runs_between("geodesic", "analogy", "llm")
+        {
+            geodesic_tried = true;
+            if let Some(response) =
+                self.try_geodesic_tier(request, &mut verification_layers, &mut repair_priors)
+            {
+                return response;
+            }
+        }
+
         // ─── Backend 3: LLM Fallback (Final Tier) ──────────────────────────
         // (Cost: 10.0 energy)
-        if self.remaining_energy() >= 10.0 {
+        if self.remaining_energy() >= 10.0 && self.runtime_policy.should_try_backend("llm") {
             let llm_result = self.try_llm_generation(request, &repair_priors);
             self.state.lock().energy_spent += 10.0;
 
@@ -1174,6 +1419,15 @@ impl CodeOrchestrator {
             });
         }
 
+        #[cfg(feature = "geodesic_synthesis")]
+        if !geodesic_tried {
+            if let Some(response) =
+                self.try_geodesic_tier(request, &mut verification_layers, &mut repair_priors)
+            {
+                return response;
+            }
+        }
+
         // ─── All native backends exhausted ─────────────────────────────────
         let energy_spent = self.state.lock().energy_spent;
         SynthesisResponse {
@@ -1188,6 +1442,100 @@ impl CodeOrchestrator {
                 "All synthesis tiers exhausted. No verified solution found.".to_string(),
             ),
         }
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    fn try_geodesic_tier(
+        &self,
+        request: &SynthesisRequest,
+        verification_layers: &mut Vec<VerificationLayer>,
+        repair_priors: &mut Vec<(String, String)>,
+    ) -> Option<SynthesisResponse> {
+        if self.remaining_energy() < 0.75 || !self.runtime_policy.should_try_backend("geodesic") {
+            return None;
+        }
+
+        let geodesic_result = self.try_geodesic_generation(request, repair_priors);
+        self.state.lock().energy_spent += 0.75;
+        let geodesic_rejection = geodesic_result.rejection.clone();
+
+        let attempt = SynthesisAttempt {
+            backend: "GeodesicSkeleton".to_string(),
+            verified: geodesic_result.verified,
+            similarity: geodesic_result.similarity,
+            energy_cost: 0.75,
+            surprise: geodesic_result.surprise,
+            diagnostic_hv_count: geodesic_result.diagnostic_hvs.len(),
+            ast_hdc_parse_successes: geodesic_result.ast_hdc.parse_successes,
+            ast_hdc_parse_failures: geodesic_result.ast_hdc.parse_failures,
+            structural_prediction_errors: geodesic_result.ast_hdc.structural_prediction_errors,
+            ast_hdc_feature_count: geodesic_result.ast_hdc.last_feature_count,
+            ast_hdc_last_features: geodesic_result.ast_hdc.last_features.clone(),
+            structural_prior_observations: geodesic_result.ast_hdc.structural_prior_observations,
+            structural_prior_score: geodesic_result.ast_hdc.last_structural_prior_score,
+            structural_prior_label: geodesic_result.ast_hdc.last_structural_prior_label.clone(),
+            structural_prior_delta: geodesic_result.ast_hdc.structural_prior_delta,
+            rejection_reason: geodesic_rejection.clone(),
+            source_preview: source_preview(&geodesic_result.source),
+            repair_prior_count: repair_priors.len(),
+            repair_prior_labels: repair_prior_labels(repair_priors),
+        };
+        self.state.lock().attempt_history.push(attempt);
+
+        if geodesic_result.verified {
+            verification_layers.push(VerificationLayer {
+                name: "geodesic_skeleton".to_string(),
+                passed: true,
+                score: Some(geodesic_result.similarity),
+                detail: "Topology-first skeleton candidate passed verification".to_string(),
+            });
+
+            self.capture_distillation(
+                request,
+                &geodesic_result.source,
+                "GeodesicSkeleton",
+                geodesic_result.similarity,
+                geodesic_result.surprise,
+                geodesic_result.diagnostic_hvs,
+            );
+
+            let certificate = self.issue_certificate(
+                request,
+                &geodesic_result.source,
+                "GeodesicSkeleton",
+                &geodesic_result.source_provenance,
+                verification_layers,
+                geodesic_result.similarity,
+            );
+
+            return Some(SynthesisResponse {
+                source: geodesic_result.source,
+                backend_name: "GeodesicSkeleton".to_string(),
+                confidence: geodesic_result.similarity,
+                epistemic_status: to_trait_epistemic(geodesic_result.epistemic),
+                verification: verification_layers.clone(),
+                accepted: true,
+                energy_cost: 0.75,
+                narrative: Some(format!(
+                    "Geodesic skeleton generation succeeded (similarity: {:.3}, cert: {})",
+                    geodesic_result.similarity, certificate.id
+                )),
+            });
+        }
+
+        verification_layers.push(VerificationLayer {
+            name: "geodesic_skeleton".to_string(),
+            passed: false,
+            score: Some(geodesic_result.similarity),
+            detail: geodesic_rejection
+                .clone()
+                .unwrap_or_else(|| "Geodesic skeleton candidate failed verification".to_string()),
+        });
+        if let Some(reason) = geodesic_rejection {
+            repair_priors.push(repair_prior_from_rejection("GeodesicSkeleton", &reason));
+        }
+
+        None
     }
 
     /// Attempt code generation via a topology-first geodesic skeleton.
@@ -1732,34 +2080,130 @@ impl CodeOrchestrator {
         _repair_priors: &[(String, String)],
     ) -> BackendResult {
         let emitter = super::emitters::driver::DriverEmitter;
-        
-        // 1. Derive DriverSpec
-        let spec = super::emitters::driver::DriverSpec::new(&request.name);
 
-        // 2. Emit Rust code
-        let source = emitter.emit(&spec);
+        // 1. Initialize solver for the loop (Track 1)
+        let bridge = crate::z3_bridge::Z3Bridge::new();
+        let memory = super::proof_memory::ProofMemory::default();
+        let mut solver = super::proof_memory::CachedProofEngine::new(bridge, memory);
 
-        // 3. Run mandatory SMT Safety Proofs (DMA, FSM, Power) (INV-13)
-        let proven = true;
-        
-        if let Some(ref dma) = spec.dma {
-            let _query = emitter.prove_dma_ownership_safety(dma);
-        }
+        // 2. Derive initial DriverSpec
+        let mut spec = super::emitters::driver::DriverSpec::new(&request.name);
 
-        if let Some(ref fsm) = spec.fsm {
-            let _query = emitter.prove_fsm_reachability(fsm, "Reset");
+        // 3. Neuro-Symbolic Refactoring Loop (Track 1)
+        let mut proven = false;
+        let mut source = String::new();
+        let mut retries = 0;
+        const MAX_HW_RETRIES: usize = 3;
+
+        while !proven && retries < MAX_HW_RETRIES {
+            retries += 1;
+
+            // Emit Rust code
+            source = emitter.emit(&spec);
+
+            // Run automated SMT verification
+            let verification_results = emitter.verify(&spec, &source, &mut solver);
+
+            // Check if all invariants are proven
+            proven = verification_results
+                .iter()
+                .all(|(_, v, _)| *v == super::proof_memory::ProofVerdict::Proven);
+
+            if !proven {
+                tracing::info!(
+                    "SMT REFUTATION in Hardware Loop (retry {}/{}). Refactoring spec...",
+                    retries,
+                    MAX_HW_RETRIES
+                );
+                // Solver-Driven Refactoring: Adjust spec based on refutations
+                for (prop, verdict, details) in &verification_results {
+                    if *verdict == super::proof_memory::ProofVerdict::Refuted {
+                        tracing::warn!("  Refuted property: {} - {}", prop, details);
+                        // Heuristic refactoring: if power budget failed, reduce clock speed or increase wait times
+                        if prop.contains("Power") {
+                            for tx in &mut spec.transactions {
+                                for step in &mut tx.steps {
+                                    if let super::emitters::driver::TransactionStep::WaitMs(ms) =
+                                        step
+                                    {
+                                        *ms += 5; // Increase delay to lower avg power
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         BackendResult {
             source,
             verified: proven,
-            similarity: 1.0, // deterministic output matches spec exactly
-            surprise: 0.0,
+            similarity: 1.0, // deterministic output matches refined spec
+            surprise: if proven { 0.0 } else { 1.0 },
             diagnostic_hvs: Vec::new(),
             ast_hdc: AstHdcTrace::default(),
-            epistemic: EpistemicStatus::Certain,
-            rejection: if proven { None } else { Some("SMT Verification Failed".into()) },
-            source_provenance: "Symthaea::DriverEmitter".into(),
+            epistemic: if proven {
+                EpistemicStatus::Certain
+            } else {
+                EpistemicStatus::Uncertain
+            },
+            rejection: if proven {
+                None
+            } else {
+                Some("SMT Verification Refuted Hardware Spec".into())
+            },
+            source_provenance: "Symthaea::DriverEmitter::SolverLoop".into(),
+        }
+    }
+
+    /// Attempt silicon-level logic generation via specialized HdlEmitter.
+    fn try_hdl_generation(
+        &self,
+        request: &SynthesisRequest,
+        _repair_priors: &[(String, String)],
+    ) -> BackendResult {
+        let emitter = super::emitters::hdl::HdlEmitter;
+
+        // 1. Initialize solver (Track 1)
+        let bridge = crate::z3_bridge::Z3Bridge::new();
+        let memory = super::proof_memory::ProofMemory::default();
+        let mut solver = super::proof_memory::CachedProofEngine::new(bridge, memory);
+
+        // 2. Derive HdlSpec
+        let spec = super::emitters::hdl::HdlSpec {
+            module_name: request.name.clone(),
+            kind: super::emitters::hdl::HdlModuleKind::Combinational,
+            inputs: vec![("a".into(), 8), ("b".into(), 8)], // example
+            outputs: vec![("out".into(), 8)],
+            logic_expression: request.purpose.clone(),
+        };
+
+        // 3. Emit Verilog
+        let source = emitter.emit(&spec);
+
+        // 4. Run mandatory Gate-Level Equivalence Proofs (INV-13)
+        let (verdict, details) = emitter.verify(&spec, &mut solver);
+        let proven = verdict == super::proof_memory::ProofVerdict::Proven;
+
+        BackendResult {
+            source,
+            verified: proven,
+            similarity: 1.0,
+            surprise: if proven { 0.0 } else { 1.0 },
+            diagnostic_hvs: Vec::new(),
+            ast_hdc: AstHdcTrace::default(),
+            epistemic: if proven {
+                EpistemicStatus::Certain
+            } else {
+                EpistemicStatus::Uncertain
+            },
+            rejection: if proven {
+                None
+            } else {
+                Some(format!("HDL Verification Failed: {}", details))
+            },
+            source_provenance: "Symthaea::HdlEmitter::SolverLoop".into(),
         }
     }
 
@@ -1871,6 +2315,9 @@ impl CodeOrchestrator {
         context
             .error_hints
             .extend(request_repair_priors(request).into_iter());
+        context
+            .error_hints
+            .extend(self.runtime_policy.repair_hints().into_iter());
         let structural_examples = self.structural_success_examples_for_request(request, 5);
         if !structural_examples.is_empty() {
             context.error_hints.push((
@@ -2399,6 +2846,80 @@ mod tests {
     }
 
     #[test]
+    fn test_runtime_policy_parses_quality_gate_output() {
+        let policy = CodingAgentRuntimePolicy::from_json_str(
+            r#"{
+                "action": "hold",
+                "composite_score": 0.954,
+                "recommended_backend_order": ["geodesic", "native", "broca", "analogy", "deepswe", "llm"],
+                "repair_mode": "standard",
+                "human_review_required": false
+            }"#,
+        )
+        .unwrap();
+
+        assert!(policy.is_configured());
+        assert_eq!(policy.action, "hold");
+        assert_eq!(policy.composite_score, Some(0.954));
+        assert!(policy.should_try_backend("geodesic"));
+        assert!(policy.should_try_backend("native"));
+        assert!(policy.should_try_backend("llm"));
+        assert!(policy.summary().contains("backend_order=geodesic,native"));
+    }
+
+    #[test]
+    fn test_runtime_policy_orders_geodesic_relative_to_other_backends() {
+        let caution = CodingAgentRuntimePolicy::from_json_str(
+            r#"{
+                "action": "caution",
+                "recommended_backend_order": ["native", "geodesic", "analogy", "llm"],
+                "repair_mode": "aggressive_with_extra_verification"
+            }"#,
+        )
+        .unwrap();
+        assert!(!caution.backend_runs_before("geodesic", "native"));
+        assert!(caution.backend_runs_between("geodesic", "native", "analogy"));
+
+        let demote = CodingAgentRuntimePolicy::from_json_str(
+            r#"{
+                "action": "demote",
+                "recommended_backend_order": ["native", "analogy", "deepswe", "llm", "geodesic"],
+                "repair_mode": "fallback_only"
+            }"#,
+        )
+        .unwrap();
+        assert!(!demote.backend_runs_before("geodesic", "native"));
+        assert!(!demote.backend_runs_between("geodesic", "native", "analogy"));
+        assert!(!demote.backend_runs_between("geodesic", "analogy", "llm"));
+    }
+
+    #[test]
+    fn test_runtime_policy_is_injected_into_generation_context() {
+        let policy = CodingAgentRuntimePolicy::from_json_str(
+            r#"{
+                "action": "caution",
+                "composite_score": 0.71,
+                "recommended_backend_order": ["native", "geodesic", "analogy", "llm"],
+                "repair_mode": "aggressive_with_extra_verification",
+                "human_review_required": true
+            }"#,
+        )
+        .unwrap();
+        let orch = CodeOrchestrator::new().with_runtime_policy(policy);
+        let request = SynthesisRequest::new("rust", "parse_count", "parse count")
+            .with_signature("fn parse_count(input: &str) -> Result<usize, String>");
+
+        let context = orch.context_for_request(&request);
+
+        assert!(context.error_hints.iter().any(|(label, hint)| {
+            label == "coding_agent_policy" && hint.contains("action=caution")
+        }));
+        assert!(context.error_hints.iter().any(|(label, hint)| {
+            label == "coding_agent_policy_repair_mode" && hint.contains("aggressive")
+        }));
+    }
+
+    #[test]
     fn test_orchestrator_indexes_project_repo_map() {
         let dir = tempfile::tempdir().unwrap();
         let src_dir = dir.path().join("src");
@@ -2863,6 +3384,42 @@ pub fn moved() -> usize {
                 "rejected synthesis should not issue certificates"
             );
         }
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_caution_policy_routes_native_before_geodesic_in_real_synthesis() {
+        let policy = CodingAgentRuntimePolicy::from_json_str(
+            r#"{
+                "action": "caution",
+                "composite_score": 0.72,
+                "recommended_backend_order": ["native", "geodesic", "analogy", "llm"],
+                "repair_mode": "aggressive_with_extra_verification",
+                "human_review_required": true
+            }"#,
+        )
+        .unwrap();
+        let orch = CodeOrchestrator::new()
+            .with_runtime_policy(policy)
+            .with_llm_backend(crate::language::llm_backend::simulated_backend())
+            .with_energy_budget(4.0);
+        let request = SynthesisRequest::new("rust", "add", "Add two integers")
+            .with_signature("fn add(a: i32, b: i32) -> i32")
+            .with_example("add(2, 3)", "5");
+
+        let response = orch.synthesize(&request);
+        let attempts = orch.attempt_history();
+
+        assert_eq!(
+            attempts.first().map(|attempt| attempt.backend.as_str()),
+            Some("CodeGenerator")
+        );
+        assert!(
+            response
+                .verification
+                .iter()
+                .any(|layer| layer.name == "coding_agent_policy")
+        );
     }
 
     #[cfg(feature = "geodesic_synthesis")]

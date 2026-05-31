@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 
 use serde::Serialize;
-use symthaea::language::code_orchestrator::CodeOrchestrator;
+use symthaea::language::code_orchestrator::{CodeOrchestrator, CodingAgentRuntimePolicy};
 use symthaea::language::repair_taxonomy::{
     FORCE_REPAIR_BENCH_ENV, categorize_rejection, extract_embedded_category,
     repair_lesson_for_rejection,
@@ -148,6 +148,9 @@ struct BenchReport {
     repair_prior_labels: BTreeMap<String, usize>,
     repair_prior_uses: usize,
     repair_prior_label_count: usize,
+    repair_hinted_attempts: usize,
+    repair_hinted_successes: usize,
+    repair_hinted_success_rate: f32,
     repair_memory_hits: usize,
     repair_memory_successes: usize,
     repair_memory_success_rate: f32,
@@ -233,6 +236,18 @@ fn run_benchmark() {
     }
     if let Some(budget) = args.energy_budget {
         orch = orch.with_energy_budget(budget);
+    }
+    if let Some(path) = args.runtime_policy_json.as_deref() {
+        match CodingAgentRuntimePolicy::from_file(std::path::Path::new(path)) {
+            Ok(policy) => {
+                eprintln!("[benchmark] loaded runtime coding-agent policy from {path}");
+                orch = orch.with_runtime_policy(policy);
+            }
+            Err(error) => {
+                eprintln!("error: failed to load runtime coding-agent policy from {path}: {error}");
+                std::process::exit(2);
+            }
+        }
     }
     let distillation_imported = if let Some(path) = args.load_distillation_jsonl.as_deref() {
         match orch.load_distillation(std::path::Path::new(path)) {
@@ -620,6 +635,16 @@ fn run_benchmark() {
     }
     let repair_prior_uses = repair_prior_counts_by_backend.values().sum();
     let repair_prior_label_count = repair_prior_labels.values().sum();
+    let repair_hinted_attempts = tasks
+        .iter()
+        .filter(|task| !task.repair_priors_seen.is_empty())
+        .count();
+    let repair_hinted_successes = tasks
+        .iter()
+        .filter(|task| !task.repair_priors_seen.is_empty() && task.accepted)
+        .count();
+    let repair_hinted_success_rate =
+        repair_hinted_successes as f32 / repair_hinted_attempts.max(1) as f32;
     let repair_memory_hits = tasks
         .iter()
         .filter(|task| task_uses_repair_memory(task))
@@ -733,6 +758,9 @@ fn run_benchmark() {
         repair_prior_labels,
         repair_prior_uses,
         repair_prior_label_count,
+        repair_hinted_attempts,
+        repair_hinted_successes,
+        repair_hinted_success_rate,
         repair_memory_hits,
         repair_memory_successes,
         repair_memory_success_rate,
@@ -845,9 +873,12 @@ fn run_benchmark() {
             report.first_successful_backend_after_repair
         );
         println!(
-            "repair priors: uses={} labels={} by_backend={:?} labels={:?}",
+            "repair priors: uses={} labels={} hinted_attempts={} hinted_successes={} hinted_rate={:.3} by_backend={:?} labels={:?}",
             report.repair_prior_uses,
             report.repair_prior_label_count,
+            report.repair_hinted_attempts,
+            report.repair_hinted_successes,
+            report.repair_hinted_success_rate,
             report.repair_prior_counts_by_backend,
             report.repair_prior_labels
         );
@@ -1015,6 +1046,7 @@ struct Args {
     save_distillation_jsonl: Option<String>,
     load_structural_prototypes: Option<String>,
     save_structural_prototypes: Option<String>,
+    runtime_policy_json: Option<String>,
     disable_fep_repair_hints: bool,
     disable_ast_hdc_fep: bool,
 }
@@ -1085,6 +1117,12 @@ impl Args {
                     };
                     args.save_structural_prototypes = Some(path);
                 }
+                "--runtime-policy-json" => {
+                    let Some(path) = iter.next() else {
+                        print_help_and_exit(2, "--runtime-policy-json requires a path");
+                    };
+                    args.runtime_policy_json = Some(path);
+                }
                 "--disable-fep-repair-hints" => args.disable_fep_repair_hints = true,
                 "--disable-ast-hdc-fep" => args.disable_ast_hdc_fep = true,
                 "--help" | "-h" => print_help_and_exit(0, ""),
@@ -1119,6 +1157,10 @@ fn print_help_and_exit(code: i32, error: &str) -> ! {
     eprintln!("                      Seed compact AST-HDC prototype memory from JSON");
     eprintln!("  --save-structural-prototypes PATH");
     eprintln!("                      Export compact AST-HDC prototype memory after the benchmark");
+    eprintln!("  --runtime-policy-json PATH");
+    eprintln!(
+        "                      Apply a coding-agent routing policy JSON during the benchmark"
+    );
     eprintln!("  --disable-fep-repair-hints");
     eprintln!(
         "                      Ablate FEP prediction-error hints while still measuring failures"
@@ -1223,6 +1265,7 @@ fn tasks_for_lane(lane: &str) -> Vec<BenchTask> {
             let mut tasks = smoke_tasks();
             tasks.extend(hard_tasks());
             tasks.extend(repair_tasks());
+            tasks.extend(frontier_tasks());
             tasks
         }
         _ => smoke_tasks(),

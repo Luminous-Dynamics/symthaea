@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "evidence_level": "measured",
+  "measured": true,
+  "benchmark": "broca-exercism-rust-fixtures",
+  "total_exercises": 4,
+  "compile_successes": 2,
+  "test_successes": 1,
+  "cases": []
+}

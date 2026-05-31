@@ -97,7 +97,6 @@ pub enum SwarmMessage {
     },
 }
 
-
 /// Aggregator for swarm-wide consciousness states and collective proofs.
 #[derive(Default, Debug, Clone)]
 pub struct SwarmAggregator {
@@ -129,7 +128,7 @@ impl SwarmAggregator {
             msg.position[1].round() as i32,
             msg.position[2].round() as i32,
         ];
-        
+
         let entry = self.haptic_map.entry(grid_pos).or_insert(0.0);
         // Exponential moving average for terrain stability
         *entry = *entry * 0.7 + msg.surprise * 0.3;
@@ -148,14 +147,20 @@ impl SwarmAggregator {
 
     /// Ingest and vote on a proposed safety law.
     pub fn ingest_law_proposal(&mut self, msg: LawGossipMsg) {
-        let entry = self.collective_laws.entry(msg.law_id).or_insert((msg.smtlib2, 0.0));
+        let entry = self
+            .collective_laws
+            .entry(msg.law_id)
+            .or_insert((msg.smtlib2, 0.0));
         entry.1 += msg.proposing_phi;
-        
+
         let total_phi: f64 = self.peer_states.values().map(|s| s.local_phi).sum();
         let threshold = total_phi * 0.5;
-        
+
         if entry.1 > threshold {
-            tracing::info!("⚖️  SWARM LAW RATIFIED: Law {} has passed threshold.", msg.node_id);
+            tracing::info!(
+                "⚖️  SWARM LAW RATIFIED: Law {} has passed threshold.",
+                msg.node_id
+            );
         }
     }
 
@@ -177,29 +182,39 @@ impl SwarmAggregator {
 
     /// Autonomously reconcile a constitutional conflict by synthesizing a "Perfect Compromise".
     ///
-    /// If two laws conflict (e.g. Performance vs. Safety), this method uses SMT 
+    /// If two laws conflict (e.g. Performance vs. Safety), this method uses SMT
     /// relaxation to find the absolute maximum performance that exactly satisfies the safety invariant.
     pub fn reconcile_constitutional_conflict(&self, core: &[String]) -> Option<(String, String)> {
         let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
-        tracing::info!("⚖️  Supreme Court: Reconciling conflict between {} laws...", core.len());
+        tracing::info!(
+            "⚖️  Supreme Court: Reconciling conflict between {} laws...",
+            core.len()
+        );
 
-        // In a real implementation, we would use binary search over the 
+        // In a real implementation, we would use binary search over the
         // numeric constants in the unsat-core to find the boundary.
         // Here we simulate the synthesis of a harmonious compromise.
 
-        if core.iter().any(|l| l.contains("robot_torque")) && core.iter().any(|l| l.contains("> 0.9")) {
-            let harmonious_law = "(assert (=> (< available_mw 5.0) (< robot_torque 0.35)))".to_string();
+        if core.iter().any(|l| l.contains("robot_torque"))
+            && core.iter().any(|l| l.contains("> 0.9"))
+        {
+            let harmonious_law =
+                "(assert (=> (< available_mw 5.0) (< robot_torque 0.35)))".to_string();
             let performance_compromise = "(assert (<= robot_torque 0.85))".to_string();
 
-            tracing::info!("✨ Synthesis Complete: Derived 'Perfect Compromise' (Torque capped at 0.85).");
-            return Some(("RES-COLLAPSE-RECONCILED".into(), format!("{}; {}", harmonious_law, performance_compromise)));
+            tracing::info!(
+                "✨ Synthesis Complete: Derived 'Perfect Compromise' (Torque capped at 0.85)."
+            );
+            return Some((
+                "RES-COLLAPSE-RECONCILED".into(),
+                format!("{}; {}", harmonious_law, performance_compromise),
+            ));
         }
 
         None
     }
 
     pub fn hive_mind_vector(&self) -> ContinuousHV {
-
         if self.peer_states.is_empty() {
             return ContinuousHV::zero(16384);
         }

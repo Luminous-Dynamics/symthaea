@@ -96,6 +96,29 @@ impl NegativePrototypeBank {
     }
 }
 
+/// Substrate performance model for hardware/software partitioning decisions.
+#[derive(Debug, Clone, Default)]
+pub struct SubstrateCostModel {
+    pub rust_latency_us: f32,
+    pub hdl_latency_us: f32,
+    pub energy_budget_mw: f32,
+}
+
+impl SubstrateCostModel {
+    pub fn compute_performance_reward(&self, action_embedding: &[f32]) -> f64 {
+        // High-phi dimensions in the embedding represent computational complexity.
+        // We use them to predict if Rust will exceed the real-time budget.
+        let complexity: f32 =
+            action_embedding.iter().map(|&x| x.abs()).sum::<f32>() / action_embedding.len() as f32;
+
+        let rust_score = 1.0 - (complexity * self.rust_latency_us / 1000.0).min(1.0);
+        let hdl_score = 1.0 - (self.hdl_latency_us / 100.0).min(1.0);
+
+        // Return normalized reward: higher is better (more deterministic/faster)
+        (rust_score.max(hdl_score) as f64).clamp(0.0, 1.0)
+    }
+}
+
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     let mut dot = 0.0;
     let mut mag_a = 0.0;
@@ -127,6 +150,7 @@ impl MctsPlanner {
         config: &MctsConfig,
         budget: &ReasoningBudget,
         negatives: &NegativePrototypeBank,
+        substrate: &SubstrateCostModel,
     ) -> MctsResult {
         if actions.is_empty() {
             return MctsResult::no_plan();
@@ -154,7 +178,14 @@ impl MctsPlanner {
             let child_idx = Self::select(&root, config.exploration_constant, &penalties);
 
             // Simulate: rollout from this action
-            let reward = Self::simulate(state, actions, child_idx, config.max_depth, negatives);
+            let reward = Self::simulate(
+                state,
+                actions,
+                child_idx,
+                config.max_depth,
+                negatives,
+                substrate,
+            );
 
             // Backpropagate
             root.children[child_idx].visits += 1;
@@ -215,6 +246,7 @@ impl MctsPlanner {
         action_idx: usize,
         _max_depth: usize,
         negatives: &NegativePrototypeBank,
+        substrate: &SubstrateCostModel,
     ) -> f64 {
         let mut forked = state.fork();
         let action = &actions[action_idx];
@@ -234,10 +266,13 @@ impl MctsPlanner {
         // Negative feedback: penalize reward based on similarity to disproven paths
         let penalty = negatives.compute_penalty(&action.embedding);
 
+        // Substrate partitioning: reward actions that fit the hardware constraints (INV-14)
+        let substrate_reward = substrate.compute_performance_reward(&action.embedding);
+
         // Epistemic bonus: prefer info-gathering actions
         let epistemic_bonus = if action.is_epistemic { 0.2 } else { 0.0 };
 
-        (reward + epistemic_bonus - penalty).clamp(0.0, 1.0)
+        (reward + epistemic_bonus + substrate_reward - penalty).clamp(0.0, 1.0)
     }
 
     /// Epistemic-only rollout: minimize uncertainty rather than maximize reward.
@@ -345,7 +380,14 @@ mod tests {
         let config = MctsConfig::tier1();
         let budget = ReasoningBudget::new(10_000, 0.8);
 
-        let result = MctsPlanner::plan(&state, &actions, &config, &budget, &Default::default());
+        let result = MctsPlanner::plan(
+            &state,
+            &actions,
+            &config,
+            &budget,
+            &Default::default(),
+            &Default::default(),
+        );
         assert!(result.did_plan);
         assert!(result.best_action_idx.is_some());
         assert!(result.iterations > 0);
@@ -374,7 +416,14 @@ mod tests {
         let budget = ReasoningBudget::new(1_000, 0.8);
 
         let start = std::time::Instant::now();
-        let result = MctsPlanner::plan(&state, &actions, &config, &budget, &Default::default());
+        let result = MctsPlanner::plan(
+            &state,
+            &actions,
+            &config,
+            &budget,
+            &Default::default(),
+            &Default::default(),
+        );
         let elapsed = start.elapsed();
 
         // Should complete within a reasonable time (Tier0 budget is 2ms)

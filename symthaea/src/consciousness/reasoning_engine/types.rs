@@ -49,6 +49,8 @@ pub struct ReasoningContext {
     pub code_context: Option<CodeReasoningContext>,
     /// Negative prototypes bank for penalizing disproven approaches in MCTS (INV-12).
     pub negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
+    /// Substrate cost model for hardware/software partitioning in MCTS (INV-14).
+    pub substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel,
 }
 
 /// Code-specific reasoning context for the consciousness engine.
@@ -119,6 +121,7 @@ pub struct ReasoningContextBuilder {
     epistemic_quality: f64,
     code_context: Option<CodeReasoningContext>,
     negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
+    substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel,
 }
 
 impl ReasoningContextBuilder {
@@ -136,6 +139,8 @@ impl ReasoningContextBuilder {
             code_context: None,
             negative_prototypes:
                 crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
+            substrate_cost_model:
+                crate::consciousness::temporal_planning::mcts::SubstrateCostModel::default(),
         }
     }
 
@@ -202,6 +207,15 @@ impl ReasoningContextBuilder {
         self
     }
 
+    /// Set the substrate cost model.
+    pub fn with_substrate_cost_model(
+        mut self,
+        model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel,
+    ) -> Self {
+        self.substrate_cost_model = model;
+        self
+    }
+
     /// Build the ReasoningContext.
     ///
     /// If theory_metrics was not set, creates default metrics based on phi.
@@ -231,6 +245,7 @@ impl ReasoningContextBuilder {
             epistemic_quality: self.epistemic_quality,
             code_context: self.code_context,
             negative_prototypes: self.negative_prototypes,
+            substrate_cost_model: self.substrate_cost_model,
         }
     }
 }

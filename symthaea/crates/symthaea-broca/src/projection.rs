@@ -333,6 +333,23 @@ impl HdcSsmProjection {
         let sum_sq: f32 = cov.iter().map(|x| x * x).sum();
         (trace * trace) / sum_sq
     }
+
+    /// Randomly destroy a percentage of weights to simulate substrate damage.
+    pub fn perturb(&mut self, damage_percent: f32) {
+        let mut rng = rand::thread_rng();
+        use rand::Rng;
+
+        for w in &mut self.w_down {
+            if rng.gen_bool(damage_percent as f64) {
+                *w = 0.0;
+            }
+        }
+        for w in &mut self.w_up {
+            if rng.gen_bool(damage_percent as f64) {
+                *w = 0.0;
+            }
+        }
+    }
 }
 
 /// Trait for layers that support local Free Energy Principle (FEP) learning.
@@ -1318,6 +1335,11 @@ impl HdcSsmProjection {
     pub fn enable_ema(&mut self, decay: f32) {
         self.ema_decay = decay.clamp(0.9, 0.99999);
         self.ema_weights = Some(self.flatten_weights());
+    }
+
+    /// Update the EMA decay rate for dynamic information-locking.
+    pub fn set_ema_decay(&mut self, decay: f32) {
+        self.ema_decay = decay.clamp(0.9, 0.99999);
     }
 
     /// Update EMA shadow weights: `ema = decay * ema + (1-decay) * live`.

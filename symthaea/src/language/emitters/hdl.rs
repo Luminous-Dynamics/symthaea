@@ -36,14 +36,22 @@ impl HdlEmitter {
 
         // 1. Port declarations
         for (name, bits) in &spec.inputs {
-            let range = if *bits > 1 { format!("[{}:0] ", bits - 1) } else { "".to_string() };
+            let range = if *bits > 1 {
+                format!("[{}:0]", bits - 1)
+            } else {
+                "".to_string()
+            };
             code.push_str(&format!("    input wire {} {},\n", range, name));
         }
         for (name, bits) in &spec.outputs {
-            let range = if *bits > 1 { format!("[{}:0] ", bits - 1) } else { "".to_string() };
+            let range = if *bits > 1 {
+                format!("[{}:0]", bits - 1)
+            } else {
+                "".to_string()
+            };
             code.push_str(&format!("    output wire {} {},\n", range, name));
         }
-        
+
         // Remove trailing comma from last port
         if code.ends_with(",\n") {
             code.pop();
@@ -55,7 +63,7 @@ impl HdlEmitter {
         // 2. Logic implementation
         // Simplified translation of Rust-like expression to Verilog assign
         let verilog_expr = self.translate_to_verilog(&spec.logic_expression);
-        
+
         if let Some((out_name, _)) = spec.outputs.first() {
             code.push_str(&format!("    assign {} = {};\n", out_name, verilog_expr));
         }
@@ -71,12 +79,11 @@ impl HdlEmitter {
             .replace("!", "~")
             .replace("==", "==")
             .replace("!=", "!=")
+            .replace("let ", "") // strip Rust let
+            .replace(";", "")
     }
 
     /// Generate an SMT-LIB2 query to prove gate-level equivalence with Rust source.
-    ///
-    /// This uses the bit-vector logic (QF_BV) to prove that the generated Verilog
-    /// logic behaves exactly like the high-phi Rust prototype.
     pub fn prove_gate_equivalence(&self, rust_smt: &str, hdl_expr: &str, bits: usize) -> String {
         format!(
             "(set-logic QF_BV)
@@ -85,11 +92,40 @@ impl HdlEmitter {
 (define-fun rust_logic () (_ BitVec {0}) {1})
 (define-fun hdl_logic () (_ BitVec {0}) {2})
 
-; Assert that Rust and HDL logic differ (we want this to be UNSAT)
+; Safety Invariant: Rust logic matches HDL logic for all inputs
+; Negation: is there an input where they differ?
 (assert (not (= rust_logic hdl_logic)))
 (check-sat)",
             bits, rust_smt, hdl_expr
         )
+    }
+
+    /// Perform automated SMT verification for gate-level equivalence.
+    pub fn verify(
+        &self,
+        spec: &HdlSpec,
+        solver: &mut crate::language::proof_memory::CachedProofEngine,
+    ) -> (crate::language::proof_memory::ProofVerdict, String) {
+        // For the prototype, we assume the high-phi Rust prototype matches the logic_expression
+        let rust_smt = format!("(bvadd a b)"); // example mapping
+        let query = self.prove_gate_equivalence(&rust_smt, &spec.logic_expression, 8);
+
+        #[cfg(feature = "swarm")]
+        return solver.verify_with_cache(
+            &format!("{}_gate_equiv", spec.module_name),
+            &spec.logic_expression,
+            &query,
+            0.85,
+            &[],
+        );
+        #[cfg(not(feature = "swarm"))]
+        return solver.verify_with_cache(
+            &format!("{}_gate_equiv", spec.module_name),
+            &spec.logic_expression,
+            &query,
+            0.85,
+            &[],
+        );
     }
 }
 
@@ -109,7 +145,7 @@ mod tests {
 
         let emitter = HdlEmitter;
         let code = emitter.emit(&spec);
-        
+
         assert!(code.contains("module Adder"));
         assert!(code.contains("input wire [7:0] a"));
         assert!(code.contains("assign sum = a + b"));

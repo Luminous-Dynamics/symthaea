@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Dexterous Manipulation Benchmark (64-DOF FullSpine Humanoid)
-//! 
+//!
 //! Simulates the 64-DOF humanoid performing a "Precision Pinch" task.
-//! Tests the coordination of the 5-finger hands (32 extra actuators) 
+//! Tests the coordination of the 5-finger hands (32 extra actuators)
 //! and the efficiency of the HDC-LTC sensory feedback loop for fine motor control.
 
+use anyhow::Result;
+use symthaea_core::genesis::GenesisSeed;
 use symthaea_humanoid::controller::HumanoidController;
 use symthaea_humanoid::encoder::HumanoidHdcEncoder;
 use symthaea_humanoid::morphology::HumanoidMorphology;
 use symthaea_humanoid::types::{HumanoidConfig, HumanoidState};
-use symthaea_core::genesis::GenesisSeed;
 use symtropy_robotics_bridge_core::safety::JointSafetyAuthority;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use anyhow::Result;
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -54,13 +54,13 @@ async fn main() -> Result<()> {
         encoder.reset();
 
         let mut cumulative_grip_success = 0.0;
-        
+
         for step in 0..STEPS_PER_TRIAL {
             let t = step as f32 * DT;
-            
+
             // A. Simulated Sensory State (Closing fingers)
             let mut state = HumanoidState::standing_for(morphology);
-            
+
             // Indices 21..53 are the hand actuators (16 per hand)
             // Simulating a rhythmic "pinch" motion
             for i in 21..53 {
@@ -79,10 +79,10 @@ async fn main() -> Result<()> {
             let mut joint_surprises = vec![0.0f64; morphology.num_actuators()];
             if step > 50 && step < 100 {
                 // Simulate index finger contact resistance
-                joint_surprises[21] = 1.8; 
+                joint_surprises[21] = 1.8;
                 joint_surprises[29] = 1.8;
             }
-            
+
             safety.update_from_surprise(&joint_surprises);
             for i in 0..command.torques.len() {
                 command.torques[i] *= safety.joint_tiers[i].motor_gain() as f32;
@@ -108,7 +108,7 @@ async fn main() -> Result<()> {
         info!("📊 Trial {} Result:", trial);
         info!("   🤲 Grip Stability: {:.2}%", avg_success * 100.0);
         info!("   🧠 Neural Confidence: {:.3}", encoder.confidence());
-        
+
         if avg_success > 0.7 {
             info!("   ✅ PRECISION GRIP ACHIEVED.");
         }

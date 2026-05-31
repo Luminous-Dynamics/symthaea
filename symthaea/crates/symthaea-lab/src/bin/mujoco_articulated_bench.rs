@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! MuJoCo Articulated Benchmark (64-DOF Flagship Humanoid)
-//! 
-//! Exports the 64-DOF morphology and executes a multibody dynamics 
+//!
+//! Exports the 64-DOF morphology and executes a multibody dynamics
 //! validation pass using the MuJoCo bridge.
 
-use symthaea_mujoco_bridge::MuJoCoBridge;
-use symthaea_sim_bridge::{EngineeringDomain, SimulationRequest, SimulationBackend, SolverKind};
-use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use anyhow::Result;
+use symthaea_mujoco_bridge::MuJoCoBridge;
+use symthaea_sim_bridge::{EngineeringDomain, SimulationBackend, SimulationRequest, SolverKind};
+use tracing::{info, level_filters::LevelFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,8 +26,13 @@ async fn main() -> Result<()> {
     bridge.dry_run = true; // Stay in dry-run mode for now to verify MJCF export only
     bridge.asset_dir = "assets/mujoco_bench".to_string();
 
-    info!("📦 Exporting 64-DOF Flagship MJCF to: {}...", bridge.asset_dir);
-    let xml_path = bridge.export_flagship_mjcf().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    info!(
+        "📦 Exporting 64-DOF Flagship MJCF to: {}...",
+        bridge.asset_dir
+    );
+    let xml_path = bridge
+        .export_flagship_mjcf()
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     info!("✅ MJCF Export SUCCESS: {}", xml_path);
 
     // 2. Prepare Simulation Request
@@ -39,17 +44,22 @@ async fn main() -> Result<()> {
     );
 
     info!("🚀 Dispatching Multibody Dynamics request to MuJoCo solver...");
-    
+
     // 3. Run Validation
-    let result = bridge.run(&request).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    let result = bridge
+        .run(&request)
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     info!("✨ BENCHMARK PASS COMPLETE.");
     info!("📊 VALIDATION REPORT:");
     info!("   🆔 Request ID: {}", result.request_id);
     info!("   🎯 Confidence: {:.2}%", result.confidence * 100.0);
-    
+
     for metric in &result.metrics {
-        info!("   🔹 Metric [{}]: {:.4} {}", metric.name, metric.value, metric.unit);
+        info!(
+            "   🔹 Metric [{}]: {:.4} {}",
+            metric.name, metric.value, metric.unit
+        );
     }
 
     if result.converged {

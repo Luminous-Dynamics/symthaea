@@ -53,6 +53,7 @@
 
 mod engine;
 mod genome;
+pub mod morphology_genome;
 mod phenotype;
 mod phi_gradient;
 

@@ -2023,6 +2023,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d27c3610c36aee21ce8ac510e6224498de4228ad772a171ed65643a24693a5a8"
 
 [[package]]
+name = "base16ct"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6"
+
+[[package]]
 name = "base32"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5542,8 +5548,6 @@ dependencies = [
 [[package]]
 name = "cudarc"
 version = "0.13.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "486c221362668c63a1636cfa51463b09574433b39029326cff40864b3ba12b6e"
 dependencies = [
  "half",
  "libloading",
@@ -5592,8 +5596,6 @@ dependencies = [
 [[package]]
 name = "curve25519-dalek-derive"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6930,12 +6932,12 @@ dependencies = [
 
 [[package]]
 name = "ed25519"
-version = "3.0.0-rc.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe639324ff99c3bf32144aaf79dc7e048305a6e82b6409644ddcbe7e0f5f5be9"
+checksum = "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a"
 dependencies = [
  "pkcs8 0.11.0",
- "serde",
+ "serdect",
  "signature 3.0.0",
 ]
 
@@ -6957,12 +6959,10 @@ dependencies = [
 [[package]]
 name = "ed25519-dalek"
 version = "3.0.0-pre.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad207ed88a133091f83224265eac21109930db09bedcad05d5252f2af2de20a1"
 dependencies = [
  "curve25519-dalek 5.0.0-pre.1",
- "ed25519 3.0.0-rc.0",
- "rand_core 0.9.5",
+ "ed25519 3.0.0",
+ "rand_core 0.10.1",
  "serde",
  "sha2 0.11.0-rc.2",
  "signature 3.0.0",
@@ -8588,7 +8588,7 @@ dependencies = [
  "libc",
  "log",
  "rustversion",
- "windows-link 0.2.1",
+ "windows-link 0.1.3",
  "windows-result 0.4.1",
 ]
 
@@ -10558,8 +10558,6 @@ checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 [[package]]
 name = "iroh"
 version = "0.97.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "feb56e7e4b0ec7fba7efa6a236b016a52b5d927d50244aceb9e20566159b1a32"
 dependencies = [
  "backon",
  "bytes",
@@ -10611,8 +10609,6 @@ dependencies = [
 [[package]]
 name = "iroh-base"
 version = "0.97.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55a354e3396b62c14717ee807dfee9a7f43f6dad47e4ac0fd1d49f1ffad14ef0"
 dependencies = [
  "curve25519-dalek 5.0.0-pre.1",
  "data-encoding",
@@ -10620,7 +10616,7 @@ dependencies = [
  "digest 0.11.0-rc.10",
  "ed25519-dalek 3.0.0-pre.1",
  "n0-error",
- "rand_core 0.9.5",
+ "rand_core 0.10.1",
  "serde",
  "sha2 0.11.0-rc.2",
  "url",
@@ -10689,8 +10685,6 @@ dependencies = [
 [[package]]
 name = "iroh-relay"
 version = "0.97.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d786b260cadfe82ae0b6a9e372e8c78949096a06c857d1c3521355cefced0f55"
 dependencies = [
  "blake3",
  "bytes",
@@ -17524,6 +17518,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serdect"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66cf8fedced2fcf12406bcb34223dffb92eaf34908ede12fed414c82b7f00b3e"
+dependencies = [
+ "base16ct",
+ "serde",
+]
+
+[[package]]
 name = "serial_test"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18564,6 +18568,7 @@ dependencies = [
  "mycelix-crypto",
  "mycelix-fl-core",
  "mycelix-sdk",
+ "mycelix-zkp-core",
  "nalgebra 0.34.2",
  "ndarray 0.16.1",
  "once_cell",
@@ -18818,6 +18823,7 @@ dependencies = [
  "candle-nn",
  "chrono",
  "chumsky",
+ "futures-util",
  "getrandom 0.2.17",
  "getrandom 0.4.2",
  "hex",
@@ -18851,6 +18857,7 @@ dependencies = [
  "symthaea-stt",
  "symthaea-swarm",
  "symthaea-vision-manifold",
+ "symtropy-robotics-bridge-core",
  "syn 2.0.117",
  "sysinfo",
  "systemstat",
@@ -19135,6 +19142,7 @@ dependencies = [
  "symthaea-sim-bridge",
  "symthaea-swarm",
  "symthaea-types",
+ "symthaea-workspace",
  "symtropy-robotics-bridge-core",
  "tracing",
  "uom",
@@ -19415,11 +19423,13 @@ dependencies = [
  "symthaea-materials",
  "symthaea-mujoco-bridge",
  "symthaea-openfoam-bridge",
+ "symthaea-phi-search",
  "symthaea-proprioception",
  "symthaea-runtime",
  "symthaea-silicon",
  "symthaea-sim-bridge",
  "symthaea-swarm",
+ "symthaea-workspace",
  "symtropy-consciousness-physics",
  "symtropy-math 0.2.0",
  "symtropy-physics",
@@ -19463,14 +19473,18 @@ dependencies = [
  "symthaea-core",
  "symthaea-fep",
  "symthaea-hal",
+ "symthaea-swarm",
  "symtropy-math 0.2.0",
  "symtropy-physics",
+ "symtropy-robotics-bridge-core",
+ "uuid",
 ]
 
 [[package]]
 name = "symthaea-materials"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "serde",
  "serde_json",
  "symthaea-core",
@@ -20248,6 +20262,16 @@ name = "symthaea-wisdom"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "symthaea-workspace"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "symthaea-core",
+ "tracing",
 ]
 
 [[package]]
@@ -25216,3 +25240,11 @@ dependencies = [
  "syn 2.0.117",
  "winnow 1.0.3",
 ]
+
+[[patch.unused]]
+name = "curve25519-dalek"
+version = "5.0.0-pre.6"
+
+[[patch.unused]]
+name = "x25519-dalek"
+version = "3.0.0-pre.6"

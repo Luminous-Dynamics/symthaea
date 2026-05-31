@@ -12,6 +12,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
+anyhow = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]

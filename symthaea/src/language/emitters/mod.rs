@@ -17,12 +17,12 @@
 //! - **PythonEmitter**: Generates Python code following PEP 8/black conventions
 //! - **NixEmitter**: Generates Nix expressions following nixfmt conventions
 
+pub mod causal_bridge;
+pub mod driver;
+pub mod hdl;
 mod nix;
 mod python;
 mod rust;
-pub mod driver;
-pub mod causal_bridge;
-pub mod hdl;
 
 pub use nix::NixEmitter;
 pub use python::PythonEmitter;

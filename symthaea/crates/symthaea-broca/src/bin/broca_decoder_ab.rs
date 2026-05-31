@@ -8,7 +8,7 @@ use std::process;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use symthaea_broca::decoder::{StructuredDecoder, StructuredReadout};
+use symthaea_broca::decoder::{StructuredDecoder, StructuredReadout, StructuredRoleFill};
 use symthaea_broca::evaluation::{CanonicalEvalCase, CanonicalEvalDataset};
 use symthaea_broca::generator::{BrocaConfig, BrocaDecoderKind, BrocaGenerator, GenerationResult};
 use symthaea_broca::training::TrainingPair;
@@ -31,15 +31,25 @@ struct Options {
     genesis_phrase: String,
     allow_checkpoint_recovery: bool,
     decoders: Vec<BrocaDecoderKind>,
+    fail_on_gate: bool,
+    max_direct_drift: f32,
+    max_mamba_drift: f32,
+    max_hallucination_rate: f32,
+    min_structured_validity: f32,
+    min_structured_required_role_rate: f32,
+    include_structured_molecule: bool,
 }
 
 #[derive(Debug, Serialize)]
 struct DecoderAbReport {
+    schema_version: u32,
+    evidence_level: String,
     checkpoint_path: Option<String>,
     mamba_projection_checkpoint: Option<String>,
     canonical_path: String,
     decoders: Vec<String>,
     aggregate: DecoderAbAggregate,
+    gates: DecoderAbGates,
     cases: Vec<DecoderAbCase>,
 }
 
@@ -51,9 +61,24 @@ struct DecoderAbAggregate {
     avg_direct_semantic_drift: Option<f32>,
     avg_structured_confidence: Option<f32>,
     avg_structured_intensity: Option<f32>,
+    avg_structured_validity: Option<f32>,
+    structured_required_role_rate: Option<f32>,
     avg_mamba_coherence: Option<f32>,
     mamba_hallucination_rate: Option<f32>,
     avg_mamba_semantic_drift: Option<f32>,
+}
+
+#[derive(Debug, Serialize)]
+struct DecoderAbGates {
+    passed: bool,
+    failures: Vec<DecoderAbGateFailure>,
+}
+
+#[derive(Debug, Serialize)]
+struct DecoderAbGateFailure {
+    metric: String,
+    observed: f32,
+    threshold: f32,
 }
 
 #[derive(Debug, Serialize)]
@@ -63,12 +88,35 @@ struct DecoderAbCase {
     category: String,
     target_text: String,
     direct: Option<DirectCase>,
-    structured: Option<StructuredReadout>,
+    structured: Option<StructuredCase>,
     mamba: Option<MambaCase>,
 }
 
 #[derive(Debug, Serialize)]
+struct StructuredCase {
+    evidence_level: String,
+    readout: StructuredReadoutReport,
+    role_count: usize,
+    required_roles_present: usize,
+    has_required_roles: bool,
+    validity: f32,
+}
+
+#[derive(Debug, Serialize)]
+struct StructuredReadoutReport {
+    decoder: String,
+    intent: String,
+    roles: Vec<StructuredRoleFill>,
+    intensity: f32,
+    confidence: f32,
+    surface: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    molecule: Option<symthaea_core::hdc::universal_semantics::SemanticMolecule>,
+}
+
+#[derive(Debug, Serialize)]
 struct DirectCase {
+    evidence_level: String,
     text: String,
     token_ids: Vec<u32>,
     num_tokens: usize,
@@ -80,6 +128,7 @@ struct DirectCase {
 
 #[derive(Debug, Serialize)]
 struct MambaCase {
+    evidence_level: String,
     text: String,
     token_ids: Vec<u32>,
     num_tokens: usize,
@@ -144,7 +193,7 @@ fn run(opts: Options) -> Result<()> {
 
         let target_thought = direct_generator
             .as_ref()
-            .map(|g| g.controller().output_hv())
+            .map(|g| g.encoder().encode(&channels))
             .unwrap_or_else(|| ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION));
 
         let direct = match direct_generator.as_mut() {
@@ -157,9 +206,10 @@ fn run(opts: Options) -> Result<()> {
             }
             None => None,
         };
-        let structured = structured_decoder
-            .as_ref()
-            .map(|decoder| decoder.decode(&channels));
+        let structured = structured_decoder.as_ref().map(|decoder| {
+            let readout = decoder.decode(&channels);
+            structured_case(readout, opts.include_structured_molecule)
+        });
 
         let mamba = match mamba_generator.as_mut() {
             Some(generator) => {
@@ -186,7 +236,12 @@ fn run(opts: Options) -> Result<()> {
         });
     }
 
+    let aggregate = aggregate(&case_results);
+    let gates = decoder_gates(&aggregate, &opts);
+    let passed = gates.passed;
     let report = DecoderAbReport {
+        schema_version: 1,
+        evidence_level: "measured".to_string(),
         checkpoint_path: opts.checkpoint_path,
         mamba_projection_checkpoint: opts.mamba_projection_checkpoint,
         canonical_path: opts.canonical_path,
@@ -195,7 +250,8 @@ fn run(opts: Options) -> Result<()> {
             .iter()
             .map(|decoder| decoder.as_str().to_string())
             .collect(),
-        aggregate: aggregate(&case_results),
+        aggregate,
+        gates,
         cases: case_results,
     };
 
@@ -204,6 +260,9 @@ fn run(opts: Options) -> Result<()> {
         std::fs::write(path, json)?;
     } else {
         println!("{json}");
+    }
+    if opts.fail_on_gate && !passed {
+        anyhow::bail!("decoder A/B gates failed");
     }
     Ok(())
 }
@@ -297,6 +356,7 @@ fn load_mamba_generator(_opts: &Options, _genesis: &GenesisSeed) -> Result<()> {
 
 fn direct_case(result: GenerationResult, semantic_drift: Option<f32>) -> DirectCase {
     DirectCase {
+        evidence_level: "measured".to_string(),
         text: result.text,
         token_ids: result.token_ids,
         num_tokens: result.num_tokens,
@@ -310,6 +370,7 @@ fn direct_case(result: GenerationResult, semantic_drift: Option<f32>) -> DirectC
 #[cfg(feature = "mamba-cpu")]
 fn mamba_case(result: GenerationResult, semantic_drift: Option<f32>) -> MambaCase {
     MambaCase {
+        evidence_level: "measured".to_string(),
         text: result.text,
         token_ids: result.token_ids,
         num_tokens: result.num_tokens,
@@ -326,17 +387,132 @@ fn mamba_case(_result: GenerationResult, _semantic_drift: Option<f32>) -> MambaC
     unreachable!("mamba result cannot be produced without mamba-cpu")
 }
 
+fn structured_case(readout: StructuredReadout, include_molecule: bool) -> StructuredCase {
+    const REQUIRED_ROLES: &[&str] = &["AGENT", "ACTION", "PATIENT", "PREDICATE", "EVALUATOR"];
+
+    let required_roles_present = REQUIRED_ROLES
+        .iter()
+        .filter(|role| readout.roles.iter().any(|fill| fill.role == **role))
+        .count();
+    let required_coverage = required_roles_present as f32 / REQUIRED_ROLES.len() as f32;
+    let confidence = readout.confidence.clamp(0.0, 1.0);
+    let intensity_present = if readout.intensity.is_finite() && readout.intensity > 0.0 {
+        1.0
+    } else {
+        0.0
+    };
+    let validity =
+        (0.6 * required_coverage + 0.3 * confidence + 0.1 * intensity_present).clamp(0.0, 1.0);
+    let readout = StructuredReadoutReport {
+        decoder: readout.decoder,
+        intent: readout.intent,
+        roles: readout.roles,
+        intensity: readout.intensity,
+        confidence: readout.confidence,
+        surface: readout.surface,
+        molecule: include_molecule.then_some(readout.molecule),
+    };
+    StructuredCase {
+        evidence_level: "measured".to_string(),
+        role_count: readout.roles.len(),
+        required_roles_present,
+        has_required_roles: required_roles_present == REQUIRED_ROLES.len(),
+        validity,
+        readout,
+    }
+}
+
 fn aggregate(cases: &[DecoderAbCase]) -> DecoderAbAggregate {
     DecoderAbAggregate {
         num_cases: cases.len(),
         avg_direct_coherence: avg_direct(cases, |case| case.final_coherence),
         direct_hallucination_rate: rate_direct(cases, |case| case.hallucination_flag),
         avg_direct_semantic_drift: avg_direct(cases, |case| case.semantic_drift.unwrap_or(0.0)),
-        avg_structured_confidence: avg_structured(cases, |case| case.confidence),
-        avg_structured_intensity: avg_structured(cases, |case| case.intensity),
+        avg_structured_confidence: avg_structured(cases, |case| case.readout.confidence),
+        avg_structured_intensity: avg_structured(cases, |case| case.readout.intensity),
+        avg_structured_validity: avg_structured(cases, |case| case.validity),
+        structured_required_role_rate: rate_structured(cases, |case| case.has_required_roles),
         avg_mamba_coherence: avg_mamba(cases, |case| case.final_coherence),
         mamba_hallucination_rate: rate_mamba(cases, |case| case.hallucination_flag),
         avg_mamba_semantic_drift: avg_mamba(cases, |case| case.semantic_drift.unwrap_or(0.0)),
+    }
+}
+
+fn decoder_gates(aggregate: &DecoderAbAggregate, opts: &Options) -> DecoderAbGates {
+    let mut failures = Vec::new();
+    check_max(
+        &mut failures,
+        "avg_direct_semantic_drift",
+        aggregate.avg_direct_semantic_drift,
+        opts.max_direct_drift,
+    );
+    check_max(
+        &mut failures,
+        "avg_mamba_semantic_drift",
+        aggregate.avg_mamba_semantic_drift,
+        opts.max_mamba_drift,
+    );
+    check_max(
+        &mut failures,
+        "direct_hallucination_rate",
+        aggregate.direct_hallucination_rate,
+        opts.max_hallucination_rate,
+    );
+    check_max(
+        &mut failures,
+        "mamba_hallucination_rate",
+        aggregate.mamba_hallucination_rate,
+        opts.max_hallucination_rate,
+    );
+    check_min(
+        &mut failures,
+        "avg_structured_validity",
+        aggregate.avg_structured_validity,
+        opts.min_structured_validity,
+    );
+    check_min(
+        &mut failures,
+        "structured_required_role_rate",
+        aggregate.structured_required_role_rate,
+        opts.min_structured_required_role_rate,
+    );
+    DecoderAbGates {
+        passed: failures.is_empty(),
+        failures,
+    }
+}
+
+fn check_min(
+    failures: &mut Vec<DecoderAbGateFailure>,
+    metric: &str,
+    observed: Option<f32>,
+    threshold: f32,
+) {
+    if let Some(observed) = observed {
+        if observed < threshold {
+            failures.push(DecoderAbGateFailure {
+                metric: metric.to_string(),
+                observed,
+                threshold,
+            });
+        }
+    }
+}
+
+fn check_max(
+    failures: &mut Vec<DecoderAbGateFailure>,
+    metric: &str,
+    observed: Option<f32>,
+    threshold: f32,
+) {
+    if let Some(observed) = observed {
+        if observed > threshold {
+            failures.push(DecoderAbGateFailure {
+                metric: metric.to_string(),
+                observed,
+                threshold,
+            });
+        }
     }
 }
 
@@ -364,12 +540,24 @@ where
 
 fn avg_structured<F>(cases: &[DecoderAbCase], mut f: F) -> Option<f32>
 where
-    F: FnMut(&StructuredReadout) -> f32,
+    F: FnMut(&StructuredCase) -> f32,
 {
     avg(cases
         .iter()
         .filter_map(|case| case.structured.as_ref())
         .map(|c| f(c)))
+}
+
+fn rate_structured<F>(cases: &[DecoderAbCase], mut f: F) -> Option<f32>
+where
+    F: FnMut(&StructuredCase) -> bool,
+{
+    rate(
+        cases
+            .iter()
+            .filter_map(|case| case.structured.as_ref())
+            .map(|c| f(c)),
+    )
 }
 
 fn avg_mamba<F>(cases: &[DecoderAbCase], mut f: F) -> Option<f32>
@@ -460,6 +648,13 @@ fn parse_args(args: &[String]) -> Result<Options> {
         genesis_phrase: "symthaea luminous dynamics".into(),
         allow_checkpoint_recovery: false,
         decoders: vec![BrocaDecoderKind::Direct, BrocaDecoderKind::Structured],
+        fail_on_gate: false,
+        max_direct_drift: 1.10,
+        max_mamba_drift: 1.10,
+        max_hallucination_rate: 1.0,
+        min_structured_validity: 0.5,
+        min_structured_required_role_rate: 1.0,
+        include_structured_molecule: false,
     };
 
     let mut i = 1;
@@ -501,6 +696,35 @@ fn parse_args(args: &[String]) -> Result<Options> {
             "--allow-checkpoint-recovery" => {
                 opts.allow_checkpoint_recovery = true;
             }
+            "--include-structured-molecule" => {
+                opts.include_structured_molecule = true;
+            }
+            "--fail-on-gate" => {
+                opts.fail_on_gate = true;
+            }
+            "--max-direct-drift" => {
+                i += 1;
+                opts.max_direct_drift = value(args, i, "--max-direct-drift")?.parse()?;
+            }
+            "--max-mamba-drift" => {
+                i += 1;
+                opts.max_mamba_drift = value(args, i, "--max-mamba-drift")?.parse()?;
+            }
+            "--max-hallucination-rate" => {
+                i += 1;
+                opts.max_hallucination_rate =
+                    value(args, i, "--max-hallucination-rate")?.parse()?;
+            }
+            "--min-structured-validity" => {
+                i += 1;
+                opts.min_structured_validity =
+                    value(args, i, "--min-structured-validity")?.parse()?;
+            }
+            "--min-structured-required-role-rate" => {
+                i += 1;
+                opts.min_structured_required_role_rate =
+                    value(args, i, "--min-structured-required-role-rate")?.parse()?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -512,6 +736,18 @@ fn parse_args(args: &[String]) -> Result<Options> {
 
     if opts.max_gen_tokens == 0 {
         anyhow::bail!("--max-r#gen-tokens must be greater than zero");
+    }
+    if !(0.0..=2.0).contains(&opts.max_direct_drift) || !(0.0..=2.0).contains(&opts.max_mamba_drift)
+    {
+        anyhow::bail!("semantic drift thresholds must be between 0.0 and 2.0");
+    }
+    if !(0.0..=1.0).contains(&opts.max_hallucination_rate) {
+        anyhow::bail!("--max-hallucination-rate must be between 0.0 and 1.0");
+    }
+    if !(0.0..=1.0).contains(&opts.min_structured_validity)
+        || !(0.0..=1.0).contains(&opts.min_structured_required_role_rate)
+    {
+        anyhow::bail!("structured thresholds must be between 0.0 and 1.0");
     }
     Ok(opts)
 }
@@ -539,7 +775,7 @@ fn value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str> {
 
 fn print_usage() {
     eprintln!(
-        "Usage: broca-decoder-ab [--checkpoint PATH] [--mamba-projection-checkpoint PATH] [--decoder direct,structured,mamba,hybrid] [--canonical-eval PATH] [--eval-limit N] [--max-r#gen-tokens N] [--json-out PATH]"
+        "Usage: broca-decoder-ab [--checkpoint PATH] [--mamba-projection-checkpoint PATH] [--decoder direct,structured,mamba,hybrid] [--canonical-eval PATH] [--eval-limit N] [--max-r#gen-tokens N] [--json-out PATH] [--fail-on-gate] [--include-structured-molecule] [--max-direct-drift F] [--max-mamba-drift F] [--max-hallucination-rate F] [--min-structured-validity F] [--min-structured-required-role-rate F]"
     );
 }
 

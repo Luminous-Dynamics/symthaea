@@ -368,8 +368,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
         #[cfg(feature = "safety-agents")]
         {
-            let safety_result = super::safety_enforcement::compute_enforcement(
-                &mut self.safety_agent,
+            let safety_result = self.safety_supervisor.assess(
                 feedback.consciousness.consciousness_level as f32,
                 dynamics.core.prediction_error,
                 feedback.self_model.temporal_coherence_score as f32,
@@ -396,72 +395,7 @@ impl CognitiveLoopService {
                 },
             );
 
-            // ── Propagate motor safety flags to carryover ──────────────
-            // These are checked in cycle_phase_dynamics MotorOutput arm
-            // to enforce motor halt/readonly across ALL motor paths.
-            self.carryover.quality.safety_motor_halt = safety_result.motor_halt;
-            self.carryover.quality.safety_motor_readonly = safety_result.motor_readonly;
-
-            // ── Emit human-facing safety alerts ──────────────────────
-            if safety_result.motor_halt {
-                super::safety_alert::emit_alert(
-                    &self.safety_alert_tx,
-                    super::safety_alert::SafetyAlertKind::MotorHalt,
-                    format!(
-                        "Motor output HALTED — safety Red (Phi={:.3})",
-                        feedback.consciousness.consciousness_level
-                    ),
-                    self.stats.total_cycles as u64,
-                    feedback.consciousness.consciousness_level,
-                );
-            } else if safety_result.motor_readonly {
-                super::safety_alert::emit_alert(
-                    &self.safety_alert_tx,
-                    super::safety_alert::SafetyAlertKind::MotorReadOnly,
-                    format!(
-                        "Motor output restricted to read-only — safety Orange (Phi={:.3})",
-                        feedback.consciousness.consciousness_level
-                    ),
-                    self.stats.total_cycles as u64,
-                    feedback.consciousness.consciousness_level,
-                );
-            }
-
-            // Gate 1: Learning rate — Arnsten (2009)
-            if safety_result.lr_multiplier < 1.0 {
-                self.stats.effective_learning_rate *= safety_result.lr_multiplier;
-            }
-
-            // Gate 2: Exploration — Yerkes-Dodson (1908)
-            if safety_result.exploration_multiplier < 1.0 {
-                self.carryover.quality.last_exploration_bonus *=
-                    safety_result.exploration_multiplier;
-            }
-
-            // Gate 3: Neuromodulators — Aston-Jones & Cohen (2005), Sapolsky (2004)
-            if safety_result.ne_nudge > 0.0 {
-                let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
-                self.neuromod
-                    .bath
-                    .noradrenaline
-                    .set_baseline(ne_base + safety_result.ne_nudge);
-            }
-            if safety_result.allostatic_load > 0.0 {
-                self.neuromod
-                    .bath
-                    .accumulate_allostatic_load(safety_result.allostatic_load, false);
-            }
-
-            // Gate 4: Consciousness penalty — Dehaene (2014)
-            // Applied via allostatic load accumulation above, which naturally
-            // degrades consciousness through the neuromodulator→Phi pathway.
-
-            // Guardian posture update
-            self.guardian_state.update(
-                safety_result.level,
-                feedback.consciousness.consciousness_level,
-                self.stats.total_cycles as usize,
-            );
+            self.apply_safety_gates(&safety_result, feedback.consciousness.consciousness_level);
 
             // ── Gate 5: Embodiment motor halt carry-forward ──────────────
             // Platform-agnostic: applies to all 10 robotics platforms.
@@ -751,8 +685,94 @@ impl CognitiveLoopService {
             &mut feedback,
             module_timings,
         );
+
+        // ── Record thought snapshot for observability ───────────────
+        self.tracer.record(super::observability::ThoughtSnapshot {
+            cycle: self.stats.total_cycles as u64,
+            timestamp: Instant::now(),
+            input_summary: input.chars().take(50).collect(),
+            consciousness_level: feedback.consciousness.consciousness_level,
+            prediction_error: dynamics.core.prediction_error,
+            primary_neuromodulators: [
+                self.neuromod.bath.noradrenaline.baseline_val() as f32,
+                self.neuromod.bath.dopamine.baseline_val() as f32,
+                self.neuromod.bath.serotonin.baseline_val() as f32,
+                self.neuromod.bath.acetylcholine.baseline_val() as f32,
+            ],
+            focus_hv_checksum: 0, // Placeholder
+            flow_state: self.behavior.flow_state.intensity as f32,
+        });
+
         result
-    } // Extracted cycle phases moved to helpers/cycle_phases.rs:
+    }
+    /// Apply the safety enforcement results to the service state.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) fn apply_safety_gates(
+        &mut self,
+        result: &super::safety_enforcement::SafetyEnforcementResult,
+        consciousness_level: f64,
+    ) {
+        // Gate 1: Learning rate
+        if result.lr_multiplier < 1.0 {
+            self.stats.effective_learning_rate *= result.lr_multiplier;
+        }
+
+        // Gate 2: Exploration
+        if result.exploration_multiplier < 1.0 {
+            self.carryover.quality.last_exploration_bonus *= result.exploration_multiplier;
+        }
+
+        // Gate 3: Neuromodulators
+        if result.ne_nudge > 0.0 {
+            let ne_base = self.neuromod.bath.noradrenaline.baseline_val();
+            self.neuromod
+                .bath
+                .noradrenaline
+                .set_baseline(ne_base + result.ne_nudge);
+        }
+        if result.allostatic_load > 0.0 {
+            self.neuromod
+                .bath
+                .accumulate_allostatic_load(result.allostatic_load, false);
+        }
+
+        // Propagate motor safety flags
+        self.carryover.quality.safety_motor_halt = result.motor_halt;
+        self.carryover.quality.safety_motor_readonly = result.motor_readonly;
+
+        // Emit alerts
+        if result.motor_halt {
+            super::safety_alert::emit_alert(
+                &self.safety_alert_tx,
+                super::safety_alert::SafetyAlertKind::MotorHalt,
+                format!(
+                    "Motor output HALTED — safety Red (Phi={:.3})",
+                    consciousness_level
+                ),
+                self.stats.total_cycles as u64,
+                consciousness_level,
+            );
+        } else if result.motor_readonly {
+            super::safety_alert::emit_alert(
+                &self.safety_alert_tx,
+                super::safety_alert::SafetyAlertKind::MotorReadOnly,
+                format!(
+                    "Motor output restricted to read-only — safety Orange (Phi={:.3})",
+                    consciousness_level
+                ),
+                self.stats.total_cycles as u64,
+                consciousness_level,
+            );
+        }
+
+        // Guardian posture update
+        self.safety_supervisor.guardian_state.update(
+            result.level,
+            consciousness_level,
+            self.stats.total_cycles as usize,
+        );
+    }
+    // Extracted cycle phases moved to helpers/cycle_phases.rs:
     // - run_resonator_codebook_phase()
     // - run_episodic_replay_and_memory_phase()
     // - run_dream_phase()

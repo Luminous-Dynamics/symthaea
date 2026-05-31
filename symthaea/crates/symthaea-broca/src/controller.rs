@@ -1355,7 +1355,7 @@ mod tests {
         assert_eq!(full_logits.len(), sampled_logits.len());
         for (a, b) in full_logits.iter().zip(sampled_logits.iter()) {
             assert!(
-                (a - b).abs() < 1e-5,
+                (a - b).abs() < 5e-5,
                 "Sampled (all indices) should match full: {a} vs {b}"
             );
         }

@@ -58,6 +58,7 @@ members = [
     "crates/symthaea-infrastructure",
     "crates/symthaea-silicon",
     "crates/symthaea-proprioception",
+    "crates/symthaea-workspace",
     "crates/symthaea-scavenger",
     "crates/symthaea-agribot",
     "crates/symthaea-biota",
@@ -277,6 +278,8 @@ symthaea-dream = { path = "crates/symthaea-dream" }
 
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
 symthaea-phi-search = { path = "crates/symthaea-phi-search" }
+mycelix-zkp-core = { path = "crates/mycelix-zkp-core", features = ["dilithium"] }
+sha2 = { version = "0.10", optional = true }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)
 symthaea-narrative-self = { path = "crates/symthaea-narrative-self" }
@@ -535,7 +538,7 @@ rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
 blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
 ed25519-dalek = { workspace = true, optional = true }  # MFDI identity signatures
-sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
+# MFDI credential hashing (already consolidated at line 281)
 chrono = { workspace = true }
 regex = { workspace = true }
 # Note: wasmtime 29.x has a critical CVE affecting aarch64 with the Winch
@@ -811,7 +814,7 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
-code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "hcl-rs", "symthaea-core/synthesis-trait"]
+code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "hcl-rs", "symthaea-core/synthesis-trait", "dep:sha2"]
 geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 
@@ -1114,6 +1117,11 @@ path = "examples/engineering_school_benchmarks.rs"
 [[example]]
 name = "sovereign_design_loop"
 path = "examples/sovereign_design_loop.rs"
+
+[[example]]
+name = "demo_proof_caching"
+path = "examples/demo_proof_caching.rs"
+required-features = ["code_generation"]
 
 [[example]]
 name = "mujoco_flight_viewer"
@@ -1958,6 +1966,18 @@ lto = "thin"         # 5x faster release builds vs "fat", <5% perf difference
 codegen-units = 1
 strip = true
 
+[patch.crates-io]
+curve25519-dalek-derive = { path = "patches/ed25519-dalek/curve25519-dalek-derive" }
+curve25519-dalek = { path = "patches/ed25519-dalek/curve25519-dalek" }
+ed25519-dalek = { path = "patches/ed25519-dalek/ed25519-dalek" }
+x25519-dalek = { path = "patches/ed25519-dalek/x25519-dalek" }
+iroh = { path = "patches/iroh/iroh" }
+iroh-base = { path = "patches/iroh/iroh-base" }
+iroh-relay = { path = "patches/iroh/iroh-relay" }
+# cudarc 0.13.9 does not ship CUDA 12.9 bindings. The vendored copy
+# aliases CUDA 12.9 to its CUDA 12.8 bindings for local Broca GPU builds.
+cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }
+
 [profile.release.package.symthaea-physics-catalog]
 opt-level = "z"
 codegen-units = 1
@@ -1972,6 +1992,9 @@ required-features = ["code_generation"]
 [[example]]
 name = "benchmark_coding_backends"
 required-features = ["code_generation"]
+
+[[example]]
+name = "forecastbench_eval"
 
 [[example]]
 name = "engineering_bridge_review"
@@ -1996,10 +2019,3 @@ required-features = ["unstable-examples"]
 [[example]]
 name = "benchmark_jepa_thermodynamic"
 required-features = ["unstable-examples"]
-
-# cudarc 0.13.9's hand-maintained CUDA-toolkit version table stops at
-# 12.8. On CUDA 12.9 (current dev toolkit), the un-patched build.rs
-# panics at compile time with "Unsupported cuda toolkit version: `12.9`".
-# CUDA 12.x is ABI-backward-compatible, so the vendored copy just adds
-# `"12.9" => (12, 9)` to the match arm and reuses the 12.x library-path
-# resolution. Unblocks Broca's `gpu` feature (and therefore Phase 2 M7

@@ -35,6 +35,7 @@ DISTILLATION_IN="${CODING_BACKEND_DISTILLATION_IN:-}"
 DISTILLATION_OUT="${CODING_BACKEND_DISTILLATION_OUT:-}"
 STRUCTURAL_PROTOTYPES_IN="${CODING_BACKEND_STRUCTURAL_PROTOTYPES_IN:-}"
 STRUCTURAL_PROTOTYPES_OUT="${CODING_BACKEND_STRUCTURAL_PROTOTYPES_OUT:-}"
+RUNTIME_POLICY_JSON="${CODING_BACKEND_RUNTIME_POLICY_JSON:-}"
 
 if [[ "$LANE" == "repair" || "$LANE" == "all" ]]; then
     export SYMTHAEA_ENABLE_FORCED_REPAIR_BENCH=1
@@ -63,6 +64,9 @@ if [[ -n "$STRUCTURAL_PROTOTYPES_IN" ]]; then
 fi
 if [[ -n "$STRUCTURAL_PROTOTYPES_OUT" ]]; then
     benchmark_args+=(--save-structural-prototypes "$STRUCTURAL_PROTOTYPES_OUT")
+fi
+if [[ -n "$RUNTIME_POLICY_JSON" ]]; then
+    benchmark_args+=(--runtime-policy-json "$RUNTIME_POLICY_JSON")
 fi
 cargo run --example benchmark_coding_backends \
     --features code_generation,geodesic_synthesis \
@@ -105,4 +109,7 @@ if [[ -n "$STRUCTURAL_PROTOTYPES_IN" ]]; then
 fi
 if [[ -n "$STRUCTURAL_PROTOTYPES_OUT" ]]; then
     echo "  structural prototypes out: $STRUCTURAL_PROTOTYPES_OUT"
+fi
+if [[ -n "$RUNTIME_POLICY_JSON" ]]; then
+    echo "  runtime policy: $RUNTIME_POLICY_JSON"
 fi

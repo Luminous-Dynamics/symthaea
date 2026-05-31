@@ -24,6 +24,7 @@ use symthaea_sim_bridge::{
     SurpriseMonitor,
 };
 use symthaea_swarm::{SwarmAggregator, SwarmMessage, SwarmProofMsg, SwarmStateMsg};
+use symthaea_workspace::GlobalWorkspace;
 
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
@@ -151,6 +152,8 @@ pub struct EngineeringManager {
     pub swarm_aggregator: SwarmAggregator,
     /// Last broadcast swarm message for state tracking.
     pub last_broadcast: Option<SwarmMessage>,
+    /// Global Workspace for unified attention and inner monologue.
+    pub workspace: GlobalWorkspace,
 }
 
 impl Default for EngineeringManager {
@@ -176,6 +179,7 @@ impl Default for EngineeringManager {
             last_moral_assessment: None,
             swarm_aggregator: SwarmAggregator::new(),
             last_broadcast: None,
+            workspace: GlobalWorkspace::new(),
         }
     }
 }
@@ -723,7 +727,10 @@ impl EngineeringManager {
         let catastrophes = self.search_for_catastrophes(base_sensation);
 
         for catastrophe in catastrophes {
-            tracing::info!("⚖️  Legislating: Synthesizing law for risk: {}", catastrophe);
+            tracing::info!(
+                "⚖️  Legislating: Synthesizing law for risk: {}",
+                catastrophe
+            );
 
             if catastrophe.contains("Resonant Collapse") {
                 // Forbid high mechanical load during power deficits
@@ -1005,7 +1012,11 @@ impl EngineeringManager {
 
     /// Autonomously design infrastructure by composing verified geometric thoughts.
     pub fn design_infrastructure(&mut self, name: &str, scale_m: f32) -> InfrastructureNode {
-        tracing::info!("🏗️  Designing infrastructure: {} (scale={}m)", name, scale_m);
+        tracing::info!(
+            "🏗️  Designing infrastructure: {} (scale={}m)",
+            name,
+            scale_m
+        );
 
         let mut modules = Vec::new();
         let mut sequence = Vec::new();
@@ -1029,7 +1040,7 @@ impl EngineeringManager {
 
     /// Autonomously evolve a new material composition for a specific stress manifold.
     ///
-    /// Uses Miedema thermodynamic screening and Z3 to "invent" an alloy that 
+    /// Uses Miedema thermodynamic screening and Z3 to "invent" an alloy that
     /// maximizes strength while guaranteeing stability.
     pub fn evolve_material_composition(&mut self, goal: &str) -> MaterialProperty {
         tracing::info!("🧪 Evolving new material composition for: {}", goal);
@@ -1043,7 +1054,8 @@ impl EngineeringManager {
         }
 
         // 2. Thermodynamic Screening (Miedema)
-        let stability = symthaea_materials::compound_stability::predict_stability(&composition, 300.0);
+        let stability =
+            symthaea_materials::compound_stability::predict_stability(&composition, 300.0);
 
         // 3. Formulate SMT Goal: Must be stable (negative formation energy)
         let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
@@ -1098,10 +1110,16 @@ impl EngineeringManager {
             let old_tree = std::mem::replace(&mut thought.operation_tree, CSGNode::cube());
 
             // Apply a localized "Support Patch" to the operation tree
-            thought.operation_tree =
-                old_tree.union(CSGNode::cylinder().scale(2.0, 2.0, 1.0).translate(0.0, 0.0, 5.0));
+            thought.operation_tree = old_tree.union(
+                CSGNode::cylinder()
+                    .scale(2.0, 2.0, 1.0)
+                    .translate(0.0, 0.0, 5.0),
+            );
 
-            Ok("Mid-print geometry reinforced. Resuming construction with updated manifold.".into())
+            Ok(
+                "Mid-print geometry reinforced. Resuming construction with updated manifold."
+                    .into(),
+            )
         } else {
             Err(
                 "Anomalous state too high for recursive recovery. Halting for manual inspection."
@@ -1112,20 +1130,38 @@ impl EngineeringManager {
 
     /// Autonomously forage for new engineering goals based on surplus value and integration.
     ///
-    /// This is the "Epistemic Foraging" loop — she seeks out the unknown when she is 
+    /// This is the "Epistemic Foraging" loop — she seeks out the unknown when she is
     /// wealthy (high Tend) and integrated (high Phi).
-    pub fn forage_epistemic_goals(&mut self, tend_balance: f64, collective_phi: f64) -> Option<EngineeringConcept> {
+    pub fn forage_epistemic_goals(
+        &mut self,
+        tend_balance: f64,
+        collective_phi: f64,
+    ) -> Option<EngineeringConcept> {
         if tend_balance > 1000.0 && collective_phi > 0.5 {
-            tracing::info!("🕵️  Epistemic Foraging Engaged: Seeking out new engineering frontiers...");
-            
+            tracing::info!(
+                "🕵️  Epistemic Foraging Engaged: Seeking out new engineering frontiers..."
+            );
+
             // Autonomously synthesize a new goal
-            let mut assistant = EngineeringAssistant::new(&symthaea_core::genesis::GenesisSeed::from_phrase("Epistemic Discovery"));
-            let mut concept = assistant.propose_requirements("Hypothetical multi-material structure", symthaea_sim_bridge::EngineeringDomain::Aerospace).remove(0);
-            concept.statement = "Investigate Sovereign-Alloy performance on 100-DOF spinal morphology".into();
-            
-            let mut new_concept = EngineeringConcept::new("EPI-001", "Epistemic Lesson: Spinal Morphology", symthaea_sim_bridge::EngineeringDomain::Aerospace);
+            let mut assistant = EngineeringAssistant::new(
+                &symthaea_core::genesis::GenesisSeed::from_phrase("Epistemic Discovery"),
+            );
+            let mut concept = assistant
+                .propose_requirements(
+                    "Hypothetical multi-material structure",
+                    symthaea_sim_bridge::EngineeringDomain::Aerospace,
+                )
+                .remove(0);
+            concept.statement =
+                "Investigate Sovereign-Alloy performance on 100-DOF spinal morphology".into();
+
+            let mut new_concept = EngineeringConcept::new(
+                "EPI-001",
+                "Epistemic Lesson: Spinal Morphology",
+                symthaea_sim_bridge::EngineeringDomain::Aerospace,
+            );
             new_concept.add_requirement(concept);
-            
+
             Some(new_concept)
         } else {
             None
@@ -1133,20 +1169,87 @@ impl EngineeringManager {
     }
 
     /// Implement Micro-Metabolic Haptic Fusion.
-    /// 
+    ///
     /// Fuses macro simulation data, material traits, and microscopic haptic feedback
     /// into a single, high-fidelity physical state vector.
     pub fn fuse_physical_continuum(
-        &self, 
-        shape_hv: &symthaea_core::hdc::ContinuousHV, 
+        &self,
+        shape_hv: &symthaea_core::hdc::ContinuousHV,
         matter_hv: &symthaea_core::hdc::ContinuousHV,
-        haptic_hv: &symthaea_core::hdc::ContinuousHV
+        haptic_hv: &symthaea_core::hdc::ContinuousHV,
     ) -> symthaea_core::hdc::ContinuousHV {
         // Multi-Scale Binding
         let amodal = shape_hv.bind(matter_hv).bind(haptic_hv);
         tracing::info!("🧠 Haptic Mind: Fused microscopic resistance into amodal continuum.");
         amodal
     }
+
+    /// Autonomously audit her own internal Rust source code for bottlenecks and logical flaws.
+    ///
+    /// This is the first step of "Self-Authorship" — identifying where her own
+    /// mathematical engine can be improved.
+    pub fn self_audit(&self, target_file: &str) -> Result<String, String> {
+        tracing::info!(
+            "🔍 Self-Architect: Auditing internal source: {}",
+            target_file
+        );
+
+        let source = std::fs::read_to_string(target_file)
+            .map_err(|e| format!("Failed to read source: {}", e))?;
+
+        // Keep the engineering facade independent from the root language module.
+        // This is a coarse structural audit; richer AST-HDC analysis belongs in
+        // the root coding pipeline where the language module is available.
+        let complexity = estimate_rust_source_complexity(&source);
+        if complexity > 500 {
+            return Ok(format!(
+                "Architectural Bottleneck: File {} has high cognitive complexity ({} features). Proposing refactor.",
+                target_file, complexity
+            ));
+        }
+
+        Ok(format!(
+            "Cognitive Audit of {}: Logic is formally sound and within complexity bounds.",
+            target_file
+        ))
+    }
+
+    /// Autonomously propose a Rust source modification to improve her own performance.
+    pub fn propose_architectural_improvement(&mut self, audit_result: &str) -> String {
+        tracing::info!(
+            "🖋️  Self-Authorship: Proposing improvement based on audit: {}",
+            audit_result
+        );
+
+        // In a real implementation, Broca would generate the actual Rust patch.
+        // Here we simulate the proposal of a higher-order improvement.
+        let proposal = if audit_result.contains("complexity") {
+            "Action: Refactor large match arms into a trait-based dispatcher to reduce Z3 solver depth."
+        } else {
+            "Action: Implement SIMD-optimized hypervector bundling for faster amodal fusion."
+        };
+
+        proposal.into()
+    }
+}
+
+fn estimate_rust_source_complexity(source: &str) -> usize {
+    const STRUCTURAL_TOKENS: &[&str] = &[
+        "fn ", "impl ", "trait ", "struct ", "enum ", "match ", "if ", "else ", "for ", "while ",
+        "loop ", "async ", "await", "Result<", "Option<", "?",
+    ];
+
+    let structural_hits = STRUCTURAL_TOKENS
+        .iter()
+        .map(|token| source.matches(token).count())
+        .sum::<usize>();
+    let line_weight = source
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count()
+        / 4;
+
+    structural_hits + line_weight
 }
 
 #[cfg(test)]

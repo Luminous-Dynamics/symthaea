@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "evidence_level": "measured",
+  "aggregate": {
+    "num_cases": 2,
+    "avg_direct_semantic_drift": 0.4,
+    "direct_hallucination_rate": 0.2,
+    "avg_structured_confidence": 0.8,
+    "avg_structured_intensity": 0.7,
+    "avg_structured_validity": 0.94,
+    "structured_required_role_rate": 1.0,
+    "avg_mamba_semantic_drift": 0.5,
+    "mamba_hallucination_rate": 0.3
+  },
+  "gates": {
+    "passed": true,
+    "failures": []
+  },
+  "cases": []
+}

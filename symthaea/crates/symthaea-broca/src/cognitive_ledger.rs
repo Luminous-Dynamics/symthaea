@@ -46,13 +46,25 @@ impl CognitiveLedger {
     }
 
     pub fn commit(&mut self, mut commit: CognitiveCommit) -> Result<()> {
-        println!("📝 Cognitive Ledger: Recording commit for mission '{}'...", commit.mission_id);
+        println!(
+            "📝 Cognitive Ledger: Recording commit for mission '{}'...",
+            commit.mission_id
+        );
 
         // 1. Link to previous state
-        commit.parent_hash = self.history.last().map(|c| c.hash.clone()).unwrap_or_default();
+        commit.parent_hash = self
+            .history
+            .last()
+            .map(|c| c.hash.clone())
+            .unwrap_or_default();
 
         // 2. Compute current hash (simplified SHA-256 via MD5 for demo speed)
-        let content = format!("{}{}{:?}", commit.parent_hash, commit.synthesized_code, commit.intent_nucleus.norm());
+        let content = format!(
+            "{}{}{:?}",
+            commit.parent_hash,
+            commit.synthesized_code,
+            commit.intent_nucleus.norm()
+        );
         commit.hash = format!("{:x}", md5::compute(content));
 
         self.history.push(commit);
@@ -67,7 +79,10 @@ impl CognitiveLedger {
         let mut expected_parent = String::new();
         for commit in &self.history {
             if commit.parent_hash != expected_parent {
-                println!("   ❌ Lineage BREAK detected at mission '{}'.", commit.mission_id);
+                println!(
+                    "   ❌ Lineage BREAK detected at mission '{}'.",
+                    commit.mission_id
+                );
                 return false;
             }
             expected_parent = commit.hash.clone();
@@ -75,7 +90,6 @@ impl CognitiveLedger {
         println!("   ✅ Lineage verified. developmental history is cryptographically sound.");
         true
     }
-
 
     pub fn last_commit(&self) -> Option<&CognitiveCommit> {
         self.history.last()

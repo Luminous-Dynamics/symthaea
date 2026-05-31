@@ -108,15 +108,21 @@ impl DriverEmitter {
         code.push_str("    i2c: I2C,\n");
         code.push_str("    address: u8,\n");
         if let Some(ref dma) = spec.dma {
-            code.push_str(&format!("    dma_buffer: *mut [u8; {}],\n", dma.buffer_size));
+            code.push_str(&format!(
+                "    dma_buffer: *mut [u8; {}],\n",
+                dma.buffer_size
+            ));
         }
         code.push_str("}\n\n");
 
         code.push_str(&format!("impl<I2C, E> {}<I2C>\n", struct_name));
         code.push_str("where\n    I2C: embedded_hal::blocking::i2c::WriteRead<Error = E> + embedded_hal::blocking::i2c::Write<Error = E>,\n{\n");
-        
+
         if let Some(ref dma) = spec.dma {
-            code.push_str(&format!("    pub fn new(i2c: I2C, address: u8, buffer: *mut [u8; {}]) -> Self {{\n", dma.buffer_size));
+            code.push_str(&format!(
+                "    pub fn new(i2c: I2C, address: u8, buffer: *mut [u8; {}]) -> Self {{\n",
+                dma.buffer_size
+            ));
             code.push_str("        Self { i2c, address, dma_buffer: buffer }\n");
         } else {
             code.push_str("    pub fn new(i2c: I2C, address: u8) -> Self {\n");
@@ -131,15 +137,24 @@ impl DriverEmitter {
             code.push_str("    /// # Safety\n");
             code.push_str("    /// This method is proven safe by Symthaea SMT Ownership Proofs.\n");
             code.push_str("    pub unsafe fn read_burst_dma(&mut self) -> Result<&[u8], E> {\n");
-            code.push_str(&format!("        // Check DMA Busy bit in status register 0x{:02X}\n", dma.status_register));
-            code.push_str(&format!("        let status = self.read_reg(0x{:02X})?;\n", dma.status_register));
-            code.push_str(&format!("        if (status & (1 << {})) != 0 {{\n", dma.busy_bit));
+            code.push_str(&format!(
+                "        // Check DMA Busy bit in status register 0x{:02X}\n",
+                dma.status_register
+            ));
+            code.push_str(&format!(
+                "        let status = self.read_reg(0x{:02X})?;\n",
+                dma.status_register
+            ));
+            code.push_str(&format!(
+                "        if (status & (1 << {})) != 0 {{\n",
+                dma.busy_bit
+            ));
             code.push_str("            return Err(anyhow::anyhow!(\"DMA Busy\").into());\n");
             code.push_str("        }\n");
             code.push_str("        // Return slice to the shared buffer\n");
             code.push_str("        Ok(&*self.dma_buffer)\n");
             code.push_str("    }\n\n");
-            
+
             code.push_str("    fn read_reg(&mut self, reg: u8) -> Result<u8, E> {\n");
             code.push_str("        let mut buffer = [0u8; 1];\n");
             code.push_str("        self.i2c.write_read(self.address, &[reg], &mut buffer)?;\n");
@@ -162,41 +177,58 @@ impl DriverEmitter {
     fn emit_transaction(&self, code: &mut String, tx: &Transaction) {
         let method_name = to_snake_case(&tx.name);
         code.push_str(&format!("    /// Hardware Transaction: {}\n", tx.name));
-        code.push_str(&format!("    pub fn {}(&mut self) -> Result<(), E> {{\n", method_name));
-        
+        code.push_str(&format!(
+            "    pub fn {}(&mut self) -> Result<(), E> {{\n",
+            method_name
+        ));
+
         if tx.is_atomic {
-            code.push_str("        // Note: Caller should ensure mutual exclusion if using interrupts.\n");
+            code.push_str(
+                "        // Note: Caller should ensure mutual exclusion if using interrupts.\n",
+            );
         }
 
         for step in &tx.steps {
             match step {
                 TransactionStep::Write { reg_name, value } => {
                     let reg_method = to_snake_case(reg_name);
-                    code.push_str(&format!("        self.write_{}(0x{:02X})?;\n", reg_method, value));
+                    code.push_str(&format!(
+                        "        self.write_{}(0x{:02X})?;\n",
+                        reg_method, value
+                    ));
                 }
                 TransactionStep::Read { reg_name } => {
                     let reg_method = to_snake_case(reg_name);
                     code.push_str(&format!("        let _ = self.read_{}()?;\n", reg_method));
                 }
                 TransactionStep::WaitMs(ms) => {
-                    code.push_str(&format!("        std::thread::sleep(std::time::Duration::from_millis({}));\n", ms));
+                    code.push_str(&format!(
+                        "        std::thread::sleep(std::time::Duration::from_millis({}));\n",
+                        ms
+                    ));
                 }
             }
         }
-        
+
         code.push_str("        Ok(())\n");
         code.push_str("    }\n\n");
     }
 
     fn emit_register_access(&self, code: &mut String, reg: &RegisterDef) {
         let method_name = to_snake_case(&reg.name);
-        
+
         // Read method
         code.push_str(&format!("    /// {}\n", reg.description));
-        code.push_str(&format!("    pub fn read_{}(&mut self) -> Result<u8, E> {{\n", method_name));
+        code.push_str(&format!(
+            "    pub fn read_{}(&mut self) -> Result<u8, E> {{\n",
+            method_name
+        ));
         code.push_str("        let mut buffer = [0u8; 1];\n");
-        code.push_str(&format!("        self.i2c.write_read(self.address, &[0x{:02X}], &mut buffer)?;\n", reg.offset));
-        
+        code.push_str(&format!(
+            "        self.i2c.write_read(self.address, &[0x{:02X}], &mut buffer)?;\n",
+            reg.offset
+        ));
+
         if reg.bit_mask != 0xFF {
             code.push_str(&format!("        Ok(buffer[0] & 0x{:02X})\n", reg.bit_mask));
         } else {
@@ -206,13 +238,28 @@ impl DriverEmitter {
 
         // Write method
         if reg.writable {
-            code.push_str(&format!("    pub fn write_{}(&mut self, value: u8) -> Result<(), E> {{\n", method_name));
+            code.push_str(&format!(
+                "    pub fn write_{}(&mut self, value: u8) -> Result<(), E> {{\n",
+                method_name
+            ));
             if reg.bit_mask != 0xFF {
-                code.push_str(&format!("        let current = self.read_{}()?;\n", method_name));
-                code.push_str(&format!("        let masked = (current & !0x{:02X}) | (value & 0x{:02X});\n", reg.bit_mask, reg.bit_mask));
-                code.push_str(&format!("        self.i2c.write(self.address, &[0x{:02X}, masked])\n", reg.offset));
+                code.push_str(&format!(
+                    "        let current = self.read_{}()?;\n",
+                    method_name
+                ));
+                code.push_str(&format!(
+                    "        let masked = (current & !0x{:02X}) | (value & 0x{:02X});\n",
+                    reg.bit_mask, reg.bit_mask
+                ));
+                code.push_str(&format!(
+                    "        self.i2c.write(self.address, &[0x{:02X}, masked])\n",
+                    reg.offset
+                ));
             } else {
-                code.push_str(&format!("        self.i2c.write(self.address, &[0x{:02X}, value])\n", reg.offset));
+                code.push_str(&format!(
+                    "        self.i2c.write(self.address, &[0x{:02X}, value])\n",
+                    reg.offset
+                ));
             }
             code.push_str("    }\n\n");
         }
@@ -256,7 +303,9 @@ impl DriverEmitter {
             if let TransactionStep::Write { reg_name, value } = step {
                 steps_smt.push_str(&format!(
                     "(define-fun state_{} () (_ BitVec 8) #x{:02x}) ; Write {}\n",
-                    state_idx + 1, value, reg_name
+                    state_idx + 1,
+                    value,
+                    reg_name
                 ));
                 state_idx += 1;
             }
@@ -287,10 +336,14 @@ impl DriverEmitter {
     pub fn prove_fsm_reachability(&self, states: &[FsmState], target_state: &str) -> String {
         let mut smt = String::new();
         smt.push_str("(set-logic QF_LIA)\n");
-        
+
         // Define states as integers
         for (i, state) in states.iter().enumerate() {
-            smt.push_str(&format!("(define-fun state_{} () Int {})\n", state.name.to_lowercase(), i));
+            smt.push_str(&format!(
+                "(define-fun state_{} () Int {})\n",
+                state.name.to_lowercase(),
+                i
+            ));
         }
 
         smt.push_str("(declare-const current_state Int)\n");
@@ -302,7 +355,8 @@ impl DriverEmitter {
             for transition in &state.valid_transitions {
                 smt.push_str(&format!(
                     "  (and (= current_state state_{}) (= next_state state_{}))\n",
-                    state.name.to_lowercase(), transition.to_lowercase()
+                    state.name.to_lowercase(),
+                    transition.to_lowercase()
                 ));
             }
         }
@@ -311,15 +365,14 @@ impl DriverEmitter {
         // Negation of reachability: can we be in a state that cannot reach the target?
         smt.push_str(&format!(
             "(assert (and (not (= current_state state_{})) (not (= next_state state_{}))))\n",
-            target_state.to_lowercase(), target_state.to_lowercase()
+            target_state.to_lowercase(),
+            target_state.to_lowercase()
         ));
         smt.push_str("(check-sat)");
         smt
     }
 
     /// Generate an SMT-LIB2 query to verify Power-Precision Tradeoff.
-    ///
-    /// Proves that the current sample rate stays within the power budget.
     pub fn verify_power_budget(&self, model: &PowerModel, hz: f32, budget_mw: f32) -> String {
         format!(
             "(set-logic QF_LRA)
@@ -328,11 +381,12 @@ impl DriverEmitter {
 (define-fun hz () Real {:.4})
 (define-fun budget () Real {:.4})
 (define-fun total_power () Real (+ idle_mw (* hz op_mw)))
-
-; Assert that total power exceeds budget (we want this to be UNSAT)
 (assert (> total_power budget))
 (check-sat)",
-            model.idle_mw, (model.read_mw + model.write_mw) / 2.0, hz, budget_mw
+            model.idle_mw,
+            (model.read_mw + model.write_mw) / 2.0,
+            hz,
+            budget_mw
         )
     }
 
@@ -340,11 +394,11 @@ impl DriverEmitter {
     pub fn discover_spec_from_header(&self, device_name: &str, header_content: &str) -> DriverSpec {
         let mut registers = Vec::new();
         let re = regex::Regex::new(r"#define\s+([A-Z0-9_]+)_REG\s+(0x[0-9A-Fa-f]+)").unwrap();
-        
+
         for cap in re.captures_iter(header_content) {
             let name = cap[1].to_string();
             let offset = u8::from_str_radix(cap[2].trim_start_matches("0x"), 16).unwrap_or(0);
-            
+
             registers.push(RegisterDef {
                 offset,
                 name: name.clone(),
@@ -363,6 +417,57 @@ impl DriverEmitter {
             fsm: None,
             power: None,
         }
+    }
+
+    /// Perform automated SMT verification for all safety invariants in the spec.
+    pub fn verify(
+        &self,
+        spec: &DriverSpec,
+        source: &str,
+        solver: &mut crate::language::proof_memory::CachedProofEngine,
+    ) -> Vec<(String, crate::language::proof_memory::ProofVerdict, String)> {
+        let mut results = Vec::new();
+
+        // 1. DMA Ownership Proof
+        if let Some(ref dma) = spec.dma {
+            let query = self.prove_dma_ownership_safety(dma);
+            let (verdict, details) = solver.verify_with_cache(
+                &format!("{}_dma", spec.device_name),
+                source,
+                &query,
+                0.85,
+                &[],
+            );
+            results.push(("DMA Ownership".to_string(), verdict, details));
+        }
+
+        // 2. FSM Reachability Proof
+        if let Some(ref states) = spec.fsm {
+            let query = self.prove_fsm_reachability(states, "Reset");
+            let (verdict, details) = solver.verify_with_cache(
+                &format!("{}_fsm", spec.device_name),
+                source,
+                &query,
+                0.85,
+                &[],
+            );
+            results.push(("FSM Reachability".to_string(), verdict, details));
+        }
+
+        // 3. Power Budget Proof
+        if let Some(ref power) = spec.power {
+            let query = self.verify_power_budget(power, 1000.0, 100.0);
+            let (verdict, details) = solver.verify_with_cache(
+                &format!("{}_power", spec.device_name),
+                source,
+                &query,
+                0.85,
+                &[],
+            );
+            results.push(("Power Budget".to_string(), verdict, details));
+        }
+
+        results
     }
 }
 
@@ -403,23 +508,24 @@ mod tests {
                 },
             ],
             dma: None,
-            transactions: vec![
-                Transaction {
-                    name: "Init".into(),
-                    is_atomic: true,
-                    steps: vec![
-                        TransactionStep::Write { reg_name: "CtrlMeas".into(), value: 0x3F },
-                        TransactionStep::WaitMs(10),
-                    ],
-                }
-            ],
+            transactions: vec![Transaction {
+                name: "Init".into(),
+                is_atomic: true,
+                steps: vec![
+                    TransactionStep::Write {
+                        reg_name: "CtrlMeas".into(),
+                        value: 0x3F,
+                    },
+                    TransactionStep::WaitMs(10),
+                ],
+            }],
             fsm: None,
             power: None,
         };
 
         let emitter = DriverEmitter;
         let code = emitter.emit(&spec);
-        
+
         assert!(code.contains("pub struct Bmp280Driver"));
         assert!(code.contains("fn read_id"));
         assert!(code.contains("fn write_ctrl_meas"));
@@ -445,7 +551,7 @@ mod tests {
         "#;
         let emitter = DriverEmitter;
         let spec = emitter.discover_spec_from_header("Lsm6ds3", header);
-        
+
         assert_eq!(spec.registers.len(), 3);
         assert_eq!(spec.registers[0].name, "WHO_AM_I");
         assert_eq!(spec.registers[0].offset, 0x0F);
@@ -471,10 +577,10 @@ mod tests {
 
         let emitter = DriverEmitter;
         let code = emitter.emit(&spec);
-        
+
         assert!(code.contains("fn read_burst_dma"));
         assert!(code.contains("dma_buffer: *mut [u8; 512]"));
-        
+
         let query = emitter.prove_dma_ownership_safety(spec.dma.as_ref().unwrap());
         assert!(query.contains("bvshl #x01 (_ bv7 8)"));
         assert!(query.contains("(assert (and is_busy (= cpu_access #b1)))"));
@@ -499,10 +605,10 @@ mod tests {
                 valid_transitions: vec!["Reset".into()],
             },
         ];
-        
+
         let emitter = DriverEmitter;
         let query = emitter.prove_fsm_reachability(&states, "Reset");
-        
+
         assert!(query.contains("state_reset"));
         assert!(query.contains("state_active"));
         assert!(query.contains("(check-sat)"));
@@ -516,12 +622,42 @@ mod tests {
             write_mw: 10.0,
             burst_mw: 20.0,
         };
-        
+
         let emitter = DriverEmitter;
         let query = emitter.verify_power_budget(&model, 100.0, 50.0);
-        
+
         assert!(query.contains("QF_LRA"));
         assert!(query.contains("idle_mw"));
         assert!(query.contains("(* hz op_mw)"));
+    }
+
+    #[test]
+    fn test_driver_automated_verification_loop() {
+        let bridge = crate::z3_bridge::Z3Bridge::new();
+        let memory = crate::language::proof_memory::ProofMemory::default();
+        let mut solver = crate::language::proof_memory::CachedProofEngine::new(bridge, memory);
+
+        let spec = DriverSpec {
+            device_name: "TestSensor".into(),
+            i2c_address: 0x11,
+            registers: vec![],
+            dma: Some(DmaConfig {
+                channel_id: 0,
+                status_register: 0x00,
+                busy_bit: 0,
+                buffer_address: 0x1000,
+                buffer_size: 64,
+            }),
+            transactions: vec![],
+            fsm: None,
+            power: None,
+        };
+
+        let emitter = DriverEmitter;
+        let source = emitter.emit(&spec);
+        let results = emitter.verify(&spec, &source, &mut solver);
+
+        assert!(!results.is_empty());
+        assert_eq!(results[0].0, "DMA Ownership");
     }
 }

@@ -6,7 +6,10 @@
 use super::rust_ast_hdc::{ast_feature_cosine_similarity, encode_rust_ast_hdc};
 use super::smt_serializer;
 use crate::z3_bridge::{VerificationResult, Z3Bridge};
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use syn::Expr;
 
@@ -23,6 +26,7 @@ pub struct ProofRecord {
     pub verdict: ProofVerdict,
     pub ast_features: BTreeMap<String, usize>,
     pub smtlib2: String,
+    pub smtlib2_hash: [u8; 32],
     pub summary: String,
 }
 
@@ -59,6 +63,13 @@ impl ProofMemory {
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
     }
 
+    pub fn exact_smt(&self, smtlib2: &str) -> Option<&ProofRecord> {
+        let query_hash = smtlib2_hash(smtlib2);
+        self.records
+            .iter()
+            .find(|record| record.smtlib2_hash == query_hash)
+    }
+
     pub fn to_json(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(self)
     }
@@ -68,6 +79,19 @@ impl ProofMemory {
     }
 }
 
+static GLOBAL_PROOF_MEMORY: Lazy<Mutex<ProofMemory>> =
+    Lazy::new(|| Mutex::new(ProofMemory::default()));
+
+pub fn global_proof_memory() -> &'static Mutex<ProofMemory> {
+    &GLOBAL_PROOF_MEMORY
+}
+
+pub fn smtlib2_hash(smtlib2: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(smtlib2.as_bytes());
+    hasher.finalize().into()
+}
+
 pub fn proof_record_for_rust_source(
     label: impl Into<String>,
     source: &str,
@@ -75,12 +99,14 @@ pub fn proof_record_for_rust_source(
     verdict: ProofVerdict,
     summary: impl Into<String>,
 ) -> Result<ProofRecord, syn::Error> {
+    let smtlib2 = smtlib2.into();
     let encoded = encode_rust_ast_hdc(source, symthaea_core::hdc::unified_hv::HDC_DIMENSION)?;
     Ok(ProofRecord {
         label: label.into(),
         verdict,
         ast_features: encoded.features,
-        smtlib2: smtlib2.into(),
+        smtlib2_hash: smtlib2_hash(&smtlib2),
+        smtlib2,
         summary: summary.into(),
     })
 }
@@ -111,7 +137,20 @@ impl CachedProofEngine {
         #[cfg(feature = "swarm")] swarm_proofs: &[symthaea_swarm::SwarmProofMsg],
         #[cfg(not(feature = "swarm"))] _swarm_proofs: &[()],
     ) -> (ProofVerdict, String) {
-        // 1. Distributed SMT Short-Circuit (Read Path Interception)
+        // Exact local SMT matches are safe to reuse as verdicts.
+        if let Some(cached_record) = self.memory.exact_smt(smtlib2) {
+            self.cache_hits += 1;
+            return (
+                cached_record.verdict.clone(),
+                format!(
+                    "LOCAL EXACT SMT CACHE HIT: `{}`. Prover summary: {}",
+                    cached_record.label, cached_record.summary
+                ),
+            );
+        }
+
+        // 1. Distributed SMT Short-Circuit (Read Path Interception).
+        // Peer verdicts are reused only for exact SMT-LIB2 matches.
         #[cfg(feature = "swarm")]
         if let Some(peer_proof) = swarm_proofs.iter().find(|p| p.smtlib2 == smtlib2) {
             self.cache_hits += 1;
@@ -129,21 +168,19 @@ impl CachedProofEngine {
             );
         }
 
+        let mut fuzzy_hint = None;
         if let Ok(encoded) =
             encode_rust_ast_hdc(source, symthaea_core::hdc::unified_hv::HDC_DIMENSION)
         {
-            // Check local cache tracking
+            // HDC similarity is useful as a repair hint, but not sound enough
+            // to reuse a formal SMT verdict. Only exact SMT hashes short-circuit.
             if let Some((cached_record, score)) =
                 self.memory.nearest(&encoded.features, min_similarity)
             {
-                self.cache_hits += 1;
-                return (
-                    cached_record.verdict.clone(),
-                    format!(
-                        "LOCAL CACHE HIT [similarity: {:.3}]: Matches formal prototype `{}`. Prover summary: {}",
-                        score, cached_record.label, cached_record.summary
-                    ),
-                );
+                fuzzy_hint = Some(format!(
+                    "local fuzzy proof prototype `{}` matched at {:.3}; treated as hint only",
+                    cached_record.label, score
+                ));
             }
 
             // 2. Fuzzy Lemma Chaining via High-Dimensional Computing (HDC)
@@ -160,23 +197,22 @@ impl CachedProofEngine {
                 }
 
                 if let Some((peer_proof, score)) = best_swarm_match {
-                    self.cache_hits += 1;
-                    let verdict = if peer_proof.verified {
-                        ProofVerdict::Proven
-                    } else {
-                        ProofVerdict::Refuted
-                    };
-                    return (
-                        verdict,
-                        format!(
-                            "SWARM HDC HIT [similarity: {:.3}]: Matches peer formal lemma `{}`.",
-                            score, peer_proof.label
-                        ),
-                    );
+                    fuzzy_hint = Some(format!(
+                        "swarm fuzzy proof prototype `{}` matched at {:.3}; treated as hint only",
+                        peer_proof.label, score
+                    ));
                 }
             }
         }
 
+        let summary = if let Some(hint) = fuzzy_hint {
+            format!(
+                "Evaluated via structural Z3 SMT runtime engine execution; {}.",
+                hint
+            )
+        } else {
+            "Evaluated via structural Z3 SMT runtime engine execution.".to_string()
+        };
         self.solver_calls += 1;
         let bridge_result = self.bridge.verify_satisfiable(smtlib2);
 
@@ -185,8 +221,6 @@ impl CachedProofEngine {
             VerificationResult::Sat { .. } | VerificationResult::Invalid => ProofVerdict::Refuted,
             _ => ProofVerdict::Unknown,
         };
-
-        let summary = format!("Evaluated via structural Z3 SMT runtime engine execution.");
 
         if let Ok(record) =
             proof_record_for_rust_source(label, source, smtlib2, verdict.clone(), &summary)
@@ -362,7 +396,7 @@ mod tests {
         assert_eq!(verdict, ProofVerdict::Proven);
         assert_eq!(engine.cache_hits, 1);
         assert_eq!(engine.solver_calls, 0);
-        assert!(details.contains("LOCAL CACHE HIT"));
+        assert!(details.contains("LOCAL EXACT SMT CACHE HIT"));
     }
 
     #[test]

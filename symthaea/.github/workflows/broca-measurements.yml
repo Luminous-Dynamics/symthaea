@@ -1,0 +1,67 @@
+name: Broca Measurements
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/symthaea-broca/**"
+      - "scripts/broca_measurement_artifacts.sh"
+      - "scripts/broca_capture_baseline.sh"
+      - ".github/workflows/broca-measurements.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  BROCA_EVAL_LIMIT: "8"
+  BROCA_EXERCISM_ATTEMPTS: "1"
+  BROCA_MAMBA_BACKEND: "cpu"
+  # Keep PR measurement jobs bounded. Full Exercism runs are intentionally
+  # opt-in because CPU Mamba synthesis can take several minutes per fixture.
+  BROCA_SKIP_EXERCISM: "1"
+
+jobs:
+  broca-measurements:
+    name: Broca measurement artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-broca-measurements-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-broca-measurements-
+            ${{ runner.os }}-broca-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
+
+      - name: Generate Broca measurement artifacts
+        run: scripts/broca_measurement_artifacts.sh target/broca-measurements
+
+      - name: Upload Broca measurement artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: broca-measurements-${{ github.sha }}
+          path: target/broca-measurements/
+          retention-days: 30

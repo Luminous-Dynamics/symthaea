@@ -7,6 +7,7 @@ license = "AGPL-3.0-or-later"
 autobins = false
 
 [dependencies]
+futures-util = { version = "0.3", features = ["sink"] }
 chumsky.workspace = true
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-geodesic = { path = "../symthaea-geodesic", optional = true }
@@ -51,8 +52,9 @@ tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
 symthaea-lean-bridge = { path = "../symthaea-lean-bridge" }
 symthaea-runtime = { path = "../symthaea-runtime" }
+symtropy-robotics-bridge-core = { path = "../../../symtropy/crates/symtropy-robotics-bridge-core" }
 systemstat = "0.2"
-tokio-websockets = "0.12"
+tokio-websockets = { version = "0.12", features = ["server"] }
 
 # Distillation collection
 ureq = { version = "2.9" }
@@ -188,9 +190,22 @@ path = "src/bin/broca_sovereign_node.rs"
 required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
 
 [[bin]]
+name = "broca-exercism-bench"
+path = "src/bin/broca_exercism_bench.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval"]
+
+[[bin]]
 name = "broca-vs-gemma"
 path = "src/bin/broca_vs_gemma.rs"
 required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-external-baseline"
+path = "src/bin/broca_external_baseline.rs"
+
+[[bin]]
+name = "broca-checkpoint-compare"
+path = "src/bin/broca_checkpoint_compare.rs"
 
 [features]
 default = ["simd", "parallel"]

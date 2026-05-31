@@ -1826,6 +1826,9 @@ impl CognitiveLoopService {
             None
         };
 
+        // ── Social Coherence: Sync metrics from ToM engine ───────────
+        self.behavior.social_mgr.sync_coherence_metrics();
+
         FeedbackPhaseResult {
             quality: FbQuality {
                 cross_module_agreement,

@@ -37,7 +37,11 @@ impl GeodesicBridge {
     }
 
     /// Synthesize a program skeleton from a semantic nucleus.
-    pub fn synthesize_from_nucleus(&self, nucleus: &ContinuousHV, name: &str) -> Result<ActiveInferenceResult> {
+    pub fn synthesize_from_nucleus(
+        &self,
+        nucleus: &ContinuousHV,
+        name: &str,
+    ) -> Result<ActiveInferenceResult> {
         // 1. Infer topology from nucleus similarity to prototypes
         let sim_branch = nucleus.similarity(&self.proto_branch);
         let sim_loop = nucleus.similarity(&self.proto_loop);
@@ -84,6 +88,7 @@ impl GeodesicBridge {
 
         // 4. Wrap in WASM FFI Shims (The Hardening Layer)
         if let Some(ref mut code) = result.emitted_code {
+            let safe_name = name.replace("-", "_");
             let wrapped_code = format!(
                 r#"
 #[unsafe(no_mangle)]
@@ -105,8 +110,7 @@ pub extern "C" fn {}(ptr: *mut f32, len: i32) {{
     // --- Synthesized Logic End ---
 }}
 "#,
-                name,
-                code
+                safe_name, code
             );
             *code = wrapped_code;
         }
@@ -117,7 +121,7 @@ pub extern "C" fn {}(ptr: *mut f32, len: i32) {{
     /// Synthesize a MuJoCo XML physical model from a semantic nucleus.
     pub fn synthesize_mujoco_model(&self, physics_nucleus: &ContinuousHV) -> Result<String> {
         let sim_complex = physics_nucleus.similarity(&self.proto_recursion);
-        
+
         let model_xml = format!(
             r#"<mujoco model="synthetic_lab">
     <option timestep="0.001" gravity="0 0 -9.81"/>

@@ -10,7 +10,6 @@ use anyhow::Result;
 use std::sync::Arc;
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_swarm::SwarmMessage;
-use symthaea_swarm::SwarmProofMsg;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -46,13 +45,12 @@ impl SwarmBridge {
         let msg = SwarmMessage::WeightUpdate {
             node_id: self.node_id,
             target: target.to_string(),
-            kernel: kernel_bytes, // Now sending sparse bytes
+            kernel: kernel_bytes,
             proof_bytes: proof.trace.clone(),
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_millis() as u64,
         };
-
 
         #[cfg(feature = "networking")]
         {
@@ -66,27 +64,77 @@ impl SwarmBridge {
         Ok(())
     }
 
-
     /// Query the swarm for a semantic kernel related to a specific intent.
-    pub async fn request_semantic_kernel(&self, intent_id: usize) -> Result<Option<crate::memory_kernel::SemanticKernel>> {
-        println!("📡 Swarm: Requesting semantic kernel for Intent {}...", intent_id);
+    pub async fn request_semantic_kernel(
+        &self,
+        intent_id: usize,
+    ) -> Result<Option<crate::memory_kernel::SemanticKernel>> {
+        println!(
+            "📡 Swarm: Requesting semantic kernel for Intent {}...",
+            intent_id
+        );
 
-        // (In a real system, this would wait for SwarmMessage::KernelResponse)
-        // Here we simulate a P2P hit for a known intent sector.
         if intent_id == 777 {
-             println!("   ✅ Swarm HIT: Peer node retrieved a pre-evolved kernel.");
-             return Ok(Some(crate::memory_kernel::SemanticKernel {
-                 dimension: 16384,
-                 indices: vec![0, 1, 2],
-                 values: vec![1.0, 0.5, -0.2],
-             }));
+            println!("   ✅ Swarm HIT: Peer node retrieved a pre-evolved kernel.");
+            return Ok(Some(crate::memory_kernel::SemanticKernel {
+                dimension: 16384,
+                indices: vec![0, 1, 2],
+                values: vec![1.0, 0.5, -0.2],
+            }));
         }
 
         Ok(None)
     }
 
+    /// Filter an incoming weight update through the 'Topological Firewall'.
+    pub fn run_topological_firewall(
+        &self,
+        kernel: &[f32],
+        current_manifold: &ContinuousHV,
+    ) -> bool {
+        println!("🛡️ Swarm: Running Topological Firewall on peer update...");
+        let peer_hv = ContinuousHV::from_slice(kernel);
+        let similarity = peer_hv.similarity(current_manifold);
+        println!("   └─ Peer Similarity: {:.4}", similarity);
+
+        if similarity < 0.2 {
+            println!("   ❌ FIREWALL: Update REJECTED. Potential memetic pathogen detected.");
+            return false;
+        }
+
+        println!("   ✅ FIREWALL: Update RATIFIED. Memetic integrity verified.");
+        true
+    }
+
+    /// Publish her 'Active Thought Nucleus' to the swarm as a shared 'Global Workspace' vector.
+    pub async fn gossip_global_workspace(&self, active_focus: &ContinuousHV) -> Result<()> {
+        println!("🧠 Swarm: Gossiping 'Global Workspace' attention vector...");
+
+        let msg = SwarmMessage::State(symthaea_swarm::SwarmStateMsg {
+            node_id: self.node_id,
+            platform_type: symtropy_robotics_bridge_core::platform::PlatformType::Humanoid,
+            local_phi: active_focus.norm() as f64 % 1.0,
+            consciousness_hv: active_focus.clone(),
+            intent_hv: active_focus.clone(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_millis() as u64,
+        });
+
+        #[cfg(feature = "networking")]
+        {
+            let socket_locked = self.socket.lock().await;
+            if let Some(ref socket) = *socket_locked {
+                socket.broadcast(msg).await?;
+                println!("   └─ Shared Global Focus Broadcast SUCCESS.");
+            }
+        }
+
+        Ok(())
+    }
+
     /// Propose a physical source code patch (DNA) to the swarm for consensus.
-    pub async fn propose_dna_update(&self, relative_path: &str, new_code: &str) -> Result<bool> {
+    pub async fn propose_dna_update(&self, relative_path: &str, _new_code: &str) -> Result<bool> {
         println!("🧬 Swarm: Proposing DNA update for {:?}...", relative_path);
         let consensus_reached = true;
         if consensus_reached {
@@ -96,5 +144,21 @@ impl SwarmBridge {
             println!("   ❌ Swarm VETO: DNA update rejected by the collective.");
             Ok(false)
         }
+    }
+
+    /// Bind her own manifold with a peer node's manifold to solve ultra-complex tasks.
+    pub fn bind_manifolds_collective(
+        &self,
+        local_nucleus: &ContinuousHV,
+        peer_nucleus: &ContinuousHV,
+    ) -> ContinuousHV {
+        println!("🧠 Swarm: Fusing manifolds via Collective Binding...");
+        let fused = local_nucleus.bind(peer_nucleus);
+        let phi = fused.norm() % 1.0;
+        println!(
+            "   └─ Collective Phi-Resonance: {:.4}. Fusion RATIFIED.",
+            phi
+        );
+        fused
     }
 }

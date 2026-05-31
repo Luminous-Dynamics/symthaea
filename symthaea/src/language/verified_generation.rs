@@ -25,7 +25,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
-use super::code_executor::{CodeExecutor, ExecutionResult, try_auto_fix};
+use super::code_executor::{CodeExecutor, ExecutionResult, TestFailure, try_auto_fix};
 use super::code_generator::{CodeContext, CodeGenerator};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
@@ -40,6 +40,7 @@ use super::repo_map::RepoMap;
 use super::rust_ast_hdc::encode_rust_ast_hdc;
 use super::rust_lsp::{LspPosition, RustAnalyzerClient};
 use super::semantic_repair::try_semantic_ast_repair;
+use super::sovereign_attestor::{ProofAttestation, SovereignAttestor};
 use super::structural_prototype::{
     StructuralPriorScore, StructuralPrototypeBank, StructuralPrototypeLabels,
     ast_features_for_source, return_shape_for_signature,
@@ -75,6 +76,8 @@ pub struct VerifiedCode {
     pub test_retries: usize,
     /// Whether Z3 formal verification succeeded (None = not attempted)
     pub formally_verified: Option<bool>,
+    /// Cryptographic attestation of formal proof (Dilithium)
+    pub attestation: Option<ProofAttestation>,
     /// Confidence assessment
     pub confidence: VerificationConfidence,
     /// Compilation errors encountered (empty if compiled successfully)
@@ -342,6 +345,7 @@ async fn generate_verified_inner<'a>(
             compile_retries: 0,
             test_retries: 0,
             formally_verified: None,
+            attestation: None,
             confidence: VerificationConfidence::compute(false, false, false, 0.0),
             compile_errors: vec![reason],
             test_failures: Vec::new(),
@@ -479,6 +483,7 @@ async fn generate_verified_inner<'a>(
                         runtime_error: None,
                         elapsed: std::time::Duration::from_millis(0),
                         simulated: false,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     }
                 } else {
@@ -513,19 +518,22 @@ async fn generate_verified_inner<'a>(
             // Compiled! Check tests
             if result.tests_failed == 0 {
                 let mut formally_verified = None;
+                let mut formal_gate_failure = None;
                 if let Some(smtlib2_query) = spec.metadata.get("smtlib2") {
                     info!(
                         "Executing neuro-symbolic proof lookup and lemma chaining for {}",
                         spec.name
                     );
                     let bridge = crate::z3_bridge::Z3Bridge::new();
-                    let memory = super::proof_memory::ProofMemory::default();
+                    let proof_memory = super::proof_memory::global_proof_memory();
+                    let memory = proof_memory.lock().clone();
                     let mut engine = super::proof_memory::CachedProofEngine::new(bridge, memory);
 
                     #[cfg(feature = "swarm")]
                     let proofs_slice = swarm_proofs.unwrap_or(&[]);
                     #[cfg(not(feature = "swarm"))]
                     let proofs_slice: &[()] = &[];
+
                     let (verdict, details) = engine.verify_with_cache(
                         &spec.name,
                         &source,
@@ -533,17 +541,29 @@ async fn generate_verified_inner<'a>(
                         0.85,
                         proofs_slice,
                     );
+                    *proof_memory.lock() = engine.memory.clone();
                     let is_proven = verdict == super::proof_memory::ProofVerdict::Proven;
                     let is_refuted = verdict == super::proof_memory::ProofVerdict::Refuted;
                     formally_verified = Some(is_proven);
 
                     if is_refuted {
-                        if let (Some(ref mut store), Some(hv)) = (experience_store.as_mut(), &last_ast_hv) {
-                            info!("LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.", spec.name);
+                        if let (Some(ref mut store), Some(hv)) =
+                            (experience_store.as_mut(), &last_ast_hv)
+                        {
+                            info!(
+                                "LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.",
+                                spec.name
+                            );
                             store.store_negative_prototype(&spec.name, hv.values.clone());
                         }
+                        formal_gate_failure = Some(TestFailure {
+                            test_name: "FormalContractGate".into(),
+                            expected: Some("SMT contract satisfiable/proven".into()),
+                            actual: Some("SMT contract refuted".into()),
+                            message: "Formal SMT contract was refuted; candidate cannot be accepted even if it compiles and passes tests.".into(),
+                            assertion: None,
+                        });
                     }
-
 
                     if is_proven && engine.solver_calls > 0 {
                         #[cfg(feature = "swarm")]
@@ -574,14 +594,21 @@ async fn generate_verified_inner<'a>(
                 // SOVEREIGN BLOCKADE: Hard gate for unsafe Rust (INV-13)
                 // We physically block the return of any code containing unsafe blocks
                 // unless they are mathematically proven safe by the SMT engine.
-                if contains_unsafe && !is_proven {
+                if let Some(failure) = formal_gate_failure {
+                    warn!(
+                        "FORMAL CONTRACT GATE: Rejecting {} because SMT contract was refuted.",
+                        spec.name
+                    );
+                    result.tests_failed = 1;
+                    result.test_failures.push(failure);
+                } else if contains_unsafe && !is_proven {
                     warn!(
                         "SOVEREIGN BLOCKADE: Rejecting unverified unsafe block in {}. SMT proof required for systems governance.",
                         spec.name
                     );
                     // Treat as test failure to trigger fix/retry logic
                     result.tests_failed = 1;
-                    result.test_failures.push(crate::language::code_executor::TestFailure {
+                    result.test_failures.push(TestFailure {
                         test_name: "SovereignSafetyGate".into(),
                         expected: Some("Proven Unsafe Block".into()),
                         actual: Some("Unverified Unsafe Block".into()),
@@ -589,6 +616,30 @@ async fn generate_verified_inner<'a>(
                         assertion: None,
                     });
                 } else {
+                    // RECURSIVE ATTESTATION: only sign successful proofs.
+                    let mut attestation = None;
+                    if formally_verified == Some(true) {
+                        // For attestation, we need the SMT query. If not in metadata, use empty.
+                        let smt = spec.metadata.get("smtlib2").cloned().unwrap_or_default();
+
+                        // Supply-chain integrity: Link formal proof to physical binary artifact (INV-14)
+                        let binary_data = result
+                            .binary_path
+                            .as_ref()
+                            .and_then(|p| std::fs::read(p).ok());
+
+                        attestation = Some(SovereignAttestor::attest_with_process_key(
+                            &spec.name,
+                            &smt,
+                            "Proven",
+                            binary_data.as_deref(),
+                        ));
+                        info!(
+                            "SOVEREIGN ATTESTATION: Generated signed proof and binary hash for {}.",
+                            spec.name
+                        );
+                    }
+
                     return VerifiedCode {
                         source,
                         compiled: true,
@@ -598,6 +649,7 @@ async fn generate_verified_inner<'a>(
                         compile_retries,
                         test_retries: 0,
                         formally_verified,
+                        attestation,
                         confidence: VerificationConfidence::compute(true, true, is_proven, 1.0),
                         compile_errors: Vec::new(),
                         test_failures: Vec::new(),
@@ -606,7 +658,7 @@ async fn generate_verified_inner<'a>(
                     };
                 }
             }
-            
+
             // If we reached here, tests failed OR the sovereign blockade was triggered
             if result.tests_failed > 0 {
                 // Tests failed — try to fix based on test output
@@ -719,6 +771,7 @@ async fn generate_verified_inner<'a>(
                                     runtime_error: None,
                                     elapsed: std::time::Duration::from_millis(0),
                                     simulated: false,
+                                    binary_path: None,
                                     test_failures: Vec::new(),
                                 }
                             } else {
@@ -746,13 +799,15 @@ async fn generate_verified_inner<'a>(
 
                     if retry_result.compiled && retry_result.tests_failed == 0 {
                         let mut formally_verified = None;
+                        let mut formal_gate_failure = None;
                         if let Some(smtlib2_query) = spec.metadata.get("smtlib2") {
                             info!(
                                 "Executing neuro-symbolic proof lookup on test-repair path for {}",
                                 spec.name
                             );
                             let bridge = crate::z3_bridge::Z3Bridge::new();
-                            let memory = super::proof_memory::ProofMemory::default();
+                            let proof_memory = super::proof_memory::global_proof_memory();
+                            let memory = proof_memory.lock().clone();
                             let mut engine =
                                 super::proof_memory::CachedProofEngine::new(bridge, memory);
 
@@ -767,8 +822,29 @@ async fn generate_verified_inner<'a>(
                                 0.85,
                                 proofs_slice,
                             );
+                            *proof_memory.lock() = engine.memory.clone();
                             let is_proven = verdict == super::proof_memory::ProofVerdict::Proven;
+                            let is_refuted = verdict == super::proof_memory::ProofVerdict::Refuted;
                             formally_verified = Some(is_proven);
+
+                            if is_refuted {
+                                if let (Some(ref mut store), Some(hv)) =
+                                    (experience_store.as_mut(), &last_ast_hv)
+                                {
+                                    info!(
+                                        "LABELING NEGATIVE PROTOTYPE: {} disproven by Z3.",
+                                        spec.name
+                                    );
+                                    store.store_negative_prototype(&spec.name, hv.values.clone());
+                                }
+                                formal_gate_failure = Some(TestFailure {
+                                    test_name: "FormalContractGate".into(),
+                                    expected: Some("SMT contract satisfiable/proven".into()),
+                                    actual: Some("SMT contract refuted".into()),
+                                    message: "Formal SMT contract was refuted on the repair path; candidate cannot be accepted.".into(),
+                                    assertion: None,
+                                });
+                            }
 
                             if is_proven && engine.solver_calls > 0 {
                                 #[cfg(feature = "swarm")]
@@ -795,22 +871,64 @@ async fn generate_verified_inner<'a>(
                             info!("Formal verification outcome (retry lane): {}", details);
                         }
 
+                        let contains_unsafe =
+                            source.contains("unsafe ") || source.contains("unsafe {");
                         let is_proven = formally_verified.unwrap_or(false);
-                        return VerifiedCode {
-                            source,
-                            compiled: true,
-                            tests_passed: true,
-                            test_count_passed: result.tests_passed,
-                            test_count_failed: 0,
-                            compile_retries,
-                            test_retries: 0,
-                            formally_verified,
-                            confidence: VerificationConfidence::compute(true, true, is_proven, 1.0),
-                            compile_errors: Vec::new(),
-                            test_failures: Vec::new(),
-                            diagnostic_hvs: all_diagnostic_hvs.clone(),
-                            ast_hdc: ast_hdc.clone(),
-                        };
+                        if let Some(failure) = formal_gate_failure {
+                            warn!(
+                                "FORMAL CONTRACT GATE: Rejecting repair candidate {} because SMT contract was refuted.",
+                                spec.name
+                            );
+                            retry_result.tests_failed = 1;
+                            retry_result.test_failures.push(failure);
+                        } else if contains_unsafe && !is_proven {
+                            warn!(
+                                "SOVEREIGN BLOCKADE: Rejecting unverified unsafe block in repair candidate {}.",
+                                spec.name
+                            );
+                            retry_result.tests_failed = 1;
+                            retry_result.test_failures.push(TestFailure {
+                                test_name: "SovereignSafetyGate".into(),
+                                expected: Some("Proven Unsafe Block".into()),
+                                actual: Some("Unverified Unsafe Block".into()),
+                                message: "Memory-unsafe code detected without formal SMT proof on repair path.".into(),
+                                assertion: None,
+                            });
+                        } else {
+                            let mut attestation = None;
+                            if formally_verified == Some(true) {
+                                let smt = spec.metadata.get("smtlib2").cloned().unwrap_or_default();
+                                let binary_data = retry_result
+                                    .binary_path
+                                    .as_ref()
+                                    .and_then(|p| std::fs::read(p).ok());
+                                attestation = Some(SovereignAttestor::attest_with_process_key(
+                                    &spec.name,
+                                    &smt,
+                                    "Proven",
+                                    binary_data.as_deref(),
+                                ));
+                            }
+
+                            return VerifiedCode {
+                                source,
+                                compiled: true,
+                                tests_passed: true,
+                                test_count_passed: result.tests_passed,
+                                test_count_failed: 0,
+                                compile_retries,
+                                test_retries: 0,
+                                formally_verified,
+                                attestation,
+                                confidence: VerificationConfidence::compute(
+                                    true, true, is_proven, 1.0,
+                                ),
+                                compile_errors: Vec::new(),
+                                test_failures: Vec::new(),
+                                diagnostic_hvs: all_diagnostic_hvs.clone(),
+                                ast_hdc: ast_hdc.clone(),
+                            };
+                        }
                     }
 
                     if !retry_result.compiled {
@@ -864,6 +982,7 @@ async fn generate_verified_inner<'a>(
                     compile_retries,
                     test_retries,
                     formally_verified: None,
+                    attestation: None,
                     confidence: VerificationConfidence::compute(
                         latest_result.compiled,
                         false,
@@ -977,6 +1096,7 @@ async fn generate_verified_inner<'a>(
         compile_retries,
         test_retries: 0,
         formally_verified: None,
+        attestation: None,
         confidence: VerificationConfidence::compute(false, false, false, 0.0),
         compile_errors: last_compile_errors,
         test_failures: Vec::new(),
@@ -1001,6 +1121,7 @@ fn simulated_verification_failure(
         compile_retries,
         test_retries,
         formally_verified: None,
+        attestation: None,
         confidence: VerificationConfidence::compute(false, false, false, 0.0),
         compile_errors: vec![reason],
         test_failures: Vec::new(),
@@ -1740,6 +1861,7 @@ mod tests {
             compile_retries: 0,
             test_retries: 0,
             formally_verified: Some(true),
+            attestation: None,
             confidence: VerificationConfidence::compute(true, true, true, 1.0),
             compile_errors: Vec::new(),
             test_failures: Vec::new(),

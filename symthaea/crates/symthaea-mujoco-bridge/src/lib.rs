@@ -5,11 +5,11 @@
 
 #![deny(unsafe_code)]
 
+use std::fs;
+use symthaea_humanoid::morphology::HumanoidMorphology;
 use symthaea_sim_bridge::{
     CommandSolver, SimulationBackend, SimulationError, SimulationResult, SolverKind,
 };
-use symthaea_humanoid::morphology::HumanoidMorphology;
-use std::fs;
 
 /// Generic MuJoCo adapter boundary.
 #[derive(Debug, Clone)]
@@ -52,9 +52,9 @@ impl MuJoCoBridge {
 
         Ok(path)
     }
-    }
+}
 
-    impl SimulationBackend for MuJoCoBridge {
+impl SimulationBackend for MuJoCoBridge {
     fn name(&self) -> &'static str {
         "mujoco"
     }
@@ -81,16 +81,16 @@ impl MuJoCoBridge {
         }
 
         // 1. Ensure the 64-DOF model is exported
-        let xml_path = if request.objective.contains("flagship") || request.objective.contains("64-dof") {
-            self.export_flagship_mjcf()?
-        } else {
-            "assets/humanoid.xml".to_string()
-        };
-
+        let xml_path =
+            if request.objective.contains("flagship") || request.objective.contains("64-dof") {
+                self.export_flagship_mjcf()?
+            } else {
+                "assets/humanoid.xml".to_string()
+            };
 
         // 2. Real path: execute command with model specification parameters
         let cmd = CommandSolver::new(&self.solver_cmd).arg(&xml_path);
-        
+
         // Execute (ignoring output for now, as we're focusing on the bridge structure)
         let _output = cmd.execute()?;
 

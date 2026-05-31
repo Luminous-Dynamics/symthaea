@@ -1337,6 +1337,14 @@ impl CodeGate {
             return;
         }
 
+        let syntax = channels.syntax_complexity();
+        let type_conf = channels.type_confidence();
+        let algo = channels.algorithm_pattern();
+        let error = channels.error_likelihood();
+        if syntax <= 1e-6 && type_conf <= 1e-6 && algo <= 1e-6 && error <= 1e-6 {
+            return;
+        }
+
         // 1. Detect language/intent using full registry
         let language_gate = self.language_gate_registry.detect_intent(channels);
         let base_gate_strength = if let Some(gate) = language_gate {
@@ -1370,11 +1378,6 @@ impl CodeGate {
         }
 
         // 5. Legacy v5 code-channel scoring (still useful as secondary modulation)
-        let syntax = channels.syntax_complexity();
-        let type_conf = channels.type_confidence();
-        let algo = channels.algorithm_pattern();
-        let error = channels.error_likelihood();
-
         if syntax > 0.3 {
             let boost = self.config.code_structural_boost * syntax;
             for &id in &self.structural_ids {

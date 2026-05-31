@@ -125,8 +125,10 @@ pub fn ast_feature_similarity_to_any<'a>(
 struct AstFeatureVisitor {
     features: BTreeMap<String, usize>,
     scopes: Vec<BTreeSet<String>>,
+    param_bindings: BTreeSet<String>,
     mutable_bindings: BTreeSet<String>,
     moved_bindings: BTreeSet<String>,
+    loop_depth: usize,
     invariants: Vec<String>,
 }
 
@@ -161,6 +163,11 @@ impl AstFeatureVisitor {
         }
     }
 
+    fn define_param_binding(&mut self, name: String, mutable: bool, type_name: Option<String>) {
+        self.param_bindings.insert(name.clone());
+        self.define_binding(name, mutable, type_name);
+    }
+
     fn is_defined(&self, name: &str) -> bool {
         self.scopes.iter().rev().any(|scope| scope.contains(name))
     }
@@ -188,6 +195,9 @@ impl AstFeatureVisitor {
             } else {
                 self.bump("semantic:assignment_to_immutable_shape");
             }
+            if self.loop_depth > 0 {
+                self.bump("semantic:mutation_in_loop");
+            }
         }
     }
 
@@ -198,6 +208,15 @@ impl AstFeatureVisitor {
             if let Some(name) = expr_ident(&reference.expr) {
                 self.bump("semantic:return_reference");
                 self.bump(format!("semantic:return_reference_name:{name}"));
+                if self.param_bindings.contains(&name) {
+                    self.bump("semantic:return_reference_to_param");
+                }
+            }
+        }
+        if let Some(name) = expr_ident(expr) {
+            self.bump(format!("semantic:return_name:{name}"));
+            if self.param_bindings.contains(&name) {
+                self.bump("semantic:return_param");
             }
         }
     }
@@ -219,12 +238,13 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
             self.bump("function:generic");
         }
         self.bump(format!("name:{}", item_fn.sig.ident));
+        let outer_params = self.param_bindings.clone();
         self.enter_scope();
         for input in &item_fn.sig.inputs {
             if let syn::FnArg::Typed(pat_type) = input {
                 if let Some((name, mutable, type_name)) = binding_from_pat(&pat_type.pat) {
                     self.bump("semantic:param");
-                    self.define_binding(name, mutable, type_name);
+                    self.define_param_binding(name, mutable, type_name);
                 }
                 let type_str = quote::ToTokens::to_token_stream(&pat_type.ty).to_string();
                 self.bump(format!(
@@ -241,6 +261,7 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
         }
         visit::visit_item_fn(self, item_fn);
         self.exit_scope();
+        self.param_bindings = outer_params;
     }
 
     fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
@@ -298,6 +319,7 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
     fn visit_expr_for_loop(&mut self, expr: &'ast syn::ExprForLoop) {
         self.bump("control:for_loop");
         self.bump("semantic:iteration");
+        self.loop_depth += 1;
         self.enter_scope();
         if let Some((name, mutable, type_name)) = binding_from_pat(&expr.pat) {
             self.bump("semantic:loop_binding");
@@ -305,17 +327,22 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
         }
         visit::visit_expr_for_loop(self, expr);
         self.exit_scope();
+        self.loop_depth = self.loop_depth.saturating_sub(1);
     }
 
     fn visit_expr_while(&mut self, expr: &'ast syn::ExprWhile) {
         self.bump("control:while_loop");
+        self.loop_depth += 1;
         visit::visit_expr_while(self, expr);
+        self.loop_depth = self.loop_depth.saturating_sub(1);
     }
 
     fn visit_expr_loop(&mut self, expr: &'ast syn::ExprLoop) {
         self.bump("control:loop");
         self.bump("semantic:unbounded_loop");
+        self.loop_depth += 1;
         visit::visit_expr_loop(self, expr);
+        self.loop_depth = self.loop_depth.saturating_sub(1);
     }
 
     fn visit_expr_if(&mut self, expr: &'ast syn::ExprIf) {
@@ -340,6 +367,12 @@ impl<'ast> Visit<'ast> for AstFeatureVisitor {
             "map" => self.bump("semantic:map_transform"),
             "filter" => self.bump("semantic:filter_predicate"),
             "fold" | "reduce" | "sum" | "product" => self.bump("semantic:aggregation"),
+            "push" | "insert" | "remove" | "retain" | "sort" | "dedup" => {
+                self.bump("semantic:mutation_method");
+                if self.loop_depth > 0 {
+                    self.bump("semantic:mutation_method_in_loop");
+                }
+            }
             "unwrap" | "expect" => self.bump("semantic:fallible_unwrap"),
             _ => {}
         }
@@ -695,6 +728,47 @@ mod tests {
         );
         assert!(encoded.features.contains_key("semantic:param_has_lifetime"));
         assert!(encoded.features.contains_key("semantic:type_ref_shared"));
+    }
+
+    #[test]
+    fn semantic_features_capture_data_flow_and_mutation_context() {
+        let returning_param = encode_rust_ast_hdc(
+            "pub fn choose<'a>(left: &'a str, right: &'a str) -> &'a str { if left.len() >= right.len() { return left; } right }",
+            512,
+        )
+        .unwrap();
+        assert!(
+            returning_param
+                .features
+                .contains_key("semantic:return_param")
+        );
+
+        let loop_mutation = encode_rust_ast_hdc(
+            r#"
+            pub fn collect_positive(items: &[i32]) -> Vec<i32> {
+                let mut out = Vec::new();
+                for item in items {
+                    if *item > 0 {
+                        out.push(*item);
+                    }
+                }
+                out
+            }
+            "#,
+            512,
+        )
+        .unwrap();
+
+        assert!(
+            loop_mutation
+                .features
+                .contains_key("semantic:mutation_method")
+        );
+        assert!(
+            loop_mutation
+                .features
+                .contains_key("semantic:mutation_method_in_loop")
+        );
     }
 
     #[test]

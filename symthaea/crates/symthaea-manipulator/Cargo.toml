@@ -10,20 +10,21 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
+symthaea-swarm = { path = "../symthaea-swarm" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hal = { path = "../symthaea-hal", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }
 anyhow = { workspace = true }
+uuid = { workspace = true }
+symtropy-physics = { path = "../../../symtropy/crates/symtropy-physics" }
+symtropy-robotics-bridge-core = { path = "../../../symtropy/crates/symtropy-robotics-bridge-core" }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 proptest = "1"
 
-[dependencies.symtropy-physics]
-path = "../../../symtropy/crates/symtropy-physics"
-optional = true
 
 [dependencies.symtropy-math]
 path = "../../../symtropy/crates/symtropy-math"
@@ -35,4 +36,4 @@ optional = true
 
 [features]
 default = []
-symtropy = ["dep:symtropy-physics", "dep:symtropy-math", "dep:nalgebra"]
+symtropy = ["dep:symtropy-math", "dep:nalgebra"]

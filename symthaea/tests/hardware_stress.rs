@@ -37,7 +37,7 @@ fn test_geometric_control_loop_stress_adversarial() {
 
             // Mock a "burst" requirement: intense vector math
             let hv_a = ContinuousHV::random(16384, total_packets as u64);
-            
+
             // Adversarial Injection: simulate a bit-flip or noise burst every 10 packets
             let mut raw_data = vec![0.5f32; 10];
             if total_packets % 10 == 0 {
@@ -51,9 +51,9 @@ fn test_geometric_control_loop_stress_adversarial() {
                 .iter()
                 .map(|&x| if x.abs() > 100.0 { 0.5 } else { x })
                 .collect();
-            
+
             // Verify noise was suppressed (Systemic Robustness)
-            assert!(filtered_data[0] < 1.0); 
+            assert!(filtered_data[0] < 1.0);
 
             let hv_b = ContinuousHV::random(16384, (total_packets + 1) as u64);
             let _similarity = hv_a.similarity(&hv_b);
@@ -88,7 +88,11 @@ fn test_geometric_control_loop_stress_adversarial() {
 
     println!("--- Stress Results ---");
     println!("Total Packets: {}", total_packets);
-    println!("Dropped:       {} ({:.2}%)", dropped_packets, (dropped_packets as f32 / total_packets as f32) * 100.0);
+    println!(
+        "Dropped:       {} ({:.2}%)",
+        dropped_packets,
+        (dropped_packets as f32 / total_packets as f32) * 100.0
+    );
     println!("Adversarial:   {} hits suppressed", adversarial_hits);
     println!("Avg Latency:   {}us", avg_latency.as_micros());
     println!("Max Latency:   {}us", max_latency.as_micros());

@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Metabolic Heartbeat Benchmark (64-DOF FullSpine Regeneration)
-//! 
+//!
 //! Measures the efficiency of Regenerative Braking in a 64-DOF humanoid.
-//! Simulates a "Stop-and-Go" cycle (acceleration vs deceleration) 
+//! Simulates a "Stop-and-Go" cycle (acceleration vs deceleration)
 //! and verifies that kinetic energy is recovered into the metabolic ledger.
 
+use anyhow::Result;
+use nalgebra::SVector;
+use symtropy_consciousness_physics::ConsciousnessField;
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
 use symtropy_physics::joints::{HingeJoint, MotorDrive};
-use symtropy_consciousness_physics::ConsciousnessField;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use nalgebra::SVector;
-use anyhow::Result;
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     // 1. Setup World & Consciousness
     let mut world = PhysicsWorld::<D>::new(SVector::from([0.0, 0.0, 0.0])); // Zero-G for pure motor testing
     let mut field = ConsciousnessField::<D>::new();
-    
+
     // 2. Spawn a simple articulated Arm (Pendulum)
     let base_handle = world.add_sphere(Point::origin(), 0.1, 0.0); // Static
     let arm_handle = world.add_sphere(Point::new([1.0, 0.0, 0.0]), 0.1, 5.0);
@@ -45,9 +45,11 @@ async fn main() -> Result<()> {
         arm_handle,
         SVector::zeros(),
         SVector::from([-1.0, 0.0, 0.0]),
-        0, 1
-    ).with_motor(motor);
-    
+        0,
+        1,
+    )
+    .with_motor(motor);
+
     world.add_constraint(Box::new(joint));
 
     let mut current_time = 0.0;
@@ -60,7 +62,10 @@ async fn main() -> Result<()> {
         // 4. Control Logic: Toggle between driving and braking
         if current_time >= 1.0 && current_time < 2.0 && phase == "ACCEL" {
             phase = "BRAKE";
-            info!("🛑 [T={:.2}s] Switching to Phase: BRAKE (Regenerative Recovery)...", current_time);
+            info!(
+                "🛑 [T={:.2}s] Switching to Phase: BRAKE (Regenerative Recovery)...",
+                current_time
+            );
             if let Some(c) = world.constraints.get_mut(0) {
                 if let Some(hinge) = c.as_any_mut().downcast_mut::<HingeJoint<D>>() {
                     if let Some(ref mut motor) = hinge.motor {
@@ -87,10 +92,16 @@ async fn main() -> Result<()> {
 
         // 6. Metrics Gathering
         if step_count % 50 == 0 {
-            let energy = field.entities.get(&arm_handle).map(|e| e.energy.available).unwrap_or(0.0);
+            let energy = field
+                .entities
+                .get(&arm_handle)
+                .map(|e| e.energy.available)
+                .unwrap_or(0.0);
             let velocity = world.body(arm_handle).unwrap().angular_velocity.get(0, 1);
-            info!("[T={:.2}s | {}] Vel: {:.2} rad/s | Energy: {:.2}J", 
-                  current_time, phase, velocity, energy);
+            info!(
+                "[T={:.2}s | {}] Vel: {:.2} rad/s | Energy: {:.2}J",
+                current_time, phase, velocity, energy
+            );
         }
 
         current_time += DT;
@@ -100,7 +111,10 @@ async fn main() -> Result<()> {
     let ledger = &field.ledger;
     info!("✨ METABOLIC HEARTBEAT BENCHMARK COMPLETE.");
     info!("📊 ENERGY RECOVERY REPORT:");
-    info!("   🌡️  Total Consumption (Work): {:.2} Joules", ledger.lifetime_energy);
+    info!(
+        "   🌡️  Total Consumption (Work): {:.2} Joules",
+        ledger.lifetime_energy
+    );
     info!("   🔄 Regenerative Braking successfully integrated into FullSpine metabolism.");
 
     Ok(())

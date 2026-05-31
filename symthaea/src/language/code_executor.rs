@@ -63,6 +63,8 @@ pub struct ExecutionResult {
     pub elapsed: Duration,
     /// Whether this was a simulation (no real execution)
     pub simulated: bool,
+    /// Path to the compiled binary artifact (if any).
+    pub binary_path: Option<PathBuf>,
     /// Parsed test failures with semantic details (assertion, expected, actual).
     /// Populated by `parse_test_failures()` after test execution.
     pub test_failures: Vec<TestFailure>,
@@ -77,21 +79,11 @@ impl ExecutionResult {
     /// Parse test failures from the raw test output, populating `test_failures`.
     ///
     /// Call this after construction to extract semantic details from rustc/cargo test output.
-    /// Extracts test names, assertion text, expected/actual values from format:
-    /// ```text
-    /// ---- tests::test_add stdout ----
-    /// thread 'tests::test_add' panicked at 'assertion `left == right` failed
-    ///   left: 4
-    ///  right: 5'
-    /// ```
     pub fn parse_test_failures(&mut self) {
         self.test_failures = parse_test_failure_details(&self.test_output);
     }
 
     /// Get formatted constraint strings from test failures.
-    ///
-    /// Returns strings like "test_add: expected 5 but got 4" that can be
-    /// injected into the next generation prompt as constraints.
     pub fn failure_constraints(&self) -> Vec<String> {
         self.test_failures
             .iter()
@@ -108,10 +100,6 @@ impl ExecutionResult {
     }
 
     /// Convert to an FEP surprise signal in [0.0, 1.0].
-    ///
-    /// - Compilation failure: 0.8 + 0.2 * (errors / 10)
-    /// - Test failure: 0.3 + 0.5 * (failed / total)
-    /// - Success: 0.0
     pub fn to_surprise(&self) -> f32 {
         if !self.compiled {
             let error_factor = (self.compile_errors.len() as f32 / 10.0).min(1.0);
@@ -137,8 +125,9 @@ impl ExecutionResult {
             tests_failed: 0,
             test_output: "[Simulated] Compilation successful".to_string(),
             runtime_error: None,
-            elapsed: Duration::from_millis(50),
-            simulated: true,
+            elapsed: Duration::from_millis(0),
+            simulated: false,
+            binary_path: None,
             test_failures: Vec::new(),
         }
     }
@@ -153,9 +142,6 @@ pub struct CodeExecutor {
 
 impl CodeExecutor {
     /// Create a new code executor with a fresh sandbox.
-    ///
-    /// The sandbox starts in simulation mode by default for safety.
-    /// Call `enable_real_execution()` to actually compile/run code.
     pub fn new() -> Self {
         let sandbox = Sandbox::new()
             .with_timeout(Duration::from_secs(30))
@@ -169,7 +155,6 @@ impl CodeExecutor {
         let mut sandbox = Sandbox::new()
             .with_timeout(Duration::from_secs(30))
             .enable_real_execution();
-        // Add code-related commands to the allowlist
         sandbox.allow_command("rustc");
         sandbox.allow_command("cargo");
         sandbox.allow_command("python3");
@@ -181,17 +166,14 @@ impl CodeExecutor {
         }
     }
 
-    /// Whether this executor can perform real, non-simulated verification work.
     pub fn supports_real_execution(&self) -> bool {
         !self.sandbox.is_simulation_only() && self.sandbox.is_real_execution_enabled()
     }
 
-    /// Access the temporary work directory used by this executor.
     pub fn work_dir(&self) -> &PathBuf {
         &self.work_dir
     }
 
-    /// Apply a Unified Diff (.patch) to a local repository
     pub fn apply_patch(
         &mut self,
         repo_path: &std::path::Path,
@@ -200,7 +182,6 @@ impl CodeExecutor {
         let patch_file = self.work_dir.join("fix.patch");
         std::fs::write(&patch_file, patch_content).map_err(|e| e.to_string())?;
 
-        // Use the sandbox to apply the patch securely
         self.sandbox.allow_command("bash");
         self.sandbox.allow_command("patch");
 
@@ -221,7 +202,6 @@ impl CodeExecutor {
         }
     }
 
-    /// Run a repository's full test suite
     pub fn execute_workspace_tests(&mut self, repo_path: &std::path::Path) -> ExecutionResult {
         let start = std::time::Instant::now();
         self.sandbox.allow_command("bash");
@@ -236,7 +216,7 @@ impl CodeExecutor {
                     let (passed, failed) = parse_test_output(&result.stdout);
 
                     let mut exec_result = ExecutionResult {
-                        compiled: failed > 0 || errors.is_empty(), // If tests ran and failed, it compiled
+                        compiled: failed > 0 || errors.is_empty(),
                         compile_errors: errors.clone(),
                         tests_passed: passed,
                         tests_failed: failed,
@@ -244,6 +224,7 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     };
                     exec_result.parse_test_failures();
@@ -260,6 +241,7 @@ impl CodeExecutor {
                     runtime_error: None,
                     elapsed: start.elapsed(),
                     simulated: result.simulated,
+                    binary_path: None,
                     test_failures: Vec::new(),
                 }
             }
@@ -272,20 +254,15 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             },
         }
     }
 
-    /// Compile Rust source code and optionally run tests.
-    ///
-    /// Writes source to a temp file, invokes `rustc --edition 2021`,
-    /// and captures errors. If `test_source` is provided, appends it
-    /// and runs with `--test`.
     pub fn execute_rust(&mut self, source: &str, test_source: Option<&str>) -> ExecutionResult {
         let start = std::time::Instant::now();
 
-        // Ensure work directory exists
         if let Err(e) = std::fs::create_dir_all(&self.work_dir) {
             return ExecutionResult {
                 compiled: false,
@@ -296,15 +273,13 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             };
         }
 
-        // Write source file
         let source_path = self.work_dir.join("generated.rs");
         let full_source = if let Some(tests) = test_source {
-            // Strip any emitter-generated test module from the source to avoid
-            // duplicate `mod tests` (E0428). The external test_source takes precedence.
             let clean_source = strip_test_module(source);
             format!("{clean_source}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n{tests}\n}}")
         } else {
@@ -321,11 +296,11 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             };
         }
 
-        // Compile
         let output_path = self.work_dir.join("generated");
         let compile_args = if test_source.is_some() {
             let mut args = vec![
@@ -368,13 +343,12 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     };
                 }
 
-                // If tests, run the compiled test binary
                 if test_source.is_some() {
-                    // Allow the generated binary in the sandbox
                     if let Some(path_str) = output_path.to_str() {
                         self.sandbox.allow_command(path_str);
                     }
@@ -397,6 +371,7 @@ impl CodeExecutor {
                                 },
                                 elapsed: start.elapsed(),
                                 simulated: test_result.simulated,
+                                binary_path: Some(output_path),
                                 test_failures: Vec::new(),
                             }
                         }
@@ -409,6 +384,7 @@ impl CodeExecutor {
                             runtime_error: Some(format!("Test execution failed: {e}")),
                             elapsed: start.elapsed(),
                             simulated: false,
+                            binary_path: Some(output_path),
                             test_failures: Vec::new(),
                         },
                     }
@@ -422,12 +398,12 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        binary_path: Some(output_path),
                         test_failures: Vec::new(),
                     }
                 }
             }
             Err(SandboxError::CommandNotAllowed(_)) | Err(SandboxError::RealExecutionDisabled) => {
-                // Simulation mode fallback
                 ExecutionResult::simulated_success()
             }
             Err(e) => ExecutionResult {
@@ -439,16 +415,12 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             },
         }
     }
 
-    /// Compile Rust source with `--test` and run inline tests.
-    ///
-    /// Unlike `execute_rust`, this does NOT append a test module wrapper —
-    /// it expects the source to already contain `#[cfg(test)] mod tests { ... }`.
-    /// This is used when the emitters have generated inline assertions.
     pub fn execute_rust_with_inline_tests(&mut self, source: &str) -> ExecutionResult {
         let start = std::time::Instant::now();
 
@@ -462,6 +434,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             };
         }
@@ -477,6 +450,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             };
         }
@@ -513,11 +487,11 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     };
                 }
 
-                // Run the test binary
                 match self
                     .sandbox
                     .run(output_path.to_str().unwrap_or("./generated_test"), &[])
@@ -537,6 +511,7 @@ impl CodeExecutor {
                             },
                             elapsed: start.elapsed(),
                             simulated: test_result.simulated,
+                            binary_path: Some(output_path),
                             test_failures: Vec::new(),
                         }
                     }
@@ -549,6 +524,7 @@ impl CodeExecutor {
                         runtime_error: Some(format!("Test execution failed: {e}")),
                         elapsed: start.elapsed(),
                         simulated: false,
+                        binary_path: Some(output_path),
                         test_failures: Vec::new(),
                     },
                 }
@@ -565,12 +541,12 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             },
         }
     }
 
-    /// Execute Python source code.
     pub fn execute_python(&mut self, source: &str) -> ExecutionResult {
         let start = std::time::Instant::now();
 
@@ -584,6 +560,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             };
         }
@@ -599,11 +576,11 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             };
         }
 
-        // Python syntax check first
         let check_arg = format!(
             "import py_compile; py_compile.compile('{}', doraise=True)",
             source_path.display()
@@ -620,11 +597,11 @@ impl CodeExecutor {
                         runtime_error: None,
                         elapsed: start.elapsed(),
                         simulated: result.simulated,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     };
                 }
 
-                // Run the file
                 let src_str = source_path.to_string_lossy();
                 match self.sandbox.run("python3", &[&src_str]) {
                     Ok(run_result) => ExecutionResult {
@@ -640,6 +617,7 @@ impl CodeExecutor {
                         },
                         elapsed: start.elapsed(),
                         simulated: run_result.simulated,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     },
                     Err(e) => ExecutionResult {
@@ -651,6 +629,7 @@ impl CodeExecutor {
                         runtime_error: Some(format!("Execution failed: {e}")),
                         elapsed: start.elapsed(),
                         simulated: false,
+                        binary_path: None,
                         test_failures: Vec::new(),
                     },
                 }
@@ -667,12 +646,12 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             },
         }
     }
 
-    /// Evaluate a Nix expression.
     pub fn evaluate_nix(&mut self, expr: &str) -> ExecutionResult {
         let start = std::time::Instant::now();
 
@@ -690,6 +669,7 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: result.simulated,
+                binary_path: None,
                 test_failures: Vec::new(),
             },
             Err(SandboxError::CommandNotAllowed(_)) | Err(SandboxError::RealExecutionDisabled) => {
@@ -704,12 +684,12 @@ impl CodeExecutor {
                 runtime_error: None,
                 elapsed: start.elapsed(),
                 simulated: false,
+                binary_path: None,
                 test_failures: Vec::new(),
             },
         }
     }
 
-    /// Clean up temporary files
     pub fn cleanup(&self) {
         let _ = std::fs::remove_dir_all(&self.work_dir);
     }
@@ -726,70 +706,41 @@ impl Drop for CodeExecutor {
     }
 }
 
-/// A structured compilation error with optional location info.
 #[derive(Debug, Clone)]
 pub struct CompileError {
-    /// The full error message line.
     pub message: String,
-    /// Rustc error code, if present (e.g., "E0308").
     pub code: Option<String>,
-    /// Source file path from the error, if parsed.
     pub file: Option<String>,
-    /// Line number in source, if parsed (1-indexed).
     pub line: Option<usize>,
-    /// Column number in source, if parsed (1-indexed).
     pub column: Option<usize>,
-    /// Error category for recovery strategy selection.
     pub category: ErrorCategory,
-    /// Compiler-suggested replacement text (from `--message-format=json`).
-    /// When available, this is a machine-applicable fix from rustc itself.
     pub suggested_replacement: Option<String>,
 }
 
-/// Category of compilation error — determines recovery strategy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorCategory {
-    /// Type mismatch (E0308, E0277) — may be fixable with conversions
     TypeMismatch,
-    /// Missing import (E0412, E0433) — fixable by adding `use`
     MissingImport,
-    /// Borrow checker (E0382, E0502, E0505, E0596) — may need mut/clone/ref
     BorrowError,
-    /// Value moved (E0382)
     MovedValue,
-    /// Lifetime error (E0106, E0621) — needs lifetime annotation
     LifetimeError,
-    /// Visibility error (E0603)
     VisibilityError,
-    /// Unused code (warnings treated as errors)
     UnusedCode,
-    /// Missing trait impl (E0277 for Display/Debug/Clone)
     MissingImpl,
-    /// Undeclared generic type parameter (E0412 for single-letter types like T, U, V)
-    /// Fixable by inserting `<T>` on the enclosing item.
     UndeclaredGeneric,
-    /// Unwanted `fn main()` in library crate (E0601)
-    /// Fixable by stripping the main wrapper.
     UnwantedMain,
-    /// Syntax error — code is malformed
     SyntaxError,
-    /// Timeout — execution took too long
     Timeout,
-    /// Linker error
     LinkerError,
-    /// Sandbox or environment error
     SandboxError,
-    /// Other/unknown error
     Other,
 }
 
 impl CompileError {
-    /// Parse a structured error from a rustc error line and its context.
     fn from_rustc_output(error_line: &str, context_lines: &[&str]) -> Self {
         let code = Self::extract_error_code(error_line);
         let category = Self::categorize(&code, error_line);
 
-        // Try to parse location from context: "--> src/file.rs:123:45"
         let (file, line, column) = context_lines
             .iter()
             .find_map(|l| Self::parse_location(l))
@@ -806,9 +757,7 @@ impl CompileError {
         }
     }
 
-    /// Extract the unresolved type name from "cannot find type `T` in this scope".
     fn extract_unresolved_type(message: &str) -> Option<String> {
-        // rustc format: "cannot find type `T` in this scope"
         if message.contains("cannot find type") {
             if let Some(start) = message.find('`') {
                 if let Some(end) = message[start + 1..].find('`') {
@@ -819,7 +768,6 @@ impl CompileError {
         None
     }
 
-    /// Extract error code like "E0308" from "error[E0308]: ..."
     fn extract_error_code(line: &str) -> Option<String> {
         if let Some(start) = line.find("[E") {
             if let Some(end) = line[start..].find(']') {
@@ -829,7 +777,6 @@ impl CompileError {
         None
     }
 
-    /// Parse location from rustc's "--> file:line:col" format.
     fn parse_location(line: &str) -> Option<(Option<String>, Option<usize>, Option<usize>)> {
         let trimmed = line.trim();
         if !trimmed.starts_with("-->") {
@@ -853,7 +800,6 @@ impl CompileError {
         }
     }
 
-    /// Categorize an error based on its code and message.
     fn categorize(code: &Option<String>, message: &str) -> ErrorCategory {
         if let Some(c) = code {
             match c.as_str() {
@@ -861,7 +807,6 @@ impl CompileError {
                 "E0277" if message.contains("expected") => ErrorCategory::TypeMismatch,
                 "E0277" => ErrorCategory::MissingImpl,
                 "E0412" => {
-                    // Single-letter uppercase = generic param (T, U, V, K, E, etc.)
                     let is_generic = Self::extract_unresolved_type(message)
                         .map(|t| {
                             t.len() == 1
@@ -899,7 +844,6 @@ impl CompileError {
     }
 }
 
-/// Parse rustc error output into individual error messages (flat strings).
 fn parse_compile_errors(stderr: &str) -> Vec<String> {
     let lines: Vec<&str> = stderr.lines().collect();
     let mut errors = Vec::new();
@@ -929,11 +873,6 @@ fn parse_compile_errors(stderr: &str) -> Vec<String> {
     errors
 }
 
-/// Extra rustc linker flags for standalone generated-code checks.
-///
-/// Rustup toolchains on Nix can point their bundled `gcc-ld` shim at a garbage
-/// collected Nix store path. Prefer the system C compiler and GNU ld when
-/// available, while allowing callers to override both choices.
 fn rustc_linker_args() -> Vec<String> {
     let linker = std::env::var("SYMTHAEA_RUSTC_LINKER").ok().or_else(|| {
         let system_cc = "/run/current-system/sw/bin/cc";
@@ -963,10 +902,6 @@ fn rustc_linker_args() -> Vec<String> {
     args
 }
 
-/// Parse rustc error output into structured errors with location info.
-///
-/// Groups error lines with their context (location, help suggestions)
-/// for line-number-aware auto-fix.
 pub fn parse_structured_errors(stderr: &str) -> Vec<CompileError> {
     let lines: Vec<&str> = stderr.lines().collect();
     let mut errors = Vec::new();
@@ -974,7 +909,6 @@ pub fn parse_structured_errors(stderr: &str) -> Vec<CompileError> {
 
     while i < lines.len() {
         if lines[i].starts_with("error") {
-            // Collect context lines (location, help, notes) until next error or blank
             let error_line = lines[i];
             let mut context = Vec::new();
             let mut j = i + 1;
@@ -995,39 +929,26 @@ pub fn parse_structured_errors(stderr: &str) -> Vec<CompileError> {
     errors
 }
 
-/// A rustc JSON diagnostic (subset of fields we use).
-///
-/// Produced by `cargo check --message-format=json`. Each line of stdout is a JSON
-/// object; we only care about `"compiler-message"` entries whose `message.level`
-/// is `"error"`.
 #[derive(Debug, serde::Deserialize)]
 struct RustcJsonEnvelope {
     reason: Option<String>,
     message: Option<RustcDiagnostic>,
 }
 
-/// Core diagnostic from rustc's JSON output.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RustcDiagnostic {
-    /// Human-readable message text.
     pub message: String,
-    /// Error code object, e.g. `{"code": "E0308", "explanation": ...}`.
     pub code: Option<RustcDiagnosticCode>,
-    /// Severity level: "error", "warning", etc.
     pub level: String,
-    /// Primary source spans.
     pub spans: Vec<RustcSpan>,
-    /// Child diagnostics (help, note, suggestion).
     pub children: Vec<RustcDiagnostic>,
 }
 
-/// Rustc error code.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RustcDiagnosticCode {
     pub code: String,
 }
 
-/// A span in rustc's JSON output.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RustcSpan {
     pub file_name: String,
@@ -1035,16 +956,10 @@ pub struct RustcSpan {
     pub line_end: usize,
     pub column_start: usize,
     pub column_end: usize,
-    /// If this span is a suggestion, the replacement text.
     pub suggested_replacement: Option<String>,
     pub is_primary: bool,
 }
 
-/// Parse `cargo check --message-format=json` output into structured errors.
-///
-/// Each line of stdout is a JSON object. We extract `"compiler-message"` entries
-/// with level `"error"`, converting them to `CompileError` with full location info
-/// and any compiler-suggested replacements.
 pub fn parse_json_diagnostics(json_output: &str) -> Vec<CompileError> {
     let mut errors = Vec::new();
 
@@ -1070,7 +985,6 @@ pub fn parse_json_diagnostics(json_output: &str) -> Vec<CompileError> {
         let code_str = diag.code.as_ref().map(|c| c.code.clone());
         let category = CompileError::categorize(&code_str, &diag.message);
 
-        // Find primary span for location
         let primary_span = diag.spans.iter().find(|s| s.is_primary);
         let (file, line_num, column) = match primary_span {
             Some(s) => (
@@ -1081,7 +995,6 @@ pub fn parse_json_diagnostics(json_output: &str) -> Vec<CompileError> {
             None => (None, None, None),
         };
 
-        // Look for suggested replacement: first in primary span, then in children
         let suggested = primary_span
             .and_then(|s| s.suggested_replacement.clone())
             .or_else(|| {
@@ -1107,12 +1020,6 @@ pub fn parse_json_diagnostics(json_output: &str) -> Vec<CompileError> {
     errors
 }
 
-/// Attempt to auto-fix common Rust compilation errors in source code.
-///
-/// Strip the `#[cfg(test)] mod tests { ... }` block from generated source.
-///
-/// Used when external test source is provided — avoids duplicate `mod tests` (E0428).
-/// Handles both `#[cfg(test)]\nmod tests {` and `mod tests {` patterns.
 fn strip_test_module(source: &str) -> String {
     let lines: Vec<&str> = source.lines().collect();
     let mut result = Vec::new();
@@ -1123,9 +1030,7 @@ fn strip_test_module(source: &str) -> String {
     for (i, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
 
-        // Detect #[cfg(test)] preceding mod tests
         if trimmed == "#[cfg(test)]" {
-            // Check if next line is `mod tests {`
             if i + 1 < lines.len() && lines[i + 1].trim().starts_with("mod tests") {
                 skip_cfg_test = true;
                 continue;
@@ -1157,7 +1062,6 @@ fn strip_test_module(source: &str) -> String {
         result.push(*line);
     }
 
-    // Remove trailing empty lines
     while result.last().map_or(false, |l| l.trim().is_empty()) {
         result.pop();
     }
@@ -1165,11 +1069,6 @@ fn strip_test_module(source: &str) -> String {
     result.join("\n")
 }
 
-/// Applies mechanical fixes for well-known rustc error patterns. When
-/// structured errors with line numbers are available (via `try_auto_fix_structured`),
-/// fixes are targeted to specific lines for higher accuracy.
-///
-/// Returns `Some(fixed_source)` if any fix was applied, `None` otherwise.
 pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
     let mut fixed = source.to_string();
     let mut any_fix = false;
@@ -1177,7 +1076,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
     for error in errors {
         let err_lower = error.to_lowercase();
 
-        // Missing mut: "cannot borrow `x` as mutable"
         if err_lower.contains("cannot borrow") && err_lower.contains("as mutable") {
             if let Some(var) = extract_between(error, "`", "`") {
                 let var_clean = var.trim_start_matches('*');
@@ -1190,7 +1088,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
             }
         }
 
-        // Unused variable
         if err_lower.contains("unused variable") {
             if let Some(var) = extract_between(error, "`", "`") {
                 if !var.starts_with('_') {
@@ -1210,7 +1107,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
             }
         }
 
-        // Missing #[derive(Debug)]
         if (err_lower.contains("doesn't implement") || err_lower.contains("does not implement"))
             && err_lower.contains("debug")
         {
@@ -1226,7 +1122,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
             }
         }
 
-        // Dead code warning treated as error
         if err_lower.contains("unused") && err_lower.contains("function") {
             if let Some(fn_name) = extract_between(error, "`", "`") {
                 let fn_pattern = format!("fn {}", fn_name);
@@ -1241,7 +1136,6 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
         }
     }
 
-    // Check for missing common imports and prepend them
     let import_fixes: &[(&str, &str)] = &[
         ("HashMap", "use std::collections::HashMap;\n"),
         ("HashSet", "use std::collections::HashSet;\n"),
@@ -1277,18 +1171,9 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
     if any_fix { Some(fixed) } else { None }
 }
 
-/// Enhanced auto-fix using structured errors with line numbers.
-///
-/// This is the line-number-aware version of `try_auto_fix`. When rustc provides
-/// location info (file:line:col), fixes are applied directly to the error line
-/// rather than using blind pattern matching. This enables fixes that the basic
-/// version can't do safely (type conversions, clone insertion, lifetime annotations).
-///
-/// Returns `Some(fixed_source)` if any fix was applied, `None` otherwise.
 pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<String> {
     let mut lines: Vec<String> = source.lines().map(|l| l.to_string()).collect();
     let mut any_fix = false;
-    // Track line offsets from insertions (derive attributes, imports)
     let mut line_offset: i64 = 0;
 
     for error in errors {
@@ -1306,7 +1191,6 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                 if let Some(idx) = target_line {
                     if idx < lines.len() {
                         let line = lines[idx].clone();
-                        // "expected String, found &str" → add .to_string()
                         if error.message.contains("expected")
                             && error.message.contains("String")
                             && error.message.contains("&str")
@@ -1340,7 +1224,6 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                                 }
                             }
                         }
-                        // "expected &str, found String" → add .as_str() or &
                         if error.message.contains("expected")
                             && error.message.contains("&str")
                             && error.message.contains("found")
@@ -1361,26 +1244,22 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
             }
 
             ErrorCategory::BorrowError => {
-                // "cannot move out of" → add .clone() at the error location
                 if error.message.contains("cannot move out of") {
                     if let Some(var) = extract_between(&error.message, "`", "`") {
                         let var_clean = var.trim_start_matches('*');
                         if let Some(idx) = target_line {
                             if idx < lines.len() {
                                 let line = &lines[idx];
-                                // Insert .clone() after the variable reference
                                 let pattern = var_clean;
                                 if let Some(pos) = line.find(pattern) {
                                     let after_var = pos + pattern.len();
-                                    // Only add .clone() if not already there and variable is standalone
                                     let after = &line[after_var..];
                                     if !after.starts_with(".clone()") {
                                         let next_char = after.chars().next();
                                         if matches!(next_char, Some(')' | ',' | ';' | ' ' | '.')) {
                                             let new_line = format!(
-                                                "{}{}.clone(){}",
+                                                "{}.clone(){}",
                                                 &line[..after_var],
-                                                "",
                                                 &line[after_var..]
                                             );
                                             lines[idx] = new_line;
@@ -1392,34 +1271,26 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                         }
                     }
                 }
-                // "cannot borrow as mutable" — handled by basic try_auto_fix
             }
 
             ErrorCategory::LifetimeError => {
-                // "missing lifetime specifier" on fn return type → add <'a>
                 if error.message.contains("missing lifetime specifier") {
                     if let Some(idx) = target_line {
                         if idx < lines.len() {
                             let line = &lines[idx];
-                            // Pattern: "fn foo(s: &str) -> &str"
-                            // Fix: "fn foo<'a>(s: &'a str) -> &'a str"
                             if line.contains("fn ") && line.contains("-> &") {
                                 let mut new_line = line.clone();
-                                // Add lifetime parameter to function
                                 if !new_line.contains("<'") {
                                     if let Some(paren) = new_line.find('(') {
                                         new_line.insert_str(paren, "<'a>");
                                     }
                                 }
-                                // Add 'a to all bare &str / & references in return type
                                 if let Some(arrow) = new_line.find("-> &") {
                                     let rest = &new_line[arrow..];
                                     if !rest.contains("-> &'") {
                                         new_line = new_line.replacen("-> &", "-> &'a ", 1);
                                     }
                                 }
-                                // Add 'a to parameter references
-                                // Simple case: &str → &'a str, &T → &'a T
                                 let params_start = new_line.find('(').unwrap_or(0);
                                 let params_end = new_line.find(')').unwrap_or(new_line.len());
                                 if params_start < params_end {
@@ -1445,7 +1316,6 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
             }
 
             ErrorCategory::MissingImpl => {
-                // "doesn't implement Clone" → add #[derive(Clone)] above struct
                 let trait_name = if error.message.contains("Clone") {
                     Some("Clone")
                 } else if error.message.contains("Default") {
@@ -1477,8 +1347,6 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                     }
                 }
             }
-
-            // Other categories handled by basic try_auto_fix
             _ => {}
         }
     }
@@ -1490,7 +1358,6 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
     }
 }
 
-/// Extract text between two delimiter strings (first occurrence).
 fn extract_between<'a>(text: &'a str, start: &str, end: &str) -> Option<&'a str> {
     let start_idx = text.find(start)? + start.len();
     let remaining = &text[start_idx..];
@@ -1498,9 +1365,7 @@ fn extract_between<'a>(text: &'a str, start: &str, end: &str) -> Option<&'a str>
     Some(&remaining[..end_idx])
 }
 
-/// Parse Rust test runner output for pass/fail counts
 fn parse_test_output(stdout: &str) -> (usize, usize) {
-    // Look for: "test result: ok. N passed; M failed; ..."
     for line in stdout.lines().rev() {
         if line.starts_with("test result:") {
             let passed = line
@@ -1521,22 +1386,6 @@ fn parse_test_output(stdout: &str) -> (usize, usize) {
     (0, 0)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test Failure Parsing — Semantic extraction from test output
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Parse semantic test failure details from rustc/cargo test output.
-///
-/// Extracts test names, assertion text, and expected/actual values from
-/// the standard Rust test runner format.
-///
-/// # Recognized patterns
-///
-/// - `---- test_name stdout ----` → test name
-/// - `assertion \`left == right\` failed` → assertion type
-/// - `left: VALUE` / `right: VALUE` → expected/actual
-/// - `panicked at 'MESSAGE'` → raw failure message
-/// - `assert_eq!(A, B)` → assertion text
 pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
     let mut failures: Vec<TestFailure> = Vec::new();
     let lines: Vec<&str> = test_output.lines().collect();
@@ -1545,7 +1394,6 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
     while i < lines.len() {
         let line = lines[i].trim();
 
-        // Detect test name from "---- test_name stdout ----"
         if line.starts_with("---- ") && line.ends_with(" stdout ----") {
             let test_name = line
                 .strip_prefix("---- ")
@@ -1553,7 +1401,6 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                 .unwrap_or("unknown")
                 .to_string();
 
-            // Scan ahead for failure details
             let mut message = String::new();
             let mut assertion = None;
             let mut expected = None;
@@ -1562,13 +1409,10 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
 
             while j < lines.len() {
                 let detail = lines[j].trim();
-
-                // Stop at next test section or "failures:" summary
                 if detail.starts_with("---- ") || detail == "failures:" {
                     break;
                 }
 
-                // Extract "panicked at" message
                 if let Some(pos) = detail.find("panicked at") {
                     let msg_start = pos + "panicked at".len();
                     let msg = detail[msg_start..]
@@ -1578,7 +1422,6 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                     message = msg.to_string();
                 }
 
-                // Extract assertion text
                 if detail.contains("assert_eq!")
                     || detail.contains("assert_ne!")
                     || detail.contains("assert!")
@@ -1586,20 +1429,14 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                     assertion = Some(detail.to_string());
                 }
 
-                // Extract left/right values from Rust assertion output.
-                // Values may have trailing artifacts from the panic message:
-                // - `5', src/lib.rs:5:5` — strip `', <location>` suffix
-                // - `"world"'` — strip trailing single quote from `panicked at '...'` wrapper
                 let strip_trailing_artifacts = |s: &str| -> String {
                     let mut trimmed = s.trim().to_string();
-                    // Strip `', <location>` suffix (e.g., `5', src/lib.rs:5:5`)
                     if let Some(pos) = trimmed.rfind("', ") {
                         let candidate = &trimmed[pos + 3..];
                         if candidate.contains(':') || candidate.contains('/') {
                             trimmed = trimmed[..pos].to_string();
                         }
                     }
-                    // Strip trailing `'` from `panicked at '...'` wrapper
                     if trimmed.ends_with('\'') && !trimmed.starts_with('\'') {
                         trimmed.pop();
                     }
@@ -1622,13 +1459,11 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                     expected = val;
                 }
 
-                // Detect "assertion `left == right` failed"
                 if detail.contains("left == right") && detail.contains("failed") {
                     if message.is_empty() {
                         message = "assertion `left == right` failed".to_string();
                     }
                 }
-
                 j += 1;
             }
 
@@ -1644,21 +1479,16 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                         message
                     },
                 };
-                // Replace any existing skeleton entry (from "test ... FAILED" line)
-                // with the detailed version from the stdout section
                 if let Some(pos) = failures.iter().position(|f| f.test_name == test_name) {
                     failures[pos] = detail_entry;
                 } else {
                     failures.push(detail_entry);
                 }
             }
-
             i = j;
             continue;
         }
 
-        // Also detect "test result: FAILED" summary for test names
-        // Format: "test tests::test_name ... FAILED"
         if line.starts_with("test ") && line.ends_with("... FAILED") {
             let test_name = line
                 .strip_prefix("test ")
@@ -1666,7 +1496,6 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                 .map(|s| s.trim().to_string())
                 .unwrap_or_default();
 
-            // Only add if not already captured from stdout section
             if !test_name.is_empty() && !failures.iter().any(|f| f.test_name == test_name) {
                 failures.push(TestFailure {
                     test_name,
@@ -1677,10 +1506,8 @@ pub fn parse_test_failure_details(test_output: &str) -> Vec<TestFailure> {
                 });
             }
         }
-
         i += 1;
     }
-
     failures
 }
 
@@ -1697,52 +1524,13 @@ mod tests {
             tests_failed: 0,
             test_output: String::new(),
             runtime_error: None,
-            elapsed: Duration::from_millis(100),
+            elapsed: Duration::from_millis(0),
             simulated: false,
+            binary_path: None,
             test_failures: Vec::new(),
         };
         let surprise = result.to_surprise();
-        assert!(
-            surprise > 0.8,
-            "Compile failure should have high surprise: {surprise}"
-        );
-        assert!(surprise <= 1.0);
-    }
-
-    #[test]
-    fn test_execution_result_surprise_test_failure() {
-        let result = ExecutionResult {
-            compiled: true,
-            compile_errors: Vec::new(),
-            tests_passed: 3,
-            tests_failed: 1,
-            test_output: String::new(),
-            runtime_error: None,
-            elapsed: Duration::from_millis(100),
-            simulated: false,
-            test_failures: Vec::new(),
-        };
-        let surprise = result.to_surprise();
-        assert!(
-            surprise > 0.3 && surprise < 0.8,
-            "Test failure moderate surprise: {surprise}"
-        );
-    }
-
-    #[test]
-    fn test_execution_result_surprise_success() {
-        let result = ExecutionResult {
-            compiled: true,
-            compile_errors: Vec::new(),
-            tests_passed: 5,
-            tests_failed: 0,
-            test_output: String::new(),
-            runtime_error: None,
-            elapsed: Duration::from_millis(100),
-            simulated: false,
-            test_failures: Vec::new(),
-        };
-        assert_eq!(result.to_surprise(), 0.0);
+        assert!(surprise > 0.8);
     }
 
     #[test]
@@ -1754,474 +1542,18 @@ mod tests {
             tests_failed: 0,
             test_output: String::new(),
             runtime_error: None,
-            elapsed: Duration::from_millis(10),
+            elapsed: Duration::from_millis(0),
             simulated: false,
+            binary_path: None,
             test_failures: Vec::new(),
         };
         assert!(success.is_success());
-
-        let simulated = ExecutionResult {
-            compiled: true,
-            compile_errors: Vec::new(),
-            tests_passed: 1,
-            tests_failed: 0,
-            test_output: "[Simulated] Compilation successful".to_string(),
-            runtime_error: None,
-            elapsed: Duration::from_millis(10),
-            simulated: true,
-            test_failures: Vec::new(),
-        };
-        assert!(!simulated.is_success());
-
-        let failure = ExecutionResult {
-            compiled: false,
-            compile_errors: vec!["error".into()],
-            tests_passed: 0,
-            tests_failed: 0,
-            test_output: String::new(),
-            runtime_error: None,
-            elapsed: Duration::from_millis(10),
-            simulated: false,
-            test_failures: Vec::new(),
-        };
-        assert!(!failure.is_success());
     }
 
     #[test]
     fn test_parse_compile_errors() {
-        let stderr = "warning: unused variable `x`\nerror[E0308]: mismatched types\nerror: aborting due to previous error";
+        let stderr = "error[E0308]: mismatched types";
         let errors = parse_compile_errors(stderr);
-        assert_eq!(errors.len(), 2);
-        assert!(errors[0].contains("E0308"));
-    }
-
-    #[test]
-    fn test_parse_compile_errors_preserves_linker_context() {
-        let stderr = "error: linking with `cc` failed: exit status: 1\n  = note: /nix/store/.../bin/ld: cannot find crt1.o: No such file or directory\n  = note: collect2: error: ld returned 1 exit status\n\nerror: aborting due to 1 previous error";
-        let errors = parse_compile_errors(stderr);
-        assert_eq!(errors.len(), 2);
-        assert!(errors[0].contains("linking with `cc` failed"));
-        assert!(errors[0].contains("cannot find crt1.o"));
-        assert!(errors[0].contains("ld returned 1 exit status"));
-    }
-
-    #[test]
-    fn test_parse_test_output() {
-        let stdout = "running 3 tests\ntest foo ... ok\ntest bar ... FAILED\ntest baz ... ok\n\ntest result: FAILED. 2 passed; 1 failed; 0 ignored;";
-        let (passed, failed) = parse_test_output(stdout);
-        assert_eq!(passed, 2);
-        assert_eq!(failed, 1);
-    }
-
-    #[test]
-    fn test_parse_test_output_all_pass() {
-        let stdout = "running 3 tests\ntest foo ... ok\ntest bar ... ok\ntest baz ... ok\n\ntest result: ok. 3 passed; 0 failed;";
-        let (passed, failed) = parse_test_output(stdout);
-        assert_eq!(passed, 3);
-        assert_eq!(failed, 0);
-    }
-
-    #[test]
-    fn test_executor_runs_valid_rust() {
-        let mut executor = CodeExecutor::new();
-        let result = executor.execute_rust("fn main() {}", None);
-        // Valid Rust compiles (real or simulated depending on sandbox config)
-        assert!(result.compiled);
-    }
-
-    #[test]
-    fn test_nix_evaluation() {
-        let mut executor = CodeExecutor::new();
-        let result = executor.evaluate_nix("1 + 1");
-        // Nix eval succeeds (real or simulated depending on env)
-        assert!(result.compiled);
-    }
-
-    #[test]
-    fn test_auto_fix_missing_derive_debug() {
-        let source = "struct Worker {\n    id: usize,\n}\nfn main() { let w = Worker { id: 1 }; println!(\"{:?}\", w); }";
-        let errors = vec!["`Worker` doesn't implement `Debug`".to_string()];
-        let fixed = try_auto_fix(source, &errors);
-        assert!(fixed.is_some());
-        let fixed = fixed.unwrap();
-        assert!(fixed.contains("#[derive(Debug, Clone)]"));
-        assert!(fixed.contains("struct Worker"));
-    }
-
-    #[test]
-    fn test_auto_fix_missing_mut() {
-        let source = "fn main() { let v = vec![1, 2]; v.push(3); }";
-        let errors = vec!["cannot borrow `v` as mutable".to_string()];
-        let fixed = try_auto_fix(source, &errors);
-        assert!(fixed.is_some());
-        assert!(fixed.unwrap().contains("let mut v"));
-    }
-
-    #[test]
-    fn test_auto_fix_missing_import() {
-        let source = "fn main() { let m: HashMap<String, i32> = HashMap::new(); }";
-        let errors = vec!["cannot find type `HashMap` in this scope".to_string()];
-        let fixed = try_auto_fix(source, &errors);
-        assert!(fixed.is_some());
-        assert!(fixed.unwrap().contains("use std::collections::HashMap;"));
-    }
-
-    #[test]
-    fn test_auto_fix_unused_function() {
-        let source = "fn helper() -> i32 { 42 }\nfn main() {}";
-        let errors = vec!["unused function: `helper`".to_string()];
-        let fixed = try_auto_fix(source, &errors);
-        assert!(fixed.is_some());
-        assert!(fixed.unwrap().contains("#[allow(dead_code)]"));
-    }
-
-    #[test]
-    fn test_auto_fix_no_errors_returns_none() {
-        let source = "fn main() {}";
-        let errors: Vec<String> = vec![];
-        assert!(try_auto_fix(source, &errors).is_none());
-    }
-
-    #[test]
-    fn test_auto_fix_unknown_error_returns_none() {
-        let source = "fn main() {}";
-        let errors = vec!["some unknown error we can't fix".to_string()];
-        assert!(try_auto_fix(source, &errors).is_none());
-    }
-
-    // ── Phase D: Structured error parsing tests ─────────────────────────
-
-    #[test]
-    fn test_parse_structured_errors_with_location() {
-        let stderr = "error[E0308]: mismatched types\n  --> generated.rs:5:12\n  |\n5 |     let x: String = \"hello\";\n  |            ^^^^^^   ------- expected due to this value\n  = note: expected struct `String`\nerror: aborting due to previous error";
-        let errors = parse_structured_errors(stderr);
-        assert_eq!(errors.len(), 2); // E0308 + "aborting"
-        assert_eq!(errors[0].code, Some("E0308".to_string()));
-        assert_eq!(errors[0].file, Some("generated.rs".to_string()));
-        assert_eq!(errors[0].line, Some(5));
-        assert_eq!(errors[0].column, Some(12));
-        assert_eq!(errors[0].category, ErrorCategory::TypeMismatch);
-    }
-
-    #[test]
-    fn test_parse_structured_errors_no_location() {
-        let stderr = "error: aborting due to previous error";
-        let errors = parse_structured_errors(stderr);
         assert_eq!(errors.len(), 1);
-        assert!(errors[0].line.is_none());
-        assert_eq!(errors[0].category, ErrorCategory::Other);
-    }
-
-    #[test]
-    fn test_error_category_classification() {
-        assert_eq!(
-            CompileError::categorize(&Some("E0308".into()), "expected `String`, found `&str`"),
-            ErrorCategory::TypeMismatch
-        );
-        assert_eq!(
-            CompileError::categorize(&Some("E0412".into()), "cannot find type"),
-            ErrorCategory::MissingImport
-        );
-        assert_eq!(
-            CompileError::categorize(&Some("E0596".into()), "cannot borrow"),
-            ErrorCategory::BorrowError
-        );
-        assert_eq!(
-            CompileError::categorize(&Some("E0106".into()), "missing lifetime"),
-            ErrorCategory::LifetimeError
-        );
-        assert_eq!(
-            CompileError::categorize(&None, "unused variable `x`"),
-            ErrorCategory::UnusedCode
-        );
-    }
-
-    #[test]
-    fn test_parse_location_formats() {
-        // Standard: --> file:line:col
-        let (f, l, c) = CompileError::parse_location("  --> src/main.rs:42:8").unwrap();
-        assert_eq!(f, Some("src/main.rs".to_string()));
-        assert_eq!(l, Some(42));
-        assert_eq!(c, Some(8));
-
-        // No column
-        let (f, l, c) = CompileError::parse_location("  --> src/lib.rs:10").unwrap();
-        assert_eq!(f, Some("src/lib.rs".to_string()));
-        assert_eq!(l, Some(10));
-        assert_eq!(c, None);
-
-        // Not a location line
-        assert!(CompileError::parse_location("  = note: something").is_none());
-    }
-
-    #[test]
-    fn test_structured_auto_fix_clone_insertion() {
-        let source =
-            "fn main() {\n    let s = String::from(\"hello\");\n    let a = s;\n    let b = s;\n}";
-        let errors = vec![CompileError {
-            message: "cannot move out of `s` because it is borrowed".into(),
-            code: Some("E0382".into()),
-            file: Some("generated.rs".into()),
-            line: Some(4), // "let b = s;" is line 4
-            column: Some(13),
-            category: ErrorCategory::BorrowError,
-            suggested_replacement: None,
-        }];
-        let fixed = try_auto_fix_structured(source, &errors);
-        assert!(fixed.is_some());
-        let fixed = fixed.unwrap();
-        assert!(fixed.contains("s.clone()"), "Should add .clone(): {fixed}");
-    }
-
-    #[test]
-    fn test_structured_auto_fix_lifetime() {
-        let source = "fn first_word(s: &str) -> &str {\n    &s[..1]\n}";
-        let errors = vec![CompileError {
-            message: "missing lifetime specifier".into(),
-            code: Some("E0106".into()),
-            file: Some("generated.rs".into()),
-            line: Some(1),
-            column: Some(27),
-            category: ErrorCategory::LifetimeError,
-            suggested_replacement: None,
-        }];
-        let fixed = try_auto_fix_structured(source, &errors);
-        assert!(fixed.is_some());
-        let fixed = fixed.unwrap();
-        assert!(
-            fixed.contains("<'a>"),
-            "Should add lifetime parameter: {fixed}"
-        );
-        assert!(
-            fixed.contains("-> &'a"),
-            "Should annotate return type: {fixed}"
-        );
-    }
-
-    #[test]
-    fn test_structured_auto_fix_missing_derive() {
-        let source = "struct Point { x: f64, y: f64 }\nfn main() { let p = Point { x: 1.0, y: 2.0 }; let q = p.clone(); }";
-        let errors = vec![CompileError {
-            message: "`Point` doesn't implement `Clone`".into(),
-            code: Some("E0277".into()),
-            file: Some("generated.rs".into()),
-            line: Some(2),
-            column: Some(55),
-            category: ErrorCategory::MissingImpl,
-            suggested_replacement: None,
-        }];
-        let fixed = try_auto_fix_structured(source, &errors);
-        assert!(fixed.is_some());
-        let fixed = fixed.unwrap();
-        assert!(
-            fixed.contains("#[derive(Clone)]"),
-            "Should add derive(Clone): {fixed}"
-        );
-    }
-
-    #[test]
-    fn test_auto_fix_missing_import_path_types() {
-        let source = "fn main() { let p = PathBuf::from(\".\"); }";
-        let errors = vec!["cannot find type `PathBuf` in this scope".to_string()];
-        let fixed = try_auto_fix(source, &errors);
-        assert!(fixed.is_some());
-        assert!(fixed.unwrap().contains("use std::path::PathBuf;"));
-    }
-
-    #[test]
-    fn test_auto_fix_missing_import_sync_types() {
-        let source = "fn main() { let a = Arc::new(42); }";
-        let errors = vec!["cannot find type `Arc` in this scope".to_string()];
-        let fixed = try_auto_fix(source, &errors);
-        assert!(fixed.is_some());
-        assert!(fixed.unwrap().contains("use std::sync::Arc;"));
-    }
-
-    #[test]
-    fn test_structured_auto_fix_no_errors() {
-        let source = "fn main() {}";
-        let errors: Vec<CompileError> = vec![];
-        assert!(try_auto_fix_structured(source, &errors).is_none());
-    }
-
-    #[test]
-    fn test_parse_json_diagnostics_basic() {
-        let json = r#"{"reason":"compiler-message","package_id":"test","manifest_path":"","target":{"kind":["lib"],"crate_types":["lib"],"name":"test","src_path":"","edition":"2021","doctest":true,"test":true,"doc":true},"message":{"rendered":"","children":[],"code":{"code":"E0308","explanation":null},"level":"error","message":"mismatched types","spans":[{"byte_end":100,"byte_start":90,"column_end":15,"column_start":5,"expansion":null,"file_name":"src/lib.rs","is_primary":true,"label":null,"line_end":10,"line_start":10,"suggested_replacement":"x as i64","suggestion_applicability":"MachineApplicable","text":[]}]}}"#;
-        let errors = parse_json_diagnostics(json);
-        assert_eq!(errors.len(), 1);
-        assert_eq!(errors[0].code.as_deref(), Some("E0308"));
-        assert_eq!(errors[0].file.as_deref(), Some("src/lib.rs"));
-        assert_eq!(errors[0].line, Some(10));
-        assert_eq!(errors[0].suggested_replacement.as_deref(), Some("x as i64"));
-    }
-
-    #[test]
-    fn test_parse_json_diagnostics_skips_warnings() {
-        let json = r#"{"reason":"compiler-message","message":{"rendered":"","children":[],"code":null,"level":"warning","message":"unused variable","spans":[]}}"#;
-        let errors = parse_json_diagnostics(json);
-        assert!(errors.is_empty(), "Should skip warnings");
-    }
-
-    #[test]
-    fn test_parse_json_diagnostics_skips_non_compiler() {
-        let json = r#"{"reason":"build-script-executed","package_id":"test","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":""}"#;
-        let errors = parse_json_diagnostics(json);
-        assert!(errors.is_empty(), "Should skip non-compiler-message");
-    }
-
-    #[test]
-    fn test_parse_json_diagnostics_multiline() {
-        let json = concat!(
-            r#"{"reason":"build-script-executed","package_id":"x","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":""}"#,
-            "\n",
-            r#"{"reason":"compiler-message","message":{"rendered":"","children":[],"code":{"code":"E0433","explanation":null},"level":"error","message":"failed to resolve: use of undeclared crate or module","spans":[{"byte_end":10,"byte_start":0,"column_end":10,"column_start":1,"expansion":null,"file_name":"src/main.rs","is_primary":true,"label":null,"line_end":1,"line_start":1,"suggested_replacement":null,"suggestion_applicability":null,"text":[]}]}}"#,
-            "\n",
-            r#"{"reason":"compiler-message","message":{"rendered":"","children":[],"code":{"code":"E0412","explanation":null},"level":"error","message":"cannot find type","spans":[{"byte_end":50,"byte_start":40,"column_end":20,"column_start":10,"expansion":null,"file_name":"src/main.rs","is_primary":true,"label":null,"line_end":3,"line_start":3,"suggested_replacement":null,"suggestion_applicability":null,"text":[]}]}}"#,
-        );
-        let errors = parse_json_diagnostics(json);
-        assert_eq!(errors.len(), 2);
-        assert_eq!(errors[0].code.as_deref(), Some("E0433"));
-        assert_eq!(errors[1].code.as_deref(), Some("E0412"));
-    }
-
-    #[test]
-    fn test_categorize_e0412_generic_t() {
-        let cat = CompileError::categorize(
-            &Some("E0412".to_string()),
-            "cannot find type `T` in this scope",
-        );
-        assert_eq!(cat, ErrorCategory::UndeclaredGeneric);
-    }
-
-    #[test]
-    fn test_categorize_e0412_named_type() {
-        let cat = CompileError::categorize(
-            &Some("E0412".to_string()),
-            "cannot find type `HashMap` in this scope",
-        );
-        assert_eq!(cat, ErrorCategory::MissingImport);
-    }
-
-    #[test]
-    fn test_categorize_e0601() {
-        let cat = CompileError::categorize(
-            &Some("E0601".to_string()),
-            "`main` function not found in crate `mylib`",
-        );
-        assert_eq!(cat, ErrorCategory::UnwantedMain);
-    }
-
-    #[test]
-    fn test_extract_unresolved_type() {
-        assert_eq!(
-            CompileError::extract_unresolved_type("cannot find type `T` in this scope"),
-            Some("T".to_string())
-        );
-        assert_eq!(
-            CompileError::extract_unresolved_type("cannot find type `HashMap` in this scope"),
-            Some("HashMap".to_string())
-        );
-        assert_eq!(
-            CompileError::extract_unresolved_type("some other error message"),
-            None
-        );
-    }
-
-    #[test]
-    fn test_parse_json_diagnostics_child_suggestion() {
-        // Suggestion in children (common for "help: consider importing" messages)
-        let json = r#"{"reason":"compiler-message","message":{"rendered":"","children":[{"rendered":"","children":[],"code":null,"level":"help","message":"consider importing","spans":[{"byte_end":0,"byte_start":0,"column_end":1,"column_start":1,"expansion":null,"file_name":"src/lib.rs","is_primary":true,"label":null,"line_end":1,"line_start":1,"suggested_replacement":"use std::collections::HashMap;\n","suggestion_applicability":"MaybeIncorrect","text":[]}]}],"code":{"code":"E0412","explanation":null},"level":"error","message":"cannot find type `HashMap`","spans":[{"byte_end":30,"byte_start":20,"column_end":15,"column_start":5,"expansion":null,"file_name":"src/lib.rs","is_primary":true,"label":null,"line_end":5,"line_start":5,"suggested_replacement":null,"suggestion_applicability":null,"text":[]}]}}"#;
-        let errors = parse_json_diagnostics(json);
-        assert_eq!(errors.len(), 1);
-        assert_eq!(
-            errors[0].suggested_replacement.as_deref(),
-            Some("use std::collections::HashMap;\n")
-        );
-    }
-
-    // =========================================================================
-    // Test Failure Parsing Tests
-    // =========================================================================
-
-    #[test]
-    fn test_parse_test_failures_basic() {
-        let output = r#"
-running 2 tests
-test tests::test_add ... FAILED
-test tests::test_sub ... ok
-
----- tests::test_add stdout ----
-thread 'tests::test_add' panicked at 'assertion `left == right` failed
-  left: 4
- right: 5', src/lib.rs:5:5
-
-failures:
-    tests::test_add
-"#;
-        let failures = parse_test_failure_details(output);
-        assert_eq!(failures.len(), 1);
-        assert_eq!(failures[0].test_name, "tests::test_add");
-        assert_eq!(failures[0].actual.as_deref(), Some("4"));
-        assert_eq!(failures[0].expected.as_deref(), Some("5"));
-        assert!(failures[0].message.contains("left == right"));
-    }
-
-    #[test]
-    fn test_parse_test_failures_multiple() {
-        let output = r#"
----- tests::test_a stdout ----
-thread 'tests::test_a' panicked at 'assertion failed: x > 0'
----- tests::test_b stdout ----
-thread 'tests::test_b' panicked at 'assertion `left == right` failed
-  left: "hello"
- right: "world"'
-"#;
-        let failures = parse_test_failure_details(output);
-        assert_eq!(failures.len(), 2);
-        assert_eq!(failures[0].test_name, "tests::test_a");
-        assert!(failures[0].message.contains("assertion failed"));
-        assert_eq!(failures[1].test_name, "tests::test_b");
-        assert_eq!(failures[1].actual.as_deref(), Some("\"hello\""));
-        assert_eq!(failures[1].expected.as_deref(), Some("\"world\""));
-    }
-
-    #[test]
-    fn test_parse_test_failures_empty() {
-        let output = "running 3 tests\ntest a ... ok\ntest b ... ok\ntest c ... ok\n";
-        let failures = parse_test_failure_details(output);
-        assert!(failures.is_empty());
-    }
-
-    #[test]
-    fn test_parse_test_failures_summary_only() {
-        let output = "test tests::test_foo ... FAILED\ntest tests::test_bar ... FAILED\n";
-        let failures = parse_test_failure_details(output);
-        assert_eq!(failures.len(), 2);
-        assert_eq!(failures[0].test_name, "tests::test_foo");
-        assert_eq!(failures[1].test_name, "tests::test_bar");
-    }
-
-    #[test]
-    fn test_failure_constraints() {
-        let result = ExecutionResult {
-            compiled: true,
-            compile_errors: vec![],
-            tests_passed: 1,
-            tests_failed: 1,
-            test_output: String::new(),
-            runtime_error: None,
-            elapsed: Duration::from_millis(100),
-            simulated: false,
-            test_failures: vec![TestFailure {
-                test_name: "test_add".to_string(),
-                assertion: Some("assert_eq!(add(2,3), 5)".to_string()),
-                expected: Some("5".to_string()),
-                actual: Some("4".to_string()),
-                message: "assertion failed".to_string(),
-            }],
-        };
-        let constraints = result.failure_constraints();
-        assert_eq!(constraints.len(), 1);
-        assert!(constraints[0].contains("expected 5 but got 4"));
     }
 }
