@@ -62,6 +62,10 @@ struct TaskReport {
     ast_hdc_parse_successes: usize,
     ast_hdc_parse_failures: usize,
     structural_prediction_errors: usize,
+    geodesic_rejection_shadow_hits: usize,
+    geodesic_rejection_shadow_true_positives: usize,
+    geodesic_rejection_shadow_false_positives: usize,
+    hard_geodesic_rejections: usize,
     mean_ast_feature_count: Option<f32>,
     structural_repair_similarity: Option<f32>,
     structural_repair_l1_delta: Option<usize>,
@@ -92,6 +96,10 @@ struct AttemptRejectionReport {
     ast_hdc_parse_successes: usize,
     ast_hdc_parse_failures: usize,
     structural_prediction_errors: usize,
+    geodesic_rejection_shadow_hits: usize,
+    geodesic_rejection_shadow_true_positives: usize,
+    geodesic_rejection_shadow_false_positives: usize,
+    hard_geodesic_rejections: usize,
     ast_hdc_feature_count: usize,
     ast_hdc_last_features: Option<BTreeMap<String, usize>>,
     structural_prior_score: Option<f32>,
@@ -167,6 +175,10 @@ struct BenchReport {
     ast_hdc_parse_successes: usize,
     ast_hdc_parse_failures: usize,
     structural_prediction_errors: usize,
+    geodesic_rejection_shadow_hits: usize,
+    geodesic_rejection_shadow_true_positives: usize,
+    geodesic_rejection_shadow_false_positives: usize,
+    hard_geodesic_rejections: usize,
     mean_ast_feature_count: Option<f32>,
     mean_structural_repair_similarity: Option<f32>,
     mean_structural_repair_l1_delta: Option<f32>,
@@ -220,6 +232,24 @@ fn run_benchmark() {
     if args.disable_ast_hdc_fep {
         unsafe {
             std::env::set_var("SYMTHAEA_DISABLE_AST_HDC_FEP", "1");
+        }
+    }
+    if args.geodesic_rejection_shadow {
+        unsafe {
+            std::env::set_var("SYMTHAEA_GEODESIC_REJECTION_SHADOW", "1");
+        }
+    }
+    if args.hard_geodesic_rejection {
+        unsafe {
+            std::env::set_var("SYMTHAEA_HARD_GEODESIC_REJECTION", "1");
+        }
+    }
+    if let Some(threshold) = args.structural_prior_threshold {
+        unsafe {
+            std::env::set_var(
+                "SYMTHAEA_STRUCTURAL_PRIOR_SURPRISE_THRESHOLD",
+                threshold.to_string(),
+            );
         }
     }
     if matches!(args.lane.as_str(), "repair" | "all")
@@ -353,6 +383,22 @@ fn run_benchmark() {
             .iter()
             .map(|attempt| attempt.structural_prediction_errors)
             .sum::<usize>();
+        let task_geodesic_rejection_shadow_hits = new_attempts
+            .iter()
+            .map(|attempt| attempt.geodesic_rejection_shadow_hits)
+            .sum::<usize>();
+        let task_geodesic_rejection_shadow_true_positives = new_attempts
+            .iter()
+            .map(|attempt| attempt.geodesic_rejection_shadow_true_positives)
+            .sum::<usize>();
+        let task_geodesic_rejection_shadow_false_positives = new_attempts
+            .iter()
+            .map(|attempt| attempt.geodesic_rejection_shadow_false_positives)
+            .sum::<usize>();
+        let task_hard_geodesic_rejections = new_attempts
+            .iter()
+            .map(|attempt| attempt.hard_geodesic_rejections)
+            .sum::<usize>();
         let task_ast_feature_counts = new_attempts
             .iter()
             .filter_map(|attempt| {
@@ -409,6 +455,12 @@ fn run_benchmark() {
                     ast_hdc_parse_successes: attempt.ast_hdc_parse_successes,
                     ast_hdc_parse_failures: attempt.ast_hdc_parse_failures,
                     structural_prediction_errors: attempt.structural_prediction_errors,
+                    geodesic_rejection_shadow_hits: attempt.geodesic_rejection_shadow_hits,
+                    geodesic_rejection_shadow_true_positives: attempt
+                        .geodesic_rejection_shadow_true_positives,
+                    geodesic_rejection_shadow_false_positives: attempt
+                        .geodesic_rejection_shadow_false_positives,
+                    hard_geodesic_rejections: attempt.hard_geodesic_rejections,
                     ast_hdc_feature_count: attempt.ast_hdc_feature_count,
                     ast_hdc_last_features: attempt.ast_hdc_last_features.clone(),
                     structural_prior_score: attempt_structural_prior
@@ -550,6 +602,11 @@ fn run_benchmark() {
             ast_hdc_parse_successes: task_ast_hdc_parse_successes,
             ast_hdc_parse_failures: task_ast_hdc_parse_failures,
             structural_prediction_errors: task_structural_prediction_errors,
+            geodesic_rejection_shadow_hits: task_geodesic_rejection_shadow_hits,
+            geodesic_rejection_shadow_true_positives: task_geodesic_rejection_shadow_true_positives,
+            geodesic_rejection_shadow_false_positives:
+                task_geodesic_rejection_shadow_false_positives,
+            hard_geodesic_rejections: task_hard_geodesic_rejections,
             mean_ast_feature_count: task_mean_ast_feature_count,
             structural_repair_similarity,
             structural_repair_l1_delta,
@@ -697,6 +754,22 @@ fn run_benchmark() {
         .iter()
         .map(|task| task.structural_prediction_errors)
         .sum::<usize>();
+    let geodesic_rejection_shadow_hits = tasks
+        .iter()
+        .map(|task| task.geodesic_rejection_shadow_hits)
+        .sum::<usize>();
+    let geodesic_rejection_shadow_true_positives = tasks
+        .iter()
+        .map(|task| task.geodesic_rejection_shadow_true_positives)
+        .sum::<usize>();
+    let geodesic_rejection_shadow_false_positives = tasks
+        .iter()
+        .map(|task| task.geodesic_rejection_shadow_false_positives)
+        .sum::<usize>();
+    let hard_geodesic_rejections = tasks
+        .iter()
+        .map(|task| task.hard_geodesic_rejections)
+        .sum::<usize>();
     let mean_ast_feature_count = mean_optional(
         tasks
             .iter()
@@ -777,6 +850,10 @@ fn run_benchmark() {
         ast_hdc_parse_successes,
         ast_hdc_parse_failures,
         structural_prediction_errors,
+        geodesic_rejection_shadow_hits,
+        geodesic_rejection_shadow_true_positives,
+        geodesic_rejection_shadow_false_positives,
+        hard_geodesic_rejections,
         mean_ast_feature_count,
         mean_structural_repair_similarity,
         mean_structural_repair_l1_delta,
@@ -901,11 +978,15 @@ fn run_benchmark() {
             report.mean_surprise_after_retry
         );
         println!(
-            "AST-HDC: enabled={} parse_successes={} parse_failures={} structural_errors={} mean_features={:?} repair_similarity={:?} repair_l1_delta={:?} prototypes={} prior_observations={} prior_score={:?} prior_delta={:?}",
+            "AST-HDC: enabled={} parse_successes={} parse_failures={} structural_errors={} shadow_hits={} shadow_tp={} shadow_fp={} hard_rejections={} mean_features={:?} repair_similarity={:?} repair_l1_delta={:?} prototypes={} prior_observations={} prior_score={:?} prior_delta={:?}",
             report.ast_hdc_fep_enabled,
             report.ast_hdc_parse_successes,
             report.ast_hdc_parse_failures,
             report.structural_prediction_errors,
+            report.geodesic_rejection_shadow_hits,
+            report.geodesic_rejection_shadow_true_positives,
+            report.geodesic_rejection_shadow_false_positives,
+            report.hard_geodesic_rejections,
             report.mean_ast_feature_count,
             report.mean_structural_repair_similarity,
             report.mean_structural_repair_l1_delta,
@@ -968,10 +1049,14 @@ fn run_benchmark() {
             }
             if task.ast_hdc_parse_successes > 0 || task.ast_hdc_parse_failures > 0 {
                 println!(
-                    "      AST-HDC: parse_successes={} parse_failures={} structural_errors={} mean_features={:?} repair_similarity={:?} repair_l1_delta={:?} prior={:?}@{:?} prior_delta={:?}",
+                    "      AST-HDC: parse_successes={} parse_failures={} structural_errors={} shadow_hits={} shadow_tp={} shadow_fp={} hard_rejections={} mean_features={:?} repair_similarity={:?} repair_l1_delta={:?} prior={:?}@{:?} prior_delta={:?}",
                     task.ast_hdc_parse_successes,
                     task.ast_hdc_parse_failures,
                     task.structural_prediction_errors,
+                    task.geodesic_rejection_shadow_hits,
+                    task.geodesic_rejection_shadow_true_positives,
+                    task.geodesic_rejection_shadow_false_positives,
+                    task.hard_geodesic_rejections,
                     task.mean_ast_feature_count,
                     task.structural_repair_similarity,
                     task.structural_repair_l1_delta,
@@ -1049,6 +1134,9 @@ struct Args {
     runtime_policy_json: Option<String>,
     disable_fep_repair_hints: bool,
     disable_ast_hdc_fep: bool,
+    geodesic_rejection_shadow: bool,
+    hard_geodesic_rejection: bool,
+    structural_prior_threshold: Option<f32>,
 }
 
 impl Args {
@@ -1125,6 +1213,17 @@ impl Args {
                 }
                 "--disable-fep-repair-hints" => args.disable_fep_repair_hints = true,
                 "--disable-ast-hdc-fep" => args.disable_ast_hdc_fep = true,
+                "--geodesic-rejection-shadow" => args.geodesic_rejection_shadow = true,
+                "--hard-geodesic-rejection" => args.hard_geodesic_rejection = true,
+                "--structural-prior-threshold" => {
+                    let Some(raw) = iter.next() else {
+                        print_help_and_exit(2, "--structural-prior-threshold requires a number");
+                    };
+                    let Ok(threshold) = raw.parse::<f32>() else {
+                        print_help_and_exit(2, "--structural-prior-threshold must be a number");
+                    };
+                    args.structural_prior_threshold = Some(threshold);
+                }
                 "--help" | "-h" => print_help_and_exit(0, ""),
                 other => print_help_and_exit(2, &format!("unknown argument: {other}")),
             }
@@ -1167,6 +1266,14 @@ fn print_help_and_exit(code: i32, error: &str) -> ! {
     );
     eprintln!("  --disable-ast-hdc-fep");
     eprintln!("                      Ablate AST-HDC structural FEP observations");
+    eprintln!("  --geodesic-rejection-shadow");
+    eprintln!(
+        "                      Measure structural-prior fast-fail accuracy without rejecting"
+    );
+    eprintln!("  --hard-geodesic-rejection");
+    eprintln!("                      Reject low-prior candidates before invoking rustc");
+    eprintln!("  --structural-prior-threshold N");
+    eprintln!("                      Override structural prior surprise threshold");
     std::process::exit(code);
 }
 

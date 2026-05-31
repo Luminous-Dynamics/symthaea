@@ -9,6 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+source scripts/broca_runtime_crust.sh
 
 export RUSTC_WRAPPER="${BROCA_GATE_RUSTC_WRAPPER:-}"
 export SCCACHE_DISABLE="${SCCACHE_DISABLE:-1}"
@@ -218,10 +219,12 @@ mkdir -p "$OUT_DIR"
 select_backend() {
     case "$BACKEND" in
         cpu)
+            BROCA_MAMBA_BACKEND=cpu broca_resolve_runtime
             CARGO_FEATURE_ARGS=()
             NIX_SHELL_ATTR="."
             ;;
         gpu)
+            BROCA_MAMBA_BACKEND=gpu broca_resolve_runtime
             CARGO_FEATURE_ARGS=(--features gpu)
             NIX_SHELL_ATTR=".#broca-gpu"
             export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$TARGET_DIR}"
@@ -229,7 +232,8 @@ select_backend() {
             export LD_LIBRARY_PATH="/run/opengl-driver/lib:${LD_LIBRARY_PATH:-}"
             ;;
         auto)
-            if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+            BROCA_MAMBA_BACKEND=auto broca_resolve_runtime
+            if [[ "$BROCA_SELECTED_BACKEND" == "gpu" ]]; then
                 CARGO_FEATURE_ARGS=(--features gpu)
                 NIX_SHELL_ATTR=".#broca-gpu"
                 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$TARGET_DIR}"

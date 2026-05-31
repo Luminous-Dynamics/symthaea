@@ -36,6 +36,9 @@ DISTILLATION_OUT="${CODING_BACKEND_DISTILLATION_OUT:-}"
 STRUCTURAL_PROTOTYPES_IN="${CODING_BACKEND_STRUCTURAL_PROTOTYPES_IN:-}"
 STRUCTURAL_PROTOTYPES_OUT="${CODING_BACKEND_STRUCTURAL_PROTOTYPES_OUT:-}"
 RUNTIME_POLICY_JSON="${CODING_BACKEND_RUNTIME_POLICY_JSON:-}"
+GEODESIC_REJECTION_SHADOW="${CODING_BACKEND_GEODESIC_REJECTION_SHADOW:-0}"
+HARD_GEODESIC_REJECTION="${CODING_BACKEND_HARD_GEODESIC_REJECTION:-0}"
+STRUCTURAL_PRIOR_THRESHOLD="${CODING_BACKEND_STRUCTURAL_PRIOR_THRESHOLD:-}"
 
 if [[ "$LANE" == "repair" || "$LANE" == "all" ]]; then
     export SYMTHAEA_ENABLE_FORCED_REPAIR_BENCH=1
@@ -67,6 +70,15 @@ if [[ -n "$STRUCTURAL_PROTOTYPES_OUT" ]]; then
 fi
 if [[ -n "$RUNTIME_POLICY_JSON" ]]; then
     benchmark_args+=(--runtime-policy-json "$RUNTIME_POLICY_JSON")
+fi
+if [[ "$GEODESIC_REJECTION_SHADOW" == "1" ]]; then
+    benchmark_args+=(--geodesic-rejection-shadow)
+fi
+if [[ "$HARD_GEODESIC_REJECTION" == "1" ]]; then
+    benchmark_args+=(--hard-geodesic-rejection)
+fi
+if [[ -n "$STRUCTURAL_PRIOR_THRESHOLD" ]]; then
+    benchmark_args+=(--structural-prior-threshold "$STRUCTURAL_PRIOR_THRESHOLD")
 fi
 cargo run --example benchmark_coding_backends \
     --features code_generation,geodesic_synthesis \
@@ -112,4 +124,13 @@ if [[ -n "$STRUCTURAL_PROTOTYPES_OUT" ]]; then
 fi
 if [[ -n "$RUNTIME_POLICY_JSON" ]]; then
     echo "  runtime policy: $RUNTIME_POLICY_JSON"
+fi
+if [[ "$GEODESIC_REJECTION_SHADOW" == "1" ]]; then
+    echo "  geodesic rejection shadow: enabled"
+fi
+if [[ "$HARD_GEODESIC_REJECTION" == "1" ]]; then
+    echo "  hard geodesic rejection: enabled"
+fi
+if [[ -n "$STRUCTURAL_PRIOR_THRESHOLD" ]]; then
+    echo "  structural prior threshold: $STRUCTURAL_PRIOR_THRESHOLD"
 fi

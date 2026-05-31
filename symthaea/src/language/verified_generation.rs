@@ -755,6 +755,17 @@ async fn generate_verified_inner<'a>(
                         &mut all_diagnostic_hvs,
                         &mut seen_prediction_error_keys,
                     );
+                    if ast_observation.fast_fail && test_retries < MAX_TEST_RETRIES {
+                        latest_test_failures =
+                            prediction_error_diagnostics(&retry_structural_prediction_errors);
+                        if latest_test_failures.is_empty() {
+                            latest_test_failures.push(
+                                "AST-HDC structural prior rejected the candidate before rustc"
+                                    .to_string(),
+                            );
+                        }
+                        continue;
+                    }
 
                     let mut retry_result = match intent {
                         CodeIntent::Solve {
@@ -1895,6 +1906,7 @@ mod tests {
             runtime_error: None,
             elapsed: std::time::Duration::from_millis(1),
             simulated: false,
+            binary_path: None,
             test_failures: Vec::new(),
         };
         let prediction_errors = prediction_errors_from_execution(&result, 1);

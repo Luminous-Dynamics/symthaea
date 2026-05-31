@@ -399,7 +399,14 @@ mod tests {
         let config = MctsConfig::tier1();
         let budget = ReasoningBudget::new(10_000, 0.8);
 
-        let result = MctsPlanner::plan(&state, &[], &config, &budget, &Default::default());
+        let result = MctsPlanner::plan(
+            &state,
+            &[],
+            &config,
+            &budget,
+            &Default::default(),
+            &Default::default(),
+        );
         assert!(!result.did_plan);
     }
 

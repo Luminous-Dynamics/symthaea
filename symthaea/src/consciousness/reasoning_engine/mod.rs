@@ -547,6 +547,7 @@ mod tests {
             neuromod_exploration_mod: 1.0,
             epistemic_quality: 0.5,
             code_context: None,
+            substrate_cost_model: Default::default(),
         }
     }
 

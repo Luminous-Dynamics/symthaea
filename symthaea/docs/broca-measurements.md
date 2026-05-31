@@ -57,6 +57,15 @@ BROCA_EXERCISM_TIMEOUT=15m \
 scripts/broca_capture_baseline.sh full-exercism-smoke
 ```
 
+Backend selection is centralized in `scripts/broca_runtime_crust.sh`. Scripts
+that source it write both the requested backend and the resolved backend into
+their manifests:
+
+- `broca_mamba_backend`: requested value, usually `auto`.
+- `broca_selected_backend`: resolved value, `gpu` or `cpu`.
+- `broca_backend_reason`: why the backend was selected.
+- `broca_mamba_feature`: Cargo feature used for Mamba-backed measurement.
+
 Use `BROCA_REQUIRE_ALL_COMPARISON_METRICS=1` only when the baseline and
 candidate both include the same decoder/benchmark lanes. Otherwise missing
 metrics are recorded in `checkpoint-compare.json` but do not fail promotion.

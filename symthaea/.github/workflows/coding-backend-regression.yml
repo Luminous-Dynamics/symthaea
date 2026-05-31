@@ -8,7 +8,10 @@ on:
       - "crates/symthaea-geodesic/**"
       - "examples/benchmark_coding_backends.rs"
       - "scripts/coding_backend_regression.sh"
+      - "scripts/coding_backend_hard_geodesic_ab.sh"
       - "scripts/coding_backend_repair_memory_ab.sh"
+      - "scripts/coding_backend_structural_memory_ab.sh"
+      - "scripts/coding_agent_quality_gate.sh"
       - "scripts/check_coding_backend_baseline.py"
       - "scripts/check_repair_memory_ab.py"
       - "scripts/merge_repair_lessons.py"
@@ -57,3 +60,17 @@ jobs:
 
       - name: Run coding backend regression
         run: scripts/coding_backend_regression.sh
+
+      - name: Run hard geodesic shadow gate
+        env:
+          CODING_BACKEND_LANE: smoke
+          CODING_BACKEND_GEODESIC_REJECTION_SHADOW: "1"
+          CODING_BACKEND_STRUCTURAL_PRIOR_THRESHOLD: "0.25"
+          CODING_BACKEND_SKIP_BASELINE: "1"
+        run: scripts/coding_backend_regression.sh
+
+      - name: Run repair memory A/B smoke
+        env:
+          CODING_BACKEND_AB_MIN_MEMORY_HITS: "1"
+          CODING_BACKEND_AB_MIN_MEMORY_HELPED_TASKS: "1"
+        run: scripts/coding_backend_repair_memory_ab.sh

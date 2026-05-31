@@ -1,0 +1,84 @@
+name: Coding Agent Quality Gate
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/language/**"
+      - "examples/benchmark_coding_backends.rs"
+      - "examples/forecastbench_eval.rs"
+      - "scripts/coding_agent_quality_gate.sh"
+      - "scripts/coding_agent_policy.py"
+      - "scripts/coding_backend_*.sh"
+      - "scripts/coding_deepswe_smoke.sh"
+      - "scripts/check_coding_backend_baseline.py"
+      - "scripts/check_forecastbench_baseline.py"
+      - "tests/fixtures/coding_backends*.json"
+      - "tests/fixtures/forecastbench*.json*"
+      - ".github/workflows/coding-agent-quality.yml"
+  workflow_dispatch:
+    inputs:
+      extended_lanes:
+        description: "Run slower A/B and Broca repair-training lanes"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  quality-gate:
+    name: Coding agent quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-coding-agent-quality-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-coding-agent-quality-
+            ${{ runner.os }}-coding-backend-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake python3
+
+      - name: Run quality gate
+        env:
+          CODING_AGENT_RUN_REPAIR_MEMORY_AB: ${{ inputs.extended_lanes == 'true' && '1' || '0' }}
+          CODING_AGENT_RUN_STRUCTURAL_MEMORY_AB: ${{ inputs.extended_lanes == 'true' && '1' || '0' }}
+          CODING_AGENT_RUN_HARD_GEODESIC_AB: ${{ inputs.extended_lanes == 'true' && '1' || '0' }}
+          CODING_AGENT_RUN_BROCA_REPAIR_SMOKE: ${{ inputs.extended_lanes == 'true' && '1' || '0' }}
+        run: scripts/coding_agent_quality_gate.sh
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coding-agent-quality-${{ github.sha }}
+          path: /tmp/symthaea-coding-agent-quality/
+          retention-days: 30

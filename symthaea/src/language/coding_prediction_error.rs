@@ -358,6 +358,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(1),
             simulated: false,
+            binary_path: None,
             test_failures: Vec::new(),
         };
 
@@ -382,6 +383,7 @@ mod tests {
             runtime_error: None,
             elapsed: Duration::from_millis(1),
             simulated: false,
+            binary_path: None,
             test_failures: Vec::new(),
         };
         result.parse_test_failures();

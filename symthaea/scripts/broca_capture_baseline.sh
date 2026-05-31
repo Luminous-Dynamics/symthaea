@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+source scripts/broca_runtime_crust.sh
+broca_resolve_runtime
+
 BASELINE_ROOT="${BROCA_BASELINE_ROOT:-target/broca-baselines}"
 BASELINE_NAME="${1:-$(date -u +%Y%m%dT%H%M%SZ)}"
 OUT_DIR="$BASELINE_ROOT/$BASELINE_NAME"
@@ -29,9 +34,7 @@ scripts/broca_measurement_artifacts.sh "$OUT_DIR"
   echo "broca_min_structured_required_role_rate=${BROCA_MIN_STRUCTURED_REQUIRED_ROLE_RATE:-1.0}"
   echo "broca_include_structured_molecule=${BROCA_INCLUDE_STRUCTURED_MOLECULE:-0}"
   echo "broca_cargo_unlocked=${BROCA_CARGO_UNLOCKED:-0}"
-  echo "broca_mamba_backend=${BROCA_MAMBA_BACKEND:-auto}"
-  echo "broca_decoder_features=${BROCA_DECODER_FEATURES:-auto}"
-  echo "broca_exercism_features=${BROCA_EXERCISM_FEATURES:-auto}"
+  broca_write_runtime_manifest
   echo "broca_skip_exercism=${BROCA_SKIP_EXERCISM:-0}"
   echo "broca_exercism_attempts=${BROCA_EXERCISM_ATTEMPTS:-1}"
   echo "broca_exercism_max_exercises=${BROCA_EXERCISM_MAX_EXERCISES:-0}"

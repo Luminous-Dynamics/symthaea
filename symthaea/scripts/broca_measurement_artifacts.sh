@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+source scripts/broca_runtime_crust.sh
+
 OUT_DIR="${1:-target/broca-measurements}"
 mkdir -p "$OUT_DIR"
 
@@ -14,40 +18,8 @@ if [[ "${BROCA_CARGO_UNLOCKED:-0}" != "1" ]]; then
   cargo_locked_args+=(--locked)
 fi
 
-detect_broca_backend() {
-  case "${BROCA_MAMBA_BACKEND:-auto}" in
-    gpu|cuda|mamba)
-      echo "gpu"
-      ;;
-    cpu|mamba-cpu)
-      echo "cpu"
-      ;;
-    auto|"")
-      if command -v nvidia-smi >/dev/null 2>&1 && command -v nvcc >/dev/null 2>&1; then
-        if nvidia-smi -L >/dev/null 2>&1; then
-          echo "gpu"
-          return
-        fi
-      fi
-      echo "cpu"
-      ;;
-    *)
-      echo "[broca] invalid BROCA_MAMBA_BACKEND=${BROCA_MAMBA_BACKEND}" >&2
-      echo "[broca] expected auto, gpu, or cpu" >&2
-      exit 2
-      ;;
-  esac
-}
-
-BROCA_SELECTED_BACKEND="$(detect_broca_backend)"
-if [[ "$BROCA_SELECTED_BACKEND" == "gpu" ]]; then
-  BROCA_MAMBA_FEATURE="mamba"
-else
-  BROCA_MAMBA_FEATURE="mamba-cpu"
-fi
-BROCA_DECODER_FEATURES="${BROCA_DECODER_FEATURES:-$BROCA_MAMBA_FEATURE}"
-BROCA_EXERCISM_FEATURES="${BROCA_EXERCISM_FEATURES:-$BROCA_MAMBA_FEATURE,code-sheaf-eval}"
-echo "[broca] selected Mamba backend: $BROCA_SELECTED_BACKEND ($BROCA_MAMBA_FEATURE)"
+broca_resolve_runtime
+broca_print_runtime
 
 write_failed_exercism_artifact() {
   local reason="$1"
@@ -79,10 +51,7 @@ JSON
   echo "broca_min_structured_required_role_rate=${BROCA_MIN_STRUCTURED_REQUIRED_ROLE_RATE:-1.0}"
   echo "broca_include_structured_molecule=${BROCA_INCLUDE_STRUCTURED_MOLECULE:-0}"
   echo "broca_cargo_unlocked=${BROCA_CARGO_UNLOCKED:-0}"
-  echo "broca_mamba_backend=${BROCA_MAMBA_BACKEND:-auto}"
-  echo "broca_selected_backend=$BROCA_SELECTED_BACKEND"
-  echo "broca_decoder_features=$BROCA_DECODER_FEATURES"
-  echo "broca_exercism_features=$BROCA_EXERCISM_FEATURES"
+  broca_write_runtime_manifest
   echo "broca_skip_exercism=${BROCA_SKIP_EXERCISM:-0}"
   echo "broca_exercism_attempts=${BROCA_EXERCISM_ATTEMPTS:-1}"
   echo "broca_exercism_max_exercises=${BROCA_EXERCISM_MAX_EXERCISES:-0}"

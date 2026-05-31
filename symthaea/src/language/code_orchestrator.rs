@@ -408,6 +408,14 @@ pub struct SynthesisAttempt {
     pub structural_prior_label: Option<String>,
     /// Last movement in structural-prior score across retries.
     pub structural_prior_delta: Option<f32>,
+    /// Number of structural candidates that shadow mode would have rejected.
+    pub geodesic_rejection_shadow_hits: usize,
+    /// Shadow rejections that would have avoided a compile failure.
+    pub geodesic_rejection_shadow_true_positives: usize,
+    /// Shadow rejections that would have skipped a compiling candidate.
+    pub geodesic_rejection_shadow_false_positives: usize,
+    /// Number of candidates rejected before invoking rustc.
+    pub hard_geodesic_rejections: usize,
     /// Why it was rejected (if applicable)
     pub rejection_reason: Option<String>,
     /// Short source preview for diagnostics and benchmark reporting.
@@ -1108,6 +1116,14 @@ impl CodeOrchestrator {
                 structural_prior_score: hw_result.ast_hdc.last_structural_prior_score,
                 structural_prior_label: hw_result.ast_hdc.last_structural_prior_label.clone(),
                 structural_prior_delta: hw_result.ast_hdc.structural_prior_delta,
+                geodesic_rejection_shadow_hits: hw_result.ast_hdc.geodesic_rejection_shadow_hits,
+                geodesic_rejection_shadow_true_positives: hw_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_true_positives,
+                geodesic_rejection_shadow_false_positives: hw_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_false_positives,
+                hard_geodesic_rejections: hw_result.ast_hdc.hard_geodesic_rejections,
                 rejection_reason: hw_result.rejection.clone(),
                 source_preview: source_preview(&hw_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -1161,6 +1177,16 @@ impl CodeOrchestrator {
                 structural_prior_score: native_result.ast_hdc.last_structural_prior_score,
                 structural_prior_label: native_result.ast_hdc.last_structural_prior_label.clone(),
                 structural_prior_delta: native_result.ast_hdc.structural_prior_delta,
+                geodesic_rejection_shadow_hits: native_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_hits,
+                geodesic_rejection_shadow_true_positives: native_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_true_positives,
+                geodesic_rejection_shadow_false_positives: native_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_false_positives,
+                hard_geodesic_rejections: native_result.ast_hdc.hard_geodesic_rejections,
                 rejection_reason: native_rejection.clone(),
                 source_preview: source_preview(&native_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -1260,6 +1286,16 @@ impl CodeOrchestrator {
                 structural_prior_score: analogy_result.ast_hdc.last_structural_prior_score,
                 structural_prior_label: analogy_result.ast_hdc.last_structural_prior_label.clone(),
                 structural_prior_delta: analogy_result.ast_hdc.structural_prior_delta,
+                geodesic_rejection_shadow_hits: analogy_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_hits,
+                geodesic_rejection_shadow_true_positives: analogy_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_true_positives,
+                geodesic_rejection_shadow_false_positives: analogy_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_false_positives,
+                hard_geodesic_rejections: analogy_result.ast_hdc.hard_geodesic_rejections,
                 rejection_reason: analogy_rejection.clone(),
                 source_preview: source_preview(&analogy_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -1359,6 +1395,14 @@ impl CodeOrchestrator {
                 structural_prior_score: llm_result.ast_hdc.last_structural_prior_score,
                 structural_prior_label: llm_result.ast_hdc.last_structural_prior_label.clone(),
                 structural_prior_delta: llm_result.ast_hdc.structural_prior_delta,
+                geodesic_rejection_shadow_hits: llm_result.ast_hdc.geodesic_rejection_shadow_hits,
+                geodesic_rejection_shadow_true_positives: llm_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_true_positives,
+                geodesic_rejection_shadow_false_positives: llm_result
+                    .ast_hdc
+                    .geodesic_rejection_shadow_false_positives,
+                hard_geodesic_rejections: llm_result.ast_hdc.hard_geodesic_rejections,
                 rejection_reason: llm_result.rejection.clone(),
                 source_preview: source_preview(&llm_result.source),
                 repair_prior_count: repair_priors.len(),
@@ -1475,6 +1519,14 @@ impl CodeOrchestrator {
             structural_prior_score: geodesic_result.ast_hdc.last_structural_prior_score,
             structural_prior_label: geodesic_result.ast_hdc.last_structural_prior_label.clone(),
             structural_prior_delta: geodesic_result.ast_hdc.structural_prior_delta,
+            geodesic_rejection_shadow_hits: geodesic_result.ast_hdc.geodesic_rejection_shadow_hits,
+            geodesic_rejection_shadow_true_positives: geodesic_result
+                .ast_hdc
+                .geodesic_rejection_shadow_true_positives,
+            geodesic_rejection_shadow_false_positives: geodesic_result
+                .ast_hdc
+                .geodesic_rejection_shadow_false_positives,
+            hard_geodesic_rejections: geodesic_result.ast_hdc.hard_geodesic_rejections,
             rejection_reason: geodesic_rejection.clone(),
             source_preview: source_preview(&geodesic_result.source),
             repair_prior_count: repair_priors.len(),

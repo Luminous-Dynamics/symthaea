@@ -8,6 +8,7 @@
 #   3. registered proof-cache demo
 #   4. deterministic coding backend regression
 #   5. ForecastBench-style epistemic calibration regression
+#   6. optional repair/structural-memory/hard-geodesic A/B lanes
 
 set -euo pipefail
 
@@ -52,6 +53,36 @@ if [[ -f "$CODING_REPORT" && -f "$FORECAST_REPORT" ]]; then
         --coding-report "$CODING_REPORT" \
         --forecast-report "$FORECAST_REPORT" \
         --output "$POLICY_REPORT"
+fi
+
+if [[ "${CODING_AGENT_RUN_REPAIR_MEMORY_AB:-0}" == "1" ]]; then
+    echo "[coding-agent-quality] repair memory A/B"
+    CODING_BACKEND_AB_OUT_DIR="$OUT_DIR/repair-memory-ab" \
+        scripts/coding_backend_repair_memory_ab.sh
+fi
+
+if [[ "${CODING_AGENT_RUN_STRUCTURAL_MEMORY_AB:-0}" == "1" ]]; then
+    echo "[coding-agent-quality] structural memory A/B"
+    CODING_BACKEND_STRUCTURAL_AB_OUT_DIR="$OUT_DIR/structural-memory-ab" \
+        scripts/coding_backend_structural_memory_ab.sh
+fi
+
+if [[ "${CODING_AGENT_RUN_HARD_GEODESIC_AB:-0}" == "1" ]]; then
+    echo "[coding-agent-quality] hard geodesic A/B"
+    CODING_BACKEND_GEODESIC_AB_OUT_DIR="$OUT_DIR/hard-geodesic-ab" \
+        scripts/coding_backend_hard_geodesic_ab.sh
+fi
+
+if [[ "${CODING_AGENT_RUN_BROCA_REPAIR_SMOKE:-0}" == "1" ]]; then
+    echo "[coding-agent-quality] Broca repair training smoke"
+    BROCA_REPAIR_SMOKE_OUT_DIR="$OUT_DIR/broca-repair-smoke" \
+        scripts/broca_repair_train_smoke.sh
+fi
+
+if [[ "${CODING_AGENT_RUN_DEEPSWE_SMOKE:-0}" == "1" ]]; then
+    echo "[coding-agent-quality] DeepSWE provider smoke"
+    DEEPSWE_SMOKE_OUT_DIR="$OUT_DIR/deepswe-smoke" \
+        scripts/coding_deepswe_smoke.sh
 fi
 
 echo "[coding-agent-quality] PASS"
