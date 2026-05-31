@@ -103,10 +103,7 @@ impl IcsParser {
     }
 
     /// Extract calendar invites from email content
-    pub fn extract_from_email(
-        body: &str,
-        attachments: &[(String, Vec<u8>)],
-    ) -> Vec<ParsedEvent> {
+    pub fn extract_from_email(body: &str, attachments: &[(String, Vec<u8>)]) -> Vec<ParsedEvent> {
         let mut events = Vec::new();
 
         // Check attachments for .ics files
@@ -196,9 +193,7 @@ impl EventDateTime {
     pub fn to_utc(&self) -> DateTime<Utc> {
         match self {
             EventDateTime::DateTime(dt) => *dt,
-            EventDateTime::Date(d) => {
-                Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap())
-            }
+            EventDateTime::Date(d) => Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap()),
         }
     }
 
@@ -271,9 +266,13 @@ impl ParsedEventBuilder {
     }
 
     fn build(self) -> Result<ParsedEvent, IcsError> {
-        let uid = self.uid.ok_or_else(|| IcsError::MissingField("UID".to_string()))?;
+        let uid = self
+            .uid
+            .ok_or_else(|| IcsError::MissingField("UID".to_string()))?;
         let summary = self.summary.unwrap_or_else(|| "(No title)".to_string());
-        let start = self.dtstart.ok_or_else(|| IcsError::MissingField("DTSTART".to_string()))?;
+        let start = self
+            .dtstart
+            .ok_or_else(|| IcsError::MissingField("DTSTART".to_string()))?;
 
         // If no end time, assume 1 hour duration for datetime, 1 day for date
         let end = self.dtend.unwrap_or_else(|| match &start {
@@ -397,7 +396,8 @@ impl CalendarService {
         raw_ics: Option<String>,
     ) -> Result<CalendarEvent, CalendarError> {
         let id = Uuid::new_v4();
-        let attendee_emails: Vec<String> = parsed.attendees.iter().map(|a| a.email.clone()).collect();
+        let attendee_emails: Vec<String> =
+            parsed.attendees.iter().map(|a| a.email.clone()).collect();
 
         let status = match parsed.status.as_deref() {
             Some("CANCELLED") => EventStatus::Cancelled,
@@ -588,18 +588,12 @@ END:VCALENDAR"#,
     }
 
     /// Delete event
-    pub async fn delete_event(
-        &self,
-        event_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "DELETE FROM calendar_events WHERE id = $1 AND user_id = $2",
-        )
-        .bind(event_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
+    pub async fn delete_event(&self, event_id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM calendar_events WHERE id = $1 AND user_id = $2")
+            .bind(event_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(result.rows_affected() > 0)
     }

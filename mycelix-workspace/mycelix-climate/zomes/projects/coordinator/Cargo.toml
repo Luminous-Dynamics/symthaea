@@ -1,0 +1,14 @@
+[package]
+name = "projects"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+getrandom = { workspace = true }
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+projects_integrity = { path = "../integrity" }

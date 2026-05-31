@@ -1,0 +1,19 @@
+[package]
+name = "orbital_objects"
+version = "0.1.0"
+edition = "2024"
+description = "Coordinator zome for orbital object catalog"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "orbital_objects"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+orbital_objects_integrity = { path = "../integrity" }
+mycelix-space-shared = { path = "../../../../zomes/shared" }
+orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
+getrandom = { workspace = true }
+getrandom_03 = { workspace = true }

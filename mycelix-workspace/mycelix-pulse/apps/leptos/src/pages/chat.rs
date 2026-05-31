@@ -91,7 +91,9 @@ pub fn ChatPage() -> impl IntoView {
         }
 
         // Scroll to bottom
-        let _ = js_sys::eval("setTimeout(()=>{const el=document.querySelector('.chat-messages');if(el)el.scrollTop=el.scrollHeight},50)");
+        let _ = js_sys::eval(
+            "setTimeout(()=>{const el=document.querySelector('.chat-messages');if(el)el.scrollTop=el.scrollHeight},50)",
+        );
     };
 
     let on_keypress = move |ev: web_sys::KeyboardEvent| {

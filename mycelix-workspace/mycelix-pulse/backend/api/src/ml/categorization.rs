@@ -151,7 +151,12 @@ impl EmailCategorizer {
         let mut patterns = HashMap::new();
 
         // Social networks
-        for domain in ["facebook.com", "twitter.com", "linkedin.com", "instagram.com"] {
+        for domain in [
+            "facebook.com",
+            "twitter.com",
+            "linkedin.com",
+            "instagram.com",
+        ] {
             patterns.insert(domain.to_string(), BuiltInCategory::Social);
         }
 
@@ -166,12 +171,23 @@ impl EmailCategorizer {
         }
 
         // Travel
-        for domain in ["airbnb.com", "booking.com", "expedia.com", "delta.com", "united.com"] {
+        for domain in [
+            "airbnb.com",
+            "booking.com",
+            "expedia.com",
+            "delta.com",
+            "united.com",
+        ] {
             patterns.insert(domain.to_string(), BuiltInCategory::Travel);
         }
 
         // Finance
-        for domain in ["chase.com", "bankofamerica.com", "wellsfargo.com", "venmo.com"] {
+        for domain in [
+            "chase.com",
+            "bankofamerica.com",
+            "wellsfargo.com",
+            "venmo.com",
+        ] {
             patterns.insert(domain.to_string(), BuiltInCategory::Finance);
         }
 
@@ -182,43 +198,91 @@ impl EmailCategorizer {
         let mut patterns = HashMap::new();
 
         // Newsletter indicators
-        patterns.insert("unsubscribe".to_string(), vec![BuiltInCategory::Newsletter, BuiltInCategory::Promotions]);
+        patterns.insert(
+            "unsubscribe".to_string(),
+            vec![BuiltInCategory::Newsletter, BuiltInCategory::Promotions],
+        );
         patterns.insert("newsletter".to_string(), vec![BuiltInCategory::Newsletter]);
-        patterns.insert("weekly digest".to_string(), vec![BuiltInCategory::Newsletter]);
+        patterns.insert(
+            "weekly digest".to_string(),
+            vec![BuiltInCategory::Newsletter],
+        );
 
         // Receipt indicators
-        patterns.insert("order confirmation".to_string(), vec![BuiltInCategory::Receipt]);
-        patterns.insert("payment received".to_string(), vec![BuiltInCategory::Receipt]);
-        patterns.insert("invoice".to_string(), vec![BuiltInCategory::Receipt, BuiltInCategory::Finance]);
+        patterns.insert(
+            "order confirmation".to_string(),
+            vec![BuiltInCategory::Receipt],
+        );
+        patterns.insert(
+            "payment received".to_string(),
+            vec![BuiltInCategory::Receipt],
+        );
+        patterns.insert(
+            "invoice".to_string(),
+            vec![BuiltInCategory::Receipt, BuiltInCategory::Finance],
+        );
         patterns.insert("receipt".to_string(), vec![BuiltInCategory::Receipt]);
 
         // Shipping indicators
         patterns.insert("shipped".to_string(), vec![BuiltInCategory::Shipping]);
-        patterns.insert("tracking number".to_string(), vec![BuiltInCategory::Shipping]);
+        patterns.insert(
+            "tracking number".to_string(),
+            vec![BuiltInCategory::Shipping],
+        );
         patterns.insert("delivery".to_string(), vec![BuiltInCategory::Shipping]);
-        patterns.insert("out for delivery".to_string(), vec![BuiltInCategory::Shipping]);
+        patterns.insert(
+            "out for delivery".to_string(),
+            vec![BuiltInCategory::Shipping],
+        );
 
         // Travel indicators
-        patterns.insert("flight confirmation".to_string(), vec![BuiltInCategory::Travel]);
-        patterns.insert("booking confirmation".to_string(), vec![BuiltInCategory::Travel]);
+        patterns.insert(
+            "flight confirmation".to_string(),
+            vec![BuiltInCategory::Travel],
+        );
+        patterns.insert(
+            "booking confirmation".to_string(),
+            vec![BuiltInCategory::Travel],
+        );
         patterns.insert("itinerary".to_string(), vec![BuiltInCategory::Travel]);
         patterns.insert("boarding pass".to_string(), vec![BuiltInCategory::Travel]);
 
         // Calendar indicators
         patterns.insert("invitation".to_string(), vec![BuiltInCategory::Calendar]);
-        patterns.insert("calendar event".to_string(), vec![BuiltInCategory::Calendar]);
-        patterns.insert("meeting request".to_string(), vec![BuiltInCategory::Calendar]);
+        patterns.insert(
+            "calendar event".to_string(),
+            vec![BuiltInCategory::Calendar],
+        );
+        patterns.insert(
+            "meeting request".to_string(),
+            vec![BuiltInCategory::Calendar],
+        );
 
         // Action indicators
-        patterns.insert("action required".to_string(), vec![BuiltInCategory::ActionRequired]);
-        patterns.insert("please review".to_string(), vec![BuiltInCategory::ActionRequired]);
-        patterns.insert("approval needed".to_string(), vec![BuiltInCategory::ActionRequired]);
-        patterns.insert("sign required".to_string(), vec![BuiltInCategory::ActionRequired]);
+        patterns.insert(
+            "action required".to_string(),
+            vec![BuiltInCategory::ActionRequired],
+        );
+        patterns.insert(
+            "please review".to_string(),
+            vec![BuiltInCategory::ActionRequired],
+        );
+        patterns.insert(
+            "approval needed".to_string(),
+            vec![BuiltInCategory::ActionRequired],
+        );
+        patterns.insert(
+            "sign required".to_string(),
+            vec![BuiltInCategory::ActionRequired],
+        );
 
         // Promotion indicators
         patterns.insert("sale".to_string(), vec![BuiltInCategory::Promotions]);
         patterns.insert("% off".to_string(), vec![BuiltInCategory::Promotions]);
-        patterns.insert("limited time".to_string(), vec![BuiltInCategory::Promotions]);
+        patterns.insert(
+            "limited time".to_string(),
+            vec![BuiltInCategory::Promotions],
+        );
         patterns.insert("deal".to_string(), vec![BuiltInCategory::Promotions]);
 
         patterns
@@ -239,7 +303,9 @@ impl EmailCategorizer {
         // Check sender patterns
         let from_domain = email.from.split('@').nth(1).unwrap_or("");
         if let Some(category) = self.sender_patterns.get(from_domain) {
-            *category_scores.entry(category.as_str().to_string()).or_insert(0.0) += 0.7;
+            *category_scores
+                .entry(category.as_str().to_string())
+                .or_insert(0.0) += 0.7;
         }
 
         // Check keyword patterns
@@ -247,18 +313,27 @@ impl EmailCategorizer {
         for (keyword, cats) in &self.keyword_patterns {
             if text.contains(keyword) {
                 for cat in cats {
-                    *category_scores.entry(cat.as_str().to_string()).or_insert(0.0) += 0.3;
+                    *category_scores
+                        .entry(cat.as_str().to_string())
+                        .or_insert(0.0) += 0.3;
                 }
             }
         }
 
         // Check for list-unsubscribe header (newsletter indicator)
         if email.headers.contains_key("list-unsubscribe") {
-            *category_scores.entry("newsletter".to_string()).or_insert(0.0) += 0.5;
+            *category_scores
+                .entry("newsletter".to_string())
+                .or_insert(0.0) += 0.5;
         }
 
         // Check for calendar content
-        if email.headers.get("content-type").map(|ct| ct.contains("calendar")).unwrap_or(false) {
+        if email
+            .headers
+            .get("content-type")
+            .map(|ct| ct.contains("calendar"))
+            .unwrap_or(false)
+        {
             *category_scores.entry("calendar".to_string()).or_insert(0.0) += 0.9;
         }
 
@@ -305,16 +380,22 @@ impl EmailCategorizer {
             };
 
             match condition.operator {
-                RuleOperator::Contains => value.to_lowercase().contains(&condition.value.to_lowercase()),
-                RuleOperator::NotContains => !value.to_lowercase().contains(&condition.value.to_lowercase()),
+                RuleOperator::Contains => value
+                    .to_lowercase()
+                    .contains(&condition.value.to_lowercase()),
+                RuleOperator::NotContains => !value
+                    .to_lowercase()
+                    .contains(&condition.value.to_lowercase()),
                 RuleOperator::Equals => value.to_lowercase() == condition.value.to_lowercase(),
-                RuleOperator::StartsWith => value.to_lowercase().starts_with(&condition.value.to_lowercase()),
-                RuleOperator::EndsWith => value.to_lowercase().ends_with(&condition.value.to_lowercase()),
-                RuleOperator::Matches => {
-                    regex::Regex::new(&condition.value)
-                        .map(|re| re.is_match(value))
-                        .unwrap_or(false)
-                }
+                RuleOperator::StartsWith => value
+                    .to_lowercase()
+                    .starts_with(&condition.value.to_lowercase()),
+                RuleOperator::EndsWith => value
+                    .to_lowercase()
+                    .ends_with(&condition.value.to_lowercase()),
+                RuleOperator::Matches => regex::Regex::new(&condition.value)
+                    .map(|re| re.is_match(value))
+                    .unwrap_or(false),
             }
         })
     }
@@ -338,7 +419,8 @@ impl EmailCategorizer {
             "delegated" => "Delegated",
             "waiting" => "Waiting",
             other => other,
-        }.to_string()
+        }
+        .to_string()
     }
 
     /// Suggest folder based on categories
@@ -434,7 +516,10 @@ mod tests {
         let categorizer = EmailCategorizer::new();
 
         let mut headers = HashMap::new();
-        headers.insert("list-unsubscribe".to_string(), "<mailto:unsub@news.com>".to_string());
+        headers.insert(
+            "list-unsubscribe".to_string(),
+            "<mailto:unsub@news.com>".to_string(),
+        );
 
         let email = EmailForCategorization {
             id: Uuid::new_v4(),

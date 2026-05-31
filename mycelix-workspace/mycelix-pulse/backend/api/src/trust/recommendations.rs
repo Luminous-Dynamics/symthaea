@@ -239,7 +239,8 @@ impl TrustRecommendationService {
                 recommendation: TrustRecommendation::AttestFromNetwork {
                     contact_id: o.subject_id,
                     email: o.email,
-                    vouchers: o.voucher_emails
+                    vouchers: o
+                        .voucher_emails
                         .iter()
                         .zip(o.contexts.iter())
                         .map(|(email, context)| VoucherInfo {

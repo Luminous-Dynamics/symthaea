@@ -1,0 +1,16 @@
+[package]
+name = "justice_bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Cross-hApp bridge coordinator zome for Mycelix Justice"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "justice_bridge"
+
+[dependencies]
+getrandom = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+justice_bridge_integrity = { path = "../integrity" }

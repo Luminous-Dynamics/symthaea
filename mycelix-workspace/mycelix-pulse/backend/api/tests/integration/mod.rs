@@ -6,24 +6,24 @@
 //! Tests the full API request/response cycle
 
 pub mod auth_tests;
-pub mod email_tests;
-pub mod contact_tests;
-pub mod trust_tests;
 pub mod collaboration_tests;
-pub mod security_tests;
+pub mod contact_tests;
+pub mod email_tests;
 pub mod migration_tests;
 pub mod ml_tests;
+pub mod security_tests;
+pub mod trust_tests;
 
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use tower::ServiceExt;
+use once_cell::sync::Lazy;
 use serde_json::json;
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
+use tower::ServiceExt;
+use uuid::Uuid;
 
 // ============================================================================
 // Test Context
@@ -196,7 +196,10 @@ pub mod utils {
         assert!(
             diff < epsilon,
             "Values not approximately equal: {} vs {} (diff: {}, epsilon: {})",
-            a, b, diff, epsilon
+            a,
+            b,
+            diff,
+            epsilon
         );
     }
 

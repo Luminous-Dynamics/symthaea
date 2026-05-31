@@ -10,8 +10,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Workflow Engine
@@ -33,38 +33,22 @@ impl WorkflowEngine {
     }
 
     fn register_default_handlers(&mut self) {
-        self.action_handlers.insert(
-            "move_to_folder".to_string(),
-            Box::new(MoveToFolderHandler),
-        );
-        self.action_handlers.insert(
-            "apply_label".to_string(),
-            Box::new(ApplyLabelHandler),
-        );
-        self.action_handlers.insert(
-            "mark_read".to_string(),
-            Box::new(MarkReadHandler),
-        );
-        self.action_handlers.insert(
-            "forward".to_string(),
-            Box::new(ForwardHandler),
-        );
-        self.action_handlers.insert(
-            "auto_reply".to_string(),
-            Box::new(AutoReplyHandler),
-        );
-        self.action_handlers.insert(
-            "notify".to_string(),
-            Box::new(NotifyHandler),
-        );
-        self.action_handlers.insert(
-            "delay".to_string(),
-            Box::new(DelayHandler),
-        );
-        self.action_handlers.insert(
-            "webhook".to_string(),
-            Box::new(WebhookHandler),
-        );
+        self.action_handlers
+            .insert("move_to_folder".to_string(), Box::new(MoveToFolderHandler));
+        self.action_handlers
+            .insert("apply_label".to_string(), Box::new(ApplyLabelHandler));
+        self.action_handlers
+            .insert("mark_read".to_string(), Box::new(MarkReadHandler));
+        self.action_handlers
+            .insert("forward".to_string(), Box::new(ForwardHandler));
+        self.action_handlers
+            .insert("auto_reply".to_string(), Box::new(AutoReplyHandler));
+        self.action_handlers
+            .insert("notify".to_string(), Box::new(NotifyHandler));
+        self.action_handlers
+            .insert("delay".to_string(), Box::new(DelayHandler));
+        self.action_handlers
+            .insert("webhook".to_string(), Box::new(WebhookHandler));
     }
 
     /// Create a new workflow
@@ -170,25 +154,23 @@ impl WorkflowEngine {
         };
 
         match condition.operator {
-            ConditionOperator::Contains => {
-                value.to_lowercase().contains(&condition.value.to_lowercase())
-            }
-            ConditionOperator::NotContains => {
-                !value.to_lowercase().contains(&condition.value.to_lowercase())
-            }
+            ConditionOperator::Contains => value
+                .to_lowercase()
+                .contains(&condition.value.to_lowercase()),
+            ConditionOperator::NotContains => !value
+                .to_lowercase()
+                .contains(&condition.value.to_lowercase()),
             ConditionOperator::Equals => value.to_lowercase() == condition.value.to_lowercase(),
             ConditionOperator::NotEquals => value.to_lowercase() != condition.value.to_lowercase(),
-            ConditionOperator::StartsWith => {
-                value.to_lowercase().starts_with(&condition.value.to_lowercase())
-            }
-            ConditionOperator::EndsWith => {
-                value.to_lowercase().ends_with(&condition.value.to_lowercase())
-            }
-            ConditionOperator::Matches => {
-                regex::Regex::new(&condition.value)
-                    .map(|re| re.is_match(value))
-                    .unwrap_or(false)
-            }
+            ConditionOperator::StartsWith => value
+                .to_lowercase()
+                .starts_with(&condition.value.to_lowercase()),
+            ConditionOperator::EndsWith => value
+                .to_lowercase()
+                .ends_with(&condition.value.to_lowercase()),
+            ConditionOperator::Matches => regex::Regex::new(&condition.value)
+                .map(|re| re.is_match(value))
+                .unwrap_or(false),
             ConditionOperator::IsEmpty => value.is_empty(),
             ConditionOperator::IsNotEmpty => !value.is_empty(),
         }
@@ -214,14 +196,21 @@ impl WorkflowEngine {
             context.current_node_index = index;
 
             match &node.node_type {
-                NodeType::Condition { condition, then_branch, else_branch } => {
+                NodeType::Condition {
+                    condition,
+                    then_branch,
+                    else_branch,
+                } => {
                     let result = self.evaluate_condition(condition, &context.email);
                     let branch = if result { then_branch } else { else_branch };
                     if let Some(branch_nodes) = branch {
                         // Execute branch (simplified - in real impl would be recursive)
                     }
                 }
-                NodeType::Action { action_type, config } => {
+                NodeType::Action {
+                    action_type,
+                    config,
+                } => {
                     if let Some(handler) = self.action_handlers.get(action_type) {
                         match handler.execute(&context, config).await {
                             Ok(result) => {
@@ -251,7 +240,8 @@ impl WorkflowEngine {
                 }
                 NodeType::Delay { duration_seconds } => {
                     // In real impl, would schedule continuation
-                    tokio::time::sleep(std::time::Duration::from_secs(*duration_seconds as u64)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(*duration_seconds as u64))
+                        .await;
                 }
                 NodeType::Split { branches } => {
                     // Execute multiple branches in parallel (simplified)
@@ -340,13 +330,11 @@ impl WorkflowEngine {
                     description: Some("Archive newsletter emails automatically".to_string()),
                     trigger: WorkflowTrigger {
                         trigger_type: TriggerType::EmailReceived,
-                        conditions: vec![
-                            Condition {
-                                field: "from".to_string(),
-                                operator: ConditionOperator::Contains,
-                                value: "newsletter".to_string(),
-                            },
-                        ],
+                        conditions: vec![Condition {
+                            field: "from".to_string(),
+                            operator: ConditionOperator::Contains,
+                            value: "newsletter".to_string(),
+                        }],
                     },
                     nodes: vec![
                         WorkflowNode {
@@ -378,27 +366,23 @@ impl WorkflowEngine {
                     description: Some("Push notification for urgent emails".to_string()),
                     trigger: WorkflowTrigger {
                         trigger_type: TriggerType::EmailReceived,
-                        conditions: vec![
-                            Condition {
-                                field: "subject".to_string(),
-                                operator: ConditionOperator::Contains,
-                                value: "urgent".to_string(),
-                            },
-                        ],
+                        conditions: vec![Condition {
+                            field: "subject".to_string(),
+                            operator: ConditionOperator::Contains,
+                            value: "urgent".to_string(),
+                        }],
                     },
-                    nodes: vec![
-                        WorkflowNode {
-                            id: "1".to_string(),
-                            node_type: NodeType::Action {
-                                action_type: "notify".to_string(),
-                                config: serde_json::json!({
-                                    "title": "Urgent Email",
-                                    "priority": "high"
-                                }),
-                            },
-                            continue_on_error: false,
+                    nodes: vec![WorkflowNode {
+                        id: "1".to_string(),
+                        node_type: NodeType::Action {
+                            action_type: "notify".to_string(),
+                            config: serde_json::json!({
+                                "title": "Urgent Email",
+                                "priority": "high"
+                            }),
                         },
-                    ],
+                        continue_on_error: false,
+                    }],
                 },
             },
             WorkflowTemplate {
@@ -413,20 +397,18 @@ impl WorkflowEngine {
                         trigger_type: TriggerType::EmailReceived,
                         conditions: vec![],
                     },
-                    nodes: vec![
-                        WorkflowNode {
-                            id: "1".to_string(),
-                            node_type: NodeType::Action {
-                                action_type: "auto_reply".to_string(),
-                                config: serde_json::json!({
-                                    "subject": "Out of Office",
-                                    "body": "Thank you for your email. I am currently out of office and will respond when I return.",
-                                    "once_per_sender": true
-                                }),
-                            },
-                            continue_on_error: false,
+                    nodes: vec![WorkflowNode {
+                        id: "1".to_string(),
+                        node_type: NodeType::Action {
+                            action_type: "auto_reply".to_string(),
+                            config: serde_json::json!({
+                                "subject": "Out of Office",
+                                "body": "Thank you for your email. I am currently out of office and will respond when I return.",
+                                "once_per_sender": true
+                            }),
                         },
-                    ],
+                        continue_on_error: false,
+                    }],
                 },
             },
         ]
@@ -449,8 +431,14 @@ trait ActionHandler: Send + Sync {
 struct MoveToFolderHandler;
 #[async_trait]
 impl ActionHandler for MoveToFolderHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
-        let folder = config["folder"].as_str().ok_or(WorkflowError::InvalidConfig("folder required".into()))?;
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
+        let folder = config["folder"]
+            .as_str()
+            .ok_or(WorkflowError::InvalidConfig("folder required".into()))?;
         Ok(format!("Moved to folder: {}", folder))
     }
 }
@@ -458,8 +446,14 @@ impl ActionHandler for MoveToFolderHandler {
 struct ApplyLabelHandler;
 #[async_trait]
 impl ActionHandler for ApplyLabelHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
-        let label = config["label"].as_str().ok_or(WorkflowError::InvalidConfig("label required".into()))?;
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
+        let label = config["label"]
+            .as_str()
+            .ok_or(WorkflowError::InvalidConfig("label required".into()))?;
         Ok(format!("Applied label: {}", label))
     }
 }
@@ -467,7 +461,11 @@ impl ActionHandler for ApplyLabelHandler {
 struct MarkReadHandler;
 #[async_trait]
 impl ActionHandler for MarkReadHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
         Ok("Marked as read".to_string())
     }
 }
@@ -475,8 +473,14 @@ impl ActionHandler for MarkReadHandler {
 struct ForwardHandler;
 #[async_trait]
 impl ActionHandler for ForwardHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
-        let to = config["to"].as_str().ok_or(WorkflowError::InvalidConfig("to required".into()))?;
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
+        let to = config["to"]
+            .as_str()
+            .ok_or(WorkflowError::InvalidConfig("to required".into()))?;
         Ok(format!("Forwarded to: {}", to))
     }
 }
@@ -484,7 +488,11 @@ impl ActionHandler for ForwardHandler {
 struct AutoReplyHandler;
 #[async_trait]
 impl ActionHandler for AutoReplyHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
         let subject = config["subject"].as_str().unwrap_or("Re: Auto-Reply");
         Ok(format!("Auto-reply sent with subject: {}", subject))
     }
@@ -493,7 +501,11 @@ impl ActionHandler for AutoReplyHandler {
 struct NotifyHandler;
 #[async_trait]
 impl ActionHandler for NotifyHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
         let title = config["title"].as_str().unwrap_or("New Email");
         Ok(format!("Notification sent: {}", title))
     }
@@ -502,7 +514,11 @@ impl ActionHandler for NotifyHandler {
 struct DelayHandler;
 #[async_trait]
 impl ActionHandler for DelayHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
         let seconds = config["seconds"].as_i64().unwrap_or(60);
         Ok(format!("Delayed for {} seconds", seconds))
     }
@@ -511,8 +527,14 @@ impl ActionHandler for DelayHandler {
 struct WebhookHandler;
 #[async_trait]
 impl ActionHandler for WebhookHandler {
-    async fn execute(&self, context: &ExecutionContext, config: &JsonValue) -> Result<String, WorkflowError> {
-        let url = config["url"].as_str().ok_or(WorkflowError::InvalidConfig("url required".into()))?;
+    async fn execute(
+        &self,
+        context: &ExecutionContext,
+        config: &JsonValue,
+    ) -> Result<String, WorkflowError> {
+        let url = config["url"]
+            .as_str()
+            .ok_or(WorkflowError::InvalidConfig("url required".into()))?;
         // Would make HTTP request
         Ok(format!("Webhook called: {}", url))
     }

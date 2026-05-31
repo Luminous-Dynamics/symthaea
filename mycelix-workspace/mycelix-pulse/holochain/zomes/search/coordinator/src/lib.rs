@@ -158,7 +158,13 @@ pub fn index_document(input: IndexDocumentInput) -> ExternResult<u32> {
     }
 
     // Index sender
-    index_term(&sender_term, &input.document_hash, IndexType::Sender, 0, 1.5)?;
+    index_term(
+        &sender_term,
+        &input.document_hash,
+        IndexType::Sender,
+        0,
+        1.5,
+    )?;
     indexed_count += 1;
 
     // Index labels
@@ -207,7 +213,10 @@ fn index_term(
     let term_hash = term_anchor(&term_key)?;
 
     // Check if term entry exists
-    let links = get_links(LinkQuery::try_new(term_hash.clone(), LinkTypes::TermHashToTerm)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(term_hash.clone(), LinkTypes::TermHashToTerm)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.last() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
@@ -219,7 +228,9 @@ fn index_term(
                     .ok_or(wasm_error!("Invalid term entry"))?;
 
                 // Update existing term entry
-                let doc_exists = index_term.documents.iter()
+                let doc_exists = index_term
+                    .documents
+                    .iter()
                     .any(|d| d.document_hash == *document_hash);
 
                 if !doc_exists {
@@ -267,7 +278,8 @@ fn index_term(
 
 /// Generate trigrams from text
 fn generate_trigrams(text: &str) -> Vec<String> {
-    let clean: String = text.to_lowercase()
+    let clean: String = text
+        .to_lowercase()
         .chars()
         .filter(|c| c.is_alphanumeric() || c.is_whitespace())
         .collect();
@@ -276,7 +288,7 @@ fn generate_trigrams(text: &str) -> Vec<String> {
     let chars: Vec<char> = clean.chars().collect();
 
     for i in 0..chars.len().saturating_sub(2) {
-        let trigram: String = chars[i..i+3].iter().collect();
+        let trigram: String = chars[i..i + 3].iter().collect();
         if !trigram.contains(' ') {
             trigrams.push(trigram);
         }
@@ -289,7 +301,10 @@ fn generate_trigrams(text: &str) -> Vec<String> {
 fn index_trigram(trigram: &str, terms: &[String]) -> ExternResult<()> {
     let trigram_hash = trigram_anchor(trigram)?;
 
-    let links = get_links(LinkQuery::try_new(trigram_hash.clone(), LinkTypes::TrigramHashToTrigram)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(trigram_hash.clone(), LinkTypes::TrigramHashToTrigram)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(_link) = links.last() {
         // Trigram exists, update terms
@@ -303,7 +318,12 @@ fn index_trigram(trigram: &str, terms: &[String]) -> ExternResult<()> {
     };
 
     let entry_hash = create_entry(EntryTypes::Trigram(trigram_entry))?;
-    create_link(trigram_hash, entry_hash, LinkTypes::TrigramHashToTrigram, ())?;
+    create_link(
+        trigram_hash,
+        entry_hash,
+        LinkTypes::TrigramHashToTrigram,
+        (),
+    )?;
 
     Ok(())
 }
@@ -357,7 +377,8 @@ pub fn search(input: SearchInput) -> ExternResult<SearchOutput> {
                 did_fuzzy = true;
                 for doc_ref in docs {
                     let score = calculate_bm25_score(&doc_ref);
-                    let entry = doc_scores.entry(doc_ref.document_hash.clone())
+                    let entry = doc_scores
+                        .entry(doc_ref.document_hash.clone())
                         .or_insert((0.0, vec![]));
                     entry.0 += score * 0.8; // Fuzzy match penalty
                     entry.1.push(matched_term.clone());
@@ -366,7 +387,8 @@ pub fn search(input: SearchInput) -> ExternResult<SearchOutput> {
         } else {
             for doc_ref in matches {
                 let score = calculate_bm25_score(&doc_ref);
-                let entry = doc_scores.entry(doc_ref.document_hash.clone())
+                let entry = doc_scores
+                    .entry(doc_ref.document_hash.clone())
                     .or_insert((0.0, vec![]));
                 entry.0 += score;
                 entry.1.push(term.clone());
@@ -390,10 +412,7 @@ pub fn search(input: SearchInput) -> ExternResult<SearchOutput> {
     let total_count = sorted.len() as u32;
 
     // Paginate
-    let paginated: Vec<_> = sorted.into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+    let paginated: Vec<_> = sorted.into_iter().skip(offset).take(limit).collect();
 
     // Build results
     let mut results = Vec::new();
@@ -419,14 +438,22 @@ fn find_term_matches(term: &str, index_type: Option<IndexType>) -> ExternResult<
 
     let index_types = match index_type {
         Some(t) => vec![t],
-        None => vec![IndexType::FullText, IndexType::Subject, IndexType::Sender, IndexType::Label],
+        None => vec![
+            IndexType::FullText,
+            IndexType::Subject,
+            IndexType::Sender,
+            IndexType::Label,
+        ],
     };
 
     for idx_type in index_types {
         let term_key = format!("{}:{}", term_lower, format!("{:?}", idx_type));
         let term_hash = term_anchor(&term_key)?;
 
-        let links = get_links(LinkQuery::try_new(term_hash, LinkTypes::TermHashToTerm)?, GetStrategy::default())?;
+        let links = get_links(
+            LinkQuery::try_new(term_hash, LinkTypes::TermHashToTerm)?,
+            GetStrategy::default(),
+        )?;
 
         for link in links {
             if let Some(action_hash) = link.target.clone().into_action_hash() {
@@ -454,7 +481,10 @@ fn find_fuzzy_matches(term: &str) -> ExternResult<Vec<(String, Vec<DocumentRef>)
     // Find terms that share trigrams
     for trigram in &trigrams {
         let trigram_hash = trigram_anchor(trigram)?;
-        let links = get_links(LinkQuery::try_new(trigram_hash, LinkTypes::TrigramHashToTrigram)?, GetStrategy::default())?;
+        let links = get_links(
+            LinkQuery::try_new(trigram_hash, LinkTypes::TrigramHashToTrigram)?,
+            GetStrategy::default(),
+        )?;
 
         for link in links {
             if let Some(action_hash) = link.target.clone().into_action_hash() {
@@ -479,7 +509,8 @@ fn find_fuzzy_matches(term: &str) -> ExternResult<Vec<(String, Vec<DocumentRef>)
 
     for (candidate, shared_count) in candidate_terms {
         let candidate_trigrams = generate_trigrams(&candidate).len() as f32;
-        let similarity = shared_count as f32 / (query_trigram_count + candidate_trigrams - shared_count as f32);
+        let similarity =
+            shared_count as f32 / (query_trigram_count + candidate_trigrams - shared_count as f32);
 
         if similarity >= FUZZY_THRESHOLD {
             let docs = find_term_matches(&candidate, None)?;
@@ -539,10 +570,11 @@ fn build_search_result(
 /// Tokenize text into terms
 fn tokenize(text: &str) -> Vec<String> {
     let stop_words: HashSet<&str> = [
-        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
-        "has", "he", "in", "is", "it", "its", "of", "on", "that", "the",
-        "to", "was", "were", "will", "with", "you", "your",
-    ].into_iter().collect();
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "he", "in", "is",
+        "it", "its", "of", "on", "that", "the", "to", "was", "were", "will", "with", "you", "your",
+    ]
+    .into_iter()
+    .collect();
 
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
@@ -573,7 +605,10 @@ pub fn save_search(input: SavedSearch) -> ExternResult<ActionHash> {
 pub fn get_saved_searches(_: ()) -> ExternResult<Vec<SavedSearch>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToSavedSearches)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToSavedSearches)?,
+        GetStrategy::default(),
+    )?;
 
     let mut searches = Vec::new();
     for link in links {

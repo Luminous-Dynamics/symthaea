@@ -459,9 +459,7 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, action)
-            }
+            OpEntry::CreateEntry { app_entry, action } => validate_create_entry(app_entry, action),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -479,10 +477,7 @@ fn validate_create_entry(
     }
 }
 
-fn validate_sync_state(
-    state: &SyncState,
-    action: &Create,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_sync_state(state: &SyncState, action: &Create) -> ExternResult<ValidateCallbackResult> {
     // Agent must be author
     if state.agent != action.author {
         return Ok(ValidateCallbackResult::Invalid(

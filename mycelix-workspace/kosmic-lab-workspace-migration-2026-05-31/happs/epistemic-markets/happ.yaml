@@ -1,0 +1,20 @@
+---
+# Epistemic Markets hApp Bundle
+# Collective truth-seeking infrastructure for Mycelix
+
+manifest_version: "0"
+name: epistemic_markets
+description: |
+  Prediction markets with E-N-M epistemic classification for collective truth-seeking.
+
+roles:
+  - name: epistemic_markets
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./epistemic-markets.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

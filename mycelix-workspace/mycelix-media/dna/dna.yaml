@@ -1,0 +1,53 @@
+---
+# Mycelix Media DNA
+# Publication, attribution, fact-checking, and curation
+
+manifest_version: "0"
+name: mycelix_media
+integrity:
+  network_seed: ~
+  properties:
+    # Fact-check configuration
+    min_factcheckers: 3
+    consensus_threshold: 0.67
+
+    # Epistemic classification
+    default_empirical_level: "E1"
+    require_evidence: true
+
+    # MATL integration
+    quality_weight: 0.4
+    consistency_weight: 0.3
+    reputation_weight: 0.3
+
+  zomes:
+    - name: publication_integrity
+      path: ../target/wasm32-unknown-unknown/release/publication_integrity.wasm
+    - name: attribution_integrity
+      path: ../target/wasm32-unknown-unknown/release/attribution_integrity.wasm
+    - name: factcheck_integrity
+      path: ../target/wasm32-unknown-unknown/release/factcheck_integrity.wasm
+    - name: curation_integrity
+      path: ../target/wasm32-unknown-unknown/release/curation_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: publication
+      path: ../target/wasm32-unknown-unknown/release/publication.wasm
+      dependencies:
+        - name: publication_integrity
+    - name: attribution
+      path: ../target/wasm32-unknown-unknown/release/attribution.wasm
+      dependencies:
+        - name: attribution_integrity
+        - name: publication_integrity
+    - name: factcheck
+      path: ../target/wasm32-unknown-unknown/release/factcheck.wasm
+      dependencies:
+        - name: factcheck_integrity
+        - name: publication_integrity
+    - name: curation
+      path: ../target/wasm32-unknown-unknown/release/curation.wasm
+      dependencies:
+        - name: curation_integrity
+        - name: publication_integrity

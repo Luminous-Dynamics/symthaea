@@ -10,7 +10,7 @@ use holochain_client::{
     IssueAppAuthenticationTokenPayload,
 };
 use holochain_types::prelude::{ActionHash, CellId};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::config::Config;
 use crate::types::*;
@@ -306,9 +306,7 @@ impl MycellixClient {
     /// Get a specific message by ID from the `mail_messages` Holochain zome.
     pub async fn get_message(&self, message_id: &str) -> Result<MailMessage> {
         if !self.is_holochain_connected().await {
-            anyhow::bail!(
-                "Cannot fetch message: not connected to Holochain conductor"
-            );
+            anyhow::bail!("Cannot fetch message: not connected to Holochain conductor");
         }
 
         // Parse message_id (base58-encoded ActionHash) back to ActionHash
@@ -607,12 +605,17 @@ impl MycellixClient {
                     .map(|s| TrustScore {
                         did: s.did,
                         score: s.composite_score,
-                        last_updated: s.last_updated.unwrap_or_else(|| chrono::Utc::now().timestamp()),
+                        last_updated: s
+                            .last_updated
+                            .unwrap_or_else(|| chrono::Utc::now().timestamp()),
                         source: s.source.unwrap_or_else(|| "matl_bridge".to_string()),
                     })
                     .collect();
 
-                println!("Synced {} trust scores from MATL bridge", trust_scores.len());
+                println!(
+                    "Synced {} trust scores from MATL bridge",
+                    trust_scores.len()
+                );
                 Ok(trust_scores)
             }
             Ok(response) if response.status() == reqwest::StatusCode::NOT_FOUND => {

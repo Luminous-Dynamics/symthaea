@@ -1,0 +1,17 @@
+[package]
+name = "mycelix_justice_integrity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "mycelix_justice_integrity"
+
+[dependencies]
+getrandom.workspace = true
+hdi.workspace = true
+holochain_serialized_bytes.workspace = true
+serde.workspace = true
+derive_more.workspace = true
+thiserror.workspace = true

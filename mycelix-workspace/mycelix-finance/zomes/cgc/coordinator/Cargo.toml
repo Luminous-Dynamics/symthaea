@@ -1,0 +1,17 @@
+[package]
+name = "cgc"
+version = "0.1.0"
+edition = "2024"
+description = "Civic Gifting Credits (CGC) coordinator zome - Commons Charter Article I"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "cgc"
+
+[dependencies]
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+cgc_integrity = { path = "../integrity" }

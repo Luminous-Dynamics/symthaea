@@ -14,18 +14,18 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum EmailCategory {
-    Primary,      // Important personal and work emails
-    Social,       // Social network notifications
-    Promotions,   // Marketing, deals, offers
-    Updates,      // Bills, receipts, confirmations
-    Forums,       // Mailing lists, group discussions
-    Newsletters,  // Subscribed newsletters
-    Transactional,// Order confirmations, shipping
-    Support,      // Customer service communications
-    Calendar,     // Meeting invites, calendar updates
-    Finance,      // Banking, investments
-    Travel,       // Flight, hotel, travel bookings
-    Security,     // Security alerts, password resets
+    Primary,       // Important personal and work emails
+    Social,        // Social network notifications
+    Promotions,    // Marketing, deals, offers
+    Updates,       // Bills, receipts, confirmations
+    Forums,        // Mailing lists, group discussions
+    Newsletters,   // Subscribed newsletters
+    Transactional, // Order confirmations, shipping
+    Support,       // Customer service communications
+    Calendar,      // Meeting invites, calendar updates
+    Finance,       // Banking, investments
+    Travel,        // Flight, hotel, travel bookings
+    Security,      // Security alerts, password resets
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub struct CategoryPrediction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriorityScore {
-    pub score: f32,        // 0.0 to 1.0 (1.0 = highest priority)
+    pub score: f32, // 0.0 to 1.0 (1.0 = highest priority)
     pub level: PriorityLevel,
     pub factors: Vec<PriorityFactor>,
     pub suggested_action: SuggestedAction,
@@ -45,11 +45,11 @@ pub struct PriorityScore {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PriorityLevel {
-    Urgent,    // 0.9-1.0: Needs immediate attention
-    High,      // 0.7-0.9: Important, respond soon
-    Normal,    // 0.4-0.7: Regular priority
-    Low,       // 0.2-0.4: Can wait
-    Minimal,   // 0.0-0.2: FYI only
+    Urgent,  // 0.9-1.0: Needs immediate attention
+    High,    // 0.7-0.9: Important, respond soon
+    Normal,  // 0.4-0.7: Regular priority
+    Low,     // 0.2-0.4: Can wait
+    Minimal, // 0.0-0.2: FYI only
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,7 +66,7 @@ pub enum SuggestedAction {
     ReviewLater,
     Archive,
     Delegate(String),
-    FollowUp(i64),  // Unix timestamp
+    FollowUp(i64), // Unix timestamp
     NoActionNeeded,
 }
 
@@ -143,49 +143,102 @@ impl CategorizationEngine {
         keyword_patterns.insert(
             EmailCategory::Social,
             vec![
-                "followed you", "liked your", "commented on", "tagged you",
-                "friend request", "connection request", "mentioned you",
-                "new follower", "reacted to", "shared your",
-            ].into_iter().map(String::from).collect(),
+                "followed you",
+                "liked your",
+                "commented on",
+                "tagged you",
+                "friend request",
+                "connection request",
+                "mentioned you",
+                "new follower",
+                "reacted to",
+                "shared your",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         );
 
         // Promotions patterns
         keyword_patterns.insert(
             EmailCategory::Promotions,
             vec![
-                "% off", "sale", "discount", "deal", "offer", "promo",
-                "limited time", "exclusive", "free shipping", "subscribe",
-                "unsubscribe", "marketing", "newsletter",
-            ].into_iter().map(String::from).collect(),
+                "% off",
+                "sale",
+                "discount",
+                "deal",
+                "offer",
+                "promo",
+                "limited time",
+                "exclusive",
+                "free shipping",
+                "subscribe",
+                "unsubscribe",
+                "marketing",
+                "newsletter",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         );
 
         // Updates patterns
         keyword_patterns.insert(
             EmailCategory::Updates,
             vec![
-                "receipt", "invoice", "bill", "statement", "confirmation",
-                "order #", "tracking", "shipped", "delivered", "payment",
-            ].into_iter().map(String::from).collect(),
+                "receipt",
+                "invoice",
+                "bill",
+                "statement",
+                "confirmation",
+                "order #",
+                "tracking",
+                "shipped",
+                "delivered",
+                "payment",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         );
 
         // Security patterns
         keyword_patterns.insert(
             EmailCategory::Security,
             vec![
-                "password reset", "verify your", "security alert", "suspicious",
-                "two-factor", "2fa", "login attempt", "account security",
-                "verification code", "confirm your identity",
-            ].into_iter().map(String::from).collect(),
+                "password reset",
+                "verify your",
+                "security alert",
+                "suspicious",
+                "two-factor",
+                "2fa",
+                "login attempt",
+                "account security",
+                "verification code",
+                "confirm your identity",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         );
 
         // Calendar patterns
         keyword_patterns.insert(
             EmailCategory::Calendar,
             vec![
-                "meeting invite", "calendar invite", "event reminder",
-                "rsvp", "invitation to", "scheduled for", "join meeting",
-                "meeting request", "availability",
-            ].into_iter().map(String::from).collect(),
+                "meeting invite",
+                "calendar invite",
+                "event reminder",
+                "rsvp",
+                "invitation to",
+                "scheduled for",
+                "join meeting",
+                "meeting request",
+                "availability",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         );
 
         // Domain mappings
@@ -216,7 +269,10 @@ impl CategorizationEngine {
         // Check domain mapping first
         if let Some(category) = self.domain_mappings.get(&features.sender_domain) {
             scores.insert(category.clone(), 0.8);
-            reasoning.push(format!("Sender domain {} maps to {:?}", features.sender_domain, category));
+            reasoning.push(format!(
+                "Sender domain {} maps to {:?}",
+                features.sender_domain, category
+            ));
         }
 
         // Keyword analysis
@@ -293,14 +349,35 @@ impl PriorityEngine {
         Self {
             vip_senders: vec![],
             urgent_keywords: vec![
-                "urgent", "asap", "immediately", "critical", "important",
-                "deadline", "time-sensitive", "action required", "response needed",
-                "by end of day", "by eod", "please respond", "waiting on you",
-            ].into_iter().map(String::from).collect(),
+                "urgent",
+                "asap",
+                "immediately",
+                "critical",
+                "important",
+                "deadline",
+                "time-sensitive",
+                "action required",
+                "response needed",
+                "by end of day",
+                "by eod",
+                "please respond",
+                "waiting on you",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             time_sensitive_patterns: vec![
-                "expires", "ending soon", "last chance", "final reminder",
-                "overdue", "past due", "action needed by",
-            ].into_iter().map(String::from).collect(),
+                "expires",
+                "ending soon",
+                "last chance",
+                "final reminder",
+                "overdue",
+                "past due",
+                "action needed by",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         }
     }
 
@@ -313,7 +390,12 @@ impl PriorityEngine {
         let mut factors = Vec::new();
 
         // VIP sender boost
-        if features.sender_is_vip || self.vip_senders.iter().any(|v| features.sender_domain.contains(v)) {
+        if features.sender_is_vip
+            || self
+                .vip_senders
+                .iter()
+                .any(|v| features.sender_domain.contains(v))
+        {
             score += 0.25;
             factors.push(PriorityFactor {
                 factor: "vip_sender".into(),
@@ -328,7 +410,10 @@ impl PriorityEngine {
             factors.push(PriorityFactor {
                 factor: "high_trust".into(),
                 weight: 0.15,
-                description: format!("Sender has high trust score ({:.2})", features.sender_trust_score),
+                description: format!(
+                    "Sender has high trust score ({:.2})",
+                    features.sender_trust_score
+                ),
             });
         } else if features.sender_trust_score < 0.3 {
             score -= 0.1;
@@ -355,7 +440,10 @@ impl PriorityEngine {
             factors.push(PriorityFactor {
                 factor: "reply_history".into(),
                 weight: 0.1,
-                description: format!("You've replied to {} emails from this sender", features.sender_reply_history),
+                description: format!(
+                    "You've replied to {} emails from this sender",
+                    features.sender_reply_history
+                ),
             });
         }
 
@@ -381,7 +469,8 @@ impl PriorityEngine {
 
         // Urgent keywords
         let text = format!("{} {}", features.subject, features.body_preview).to_lowercase();
-        let urgent_matches: Vec<_> = self.urgent_keywords
+        let urgent_matches: Vec<_> = self
+            .urgent_keywords
             .iter()
             .filter(|k| text.contains(*k))
             .collect();
@@ -392,12 +481,21 @@ impl PriorityEngine {
             factors.push(PriorityFactor {
                 factor: "urgent_keywords".into(),
                 weight: boost,
-                description: format!("Contains urgent keywords: {}", urgent_matches.iter().take(3).cloned().collect::<Vec<_>>().join(", ")),
+                description: format!(
+                    "Contains urgent keywords: {}",
+                    urgent_matches
+                        .iter()
+                        .take(3)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
             });
         }
 
         // Time sensitive patterns
-        let time_matches: Vec<_> = self.time_sensitive_patterns
+        let time_matches: Vec<_> = self
+            .time_sensitive_patterns
             .iter()
             .filter(|p| text.contains(*p))
             .collect();
@@ -594,6 +692,9 @@ mod tests {
         let features = sample_features();
         let result = engine.calculate_priority(&features);
         assert!(result.score > 0.7);
-        assert!(matches!(result.level, PriorityLevel::High | PriorityLevel::Urgent));
+        assert!(matches!(
+            result.level,
+            PriorityLevel::High | PriorityLevel::Urgent
+        ));
     }
 }

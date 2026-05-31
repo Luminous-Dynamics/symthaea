@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use std::fs::File;
 use std::io::Write;
@@ -212,7 +212,10 @@ fn parse_date(date_str: &str) -> Result<i64> {
             return Ok(DateTime::<Utc>::from_naive_utc_and_offset(today, Utc).timestamp());
         }
         "yesterday" => {
-            let yesterday = (now - chrono::Duration::days(1)).date_naive().and_hms_opt(0, 0, 0).unwrap();
+            let yesterday = (now - chrono::Duration::days(1))
+                .date_naive()
+                .and_hms_opt(0, 0, 0)
+                .unwrap();
             return Ok(DateTime::<Utc>::from_naive_utc_and_offset(yesterday, Utc).timestamp());
         }
         _ => {}

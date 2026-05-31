@@ -1386,6 +1386,8 @@ fn md5_simple(data: &[u8]) -> u64 {
 fn download_file(filename: &str, content: &str, mime: &str) {
     let _ = js_sys::eval(&format!(
         "const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([`{}`],{{type:'{}'}}));a.download='{}';a.click()",
-        content.replace('`', "\\`").replace('\\', "\\\\"), mime, filename,
+        content.replace('`', "\\`").replace('\\', "\\\\"),
+        mime,
+        filename,
     ));
 }

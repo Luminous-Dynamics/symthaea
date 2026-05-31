@@ -55,7 +55,8 @@ pub async fn handle_inbox(
     let mut trust_scores = std::collections::HashMap::new();
     if trust_min.is_some() {
         // Collect unique sender DIDs
-        let sender_dids: std::collections::HashSet<_> = messages.iter().map(|m| m.from_did.clone()).collect();
+        let sender_dids: std::collections::HashSet<_> =
+            messages.iter().map(|m| m.from_did.clone()).collect();
 
         // Fetch trust scores for each sender
         for did in sender_dids {
@@ -69,7 +70,14 @@ pub async fn handle_inbox(
     let read_messages = load_read_messages();
 
     // 4. Apply filters
-    messages = apply_filters(messages, from, trust_min, unread, &trust_scores, &read_messages);
+    messages = apply_filters(
+        messages,
+        from,
+        trust_min,
+        unread,
+        &trust_scores,
+        &read_messages,
+    );
 
     // 3. Sort by timestamp (newest first)
     messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
@@ -142,8 +150,8 @@ fn load_read_messages() -> std::collections::HashSet<String> {
 /// Save read message IDs to local storage
 fn save_read_messages(read_messages: &std::collections::HashSet<String>) -> Result<()> {
     let path = get_read_messages_path();
-    let content = serde_json::to_string_pretty(read_messages)
-        .context("Failed to serialize read messages")?;
+    let content =
+        serde_json::to_string_pretty(read_messages).context("Failed to serialize read messages")?;
     std::fs::write(&path, content).context("Failed to write read messages file")?;
     Ok(())
 }
@@ -413,11 +421,25 @@ mod tests {
         let read_messages = std::collections::HashSet::new();
 
         // Should match
-        let filtered = apply_filters(messages.clone(), Some("ABC".to_string()), None, false, &trust_scores, &read_messages);
+        let filtered = apply_filters(
+            messages.clone(),
+            Some("ABC".to_string()),
+            None,
+            false,
+            &trust_scores,
+            &read_messages,
+        );
         assert_eq!(filtered.len(), 1);
 
         // Should not match
-        let filtered = apply_filters(messages.clone(), Some("ZZZ".to_string()), None, false, &trust_scores, &read_messages);
+        let filtered = apply_filters(
+            messages.clone(),
+            Some("ZZZ".to_string()),
+            None,
+            false,
+            &trust_scores,
+            &read_messages,
+        );
         assert_eq!(filtered.len(), 0);
     }
 
@@ -439,11 +461,25 @@ mod tests {
         let read_messages = std::collections::HashSet::new();
 
         // Should match (trust 0.8 >= 0.5)
-        let filtered = apply_filters(messages.clone(), None, Some(0.5), false, &trust_scores, &read_messages);
+        let filtered = apply_filters(
+            messages.clone(),
+            None,
+            Some(0.5),
+            false,
+            &trust_scores,
+            &read_messages,
+        );
         assert_eq!(filtered.len(), 1);
 
         // Should not match (trust 0.8 < 0.9)
-        let filtered = apply_filters(messages.clone(), None, Some(0.9), false, &trust_scores, &read_messages);
+        let filtered = apply_filters(
+            messages.clone(),
+            None,
+            Some(0.9),
+            false,
+            &trust_scores,
+            &read_messages,
+        );
         assert_eq!(filtered.len(), 0);
     }
 
@@ -464,7 +500,14 @@ mod tests {
         let mut read_messages = std::collections::HashSet::new();
 
         // Should match (unread filter on, message not read)
-        let filtered = apply_filters(messages.clone(), None, None, true, &trust_scores, &read_messages);
+        let filtered = apply_filters(
+            messages.clone(),
+            None,
+            None,
+            true,
+            &trust_scores,
+            &read_messages,
+        );
         assert_eq!(filtered.len(), 1);
 
         // Mark as read
@@ -472,7 +515,14 @@ mod tests {
         read_messages.insert(msg_id);
 
         // Should not match (unread filter on, message is read)
-        let filtered = apply_filters(messages.clone(), None, None, true, &trust_scores, &read_messages);
+        let filtered = apply_filters(
+            messages.clone(),
+            None,
+            None,
+            true,
+            &trust_scores,
+            &read_messages,
+        );
         assert_eq!(filtered.len(), 0);
     }
 }

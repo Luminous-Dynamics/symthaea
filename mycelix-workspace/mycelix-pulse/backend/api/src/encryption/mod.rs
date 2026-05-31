@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Key Management
@@ -372,7 +372,11 @@ impl EncryptionService {
     }
 
     /// Check if a contact has a public key available
-    pub async fn can_encrypt_to(&self, user_id: Uuid, email: &str) -> Result<bool, EncryptionError> {
+    pub async fn can_encrypt_to(
+        &self,
+        user_id: Uuid,
+        email: &str,
+    ) -> Result<bool, EncryptionError> {
         Ok(self
             .key_manager
             .get_contact_key(user_id, email)
@@ -404,7 +408,9 @@ impl SelfDestructService {
         let expires_at = match config.destruct_type {
             DestructType::AfterRead { delay_seconds } => None, // Calculated on read
             DestructType::AtTime { time } => Some(time),
-            DestructType::AfterDuration { seconds } => Some(Utc::now() + chrono::Duration::seconds(seconds as i64)),
+            DestructType::AfterDuration { seconds } => {
+                Some(Utc::now() + chrono::Duration::seconds(seconds as i64))
+            }
         };
 
         sqlx::query(
@@ -469,7 +475,9 @@ impl SelfDestructService {
 
         // Calculate destruction time for "after read" type
         if record.destruct_type == "after_read" {
-            if let (Some(first_read), Some(delay)) = (record.first_read_at, record.delay_after_read_seconds) {
+            if let (Some(first_read), Some(delay)) =
+                (record.first_read_at, record.delay_after_read_seconds)
+            {
                 let destruct_at = first_read + chrono::Duration::seconds(delay as i64);
                 if Utc::now() >= destruct_at {
                     self.destroy_message(email_id).await?;
@@ -548,8 +556,12 @@ impl Keyring {
     ) -> Result<KeyPair, EncryptionError> {
         // In real implementation, would use sequoia-pgp or similar
         Ok(KeyPair {
-            public_key: format!("-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----"),
-            private_key_encrypted: format!("-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----"),
+            public_key: format!(
+                "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----"
+            ),
+            private_key_encrypted: format!(
+                "-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----"
+            ),
             fingerprint: format!("{:040X}", uuid::Uuid::new_v4().as_u128()),
         })
     }
@@ -567,7 +579,11 @@ impl Keyring {
         })
     }
 
-    fn encrypt_pgp(&self, content: &str, recipient_keys: &[String]) -> Result<String, EncryptionError> {
+    fn encrypt_pgp(
+        &self,
+        content: &str,
+        recipient_keys: &[String],
+    ) -> Result<String, EncryptionError> {
         // Would use actual PGP encryption
         Ok(format!(
             "-----BEGIN PGP MESSAGE-----\n{}\n-----END PGP MESSAGE-----",
@@ -608,7 +624,11 @@ impl Keyring {
         Ok(true)
     }
 
-    fn encrypt_binary(&self, recipient_keys: &[String], data: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+    fn encrypt_binary(
+        &self,
+        recipient_keys: &[String],
+        data: &[u8],
+    ) -> Result<Vec<u8>, EncryptionError> {
         // Would encrypt binary data
         Ok(data.to_vec())
     }

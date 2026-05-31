@@ -19,7 +19,10 @@ mod trust_tests {
     fn test_trust_score_calculation() {
         // Direct attestation should give high trust
         let direct_score = calculate_direct_trust(0.9, 1.0);
-        assert!(direct_score >= 0.8, "Direct attestation should give high trust");
+        assert!(
+            direct_score >= 0.8,
+            "Direct attestation should give high trust"
+        );
     }
 
     #[test]
@@ -40,9 +43,9 @@ mod trust_tests {
     #[test]
     fn test_trust_aggregation() {
         let attestations = vec![
-            (0.9, 1.0),  // High trust, max confidence
-            (0.7, 0.8),  // Medium trust, good confidence
-            (0.8, 0.5),  // Good trust, low confidence
+            (0.9, 1.0), // High trust, max confidence
+            (0.7, 0.8), // Medium trust, good confidence
+            (0.8, 0.5), // Good trust, low confidence
         ];
 
         let aggregated = aggregate_trust_scores(&attestations);
@@ -106,7 +109,10 @@ mod email_parsing_tests {
     #[test]
     fn test_extract_domain() {
         assert_eq!(extract_domain("user@example.com"), "example.com");
-        assert_eq!(extract_domain("user@sub.example.co.uk"), "sub.example.co.uk");
+        assert_eq!(
+            extract_domain("user@sub.example.co.uk"),
+            "sub.example.co.uk"
+        );
     }
 
     #[test]
@@ -119,9 +125,13 @@ mod email_parsing_tests {
         if let Some(start) = addr.find('<') {
             if let Some(end) = addr.find('>') {
                 let name = addr[..start].trim();
-                let email = &addr[start+1..end];
+                let email = &addr[start + 1..end];
                 return (
-                    if name.is_empty() { None } else { Some(name.to_string()) },
+                    if name.is_empty() {
+                        None
+                    } else {
+                        Some(name.to_string())
+                    },
                     email.to_string(),
                 );
             }
@@ -156,14 +166,20 @@ mod search_tests {
     #[test]
     fn test_parse_field_query() {
         let query = parse_search_query("from:alice@example.com");
-        assert_eq!(query.filters.get("from"), Some(&"alice@example.com".to_string()));
+        assert_eq!(
+            query.filters.get("from"),
+            Some(&"alice@example.com".to_string())
+        );
     }
 
     #[test]
     fn test_parse_complex_query() {
         let query = parse_search_query("meeting from:boss@company.com is:unread");
         assert_eq!(query.terms, vec!["meeting"]);
-        assert_eq!(query.filters.get("from"), Some(&"boss@company.com".to_string()));
+        assert_eq!(
+            query.filters.get("from"),
+            Some(&"boss@company.com".to_string())
+        );
         assert_eq!(query.filters.get("is"), Some(&"unread".to_string()));
     }
 
@@ -319,9 +335,21 @@ mod workflow_tests {
         let email_from = "newsletter@example.com";
         let email_subject = "Weekly Newsletter #42";
 
-        assert!(evaluate_condition("from contains 'newsletter'", email_from, email_subject));
-        assert!(evaluate_condition("subject contains 'Newsletter'", email_from, email_subject));
-        assert!(!evaluate_condition("from equals 'other@example.com'", email_from, email_subject));
+        assert!(evaluate_condition(
+            "from contains 'newsletter'",
+            email_from,
+            email_subject
+        ));
+        assert!(evaluate_condition(
+            "subject contains 'Newsletter'",
+            email_from,
+            email_subject
+        ));
+        assert!(!evaluate_condition(
+            "from equals 'other@example.com'",
+            email_from,
+            email_subject
+        ));
     }
 
     fn evaluate_condition(condition: &str, from: &str, subject: &str) -> bool {

@@ -61,10 +61,7 @@ pub enum SyncSignal {
         peer: AgentPubKey,
     },
     /// Sync complete
-    SyncComplete {
-        peer: AgentPubKey,
-        ops_synced: u32,
-    },
+    SyncComplete { peer: AgentPubKey, ops_synced: u32 },
 }
 
 // ==================== INPUTS/OUTPUTS ====================
@@ -146,7 +143,10 @@ pub fn init_sync_state(_: ()) -> ExternResult<ActionHash> {
 pub fn get_sync_state(_: ()) -> ExternResult<Option<SyncState>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToSyncState)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToSyncState)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.last() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -196,8 +196,7 @@ pub fn record_operation(input: RecordOperationInput) -> ExternResult<ActionHash>
     let now = sys_time()?;
 
     // Get current sync state
-    let mut sync_state = get_sync_state(())?
-        .ok_or(wasm_error!("Sync state not initialized"))?;
+    let mut sync_state = get_sync_state(())?.ok_or(wasm_error!("Sync state not initialized"))?;
 
     // Increment vector clock
     sync_state.vector_clock.increment(&agent);
@@ -286,7 +285,10 @@ pub fn process_offline_queue(_: ()) -> ExternResult<u32> {
     let agent = agent_info()?.agent_initial_pubkey;
     let mut processed = 0;
 
-    let links = get_links(LinkQuery::try_new(agent.clone(), LinkTypes::AgentToOfflineQueue)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToOfflineQueue)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -322,7 +324,10 @@ pub fn get_operations_since(input: GetOperationsInput) -> ExternResult<Vec<SyncO
     let agent = agent_info()?.agent_initial_pubkey;
     let limit = input.limit.unwrap_or(SYNC_BATCH_SIZE);
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToOperations)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToOperations)?,
+        GetStrategy::default(),
+    )?;
 
     let mut operations = Vec::new();
 
@@ -363,8 +368,7 @@ pub fn apply_remote_operations(input: ApplyRemoteOperationsInput) -> ExternResul
     let mut conflicts = Vec::new();
 
     // Get current sync state
-    let mut sync_state = get_sync_state(())?
-        .ok_or(wasm_error!("Sync state not initialized"))?;
+    let mut sync_state = get_sync_state(())?.ok_or(wasm_error!("Sync state not initialized"))?;
 
     // Sort operations by dependencies
     let sorted_ops = topological_sort(&input.operations)?;
@@ -448,7 +452,10 @@ pub struct ApplyResult {
 fn operation_exists(op_id: &str) -> ExternResult<bool> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToOperations)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToOperations)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -502,7 +509,10 @@ fn topological_sort(operations: &[SyncOperation]) -> ExternResult<Vec<SyncOperat
 }
 
 /// Detect conflict between operation and current state
-fn detect_conflict(op: &SyncOperation, sync_state: &SyncState) -> ExternResult<Option<ConflictType>> {
+fn detect_conflict(
+    op: &SyncOperation,
+    sync_state: &SyncState,
+) -> ExternResult<Option<ConflictType>> {
     // Check causality - if operation's clock is concurrent with ours
     let comparison = op.vector_clock.compare(&sync_state.vector_clock);
 
@@ -533,19 +543,33 @@ fn try_auto_resolve(op: &SyncOperation, conflict: &SyncConflict) -> ExternResult
         ConflictType::ConcurrentEdit => {
             // Use CRDT merge rules based on payload type
             match &op.payload {
-                SyncPayload::EmailState { email_hash: _, new_state: _ } => {
+                SyncPayload::EmailState {
+                    email_hash: _,
+                    new_state: _,
+                } => {
                     // Email state uses LWW per field - auto resolve
                     true
                 }
-                SyncPayload::LabelSet { email_hash: _, labels: _ } => {
+                SyncPayload::LabelSet {
+                    email_hash: _,
+                    labels: _,
+                } => {
                     // Labels use Add-Wins Set - auto resolve
                     true
                 }
-                SyncPayload::DraftContent { draft_hash: _, encrypted_content: _, lww_timestamp: _ } => {
+                SyncPayload::DraftContent {
+                    draft_hash: _,
+                    encrypted_content: _,
+                    lww_timestamp: _,
+                } => {
                     // Drafts use LWW - auto resolve
                     true
                 }
-                SyncPayload::Setting { key: _, value: _, lww_timestamp: _ } => {
+                SyncPayload::Setting {
+                    key: _,
+                    value: _,
+                    lww_timestamp: _,
+                } => {
                     // Settings use LWW - auto resolve
                     true
                 }
@@ -639,7 +663,10 @@ pub fn merge_email_states(input: MergeStatesInput) -> ExternResult<EmailStateCrd
 
     // Merge labels (Add-Wins Set)
     for remote_label in &input.remote.labels {
-        let existing = merged.labels.iter_mut().find(|l| l.label == remote_label.label);
+        let existing = merged
+            .labels
+            .iter_mut()
+            .find(|l| l.label == remote_label.label);
 
         match existing {
             Some(local_label) => {
@@ -691,8 +718,7 @@ pub struct MergeStatesInput {
 #[hdk_extern]
 pub fn create_checkpoint(_: ()) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
-    let sync_state = get_sync_state(())?
-        .ok_or(wasm_error!("Sync state not initialized"))?;
+    let sync_state = get_sync_state(())?.ok_or(wasm_error!("Sync state not initialized"))?;
 
     let checkpoint = SyncCheckpoint {
         agent: agent.clone(),
@@ -721,7 +747,10 @@ pub fn create_checkpoint(_: ()) -> ExternResult<ActionHash> {
 pub fn get_latest_checkpoint(_: ()) -> ExternResult<Option<SyncCheckpoint>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToCheckpoints)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToCheckpoints)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.last() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -804,7 +833,10 @@ pub fn register_sync_peer(peer: AgentPubKey) -> ExternResult<ActionHash> {
 pub fn get_sync_peers(_: ()) -> ExternResult<Vec<SyncPeer>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToSyncPeers)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToSyncPeers)?,
+        GetStrategy::default(),
+    )?;
 
     let mut peers = Vec::new();
 

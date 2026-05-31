@@ -6,9 +6,9 @@
 //! Provides access to MATL-based trust scoring with caching.
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, post},
-    Json, Router,
 };
 
 use crate::error::AppResult;

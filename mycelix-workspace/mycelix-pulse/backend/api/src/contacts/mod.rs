@@ -8,8 +8,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Contact Service
@@ -235,15 +235,13 @@ impl ContactService {
         .map_err(|e| ContactError::Database(e.to_string()))?;
 
         // Update email references
-        sqlx::query(
-            "UPDATE emails SET contact_id = $1 WHERE contact_id = $2 AND user_id = $3",
-        )
-        .bind(primary_id)
-        .bind(secondary_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await
-        .ok();
+        sqlx::query("UPDATE emails SET contact_id = $1 WHERE contact_id = $2 AND user_id = $3")
+            .bind(primary_id)
+            .bind(secondary_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .ok();
 
         // Delete secondary contact
         self.delete_contact(user_id, secondary_id).await?;
@@ -491,14 +489,13 @@ impl ContactEnrichment {
         user_id: Uuid,
         contact_id: Uuid,
     ) -> Result<EnrichmentResult, ContactError> {
-        let contact: (String,) = sqlx::query_as(
-            "SELECT email FROM contacts WHERE id = $1 AND user_id = $2",
-        )
-        .bind(contact_id)
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ContactError::Database(e.to_string()))?;
+        let contact: (String,) =
+            sqlx::query_as("SELECT email FROM contacts WHERE id = $1 AND user_id = $2")
+                .bind(contact_id)
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| ContactError::Database(e.to_string()))?;
 
         let email = contact.0;
         let domain = email.split('@').last().unwrap_or("");

@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Integration Registry
@@ -61,7 +61,7 @@ pub struct IntegrationConfig {
     pub base_url: String,
     pub api_key: Option<String>,
     pub username: Option<String>,
-    pub password_ref: Option<String>,  // Reference to secret in vault
+    pub password_ref: Option<String>, // Reference to secret in vault
     pub oauth_token: Option<String>,
     pub refresh_token: Option<String>,
     pub extra: HashMap<String, String>,
@@ -105,12 +105,9 @@ impl IntegrationRegistry {
     }
 
     pub async fn get(&self, integration_id: Uuid) -> Result<Integration> {
-        let row = sqlx::query!(
-            "SELECT * FROM integrations WHERE id = $1",
-            integration_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let row = sqlx::query!("SELECT * FROM integrations WHERE id = $1", integration_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(Integration {
             id: row.id,
@@ -132,19 +129,27 @@ impl IntegrationRegistry {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| Integration {
-            id: r.id,
-            user_id: r.user_id,
-            integration_type: serde_json::from_str(&r.integration_type).unwrap_or(IntegrationType::Nextcloud),
-            name: r.name,
-            config: serde_json::from_value(r.config).unwrap_or_default(),
-            status: serde_json::from_str(&r.status).unwrap_or(IntegrationStatus::Inactive),
-            last_sync: r.last_sync,
-            created_at: r.created_at,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| Integration {
+                id: r.id,
+                user_id: r.user_id,
+                integration_type: serde_json::from_str(&r.integration_type)
+                    .unwrap_or(IntegrationType::Nextcloud),
+                name: r.name,
+                config: serde_json::from_value(r.config).unwrap_or_default(),
+                status: serde_json::from_str(&r.status).unwrap_or(IntegrationStatus::Inactive),
+                last_sync: r.last_sync,
+                created_at: r.created_at,
+            })
+            .collect())
     }
 
-    pub async fn update_status(&self, integration_id: Uuid, status: IntegrationStatus) -> Result<()> {
+    pub async fn update_status(
+        &self,
+        integration_id: Uuid,
+        status: IntegrationStatus,
+    ) -> Result<()> {
         sqlx::query!(
             "UPDATE integrations SET status = $1, last_sync = NOW() WHERE id = $2",
             serde_json::to_string(&status)?,
@@ -227,7 +232,8 @@ impl NextcloudIntegration {
     }
 
     pub async fn test_connection(&self) -> Result<bool> {
-        let response = self.client
+        let response = self
+            .client
             .get(format!("{}/ocs/v2.php/cloud/user", self.config.base_url))
             .basic_auth(&self.config.username, Some(&self.config.app_password))
             .header("OCS-APIRequest", "true")
@@ -238,7 +244,10 @@ impl NextcloudIntegration {
     }
 
     pub async fn get_calendars(&self) -> Result<Vec<NextcloudCalendar>> {
-        let dav_url = format!("{}/remote.php/dav/calendars/{}/", self.config.base_url, self.config.username);
+        let dav_url = format!(
+            "{}/remote.php/dav/calendars/{}/",
+            self.config.base_url, self.config.username
+        );
 
         let response = self.client
             .request(reqwest::Method::from_bytes(b"PROPFIND")?, &dav_url)
@@ -262,15 +271,17 @@ impl NextcloudIntegration {
         Ok(vec![])
     }
 
-    pub async fn create_event_from_email(&self, email_id: Uuid, calendar_id: &str, event: NextcloudEvent) -> Result<String> {
+    pub async fn create_event_from_email(
+        &self,
+        email_id: Uuid,
+        calendar_id: &str,
+        event: NextcloudEvent,
+    ) -> Result<String> {
         let ical = self.event_to_ical(&event);
 
         let event_url = format!(
             "{}/remote.php/dav/calendars/{}/{}/{}.ics",
-            self.config.base_url,
-            self.config.username,
-            calendar_id,
-            event.uid
+            self.config.base_url, self.config.username, calendar_id, event.uid
         );
 
         self.client
@@ -310,9 +321,13 @@ END:VCALENDAR"#,
     }
 
     pub async fn get_contacts(&self) -> Result<Vec<NextcloudContact>> {
-        let dav_url = format!("{}/remote.php/dav/addressbooks/users/{}/contacts/", self.config.base_url, self.config.username);
+        let dav_url = format!(
+            "{}/remote.php/dav/addressbooks/users/{}/contacts/",
+            self.config.base_url, self.config.username
+        );
 
-        let response = self.client
+        let response = self
+            .client
             .request(reqwest::Method::from_bytes(b"PROPFIND")?, &dav_url)
             .basic_auth(&self.config.username, Some(&self.config.app_password))
             .header("Depth", "1")
@@ -325,7 +340,12 @@ END:VCALENDAR"#,
         Ok(vec![])
     }
 
-    pub async fn save_email_as_note(&self, subject: &str, body: &str, folder: &str) -> Result<String> {
+    pub async fn save_email_as_note(
+        &self,
+        subject: &str,
+        body: &str,
+        folder: &str,
+    ) -> Result<String> {
         let notes_url = format!(
             "{}/remote.php/webdav/{}/{}.md",
             self.config.base_url,
@@ -395,9 +415,13 @@ impl MatrixIntegration {
             self.config.homeserver, room_id, txn_id
         );
 
-        let response = self.client
+        let response = self
+            .client
             .put(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .json(&serde_json::json!({
                 "msgtype": "m.text",
                 "body": message
@@ -410,7 +434,13 @@ impl MatrixIntegration {
         Ok(response["event_id"].as_str().unwrap_or("").to_string())
     }
 
-    pub async fn send_email_notification(&self, room_id: &str, subject: &str, from: &str, preview: &str) -> Result<String> {
+    pub async fn send_email_notification(
+        &self,
+        room_id: &str,
+        subject: &str,
+        from: &str,
+        preview: &str,
+    ) -> Result<String> {
         let formatted = format!(
             r#"<h4>📧 New Email</h4>
 <p><strong>From:</strong> {}</p>
@@ -419,7 +449,10 @@ impl MatrixIntegration {
             from, subject, preview
         );
 
-        let plain = format!("📧 New Email\nFrom: {}\nSubject: {}\n\n{}", from, subject, preview);
+        let plain = format!(
+            "📧 New Email\nFrom: {}\nSubject: {}\n\n{}",
+            from, subject, preview
+        );
 
         let txn_id = Uuid::new_v4().to_string();
         let url = format!(
@@ -427,9 +460,13 @@ impl MatrixIntegration {
             self.config.homeserver, room_id, txn_id
         );
 
-        let response = self.client
+        let response = self
+            .client
             .put(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .json(&serde_json::json!({
                 "msgtype": "m.text",
                 "body": plain,
@@ -447,9 +484,13 @@ impl MatrixIntegration {
     pub async fn get_rooms(&self) -> Result<Vec<MatrixRoom>> {
         let url = format!("{}/_matrix/client/v3/joined_rooms", self.config.homeserver);
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .send()
             .await?
             .json::<serde_json::Value>()
@@ -478,9 +519,13 @@ impl MatrixIntegration {
             self.config.homeserver, room_id
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .send()
             .await?
             .json::<serde_json::Value>()
@@ -530,7 +575,11 @@ impl JitsiIntegration {
     }
 
     pub fn create_meeting_from_email(&self, subject: &str, user_name: &str) -> JitsiMeeting {
-        let room_name = format!("{}-{}", slugify(subject), Uuid::new_v4().to_string()[..8].to_string());
+        let room_name = format!(
+            "{}-{}",
+            slugify(subject),
+            Uuid::new_v4().to_string()[..8].to_string()
+        );
 
         let url = format!("{}/{}", self.config.server_url, room_name);
 
@@ -602,7 +651,8 @@ impl VikunjaIntegration {
     }
 
     pub async fn get_projects(&self) -> Result<Vec<VikunjaProject>> {
-        let response = self.client
+        let response = self
+            .client
             .get(format!("{}/api/v1/projects", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_token))
             .send()
@@ -614,8 +664,12 @@ impl VikunjaIntegration {
     }
 
     pub async fn create_task(&self, task: VikunjaTask) -> Result<VikunjaTask> {
-        let response = self.client
-            .put(format!("{}/api/v1/projects/{}/tasks", self.config.base_url, task.project_id))
+        let response = self
+            .client
+            .put(format!(
+                "{}/api/v1/projects/{}/tasks",
+                self.config.base_url, task.project_id
+            ))
             .header("Authorization", format!("Bearer {}", self.config.api_token))
             .json(&task)
             .send()
@@ -626,7 +680,13 @@ impl VikunjaIntegration {
         Ok(response)
     }
 
-    pub async fn create_task_from_email(&self, project_id: i64, subject: &str, body: &str, due: Option<DateTime<Utc>>) -> Result<VikunjaTask> {
+    pub async fn create_task_from_email(
+        &self,
+        project_id: i64,
+        subject: &str,
+        body: &str,
+        due: Option<DateTime<Utc>>,
+    ) -> Result<VikunjaTask> {
         let task = VikunjaTask {
             id: None,
             title: subject.to_string(),
@@ -707,8 +767,12 @@ impl OIDCIntegration {
     }
 
     pub async fn exchange_code(&self, code: &str) -> Result<OIDCToken> {
-        let response = self.client
-            .post(format!("{}/protocol/openid-connect/token", self.config.issuer_url))
+        let response = self
+            .client
+            .post(format!(
+                "{}/protocol/openid-connect/token",
+                self.config.issuer_url
+            ))
             .form(&[
                 ("grant_type", "authorization_code"),
                 ("client_id", &self.config.client_id),
@@ -725,8 +789,12 @@ impl OIDCIntegration {
     }
 
     pub async fn get_user_info(&self, access_token: &str) -> Result<OIDCUserInfo> {
-        let response = self.client
-            .get(format!("{}/protocol/openid-connect/userinfo", self.config.issuer_url))
+        let response = self
+            .client
+            .get(format!(
+                "{}/protocol/openid-connect/userinfo",
+                self.config.issuer_url
+            ))
             .header("Authorization", format!("Bearer {}", access_token))
             .send()
             .await?
@@ -737,8 +805,12 @@ impl OIDCIntegration {
     }
 
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<OIDCToken> {
-        let response = self.client
-            .post(format!("{}/protocol/openid-connect/token", self.config.issuer_url))
+        let response = self
+            .client
+            .post(format!(
+                "{}/protocol/openid-connect/token",
+                self.config.issuer_url
+            ))
             .form(&[
                 ("grant_type", "refresh_token"),
                 ("client_id", &self.config.client_id),
@@ -800,7 +872,11 @@ impl N8nIntegration {
         }
     }
 
-    pub async fn trigger_webhook(&self, webhook_url: &str, payload: serde_json::Value) -> Result<()> {
+    pub async fn trigger_webhook(
+        &self,
+        webhook_url: &str,
+        payload: serde_json::Value,
+    ) -> Result<()> {
         let signature = self.sign_payload(&payload)?;
 
         self.client
@@ -826,7 +902,12 @@ impl N8nIntegration {
         Ok(hex::encode(result.into_bytes()))
     }
 
-    pub async fn send_email_event(&self, webhook: &N8nWebhook, event: EmailEvent, email_data: serde_json::Value) -> Result<()> {
+    pub async fn send_email_event(
+        &self,
+        webhook: &N8nWebhook,
+        event: EmailEvent,
+        email_data: serde_json::Value,
+    ) -> Result<()> {
         if !webhook.active || !webhook.trigger_events.contains(&event) {
             return Ok(());
         }
@@ -880,8 +961,10 @@ impl MeilisearchIntegration {
     }
 
     pub async fn index_email(&self, doc: SearchDocument) -> Result<()> {
-        let mut request = self.client
-            .post(format!("{}/indexes/{}/documents", self.config.host, self.config.index_name));
+        let mut request = self.client.post(format!(
+            "{}/indexes/{}/documents",
+            self.config.host, self.config.index_name
+        ));
 
         if let Some(ref key) = self.config.api_key {
             request = request.header("Authorization", format!("Bearer {}", key));
@@ -892,9 +975,16 @@ impl MeilisearchIntegration {
         Ok(())
     }
 
-    pub async fn search(&self, query: &str, user_id: &str, limit: u32) -> Result<Vec<SearchDocument>> {
-        let mut request = self.client
-            .post(format!("{}/indexes/{}/search", self.config.host, self.config.index_name));
+    pub async fn search(
+        &self,
+        query: &str,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<Vec<SearchDocument>> {
+        let mut request = self.client.post(format!(
+            "{}/indexes/{}/search",
+            self.config.host, self.config.index_name
+        ));
 
         if let Some(ref key) = self.config.api_key {
             request = request.header("Authorization", format!("Bearer {}", key));
@@ -922,8 +1012,10 @@ impl MeilisearchIntegration {
     }
 
     pub async fn delete_email(&self, email_id: &str) -> Result<()> {
-        let mut request = self.client
-            .delete(format!("{}/indexes/{}/documents/{}", self.config.host, self.config.index_name, email_id));
+        let mut request = self.client.delete(format!(
+            "{}/indexes/{}/documents/{}",
+            self.config.host, self.config.index_name, email_id
+        ));
 
         if let Some(ref key) = self.config.api_key {
             request = request.header("Authorization", format!("Bearer {}", key));
@@ -977,9 +1069,13 @@ impl GiteaIntegration {
     }
 
     pub async fn get_notifications(&self) -> Result<Vec<GiteaNotification>> {
-        let response = self.client
+        let response = self
+            .client
             .get(format!("{}/api/v1/notifications", self.config.base_url))
-            .header("Authorization", format!("token {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("token {}", self.config.access_token),
+            )
             .send()
             .await?
             .json::<Vec<GiteaNotification>>()
@@ -988,10 +1084,22 @@ impl GiteaIntegration {
         Ok(response)
     }
 
-    pub async fn create_issue(&self, owner: &str, repo: &str, issue: GiteaIssue) -> Result<GiteaIssue> {
-        let response = self.client
-            .post(format!("{}/api/v1/repos/{}/{}/issues", self.config.base_url, owner, repo))
-            .header("Authorization", format!("token {}", self.config.access_token))
+    pub async fn create_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue: GiteaIssue,
+    ) -> Result<GiteaIssue> {
+        let response = self
+            .client
+            .post(format!(
+                "{}/api/v1/repos/{}/{}/issues",
+                self.config.base_url, owner, repo
+            ))
+            .header(
+                "Authorization",
+                format!("token {}", self.config.access_token),
+            )
             .json(&issue)
             .send()
             .await?
@@ -1001,7 +1109,13 @@ impl GiteaIntegration {
         Ok(response)
     }
 
-    pub async fn create_issue_from_email(&self, owner: &str, repo: &str, subject: &str, body: &str) -> Result<GiteaIssue> {
+    pub async fn create_issue_from_email(
+        &self,
+        owner: &str,
+        repo: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<GiteaIssue> {
         let issue = GiteaIssue {
             id: None,
             title: subject.to_string(),
@@ -1020,7 +1134,7 @@ impl GiteaIntegration {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoplinConfig {
-    pub base_url: String,  // Usually http://localhost:41184
+    pub base_url: String, // Usually http://localhost:41184
     pub token: String,
 }
 
@@ -1055,8 +1169,12 @@ impl JoplinIntegration {
     }
 
     pub async fn get_folders(&self) -> Result<Vec<JoplinFolder>> {
-        let response = self.client
-            .get(format!("{}/folders?token={}", self.config.base_url, self.config.token))
+        let response = self
+            .client
+            .get(format!(
+                "{}/folders?token={}",
+                self.config.base_url, self.config.token
+            ))
             .send()
             .await?
             .json::<JoplinResponse<JoplinFolder>>()
@@ -1066,8 +1184,12 @@ impl JoplinIntegration {
     }
 
     pub async fn create_note(&self, note: JoplinNote) -> Result<JoplinNote> {
-        let response = self.client
-            .post(format!("{}/notes?token={}", self.config.base_url, self.config.token))
+        let response = self
+            .client
+            .post(format!(
+                "{}/notes?token={}",
+                self.config.base_url, self.config.token
+            ))
             .json(&note)
             .send()
             .await?
@@ -1077,7 +1199,13 @@ impl JoplinIntegration {
         Ok(response)
     }
 
-    pub async fn save_email_as_note(&self, folder_id: &str, subject: &str, body: &str, as_todo: bool) -> Result<JoplinNote> {
+    pub async fn save_email_as_note(
+        &self,
+        folder_id: &str,
+        subject: &str,
+        body: &str,
+        as_todo: bool,
+    ) -> Result<JoplinNote> {
         let note = JoplinNote {
             id: None,
             parent_id: folder_id.to_string(),
@@ -1124,18 +1252,21 @@ impl DAVIntegration {
 
     pub async fn sync_contacts(&self) -> Result<Vec<NextcloudContact>> {
         if let Some(ref url) = self.config.contacts_url {
-            let response = self.client
+            let response = self
+                .client
                 .request(reqwest::Method::from_bytes(b"PROPFIND")?, url)
                 .basic_auth(&self.config.username, Some(&self.config.password))
                 .header("Depth", "1")
                 .header("Content-Type", "application/xml")
-                .body(r#"<?xml version="1.0"?>
+                .body(
+                    r#"<?xml version="1.0"?>
                     <d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">
                         <d:prop>
                             <d:getetag/>
                             <card:address-data/>
                         </d:prop>
-                    </d:propfind>"#)
+                    </d:propfind>"#,
+                )
                 .send()
                 .await?;
 
@@ -1148,18 +1279,21 @@ impl DAVIntegration {
 
     pub async fn sync_calendar(&self) -> Result<Vec<NextcloudEvent>> {
         if let Some(ref url) = self.config.calendar_url {
-            let response = self.client
+            let response = self
+                .client
                 .request(reqwest::Method::from_bytes(b"PROPFIND")?, url)
                 .basic_auth(&self.config.username, Some(&self.config.password))
                 .header("Depth", "1")
                 .header("Content-Type", "application/xml")
-                .body(r#"<?xml version="1.0"?>
+                .body(
+                    r#"<?xml version="1.0"?>
                     <d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
                         <d:prop>
                             <d:getetag/>
                             <c:calendar-data/>
                         </d:prop>
-                    </d:propfind>"#)
+                    </d:propfind>"#,
+                )
                 .send()
                 .await?;
 
@@ -1198,7 +1332,8 @@ impl BitwardenIntegration {
     }
 
     pub async fn authenticate(&mut self) -> Result<()> {
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/identity/connect/token", self.config.server_url))
             .form(&[
                 ("grant_type", "client_credentials"),
@@ -1216,11 +1351,17 @@ impl BitwardenIntegration {
     }
 
     pub async fn get_secret(&self, secret_id: &str) -> Result<String> {
-        let token = self.access_token.as_ref()
+        let token = self
+            .access_token
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Not authenticated"))?;
 
-        let response = self.client
-            .get(format!("{}/api/secrets/{}", self.config.server_url, secret_id))
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/secrets/{}",
+                self.config.server_url, secret_id
+            ))
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await?
@@ -1248,7 +1389,11 @@ impl FossIntegrationService {
         }
     }
 
-    pub async fn notify_email_received(&self, user_id: Uuid, email_data: serde_json::Value) -> Result<()> {
+    pub async fn notify_email_received(
+        &self,
+        user_id: Uuid,
+        email_data: serde_json::Value,
+    ) -> Result<()> {
         let integrations = self.registry.list_for_user(user_id).await?;
 
         for integration in integrations {
@@ -1258,26 +1403,34 @@ impl FossIntegrationService {
 
             match integration.integration_type {
                 IntegrationType::Matrix => {
-                    if let Ok(config) = serde_json::from_value::<MatrixConfig>(serde_json::to_value(&integration.config)?) {
+                    if let Ok(config) = serde_json::from_value::<MatrixConfig>(
+                        serde_json::to_value(&integration.config)?,
+                    ) {
                         let matrix = MatrixIntegration::new(config.clone());
                         if let Some(room_id) = &config.notification_room {
                             let subject = email_data["subject"].as_str().unwrap_or("(no subject)");
                             let from = email_data["from"].as_str().unwrap_or("unknown");
                             let preview = email_data["preview"].as_str().unwrap_or("");
-                            let _ = matrix.send_email_notification(room_id, subject, from, preview).await;
+                            let _ = matrix
+                                .send_email_notification(room_id, subject, from, preview)
+                                .await;
                         }
                     }
                 }
                 IntegrationType::N8n | IntegrationType::Huginn => {
                     // Trigger automation webhooks
-                    if let Ok(config) = serde_json::from_value::<N8nConfig>(serde_json::to_value(&integration.config)?) {
+                    if let Ok(config) = serde_json::from_value::<N8nConfig>(serde_json::to_value(
+                        &integration.config,
+                    )?) {
                         let n8n = N8nIntegration::new(config);
                         // Would look up registered webhooks and trigger them
                     }
                 }
                 IntegrationType::Meilisearch | IntegrationType::Typesense => {
                     // Index email for search
-                    if let Ok(config) = serde_json::from_value::<MeilisearchConfig>(serde_json::to_value(&integration.config)?) {
+                    if let Ok(config) = serde_json::from_value::<MeilisearchConfig>(
+                        serde_json::to_value(&integration.config)?,
+                    ) {
                         let meili = MeilisearchIntegration::new(config);
                         let doc = SearchDocument {
                             id: email_data["id"].as_str().unwrap_or("").to_string(),
@@ -1301,7 +1454,11 @@ impl FossIntegrationService {
         Ok(())
     }
 
-    pub async fn create_meeting_from_email(&self, user_id: Uuid, email_id: Uuid) -> Result<JitsiMeeting> {
+    pub async fn create_meeting_from_email(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+    ) -> Result<JitsiMeeting> {
         let email = sqlx::query!(
             "SELECT subject, sender FROM emails WHERE id = $1 AND user_id = $2",
             email_id,
@@ -1312,16 +1469,16 @@ impl FossIntegrationService {
 
         let integrations = self.registry.list_for_user(user_id).await?;
 
-        let jitsi_integration = integrations.iter()
+        let jitsi_integration = integrations
+            .iter()
             .find(|i| matches!(i.integration_type, IntegrationType::Jitsi));
 
         if let Some(integration) = jitsi_integration {
-            let config: JitsiConfig = serde_json::from_value(serde_json::to_value(&integration.config)?)?;
+            let config: JitsiConfig =
+                serde_json::from_value(serde_json::to_value(&integration.config)?)?;
             let jitsi = JitsiIntegration::new(config);
-            let meeting = jitsi.create_meeting_from_email(
-                &email.subject.unwrap_or_default(),
-                &email.sender
-            );
+            let meeting =
+                jitsi.create_meeting_from_email(&email.subject.unwrap_or_default(), &email.sender);
             return Ok(meeting);
         }
 
@@ -1332,13 +1489,15 @@ impl FossIntegrationService {
             jwt_secret: None,
         });
 
-        Ok(jitsi.create_meeting_from_email(
-            &email.subject.unwrap_or_default(),
-            &email.sender
-        ))
+        Ok(jitsi.create_meeting_from_email(&email.subject.unwrap_or_default(), &email.sender))
     }
 
-    pub async fn create_task_from_email(&self, user_id: Uuid, email_id: Uuid, project_id: i64) -> Result<VikunjaTask> {
+    pub async fn create_task_from_email(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+        project_id: i64,
+    ) -> Result<VikunjaTask> {
         let email = sqlx::query!(
             "SELECT subject, body FROM emails WHERE id = $1 AND user_id = $2",
             email_id,
@@ -1349,24 +1508,33 @@ impl FossIntegrationService {
 
         let integrations = self.registry.list_for_user(user_id).await?;
 
-        let vikunja_integration = integrations.iter()
+        let vikunja_integration = integrations
+            .iter()
             .find(|i| matches!(i.integration_type, IntegrationType::Vikunja));
 
         if let Some(integration) = vikunja_integration {
-            let config: VikunjaConfig = serde_json::from_value(serde_json::to_value(&integration.config)?)?;
+            let config: VikunjaConfig =
+                serde_json::from_value(serde_json::to_value(&integration.config)?)?;
             let vikunja = VikunjaIntegration::new(config);
-            return vikunja.create_task_from_email(
-                project_id,
-                &email.subject.unwrap_or_default(),
-                &email.body,
-                None
-            ).await;
+            return vikunja
+                .create_task_from_email(
+                    project_id,
+                    &email.subject.unwrap_or_default(),
+                    &email.body,
+                    None,
+                )
+                .await;
         }
 
         Err(anyhow::anyhow!("No Vikunja integration configured"))
     }
 
-    pub async fn save_email_to_notes(&self, user_id: Uuid, email_id: Uuid, folder_id: &str) -> Result<String> {
+    pub async fn save_email_to_notes(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+        folder_id: &str,
+    ) -> Result<String> {
         let email = sqlx::query!(
             "SELECT subject, body FROM emails WHERE id = $1 AND user_id = $2",
             email_id,
@@ -1378,27 +1546,35 @@ impl FossIntegrationService {
         let integrations = self.registry.list_for_user(user_id).await?;
 
         // Try Joplin first
-        if let Some(integration) = integrations.iter().find(|i| matches!(i.integration_type, IntegrationType::Joplin)) {
-            let config: JoplinConfig = serde_json::from_value(serde_json::to_value(&integration.config)?)?;
+        if let Some(integration) = integrations
+            .iter()
+            .find(|i| matches!(i.integration_type, IntegrationType::Joplin))
+        {
+            let config: JoplinConfig =
+                serde_json::from_value(serde_json::to_value(&integration.config)?)?;
             let joplin = JoplinIntegration::new(config);
-            let note = joplin.save_email_as_note(
-                folder_id,
-                &email.subject.unwrap_or_default(),
-                &email.body,
-                false
-            ).await?;
+            let note = joplin
+                .save_email_as_note(
+                    folder_id,
+                    &email.subject.unwrap_or_default(),
+                    &email.body,
+                    false,
+                )
+                .await?;
             return Ok(note.id.unwrap_or_default());
         }
 
         // Try Nextcloud
-        if let Some(integration) = integrations.iter().find(|i| matches!(i.integration_type, IntegrationType::Nextcloud)) {
-            let config: NextcloudConfig = serde_json::from_value(serde_json::to_value(&integration.config)?)?;
+        if let Some(integration) = integrations
+            .iter()
+            .find(|i| matches!(i.integration_type, IntegrationType::Nextcloud))
+        {
+            let config: NextcloudConfig =
+                serde_json::from_value(serde_json::to_value(&integration.config)?)?;
             let nextcloud = NextcloudIntegration::new(config);
-            return nextcloud.save_email_as_note(
-                &email.subject.unwrap_or_default(),
-                &email.body,
-                folder_id
-            ).await;
+            return nextcloud
+                .save_email_as_note(&email.subject.unwrap_or_default(), &email.body, folder_id)
+                .await;
         }
 
         Err(anyhow::anyhow!("No notes integration configured"))

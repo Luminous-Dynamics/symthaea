@@ -12,8 +12,8 @@ use domain_mail::types::{InboxSummary, InboxSummarySource, ThreadSummary, TrustH
 use leptos::prelude::*;
 use mail_leptos_types::{ContactView, EmailListItem, EmailPriority};
 
-use crate::mail_context::{use_mail, MailCtx};
-use crate::offline::{use_offline, OfflineState};
+use crate::mail_context::{MailCtx, use_mail};
+use crate::offline::{OfflineState, use_offline};
 
 pub const PULSE_SUMMARY_STORAGE_KEY: &str = "mycelix:pulse:inbox_summary:v1";
 

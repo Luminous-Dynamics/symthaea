@@ -10,8 +10,8 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Workflow Definition
@@ -57,23 +57,13 @@ pub struct NodeConnection {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WorkflowTrigger {
-    EmailReceived {
-        filters: Vec<TriggerFilter>,
-    },
+    EmailReceived { filters: Vec<TriggerFilter> },
     EmailSent,
-    Schedule {
-        cron: String,
-    },
+    Schedule { cron: String },
     Manual,
-    Webhook {
-        secret: String,
-    },
-    LabelAdded {
-        label: String,
-    },
-    ThreadUpdated {
-        thread_id: Option<Uuid>,
-    },
+    Webhook { secret: String },
+    LabelAdded { label: String },
+    ThreadUpdated { thread_id: Option<Uuid> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,7 +93,7 @@ pub enum FilterOperator {
     NotContains,
     StartsWith,
     EndsWith,
-    Matches,  // Regex
+    Matches, // Regex
     GreaterThan,
     LessThan,
 }
@@ -254,7 +244,7 @@ pub enum ScheduleTime {
     Absolute(DateTime<Utc>),
     Relative { duration: DelayDuration },
     RecipientTimezone { time: String },
-    OptimalTime,  // AI-determined best time
+    OptimalTime, // AI-determined best time
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -323,7 +313,7 @@ pub enum TaskIntegration {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskDueDate {
-    FromEmail,  // Extract from email content
+    FromEmail, // Extract from email content
     RelativeDays(u32),
     Fixed(DateTime<Utc>),
 }
@@ -359,7 +349,7 @@ pub struct SetVariableNode {
 pub enum VariableValue {
     Static(String),
     FromEmail(String),  // JSONPath to extract from email
-    Expression(String),  // Template expression
+    Expression(String), // Template expression
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -564,7 +554,11 @@ impl WorkflowService {
         Ok(())
     }
 
-    pub async fn get_triggered_workflows(&self, user_id: Uuid, email: &EmailContext) -> Result<Vec<Workflow>> {
+    pub async fn get_triggered_workflows(
+        &self,
+        user_id: Uuid,
+        email: &EmailContext,
+    ) -> Result<Vec<Workflow>> {
         let all_workflows = self.list(user_id).await?;
 
         let mut matching = Vec::new();
@@ -591,9 +585,7 @@ impl WorkflowService {
                 }
                 true
             }
-            WorkflowTrigger::LabelAdded { label } => {
-                email.labels.contains(label)
-            }
+            WorkflowTrigger::LabelAdded { label } => email.labels.contains(label),
             _ => false,
         }
     }
@@ -606,7 +598,13 @@ impl WorkflowService {
             TriggerField::Folder => &email.folder,
             TriggerField::To => email.to.join(",").as_str(),
             TriggerField::Domain => email.from.split('@').last().unwrap_or(""),
-            TriggerField::HasAttachment => if email.has_attachments { "true" } else { "false" },
+            TriggerField::HasAttachment => {
+                if email.has_attachments {
+                    "true"
+                } else {
+                    "false"
+                }
+            }
             TriggerField::Label => email.labels.join(",").as_str(),
         };
 
@@ -617,11 +615,9 @@ impl WorkflowService {
             FilterOperator::NotContains => !field_value.contains(&filter.value),
             FilterOperator::StartsWith => field_value.starts_with(&filter.value),
             FilterOperator::EndsWith => field_value.ends_with(&filter.value),
-            FilterOperator::Matches => {
-                regex::Regex::new(&filter.value)
-                    .map(|re| re.is_match(field_value))
-                    .unwrap_or(false)
-            }
+            FilterOperator::Matches => regex::Regex::new(&filter.value)
+                .map(|re| re.is_match(field_value))
+                .unwrap_or(false),
             _ => false,
         }
     }
@@ -688,7 +684,11 @@ impl WorkflowExecutor {
         Self { pool }
     }
 
-    pub async fn execute(&self, workflow: &Workflow, context: &EmailContext) -> Result<WorkflowExecution> {
+    pub async fn execute(
+        &self,
+        workflow: &Workflow,
+        context: &EmailContext,
+    ) -> Result<WorkflowExecution> {
         let execution = WorkflowExecution {
             id: Uuid::new_v4(),
             workflow_id: workflow.id,
@@ -709,7 +709,8 @@ impl WorkflowExecutor {
         let start_node = self.find_start_node(workflow);
 
         if let Some(node_id) = start_node {
-            self.execute_node(workflow, &node_id, context, &execution).await?;
+            self.execute_node(workflow, &node_id, context, &execution)
+                .await?;
         }
 
         // Update workflow stats
@@ -728,20 +729,33 @@ impl WorkflowExecutor {
         vars.insert("email.id".to_string(), serde_json::json!(context.id));
         vars.insert("email.from".to_string(), serde_json::json!(context.from));
         vars.insert("email.to".to_string(), serde_json::json!(context.to));
-        vars.insert("email.subject".to_string(), serde_json::json!(context.subject));
+        vars.insert(
+            "email.subject".to_string(),
+            serde_json::json!(context.subject),
+        );
         vars.insert("email.body".to_string(), serde_json::json!(context.body));
-        vars.insert("email.folder".to_string(), serde_json::json!(context.folder));
-        vars.insert("email.labels".to_string(), serde_json::json!(context.labels));
+        vars.insert(
+            "email.folder".to_string(),
+            serde_json::json!(context.folder),
+        );
+        vars.insert(
+            "email.labels".to_string(),
+            serde_json::json!(context.labels),
+        );
         vars
     }
 
     fn find_start_node(&self, workflow: &Workflow) -> Option<String> {
         // Find node that is connected from trigger (has no incoming connections)
-        let connected_to: std::collections::HashSet<_> = workflow.connections.iter()
+        let connected_to: std::collections::HashSet<_> = workflow
+            .connections
+            .iter()
             .map(|c| c.to_node.clone())
             .collect();
 
-        workflow.nodes.iter()
+        workflow
+            .nodes
+            .iter()
             .find(|n| !connected_to.contains(&n.id))
             .map(|n| n.id.clone())
     }
@@ -753,7 +767,9 @@ impl WorkflowExecutor {
         context: &EmailContext,
         execution: &WorkflowExecution,
     ) -> Result<()> {
-        let node = workflow.nodes.iter()
+        let node = workflow
+            .nodes
+            .iter()
             .find(|n| n.id == node_id)
             .ok_or_else(|| anyhow::anyhow!("Node not found: {}", node_id))?;
 
@@ -835,7 +851,7 @@ impl WorkflowExecutor {
                     DelayDuration::Days(d) => Utc::now() + Duration::days(*d as i64),
                     DelayDuration::Until { time, .. } => {
                         // Parse time and calculate next occurrence
-                        Utc::now() + Duration::hours(1)  // Placeholder
+                        Utc::now() + Duration::hours(1) // Placeholder
                     }
                 };
 
@@ -851,7 +867,7 @@ impl WorkflowExecutor {
                 .execute(&self.pool)
                 .await?;
 
-                return Ok(());  // Stop execution, will resume later
+                return Ok(()); // Stop execution, will resume later
             }
             NodeType::Webhook(config) => {
                 let client = reqwest::Client::new();
@@ -876,13 +892,21 @@ impl WorkflowExecutor {
             }
             NodeType::Condition(config) => {
                 let matches = match config.logic {
-                    ConditionLogic::And => config.conditions.iter().all(|f| self.matches_filter_exec(f, context)),
-                    ConditionLogic::Or => config.conditions.iter().any(|f| self.matches_filter_exec(f, context)),
+                    ConditionLogic::And => config
+                        .conditions
+                        .iter()
+                        .all(|f| self.matches_filter_exec(f, context)),
+                    ConditionLogic::Or => config
+                        .conditions
+                        .iter()
+                        .any(|f| self.matches_filter_exec(f, context)),
                 };
 
                 // Get next node based on condition
                 let output_port = if matches { "true" } else { "false" };
-                let next_node = workflow.connections.iter()
+                let next_node = workflow
+                    .connections
+                    .iter()
                     .find(|c| c.from_node == node_id && c.from_port == output_port)
                     .map(|c| c.to_node.clone());
 
@@ -904,7 +928,9 @@ impl WorkflowExecutor {
         }
 
         // Find and execute next node
-        let next_node = workflow.connections.iter()
+        let next_node = workflow
+            .connections
+            .iter()
             .find(|c| c.from_node == node_id)
             .map(|c| c.to_node.clone());
 
@@ -930,7 +956,11 @@ impl WorkflowExecutor {
         }
     }
 
-    fn render_template(&self, template: &str, variables: &HashMap<String, serde_json::Value>) -> String {
+    fn render_template(
+        &self,
+        template: &str,
+        variables: &HashMap<String, serde_json::Value>,
+    ) -> String {
         let mut result = template.to_string();
         for (key, value) in variables {
             let placeholder = format!("{{{{{}}}}}", key);
@@ -963,12 +993,20 @@ impl WorkflowExecutor {
         Ok(())
     }
 
-    async fn send_slack_notification(&self, config: &SlackNotifyNode, context: &EmailContext) -> Result<()> {
+    async fn send_slack_notification(
+        &self,
+        config: &SlackNotifyNode,
+        context: &EmailContext,
+    ) -> Result<()> {
         // Would integrate with Slack API
         Ok(())
     }
 
-    async fn send_matrix_notification(&self, config: &MatrixNotifyNode, context: &EmailContext) -> Result<()> {
+    async fn send_matrix_notification(
+        &self,
+        config: &MatrixNotifyNode,
+        context: &EmailContext,
+    ) -> Result<()> {
         // Would integrate with Matrix API
         Ok(())
     }
@@ -1072,7 +1110,9 @@ impl SequenceService {
     pub async fn enroll(&self, sequence_id: Uuid, email: &str) -> Result<SequenceEnrollment> {
         let sequence = self.get(sequence_id).await?;
 
-        let first_delay = sequence.steps.first()
+        let first_delay = sequence
+            .steps
+            .first()
             .map(|s| self.calculate_delay(&s.delay))
             .unwrap_or_else(|| Duration::hours(1));
 
@@ -1107,12 +1147,9 @@ impl SequenceService {
     }
 
     pub async fn get(&self, sequence_id: Uuid) -> Result<EmailSequence> {
-        let row = sqlx::query!(
-            "SELECT * FROM email_sequences WHERE id = $1",
-            sequence_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let row = sqlx::query!("SELECT * FROM email_sequences WHERE id = $1", sequence_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(EmailSequence {
             id: row.id,
@@ -1151,11 +1188,8 @@ impl SequenceService {
                 let step = &sequence.steps[step_idx];
 
                 // Send email
-                self.send_sequence_email(
-                    &enrollment.recipient_email,
-                    &step.email,
-                    &sequence
-                ).await?;
+                self.send_sequence_email(&enrollment.recipient_email, &step.email, &sequence)
+                    .await?;
 
                 // Update enrollment
                 let next_step = step_idx + 1;
@@ -1199,11 +1233,16 @@ impl SequenceService {
             DelayDuration::Minutes(m) => Duration::minutes(*m as i64),
             DelayDuration::Hours(h) => Duration::hours(*h as i64),
             DelayDuration::Days(d) => Duration::days(*d as i64),
-            DelayDuration::Until { .. } => Duration::hours(24),  // Placeholder
+            DelayDuration::Until { .. } => Duration::hours(24), // Placeholder
         }
     }
 
-    async fn send_sequence_email(&self, to: &str, email: &SequenceEmail, _sequence: &EmailSequence) -> Result<()> {
+    async fn send_sequence_email(
+        &self,
+        to: &str,
+        email: &SequenceEmail,
+        _sequence: &EmailSequence,
+    ) -> Result<()> {
         // Would integrate with email sending service
         Ok(())
     }
@@ -1277,7 +1316,11 @@ impl ApprovalService {
         Self { pool }
     }
 
-    pub async fn create_request(&self, workflow_id: Uuid, email_id: Uuid) -> Result<ApprovalRequest> {
+    pub async fn create_request(
+        &self,
+        workflow_id: Uuid,
+        email_id: Uuid,
+    ) -> Result<ApprovalRequest> {
         let request = ApprovalRequest {
             id: Uuid::new_v4(),
             workflow_id,
@@ -1318,7 +1361,13 @@ impl ApprovalService {
         Ok(request)
     }
 
-    pub async fn vote(&self, request_id: Uuid, approver_id: Uuid, decision: ApprovalDecision, comment: Option<String>) -> Result<ApprovalRequest> {
+    pub async fn vote(
+        &self,
+        request_id: Uuid,
+        approver_id: Uuid,
+        decision: ApprovalDecision,
+        comment: Option<String>,
+    ) -> Result<ApprovalRequest> {
         let vote = ApprovalVote {
             approver_id,
             decision,
@@ -1343,12 +1392,9 @@ impl ApprovalService {
     }
 
     async fn check_and_resolve(&self, request_id: Uuid) -> Result<ApprovalRequest> {
-        let request = sqlx::query!(
-            "SELECT * FROM approval_requests WHERE id = $1",
-            request_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let request = sqlx::query!("SELECT * FROM approval_requests WHERE id = $1", request_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         let workflow = sqlx::query!(
             "SELECT * FROM approval_workflows WHERE id = $1",
@@ -1360,10 +1406,12 @@ impl ApprovalService {
         let approvals: Vec<ApprovalVote> = serde_json::from_value(request.approvals)?;
         let approvers: Vec<Uuid> = serde_json::from_value(workflow.approvers)?;
 
-        let approved_count = approvals.iter()
+        let approved_count = approvals
+            .iter()
             .filter(|v| matches!(v.decision, ApprovalDecision::Approve))
             .count();
-        let rejected_count = approvals.iter()
+        let rejected_count = approvals
+            .iter()
             .filter(|v| matches!(v.decision, ApprovalDecision::Reject))
             .count();
 

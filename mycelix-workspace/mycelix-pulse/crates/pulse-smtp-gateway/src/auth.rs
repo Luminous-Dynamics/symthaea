@@ -8,8 +8,8 @@
 //! code via [`crate::error::GatewayError`].
 
 use mail_auth::{
-    dmarc::verify::DmarcParameters, spf::verify::SpfParameters, AuthenticatedMessage, DmarcResult,
-    MessageAuthenticator,
+    AuthenticatedMessage, DmarcResult, MessageAuthenticator, dmarc::verify::DmarcParameters,
+    spf::verify::SpfParameters,
 };
 use std::net::IpAddr;
 
@@ -67,7 +67,7 @@ impl InboundAuth {
             None => {
                 return AuthVerdict::Reject {
                     reason: "RFC 5322 parse failed in auth layer".into(),
-                }
+                };
             }
         };
 

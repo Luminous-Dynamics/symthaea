@@ -8,8 +8,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Search Engine
@@ -41,7 +41,7 @@ impl SearchEngine {
                    ts_rank(search_vector, plainto_tsquery('english', $2)) as rank
             FROM emails e
             WHERE e.user_id = $1
-            "#
+            "#,
         );
 
         let mut param_count = 2;
@@ -116,7 +116,10 @@ impl SearchEngine {
             SortBy::Sender => sql.push_str("from_address ASC"),
         }
 
-        sql.push_str(&format!(" LIMIT {} OFFSET {}", options.limit, options.offset));
+        sql.push_str(&format!(
+            " LIMIT {} OFFSET {}",
+            options.limit, options.offset
+        ));
 
         // Execute query (simplified - actual implementation would bind all params)
         let results: Vec<SearchResult> = sqlx::query_as(&sql)
@@ -246,7 +249,11 @@ impl SearchEngine {
         let now = Utc::now();
         match s.to_lowercase().as_str() {
             "today" => Ok(now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc()),
-            "yesterday" => Ok((now - chrono::Duration::days(1)).date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc()),
+            "yesterday" => Ok((now - chrono::Duration::days(1))
+                .date_naive()
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc()),
             "week" | "1w" => Ok(now - chrono::Duration::weeks(1)),
             "month" | "1m" => Ok(now - chrono::Duration::days(30)),
             "year" | "1y" => Ok(now - chrono::Duration::days(365)),
@@ -295,7 +302,7 @@ impl SavedSearchService {
             r#"
             INSERT INTO saved_searches (id, user_id, name, query, created_at)
             VALUES ($1, $2, $3, $4, NOW())
-            "#
+            "#,
         )
         .bind(id)
         .bind(user_id)
@@ -319,7 +326,7 @@ impl SavedSearchService {
     /// Get all saved searches for a user
     pub async fn get_saved_searches(&self, user_id: Uuid) -> Result<Vec<SavedSearch>, SearchError> {
         let searches: Vec<SavedSearch> = sqlx::query_as(
-            "SELECT * FROM saved_searches WHERE user_id = $1 ORDER BY use_count DESC, name ASC"
+            "SELECT * FROM saved_searches WHERE user_id = $1 ORDER BY use_count DESC, name ASC",
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -330,7 +337,11 @@ impl SavedSearchService {
     }
 
     /// Delete a saved search
-    pub async fn delete_saved_search(&self, user_id: Uuid, search_id: Uuid) -> Result<(), SearchError> {
+    pub async fn delete_saved_search(
+        &self,
+        user_id: Uuid,
+        search_id: Uuid,
+    ) -> Result<(), SearchError> {
         sqlx::query("DELETE FROM saved_searches WHERE id = $1 AND user_id = $2")
             .bind(search_id)
             .bind(user_id)
@@ -381,7 +392,7 @@ impl SearchHistoryService {
             WHERE user_id = $1
             ORDER BY query, searched_at DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit)
@@ -413,8 +424,16 @@ impl SearchHistoryService {
 
         // Operator suggestions
         let operators = [
-            "from:", "to:", "subject:", "has:attachment", "is:unread",
-            "is:starred", "in:", "label:", "after:", "before:",
+            "from:",
+            "to:",
+            "subject:",
+            "has:attachment",
+            "is:unread",
+            "is:starred",
+            "in:",
+            "label:",
+            "after:",
+            "before:",
         ];
 
         for op in operators {
@@ -430,7 +449,7 @@ impl SearchHistoryService {
             WHERE user_id = $1 AND LOWER(query) LIKE LOWER($2)
             ORDER BY query
             LIMIT 5
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(format!("{}%", prefix))

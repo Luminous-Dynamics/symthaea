@@ -519,7 +519,7 @@ fn validate_encrypted_email(
         _ => {
             return Ok(ValidateCallbackResult::Invalid(
                 "Unknown key exchange for ephemeral key validation".to_string(),
-            ))
+            ));
         }
     };
     if email.ephemeral_pubkey.len() != expected_key_len {

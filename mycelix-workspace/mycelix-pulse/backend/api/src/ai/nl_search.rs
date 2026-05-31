@@ -7,10 +7,10 @@
 //! "emails from John last week about the project proposal"
 //! "unread messages with attachments from marketing team"
 
-use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration, NaiveDate, Datelike, Weekday};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Parsed search query with structured filters
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -53,8 +53,8 @@ pub struct DateRange {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SizeFilter {
-    LargerThan(usize),   // bytes
-    SmallerThan(usize),  // bytes
+    LargerThan(usize),  // bytes
+    SmallerThan(usize), // bytes
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -98,12 +98,21 @@ impl NLQueryParser {
         Self {
             date_patterns: Self::build_date_patterns(),
             person_indicators: vec![
-                "from", "by", "sent by", "written by",
-                "to", "sent to", "addressed to",
+                "from",
+                "by",
+                "sent by",
+                "written by",
+                "to",
+                "sent to",
+                "addressed to",
             ],
             attachment_indicators: vec![
-                "with attachment", "with attachments", "has attachment",
-                "with files", "with documents", "containing files",
+                "with attachment",
+                "with attachments",
+                "has attachment",
+                "with files",
+                "with documents",
+                "containing files",
             ],
             status_indicators: HashMap::from([
                 ("unread", StatusType::Unread),
@@ -128,7 +137,10 @@ impl NLQueryParser {
                 ("archive", "archive"),
                 ("archived", "archive"),
             ]),
-            size_pattern: Regex::new(r"(?i)(larger|bigger|greater|smaller|less) than (\d+)\s*(kb|mb|gb|bytes?)?").unwrap(),
+            size_pattern: Regex::new(
+                r"(?i)(larger|bigger|greater|smaller|less) than (\d+)\s*(kb|mb|gb|bytes?)?",
+            )
+            .unwrap(),
         }
     }
 
@@ -306,7 +318,10 @@ impl NLQueryParser {
             if let Some(caps) = date_pattern.pattern.captures(&remaining_query) {
                 if let Some(range) = (date_pattern.parser)(query, &caps) {
                     result.date_range = Some(range);
-                    remaining_query = date_pattern.pattern.replace(&remaining_query, "").to_string();
+                    remaining_query = date_pattern
+                        .pattern
+                        .replace(&remaining_query, "")
+                        .to_string();
                     result.confidence += 0.05;
                     break;
                 }
@@ -314,17 +329,22 @@ impl NLQueryParser {
         }
 
         // Extract "from" patterns
-        let from_regex = Regex::new(r"(?i)\b(?:from|by|sent by)\s+([a-zA-Z0-9._@-]+(?:\s+[a-zA-Z]+)?)\b").unwrap();
+        let from_regex =
+            Regex::new(r"(?i)\b(?:from|by|sent by)\s+([a-zA-Z0-9._@-]+(?:\s+[a-zA-Z]+)?)\b")
+                .unwrap();
         for caps in from_regex.captures_iter(&remaining_query.clone()) {
             if let Some(person) = caps.get(1) {
-                result.from_patterns.push(person.as_str().trim().to_string());
+                result
+                    .from_patterns
+                    .push(person.as_str().trim().to_string());
                 result.confidence += 0.05;
             }
         }
         remaining_query = from_regex.replace_all(&remaining_query, "").to_string();
 
         // Extract "to" patterns
-        let to_regex = Regex::new(r"(?i)\b(?:to|sent to)\s+([a-zA-Z0-9._@-]+(?:\s+[a-zA-Z]+)?)\b").unwrap();
+        let to_regex =
+            Regex::new(r"(?i)\b(?:to|sent to)\s+([a-zA-Z0-9._@-]+(?:\s+[a-zA-Z]+)?)\b").unwrap();
         for caps in to_regex.captures_iter(&remaining_query.clone()) {
             if let Some(person) = caps.get(1) {
                 result.to_patterns.push(person.as_str().trim().to_string());
@@ -343,8 +363,11 @@ impl NLQueryParser {
         }
 
         // Check without attachments
-        if remaining_query.to_lowercase().contains("without attachment") ||
-           remaining_query.to_lowercase().contains("no attachment") {
+        if remaining_query
+            .to_lowercase()
+            .contains("without attachment")
+            || remaining_query.to_lowercase().contains("no attachment")
+        {
             result.has_attachments = Some(false);
             remaining_query = Regex::new(r"(?i)(without|no)\s+attachments?")
                 .unwrap()
@@ -368,10 +391,16 @@ impl NLQueryParser {
 
         // Check for folder mentions
         for (mention, folder) in &self.folder_mappings {
-            if remaining_query.to_lowercase().contains(&format!("in {}", mention)) ||
-               remaining_query.to_lowercase().contains(&format!("from {}", mention)) {
+            if remaining_query
+                .to_lowercase()
+                .contains(&format!("in {}", mention))
+                || remaining_query
+                    .to_lowercase()
+                    .contains(&format!("from {}", mention))
+            {
                 result.folders.push((*folder).to_string());
-                let folder_regex = Regex::new(&format!(r"(?i)\b(in|from)\s+{}\b", mention)).unwrap();
+                let folder_regex =
+                    Regex::new(&format!(r"(?i)\b(in|from)\s+{}\b", mention)).unwrap();
                 remaining_query = folder_regex.replace_all(&remaining_query, "").to_string();
                 result.confidence += 0.03;
             }
@@ -381,7 +410,10 @@ impl NLQueryParser {
         if let Some(caps) = self.size_pattern.captures(&remaining_query) {
             if let (Some(comparison), Some(size_str)) = (caps.get(1), caps.get(2)) {
                 if let Ok(size) = size_str.as_str().parse::<usize>() {
-                    let unit = caps.get(3).map(|m| m.as_str().to_lowercase()).unwrap_or_default();
+                    let unit = caps
+                        .get(3)
+                        .map(|m| m.as_str().to_lowercase())
+                        .unwrap_or_default();
                     let multiplier = match unit.as_str() {
                         "kb" => 1024,
                         "mb" => 1024 * 1024,
@@ -398,11 +430,22 @@ impl NLQueryParser {
                     }
                 }
             }
-            remaining_query = self.size_pattern.replace_all(&remaining_query, "").to_string();
+            remaining_query = self
+                .size_pattern
+                .replace_all(&remaining_query, "")
+                .to_string();
         }
 
         // Check for category mentions
-        let categories = ["primary", "social", "promotions", "updates", "forums", "work", "personal"];
+        let categories = [
+            "primary",
+            "social",
+            "promotions",
+            "updates",
+            "forums",
+            "work",
+            "personal",
+        ];
         for category in categories {
             if remaining_query.to_lowercase().contains(category) {
                 result.category = Some(category.to_string());
@@ -414,8 +457,9 @@ impl NLQueryParser {
         }
 
         // Check for sort preferences
-        if remaining_query.to_lowercase().contains("oldest first") ||
-           remaining_query.to_lowercase().contains("oldest") {
+        if remaining_query.to_lowercase().contains("oldest first")
+            || remaining_query.to_lowercase().contains("oldest")
+        {
             result.sort = SortOrder::DateAsc;
             remaining_query = Regex::new(r"(?i)oldest\s*(first)?")
                 .unwrap()
@@ -429,7 +473,8 @@ impl NLQueryParser {
         // Check for trust score mentions
         let trust_regex = Regex::new(r"(?i)\b(?:trusted|high trust|trust score)\s*(?:above|over|greater than)?\s*(\d+(?:\.\d+)?)?").unwrap();
         if let Some(caps) = trust_regex.captures(&remaining_query) {
-            let score = caps.get(1)
+            let score = caps
+                .get(1)
                 .and_then(|m| m.as_str().parse::<f64>().ok())
                 .unwrap_or(0.7);
             result.min_trust_score = Some(score);
@@ -437,7 +482,21 @@ impl NLQueryParser {
         }
 
         // Extract remaining keywords (clean up filler words)
-        let filler_words = ["the", "a", "an", "about", "regarding", "concerning", "with", "and", "or", "emails", "email", "messages", "message"];
+        let filler_words = [
+            "the",
+            "a",
+            "an",
+            "about",
+            "regarding",
+            "concerning",
+            "with",
+            "and",
+            "or",
+            "emails",
+            "email",
+            "messages",
+            "message",
+        ];
         let cleaned = remaining_query
             .split_whitespace()
             .filter(|word| {
@@ -450,7 +509,10 @@ impl NLQueryParser {
         result.keywords = cleaned;
 
         // Adjust confidence based on parse completeness
-        if result.keywords.is_empty() && result.from_patterns.is_empty() && result.date_range.is_none() {
+        if result.keywords.is_empty()
+            && result.from_patterns.is_empty()
+            && result.date_range.is_none()
+        {
             result.confidence = 0.3;
         }
 
@@ -478,9 +540,11 @@ impl NLQueryParser {
         if let Some(ref range) = parsed.date_range {
             match (&range.start, &range.end) {
                 (Some(start), Some(end)) => {
-                    parts.push(format!("between {} and {}",
+                    parts.push(format!(
+                        "between {} and {}",
                         start.format("%b %d, %Y"),
-                        end.format("%b %d, %Y")));
+                        end.format("%b %d, %Y")
+                    ));
                 }
                 (Some(start), None) => {
                     parts.push(format!("after {}", start.format("%b %d, %Y")));
@@ -595,7 +659,8 @@ impl NLSearchService {
                 SortOrder::Relevance => "relevance",
                 SortOrder::SenderAsc => "sender_asc",
                 SortOrder::SenderDesc => "sender_desc",
-            }.to_string(),
+            }
+            .to_string(),
         }
     }
 }
@@ -643,7 +708,12 @@ mod tests {
 
         assert!(!result.from_patterns.is_empty());
         assert!(result.from_patterns[0].to_lowercase().contains("john"));
-        assert!(result.keywords.iter().any(|k| k.to_lowercase() == "project" || k.to_lowercase() == "proposal"));
+        assert!(
+            result
+                .keywords
+                .iter()
+                .any(|k| k.to_lowercase() == "project" || k.to_lowercase() == "proposal")
+        );
     }
 
     #[test]
@@ -675,7 +745,8 @@ mod tests {
     #[test]
     fn test_complex_query() {
         let parser = NLQueryParser::new();
-        let result = parser.parse("starred unread emails from John last month with attachments in inbox");
+        let result =
+            parser.parse("starred unread emails from John last month with attachments in inbox");
 
         assert_eq!(result.is_starred, Some(true));
         assert_eq!(result.is_unread, Some(true));

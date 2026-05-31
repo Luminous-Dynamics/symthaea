@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Holochain
+*.dna
+*.happ
+/workdir/
+
+# Nix
+/result
+.direnv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.sweettest/
+
+# Environment
+.env
+.env.local

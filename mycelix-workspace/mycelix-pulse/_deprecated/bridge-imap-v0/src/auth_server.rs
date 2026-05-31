@@ -4,8 +4,8 @@
 //! Tiny HTTP server for OAuth2 redirect callback.
 //! Runs on localhost:8118, receives the auth code, exchanges for tokens.
 
-use crate::oauth::{OAuthProvider, OAuthTokens};
 use crate::config::BridgeConfig;
+use crate::oauth::{OAuthProvider, OAuthTokens};
 use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::Mutex;

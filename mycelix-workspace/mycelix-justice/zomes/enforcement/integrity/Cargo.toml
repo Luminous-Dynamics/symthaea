@@ -1,0 +1,14 @@
+[package]
+name = "enforcement_integrity"
+version = "0.1.0"
+edition = "2024"
+description = "Justice enforcement integrity zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

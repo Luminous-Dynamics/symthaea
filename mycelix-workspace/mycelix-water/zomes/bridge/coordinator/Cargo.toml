@@ -1,0 +1,14 @@
+[package]
+name = "water_bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Cross-hApp water bridge coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+water_bridge_integrity = { path = "../integrity" }

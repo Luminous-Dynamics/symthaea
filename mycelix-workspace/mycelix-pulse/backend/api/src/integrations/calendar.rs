@@ -5,10 +5,10 @@
 // Integration with calendar systems for scheduling and event detection
 
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc, Weekday};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use regex::Regex;
 
 /// Supported calendar providers
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -17,7 +17,7 @@ pub enum CalendarProvider {
     Outlook365,
     AppleCalendar,
     CalDAV(String), // Custom CalDAV server URL
-    ICS, // iCalendar file import
+    ICS,            // iCalendar file import
 }
 
 /// Calendar connection for a user
@@ -232,11 +232,15 @@ impl CalendarService {
 
     /// Disconnect calendar
     pub async fn disconnect_calendar(&mut self, connection_id: Uuid) -> Result<(), CalendarError> {
-        let connection = self.connections.remove(&connection_id)
+        let connection = self
+            .connections
+            .remove(&connection_id)
             .ok_or(CalendarError::ConnectionNotFound)?;
 
         // Remove all events from this calendar
-        let events_to_remove: Vec<Uuid> = self.events.iter()
+        let events_to_remove: Vec<Uuid> = self
+            .events
+            .iter()
             .filter(|(_, e)| e.calendar_id == connection_id)
             .map(|(id, _)| *id)
             .collect();
@@ -255,7 +259,9 @@ impl CalendarService {
 
     /// Sync calendar events from provider
     pub async fn sync_calendar(&mut self, connection_id: Uuid) -> Result<usize, CalendarError> {
-        let connection = self.connections.get_mut(&connection_id)
+        let connection = self
+            .connections
+            .get_mut(&connection_id)
             .ok_or(CalendarError::ConnectionNotFound)?;
 
         if !connection.sync_enabled {
@@ -300,7 +306,9 @@ impl CalendarService {
         location: Option<String>,
         attendees: Vec<Attendee>,
     ) -> Result<CalendarEvent, CalendarError> {
-        let connection = self.connections.get(&calendar_id)
+        let connection = self
+            .connections
+            .get(&calendar_id)
             .ok_or(CalendarError::ConnectionNotFound)?;
 
         let event = CalendarEvent {
@@ -319,8 +327,14 @@ impl CalendarService {
             status: EventStatus::Confirmed,
             visibility: EventVisibility::Private,
             reminders: vec![
-                Reminder { method: ReminderMethod::Popup, minutes_before: 15 },
-                Reminder { method: ReminderMethod::Email, minutes_before: 60 },
+                Reminder {
+                    method: ReminderMethod::Popup,
+                    minutes_before: 15,
+                },
+                Reminder {
+                    method: ReminderMethod::Email,
+                    minutes_before: 60,
+                },
             ],
             conference: None,
             source_email_id: None,
@@ -356,7 +370,9 @@ impl CalendarService {
         let duration = detected.duration_minutes.unwrap_or(60);
         let end = start + Duration::minutes(duration as i64);
 
-        let attendees: Vec<Attendee> = detected.attendees.iter()
+        let attendees: Vec<Attendee> = detected
+            .attendees
+            .iter()
             .map(|email| Attendee {
                 email: email.clone(),
                 name: None,
@@ -365,15 +381,17 @@ impl CalendarService {
             })
             .collect();
 
-        let mut event = self.create_event(
-            calendar_id,
-            detected.title.clone(),
-            start,
-            end,
-            None,
-            detected.location.clone(),
-            attendees,
-        ).await?;
+        let mut event = self
+            .create_event(
+                calendar_id,
+                detected.title.clone(),
+                start,
+                end,
+                None,
+                detected.location.clone(),
+                attendees,
+            )
+            .await?;
 
         event.source_email_id = Some(email_id);
         self.events.insert(event.id, event.clone());
@@ -387,7 +405,9 @@ impl CalendarService {
         event_id: Uuid,
         updates: EventUpdate,
     ) -> Result<CalendarEvent, CalendarError> {
-        let event = self.events.get_mut(&event_id)
+        let event = self
+            .events
+            .get_mut(&event_id)
             .ok_or(CalendarError::EventNotFound)?;
 
         if let Some(title) = updates.title {
@@ -418,7 +438,9 @@ impl CalendarService {
 
     /// Delete an event
     pub async fn delete_event(&mut self, event_id: Uuid) -> Result<(), CalendarError> {
-        let event = self.events.remove(&event_id)
+        let event = self
+            .events
+            .remove(&event_id)
             .ok_or(CalendarError::EventNotFound)?;
 
         // Update user index
@@ -440,10 +462,14 @@ impl CalendarService {
         user_email: &str,
         response: ResponseStatus,
     ) -> Result<(), CalendarError> {
-        let event = self.events.get_mut(&event_id)
+        let event = self
+            .events
+            .get_mut(&event_id)
             .ok_or(CalendarError::EventNotFound)?;
 
-        if let Some(attendee) = event.attendees.iter_mut()
+        if let Some(attendee) = event
+            .attendees
+            .iter_mut()
             .find(|a| a.email.eq_ignore_ascii_case(user_email))
         {
             attendee.response_status = response;
@@ -464,7 +490,8 @@ impl CalendarService {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Vec<&CalendarEvent> {
-        self.user_events.get(&user_id)
+        self.user_events
+            .get(&user_id)
             .map(|ids| {
                 ids.iter()
                     .filter_map(|id| self.events.get(id))
@@ -483,8 +510,9 @@ impl CalendarService {
     ) -> Vec<FreeBusySlot> {
         let events = self.get_events(user_id, start, end);
 
-        events.iter().map(|e| {
-            FreeBusySlot {
+        events
+            .iter()
+            .map(|e| FreeBusySlot {
                 start: e.start,
                 end: e.end,
                 status: match e.status {
@@ -497,8 +525,8 @@ impl CalendarService {
                 } else {
                     None
                 },
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Find available meeting times
@@ -534,7 +562,8 @@ impl CalendarService {
             let within_working = hour >= working_hours.0 && hour < working_hours.1;
 
             // Check conflicts
-            let conflicts: Vec<String> = all_busy.iter()
+            let conflicts: Vec<String> = all_busy
+                .iter()
                 .filter(|b| b.start < slot_end && b.end > current && b.status == BusyStatus::Busy)
                 .filter_map(|b| b.event_title.clone())
                 .collect();
@@ -556,7 +585,11 @@ impl CalendarService {
         }
 
         // Sort by score (best first)
-        suggestions.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        suggestions.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         suggestions.truncate(10);
 
         suggestions
@@ -607,11 +640,11 @@ impl CalendarService {
         ];
 
         // Try to detect meeting keywords
-        let has_meeting_keyword = full_text.to_lowercase().contains("meeting") ||
-            full_text.to_lowercase().contains("schedule") ||
-            full_text.to_lowercase().contains("appointment") ||
-            full_text.to_lowercase().contains("call") ||
-            full_text.to_lowercase().contains("invite");
+        let has_meeting_keyword = full_text.to_lowercase().contains("meeting")
+            || full_text.to_lowercase().contains("schedule")
+            || full_text.to_lowercase().contains("appointment")
+            || full_text.to_lowercase().contains("call")
+            || full_text.to_lowercase().contains("invite");
 
         if !has_meeting_keyword {
             return events;
@@ -630,7 +663,8 @@ impl CalendarService {
 
         // If no specific title found, use subject
         let title = title.unwrap_or_else(|| {
-            subject.trim()
+            subject
+                .trim()
                 .trim_start_matches(|c: char| c.is_ascii_punctuation() || c.is_whitespace())
                 .to_string()
         });
@@ -654,7 +688,8 @@ impl CalendarService {
 
         // Extract email addresses as potential attendees
         let email_re = Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").unwrap();
-        let attendees: Vec<String> = email_re.find_iter(&full_text)
+        let attendees: Vec<String> = email_re
+            .find_iter(&full_text)
             .map(|m| m.as_str().to_lowercase())
             .collect();
 
@@ -685,17 +720,14 @@ impl CalendarService {
 
     /// Get user's calendar connections
     pub fn get_connections(&self, user_id: Uuid) -> Vec<&CalendarConnection> {
-        self.connections.values()
+        self.connections
+            .values()
             .filter(|c| c.user_id == user_id)
             .collect()
     }
 
     /// Get upcoming events
-    pub fn get_upcoming_events(
-        &self,
-        user_id: Uuid,
-        limit: usize,
-    ) -> Vec<&CalendarEvent> {
+    pub fn get_upcoming_events(&self, user_id: Uuid, limit: usize) -> Vec<&CalendarEvent> {
         let now = Utc::now();
         let future = now + Duration::days(30);
 
@@ -766,29 +798,35 @@ mod tests {
         let user_id = Uuid::new_v4();
 
         // First connect a calendar
-        let connection = service.connect_calendar(
-            user_id,
-            CalendarProvider::GoogleCalendar,
-            "Personal".to_string(),
-            "test@gmail.com".to_string(),
-            Some("mock_token".to_string()),
-            None,
-            None,
-        ).await.unwrap();
+        let connection = service
+            .connect_calendar(
+                user_id,
+                CalendarProvider::GoogleCalendar,
+                "Personal".to_string(),
+                "test@gmail.com".to_string(),
+                Some("mock_token".to_string()),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
 
         // Create event
         let start = Utc::now() + Duration::hours(1);
         let end = start + Duration::hours(1);
 
-        let event = service.create_event(
-            connection.id,
-            "Team Meeting".to_string(),
-            start,
-            end,
-            Some("Weekly sync".to_string()),
-            Some("Conference Room A".to_string()),
-            vec![],
-        ).await.unwrap();
+        let event = service
+            .create_event(
+                connection.id,
+                "Team Meeting".to_string(),
+                start,
+                end,
+                Some("Weekly sync".to_string()),
+                Some("Conference Room A".to_string()),
+                vec![],
+            )
+            .await
+            .unwrap();
 
         assert_eq!(event.title, "Team Meeting");
 
@@ -811,7 +849,11 @@ mod tests {
         let events = service.detect_events_from_email(subject, body);
 
         assert!(!events.is_empty());
-        assert!(events[0].attendees.contains(&"alice@company.com".to_string()));
+        assert!(
+            events[0]
+                .attendees
+                .contains(&"alice@company.com".to_string())
+        );
     }
 
     #[test]

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mycelix ZK Tax SDK Playground</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-secondary: #12122a;
+            --bg-card: #1a1a3a;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--accent-light), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-muted);
+        }
+
+        .tab:hover {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        .tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        button {
+            padding: 0.875rem 2rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .result h3 {
+            color: var(--accent-light);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .result-item {
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .result-item .label {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .result-item .value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 0.25rem;
+        }
+
+        .commitment {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            word-break: break-all;
+            color: var(--success);
+        }
+
+        .privacy-note {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 8px;
+            color: var(--success);
+            font-size: 0.9rem;
+        }
+
+        .error {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            color: #ef4444;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .feature-card h3 {
+            color: var(--accent-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        footer {
+            margin-top: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent-light);
+            text-decoration: none;
+        }
+
+        .jurisdiction-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .jurisdiction-badge {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .year-inputs {
+            margin-top: 1rem;
+        }
+
+        .year-row {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            align-items: center;
+        }
+
+        .year-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mycelix ZK Tax SDK</h1>
+            <p class="subtitle">Zero-knowledge proofs for privacy-preserving tax compliance</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="bracket">Tax Bracket Proof</div>
+            <div class="tab" data-tab="range">Income Range Proof</div>
+            <div class="tab" data-tab="batch">Multi-Year Batch</div>
+            <div class="tab" data-tab="about">About</div>
+        </div>
+
+        <!-- Tax Bracket Proof Panel -->
+        <div class="panel active" id="bracket-panel">
+            <h2>Generate Tax Bracket Proof</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Prove you fall within a specific tax bracket without revealing your actual income.
+            </p>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="income">Annual Income (Private)</label>
+                    <input type="number" id="income" value="85000" min="0" step="1000">
+                </div>
+                <div class="form-group">
+                    <label for="jurisdiction">Jurisdiction</label>
+                    <select id="jurisdiction">
+                        <optgroup label="Americas">
+                            <option value="US" selected>United States</option>
+                            <option value="CA">Canada</option>
+                            <option value="MX">Mexico</option>
+                            <option value="BR">Brazil</option>
+                            <option value="AR">Argentina</option>
+                        </optgroup>
+                        <optgroup label="Europe">
+                            <option value="UK">United Kingdom</option>
+                            <option value="DE">Germany</option>
+                            <option value="FR">France</option>
+                            <option value="IT">Italy</option>
+                            <option value="RU">Russia</option>
+                            <option value="TR">Turkey</option>
+                        </optgroup>
+                        <optgroup label="Asia-Pacific">
+                            <option value="JP">Japan</option>
+                            <option value="CN">China</option>
+                            <option value="IN">India</option>
+                            <option value="KR">South Korea</option>
+                            <option value="ID">Indonesia</option>
+                            <option value="AU">Australia</option>
+                        </optgroup>
+                        <optgroup label="Middle East & Africa">
+                            <option value="SA">Saudi Arabia</option>
+                            <option value="ZA">South Africa</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="filing-status">Filing Status</label>
+                    <select id="filing-status">
+                        <option value="single">Single</option>
+                        <option value="mfj">Married Filing Jointly</option>
+                        <option value="mfs">Married Filing Separately</option>
+                        <option value="hoh">Head of Household</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="tax-year">Tax Year</label>
+                    <select id="tax-year">
+                        <option value="2024" selected>2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                        <option value="2021">2021</option>
+                        <option value="2020">2020</option>
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="generateBracketProof()">Generate Proof</button>
+
+            <div id="bracket-result"></div>
+        </div>
+
+        <!-- Income Range Proof Panel -->
+        <div class="panel" id="range-panel">
+            <h2>Generate Income Range Proof</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Prove your income falls within a custom range. Useful for loan applications, rental qualifications, and benefits eligibility.
+            </p>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="range-income">Actual Income (Private)</label>
+                    <input type="number" id="range-income" value="75000" min="0" step="1000">
+                </div>
+                <div class="form-group">
+                    <label for="range-year">Tax Year</label>
+                    <select id="range-year">
+                        <option value="2024" selected>2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="range-lower">Minimum (Prove Above)</label>
+                    <input type="number" id="range-lower" value="50000" min="0" step="1000">
+                </div>
+                <div class="form-group">
+                    <label for="range-upper">Maximum (Prove Below)</label>
+                    <input type="number" id="range-upper" value="100000" min="0" step="1000">
+                    <small style="color: var(--text-muted);">Leave 0 for no upper limit</small>
+                </div>
+            </div>
+
+            <button onclick="generateRangeProof()">Generate Range Proof</button>
+
+            <div id="range-result"></div>
+        </div>
+
+        <!-- Batch Proof Panel -->
+        <div class="panel" id="batch-panel">
+            <h2>Generate Multi-Year Batch Proof</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                Prove tax bracket membership across multiple years. Essential for mortgage applications and visa requirements.
+            </p>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="batch-jurisdiction">Jurisdiction</label>
+                    <select id="batch-jurisdiction">
+                        <option value="US" selected>United States</option>
+                        <option value="UK">United Kingdom</option>
+                        <option value="CA">Canada</option>
+                        <option value="DE">Germany</option>
+                        <option value="AU">Australia</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="batch-filing">Filing Status</label>
+                    <select id="batch-filing">
+                        <option value="single" selected>Single</option>
+                        <option value="mfj">Married Filing Jointly</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="year-inputs">
+                <label>Income by Year (Private)</label>
+                <div class="year-row">
+                    <span class="year-label">2022:</span>
+                    <input type="number" id="income-2022" value="70000" min="0" step="1000">
+                </div>
+                <div class="year-row">
+                    <span class="year-label">2023:</span>
+                    <input type="number" id="income-2023" value="78000" min="0" step="1000">
+                </div>
+                <div class="year-row">
+                    <span class="year-label">2024:</span>
+                    <input type="number" id="income-2024" value="85000" min="0" step="1000">
+                </div>
+            </div>
+
+            <button onclick="generateBatchProof()" style="margin-top: 1rem;">Generate 3-Year Proof</button>
+
+            <div id="batch-result"></div>
+        </div>
+
+        <!-- About Panel -->
+        <div class="panel" id="about-panel">
+            <h2>About ZK Tax Proofs</h2>
+
+            <p style="margin-bottom: 1.5rem;">
+                Zero-knowledge proofs allow you to prove statements about your financial data without revealing the underlying information. This is revolutionary for privacy-preserving compliance.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Privacy First</h3>
+                    <p>Your actual income is NEVER revealed. The proof only shows which bracket you fall into, not your exact earnings.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Cryptographically Secure</h3>
+                    <p>Built on STARK proofs via Risc0 zkVM. Mathematical guarantees that proofs cannot be forged.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>19 Jurisdictions</h3>
+                    <p>Support for all G20 countries including US, UK, EU, Japan, China, India, and more.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Historical Data</h3>
+                    <p>Tax brackets from 2020-2025 for multi-year compliance verification.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Range Proofs</h3>
+                    <p>Prove income is above a minimum (loans) or below a maximum (benefits) without exact disclosure.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Holochain Ready</h3>
+                    <p>Integrated with Mycelix DHT for decentralized proof storage and verification.</p>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Supported Jurisdictions</h3>
+            <div class="jurisdiction-grid">
+                <div class="jurisdiction-badge">US</div>
+                <div class="jurisdiction-badge">UK</div>
+                <div class="jurisdiction-badge">CA</div>
+                <div class="jurisdiction-badge">DE</div>
+                <div class="jurisdiction-badge">FR</div>
+                <div class="jurisdiction-badge">IT</div>
+                <div class="jurisdiction-badge">JP</div>
+                <div class="jurisdiction-badge">CN</div>
+                <div class="jurisdiction-badge">IN</div>
+                <div class="jurisdiction-badge">KR</div>
+                <div class="jurisdiction-badge">AU</div>
+                <div class="jurisdiction-badge">BR</div>
+                <div class="jurisdiction-badge">MX</div>
+                <div class="jurisdiction-badge">AR</div>
+                <div class="jurisdiction-badge">RU</div>
+                <div class="jurisdiction-badge">TR</div>
+                <div class="jurisdiction-badge">ID</div>
+                <div class="jurisdiction-badge">SA</div>
+                <div class="jurisdiction-badge">ZA</div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Mycelix ZK Tax SDK v0.1.0 | <a href="https://github.com/Luminous-Dynamics/mycelix">GitHub</a> | <a href="https://mycelix.net">mycelix.net</a></p>
+            <p style="margin-top: 0.5rem;">Note: This playground runs in development mode. Production proofs require the Risc0 prover.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-panel`).classList.add('active');
+            });
+        });
+
+        // US tax brackets 2024 (for demo calculations)
+        const US_BRACKETS_2024 = [
+            { index: 0, lower: 0, upper: 11600, rate: 10 },
+            { index: 1, lower: 11600, upper: 47150, rate: 12 },
+            { index: 2, lower: 47150, upper: 100525, rate: 22 },
+            { index: 3, lower: 100525, upper: 191950, rate: 24 },
+            { index: 4, lower: 191950, upper: 243725, rate: 32 },
+            { index: 5, lower: 243725, upper: 609350, rate: 35 },
+            { index: 6, lower: 609350, upper: Infinity, rate: 37 },
+        ];
+
+        function findBracket(income, brackets) {
+            for (const bracket of brackets) {
+                if (income >= bracket.lower && income < bracket.upper) {
+                    return bracket;
+                }
+            }
+            return brackets[brackets.length - 1];
+        }
+
+        function formatCurrency(n) {
+            return n.toLocaleString('en-US');
+        }
+
+        // Simple hash function for demo commitments
+        function generateCommitment(lower, upper, year) {
+            const data = `${lower}-${upper}-${year}`;
+            let hash = 0xcbf29ce484222325n;
+            const prime = 0x100000001b3n;
+
+            for (let i = 0; i < data.length; i++) {
+                hash ^= BigInt(data.charCodeAt(i));
+                hash = (hash * prime) & 0xffffffffffffffffn;
+            }
+
+            return hash.toString(16).padStart(16, '0');
+        }
+
+        function generateBracketProof() {
+            const income = parseInt(document.getElementById('income').value);
+            const jurisdiction = document.getElementById('jurisdiction').value;
+            const filingStatus = document.getElementById('filing-status').value;
+            const taxYear = parseInt(document.getElementById('tax-year').value);
+
+            // Find bracket (using US brackets for demo)
+            const bracket = findBracket(income, US_BRACKETS_2024);
+            const commitment = generateCommitment(bracket.lower, bracket.upper, taxYear);
+
+            const resultHtml = `
+                <div class="result">
+                    <h3>Proof Generated</h3>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <div class="label">Jurisdiction</div>
+                            <div class="value">${jurisdiction}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Tax Year</div>
+                            <div class="value">${taxYear}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Bracket</div>
+                            <div class="value">#${bracket.index}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Marginal Rate</div>
+                            <div class="value">${bracket.rate}%</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Bracket Range</div>
+                            <div class="value">$${formatCurrency(bracket.lower)} - ${bracket.upper === Infinity ? '+' : '$' + formatCurrency(bracket.upper)}</div>
+                        </div>
+                    </div>
+                    <div class="commitment">
+                        <strong>Commitment:</strong> ${commitment}...
+                    </div>
+                    <div class="privacy-note">
+                        Your actual income of $${formatCurrency(income)} was NEVER revealed.
+                        The verifier only knows you fall within bracket #${bracket.index}.
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('bracket-result').innerHTML = resultHtml;
+        }
+
+        function generateRangeProof() {
+            const income = parseInt(document.getElementById('range-income').value);
+            const year = parseInt(document.getElementById('range-year').value);
+            const lower = parseInt(document.getElementById('range-lower').value);
+            let upper = parseInt(document.getElementById('range-upper').value);
+
+            if (upper === 0) upper = Infinity;
+
+            if (income < lower) {
+                document.getElementById('range-result').innerHTML = `
+                    <div class="error">
+                        Cannot generate proof: Income ($${formatCurrency(income)}) is below claimed minimum ($${formatCurrency(lower)})
+                    </div>
+                `;
+                return;
+            }
+
+            if (income >= upper) {
+                document.getElementById('range-result').innerHTML = `
+                    <div class="error">
+                        Cannot generate proof: Income ($${formatCurrency(income)}) is at or above claimed maximum ($${formatCurrency(upper)})
+                    </div>
+                `;
+                return;
+            }
+
+            const commitment = generateCommitment(lower, upper, year);
+
+            const resultHtml = `
+                <div class="result">
+                    <h3>Range Proof Generated</h3>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <div class="label">Proven Range</div>
+                            <div class="value">$${formatCurrency(lower)} - ${upper === Infinity ? '+' : '$' + formatCurrency(upper)}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Tax Year</div>
+                            <div class="value">${year}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Range Width</div>
+                            <div class="value">${upper === Infinity ? 'Unbounded' : '$' + formatCurrency(upper - lower)}</div>
+                        </div>
+                    </div>
+                    <div class="commitment">
+                        <strong>Commitment:</strong> ${commitment}...
+                    </div>
+                    <div class="privacy-note">
+                        Proof shows income is between $${formatCurrency(lower)} and ${upper === Infinity ? 'unlimited' : '$' + formatCurrency(upper)}.
+                        Actual income of $${formatCurrency(income)} remains private.
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('range-result').innerHTML = resultHtml;
+        }
+
+        function generateBatchProof() {
+            const jurisdiction = document.getElementById('batch-jurisdiction').value;
+            const filing = document.getElementById('batch-filing').value;
+            const income2022 = parseInt(document.getElementById('income-2022').value);
+            const income2023 = parseInt(document.getElementById('income-2023').value);
+            const income2024 = parseInt(document.getElementById('income-2024').value);
+
+            const bracket2022 = findBracket(income2022, US_BRACKETS_2024);
+            const bracket2023 = findBracket(income2023, US_BRACKETS_2024);
+            const bracket2024 = findBracket(income2024, US_BRACKETS_2024);
+
+            const brackets = [bracket2022, bracket2023, bracket2024];
+            const years = [2022, 2023, 2024];
+
+            // Check consistency
+            const isConsistent = brackets.every(b => b.index === brackets[0].index);
+            const showsGrowth = bracket2022.index <= bracket2023.index && bracket2023.index <= bracket2024.index;
+
+            // Generate combined commitment
+            const commitment = generateCommitment(
+                `${bracket2022.index}-${bracket2023.index}-${bracket2024.index}`,
+                0,
+                2024
+            );
+
+            const resultHtml = `
+                <div class="result">
+                    <h3>3-Year Batch Proof Generated</h3>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <div class="label">2022 Bracket</div>
+                            <div class="value">#${bracket2022.index} (${bracket2022.rate}%)</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">2023 Bracket</div>
+                            <div class="value">#${bracket2023.index} (${bracket2023.rate}%)</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">2024 Bracket</div>
+                            <div class="value">#${bracket2024.index} (${bracket2024.rate}%)</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Consistency</div>
+                            <div class="value">${isConsistent ? 'Same bracket all years' : 'Varying brackets'}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="label">Career Growth</div>
+                            <div class="value">${showsGrowth ? 'Upward trend' : 'No clear trend'}</div>
+                        </div>
+                    </div>
+                    <div class="commitment">
+                        <strong>Batch Commitment:</strong> ${commitment}...
+                    </div>
+                    <div class="privacy-note">
+                        This proof demonstrates 3 years of tax compliance for ${jurisdiction}.
+                        Individual year incomes ($${formatCurrency(income2022)}, $${formatCurrency(income2023)}, $${formatCurrency(income2024)}) remain private.
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('batch-result').innerHTML = resultHtml;
+        }
+    </script>
+</body>
+</html>

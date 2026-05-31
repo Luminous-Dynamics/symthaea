@@ -7,18 +7,18 @@
 
 use axum::{
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::header::AUTHORIZATION,
     response::Response,
 };
 use futures::{SinkExt, StreamExt};
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{RwLock, broadcast, mpsc};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -120,11 +120,7 @@ impl WebSocketHub {
     }
 
     /// Handle WebSocket upgrade
-    pub async fn handle_upgrade(
-        hub: Arc<Self>,
-        ws: WebSocketUpgrade,
-        user_id: Uuid,
-    ) -> Response {
+    pub async fn handle_upgrade(hub: Arc<Self>, ws: WebSocketUpgrade, user_id: Uuid) -> Response {
         ws.on_upgrade(move |socket| hub.handle_connection(socket, user_id))
     }
 
@@ -287,7 +283,8 @@ impl WebSocketHub {
 
     /// Notify about trust score change
     pub async fn notify_trust_update(&self, user_id: Uuid, update: TrustUpdateNotification) {
-        self.send_to_user(user_id, WsMessage::TrustScoreUpdated(update)).await;
+        self.send_to_user(user_id, WsMessage::TrustScoreUpdated(update))
+            .await;
     }
 
     /// Get connected user count

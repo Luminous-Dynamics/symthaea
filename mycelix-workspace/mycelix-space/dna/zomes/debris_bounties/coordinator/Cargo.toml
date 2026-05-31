@@ -1,0 +1,18 @@
+[package]
+name = "debris_bounties"
+version = "0.1.0"
+edition = "2024"
+description = "Coordinator zome for Kessler cleanup bounty system"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "debris_bounties"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+debris_bounties_integrity = { path = "../integrity" }
+mycelix-space-shared = { path = "../../../../zomes/shared" }
+orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
+getrandom = { workspace = true }

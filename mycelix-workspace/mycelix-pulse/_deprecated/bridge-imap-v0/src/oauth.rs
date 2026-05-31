@@ -9,8 +9,8 @@
 //! - Token refresh
 //! - XOAUTH2 SASL string generation for IMAP
 
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OAuthProvider {
@@ -92,7 +92,8 @@ impl OAuthProvider {
     /// Exchange authorization code for tokens.
     pub async fn exchange_code(&self, code: &str) -> Result<OAuthTokens> {
         let client = reqwest::Client::new();
-        let response = client.post(&self.token_url)
+        let response = client
+            .post(&self.token_url)
             .form(&[
                 ("client_id", self.client_id.as_str()),
                 ("client_secret", self.client_secret.as_str()),
@@ -106,9 +107,12 @@ impl OAuthProvider {
         let body: serde_json::Value = response.json().await?;
 
         if let Some(error) = body.get("error") {
-            return Err(anyhow::anyhow!("OAuth error: {} - {}",
+            return Err(anyhow::anyhow!(
+                "OAuth error: {} - {}",
                 error.as_str().unwrap_or("unknown"),
-                body.get("error_description").and_then(|d| d.as_str()).unwrap_or("")
+                body.get("error_description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("")
             ));
         }
 
@@ -129,7 +133,8 @@ impl OAuthProvider {
     /// Refresh an expired access token.
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthTokens> {
         let client = reqwest::Client::new();
-        let response = client.post(&self.token_url)
+        let response = client
+            .post(&self.token_url)
             .form(&[
                 ("client_id", self.client_id.as_str()),
                 ("client_secret", self.client_secret.as_str()),
@@ -149,7 +154,9 @@ impl OAuthProvider {
 
         Ok(OAuthTokens {
             access_token: body["access_token"].as_str().unwrap_or("").into(),
-            refresh_token: body["refresh_token"].as_str().map(String::from)
+            refresh_token: body["refresh_token"]
+                .as_str()
+                .map(String::from)
                 .or_else(|| Some(refresh_token.to_string())),
             expires_at: now + expires_in,
             token_type: body["token_type"].as_str().unwrap_or("Bearer").into(),
@@ -170,7 +177,10 @@ impl OAuthTokens {
     /// Generate XOAUTH2 SASL string for IMAP authentication.
     /// Format: base64("user=" + email + "\x01auth=Bearer " + token + "\x01\x01")
     pub fn xoauth2_string(&self, email: &str) -> String {
-        let sasl = format!("user={}\x01auth=Bearer {}\x01\x01", email, self.access_token);
+        let sasl = format!(
+            "user={}\x01auth=Bearer {}\x01\x01",
+            email, self.access_token
+        );
         base64_encode(sasl.as_bytes())
     }
 }
@@ -183,10 +193,12 @@ fn base64_encode(data: &[u8]) -> String {
 /// URL encoding helper.
 mod urlencoding {
     pub fn encode(s: &str) -> String {
-        s.chars().map(|c| match c {
-            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-            ' ' => "+".to_string(),
-            _ => format!("%{:02X}", c as u8),
-        }).collect()
+        s.chars()
+            .map(|c| match c {
+                'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+                ' ' => "+".to_string(),
+                _ => format!("%{:02X}", c as u8),
+            })
+            .collect()
     }
 }

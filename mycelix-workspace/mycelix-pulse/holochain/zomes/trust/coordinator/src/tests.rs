@@ -114,15 +114,15 @@ mod tests {
     }
 
     /// Creates a test TrustDispute
-    fn test_dispute(
-        attestation_hash: ActionHash,
-        disputer: AgentPubKey,
-    ) -> TrustDispute {
+    fn test_dispute(attestation_hash: ActionHash, disputer: AgentPubKey) -> TrustDispute {
         TrustDispute {
             attestation_hash,
             disputer,
             reason: "This attestation contains false information".to_string(),
-            counter_evidence: vec![test_evidence(EvidenceType::Custom("Counter proof".to_string()), 0.7)],
+            counter_evidence: vec![test_evidence(
+                EvidenceType::Custom("Counter proof".to_string()),
+                0.7,
+            )],
             status: DisputeStatus::Open,
             filed_at: test_timestamp(1000000),
             resolution: None,
@@ -176,24 +176,16 @@ mod tests {
             let valid_levels = vec![-1.0, -0.5, 0.0, 0.5, 1.0];
 
             for level in valid_levels {
-                let attestation = test_attestation(
-                    test_agent(1),
-                    test_agent(2),
-                    level,
-                    TrustCategory::Identity,
-                );
+                let attestation =
+                    test_attestation(test_agent(1), test_agent(2), level, TrustCategory::Identity);
                 assert!(attestation.trust_level >= -1.0 && attestation.trust_level <= 1.0);
             }
         }
 
         #[test]
         fn test_attestation_with_expiration() {
-            let mut attestation = test_attestation(
-                test_agent(1),
-                test_agent(2),
-                0.7,
-                TrustCategory::Identity,
-            );
+            let mut attestation =
+                test_attestation(test_agent(1), test_agent(2), 0.7, TrustCategory::Identity);
             attestation.expires_at = Some(test_timestamp(2000000));
 
             assert!(attestation.expires_at.is_some());
@@ -201,12 +193,8 @@ mod tests {
 
         #[test]
         fn test_attestation_with_stake() {
-            let mut attestation = test_attestation(
-                test_agent(1),
-                test_agent(2),
-                0.9,
-                TrustCategory::Identity,
-            );
+            let mut attestation =
+                test_attestation(test_agent(1), test_agent(2), 0.9, TrustCategory::Identity);
             attestation.stake = Some(test_stake(1000));
 
             assert!(attestation.stake.is_some());
@@ -215,12 +203,8 @@ mod tests {
 
         #[test]
         fn test_attestation_revocation() {
-            let mut attestation = test_attestation(
-                test_agent(1),
-                test_agent(2),
-                0.8,
-                TrustCategory::Identity,
-            );
+            let mut attestation =
+                test_attestation(test_agent(1), test_agent(2), 0.8, TrustCategory::Identity);
 
             assert!(!attestation.revoked);
             attestation.revoked = true;
@@ -243,24 +227,16 @@ mod tests {
             ];
 
             for category in categories {
-                let attestation = test_attestation(
-                    test_agent(1),
-                    test_agent(2),
-                    0.5,
-                    category.clone(),
-                );
+                let attestation =
+                    test_attestation(test_agent(1), test_agent(2), 0.5, category.clone());
                 assert_eq!(attestation.category, category);
             }
         }
 
         #[test]
         fn test_attestation_multiple_evidence() {
-            let mut attestation = test_attestation(
-                test_agent(1),
-                test_agent(2),
-                0.9,
-                TrustCategory::Identity,
-            );
+            let mut attestation =
+                test_attestation(test_agent(1), test_agent(2), 0.9, TrustCategory::Identity);
             attestation.evidence = vec![
                 test_evidence(EvidenceType::InPersonMeeting, 0.95),
                 test_evidence(EvidenceType::GovernmentId, 0.95),
@@ -281,12 +257,8 @@ mod tests {
 
         #[test]
         fn test_negative_trust_attestation() {
-            let attestation = test_attestation(
-                test_agent(1),
-                test_agent(2),
-                -0.5,
-                TrustCategory::Identity,
-            );
+            let attestation =
+                test_attestation(test_agent(1), test_agent(2), -0.5, TrustCategory::Identity);
 
             assert!(attestation.trust_level < 0.0);
         }
@@ -412,9 +384,8 @@ mod tests {
         #[test]
         fn test_trust_score_with_byzantine_flags() {
             let mut score = test_trust_score(test_agent(1), 0.8, 0.7);
-            score.byzantine_flags = vec![
-                test_byzantine_flag(ByzantineFlagType::SybilSuspicion, 0.3),
-            ];
+            score.byzantine_flags =
+                vec![test_byzantine_flag(ByzantineFlagType::SybilSuspicion, 0.3)];
 
             assert!(!score.byzantine_flags.is_empty());
         }
@@ -620,9 +591,15 @@ mod tests {
         #[test]
         fn test_sybil_detection_logic() {
             // If trusters.len() > SYBIL_DETECTION_THRESHOLD and unique < len/2
-            let trusters: Vec<AgentPubKey> = (0..15).map(|i| {
-                if i < 5 { test_agent(1) } else { test_agent((i % 5) as u8) }
-            }).collect();
+            let trusters: Vec<AgentPubKey> = (0..15)
+                .map(|i| {
+                    if i < 5 {
+                        test_agent(1)
+                    } else {
+                        test_agent((i % 5) as u8)
+                    }
+                })
+                .collect();
 
             let unique_count: std::collections::HashSet<_> = trusters.iter().collect();
 
@@ -638,7 +615,8 @@ mod tests {
             // High variance in trust scores indicates volatility
             let scores = vec![0.9, 0.1, 0.8, 0.2, 0.7];
             let mean = scores.iter().sum::<f64>() / scores.len() as f64;
-            let variance = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scores.len() as f64;
+            let variance =
+                scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scores.len() as f64;
             let std_dev = variance.sqrt();
 
             // High variance (> 0.5) triggers flag
@@ -653,8 +631,14 @@ mod tests {
                 (test_agent(1), -0.5), // Same truster, conflicting score
             ];
 
-            let max = attestations.iter().map(|(_, s)| *s).fold(f64::MIN, f64::max);
-            let min = attestations.iter().map(|(_, s)| *s).fold(f64::MAX, f64::min);
+            let max = attestations
+                .iter()
+                .map(|(_, s)| *s)
+                .fold(f64::MIN, f64::max);
+            let min = attestations
+                .iter()
+                .map(|(_, s)| *s)
+                .fold(f64::MAX, f64::min);
 
             // If max - min > 1.0, it's inconsistent
             assert!(max - min > 1.0);
@@ -672,11 +656,7 @@ mod tests {
             let introduced = test_agent(2);
             let target = test_agent(3);
 
-            let intro = test_introduction(
-                introducer.clone(),
-                introduced.clone(),
-                target.clone(),
-            );
+            let intro = test_introduction(introducer.clone(), introduced.clone(), target.clone());
 
             assert_eq!(intro.introducer, introducer);
             assert_eq!(intro.introduced, introduced);
@@ -686,11 +666,7 @@ mod tests {
 
         #[test]
         fn test_introduction_acceptance() {
-            let mut intro = test_introduction(
-                test_agent(1),
-                test_agent(2),
-                test_agent(3),
-            );
+            let mut intro = test_introduction(test_agent(1), test_agent(2), test_agent(3));
 
             assert!(intro.accepted.is_none());
             intro.accepted = Some(true);
@@ -699,11 +675,7 @@ mod tests {
 
         #[test]
         fn test_introduction_rejection() {
-            let mut intro = test_introduction(
-                test_agent(1),
-                test_agent(2),
-                test_agent(3),
-            );
+            let mut intro = test_introduction(test_agent(1), test_agent(2), test_agent(3));
 
             intro.accepted = Some(false);
             assert_eq!(intro.accepted, Some(false));
@@ -711,11 +683,7 @@ mod tests {
 
         #[test]
         fn test_introduction_recommendation_level() {
-            let mut intro = test_introduction(
-                test_agent(1),
-                test_agent(2),
-                test_agent(3),
-            );
+            let mut intro = test_introduction(test_agent(1), test_agent(2), test_agent(3));
 
             intro.recommendation_level = 0.95;
             assert!(intro.recommendation_level >= 0.0 && intro.recommendation_level <= 1.0);
@@ -723,11 +691,7 @@ mod tests {
 
         #[test]
         fn test_introduction_all_parties_different() {
-            let intro = test_introduction(
-                test_agent(1),
-                test_agent(2),
-                test_agent(3),
-            );
+            let intro = test_introduction(test_agent(1), test_agent(2), test_agent(3));
 
             assert_ne!(intro.introducer, intro.introduced);
             assert_ne!(intro.introducer, intro.target);
@@ -894,7 +858,11 @@ mod tests {
             };
 
             match signal {
-                TrustSignal::TrustScoreUpdated { new_score, confidence, .. } => {
+                TrustSignal::TrustScoreUpdated {
+                    new_score,
+                    confidence,
+                    ..
+                } => {
                     assert_eq!(new_score, 0.75);
                     assert_eq!(confidence, 0.9);
                 }
@@ -1030,8 +998,10 @@ mod tests {
             let old_attestation = test_timestamp(100000000 - time_window_seconds * 1000000 - 1);
             let recent_attestation = test_timestamp(100000000 - 1000000);
 
-            let is_old_in_window = (now.as_micros() - old_attestation.as_micros()) < time_window_seconds * 1000000;
-            let is_recent_in_window = (now.as_micros() - recent_attestation.as_micros()) < time_window_seconds * 1000000;
+            let is_old_in_window =
+                (now.as_micros() - old_attestation.as_micros()) < time_window_seconds * 1000000;
+            let is_recent_in_window =
+                (now.as_micros() - recent_attestation.as_micros()) < time_window_seconds * 1000000;
 
             assert!(!is_old_in_window);
             assert!(is_recent_in_window);

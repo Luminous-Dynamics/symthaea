@@ -1,0 +1,21 @@
+---
+# Mycelix Media hApp Bundle
+# Decentralized journalism and content verification
+
+manifest_version: "0"
+name: mycelix-media
+description: |
+  Decentralized journalism and content verification for the Mycelix ecosystem.
+  Features epistemic fact-checking, attribution tracking, and curation.
+
+roles:
+  - name: media
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_media.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use crate::components::ContactCard;
-use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::holochain::{ConnectionStatus, use_holochain};
 use crate::mail_context::use_mail;
 use crate::toasts::use_toasts;
 use leptos::prelude::*;

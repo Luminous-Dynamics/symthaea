@@ -1,0 +1,21 @@
+---
+# Mycelix Energy hApp Bundle
+# Energy coordination and community ownership - Terra Atlas integration
+
+manifest_version: "0"
+name: mycelix-energy
+description: |
+  Energy coordination and community ownership for the Mycelix ecosystem.
+  Integrates with Terra Atlas for renewable energy project management.
+
+roles:
+  - name: energy
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_energy.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

@@ -208,8 +208,8 @@ impl FederationProtocol {
             .ok_or_else(|| FederationError::UnknownInstance(from_domain.to_string()))?;
 
         // Decode public key
-        let public_key_bytes = hex::decode(&instance.public_key)
-            .map_err(|_| FederationError::InvalidSignature)?;
+        let public_key_bytes =
+            hex::decode(&instance.public_key).map_err(|_| FederationError::InvalidSignature)?;
 
         let public_key = VerifyingKey::from_bytes(
             public_key_bytes
@@ -263,9 +263,7 @@ impl FederationProtocol {
 
         // Default handlers
         match &signed.message {
-            FederationMessage::Hello(hello) => {
-                self.handle_hello(from_domain, hello).await
-            }
+            FederationMessage::Hello(hello) => self.handle_hello(from_domain, hello).await,
             FederationMessage::TrustQuery(query) => {
                 self.handle_trust_query(from_domain, query).await
             }
@@ -288,10 +286,16 @@ impl FederationProtocol {
         }
 
         // Check if we should accept
-        let accepted = if self.config.blocked_instances.contains(&from_domain.to_string()) {
+        let accepted = if self
+            .config
+            .blocked_instances
+            .contains(&from_domain.to_string())
+        {
             false
         } else if !self.config.allowed_instances.is_empty() {
-            self.config.allowed_instances.contains(&from_domain.to_string())
+            self.config
+                .allowed_instances
+                .contains(&from_domain.to_string())
         } else {
             self.config.auto_accept
         };
@@ -360,7 +364,10 @@ impl FederationProtocol {
         let mut results = Vec::new();
 
         for (domain, instance) in instances.iter() {
-            if instance.capabilities.contains(&FederationCapability::TrustSync) {
+            if instance
+                .capabilities
+                .contains(&FederationCapability::TrustSync)
+            {
                 let query = FederationMessage::TrustQuery(TrustQueryPayload {
                     requester: format!("{}@{}", "local", self.config.domain),
                     target_user: user_id.to_string(),

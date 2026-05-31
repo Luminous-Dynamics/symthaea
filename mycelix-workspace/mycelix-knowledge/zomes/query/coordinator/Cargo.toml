@@ -1,0 +1,15 @@
+[package]
+name = "query"
+version = "0.1.0"
+edition = "2024"
+description = "Knowledge query coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+query_integrity = { path = "../integrity" }
+getrandom = { workspace = true }

@@ -7,7 +7,7 @@
 //! X25519 key agreement in Rust/WASM, HKDF-SHA256 for key derivation, and
 //! AES-256-GCM via Web Crypto for payload encryption.
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ed25519_dalek::Signer;
 use hkdf::Hkdf;
 use sha2::Sha256;

@@ -69,12 +69,7 @@ pub fn publish_pre_key_bundle(bundle: PreKeyBundle) -> ExternResult<ActionHash> 
 
     // Link from agent to bundle
     let my_agent = agent_info()?.agent_initial_pubkey;
-    create_link(
-        my_agent,
-        action_hash.clone(),
-        LinkTypes::AgentToBundle,
-        (),
-    )?;
+    create_link(my_agent, action_hash.clone(), LinkTypes::AgentToBundle, ())?;
 
     Ok(action_hash)
 }
@@ -82,7 +77,10 @@ pub fn publish_pre_key_bundle(bundle: PreKeyBundle) -> ExternResult<ActionHash> 
 /// Get pre-key bundle for an agent
 #[hdk_extern]
 pub fn get_pre_key_bundle(agent: AgentPubKey) -> ExternResult<Option<PreKeyBundle>> {
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToBundle)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToBundle)?,
+        GetStrategy::default(),
+    )?;
 
     // Get the most recent bundle
     let mut bundles: Vec<(u64, PreKeyBundle)> = Vec::new();
@@ -166,11 +164,7 @@ pub struct ConsumePreKeyInput {
 #[hdk_extern]
 pub fn get_available_pre_key_count(agent: AgentPubKey) -> ExternResult<u32> {
     if let Some(bundle) = get_pre_key_bundle(agent)? {
-        let count = bundle
-            .one_time_pre_keys
-            .iter()
-            .filter(|k| !k.used)
-            .count();
+        let count = bundle.one_time_pre_keys.iter().filter(|k| !k.used).count();
         Ok(count as u32)
     } else {
         Ok(0)
@@ -199,12 +193,7 @@ pub fn rotate_keys(input: RotateKeysInput) -> ExternResult<ActionHash> {
         };
         let rotation_hash = create_entry(EntryTypes::KeyRotation(rotation))?;
 
-        create_link(
-            my_agent,
-            rotation_hash,
-            LinkTypes::KeyRotations,
-            (),
-        )?;
+        create_link(my_agent, rotation_hash, LinkTypes::KeyRotations, ())?;
     }
 
     Ok(new_bundle_hash)
@@ -220,7 +209,10 @@ pub struct RotateKeysInput {
 #[hdk_extern]
 pub fn get_rotation_history(_: ()) -> ExternResult<Vec<KeyRotation>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
-    let links = get_links(LinkQuery::try_new(my_agent, LinkTypes::KeyRotations)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::KeyRotations)?,
+        GetStrategy::default(),
+    )?;
 
     let mut rotations = Vec::new();
     for link in links {
@@ -251,11 +243,7 @@ pub fn needs_refresh(_: ()) -> ExternResult<BundleStatus> {
     let now = sys_time()?.as_micros() as u64;
 
     if let Some(bundle) = get_pre_key_bundle(my_agent)? {
-        let available_keys = bundle
-            .one_time_pre_keys
-            .iter()
-            .filter(|k| !k.used)
-            .count();
+        let available_keys = bundle.one_time_pre_keys.iter().filter(|k| !k.used).count();
 
         // Check expiration (warn if expires within 24 hours)
         let one_day = 24 * 60 * 60 * 1_000_000; // microseconds
@@ -287,7 +275,10 @@ pub enum BundleStatus {
 
 fn get_my_bundle_hash() -> ExternResult<Option<ActionHash>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
-    let links = get_links(LinkQuery::try_new(my_agent, LinkTypes::AgentToBundle)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::AgentToBundle)?,
+        GetStrategy::default(),
+    )?;
 
     // Get most recent
     let mut bundles: Vec<(u64, ActionHash)> = Vec::new();

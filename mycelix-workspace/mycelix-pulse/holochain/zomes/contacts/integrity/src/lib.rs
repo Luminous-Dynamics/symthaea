@@ -117,7 +117,10 @@ pub enum LinkTypes {
 }
 
 /// Validate contact entry
-fn validate_create_contact(_action: Create, contact: Contact) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_contact(
+    _action: Create,
+    contact: Contact,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate display name
     if contact.display_name.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -128,9 +131,10 @@ fn validate_create_contact(_action: Create, contact: Contact) -> ExternResult<Va
     // Validate at least one email if any emails provided
     for email in &contact.emails {
         if !email.email.contains('@') {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Invalid email format: {}", email.email),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid email format: {}",
+                email.email
+            )));
         }
     }
 
@@ -174,7 +178,9 @@ fn validate_create_contact_group(group: ContactGroup) -> ExternResult<ValidateCa
 }
 
 /// Validate membership
-fn validate_create_group_membership(membership: GroupMembership) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_group_membership(
+    membership: GroupMembership,
+) -> ExternResult<ValidateCallbackResult> {
     if membership.contact_id.is_empty() || membership.group_id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Contact ID and Group ID are required".to_string(),

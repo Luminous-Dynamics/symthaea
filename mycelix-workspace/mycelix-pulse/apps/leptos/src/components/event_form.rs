@@ -111,19 +111,11 @@ pub fn EventForm(
             title: t,
             description: {
                 let d = description.get_untracked();
-                if d.is_empty() {
-                    None
-                } else {
-                    Some(d)
-                }
+                if d.is_empty() { None } else { Some(d) }
             },
             location: {
                 let l = location.get_untracked();
-                if l.is_empty() {
-                    None
-                } else {
-                    Some(l)
-                }
+                if l.is_empty() { None } else { Some(l) }
             },
             start_time: start_ts,
             end_time: end_ts,

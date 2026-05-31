@@ -23,7 +23,7 @@ use crate::pages::*;
 use crate::preferences::provide_preferences_context;
 use crate::summary::provide_pulse_summary_context;
 use crate::theme::provide_theme_context;
-use crate::toasts::{provide_toast_context, ToastContainer};
+use crate::toasts::{ToastContainer, provide_toast_context};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -85,7 +85,7 @@ fn AppInner() -> impl IntoView {
                 } else {
                     // Reset to default favicon
                     let _ = js_sys::eval(
-                        "let l=document.querySelector('link[rel=icon]');if(l)l.href=\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>\\u2709</text></svg>\""
+                        "let l=document.querySelector('link[rel=icon]');if(l)l.href=\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>\\u2709</text></svg>\"",
                     );
                 }
             }

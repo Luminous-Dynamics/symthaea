@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mycelix Knowledge</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .status-dot.disconnected {
+      background: #ef4444;
+    }
+
+    .status-text {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+      border: none;
+      background: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab:hover {
+      color: #3b82f6;
+    }
+
+    .tab.active {
+      color: #3b82f6;
+      border-bottom-color: #3b82f6;
+    }
+
+    .content {
+      padding: 16px;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .search-box button {
+      padding: 10px 16px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .search-box button:hover {
+      background: #2563eb;
+    }
+
+    .results {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .result-item {
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .result-item:hover {
+      border-color: #3b82f6;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+    }
+
+    .result-content {
+      font-size: 13px;
+      color: #1e293b;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .result-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .result-tag {
+      font-size: 11px;
+      padding: 2px 6px;
+      background: #f1f5f9;
+      color: #64748b;
+      border-radius: 4px;
+    }
+
+    .result-score {
+      font-size: 11px;
+      color: #22c55e;
+      font-weight: 500;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .action-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 20px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      border-color: #3b82f6;
+      background: #f0f9ff;
+    }
+
+    .action-btn .icon {
+      font-size: 24px;
+    }
+
+    .action-btn .label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 600;
+      color: #3b82f6;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .recent-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .recent-verdict {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .recent-verdict.true { background: #22c55e; }
+    .recent-verdict.false { background: #ef4444; }
+    .recent-verdict.mixed { background: #eab308; }
+    .recent-verdict.unknown { background: #6b7280; }
+
+    .recent-text {
+      font-size: 12px;
+      color: #1e293b;
+      line-height: 1.4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+    }
+
+    .empty-state .icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    .footer {
+      padding: 12px 16px;
+      background: white;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+    }
+
+    .footer a {
+      font-size: 12px;
+      color: #64748b;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      color: #3b82f6;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Mycelix Knowledge</h1>
+    <p>Decentralized Fact-Checking</p>
+  </div>
+
+  <div class="status">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-text" id="status-text">Connecting...</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="search">Search</button>
+    <button class="tab" data-tab="actions">Actions</button>
+    <button class="tab" data-tab="history">History</button>
+  </div>
+
+  <div class="content">
+    <!-- Search Panel -->
+    <div class="panel active" id="panel-search">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Search the knowledge graph...">
+        <button id="search-btn">Search</button>
+      </div>
+      <div class="results" id="search-results">
+        <div class="empty-state">
+          <div class="icon">🔍</div>
+          <p>Search for claims in the knowledge graph</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions Panel -->
+    <div class="panel" id="panel-actions">
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="stat-claims">-</div>
+          <div class="stat-label">Claims</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-checks">-</div>
+          <div class="stat-label">Fact Checks</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-submitted">-</div>
+          <div class="stat-label">Submitted</div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <button class="action-btn" id="action-factcheck">
+          <span class="icon">🔍</span>
+          <span class="label">Fact Check</span>
+        </button>
+        <button class="action-btn" id="action-submit">
+          <span class="icon">📝</span>
+          <span class="label">Submit Claim</span>
+        </button>
+        <button class="action-btn" id="action-classify">
+          <span class="icon">🎯</span>
+          <span class="label">Classify</span>
+        </button>
+        <button class="action-btn" id="action-settings">
+          <span class="icon">⚙️</span>
+          <span class="label">Settings</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- History Panel -->
+    <div class="panel" id="panel-history">
+      <div class="recent-list" id="recent-list">
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>No recent fact checks</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <a href="https://mycelix.net" target="_blank">mycelix.net</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

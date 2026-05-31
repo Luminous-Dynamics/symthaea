@@ -1,0 +1,21 @@
+---
+# Mycelix Finance hApp Bundle
+# Peer-to-peer lending, credit, and value transfer
+
+manifest_version: "0"
+name: mycelix-finance
+description: |
+  Peer-to-peer lending, credit, and value transfer for the Mycelix ecosystem.
+  MATL-based credit scoring with mutual credit currency.
+
+roles:
+  - name: finance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_finance.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

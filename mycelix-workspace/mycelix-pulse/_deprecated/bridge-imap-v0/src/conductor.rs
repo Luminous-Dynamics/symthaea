@@ -14,10 +14,13 @@ impl ConductorClient {
     pub async fn connect(url: &str) -> Result<Self> {
         // Verify connectivity with a simple TCP check
         let addr = url.trim_start_matches("ws://").trim_start_matches("wss://");
-        let _ = tokio::net::TcpStream::connect(addr).await
+        let _ = tokio::net::TcpStream::connect(addr)
+            .await
             .map_err(|e| anyhow::anyhow!("Cannot reach conductor at {url}: {e}"))?;
         tracing::info!("Conductor connectivity verified at {url}");
-        Ok(Self { url: url.to_string() })
+        Ok(Self {
+            url: url.to_string(),
+        })
     }
 
     /// Relay an inbound IMAP message into Holochain via federation bridge.

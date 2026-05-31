@@ -6,8 +6,8 @@
 //! Provides Swagger UI at `/api-docs` and OpenAPI JSON at `/api-docs/openapi.json`
 
 use utoipa::{
-    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
     Modify, OpenApi,
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
 };
 
 /// Security scheme modifier for JWT bearer authentication

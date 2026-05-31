@@ -171,12 +171,10 @@ impl TenantService {
 
     /// Get tenant by slug
     pub async fn get_tenant_by_slug(&self, slug: &str) -> Result<Option<Tenant>, sqlx::Error> {
-        sqlx::query_as::<_, Tenant>(
-            "SELECT * FROM tenants WHERE slug = $1 AND status != 'deleted'",
-        )
-        .bind(slug)
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_as::<_, Tenant>("SELECT * FROM tenants WHERE slug = $1 AND status != 'deleted'")
+            .bind(slug)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Get tenant by domain

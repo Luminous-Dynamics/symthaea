@@ -1,0 +1,19 @@
+[package]
+name = "rbbft"
+version = "0.1.0"
+edition = "2024"
+description = "RB-BFT Consensus Coordinator Zome - Reputation-based Byzantine fault tolerance"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "rbbft"
+
+[dependencies]
+getrandom = { workspace = true }
+getrandom_03 = { workspace = true }
+hdk = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+rbbft_integrity = { path = "../integrity" }
+
+[features]
+default = []

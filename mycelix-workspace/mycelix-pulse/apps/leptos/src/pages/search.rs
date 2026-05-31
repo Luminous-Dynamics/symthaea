@@ -4,7 +4,7 @@
 //! Search page with zome-backed BM25 search (#8), client-side fallback for mock mode.
 
 use crate::components::EmailCard;
-use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::holochain::{ConnectionStatus, use_holochain};
 use crate::mail_context::use_mail;
 use crate::semantic;
 use leptos::prelude::*;

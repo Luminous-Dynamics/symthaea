@@ -8,8 +8,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
 
 // ============================================================================
 // Threading Service
@@ -125,13 +125,11 @@ impl ThreadingService {
         headers: &EmailHeaders,
     ) -> Result<(), ThreadingError> {
         // Get current position count
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM emails WHERE thread_id = $1",
-        )
-        .bind(thread_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ThreadingError::Database(e.to_string()))?;
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM emails WHERE thread_id = $1")
+            .bind(thread_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ThreadingError::Database(e.to_string()))?;
 
         sqlx::query("UPDATE emails SET thread_id = $1, thread_position = $2 WHERE id = $3")
             .bind(thread_id)
@@ -455,9 +453,8 @@ impl ConversationIntelligence {
             for pattern in &action_patterns {
                 if body_lower.contains(pattern) {
                     // Extract the sentence containing the pattern
-                    if let Some(sentence) = body
-                        .split('.')
-                        .find(|s| s.to_lowercase().contains(pattern))
+                    if let Some(sentence) =
+                        body.split('.').find(|s| s.to_lowercase().contains(pattern))
                     {
                         items.push(ActionItem {
                             text: sentence.trim().to_string(),
@@ -474,16 +471,27 @@ impl ConversationIntelligence {
         items
     }
 
-    fn analyze_sentiment(
-        &self,
-        messages: &[(String, String, DateTime<Utc>)],
-    ) -> ThreadSentiment {
+    fn analyze_sentiment(&self, messages: &[(String, String, DateTime<Utc>)]) -> ThreadSentiment {
         // Simple sentiment analysis (would use ML model)
         let mut positive_count = 0;
         let mut negative_count = 0;
 
-        let positive_words = ["thank", "great", "excellent", "happy", "pleased", "appreciate"];
-        let negative_words = ["urgent", "problem", "issue", "disappointed", "concern", "unfortunately"];
+        let positive_words = [
+            "thank",
+            "great",
+            "excellent",
+            "happy",
+            "pleased",
+            "appreciate",
+        ];
+        let negative_words = [
+            "urgent",
+            "problem",
+            "issue",
+            "disappointed",
+            "concern",
+            "unfortunately",
+        ];
 
         for (_, body, _) in messages {
             let body_lower = body.to_lowercase();
@@ -509,7 +517,11 @@ impl ConversationIntelligence {
     }
 
     /// Detect if thread needs response
-    pub async fn needs_response(&self, thread_id: Uuid, user_email: &str) -> Result<bool, ThreadingError> {
+    pub async fn needs_response(
+        &self,
+        thread_id: Uuid,
+        user_email: &str,
+    ) -> Result<bool, ThreadingError> {
         let last_message: Option<(String,)> = sqlx::query_as(
             r#"
             SELECT from_address FROM emails
@@ -523,7 +535,9 @@ impl ConversationIntelligence {
         .map_err(|e| ThreadingError::Database(e.to_string()))?;
 
         // Thread needs response if last message is not from user
-        Ok(last_message.map(|(from,)| from != user_email).unwrap_or(false))
+        Ok(last_message
+            .map(|(from,)| from != user_email)
+            .unwrap_or(false))
     }
 
     /// Find related threads by topic similarity
@@ -534,16 +548,15 @@ impl ConversationIntelligence {
         limit: i64,
     ) -> Result<Vec<RelatedThread>, ThreadingError> {
         // Get thread subject for comparison
-        let subject: (String,) = sqlx::query_as(
-            "SELECT subject FROM email_threads WHERE id = $1",
-        )
-        .bind(thread_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ThreadingError::Database(e.to_string()))?;
+        let subject: (String,) = sqlx::query_as("SELECT subject FROM email_threads WHERE id = $1")
+            .bind(thread_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ThreadingError::Database(e.to_string()))?;
 
         // Simple keyword matching (would use embeddings in production)
-        let keywords: Vec<&str> = subject.0
+        let keywords: Vec<&str> = subject
+            .0
             .split_whitespace()
             .filter(|w| w.len() > 3)
             .take(5)

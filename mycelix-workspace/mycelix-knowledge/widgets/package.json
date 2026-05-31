@@ -1,0 +1,60 @@
+{
+  "name": "@mycelix/knowledge-widgets",
+  "version": "0.1.0",
+  "description": "Embeddable widgets for Mycelix Knowledge fact-checking and claim display",
+  "main": "dist/embed.js",
+  "module": "dist/embed.esm.js",
+  "types": "dist/embed.d.ts",
+  "unpkg": "dist/embed.umd.js",
+  "jsdelivr": "dist/embed.umd.js",
+  "exports": {
+    ".": {
+      "import": "./dist/embed.esm.js",
+      "require": "./dist/embed.js",
+      "types": "./dist/embed.d.ts"
+    },
+    "./umd": "./dist/embed.umd.js"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "test": "vitest"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.0",
+    "@rollup/plugin-typescript": "^11.1.0",
+    "rollup": "^4.6.0",
+    "rollup-plugin-terser": "^7.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge.git",
+    "directory": "widgets"
+  },
+  "author": "Luminous Dynamics <dev@luminousdynamics.org>",
+  "keywords": [
+    "mycelix",
+    "knowledge",
+    "fact-check",
+    "widget",
+    "embed",
+    "epistemic"
+  ],
+  "license": "AGPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge/issues"
+  },
+  "homepage": "https://knowledge.mycelix.net/integrations/widgets",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

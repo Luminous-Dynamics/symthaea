@@ -9,7 +9,7 @@
 //! 3. If not found: offers one-click install instructions via platform detection
 //! 4. Continuously polls for conductor availability
 
-use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::holochain::{ConnectionStatus, use_holochain};
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 

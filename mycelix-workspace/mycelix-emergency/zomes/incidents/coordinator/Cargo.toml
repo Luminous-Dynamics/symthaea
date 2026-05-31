@@ -1,0 +1,15 @@
+[package]
+name = "incidents"
+version = "0.1.0"
+edition = "2024"
+description = "Emergency incidents coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+getrandom_03 = { workspace = true }
+incidents_integrity = { path = "../integrity" }

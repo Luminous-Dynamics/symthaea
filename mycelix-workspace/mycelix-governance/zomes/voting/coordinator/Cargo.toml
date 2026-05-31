@@ -1,0 +1,17 @@
+[package]
+name = "voting"
+version = "0.1.0"
+edition = "2024"
+description = "Governance voting coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+hex = "0.4"
+voting_integrity = { path = "../integrity" }
+proposals_integrity = { path = "../../proposals/integrity" }
+mycelix-core-types = { workspace = true }

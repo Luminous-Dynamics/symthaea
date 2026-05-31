@@ -1,0 +1,53 @@
+---
+# Mycelix Property DNA
+# Property registry, transfers, disputes, and commons
+
+manifest_version: "0"
+name: mycelix_property
+integrity:
+  network_seed: ~
+  properties:
+    # Registry configuration
+    require_proof_of_ownership: true
+    max_property_size_sqm: 10000000
+
+    # Transfer configuration
+    transfer_cooling_period_days: 7
+    require_witness_signatures: 2
+
+    # MATL integration
+    quality_weight: 0.4
+    consistency_weight: 0.3
+    reputation_weight: 0.3
+
+  zomes:
+    - name: registry_integrity
+      path: ../target/wasm32-unknown-unknown/release/registry_integrity.wasm
+    - name: transfer_integrity
+      path: ../target/wasm32-unknown-unknown/release/transfer_integrity.wasm
+    - name: disputes_integrity
+      path: ../target/wasm32-unknown-unknown/release/disputes_integrity.wasm
+    - name: commons_integrity
+      path: ../target/wasm32-unknown-unknown/release/commons_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: registry
+      path: ../target/wasm32-unknown-unknown/release/registry.wasm
+      dependencies:
+        - name: registry_integrity
+    - name: transfer
+      path: ../target/wasm32-unknown-unknown/release/transfer.wasm
+      dependencies:
+        - name: transfer_integrity
+        - name: registry_integrity
+    - name: disputes
+      path: ../target/wasm32-unknown-unknown/release/disputes.wasm
+      dependencies:
+        - name: disputes_integrity
+        - name: registry_integrity
+    - name: commons
+      path: ../target/wasm32-unknown-unknown/release/commons.wasm
+      dependencies:
+        - name: commons_integrity
+        - name: registry_integrity

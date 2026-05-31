@@ -1,0 +1,15 @@
+[package]
+name = "recovery"
+version = "0.1.0"
+edition = "2024"
+description = "Social recovery coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+recovery_integrity = { path = "../integrity" }
+did_registry_integrity = { path = "../../did_registry/integrity" }

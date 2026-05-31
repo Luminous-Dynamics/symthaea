@@ -5,8 +5,8 @@
 
 use crate::mail_context::use_mail;
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 
 #[derive(Clone, Copy)]
 pub struct NotificationState {
@@ -56,7 +56,7 @@ pub fn use_notifications() -> NotificationState {
 /// Request notification permission on first user interaction.
 pub fn request_notification_permission() {
     let _ = js_sys::eval(
-        "if('Notification' in window && Notification.permission==='default'){Notification.requestPermission()}"
+        "if('Notification' in window && Notification.permission==='default'){Notification.requestPermission()}",
     );
 }
 
@@ -83,6 +83,6 @@ pub fn play_notification_sound() {
 
     // Use eval for simple Web Audio beep
     let _ = js_sys::eval(
-        "try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.type='sine';o.frequency.value=880;g.gain.value=0.08;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+0.1)}catch(e){}"
+        "try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.type='sine';o.frequency.value=880;g.gain.value=0.08;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+0.1)}catch(e){}",
     );
 }

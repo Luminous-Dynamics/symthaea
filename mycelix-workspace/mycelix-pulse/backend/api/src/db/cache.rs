@@ -5,8 +5,8 @@
 //!
 //! Provides caching with TTL, invalidation, and cache-aside pattern
 
-use redis::{aio::ConnectionManager, AsyncCommands, RedisError};
-use serde::{de::DeserializeOwned, Serialize};
+use redis::{AsyncCommands, RedisError, aio::ConnectionManager};
+use serde::{Serialize, de::DeserializeOwned};
 use std::time::Duration;
 use thiserror::Error;
 
@@ -35,7 +35,8 @@ pub struct CacheConfig {
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            url: std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+            url: std::env::var("REDIS_URL")
+                .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             default_ttl: Duration::from_secs(300), // 5 minutes
             key_prefix: "mycelix:".to_string(),
         }
@@ -140,12 +141,7 @@ impl Cache {
     }
 
     /// Get or set (cache-aside pattern)
-    pub async fn get_or_set<T, F, Fut>(
-        &self,
-        key: &str,
-        ttl: Duration,
-        f: F,
-    ) -> CacheResult<T>
+    pub async fn get_or_set<T, F, Fut>(&self, key: &str, ttl: Duration, f: F) -> CacheResult<T>
     where
         T: Serialize + DeserializeOwned,
         F: FnOnce() -> Fut,
@@ -256,8 +252,8 @@ impl CacheKeys {
 // Cached Repository Wrapper
 // ============================================================================
 
-use super::repositories::*;
 use super::models::*;
+use super::repositories::*;
 use uuid::Uuid;
 
 /// Cached user repository
@@ -345,7 +341,10 @@ mod tests {
         assert_eq!(CacheKeys::user_emails("123", 1), "user:123:emails:1");
         assert_eq!(CacheKeys::email("abc"), "email:abc");
         assert_eq!(CacheKeys::trust_score("agent1"), "trust:agent1");
-        assert_eq!(CacheKeys::rate_limit("1.2.3.4", "/api/send"), "ratelimit:1.2.3.4:/api/send");
+        assert_eq!(
+            CacheKeys::rate_limit("1.2.3.4", "/api/send"),
+            "ratelimit:1.2.3.4:/api/send"
+        );
     }
 
     #[test]

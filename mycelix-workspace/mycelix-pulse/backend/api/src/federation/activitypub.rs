@@ -11,13 +11,13 @@
 //! - HTTP Signatures for authentication
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chrono::{DateTime, Utc};
 use ring::{rand, signature};
 use serde::{Deserialize, Serialize};
@@ -202,11 +202,9 @@ pub struct FederationState {
 impl FederationState {
     pub fn new(domain: String, private_key_pem: &str) -> Self {
         // Parse RSA private key
-        let private_key_der = pem::parse(private_key_pem)
-            .expect("Invalid PEM")
-            .contents;
-        let private_key = signature::RsaKeyPair::from_pkcs8(&private_key_der)
-            .expect("Invalid RSA key");
+        let private_key_der = pem::parse(private_key_pem).expect("Invalid PEM").contents;
+        let private_key =
+            signature::RsaKeyPair::from_pkcs8(&private_key_der).expect("Invalid RSA key");
 
         // Extract public key PEM (simplified)
         let public_key_pem = private_key_pem
@@ -364,9 +362,7 @@ async fn get_actor(
         .unwrap_or("");
 
     // Check if requesting ActivityPub format
-    if !accept.contains("application/activity+json")
-        && !accept.contains("application/ld+json")
-    {
+    if !accept.contains("application/activity+json") && !accept.contains("application/ld+json") {
         // Could redirect to profile page for HTML requests
     }
 
@@ -389,7 +385,11 @@ async fn inbox(
 ) -> impl IntoResponse {
     // Verify HTTP signature
     if let Err(e) = verify_http_signature(&headers, &activity.actor).await {
-        return (StatusCode::UNAUTHORIZED, format!("Invalid signature: {}", e)).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            format!("Invalid signature: {}", e),
+        )
+            .into_response();
     }
 
     // Process activity
@@ -481,11 +481,7 @@ async fn post_outbox(
 
     // Generate ID if not present
     if activity.id.is_empty() {
-        activity.id = format!(
-            "https://{}/activities/{}",
-            state.domain,
-            Uuid::new_v4()
-        );
+        activity.id = format!("https://{}/activities/{}", state.domain, Uuid::new_v4());
     }
 
     // Set published time

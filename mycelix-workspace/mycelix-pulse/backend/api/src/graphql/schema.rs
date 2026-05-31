@@ -7,8 +7,8 @@
 //! and advanced querying capabilities.
 
 use async_graphql::{
-    Context, EmptyMutation, EmptySubscription, Enum, InputObject, Object, Result,
-    Schema, SimpleObject, Subscription, ID,
+    Context, EmptyMutation, EmptySubscription, Enum, ID, InputObject, Object, Result, Schema,
+    SimpleObject, Subscription,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use chrono::{DateTime, Utc};
@@ -274,27 +274,35 @@ impl QueryRoot {
         pagination: Option<Pagination>,
     ) -> Result<EmailConnection> {
         let gql_ctx = ctx.data::<GqlContext>()?;
-        let pagination = pagination.unwrap_or(Pagination { limit: 50, offset: 0 });
+        let pagination = pagination.unwrap_or(Pagination {
+            limit: 50,
+            offset: 0,
+        });
 
         // Build database filter from GraphQL filter
-        let db_filter = filter.map(|f| db_models::EmailFilter {
-            user_id: Some(gql_ctx.user_id),
-            thread_id: f.thread_id.map(|id| Uuid::parse_str(id.as_str()).ok()).flatten(),
-            is_read: f.is_read,
-            is_starred: f.is_starred,
-            is_archived: None,
-            is_deleted: Some(false),
-            labels: f.labels,
-            from_address: f.from,
-            search: f.subject_contains.or(f.body_contains),
-            min_trust_score: f.min_trust_score,
-            since: f.date_from,
-            until: f.date_to,
-        }).unwrap_or_else(|| db_models::EmailFilter {
-            user_id: Some(gql_ctx.user_id),
-            is_deleted: Some(false),
-            ..Default::default()
-        });
+        let db_filter = filter
+            .map(|f| db_models::EmailFilter {
+                user_id: Some(gql_ctx.user_id),
+                thread_id: f
+                    .thread_id
+                    .map(|id| Uuid::parse_str(id.as_str()).ok())
+                    .flatten(),
+                is_read: f.is_read,
+                is_starred: f.is_starred,
+                is_archived: None,
+                is_deleted: Some(false),
+                labels: f.labels,
+                from_address: f.from,
+                search: f.subject_contains.or(f.body_contains),
+                min_trust_score: f.min_trust_score,
+                since: f.date_from,
+                until: f.date_to,
+            })
+            .unwrap_or_else(|| db_models::EmailFilter {
+                user_id: Some(gql_ctx.user_id),
+                is_deleted: Some(false),
+                ..Default::default()
+            });
 
         let db_pagination = db_models::Pagination {
             page: (pagination.offset / pagination.limit.max(1)) as u32 + 1,
@@ -303,42 +311,54 @@ impl QueryRoot {
 
         // Query database
         let repo = EmailRepository::new(gql_ctx.db_pool.clone());
-        let result = repo.find_by_user(gql_ctx.user_id, db_filter, db_pagination).await
+        let result = repo
+            .find_by_user(gql_ctx.user_id, db_filter, db_pagination)
+            .await
             .map_err(|e| async_graphql::Error::new(format!("Database error: {}", e)))?;
 
         // Convert database models to GraphQL types
-        let edges: Vec<Email> = result.items.into_iter().map(|db_email| {
-            Email {
-                id: db_email.id.to_string().into(),
-                from: db_email.from_address.clone(),
-                from_name: None,
-                to: db_email.to_addresses.clone(),
-                cc: db_email.cc_addresses.clone(),
-                bcc: db_email.bcc_addresses.clone(),
-                subject: db_email.subject.clone(),
-                body_text: db_email.body_text.clone().unwrap_or_default(),
-                body_html: db_email.body_html.clone(),
-                snippet: db_email.body_text.as_ref()
-                    .map(|t| t.chars().take(100).collect())
-                    .unwrap_or_default(),
-                folder: if db_email.is_archived { "archive".to_string() }
-                        else if db_email.is_deleted { "trash".to_string() }
-                        else { "inbox".to_string() },
-                labels: db_email.labels.clone(),
-                is_read: db_email.is_read,
-                is_starred: db_email.is_starred,
-                is_draft: db_email.status == db_models::EmailStatus::Draft,
-                has_attachments: false, // Would need attachment count query
-                attachment_count: 0,
-                trust_score: db_email.trust_score.unwrap_or(0.5),
-                category: EmailCategory::Primary,
-                priority: EmailPriority::Normal,
-                received_at: db_email.received_at.unwrap_or(db_email.created_at),
-                sent_at: db_email.sent_at,
-                thread_id: db_email.thread_id.map(|id| id.to_string().into()),
-                reply_to_id: db_email.in_reply_to.map(|s| s.into()),
-            }
-        }).collect();
+        let edges: Vec<Email> = result
+            .items
+            .into_iter()
+            .map(|db_email| {
+                Email {
+                    id: db_email.id.to_string().into(),
+                    from: db_email.from_address.clone(),
+                    from_name: None,
+                    to: db_email.to_addresses.clone(),
+                    cc: db_email.cc_addresses.clone(),
+                    bcc: db_email.bcc_addresses.clone(),
+                    subject: db_email.subject.clone(),
+                    body_text: db_email.body_text.clone().unwrap_or_default(),
+                    body_html: db_email.body_html.clone(),
+                    snippet: db_email
+                        .body_text
+                        .as_ref()
+                        .map(|t| t.chars().take(100).collect())
+                        .unwrap_or_default(),
+                    folder: if db_email.is_archived {
+                        "archive".to_string()
+                    } else if db_email.is_deleted {
+                        "trash".to_string()
+                    } else {
+                        "inbox".to_string()
+                    },
+                    labels: db_email.labels.clone(),
+                    is_read: db_email.is_read,
+                    is_starred: db_email.is_starred,
+                    is_draft: db_email.status == db_models::EmailStatus::Draft,
+                    has_attachments: false, // Would need attachment count query
+                    attachment_count: 0,
+                    trust_score: db_email.trust_score.unwrap_or(0.5),
+                    category: EmailCategory::Primary,
+                    priority: EmailPriority::Normal,
+                    received_at: db_email.received_at.unwrap_or(db_email.created_at),
+                    sent_at: db_email.sent_at,
+                    thread_id: db_email.thread_id.map(|id| id.to_string().into()),
+                    reply_to_id: db_email.in_reply_to.map(|s| s.into()),
+                }
+            })
+            .collect();
 
         let total_count = result.total as i32;
         let has_next_page = result.page < result.total_pages;
@@ -366,41 +386,47 @@ impl QueryRoot {
 
         // Query database
         let repo = EmailRepository::new(gql_ctx.db_pool.clone());
-        let db_email = repo.find_by_id(email_id).await
+        let db_email = repo
+            .find_by_id(email_id)
+            .await
             .map_err(|e| async_graphql::Error::new(format!("Database error: {}", e)))?;
 
         // Convert to GraphQL type if found
-        Ok(db_email.map(|db_email| {
-            Email {
-                id: db_email.id.to_string().into(),
-                from: db_email.from_address.clone(),
-                from_name: None,
-                to: db_email.to_addresses.clone(),
-                cc: db_email.cc_addresses.clone(),
-                bcc: db_email.bcc_addresses.clone(),
-                subject: db_email.subject.clone(),
-                body_text: db_email.body_text.clone().unwrap_or_default(),
-                body_html: db_email.body_html.clone(),
-                snippet: db_email.body_text.as_ref()
-                    .map(|t| t.chars().take(100).collect())
-                    .unwrap_or_default(),
-                folder: if db_email.is_archived { "archive".to_string() }
-                        else if db_email.is_deleted { "trash".to_string() }
-                        else { "inbox".to_string() },
-                labels: db_email.labels.clone(),
-                is_read: db_email.is_read,
-                is_starred: db_email.is_starred,
-                is_draft: db_email.status == db_models::EmailStatus::Draft,
-                has_attachments: false,
-                attachment_count: 0,
-                trust_score: db_email.trust_score.unwrap_or(0.5),
-                category: EmailCategory::Primary,
-                priority: EmailPriority::Normal,
-                received_at: db_email.received_at.unwrap_or(db_email.created_at),
-                sent_at: db_email.sent_at,
-                thread_id: db_email.thread_id.map(|id| id.to_string().into()),
-                reply_to_id: db_email.in_reply_to.map(|s| s.into()),
-            }
+        Ok(db_email.map(|db_email| Email {
+            id: db_email.id.to_string().into(),
+            from: db_email.from_address.clone(),
+            from_name: None,
+            to: db_email.to_addresses.clone(),
+            cc: db_email.cc_addresses.clone(),
+            bcc: db_email.bcc_addresses.clone(),
+            subject: db_email.subject.clone(),
+            body_text: db_email.body_text.clone().unwrap_or_default(),
+            body_html: db_email.body_html.clone(),
+            snippet: db_email
+                .body_text
+                .as_ref()
+                .map(|t| t.chars().take(100).collect())
+                .unwrap_or_default(),
+            folder: if db_email.is_archived {
+                "archive".to_string()
+            } else if db_email.is_deleted {
+                "trash".to_string()
+            } else {
+                "inbox".to_string()
+            },
+            labels: db_email.labels.clone(),
+            is_read: db_email.is_read,
+            is_starred: db_email.is_starred,
+            is_draft: db_email.status == db_models::EmailStatus::Draft,
+            has_attachments: false,
+            attachment_count: 0,
+            trust_score: db_email.trust_score.unwrap_or(0.5),
+            category: EmailCategory::Primary,
+            priority: EmailPriority::Normal,
+            received_at: db_email.received_at.unwrap_or(db_email.created_at),
+            sent_at: db_email.sent_at,
+            thread_id: db_email.thread_id.map(|id| id.to_string().into()),
+            reply_to_id: db_email.in_reply_to.map(|s| s.into()),
         }))
     }
 
@@ -503,11 +529,7 @@ impl MutationRoot {
     ///
     /// Requires: EmailRepository::save_draft() implementation with
     /// `is_draft = true` flag on the email record.
-    async fn save_draft(
-        &self,
-        ctx: &Context<'_>,
-        input: ComposeEmailInput,
-    ) -> Result<Email> {
+    async fn save_draft(&self, ctx: &Context<'_>, input: ComposeEmailInput) -> Result<Email> {
         let gql_ctx = ctx.data::<GqlContext>()?;
         let repo = EmailRepository::new(gql_ctx.db_pool.clone());
         let now = Utc::now();
@@ -529,7 +551,10 @@ impl MutationRoot {
             is_read: true,
             is_starred: false,
             is_draft: true,
-            has_attachments: input.attachment_ids.as_ref().map_or(false, |a| !a.is_empty()),
+            has_attachments: input
+                .attachment_ids
+                .as_ref()
+                .map_or(false, |a| !a.is_empty()),
             attachment_count: input.attachment_ids.as_ref().map_or(0, |a| a.len() as i32),
             trust_score: 1.0,
             category: EmailCategory::Primary,
@@ -564,7 +589,7 @@ impl MutationRoot {
         // Should apply non-None fields from UpdateEmailInput to the existing record and
         // return the updated Email.
         Err(async_graphql::Error::new(
-            "Email update not yet implemented: requires EmailRepository::update_email()"
+            "Email update not yet implemented: requires EmailRepository::update_email()",
         ))
     }
 
@@ -604,11 +629,7 @@ impl MutationRoot {
     /// Create a folder
     ///
     /// Requires: EmailRepository::create_folder() implementation.
-    async fn create_folder(
-        &self,
-        ctx: &Context<'_>,
-        input: CreateFolderInput,
-    ) -> Result<Folder> {
+    async fn create_folder(&self, ctx: &Context<'_>, input: CreateFolderInput) -> Result<Folder> {
         let gql_ctx = ctx.data::<GqlContext>()?;
         let _repo = EmailRepository::new(gql_ctx.db_pool.clone());
         let id = Uuid::new_v4();
@@ -643,11 +664,7 @@ impl MutationRoot {
     /// Create a label
     ///
     /// Requires: EmailRepository::create_label() implementation.
-    async fn create_label(
-        &self,
-        ctx: &Context<'_>,
-        input: CreateLabelInput,
-    ) -> Result<Label> {
+    async fn create_label(&self, ctx: &Context<'_>, input: CreateLabelInput) -> Result<Label> {
         let gql_ctx = ctx.data::<GqlContext>()?;
         let _repo = EmailRepository::new(gql_ctx.db_pool.clone());
         let id = Uuid::new_v4();
@@ -704,7 +721,7 @@ impl MutationRoot {
         // Validate trust score range
         if !(0.0..=1.0).contains(&score) {
             return Err(async_graphql::Error::new(
-                "Trust score must be between 0.0 and 1.0"
+                "Trust score must be between 0.0 and 1.0",
             ));
         }
 
@@ -713,7 +730,7 @@ impl MutationRoot {
         // call_zome("trust_filter", "update_trust_score", ...) for DHT persistence.
         Err(async_graphql::Error::new(
             "Trust score update not yet implemented: requires EmailRepository::update_contact_trust_score() \
-             and trust_filter zome integration"
+             and trust_filter zome integration",
         ))
     }
 }
@@ -807,47 +824,37 @@ impl SubscriptionRoot {
 }
 
 /// Calculate the unread email count for a user
-async fn calculate_unread_count(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-    folder: Option<&str>,
-) -> i32 {
+async fn calculate_unread_count(pool: &sqlx::PgPool, user_id: Uuid, folder: Option<&str>) -> i32 {
     // Build query based on folder filter
     let query = match folder {
-        Some("inbox") | None => {
-            sqlx::query_scalar::<_, i64>(
-                r#"
+        Some("inbox") | None => sqlx::query_scalar::<_, i64>(
+            r#"
                 SELECT COUNT(*) FROM emails
                 WHERE user_id = $1
                   AND is_read = false
                   AND is_deleted = false
                   AND is_archived = false
                 "#,
-            )
-            .bind(user_id)
-        }
-        Some("archive") => {
-            sqlx::query_scalar::<_, i64>(
-                r#"
+        )
+        .bind(user_id),
+        Some("archive") => sqlx::query_scalar::<_, i64>(
+            r#"
                 SELECT COUNT(*) FROM emails
                 WHERE user_id = $1
                   AND is_read = false
                   AND is_archived = true
                 "#,
-            )
-            .bind(user_id)
-        }
-        Some("trash") => {
-            sqlx::query_scalar::<_, i64>(
-                r#"
+        )
+        .bind(user_id),
+        Some("trash") => sqlx::query_scalar::<_, i64>(
+            r#"
                 SELECT COUNT(*) FROM emails
                 WHERE user_id = $1
                   AND is_read = false
                   AND is_deleted = true
                 "#,
-            )
-            .bind(user_id)
-        }
+        )
+        .bind(user_id),
         Some(_) => {
             // For any other folder, count all unread
             sqlx::query_scalar::<_, i64>(
@@ -862,14 +869,10 @@ async fn calculate_unread_count(
         }
     };
 
-    query
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0) as i32
+    query.fetch_one(pool).await.unwrap_or(0) as i32
 }
 
 /// Build the GraphQL schema
 pub fn build_schema() -> Schema<QueryRoot, MutationRoot, SubscriptionRoot> {
-    Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
-        .finish()
+    Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).finish()
 }

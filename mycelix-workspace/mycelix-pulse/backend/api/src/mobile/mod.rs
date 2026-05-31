@@ -10,8 +10,8 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // PWA & Offline Support
@@ -107,7 +107,11 @@ impl OfflineSyncService {
         Self { pool }
     }
 
-    pub async fn get_sync_manifest(&self, user_id: Uuid, since_version: Option<u64>) -> Result<SyncManifest> {
+    pub async fn get_sync_manifest(
+        &self,
+        user_id: Uuid,
+        since_version: Option<u64>,
+    ) -> Result<SyncManifest> {
         let current_version = self.get_current_version(user_id).await?;
 
         let emails = if let Some(since) = since_version {
@@ -177,25 +181,30 @@ impl OfflineSyncService {
         .fetch_all(&self.pool)
         .await?
         .into_iter()
-        .filter_map(|r| r.name.map(|n| LabelSyncRecord {
-            name: n,
-            color: "#808080".to_string(),
-            count: r.count.unwrap_or(0) as u32,
-        }))
+        .filter_map(|r| {
+            r.name.map(|n| LabelSyncRecord {
+                name: n,
+                color: "#808080".to_string(),
+                count: r.count.unwrap_or(0) as u32,
+            })
+        })
         .collect();
 
         Ok(SyncManifest {
             version: current_version,
-            emails: emails.into_iter().map(|e| EmailSyncRecord {
-                id: e.id,
-                version: e.version as u64,
-                folder: e.folder,
-                is_read: e.is_read,
-                is_starred: e.is_starred,
-                labels: e.labels,
-                updated_at: e.updated_at,
-                deleted: e.deleted,
-            }).collect(),
+            emails: emails
+                .into_iter()
+                .map(|e| EmailSyncRecord {
+                    id: e.id,
+                    version: e.version as u64,
+                    folder: e.folder,
+                    is_read: e.is_read,
+                    is_starred: e.is_starred,
+                    labels: e.labels,
+                    updated_at: e.updated_at,
+                    deleted: e.deleted,
+                })
+                .collect(),
             folders,
             labels,
             settings: serde_json::json!({}),
@@ -214,7 +223,11 @@ impl OfflineSyncService {
         Ok(result.version.unwrap_or(0) as u64)
     }
 
-    pub async fn apply_offline_actions(&self, user_id: Uuid, actions: Vec<PendingAction>) -> Result<Vec<ActionResult>> {
+    pub async fn apply_offline_actions(
+        &self,
+        user_id: Uuid,
+        actions: Vec<PendingAction>,
+    ) -> Result<Vec<ActionResult>> {
         let mut results = Vec::new();
 
         for action in actions {
@@ -502,24 +515,26 @@ impl PrefetchService {
     }
 
     pub async fn get_config(&self, user_id: Uuid) -> Result<PrefetchConfig> {
-        let config = sqlx::query!(
-            "SELECT * FROM prefetch_configs WHERE user_id = $1",
-            user_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let config = sqlx::query!("SELECT * FROM prefetch_configs WHERE user_id = $1", user_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
-        Ok(config.map(|c| PrefetchConfig {
-            user_id: c.user_id,
-            enabled: c.enabled,
-            max_emails: c.max_emails as u32,
-            max_cache_mb: c.max_cache_mb as u32,
-            prefetch_attachments: c.prefetch_attachments,
-            attachment_size_limit_mb: c.attachment_size_limit_mb as u32,
-            prefetch_threads: c.prefetch_threads,
-            priority_senders: c.priority_senders,
-            priority_labels: c.priority_labels,
-        }).unwrap_or_else(|| PrefetchConfig { user_id, ..Default::default() }))
+        Ok(config
+            .map(|c| PrefetchConfig {
+                user_id: c.user_id,
+                enabled: c.enabled,
+                max_emails: c.max_emails as u32,
+                max_cache_mb: c.max_cache_mb as u32,
+                prefetch_attachments: c.prefetch_attachments,
+                attachment_size_limit_mb: c.attachment_size_limit_mb as u32,
+                prefetch_threads: c.prefetch_threads,
+                priority_senders: c.priority_senders,
+                priority_labels: c.priority_labels,
+            })
+            .unwrap_or_else(|| PrefetchConfig {
+                user_id,
+                ..Default::default()
+            }))
     }
 }
 
@@ -586,24 +601,31 @@ impl GestureService {
     }
 
     pub async fn get_config(&self, user_id: Uuid) -> Result<GestureConfig> {
-        let config = sqlx::query!(
-            "SELECT * FROM gesture_configs WHERE user_id = $1",
-            user_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let config = sqlx::query!("SELECT * FROM gesture_configs WHERE user_id = $1", user_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
-        Ok(config.map(|c| GestureConfig {
-            user_id: c.user_id,
-            swipe_left: serde_json::from_value(c.swipe_left).unwrap_or(GestureAction::Delete),
-            swipe_right: serde_json::from_value(c.swipe_right).unwrap_or(GestureAction::Archive),
-            swipe_long_left: serde_json::from_value(c.swipe_long_left).unwrap_or(GestureAction::Spam),
-            swipe_long_right: serde_json::from_value(c.swipe_long_right).unwrap_or(GestureAction::Snooze { hours: 3 }),
-            double_tap: serde_json::from_value(c.double_tap).unwrap_or(GestureAction::ToggleStar),
-            long_press: serde_json::from_value(c.long_press).unwrap_or(GestureAction::SelectMultiple),
-            shake: serde_json::from_value(c.shake).unwrap_or(GestureAction::Undo),
-            pull_down: serde_json::from_value(c.pull_down).unwrap_or(GestureAction::Refresh),
-        }).unwrap_or_else(|| GestureConfig { user_id, ..Default::default() }))
+        Ok(config
+            .map(|c| GestureConfig {
+                user_id: c.user_id,
+                swipe_left: serde_json::from_value(c.swipe_left).unwrap_or(GestureAction::Delete),
+                swipe_right: serde_json::from_value(c.swipe_right)
+                    .unwrap_or(GestureAction::Archive),
+                swipe_long_left: serde_json::from_value(c.swipe_long_left)
+                    .unwrap_or(GestureAction::Spam),
+                swipe_long_right: serde_json::from_value(c.swipe_long_right)
+                    .unwrap_or(GestureAction::Snooze { hours: 3 }),
+                double_tap: serde_json::from_value(c.double_tap)
+                    .unwrap_or(GestureAction::ToggleStar),
+                long_press: serde_json::from_value(c.long_press)
+                    .unwrap_or(GestureAction::SelectMultiple),
+                shake: serde_json::from_value(c.shake).unwrap_or(GestureAction::Undo),
+                pull_down: serde_json::from_value(c.pull_down).unwrap_or(GestureAction::Refresh),
+            })
+            .unwrap_or_else(|| GestureConfig {
+                user_id,
+                ..Default::default()
+            }))
     }
 
     pub async fn save_config(&self, config: &GestureConfig) -> Result<()> {
@@ -637,7 +659,12 @@ impl GestureService {
         Ok(())
     }
 
-    pub async fn execute_gesture(&self, user_id: Uuid, email_id: Uuid, gesture: &GestureAction) -> Result<()> {
+    pub async fn execute_gesture(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+        gesture: &GestureAction,
+    ) -> Result<()> {
         match gesture {
             GestureAction::Archive => {
                 sqlx::query!(
@@ -823,7 +850,11 @@ impl WearableService {
         Self { pool }
     }
 
-    pub async fn register_device(&self, user_id: Uuid, device: WearableDevice) -> Result<WearableDevice> {
+    pub async fn register_device(
+        &self,
+        user_id: Uuid,
+        device: WearableDevice,
+    ) -> Result<WearableDevice> {
         sqlx::query!(
             r#"
             INSERT INTO wearable_devices (id, user_id, device_type, device_name, connected, capabilities)
@@ -845,7 +876,11 @@ impl WearableService {
         Ok(device)
     }
 
-    pub async fn prepare_notification(&self, user_id: Uuid, email_id: Uuid) -> Result<WearableNotification> {
+    pub async fn prepare_notification(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+    ) -> Result<WearableNotification> {
         let config = self.get_config(user_id).await?;
 
         let email = sqlx::query!(
@@ -869,7 +904,9 @@ impl WearableService {
             NotificationImportance::Normal
         };
 
-        let preview: String = email.body.chars()
+        let preview: String = email
+            .body
+            .chars()
             .take(config.max_preview_length as usize)
             .collect();
 
@@ -883,7 +920,12 @@ impl WearableService {
         })
     }
 
-    pub async fn send_quick_reply(&self, user_id: Uuid, email_id: Uuid, reply_text: &str) -> Result<Uuid> {
+    pub async fn send_quick_reply(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+        reply_text: &str,
+    ) -> Result<Uuid> {
         let original = sqlx::query!(
             "SELECT sender, subject, thread_id FROM emails WHERE id = $1 AND user_id = $2",
             email_id,
@@ -915,22 +957,27 @@ impl WearableService {
     }
 
     pub async fn get_config(&self, user_id: Uuid) -> Result<WearableConfig> {
-        let config = sqlx::query!(
-            "SELECT * FROM wearable_configs WHERE user_id = $1",
-            user_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let config = sqlx::query!("SELECT * FROM wearable_configs WHERE user_id = $1", user_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
-        Ok(config.map(|c| WearableConfig {
-            user_id: c.user_id,
-            notifications_enabled: c.notifications_enabled,
-            notification_importance_filter: serde_json::from_value(c.notification_importance_filter).unwrap_or(NotificationImportance::Normal),
-            quick_replies: c.quick_replies,
-            haptic_feedback: c.haptic_feedback,
-            show_sender_avatar: c.show_sender_avatar,
-            max_preview_length: c.max_preview_length as u32,
-        }).unwrap_or_else(|| WearableConfig { user_id, ..Default::default() }))
+        Ok(config
+            .map(|c| WearableConfig {
+                user_id: c.user_id,
+                notifications_enabled: c.notifications_enabled,
+                notification_importance_filter: serde_json::from_value(
+                    c.notification_importance_filter,
+                )
+                .unwrap_or(NotificationImportance::Normal),
+                quick_replies: c.quick_replies,
+                haptic_feedback: c.haptic_feedback,
+                show_sender_avatar: c.show_sender_avatar,
+                max_preview_length: c.max_preview_length as u32,
+            })
+            .unwrap_or_else(|| WearableConfig {
+                user_id,
+                ..Default::default()
+            }))
     }
 }
 
@@ -1048,19 +1095,29 @@ impl ContinuityService {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(sessions.into_iter().map(|s| DeviceSession {
-            id: s.id,
-            user_id: s.user_id,
-            device_id: s.device_id,
-            device_type: serde_json::from_str(&s.device_type).unwrap_or(DeviceType::Browser),
-            device_name: s.device_name,
-            current_activity: s.current_activity.and_then(|a| serde_json::from_value(a).ok()),
-            last_active: s.last_active,
-            push_token: s.push_token,
-        }).collect())
+        Ok(sessions
+            .into_iter()
+            .map(|s| DeviceSession {
+                id: s.id,
+                user_id: s.user_id,
+                device_id: s.device_id,
+                device_type: serde_json::from_str(&s.device_type).unwrap_or(DeviceType::Browser),
+                device_name: s.device_name,
+                current_activity: s
+                    .current_activity
+                    .and_then(|a| serde_json::from_value(a).ok()),
+                last_active: s.last_active,
+                push_token: s.push_token,
+            })
+            .collect())
     }
 
-    pub async fn initiate_handoff(&self, user_id: Uuid, from_device: &str, to_device: &str) -> Result<HandoffData> {
+    pub async fn initiate_handoff(
+        &self,
+        user_id: Uuid,
+        from_device: &str,
+        to_device: &str,
+    ) -> Result<HandoffData> {
         let from_session = sqlx::query!(
             "SELECT current_activity FROM device_sessions WHERE device_id = $1 AND user_id = $2",
             from_device,
@@ -1069,9 +1126,8 @@ impl ContinuityService {
         .fetch_one(&self.pool)
         .await?;
 
-        let activity: ActivityState = serde_json::from_value(
-            from_session.current_activity.unwrap_or_default()
-        )?;
+        let activity: ActivityState =
+            serde_json::from_value(from_session.current_activity.unwrap_or_default())?;
 
         // Prepare context based on activity type
         let context = match &activity.activity_type {
@@ -1190,19 +1246,30 @@ impl BandwidthOptimizer {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(config.map(|c| BandwidthConfig {
-            user_id: c.user_id,
-            data_saver_mode: c.data_saver_mode,
-            lazy_load_images: c.lazy_load_images,
-            compress_attachments: c.compress_attachments,
-            image_quality: serde_json::from_value(c.image_quality).unwrap_or(ImageQuality::High),
-            max_inline_image_kb: c.max_inline_image_kb as u32,
-            stream_large_attachments: c.stream_large_attachments,
-            prefetch_on_wifi_only: c.prefetch_on_wifi_only,
-        }).unwrap_or_else(|| BandwidthConfig { user_id, ..Default::default() }))
+        Ok(config
+            .map(|c| BandwidthConfig {
+                user_id: c.user_id,
+                data_saver_mode: c.data_saver_mode,
+                lazy_load_images: c.lazy_load_images,
+                compress_attachments: c.compress_attachments,
+                image_quality: serde_json::from_value(c.image_quality)
+                    .unwrap_or(ImageQuality::High),
+                max_inline_image_kb: c.max_inline_image_kb as u32,
+                stream_large_attachments: c.stream_large_attachments,
+                prefetch_on_wifi_only: c.prefetch_on_wifi_only,
+            })
+            .unwrap_or_else(|| BandwidthConfig {
+                user_id,
+                ..Default::default()
+            }))
     }
 
-    pub async fn optimize_email_content(&self, user_id: Uuid, email_id: Uuid, connection_type: ConnectionType) -> Result<OptimizedContent> {
+    pub async fn optimize_email_content(
+        &self,
+        user_id: Uuid,
+        email_id: Uuid,
+        connection_type: ConnectionType,
+    ) -> Result<OptimizedContent> {
         let config = self.get_config(user_id).await?;
 
         let email = sqlx::query!(
@@ -1213,12 +1280,16 @@ impl BandwidthOptimizer {
         .await?;
 
         let mut body = email.body.clone();
-        let attachments: Vec<AttachmentInfo> = serde_json::from_value(
-            email.attachments.unwrap_or_default()
-        ).unwrap_or_default();
+        let attachments: Vec<AttachmentInfo> =
+            serde_json::from_value(email.attachments.unwrap_or_default()).unwrap_or_default();
 
         // Apply data saver optimizations
-        if config.data_saver_mode || matches!(connection_type, ConnectionType::Cellular2G | ConnectionType::Cellular3G) {
+        if config.data_saver_mode
+            || matches!(
+                connection_type,
+                ConnectionType::Cellular2G | ConnectionType::Cellular3G
+            )
+        {
             // Strip images from body
             if matches!(config.image_quality, ImageQuality::None) {
                 body = self.strip_images(&body);
@@ -1230,7 +1301,8 @@ impl BandwidthOptimizer {
             }
         }
 
-        let optimized_attachments: Vec<OptimizedAttachment> = attachments.into_iter()
+        let optimized_attachments: Vec<OptimizedAttachment> = attachments
+            .into_iter()
             .map(|a| {
                 let should_stream = config.stream_large_attachments && a.size > 1024 * 1024;
                 OptimizedAttachment {
@@ -1238,10 +1310,16 @@ impl BandwidthOptimizer {
                     filename: a.filename,
                     mime_type: a.mime_type,
                     size: a.size,
-                    stream_url: if should_stream { Some(format!("/api/attachments/{}/stream", a.id)) } else { None },
+                    stream_url: if should_stream {
+                        Some(format!("/api/attachments/{}/stream", a.id))
+                    } else {
+                        None
+                    },
                     thumbnail_url: if a.mime_type.starts_with("image/") {
                         Some(format!("/api/attachments/{}/thumbnail", a.id))
-                    } else { None },
+                    } else {
+                        None
+                    },
                 }
             })
             .collect();
@@ -1257,7 +1335,8 @@ impl BandwidthOptimizer {
     fn strip_images(&self, html: &str) -> String {
         // Simple regex to remove img tags
         let re = regex::Regex::new(r"<img[^>]*>").unwrap();
-        re.replace_all(html, "[Image removed - Data Saver mode]").to_string()
+        re.replace_all(html, "[Image removed - Data Saver mode]")
+            .to_string()
     }
 
     fn add_lazy_loading(&self, html: &str) -> String {

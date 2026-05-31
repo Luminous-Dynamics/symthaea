@@ -7,9 +7,9 @@
 
 use async_trait::async_trait;
 use lettre::{
-    message::{header::ContentType, Mailbox, MultiPart, SinglePart},
-    transport::smtp::{authentication::Credentials, PoolConfig},
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    message::{Mailbox, MultiPart, SinglePart, header::ContentType},
+    transport::smtp::{PoolConfig, authentication::Credentials},
 };
 use std::time::Duration;
 use thiserror::Error;
@@ -233,7 +233,10 @@ impl SmtpTransport {
             "Email sent successfully"
         );
 
-        Ok(response.message().map(|m| m.to_string()).unwrap_or_default())
+        Ok(response
+            .message()
+            .map(|m| m.to_string())
+            .unwrap_or_default())
     }
 
     /// Check connection health
@@ -268,7 +271,11 @@ impl DeliveryStatusRepository {
     }
 
     /// Update email status to delivered/sent
-    pub async fn mark_delivered(&self, email_id: &str, smtp_response: &str) -> Result<(), sqlx::Error> {
+    pub async fn mark_delivered(
+        &self,
+        email_id: &str,
+        smtp_response: &str,
+    ) -> Result<(), sqlx::Error> {
         // Parse email_id as UUID
         let id = match uuid::Uuid::parse_str(email_id) {
             Ok(id) => id,
@@ -310,7 +317,12 @@ impl DeliveryStatusRepository {
     }
 
     /// Update email status to failed
-    pub async fn mark_failed(&self, email_id: &str, error: &str, retry_count: u32) -> Result<(), sqlx::Error> {
+    pub async fn mark_failed(
+        &self,
+        email_id: &str,
+        error: &str,
+        retry_count: u32,
+    ) -> Result<(), sqlx::Error> {
         let id = match uuid::Uuid::parse_str(email_id) {
             Ok(id) => id,
             Err(_) => {
@@ -381,7 +393,11 @@ impl EmailQueue {
     }
 
     /// Create a new email queue with database support for delivery tracking
-    pub fn new_with_db(transport: SmtpTransport, max_retries: u32, db_pool: Option<sqlx::PgPool>) -> Self {
+    pub fn new_with_db(
+        transport: SmtpTransport,
+        max_retries: u32,
+        db_pool: Option<sqlx::PgPool>,
+    ) -> Self {
         let (sender, mut receiver) = mpsc::channel::<QueuedEmail>(1000);
         let delivery_repo = db_pool.map(DeliveryStatusRepository::new);
 
@@ -427,11 +443,10 @@ impl EmailQueue {
                             );
                             // Mark as failed in database
                             if let Some(ref repo) = delivery_repo {
-                                if let Err(db_err) = repo.mark_failed(
-                                    &queued.email.id,
-                                    &e.to_string(),
-                                    queued.retries,
-                                ).await {
+                                if let Err(db_err) = repo
+                                    .mark_failed(&queued.email.id, &e.to_string(), queued.retries)
+                                    .await
+                                {
                                     error!(
                                         email_id = %queued.email.id,
                                         error = %db_err,
@@ -503,11 +518,10 @@ impl BounceHandler {
     }
 
     fn extract_header(email: &str, header: &str) -> Option<String> {
-        email.lines().find(|l| l.starts_with(header)).map(|l| {
-            l.trim_start_matches(header)
-                .trim()
-                .to_string()
-        })
+        email
+            .lines()
+            .find(|l| l.starts_with(header))
+            .map(|l| l.trim_start_matches(header).trim().to_string())
     }
 }
 

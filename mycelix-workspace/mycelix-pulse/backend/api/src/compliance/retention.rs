@@ -7,7 +7,7 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{warn, debug};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 /// Data category for retention classification
@@ -371,7 +371,9 @@ impl RetentionService {
         policy_id: Uuid,
         updates: PolicyUpdate,
     ) -> Result<RetentionPolicy, RetentionError> {
-        let policy = self.policies.get_mut(&policy_id)
+        let policy = self
+            .policies
+            .get_mut(&policy_id)
             .ok_or(RetentionError::PolicyNotFound)?;
 
         if let Some(name) = updates.name {
@@ -400,7 +402,8 @@ impl RetentionService {
 
     /// Delete a policy
     pub async fn delete_policy(&mut self, policy_id: Uuid) -> Result<(), RetentionError> {
-        self.policies.remove(&policy_id)
+        self.policies
+            .remove(&policy_id)
             .ok_or(RetentionError::PolicyNotFound)?;
         Ok(())
     }
@@ -435,7 +438,9 @@ impl RetentionService {
 
     /// Release a legal hold
     pub async fn release_legal_hold(&mut self, hold_id: Uuid) -> Result<(), RetentionError> {
-        let hold = self.legal_holds.get_mut(&hold_id)
+        let hold = self
+            .legal_holds
+            .get_mut(&hold_id)
             .ok_or(RetentionError::LegalHoldNotFound)?;
 
         hold.active = false;
@@ -444,14 +449,15 @@ impl RetentionService {
 
     /// Check if item is under legal hold
     pub fn is_under_legal_hold(&self, owner_id: Uuid) -> bool {
-        self.legal_holds.values().any(|hold| {
-            hold.active && hold.custodians.contains(&owner_id)
-        })
+        self.legal_holds
+            .values()
+            .any(|hold| hold.active && hold.custodians.contains(&owner_id))
     }
 
     /// Get all active legal holds for a user
     pub fn get_active_holds(&self, user_id: Uuid) -> Vec<&LegalHold> {
-        self.legal_holds.values()
+        self.legal_holds
+            .values()
             .filter(|hold| hold.active && hold.custodians.contains(&user_id))
             .collect()
     }
@@ -471,7 +477,8 @@ impl RetentionService {
             for mut candidate in simulated_candidates {
                 // Check legal holds
                 if self.is_under_legal_hold(candidate.owner_id) {
-                    let holds: Vec<Uuid> = self.get_active_holds(candidate.owner_id)
+                    let holds: Vec<Uuid> = self
+                        .get_active_holds(candidate.owner_id)
                         .iter()
                         .map(|h| h.id)
                         .collect();
@@ -506,7 +513,9 @@ impl RetentionService {
         &mut self,
         policy_id: Uuid,
     ) -> Result<RetentionJob, RetentionError> {
-        let policy = self.policies.get(&policy_id)
+        let policy = self
+            .policies
+            .get(&policy_id)
             .ok_or(RetentionError::PolicyNotFound)?
             .clone();
 
@@ -529,7 +538,9 @@ impl RetentionService {
         self.jobs.insert(job.id, job.clone());
 
         // Process candidates for this policy
-        let candidates: Vec<_> = self.candidates.iter()
+        let candidates: Vec<_> = self
+            .candidates
+            .iter()
             .filter(|c| c.policy_id == policy_id && c.legal_holds.is_empty())
             .cloned()
             .collect();
@@ -608,7 +619,9 @@ impl RetentionService {
 
     /// Run all enabled retention policies
     pub async fn run_all_policies(&mut self) -> Vec<RetentionJob> {
-        let policy_ids: Vec<Uuid> = self.policies.values()
+        let policy_ids: Vec<Uuid> = self
+            .policies
+            .values()
             .filter(|p| p.enabled)
             .map(|p| p.id)
             .collect();
@@ -659,14 +672,18 @@ impl RetentionService {
         let enabled_policies = self.policies.values().filter(|p| p.enabled).count();
         let active_holds = self.legal_holds.values().filter(|h| h.active).count();
         let pending_candidates = self.candidates.len();
-        let held_candidates = self.candidates.iter().filter(|c| !c.legal_holds.is_empty()).count();
+        let held_candidates = self
+            .candidates
+            .iter()
+            .filter(|c| !c.legal_holds.is_empty())
+            .count();
 
-        let completed_jobs = self.jobs.values()
+        let completed_jobs = self
+            .jobs
+            .values()
             .filter(|j| j.status == JobStatus::Completed)
             .count();
-        let total_reclaimed: u64 = self.jobs.values()
-            .map(|j| j.bytes_reclaimed)
-            .sum();
+        let total_reclaimed: u64 = self.jobs.values().map(|j| j.bytes_reclaimed).sum();
 
         RetentionStatistics {
             total_policies,
@@ -763,22 +780,33 @@ mod tests {
         let policies = service.list_policies();
 
         assert!(!policies.is_empty());
-        assert!(policies.iter().any(|p| p.category == DataCategory::DeletedItems));
-        assert!(policies.iter().any(|p| p.category == DataCategory::SpamQuarantine));
+        assert!(
+            policies
+                .iter()
+                .any(|p| p.category == DataCategory::DeletedItems)
+        );
+        assert!(
+            policies
+                .iter()
+                .any(|p| p.category == DataCategory::SpamQuarantine)
+        );
     }
 
     #[tokio::test]
     async fn test_create_policy() {
         let mut service = RetentionService::new();
 
-        let policy = service.create_policy(
-            "Test Policy".to_string(),
-            "A test retention policy".to_string(),
-            DataCategory::EmailContent,
-            180,
-            RetentionAction::Archive,
-            RetentionConditions::default(),
-        ).await.unwrap();
+        let policy = service
+            .create_policy(
+                "Test Policy".to_string(),
+                "A test retention policy".to_string(),
+                DataCategory::EmailContent,
+                180,
+                RetentionAction::Archive,
+                RetentionConditions::default(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(policy.name, "Test Policy");
         assert_eq!(policy.retention_days, 180);
@@ -789,15 +817,18 @@ mod tests {
         let mut service = RetentionService::new();
         let user_id = Uuid::new_v4();
 
-        let hold = service.create_legal_hold(
-            "Investigation Hold".to_string(),
-            "Hold for legal investigation".to_string(),
-            Some("CASE-2024-001".to_string()),
-            vec![user_id],
-            None,
-            Uuid::new_v4(),
-            None,
-        ).await.unwrap();
+        let hold = service
+            .create_legal_hold(
+                "Investigation Hold".to_string(),
+                "Hold for legal investigation".to_string(),
+                Some("CASE-2024-001".to_string()),
+                vec![user_id],
+                None,
+                Uuid::new_v4(),
+                None,
+            )
+            .await
+            .unwrap();
 
         assert!(service.is_under_legal_hold(user_id));
 

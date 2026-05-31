@@ -25,16 +25,18 @@ impl QueryAnalyzer {
     pub async fn explain(&self, query: &str) -> Result<QueryPlan, sqlx::Error> {
         let explain_query = format!("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {}", query);
 
-        let row: (serde_json::Value,) = sqlx::query_as(&explain_query)
-            .fetch_one(&self.pool)
-            .await?;
+        let row: (serde_json::Value,) =
+            sqlx::query_as(&explain_query).fetch_one(&self.pool).await?;
 
         let plan = serde_json::from_value(row.0).unwrap_or_default();
         Ok(plan)
     }
 
     /// Get slow queries from pg_stat_statements
-    pub async fn get_slow_queries(&self, min_duration_ms: f64) -> Result<Vec<SlowQuery>, sqlx::Error> {
+    pub async fn get_slow_queries(
+        &self,
+        min_duration_ms: f64,
+    ) -> Result<Vec<SlowQuery>, sqlx::Error> {
         let queries = sqlx::query_as::<_, SlowQuery>(
             r#"
             SELECT
@@ -303,11 +305,7 @@ impl QueryTimer {
                 "SLOW QUERY (critical)"
             );
         } else if ms >= self.thresholds.warn_ms {
-            info!(
-                query = query_name,
-                duration_ms = ms,
-                "Slow query"
-            );
+            info!(query = query_name, duration_ms = ms, "Slow query");
         }
 
         result

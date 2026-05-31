@@ -142,6 +142,7 @@ Domain-specific uses of the architecture.
 
 Pre-LaTeX drafts and superseded work in `archive/`:
 
+- `archive/historical-k/` — **The K-Index Era** (2025-2026). Foundational research on machine consciousness proxies prior to the Phi-breakthrough. Includes Neural Computation submission and Science drafts.
 - `archive/legacy-markdown/` — 12 markdown paper drafts
 - `archive/legacy-drafts/` — 6 early draft fragments
 - `archive/legacy-appendices/` — Theoretical analysis (now in book)

@@ -5,7 +5,7 @@
 //!
 //! Find available times, schedule meetings, and share availability
 
-use chrono::{DateTime, Duration, NaiveTime, Utc, Weekday, Datelike, Timelike};
+use chrono::{DateTime, Datelike, Duration, NaiveTime, Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -293,14 +293,13 @@ impl SchedulingService {
         booking: BookingRequest,
     ) -> Result<ScheduledMeeting, SchedulingError> {
         // Get link
-        let link: SchedulingLinkRow = sqlx::query_as(
-            "SELECT * FROM scheduling_links WHERE slug = $1",
-        )
-        .bind(slug)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| SchedulingError::Database(e.to_string()))?
-        .ok_or(SchedulingError::LinkNotFound)?;
+        let link: SchedulingLinkRow =
+            sqlx::query_as("SELECT * FROM scheduling_links WHERE slug = $1")
+                .bind(slug)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| SchedulingError::Database(e.to_string()))?
+                .ok_or(SchedulingError::LinkNotFound)?;
 
         // Verify slot is still available
         let date = booking.start_time;
@@ -330,7 +329,11 @@ impl SchedulingService {
         .bind(&booking.guest_email)
         .bind(booking.start_time)
         .bind(end_time)
-        .bind(if link.requires_confirmation { "pending" } else { "confirmed" })
+        .bind(if link.requires_confirmation {
+            "pending"
+        } else {
+            "confirmed"
+        })
         .bind(serde_json::to_value(&booking.answers).unwrap_or_default())
         .execute(&self.pool)
         .await
@@ -358,7 +361,8 @@ impl SchedulingService {
         .map_err(|e| SchedulingError::Database(e.to_string()))?;
 
         // Send confirmation emails
-        self.send_booking_confirmation(meeting_id, &link, &booking).await?;
+        self.send_booking_confirmation(meeting_id, &link, &booking)
+            .await?;
 
         Ok(ScheduledMeeting {
             id: meeting_id,
@@ -395,12 +399,18 @@ impl SchedulingService {
         .await
         .map_err(|e| SchedulingError::Database(e.to_string()))?;
 
-        Ok(prefs.map(|p| SchedulingPreferences {
-            working_hours_start: p.working_hours_start as u8,
-            working_hours_end: p.working_hours_end as u8,
-            working_days: p.working_days.into_iter().map(|d| num_to_weekday(d)).collect(),
-            timezone: p.timezone,
-        }).unwrap_or_default())
+        Ok(prefs
+            .map(|p| SchedulingPreferences {
+                working_hours_start: p.working_hours_start as u8,
+                working_hours_end: p.working_hours_end as u8,
+                working_days: p
+                    .working_days
+                    .into_iter()
+                    .map(|d| num_to_weekday(d))
+                    .collect(),
+                timezone: p.timezone,
+            })
+            .unwrap_or_default())
     }
 
     fn calculate_free_slots(
@@ -419,7 +429,9 @@ impl SchedulingService {
                 let gap_start = current;
                 let gap_end = busy_slot.start;
 
-                if let Some(working_slot) = self.intersect_with_working_hours(gap_start, gap_end, prefs) {
+                if let Some(working_slot) =
+                    self.intersect_with_working_hours(gap_start, gap_end, prefs)
+                {
                     free.push(working_slot);
                 }
             }
@@ -448,8 +460,12 @@ impl SchedulingService {
         }
 
         // Clamp to working hours
-        let day_start = start.date_naive().and_hms_opt(prefs.working_hours_start as u32, 0, 0)?;
-        let day_end = start.date_naive().and_hms_opt(prefs.working_hours_end as u32, 0, 0)?;
+        let day_start = start
+            .date_naive()
+            .and_hms_opt(prefs.working_hours_start as u32, 0, 0)?;
+        let day_end = start
+            .date_naive()
+            .and_hms_opt(prefs.working_hours_end as u32, 0, 0)?;
 
         let work_start = DateTime::from_naive_utc_and_offset(day_start, Utc);
         let work_end = DateTime::from_naive_utc_and_offset(day_end, Utc);
@@ -487,7 +503,12 @@ impl SchedulingService {
         merged
     }
 
-    fn score_slot(&self, slot: &TimeSlot, prefs: &SchedulingPreferences, options: &FindOptions) -> f64 {
+    fn score_slot(
+        &self,
+        slot: &TimeSlot,
+        prefs: &SchedulingPreferences,
+        options: &FindOptions,
+    ) -> f64 {
         let mut score = 1.0;
 
         let hour = slot.start.hour();
@@ -526,7 +547,9 @@ fn generate_slug() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyz0123456789".chars().collect();
-    (0..8).map(|_| chars[rng.gen_range(0..chars.len())]).collect()
+    (0..8)
+        .map(|_| chars[rng.gen_range(0..chars.len())])
+        .collect()
 }
 
 fn num_to_weekday(n: i32) -> Weekday {
@@ -599,8 +622,11 @@ impl Default for SchedulingPreferences {
             working_hours_start: 9,
             working_hours_end: 17,
             working_days: vec![
-                Weekday::Mon, Weekday::Tue, Weekday::Wed,
-                Weekday::Thu, Weekday::Fri,
+                Weekday::Mon,
+                Weekday::Tue,
+                Weekday::Wed,
+                Weekday::Thu,
+                Weekday::Fri,
             ],
             timezone: None,
         }

@@ -1,0 +1,17 @@
+[package]
+name = "markets_integration_integrity"
+version = "0.1.0"
+edition = "2024"
+description = "Knowledge-Markets integration integrity zome - Bidirectional integration with Epistemic Markets"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+claims_integrity = { path = "../../claims/integrity" }
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }

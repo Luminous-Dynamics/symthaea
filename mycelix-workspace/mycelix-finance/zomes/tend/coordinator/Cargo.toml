@@ -1,0 +1,17 @@
+[package]
+name = "tend"
+version = "0.1.0"
+edition = "2024"
+description = "Time Exchange Network of Dignity (TEND) coordinator zome - Commons Charter Article I"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "tend"
+
+[dependencies]
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tend_integrity = { path = "../integrity" }

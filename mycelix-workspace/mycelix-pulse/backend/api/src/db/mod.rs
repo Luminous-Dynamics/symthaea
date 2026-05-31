@@ -5,10 +5,10 @@
 //!
 //! Provides SQLx-based database access with repository pattern
 
+pub mod cache;
+pub mod migrations;
 pub mod models;
 pub mod repositories;
-pub mod migrations;
-pub mod cache;
 
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::time::Duration;
@@ -90,9 +90,7 @@ impl Database {
 
     /// Health check
     pub async fn health_check(&self) -> DbResult<()> {
-        sqlx::query("SELECT 1")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())
     }
 }

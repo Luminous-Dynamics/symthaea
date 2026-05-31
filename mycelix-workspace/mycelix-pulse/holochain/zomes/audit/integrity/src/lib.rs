@@ -65,11 +65,11 @@ pub struct AuditTarget {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AuditDetails {
     pub message: String,
-    pub before: Option<String>,  // JSON string
-    pub after: Option<String>,   // JSON string
+    pub before: Option<String>, // JSON string
+    pub after: Option<String>,  // JSON string
     pub error: Option<String>,
     pub stack_trace: Option<String>,
-    pub custom: Option<String>,  // JSON string
+    pub custom: Option<String>, // JSON string
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -150,7 +150,6 @@ fn validate_create_audit_entry(
 
     Ok(ValidateCallbackResult::Valid)
 }
-
 
 /// Main validation dispatcher
 #[hdk_extern]

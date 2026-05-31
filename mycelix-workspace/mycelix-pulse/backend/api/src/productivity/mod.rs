@@ -188,7 +188,11 @@ impl ResponseTimeService {
             median_response_time_hours: overall.median_hours.unwrap_or(0.0) as f32,
             fastest_response_minutes: overall.min_minutes.unwrap_or(0.0) as i32,
             slowest_response_hours: overall.max_hours.unwrap_or(0.0) as i32,
-            response_rate: if total > 0.0 { responded / total * 100.0 } else { 0.0 },
+            response_rate: if total > 0.0 {
+                responded / total * 100.0
+            } else {
+                0.0
+            },
             by_sender,
             by_day_of_week,
             by_hour,
@@ -196,7 +200,10 @@ impl ResponseTimeService {
         })
     }
 
-    async fn calculate_response_trend(&self, user_id: Uuid) -> Result<ResponseTrend, ProductivityError> {
+    async fn calculate_response_trend(
+        &self,
+        user_id: Uuid,
+    ) -> Result<ResponseTrend, ProductivityError> {
         let now = Utc::now();
         let last_week = now - Duration::days(7);
         let prev_week = now - Duration::days(14);
@@ -256,20 +263,20 @@ pub struct RelationshipScore {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelationshipComponents {
-    pub frequency_score: f32,    // How often you communicate
-    pub recency_score: f32,      // How recent was last contact
-    pub reciprocity_score: f32,  // Balance of sent/received
-    pub response_score: f32,     // How quickly you respond to each other
-    pub engagement_score: f32,   // Length of conversations
+    pub frequency_score: f32,   // How often you communicate
+    pub recency_score: f32,     // How recent was last contact
+    pub reciprocity_score: f32, // Balance of sent/received
+    pub response_score: f32,    // How quickly you respond to each other
+    pub engagement_score: f32,  // Length of conversations
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RelationshipType {
-    VeryActive,    // Daily/weekly contact
-    Active,        // Regular contact
-    Moderate,      // Occasional contact
-    Dormant,       // No recent contact
-    New,           // Recently started communicating
+    VeryActive, // Daily/weekly contact
+    Active,     // Regular contact
+    Moderate,   // Occasional contact
+    Dormant,    // No recent contact
+    New,        // Recently started communicating
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -662,7 +669,9 @@ impl DashboardService {
 
         let comparison = PeriodComparison {
             sent_change_percent: ((email_volume.sent as f32 - prev_sent) / prev_sent) * 100.0,
-            received_change_percent: ((email_volume.received as f32 - prev_received) / prev_received) * 100.0,
+            received_change_percent: ((email_volume.received as f32 - prev_received)
+                / prev_received)
+                * 100.0,
             response_time_change_percent: 0.0, // Would calculate properly
             direction: ComparisonDirection::Same,
         };
@@ -684,16 +693,13 @@ impl DashboardService {
         let inbox_health = InboxHealth {
             unread_count: health.unread.unwrap_or(0) as i32,
             oldest_unread_days: health.oldest_unread.unwrap_or(0.0) as i32,
-            inbox_zero_days: 0, // Would calculate from history
+            inbox_zero_days: 0,                 // Would calculate from history
             average_processing_time_hours: 4.0, // Would calculate properly
         };
 
         // Calculate productivity score
-        let productivity_score = self.calculate_productivity_score(
-            &email_volume,
-            &inbox_health,
-            &comparison,
-        );
+        let productivity_score =
+            self.calculate_productivity_score(&email_volume, &inbox_health, &comparison);
 
         Ok(ProductivityDashboard {
             period: DashboardPeriod {
@@ -820,10 +826,7 @@ impl ForecastService {
 
         let mut by_dow: HashMap<i32, f32> = HashMap::new();
         for h in &historical {
-            by_dow.insert(
-                h.dow.unwrap_or(0.0) as i32,
-                h.avg_daily.unwrap_or(0) as f32,
-            );
+            by_dow.insert(h.dow.unwrap_or(0.0) as i32, h.avg_daily.unwrap_or(0) as f32);
         }
 
         // Generate predictions
@@ -849,7 +852,15 @@ impl ForecastService {
         }
 
         // Calculate weekly pattern
-        let day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        let day_names = [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+        ];
         let mut by_day = HashMap::new();
         let mut max_day = (0, 0.0f32);
         let mut min_day = (0, f32::MAX);
@@ -873,13 +884,14 @@ impl ForecastService {
         };
 
         // Identify factors
-        let factors = vec![
-            ForecastFactor {
-                factor: "Weekly Pattern".to_string(),
-                impact: FactorImpact::Neutral,
-                description: format!("{} tends to be your busiest day", weekly_pattern.busiest_day),
-            },
-        ];
+        let factors = vec![ForecastFactor {
+            factor: "Weekly Pattern".to_string(),
+            impact: FactorImpact::Neutral,
+            description: format!(
+                "{} tends to be your busiest day",
+                weekly_pattern.busiest_day
+            ),
+        }];
 
         Ok(EmailForecast {
             predictions,
@@ -1043,9 +1055,9 @@ pub struct Streak {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StreakType {
     InboxZero,
-    QuickResponse, // Responded within 1 hour
+    QuickResponse,   // Responded within 1 hour
     DailyProcessing, // Processed all emails
-    NoUnread, // Ended day with no unread
+    NoUnread,        // Ended day with no unread
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

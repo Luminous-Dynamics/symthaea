@@ -1,0 +1,16 @@
+[package]
+name = "materials_coordinator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "materials_coordinator"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+fabrication_common = { workspace = true }
+materials_integrity = { path = "../integrity" }

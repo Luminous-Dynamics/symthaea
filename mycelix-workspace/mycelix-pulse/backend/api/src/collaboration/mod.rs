@@ -366,7 +366,10 @@ impl InternalNotes {
     }
 
     /// Get notes for an email
-    pub async fn get_notes(&self, email_id: Uuid) -> Result<Vec<NoteWithAuthor>, CollaborationError> {
+    pub async fn get_notes(
+        &self,
+        email_id: Uuid,
+    ) -> Result<Vec<NoteWithAuthor>, CollaborationError> {
         let notes: Vec<NoteWithAuthor> = sqlx::query_as(
             r#"
             SELECT n.id, n.email_id, n.user_id, n.content, n.mentions, n.created_at,

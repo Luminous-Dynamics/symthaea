@@ -315,11 +315,7 @@ impl LiveDraftService {
         Ok(new_version)
     }
 
-    async fn apply_insert(
-        &self,
-        draft_id: Uuid,
-        op: &DraftOperation,
-    ) -> Result<(), RealtimeError> {
+    async fn apply_insert(&self, draft_id: Uuid, op: &DraftOperation) -> Result<(), RealtimeError> {
         let content = op.content.as_deref().unwrap_or("");
 
         match op.field.as_str() {
@@ -365,11 +361,7 @@ impl LiveDraftService {
         Ok(())
     }
 
-    async fn apply_delete(
-        &self,
-        draft_id: Uuid,
-        op: &DraftOperation,
-    ) -> Result<(), RealtimeError> {
+    async fn apply_delete(&self, draft_id: Uuid, op: &DraftOperation) -> Result<(), RealtimeError> {
         let length = op.length.unwrap_or(1);
 
         match op.field.as_str() {
@@ -658,7 +650,10 @@ impl PresenceService {
         Ok(())
     }
 
-    pub async fn get_team_presence(&self, user_id: Uuid) -> Result<Vec<UserPresence>, RealtimeError> {
+    pub async fn get_team_presence(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<UserPresence>, RealtimeError> {
         // Get presence for users in same team/shared mailboxes
         let presence = sqlx::query!(
             r#"
@@ -692,7 +687,9 @@ impl PresenceService {
             user_id: row.user_id,
             user_name: row.user_name,
             status: serde_json::from_str(&row.status).unwrap_or(PresenceStatus::Offline),
-            current_view: row.current_view.and_then(|v| serde_json::from_value(v).ok()),
+            current_view: row
+                .current_view
+                .and_then(|v| serde_json::from_value(v).ok()),
             last_active: row.last_active,
             typing_in: row.typing_in,
         })
@@ -723,7 +720,9 @@ impl PresenceService {
             user_id: row.user_id,
             user_name: row.user_name,
             status: serde_json::from_str(&row.status).unwrap_or(PresenceStatus::Offline),
-            current_view: row.current_view.and_then(|v| serde_json::from_value(v).ok()),
+            current_view: row
+                .current_view
+                .and_then(|v| serde_json::from_value(v).ok()),
             last_active: row.last_active,
             typing_in: row.typing_in,
         })
@@ -807,7 +806,8 @@ impl ThreadService {
         .await?;
 
         // Add initial message
-        self.add_message(thread_id, created_by, initial_message, vec![]).await?;
+        self.add_message(thread_id, created_by, initial_message, vec![])
+            .await?;
 
         self.get_thread(thread_id).await
     }
@@ -1050,7 +1050,11 @@ impl ThreadService {
         Ok(reactions)
     }
 
-    pub async fn resolve_thread(&self, thread_id: Uuid, user_id: Uuid) -> Result<(), RealtimeError> {
+    pub async fn resolve_thread(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), RealtimeError> {
         sqlx::query!(
             r#"
             UPDATE collaborative_threads
@@ -1200,7 +1204,8 @@ impl VersionHistoryService {
         let version = self.get_version(version_id).await?;
 
         // Save current state as new version first
-        self.save_version(version.draft_id, user_id, Some("Before restore")).await?;
+        self.save_version(version.draft_id, user_id, Some("Before restore"))
+            .await?;
 
         // Restore the old version
         let new_version = sqlx::query_scalar!(

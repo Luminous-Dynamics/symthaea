@@ -11,10 +11,10 @@ use sqlx::PgPool;
 use std::io::Write;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use uuid::Uuid;
-use zip::write::FileOptions;
 use zip::ZipWriter;
+use zip::write::FileOptions;
 
 /// GDPR request types
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, sqlx::Type)]
@@ -124,14 +124,12 @@ impl GdprService {
     /// Process data export
     pub async fn process_export(&self, request_id: Uuid) -> Result<String, GdprError> {
         // Get request
-        let request = sqlx::query_as::<_, GdprRequest>(
-            "SELECT * FROM gdpr_requests WHERE id = $1",
-        )
-        .bind(request_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(GdprError::Database)?
-        .ok_or(GdprError::NotFound)?;
+        let request = sqlx::query_as::<_, GdprRequest>("SELECT * FROM gdpr_requests WHERE id = $1")
+            .bind(request_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(GdprError::Database)?
+            .ok_or(GdprError::NotFound)?;
 
         // Mark as processing
         sqlx::query("UPDATE gdpr_requests SET status = 'processing' WHERE id = $1")
@@ -181,13 +179,12 @@ impl GdprService {
     /// Collect all user data for export
     async fn collect_user_data(&self, user_id: Uuid) -> Result<ExportData, GdprError> {
         // User profile
-        let profile: Option<serde_json::Value> = sqlx::query_scalar(
-            "SELECT row_to_json(u) FROM users u WHERE id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(GdprError::Database)?;
+        let profile: Option<serde_json::Value> =
+            sqlx::query_scalar("SELECT row_to_json(u) FROM users u WHERE id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(GdprError::Database)?;
 
         // Emails (limited to prevent huge exports)
         let emails: Vec<serde_json::Value> = sqlx::query_scalar(
@@ -223,13 +220,12 @@ impl GdprService {
         .map_err(GdprError::Database)?;
 
         // Consents
-        let consents: Vec<serde_json::Value> = sqlx::query_scalar(
-            "SELECT json_agg(uc) FROM user_consents uc WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(GdprError::Database)?;
+        let consents: Vec<serde_json::Value> =
+            sqlx::query_scalar("SELECT json_agg(uc) FROM user_consents uc WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(GdprError::Database)?;
 
         // Activity logs
         let activity: Vec<serde_json::Value> = sqlx::query_scalar(
@@ -264,12 +260,10 @@ impl GdprService {
         filepath: &str,
         data: &ExportData,
     ) -> Result<(), GdprError> {
-        let file = std::fs::File::create(filepath)
-            .map_err(|e| GdprError::Io(e.to_string()))?;
+        let file = std::fs::File::create(filepath).map_err(|e| GdprError::Io(e.to_string()))?;
 
         let mut zip = ZipWriter::new(file);
-        let options = FileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
+        let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         // Write each section as JSON file
         if let Some(profile) = &data.profile {
@@ -281,23 +275,39 @@ impl GdprService {
 
         zip.start_file("emails.json", options)
             .map_err(|e| GdprError::Io(e.to_string()))?;
-        zip.write_all(serde_json::to_string_pretty(&data.emails).unwrap().as_bytes())
-            .map_err(|e| GdprError::Io(e.to_string()))?;
+        zip.write_all(
+            serde_json::to_string_pretty(&data.emails)
+                .unwrap()
+                .as_bytes(),
+        )
+        .map_err(|e| GdprError::Io(e.to_string()))?;
 
         zip.start_file("contacts.json", options)
             .map_err(|e| GdprError::Io(e.to_string()))?;
-        zip.write_all(serde_json::to_string_pretty(&data.contacts).unwrap().as_bytes())
-            .map_err(|e| GdprError::Io(e.to_string()))?;
+        zip.write_all(
+            serde_json::to_string_pretty(&data.contacts)
+                .unwrap()
+                .as_bytes(),
+        )
+        .map_err(|e| GdprError::Io(e.to_string()))?;
 
         zip.start_file("consents.json", options)
             .map_err(|e| GdprError::Io(e.to_string()))?;
-        zip.write_all(serde_json::to_string_pretty(&data.consents).unwrap().as_bytes())
-            .map_err(|e| GdprError::Io(e.to_string()))?;
+        zip.write_all(
+            serde_json::to_string_pretty(&data.consents)
+                .unwrap()
+                .as_bytes(),
+        )
+        .map_err(|e| GdprError::Io(e.to_string()))?;
 
         zip.start_file("activity.json", options)
             .map_err(|e| GdprError::Io(e.to_string()))?;
-        zip.write_all(serde_json::to_string_pretty(&data.activity).unwrap().as_bytes())
-            .map_err(|e| GdprError::Io(e.to_string()))?;
+        zip.write_all(
+            serde_json::to_string_pretty(&data.activity)
+                .unwrap()
+                .as_bytes(),
+        )
+        .map_err(|e| GdprError::Io(e.to_string()))?;
 
         // Metadata
         let metadata = serde_json::json!({
@@ -346,14 +356,12 @@ impl GdprService {
 
     /// Process account deletion
     pub async fn process_deletion(&self, request_id: Uuid) -> Result<(), GdprError> {
-        let request = sqlx::query_as::<_, GdprRequest>(
-            "SELECT * FROM gdpr_requests WHERE id = $1",
-        )
-        .bind(request_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(GdprError::Database)?
-        .ok_or(GdprError::NotFound)?;
+        let request = sqlx::query_as::<_, GdprRequest>("SELECT * FROM gdpr_requests WHERE id = $1")
+            .bind(request_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(GdprError::Database)?
+            .ok_or(GdprError::NotFound)?;
 
         let user_id = request.user_id;
 
@@ -471,21 +479,15 @@ impl GdprService {
 
     /// Get user consents
     pub async fn get_user_consents(&self, user_id: Uuid) -> Result<Vec<UserConsent>, GdprError> {
-        sqlx::query_as::<_, UserConsent>(
-            "SELECT * FROM user_consents WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(GdprError::Database)
+        sqlx::query_as::<_, UserConsent>("SELECT * FROM user_consents WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(GdprError::Database)
     }
 
     /// Check if user has consent
-    pub async fn has_consent(
-        &self,
-        user_id: Uuid,
-        consent_type: &str,
-    ) -> Result<bool, GdprError> {
+    pub async fn has_consent(&self, user_id: Uuid, consent_type: &str) -> Result<bool, GdprError> {
         let granted: Option<bool> = sqlx::query_scalar(
             "SELECT granted FROM user_consents WHERE user_id = $1 AND consent_type = $2",
         )
@@ -514,10 +516,7 @@ impl GdprService {
 
             match policy.action {
                 RetentionAction::Delete => {
-                    let query = format!(
-                        "DELETE FROM {} WHERE created_at < $1",
-                        policy.table_name
-                    );
+                    let query = format!("DELETE FROM {} WHERE created_at < $1", policy.table_name);
                     let deleted = sqlx::query(&query)
                         .bind(cutoff)
                         .execute(&self.pool)

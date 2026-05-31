@@ -10,7 +10,7 @@ use tokio::sync::broadcast;
 
 use crate::config::Config;
 use crate::services::{BridgeClient, HolochainService, StorageService, TrustCacheService};
-use mycelix_identity_client::{IdentityClient, IdentityClientConfig, FallbackMode};
+use mycelix_identity_client::{FallbackMode, IdentityClient, IdentityClientConfig};
 
 pub mod ai;
 pub mod auth;

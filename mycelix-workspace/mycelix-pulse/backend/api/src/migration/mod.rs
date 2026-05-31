@@ -8,8 +8,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Migration Service
@@ -60,24 +60,24 @@ impl MigrationService {
 
     /// Get migration job status
     pub async fn get_job(&self, job_id: Uuid) -> Result<MigrationJob, MigrationError> {
-        let job: MigrationJob = sqlx::query_as(
-            "SELECT * FROM migration_jobs WHERE id = $1",
-        )
-        .bind(job_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| MigrationError::Database(e.to_string()))?;
+        let job: MigrationJob = sqlx::query_as("SELECT * FROM migration_jobs WHERE id = $1")
+            .bind(job_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| MigrationError::Database(e.to_string()))?;
 
         Ok(job)
     }
 
     /// Cancel a running migration
     pub async fn cancel_migration(&self, job_id: Uuid) -> Result<(), MigrationError> {
-        sqlx::query("UPDATE migration_jobs SET status = 'cancelled' WHERE id = $1 AND status = 'running'")
-            .bind(job_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| MigrationError::Database(e.to_string()))?;
+        sqlx::query(
+            "UPDATE migration_jobs SET status = 'cancelled' WHERE id = $1 AND status = 'running'",
+        )
+        .bind(job_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| MigrationError::Database(e.to_string()))?;
 
         Ok(())
     }
@@ -104,7 +104,9 @@ impl GmailImporter {
         options: GmailImportOptions,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::Gmail).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::Gmail)
+            .await?;
 
         let pool = self.pool.clone();
         let job_id = job.id;
@@ -112,11 +114,13 @@ impl GmailImporter {
 
         tokio::spawn(async move {
             // Would use Gmail API to fetch and import emails
-            sqlx::query("UPDATE migration_jobs SET status = 'running', started_at = NOW() WHERE id = $1")
-                .bind(job_id)
-                .execute(&pool)
-                .await
-                .ok();
+            sqlx::query(
+                "UPDATE migration_jobs SET status = 'running', started_at = NOW() WHERE id = $1",
+            )
+            .bind(job_id)
+            .execute(&pool)
+            .await
+            .ok();
 
             // Import logic here...
 
@@ -161,7 +165,9 @@ impl OutlookImporter {
         options: OutlookImportOptions,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::Outlook).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::Outlook)
+            .await?;
 
         // Similar to Gmail, spawn background task
         Ok(job)
@@ -198,7 +204,9 @@ impl FileImporter {
         target_folder: &str,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::MBOX).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::MBOX)
+            .await?;
 
         let pool = self.pool.clone();
         let job_id = job.id;
@@ -206,11 +214,13 @@ impl FileImporter {
         let folder = target_folder.to_string();
 
         tokio::spawn(async move {
-            sqlx::query("UPDATE migration_jobs SET status = 'running', started_at = NOW() WHERE id = $1")
-                .bind(job_id)
-                .execute(&pool)
-                .await
-                .ok();
+            sqlx::query(
+                "UPDATE migration_jobs SET status = 'running', started_at = NOW() WHERE id = $1",
+            )
+            .bind(job_id)
+            .execute(&pool)
+            .await
+            .ok();
 
             // Parse MBOX file and import emails
             match tokio::fs::read_to_string(&path).await {
@@ -305,7 +315,10 @@ impl FileImporter {
         Ok(ParsedEmail {
             message_id: headers.get("message-id").cloned().unwrap_or_default(),
             from_address: headers.get("from").cloned().unwrap_or_default(),
-            to_addresses: headers.get("to").map(|s| vec![s.clone()]).unwrap_or_default(),
+            to_addresses: headers
+                .get("to")
+                .map(|s| vec![s.clone()])
+                .unwrap_or_default(),
             subject: headers.get("subject").cloned().unwrap_or_default(),
             body_text: body,
             date: headers
@@ -400,7 +413,9 @@ impl ProtonMailImporter {
         options: ProtonMailImportOptions,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::ProtonMail).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::ProtonMail)
+            .await?;
 
         let pool = self.pool.clone();
         let job_id = job.id;
@@ -459,7 +474,11 @@ impl ProtonMailImporter {
             .map_err(|e| MigrationError::FileError(e.to_string()))?;
 
         let mut entries = entries;
-        while let Some(entry) = entries.next_entry().await.map_err(|e| MigrationError::FileError(e.to_string()))? {
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| MigrationError::FileError(e.to_string()))?
+        {
             let file_path = entry.path();
 
             if file_path.extension().map_or(false, |e| e == "mbox") {
@@ -501,11 +520,13 @@ impl ProtonMailImporter {
 
         // Import contacts if requested
         if options.include_contacts {
-            sqlx::query("UPDATE migration_jobs SET current_phase = 'Importing contacts' WHERE id = $1")
-                .bind(job_id)
-                .execute(pool)
-                .await
-                .ok();
+            sqlx::query(
+                "UPDATE migration_jobs SET current_phase = 'Importing contacts' WHERE id = $1",
+            )
+            .bind(job_id)
+            .execute(pool)
+            .await
+            .ok();
 
             // Process contacts vCard export
         }
@@ -549,7 +570,9 @@ impl ImapImporter {
         config: ImapImportConfig,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::IMAP).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::IMAP)
+            .await?;
 
         let pool = self.pool.clone();
         let job_id = job.id;
@@ -612,7 +635,9 @@ impl AppleMailImporter {
         mail_directory: &str,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::AppleMail).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::AppleMail)
+            .await?;
 
         // Apple Mail stores emails as .emlx files in ~/Library/Mail
         // Process directory structure
@@ -641,7 +666,9 @@ impl ThunderbirdImporter {
         profile_path: &str,
     ) -> Result<MigrationJob, MigrationError> {
         let migration_service = MigrationService::new(self.pool.clone());
-        let job = migration_service.start_migration(user_id, MigrationSource::Thunderbird).await?;
+        let job = migration_service
+            .start_migration(user_id, MigrationSource::Thunderbird)
+            .await?;
 
         // Thunderbird uses MBOX format in profile directory
         // Parse Local Folders and ImapMail directories
@@ -655,9 +682,9 @@ impl ThunderbirdImporter {
 // ============================================================================
 
 use axum::{
-    extract::{Path, State, Multipart},
-    response::Json,
+    extract::{Multipart, Path, State},
     http::StatusCode,
+    response::Json,
 };
 
 pub async fn list_migrations(
@@ -665,7 +692,7 @@ pub async fn list_migrations(
     user_id: Uuid,
 ) -> Result<Json<Vec<MigrationJob>>, (StatusCode, String)> {
     let jobs: Vec<MigrationJob> = sqlx::query_as(
-        "SELECT * FROM migration_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50"
+        "SELECT * FROM migration_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
     )
     .bind(user_id)
     .fetch_all(&pool)
@@ -680,7 +707,8 @@ pub async fn get_migration_status(
     Path(job_id): Path<Uuid>,
 ) -> Result<Json<MigrationJob>, (StatusCode, String)> {
     let service = MigrationService::new(pool);
-    let job = service.get_job(job_id)
+    let job = service
+        .get_job(job_id)
         .await
         .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
 
@@ -692,7 +720,8 @@ pub async fn cancel_migration(
     Path(job_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let service = MigrationService::new(pool);
-    service.cancel_migration(job_id)
+    service
+        .cancel_migration(job_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

@@ -39,8 +39,8 @@ impl AttachmentStore {
     }
 
     fn store_path(&self, path: &Path) -> Result<AttachmentRef> {
-        let content = fs::read(path)
-            .with_context(|| format!("Failed to read attachment: {:?}", path))?;
+        let content =
+            fs::read(path).with_context(|| format!("Failed to read attachment: {:?}", path))?;
         let size_bytes = content.len() as u64;
 
         let mut hasher = Blake2b512::new();

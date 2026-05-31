@@ -1,0 +1,72 @@
+{
+  "name": "@mycelix/knowledge-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tests for Mycelix Knowledge hApp",
+  "scripts": {
+    "test": "PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\" NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
+    "test:genesis": "PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\" NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest genesis-simulation",
+    "test:integration": "PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\" NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --testPathPattern=integration",
+    "test:sdk": "PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\" NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --testPathPattern=sdk",
+    "test:watch": "PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\" NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
+    "test:coverage": "PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\" NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --coverage"
+  },
+  "devDependencies": {
+    "@holochain/client": "^0.20.0",
+    "@holochain/tryorama": "^0.19.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.3.0"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>"
+    ],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "mts",
+      "js",
+      "mjs",
+      "json"
+    ],
+    "extensionsToTreatAsEsm": [
+      ".ts",
+      ".mts"
+    ],
+    "transform": {
+      "^.+\\.(t|j)sx?$": [
+        "ts-jest",
+        {
+          "useESM": true,
+          "tsconfig": {
+            "module": "ESNext",
+            "moduleResolution": "bundler",
+            "esModuleInterop": true,
+            "allowSyntheticDefaultImports": true
+          }
+        }
+      ]
+    },
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1",
+      "^\\./libsodium\\.mjs$": "<rootDir>/node_modules/libsodium/dist/modules-esm/libsodium.mjs"
+    },
+    "collectCoverageFrom": [
+      "../client/src/**/*.ts",
+      "!**/*.d.ts"
+    ],
+    "coverageDirectory": "./coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
+  }
+}

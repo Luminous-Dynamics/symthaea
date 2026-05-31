@@ -6,7 +6,7 @@
 //! Micro-benchmarks for critical path operations.
 //! Run with: cargo bench
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use std::time::Duration;
 
 // Mock types for benchmarking - replace with actual imports
@@ -31,11 +31,7 @@ mod mock {
         }
     }
 
-    pub fn calculate_trust_score(
-        sender: &str,
-        existing_interactions: u32,
-        vouches: u32,
-    ) -> f64 {
+    pub fn calculate_trust_score(sender: &str, existing_interactions: u32, vouches: u32) -> f64 {
         let base_score = 0.3;
         let interaction_bonus = (existing_interactions as f64 * 0.01).min(0.3);
         let vouch_bonus = (vouches as f64 * 0.05).min(0.4);
@@ -58,7 +54,11 @@ mod mock {
 
     pub fn encrypt_content(content: &[u8], key: &[u8]) -> Vec<u8> {
         // Simulated encryption (XOR for benchmark purposes)
-        content.iter().zip(key.iter().cycle()).map(|(a, b)| a ^ b).collect()
+        content
+            .iter()
+            .zip(key.iter().cycle())
+            .map(|(a, b)| a ^ b)
+            .collect()
     }
 
     pub fn parse_email_headers(raw: &str) -> HashMap<String, String> {
@@ -75,11 +75,12 @@ mod mock {
 
     pub fn search_emails(query: &str, corpus: &[Email]) -> Vec<&Email> {
         let query_lower = query.to_lowercase();
-        corpus.iter()
+        corpus
+            .iter()
             .filter(|e| {
-                e.subject.to_lowercase().contains(&query_lower) ||
-                e.body.to_lowercase().contains(&query_lower) ||
-                e.from.to_lowercase().contains(&query_lower)
+                e.subject.to_lowercase().contains(&query_lower)
+                    || e.body.to_lowercase().contains(&query_lower)
+                    || e.from.to_lowercase().contains(&query_lower)
             })
             .collect()
     }
@@ -112,7 +113,11 @@ fn bench_email_categorization(c: &mut Criterion) {
 
     let test_cases = vec![
         ("short", "Meeting tomorrow", "Let's meet"),
-        ("medium", "Weekly Newsletter - Special Offer!", "Check out our deals. Unsubscribe here."),
+        (
+            "medium",
+            "Weekly Newsletter - Special Offer!",
+            "Check out our deals. Unsubscribe here.",
+        ),
         ("long", "Project Update", &"x".repeat(10000)),
     ];
 
@@ -137,14 +142,10 @@ fn bench_encryption(c: &mut Criterion) {
 
     for size in [1024, 10240, 102400, 1048576].iter() {
         group.throughput(Throughput::Bytes(*size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("content_size", size),
-            size,
-            |b, &size| {
-                let content = vec![0u8; size];
-                b.iter(|| mock::encrypt_content(black_box(&content), black_box(key)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("content_size", size), size, |b, &size| {
+            let content = vec![0u8; size];
+            b.iter(|| mock::encrypt_content(black_box(&content), black_box(key)));
+        });
     }
 
     group.finish();
@@ -170,7 +171,10 @@ fn bench_header_parsing(c: &mut Criterion) {
          X-Custom-Header-2: value2\n\
          X-Custom-Header-3: value3\n\
          {}",
-        (0..50).map(|i| format!("X-Extra-{}: value{}", i, i)).collect::<Vec<_>>().join("\n")
+        (0..50)
+            .map(|i| format!("X-Extra-{}: value{}", i, i))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 
     group.bench_function("small", |b| {
@@ -196,8 +200,16 @@ fn bench_email_search(c: &mut Criterion) {
                 id: format!("email-{}", i),
                 from: format!("sender{}@example.com", i % 100),
                 to: vec![format!("recipient{}@example.com", i % 50)],
-                subject: format!("Subject {} with keyword{}", i, if i % 10 == 0 { " important" } else { "" }),
-                body: format!("Body content {} {}", i, if i % 5 == 0 { "meeting" } else { "general" }),
+                subject: format!(
+                    "Subject {} with keyword{}",
+                    i,
+                    if i % 10 == 0 { " important" } else { "" }
+                ),
+                body: format!(
+                    "Body content {} {}",
+                    i,
+                    if i % 5 == 0 { "meeting" } else { "general" }
+                ),
             })
             .collect();
 

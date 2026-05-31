@@ -1,0 +1,16 @@
+[package]
+name = "proposals"
+version = "0.1.0"
+edition = "2024"
+description = "Governance proposals coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+proposals_integrity = { path = "../integrity" }
+# Enable wasm_js feature on getrandom 0.3 (transitive from holochain_nonce)
+getrandom_03 = { workspace = true }

@@ -106,11 +106,15 @@ impl Config {
             holochain_connect_timeout_secs: env::var("HOLOCHAIN_CONNECT_TIMEOUT_SECS")
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()
-                .map_err(|_| ConfigError::InvalidValue("HOLOCHAIN_CONNECT_TIMEOUT_SECS must be a number"))?,
+                .map_err(|_| {
+                    ConfigError::InvalidValue("HOLOCHAIN_CONNECT_TIMEOUT_SECS must be a number")
+                })?,
             holochain_max_reconnect_attempts: env::var("HOLOCHAIN_MAX_RECONNECT_ATTEMPTS")
                 .unwrap_or_else(|_| "5".to_string())
                 .parse()
-                .map_err(|_| ConfigError::InvalidValue("HOLOCHAIN_MAX_RECONNECT_ATTEMPTS must be a number"))?,
+                .map_err(|_| {
+                    ConfigError::InvalidValue("HOLOCHAIN_MAX_RECONNECT_ATTEMPTS must be a number")
+                })?,
 
             jwt_secret: env::var("JWT_SECRET")
                 .map_err(|_| ConfigError::MissingRequired("JWT_SECRET"))?,
@@ -126,7 +130,9 @@ impl Config {
             trust_cache_max_entries: env::var("TRUST_CACHE_MAX_ENTRIES")
                 .unwrap_or_else(|_| "10000".to_string())
                 .parse()
-                .map_err(|_| ConfigError::InvalidValue("TRUST_CACHE_MAX_ENTRIES must be a number"))?,
+                .map_err(|_| {
+                    ConfigError::InvalidValue("TRUST_CACHE_MAX_ENTRIES must be a number")
+                })?,
 
             default_min_trust: env::var("DEFAULT_MIN_TRUST")
                 .unwrap_or_else(|_| "0.3".to_string())
@@ -163,8 +169,7 @@ impl Config {
                 .unwrap_or_else(|_| "0.3".to_string())
                 .parse()
                 .map_err(|_| ConfigError::InvalidValue("BRIDGE_FALLBACK_TRUST must be a number"))?,
-            bridge_zome_name: env::var("BRIDGE_ZOME_NAME")
-                .unwrap_or_else(|_| "bridge".to_string()),
+            bridge_zome_name: env::var("BRIDGE_ZOME_NAME").unwrap_or_else(|_| "bridge".to_string()),
             bridge_cross_happ_enabled: env::var("BRIDGE_CROSS_HAPP_ENABLED")
                 .map(|v| v.to_lowercase() != "false" && v != "0")
                 .unwrap_or(true),
@@ -221,10 +226,14 @@ impl Config {
             ));
         }
         if self.default_min_trust < 0.0 || self.default_min_trust > 1.0 {
-            return Err(ConfigError::InvalidValue("DEFAULT_MIN_TRUST must be between 0.0 and 1.0"));
+            return Err(ConfigError::InvalidValue(
+                "DEFAULT_MIN_TRUST must be between 0.0 and 1.0",
+            ));
         }
         if self.byzantine_threshold < 0.0 || self.byzantine_threshold > 1.0 {
-            return Err(ConfigError::InvalidValue("BYZANTINE_THRESHOLD must be between 0.0 and 1.0"));
+            return Err(ConfigError::InvalidValue(
+                "BYZANTINE_THRESHOLD must be between 0.0 and 1.0",
+            ));
         }
         Ok(())
     }

@@ -83,19 +83,13 @@ impl ExpirationService {
         .ok_or(PrivacyError::EmailNotFound(email_id))?;
 
         let expires_at = match &input.expiration_type {
-            ExpirationType::TimeBased { hours } => {
-                Utc::now() + Duration::hours(*hours as i64)
-            }
+            ExpirationType::TimeBased { hours } => Utc::now() + Duration::hours(*hours as i64),
             ExpirationType::ViewBased { .. } => {
                 // Set far future, will expire on view count
                 Utc::now() + Duration::days(365)
             }
-            ExpirationType::OnRead => {
-                Utc::now() + Duration::days(365)
-            }
-            ExpirationType::Custom { .. } => {
-                Utc::now() + Duration::days(30)
-            }
+            ExpirationType::OnRead => Utc::now() + Duration::days(365),
+            ExpirationType::Custom { .. } => Utc::now() + Duration::days(30),
         };
 
         let max_views = match &input.expiration_type {
@@ -200,12 +194,9 @@ impl ExpirationService {
             .unwrap_or((true, true));
 
         if delete_attachments {
-            sqlx::query!(
-                "DELETE FROM attachments WHERE email_id = $1",
-                email_id
-            )
-            .execute(&self.pool)
-            .await?;
+            sqlx::query!("DELETE FROM attachments WHERE email_id = $1", email_id)
+                .execute(&self.pool)
+                .await?;
         }
 
         if leave_placeholder {
@@ -256,7 +247,11 @@ impl ExpirationService {
         Ok(count)
     }
 
-    pub async fn cancel_expiration(&self, email_id: Uuid, user_id: Uuid) -> Result<(), PrivacyError> {
+    pub async fn cancel_expiration(
+        &self,
+        email_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), PrivacyError> {
         let result = sqlx::query!(
             r#"
             DELETE FROM expiring_emails
@@ -325,7 +320,11 @@ impl RecallService {
         Self { pool }
     }
 
-    pub async fn can_recall(&self, email_id: Uuid, user_id: Uuid) -> Result<RecallEligibility, PrivacyError> {
+    pub async fn can_recall(
+        &self,
+        email_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<RecallEligibility, PrivacyError> {
         let email = sqlx::query!(
             r#"
             SELECT id, sent_at, recipients
@@ -383,24 +382,28 @@ impl RecallService {
         let domain = email.split('@').last().unwrap_or("");
 
         // Internal emails are always recallable
-        let is_internal = sqlx::query_scalar!(
-            "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)",
-            email
-        )
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(Some(false))
-        .unwrap_or(false);
+        let is_internal =
+            sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", email)
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(Some(false))
+                .unwrap_or(false);
 
         is_internal
     }
 
-    pub async fn request_recall(&self, email_id: Uuid, user_id: Uuid) -> Result<RecallRequest, PrivacyError> {
+    pub async fn request_recall(
+        &self,
+        email_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<RecallRequest, PrivacyError> {
         let eligibility = self.can_recall(email_id, user_id).await?;
 
         if !eligibility.can_recall {
             return Err(PrivacyError::RecallFailed(
-                eligibility.reason.unwrap_or("Cannot recall this email".to_string()),
+                eligibility
+                    .reason
+                    .unwrap_or("Cannot recall this email".to_string()),
             ));
         }
 
@@ -421,7 +424,8 @@ impl RecallService {
 
         // Process supported recipients
         for recipient in &eligibility.supported_recipients {
-            self.process_recall_for_recipient(request_id, email_id, recipient).await?;
+            self.process_recall_for_recipient(request_id, email_id, recipient)
+                .await?;
         }
 
         // Mark unsupported recipients
@@ -497,7 +501,10 @@ impl RecallService {
         Ok(())
     }
 
-    pub async fn get_recall_request(&self, request_id: Uuid) -> Result<RecallRequest, PrivacyError> {
+    pub async fn get_recall_request(
+        &self,
+        request_id: Uuid,
+    ) -> Result<RecallRequest, PrivacyError> {
         let request = sqlx::query!(
             r#"
             SELECT id, email_id, requested_by, requested_at, status
@@ -661,14 +668,14 @@ impl TrackingDetectionService {
         ]
     }
 
-    pub async fn scan_email(&self, email_id: Uuid) -> Result<TrackingDetectionResult, PrivacyError> {
-        let email = sqlx::query!(
-            "SELECT body_html FROM emails WHERE id = $1",
-            email_id
-        )
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or(PrivacyError::EmailNotFound(email_id))?;
+    pub async fn scan_email(
+        &self,
+        email_id: Uuid,
+    ) -> Result<TrackingDetectionResult, PrivacyError> {
+        let email = sqlx::query!("SELECT body_html FROM emails WHERE id = $1", email_id)
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or(PrivacyError::EmailNotFound(email_id))?;
 
         let html = email.body_html.unwrap_or_default();
         let mut detected_trackers = Vec::new();
@@ -761,7 +768,8 @@ impl TrackingDetectionService {
         }
 
         // Heuristic detection
-        if domain.starts_with("track.") || domain.starts_with("click.") || domain.contains("pixel") {
+        if domain.starts_with("track.") || domain.starts_with("click.") || domain.contains("pixel")
+        {
             return Some(DetectedTracker {
                 tracker_type: expected_type,
                 url: url.to_string(),
@@ -776,19 +784,17 @@ impl TrackingDetectionService {
     }
 
     pub async fn strip_trackers(&self, email_id: Uuid) -> Result<String, PrivacyError> {
-        let email = sqlx::query!(
-            "SELECT body_html FROM emails WHERE id = $1",
-            email_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let email = sqlx::query!("SELECT body_html FROM emails WHERE id = $1", email_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         let mut html = email.body_html.unwrap_or_default();
 
         // Remove tracking pixels
         let pixel_pattern = regex::Regex::new(
-            r#"<img[^>]*(?:width\s*=\s*["']?1["']?|height\s*=\s*["']?1["']?)[^>]*/?\s*>"#
-        ).unwrap();
+            r#"<img[^>]*(?:width\s*=\s*["']?1["']?|height\s*=\s*["']?1["']?)[^>]*/?\s*>"#,
+        )
+        .unwrap();
         html = pixel_pattern.replace_all(&html, "").to_string();
 
         // Proxy tracking links through our proxy
@@ -893,27 +899,29 @@ impl ReadReceiptService {
 
         // Check whitelist
         if !settings.whitelist.is_empty() {
-            let whitelisted = settings.whitelist.iter().any(|w| {
-                sender_email.ends_with(w) || sender_email == w
-            });
+            let whitelisted = settings
+                .whitelist
+                .iter()
+                .any(|w| sender_email.ends_with(w) || sender_email == w);
             if !whitelisted {
                 return Ok(false);
             }
         }
 
         // Check blacklist
-        let blacklisted = settings.blacklist.iter().any(|b| {
-            sender_email.ends_with(b) || sender_email == b
-        });
+        let blacklisted = settings
+            .blacklist
+            .iter()
+            .any(|b| sender_email.ends_with(b) || sender_email == b);
 
         Ok(!blacklisted)
     }
 
     pub async fn strip_mdn_request(&self, headers: &mut Vec<(String, String)>) {
         headers.retain(|(k, _)| {
-            !k.eq_ignore_ascii_case("Disposition-Notification-To") &&
-            !k.eq_ignore_ascii_case("Return-Receipt-To") &&
-            !k.eq_ignore_ascii_case("X-Confirm-Reading-To")
+            !k.eq_ignore_ascii_case("Disposition-Notification-To")
+                && !k.eq_ignore_ascii_case("Return-Receipt-To")
+                && !k.eq_ignore_ascii_case("X-Confirm-Reading-To")
         });
     }
 }
@@ -975,7 +983,10 @@ impl AnonymousService {
         Ok(identity)
     }
 
-    pub async fn get_identities(&self, user_id: Uuid) -> Result<Vec<AnonymousIdentity>, PrivacyError> {
+    pub async fn get_identities(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<AnonymousIdentity>, PrivacyError> {
         let identities = sqlx::query_as!(
             AnonymousIdentity,
             r#"
@@ -993,7 +1004,11 @@ impl AnonymousService {
         Ok(identities)
     }
 
-    pub async fn deactivate_identity(&self, identity_id: Uuid, user_id: Uuid) -> Result<(), PrivacyError> {
+    pub async fn deactivate_identity(
+        &self,
+        identity_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), PrivacyError> {
         sqlx::query!(
             r#"
             UPDATE anonymous_identities
@@ -1009,10 +1024,7 @@ impl AnonymousService {
         Ok(())
     }
 
-    pub async fn route_incoming(
-        &self,
-        alias_email: &str,
-    ) -> Result<Option<Uuid>, PrivacyError> {
+    pub async fn route_incoming(&self, alias_email: &str) -> Result<Option<Uuid>, PrivacyError> {
         let user_id = sqlx::query_scalar!(
             r#"
             SELECT user_id
@@ -1068,7 +1080,9 @@ impl AnonymousService {
 
         // Create email with anonymous sender
         let email_id = Uuid::new_v4();
-        let sender_name = identity.display_name.unwrap_or_else(|| "Anonymous".to_string());
+        let sender_name = identity
+            .display_name
+            .unwrap_or_else(|| "Anonymous".to_string());
 
         sqlx::query!(
             r#"
@@ -1149,7 +1163,10 @@ pub struct LinkProxyService {
 
 impl LinkProxyService {
     pub fn new(pool: PgPool, proxy_base_url: String) -> Self {
-        Self { pool, proxy_base_url }
+        Self {
+            pool,
+            proxy_base_url,
+        }
     }
 
     pub async fn get_settings(&self, user_id: Uuid) -> Result<LinkProxySettings, PrivacyError> {
@@ -1255,14 +1272,23 @@ impl LinkProxyService {
     }
 
     fn clean_url(&self, url: &str) -> Result<String, PrivacyError> {
-        let mut parsed = Url::parse(url)
-            .map_err(|e| PrivacyError::InvalidUrl(e.to_string()))?;
+        let mut parsed = Url::parse(url).map_err(|e| PrivacyError::InvalidUrl(e.to_string()))?;
 
         // Remove tracking parameters
         let tracking_params = [
-            "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-            "fbclid", "gclid", "msclkid", "mc_eid", "mc_cid",
-            "ref", "source", "tracking_id",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+            "fbclid",
+            "gclid",
+            "msclkid",
+            "mc_eid",
+            "mc_cid",
+            "ref",
+            "source",
+            "tracking_id",
         ];
 
         let query_pairs: Vec<(String, String)> = parsed

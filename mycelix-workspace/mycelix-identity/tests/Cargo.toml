@@ -1,0 +1,49 @@
+[package]
+name = "mycelix-identity-tests"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <dev@luminous-dynamics.com>"]
+license = "AGPL-3.0-or-later"
+description = "Integration tests for Mycelix Identity Holochain zomes"
+autotests = false
+
+[dependencies]
+# Holochain testing dependencies (NO zome crate imports to avoid duplicate symbols)
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+hdk = "0.6"
+hdi = "0.7"
+
+# Async runtime for tests
+tokio = { version = "1.35", features = ["full", "test-util"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Serialization (msgpack for Holochain entry deserialization)
+rmp-serde = "1.1"
+
+# Utilities
+chrono = "0.4"
+uuid = { version = "1.6", features = ["v4"] }
+
+# DID Registry Integration Tests
+[[test]]
+name = "did_registry_test"
+path = "did_registry_test.rs"
+
+# Comprehensive Identity Module Tests
+[[test]]
+name = "identity_test"
+path = "identity_test.rs"
+
+# Education Credential Tests (Legacy Bridge)
+[[test]]
+name = "education_test"
+path = "education_test.rs"
+
+# Sweettest Integration Tests (conductor-based)
+[[test]]
+name = "sweettest_integration"
+path = "sweettest_integration.rs"

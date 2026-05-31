@@ -1,0 +1,14 @@
+[package]
+name = "complaints"
+version = "0.1.0"
+edition = "2024"
+description = "Justice complaints coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+complaints_integrity = { path = "../integrity" }

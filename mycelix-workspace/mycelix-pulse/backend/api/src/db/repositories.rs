@@ -367,7 +367,11 @@ impl ContactRepository {
         Ok(contact)
     }
 
-    pub async fn find_by_user(&self, user_id: Uuid, pagination: Pagination) -> DbResult<PaginatedResult<Contact>> {
+    pub async fn find_by_user(
+        &self,
+        user_id: Uuid,
+        pagination: Pagination,
+    ) -> DbResult<PaginatedResult<Contact>> {
         let total = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*) FROM contacts WHERE user_id = $1

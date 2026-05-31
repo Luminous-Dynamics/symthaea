@@ -6,11 +6,11 @@
 //! A powerful, flexible rules engine that allows users to create complex
 //! email filtering, forwarding, and automation rules.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use uuid::Uuid;
 
 /// A complete email rule with conditions and actions
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,8 +91,8 @@ pub enum ConditionOperator {
     LessThan,
     GreaterOrEqual,
     LessOrEqual,
-    In,      // Value is in list
-    NotIn,   // Value is not in list
+    In,    // Value is in list
+    NotIn, // Value is not in list
     Exists,
     NotExists,
 }
@@ -214,7 +214,11 @@ impl RulesEngine {
             let result = RuleEvaluationResult {
                 rule_id: rule.id,
                 matched,
-                actions_to_execute: if matched { rule.actions.clone() } else { Vec::new() },
+                actions_to_execute: if matched {
+                    rule.actions.clone()
+                } else {
+                    Vec::new()
+                },
                 stop_processing: matched && rule.stop_processing,
             };
 
@@ -229,7 +233,11 @@ impl RulesEngine {
     }
 
     /// Evaluate a group of conditions
-    fn evaluate_condition_group(&mut self, group: &RuleConditionGroup, email: &EmailContext) -> bool {
+    fn evaluate_condition_group(
+        &mut self,
+        group: &RuleConditionGroup,
+        email: &EmailContext,
+    ) -> bool {
         let condition_results: Vec<bool> = group
             .conditions
             .iter()
@@ -268,26 +276,24 @@ impl RulesEngine {
                 &condition.value,
                 condition.case_sensitive,
             ),
-            FieldValue::Number(n) => self.evaluate_number_condition(
-                n,
-                &condition.operator,
-                &condition.value,
-            ),
-            FieldValue::Boolean(b) => self.evaluate_boolean_condition(
-                b,
-                &condition.operator,
-                &condition.value,
-            ),
+            FieldValue::Number(n) => {
+                self.evaluate_number_condition(n, &condition.operator, &condition.value)
+            }
+            FieldValue::Boolean(b) => {
+                self.evaluate_boolean_condition(b, &condition.operator, &condition.value)
+            }
             FieldValue::StringList(list) => self.evaluate_list_condition(
                 &list,
                 &condition.operator,
                 &condition.value,
                 condition.case_sensitive,
             ),
-            FieldValue::None => matches!(
-                condition.operator,
-                ConditionOperator::NotExists | ConditionOperator::Equals
-            ) && matches!(condition.value, ConditionValue::String(ref s) if s.is_empty()),
+            FieldValue::None => {
+                matches!(
+                    condition.operator,
+                    ConditionOperator::NotExists | ConditionOperator::Equals
+                ) && matches!(condition.value, ConditionValue::String(ref s) if s.is_empty())
+            }
         }
     }
 
@@ -299,11 +305,11 @@ impl RulesEngine {
             ConditionField::Cc => FieldValue::StringList(email.cc.clone()),
             ConditionField::Subject => FieldValue::String(email.subject.clone()),
             ConditionField::Body => FieldValue::String(email.body_text.clone()),
-            ConditionField::Headers(name) => {
-                email.headers.get(name)
-                    .map(|v| FieldValue::String(v.clone()))
-                    .unwrap_or(FieldValue::None)
-            }
+            ConditionField::Headers(name) => email
+                .headers
+                .get(name)
+                .map(|v| FieldValue::String(v.clone()))
+                .unwrap_or(FieldValue::None),
             ConditionField::Attachments => {
                 FieldValue::StringList(email.attachments.iter().map(|a| a.name.clone()).collect())
             }
@@ -314,9 +320,13 @@ impl RulesEngine {
                 let total: usize = email.attachments.iter().map(|a| a.size_bytes).sum();
                 FieldValue::Number(total as f64)
             }
-            ConditionField::AttachmentType => {
-                FieldValue::StringList(email.attachments.iter().map(|a| a.mime_type.clone()).collect())
-            }
+            ConditionField::AttachmentType => FieldValue::StringList(
+                email
+                    .attachments
+                    .iter()
+                    .map(|a| a.mime_type.clone())
+                    .collect(),
+            ),
             ConditionField::Size => FieldValue::Number(email.size_bytes as f64),
             ConditionField::Date => FieldValue::Number(email.received_at.timestamp() as f64),
             ConditionField::TrustScore => FieldValue::Number(email.trust_score),
@@ -341,7 +351,10 @@ impl RulesEngine {
         let (compare_value, compare_target) = if case_sensitive {
             (value.to_string(), self.extract_string(condition_value))
         } else {
-            (value.to_lowercase(), self.extract_string(condition_value).to_lowercase())
+            (
+                value.to_lowercase(),
+                self.extract_string(condition_value).to_lowercase(),
+            )
         };
 
         match operator {
@@ -352,7 +365,9 @@ impl RulesEngine {
             ConditionOperator::StartsWith => compare_value.starts_with(&compare_target),
             ConditionOperator::EndsWith => compare_value.ends_with(&compare_target),
             ConditionOperator::Matches => {
-                if let ConditionValue::Regex(pattern) | ConditionValue::String(pattern) = condition_value {
+                if let ConditionValue::Regex(pattern) | ConditionValue::String(pattern) =
+                    condition_value
+                {
                     self.regex_matches(&compare_value, pattern)
                 } else {
                     false
@@ -432,27 +447,37 @@ impl RulesEngine {
         case_sensitive: bool,
     ) -> bool {
         let target = self.extract_string(condition_value);
-        let compare_target = if case_sensitive { target.clone() } else { target.to_lowercase() };
+        let compare_target = if case_sensitive {
+            target.clone()
+        } else {
+            target.to_lowercase()
+        };
 
         match operator {
-            ConditionOperator::Contains => {
-                values.iter().any(|v| {
-                    let compare = if case_sensitive { v.clone() } else { v.to_lowercase() };
-                    compare.contains(&compare_target)
-                })
-            }
-            ConditionOperator::NotContains => {
-                !values.iter().any(|v| {
-                    let compare = if case_sensitive { v.clone() } else { v.to_lowercase() };
-                    compare.contains(&compare_target)
-                })
-            }
-            ConditionOperator::Equals => {
-                values.iter().any(|v| {
-                    let compare = if case_sensitive { v.clone() } else { v.to_lowercase() };
-                    compare == compare_target
-                })
-            }
+            ConditionOperator::Contains => values.iter().any(|v| {
+                let compare = if case_sensitive {
+                    v.clone()
+                } else {
+                    v.to_lowercase()
+                };
+                compare.contains(&compare_target)
+            }),
+            ConditionOperator::NotContains => !values.iter().any(|v| {
+                let compare = if case_sensitive {
+                    v.clone()
+                } else {
+                    v.to_lowercase()
+                };
+                compare.contains(&compare_target)
+            }),
+            ConditionOperator::Equals => values.iter().any(|v| {
+                let compare = if case_sensitive {
+                    v.clone()
+                } else {
+                    v.to_lowercase()
+                };
+                compare == compare_target
+            }),
             ConditionOperator::Exists => !values.is_empty(),
             ConditionOperator::NotExists => values.is_empty(),
             _ => false,

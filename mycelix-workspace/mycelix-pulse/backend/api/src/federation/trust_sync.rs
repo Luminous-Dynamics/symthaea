@@ -5,8 +5,8 @@
 //!
 //! Synchronize trust attestations across federated instances
 
+use super::protocol::{FederationError, FederationProtocol};
 use super::*;
-use super::protocol::{FederationProtocol, FederationError};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -42,7 +42,11 @@ impl Default for TrustSyncConfig {
 
 impl TrustSyncService {
     pub fn new(pool: PgPool, protocol: Arc<FederationProtocol>, config: TrustSyncConfig) -> Self {
-        Self { pool, protocol, config }
+        Self {
+            pool,
+            protocol,
+            config,
+        }
     }
 
     /// Get aggregated trust score including federated sources
@@ -52,7 +56,9 @@ impl TrustSyncService {
         target_identifier: &str,
     ) -> Result<AggregatedTrust, TrustSyncError> {
         // Get local trust first
-        let local_trust = self.get_local_trust(local_user_id, target_identifier).await?;
+        let local_trust = self
+            .get_local_trust(local_user_id, target_identifier)
+            .await?;
 
         // Check cache for federated trust
         if let Some(cached) = self.get_cached_federated_trust(target_identifier).await? {
@@ -90,7 +96,8 @@ impl TrustSyncService {
             aggregate_score: self.calculate_federated_aggregate(&federated_attestations),
             fetched_at: Utc::now(),
         };
-        self.cache_federated_trust(target_identifier, &federated_trust).await?;
+        self.cache_federated_trust(target_identifier, &federated_trust)
+            .await?;
 
         Ok(self.merge_trust(local_trust, federated_trust))
     }
@@ -249,7 +256,9 @@ impl TrustSyncService {
         .await
         .map_err(|e| TrustSyncError::Database(e.to_string()))?;
 
-        Ok(result.map(|r| serde_json::from_value(r.data).ok()).flatten())
+        Ok(result
+            .map(|r| serde_json::from_value(r.data).ok())
+            .flatten())
     }
 
     async fn cache_federated_trust(
@@ -257,8 +266,8 @@ impl TrustSyncService {
         target: &str,
         data: &FederatedTrustData,
     ) -> Result<(), TrustSyncError> {
-        let json_data = serde_json::to_value(data)
-            .map_err(|e| TrustSyncError::Serialization(e.to_string()))?;
+        let json_data =
+            serde_json::to_value(data).map_err(|e| TrustSyncError::Serialization(e.to_string()))?;
 
         sqlx::query(
             r#"

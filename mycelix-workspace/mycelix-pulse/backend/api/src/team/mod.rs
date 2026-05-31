@@ -122,7 +122,8 @@ impl SharedMailboxService {
         })?;
 
         // Add creator as owner
-        self.add_member(mailbox.id, creator_id, creator_id, MailboxRole::Owner).await?;
+        self.add_member(mailbox.id, creator_id, creator_id, MailboxRole::Owner)
+            .await?;
 
         Ok(mailbox)
     }
@@ -150,7 +151,10 @@ impl SharedMailboxService {
         .ok_or(TeamError::MailboxNotFound(mailbox_id))
     }
 
-    pub async fn list_user_mailboxes(&self, user_id: Uuid) -> Result<Vec<SharedMailbox>, TeamError> {
+    pub async fn list_user_mailboxes(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<SharedMailbox>, TeamError> {
         let mailboxes = sqlx::query!(
             r#"
             SELECT m.id, m.name, m.email_address, m.description, m.team_id,
@@ -204,7 +208,10 @@ impl SharedMailboxService {
         Ok(())
     }
 
-    pub async fn get_members(&self, mailbox_id: Uuid) -> Result<Vec<SharedMailboxMember>, TeamError> {
+    pub async fn get_members(
+        &self,
+        mailbox_id: Uuid,
+    ) -> Result<Vec<SharedMailboxMember>, TeamError> {
         let members = sqlx::query!(
             r#"
             SELECT mem.user_id, u.name as user_name, u.email as user_email,
@@ -352,7 +359,8 @@ impl NotesService {
 
         // Create mention notifications
         for user_id in &input.mentions {
-            self.create_mention_notification(note_id, *user_id, author_id).await?;
+            self.create_mention_notification(note_id, *user_id, author_id)
+                .await?;
         }
 
         self.get_note(note_id).await
@@ -385,7 +393,10 @@ impl NotesService {
         })
     }
 
-    pub async fn get_notes_for_email(&self, email_id: Uuid) -> Result<Vec<InternalNote>, TeamError> {
+    pub async fn get_notes_for_email(
+        &self,
+        email_id: Uuid,
+    ) -> Result<Vec<InternalNote>, TeamError> {
         let notes = sqlx::query!(
             r#"
             SELECT n.id, n.email_id, n.author_id, u.name as author_name,
@@ -493,7 +504,10 @@ impl NotesService {
         Ok(())
     }
 
-    pub async fn get_unread_mentions(&self, user_id: Uuid) -> Result<Vec<MentionNotification>, TeamError> {
+    pub async fn get_unread_mentions(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<MentionNotification>, TeamError> {
         let mentions = sqlx::query!(
             r#"
             SELECT mn.id, mn.note_id, n.email_id, n.content as note_content,
@@ -841,7 +855,8 @@ impl AssignmentService {
             assigned_at: assignment.assigned_at,
             status: serde_json::from_str(&assignment.status).unwrap_or(AssignmentStatus::Pending),
             due_at: assignment.due_at,
-            priority: serde_json::from_str(&assignment.priority).unwrap_or(AssignmentPriority::Normal),
+            priority: serde_json::from_str(&assignment.priority)
+                .unwrap_or(AssignmentPriority::Normal),
         })
     }
 
@@ -981,7 +996,9 @@ impl AssignmentService {
                     user_id,
                     user_id, // System auto-assign
                     AssignmentPriority::Normal,
-                    settings.sla_hours.map(|h| Utc::now() + chrono::Duration::hours(h as i64)),
+                    settings
+                        .sla_hours
+                        .map(|h| Utc::now() + chrono::Duration::hours(h as i64)),
                 )
                 .await?;
             Ok(Some(assignment))

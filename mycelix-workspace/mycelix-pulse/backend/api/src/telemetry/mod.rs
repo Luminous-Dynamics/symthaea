@@ -6,15 +6,14 @@
 //! OpenTelemetry distributed tracing, metrics, and logging
 
 use opentelemetry::{
-    global,
+    KeyValue, global,
     sdk::{
+        Resource,
         export::trace::SpanExporter,
         propagation::TraceContextPropagator,
         trace::{self, RandomIdGenerator, Sampler, Tracer},
-        Resource,
     },
     trace::{TraceError, TracerProvider},
-    KeyValue,
 };
 use opentelemetry_otlp::{ExportConfig, Protocol, WithExportConfig};
 use opentelemetry_semantic_conventions as semconv;
@@ -22,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::Subscriber;
 use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::{layer::SubscriberExt, registry::LookupSpan, EnvFilter, Layer};
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, registry::LookupSpan};
 
 /// Telemetry configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,8 +57,14 @@ pub fn init_telemetry(config: &TelemetryConfig) -> Result<(), Box<dyn std::error
     // Build resource
     let resource = Resource::new(vec![
         KeyValue::new(semconv::resource::SERVICE_NAME, config.service_name.clone()),
-        KeyValue::new(semconv::resource::SERVICE_VERSION, config.service_version.clone()),
-        KeyValue::new(semconv::resource::DEPLOYMENT_ENVIRONMENT, config.environment.clone()),
+        KeyValue::new(
+            semconv::resource::SERVICE_VERSION,
+            config.service_version.clone(),
+        ),
+        KeyValue::new(
+            semconv::resource::DEPLOYMENT_ENVIRONMENT,
+            config.environment.clone(),
+        ),
     ]);
 
     // Initialize tracer if OTLP endpoint is configured
@@ -84,9 +89,10 @@ pub fn init_telemetry(config: &TelemetryConfig) -> Result<(), Box<dyn std::error
         let telemetry_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
         let subscriber = tracing_subscriber::registry()
-            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                EnvFilter::new(&config.log_level)
-            }))
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| EnvFilter::new(&config.log_level)),
+            )
             .with(tracing_subscriber::fmt::layer().json())
             .with(telemetry_layer);
 
@@ -94,9 +100,10 @@ pub fn init_telemetry(config: &TelemetryConfig) -> Result<(), Box<dyn std::error
     } else {
         // Simple logging without OTLP
         let subscriber = tracing_subscriber::registry()
-            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                EnvFilter::new(&config.log_level)
-            }))
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| EnvFilter::new(&config.log_level)),
+            )
             .with(tracing_subscriber::fmt::layer().json());
 
         tracing::subscriber::set_global_default(subscriber)?;
@@ -166,8 +173,8 @@ pub mod attributes {
 pub mod metrics {
     use once_cell::sync::Lazy;
     use prometheus::{
-        register_counter_vec, register_histogram_vec, register_gauge_vec,
-        CounterVec, HistogramVec, GaugeVec, Opts, DEFAULT_BUCKETS,
+        CounterVec, DEFAULT_BUCKETS, GaugeVec, HistogramVec, Opts, register_counter_vec,
+        register_gauge_vec, register_histogram_vec,
     };
 
     // Email metrics
@@ -210,7 +217,10 @@ pub mod metrics {
 
     pub static ATTESTATIONS_CREATED: Lazy<CounterVec> = Lazy::new(|| {
         register_counter_vec!(
-            Opts::new("mycelix_attestations_created_total", "Total attestations created"),
+            Opts::new(
+                "mycelix_attestations_created_total",
+                "Total attestations created"
+            ),
             &["context", "tenant"]
         )
         .unwrap()
@@ -246,7 +256,10 @@ pub mod metrics {
 
     pub static WEBSOCKET_CONNECTIONS: Lazy<GaugeVec> = Lazy::new(|| {
         register_gauge_vec!(
-            Opts::new("mycelix_websocket_connections", "Active WebSocket connections"),
+            Opts::new(
+                "mycelix_websocket_connections",
+                "Active WebSocket connections"
+            ),
             &["tenant"]
         )
         .unwrap()
@@ -274,7 +287,10 @@ pub mod metrics {
     // Encryption metrics
     pub static ENCRYPTION_OPERATIONS: Lazy<CounterVec> = Lazy::new(|| {
         register_counter_vec!(
-            Opts::new("mycelix_encryption_operations_total", "Encryption operations"),
+            Opts::new(
+                "mycelix_encryption_operations_total",
+                "Encryption operations"
+            ),
             &["operation", "algorithm"]
         )
         .unwrap()

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mycelix Knowledge Settings</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #8b5cf6;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section h2 {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #444;
+    }
+
+    .description {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      outline: none;
+      border-color: #8b5cf6;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    }
+
+    .checkbox-field {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .checkbox-field input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: #8b5cf6;
+    }
+
+    .checkbox-field .label-content {
+      flex: 1;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #8b5cf6;
+      color: white;
+      border: none;
+    }
+
+    .btn-primary:hover {
+      background: #7c3aed;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #666;
+      border: 1px solid #ddd;
+    }
+
+    .btn-secondary:hover {
+      background: #f5f5f5;
+    }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status.success {
+      display: block;
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status.error {
+      display: block;
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-top: 12px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .status-dot.connected {
+      background: #28a745;
+    }
+
+    .status-dot.disconnected {
+      background: #dc3545;
+    }
+
+    .status-dot.connecting {
+      background: #ffc107;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Mycelix Knowledge Settings</h1>
+  <p class="subtitle">Configure your connection to the decentralized knowledge graph</p>
+
+  <div class="section">
+    <h2>Connection</h2>
+
+    <div class="field">
+      <label for="holochainUrl">Holochain Conductor URL</label>
+      <input type="text" id="holochainUrl" placeholder="ws://localhost:8888">
+      <p class="description">WebSocket URL of your Holochain conductor</p>
+    </div>
+
+    <div class="field">
+      <label for="appId">App ID</label>
+      <input type="text" id="appId" placeholder="mycelix-knowledge">
+      <p class="description">The Holochain app identifier</p>
+    </div>
+
+    <div class="connection-status">
+      <span class="status-dot disconnected" id="statusDot"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Fact-Checking</h2>
+
+    <div class="field checkbox-field">
+      <input type="checkbox" id="autoHighlight">
+      <div class="label-content">
+        <label for="autoHighlight">Auto-highlight checked text</label>
+        <p class="description">Highlight fact-checked text with credibility colors</p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="minCredibility">Minimum Credibility Threshold</label>
+      <input type="number" id="minCredibility" min="0" max="1" step="0.1" value="0.5">
+      <p class="description">Only show results with credibility above this value (0-1)</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Appearance</h2>
+
+    <div class="field">
+      <label for="theme">Theme</label>
+      <select id="theme">
+        <option value="system">System Default</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+
+    <div class="field checkbox-field">
+      <input type="checkbox" id="showBadge" checked>
+      <div class="label-content">
+        <label for="showBadge">Show badge count</label>
+        <p class="description">Display number of fact-checks in toolbar icon</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-primary" id="saveBtn">Save Settings</button>
+    <button class="btn-secondary" id="resetBtn">Reset to Defaults</button>
+    <button class="btn-secondary" id="testBtn">Test Connection</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

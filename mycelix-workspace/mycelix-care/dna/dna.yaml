@@ -1,0 +1,61 @@
+---
+manifest_version: "0"
+name: mycelix_care_dna
+
+integrity:
+  network_seed: "mycelix-care-v1"
+  zomes:
+    - name: timebank_integrity
+      path: "../target/wasm32-unknown-unknown/release/timebank_integrity.wasm"
+
+    - name: circles_integrity
+      path: "../target/wasm32-unknown-unknown/release/circles_integrity.wasm"
+
+    - name: matching_integrity
+      path: "../target/wasm32-unknown-unknown/release/matching_integrity.wasm"
+
+    - name: care_plans_integrity
+      path: "../target/wasm32-unknown-unknown/release/care_plans_integrity.wasm"
+
+    - name: credentials_integrity
+      path: "../target/wasm32-unknown-unknown/release/credentials_integrity.wasm"
+
+    - name: care_bridge_integrity
+      path: "../target/wasm32-unknown-unknown/release/care_bridge_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: timebank
+      path: "../target/wasm32-unknown-unknown/release/timebank.wasm"
+      dependencies:
+        - name: timebank_integrity
+
+    - name: circles
+      path: "../target/wasm32-unknown-unknown/release/circles.wasm"
+      dependencies:
+        - name: circles_integrity
+
+    - name: matching
+      path: "../target/wasm32-unknown-unknown/release/matching.wasm"
+      dependencies:
+        - name: matching_integrity
+        - name: timebank_integrity
+
+    - name: care_plans
+      path: "../target/wasm32-unknown-unknown/release/care_plans.wasm"
+      dependencies:
+        - name: care_plans_integrity
+        - name: timebank_integrity
+
+    - name: credentials
+      path: "../target/wasm32-unknown-unknown/release/credentials.wasm"
+      dependencies:
+        - name: credentials_integrity
+
+    - name: care_bridge
+      path: "../target/wasm32-unknown-unknown/release/care_bridge.wasm"
+      dependencies:
+        - name: care_bridge_integrity
+        - name: timebank_integrity
+        - name: circles_integrity
+        - name: credentials_integrity

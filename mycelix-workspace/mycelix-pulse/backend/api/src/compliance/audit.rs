@@ -6,11 +6,11 @@
 //! Comprehensive audit trail for security, compliance, and forensics.
 //! Supports tamper-evident logging and compliance reporting.
 
+use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::{DateTime, Utc, Duration};
-use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -417,7 +417,8 @@ impl AuditService {
     pub async fn query(&self, filter: AuditFilter) -> Vec<AuditEntry> {
         let entries = self.entries.read().await;
 
-        entries.iter()
+        entries
+            .iter()
             .filter(|e| {
                 // Category filter
                 if let Some(ref cats) = filter.categories {
@@ -492,11 +493,13 @@ impl AuditService {
         from: DateTime<Utc>,
         to: DateTime<Utc>,
     ) -> ComplianceReport {
-        let entries = self.query(AuditFilter {
-            from_date: Some(from),
-            to_date: Some(to),
-            ..Default::default()
-        }).await;
+        let entries = self
+            .query(AuditFilter {
+                from_date: Some(from),
+                to_date: Some(to),
+                ..Default::default()
+            })
+            .await;
 
         let mut category_counts: HashMap<AuditCategory, usize> = HashMap::new();
         let mut outcome_counts: HashMap<AuditOutcome, usize> = HashMap::new();
@@ -511,8 +514,9 @@ impl AuditService {
             *outcome_counts.entry(entry.outcome.clone()).or_insert(0) += 1;
             *severity_counts.entry(entry.severity).or_insert(0) += 1;
 
-            if entry.category == AuditCategory::Authentication &&
-               entry.outcome == AuditOutcome::Failure {
+            if entry.category == AuditCategory::Authentication
+                && entry.outcome == AuditOutcome::Failure
+            {
                 failed_logins += 1;
             }
 
@@ -601,14 +605,30 @@ pub struct ComplianceReport {
 }
 
 // Convenience logging functions
-pub async fn log_login(service: &AuditService, user_id: Uuid, email: &str, ip: &str, success: bool) -> Uuid {
-    service.log(
-        AuditEntryBuilder::new(AuditCategory::Authentication, "user.login")
-            .actor_user(user_id, Some(email.to_string()))
-            .actor_ip(ip)
-            .outcome(if success { AuditOutcome::Success } else { AuditOutcome::Failure })
-            .message(if success { "User logged in" } else { "Login failed" })
-    ).await
+pub async fn log_login(
+    service: &AuditService,
+    user_id: Uuid,
+    email: &str,
+    ip: &str,
+    success: bool,
+) -> Uuid {
+    service
+        .log(
+            AuditEntryBuilder::new(AuditCategory::Authentication, "user.login")
+                .actor_user(user_id, Some(email.to_string()))
+                .actor_ip(ip)
+                .outcome(if success {
+                    AuditOutcome::Success
+                } else {
+                    AuditOutcome::Failure
+                })
+                .message(if success {
+                    "User logged in"
+                } else {
+                    "Login failed"
+                }),
+        )
+        .await
 }
 
 pub async fn log_data_access(
@@ -617,12 +637,14 @@ pub async fn log_data_access(
     resource_type: &str,
     resource_id: &str,
 ) -> Uuid {
-    service.log(
-        AuditEntryBuilder::new(AuditCategory::DataAccess, format!("{}.read", resource_type))
-            .actor_user(user_id, None)
-            .resource(resource_type, resource_id)
-            .message(format!("Accessed {} {}", resource_type, resource_id))
-    ).await
+    service
+        .log(
+            AuditEntryBuilder::new(AuditCategory::DataAccess, format!("{}.read", resource_type))
+                .actor_user(user_id, None)
+                .resource(resource_type, resource_id)
+                .message(format!("Accessed {} {}", resource_type, resource_id)),
+        )
+        .await
 }
 
 #[cfg(test)]
@@ -633,12 +655,14 @@ mod tests {
     async fn test_audit_logging() {
         let service = AuditService::new(AuditConfig::default());
 
-        let id = service.log(
-            AuditEntryBuilder::new(AuditCategory::Authentication, "user.login")
-                .actor_user(Uuid::new_v4(), Some("test@example.com".to_string()))
-                .outcome(AuditOutcome::Success)
-                .message("User logged in successfully")
-        ).await;
+        let id = service
+            .log(
+                AuditEntryBuilder::new(AuditCategory::Authentication, "user.login")
+                    .actor_user(Uuid::new_v4(), Some("test@example.com".to_string()))
+                    .outcome(AuditOutcome::Success)
+                    .message("User logged in successfully"),
+            )
+            .await;
 
         assert_ne!(id, Uuid::nil());
 
@@ -651,10 +675,12 @@ mod tests {
         let service = AuditService::new(AuditConfig::default());
 
         for i in 0..5 {
-            service.log(
-                AuditEntryBuilder::new(AuditCategory::System, format!("test.action.{}", i))
-                    .message(format!("Test entry {}", i))
-            ).await;
+            service
+                .log(
+                    AuditEntryBuilder::new(AuditCategory::System, format!("test.action.{}", i))
+                        .message(format!("Test entry {}", i)),
+                )
+                .await;
         }
 
         let report = service.verify_integrity().await;

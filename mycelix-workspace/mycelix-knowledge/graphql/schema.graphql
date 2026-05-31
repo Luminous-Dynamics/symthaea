@@ -1,0 +1,389 @@
+"""
+Mycelix Knowledge - GraphQL Schema
+Decentralized knowledge graph with epistemic classification and credibility scoring
+"""
+
+# ============================================================================
+# Scalars
+# ============================================================================
+
+scalar DateTime
+scalar JSON
+
+# ============================================================================
+# Enums
+# ============================================================================
+
+enum Verdict {
+  TRUE
+  MOSTLY_TRUE
+  MIXED
+  MOSTLY_FALSE
+  FALSE
+  UNVERIFIABLE
+  INSUFFICIENT_EVIDENCE
+}
+
+enum RelationshipType {
+  SUPPORTS
+  CONTRADICTS
+  REFINES
+  DEPENDS_ON
+  AUTHORED
+  CITES
+}
+
+enum EpistemicType {
+  EMPIRICAL
+  NORMATIVE
+  MYTHIC
+  MIXED
+}
+
+enum SortOrder {
+  RELEVANCE
+  CREDIBILITY
+  DATE
+  INFORMATION_VALUE
+}
+
+enum MarketStatus {
+  OPEN
+  CLOSED
+  RESOLVED
+}
+
+# ============================================================================
+# Types
+# ============================================================================
+
+"""
+Epistemic classification along three dimensions
+"""
+type EpistemicClassification {
+  "Verifiable through observation (0-1)"
+  empirical: Float!
+  "Value-based, ethical (0-1)"
+  normative: Float!
+  "Meaning-making, narrative (0-1)"
+  mythic: Float!
+}
+
+"""
+A claim in the knowledge graph
+"""
+type Claim {
+  id: ID!
+  content: String!
+  classification: EpistemicClassification!
+  author: Author!
+  createdAt: DateTime!
+  updatedAt: DateTime
+  tags: [String!]!
+  sourceCount: Int!
+
+  "Computed credibility score"
+  credibility: EnhancedCredibilityScore
+
+  "Relationships to other claims"
+  relationships(type: RelationshipType, limit: Int = 20): [Relationship!]!
+
+  "Dependency tree"
+  dependencyTree(maxDepth: Int = 3): DependencyTree
+
+  "Associated verification markets"
+  markets: [MarketSummary!]!
+}
+
+"""
+Summary view of a claim for lists
+"""
+type ClaimSummary {
+  id: ID!
+  content: String!
+  classification: EpistemicClassification!
+  credibility: Float
+  author: String!
+  tags: [String!]!
+}
+
+"""
+Enhanced credibility score with factors
+"""
+type EnhancedCredibilityScore {
+  score: Float!
+  factors: CredibilityFactors!
+  confidence: Float!
+  calculatedAt: DateTime!
+}
+
+type CredibilityFactors {
+  sourceDiversity: Float!
+  authorReputation: Float!
+  temporalConsistency: Float!
+  crossValidation: Float!
+  matlComposite: Float
+}
+
+"""
+An author in the system
+"""
+type Author {
+  did: ID!
+  reputation: AuthorReputation
+  claims(limit: Int = 20, offset: Int = 0): ClaimConnection!
+}
+
+"""
+Author reputation across domains
+"""
+type AuthorReputation {
+  did: ID!
+  overallScore: Float!
+  domainScores: JSON!
+  claimCount: Int!
+  accuracyHistory: Float!
+}
+
+"""
+Relationship between claims
+"""
+type Relationship {
+  id: ID!
+  source: Claim!
+  target: Claim!
+  type: RelationshipType!
+  weight: Float!
+  createdAt: DateTime!
+}
+
+"""
+Dependency tree node
+"""
+type DependencyTree {
+  root: TreeNode!
+  depth: Int!
+  totalNodes: Int!
+}
+
+type TreeNode {
+  claimId: ID!
+  content: String!
+  credibility: Float
+  relationshipType: RelationshipType
+  children: [TreeNode!]!
+}
+
+"""
+Fact-check result
+"""
+type FactCheckResult {
+  verdict: Verdict!
+  confidence: Float!
+  explanation: String!
+  supportingClaims: [ClaimSummary!]!
+  contradictingClaims: [ClaimSummary!]!
+  sources: [String!]!
+  checkedAt: DateTime!
+}
+
+"""
+Verification market summary
+"""
+type MarketSummary {
+  marketId: ID!
+  claimId: ID!
+  targetE: Int!
+  currentProbability: Float!
+  volume: Float!
+  closesAt: DateTime!
+  status: MarketStatus!
+}
+
+"""
+Belief propagation result
+"""
+type PropagationResult {
+  claimsUpdated: Int!
+  iterations: Int!
+  converged: Boolean!
+  affectedClaims: [ID!]!
+}
+
+"""
+Information value ranking
+"""
+type InformationValueRecord {
+  claimId: ID!
+  content: String!
+  informationValue: Float!
+  currentCredibility: Float!
+  dependentCount: Int!
+}
+
+# ============================================================================
+# Connections (Pagination)
+# ============================================================================
+
+type ClaimConnection {
+  edges: [ClaimEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ClaimEdge {
+  node: Claim!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type SearchResult {
+  claims: [ClaimSummary!]!
+  total: Int!
+  took: Int!
+}
+
+# ============================================================================
+# Inputs
+# ============================================================================
+
+input EpistemicClassificationInput {
+  empirical: Float!
+  normative: Float!
+  mythic: Float!
+}
+
+input CreateClaimInput {
+  content: String!
+  classification: EpistemicClassificationInput
+  tags: [String!]
+  sources: [String!]
+}
+
+input UpdateClaimInput {
+  content: String
+  classification: EpistemicClassificationInput
+  tags: [String!]
+}
+
+input CreateRelationshipInput {
+  sourceId: ID!
+  targetId: ID!
+  type: RelationshipType!
+  weight: Float!
+}
+
+input FactCheckInput {
+  statement: String!
+  context: String
+  minEpistemicLevel: Int = 2
+  minConfidence: Float = 0.6
+}
+
+input SpawnMarketInput {
+  claimId: ID!
+  targetE: Int!
+  minConfidence: Float = 0.7
+  closesAt: DateTime
+  initialSubsidy: Float = 100
+}
+
+input SearchInput {
+  query: String!
+  epistemicType: EpistemicType
+  minCredibility: Float
+  tags: [String!]
+  limit: Int = 20
+  offset: Int = 0
+  sortBy: SortOrder = RELEVANCE
+}
+
+# ============================================================================
+# Queries
+# ============================================================================
+
+type Query {
+  "Get a claim by ID"
+  claim(id: ID!): Claim
+
+  "List claims with pagination"
+  claims(
+    first: Int = 20
+    after: String
+    author: String
+    minCredibility: Float
+    tags: [String!]
+  ): ClaimConnection!
+
+  "Search claims"
+  search(input: SearchInput!): SearchResult!
+
+  "Get author by DID"
+  author(did: ID!): Author
+
+  "Get author reputation"
+  authorReputation(did: ID!): AuthorReputation
+
+  "Fact-check a statement"
+  factCheck(input: FactCheckInput!): FactCheckResult!
+
+  "Get claims ranked by information value"
+  informationValueRanking(limit: Int = 20): [InformationValueRecord!]!
+
+  "Get verification markets for a claim"
+  claimMarkets(claimId: ID!): [MarketSummary!]!
+}
+
+# ============================================================================
+# Mutations
+# ============================================================================
+
+type Mutation {
+  "Create a new claim"
+  createClaim(input: CreateClaimInput!): Claim!
+
+  "Update an existing claim"
+  updateClaim(id: ID!, input: UpdateClaimInput!): Claim!
+
+  "Delete a claim"
+  deleteClaim(id: ID!): Boolean!
+
+  "Create a relationship between claims"
+  createRelationship(input: CreateRelationshipInput!): Relationship!
+
+  "Delete a relationship"
+  deleteRelationship(id: ID!): Boolean!
+
+  "Propagate belief updates through the graph"
+  propagateBelief(claimId: ID!): PropagationResult!
+
+  "Spawn a verification market for a claim"
+  spawnVerificationMarket(input: SpawnMarketInput!): MarketSummary!
+}
+
+# ============================================================================
+# Subscriptions
+# ============================================================================
+
+type Subscription {
+  "Subscribe to claim updates"
+  claimUpdated(claimId: ID): Claim!
+
+  "Subscribe to credibility changes"
+  credibilityChanged(claimId: ID, threshold: Float): EnhancedCredibilityScore!
+
+  "Subscribe to new relationships"
+  relationshipCreated(claimId: ID): Relationship!
+
+  "Subscribe to market updates"
+  marketUpdated(claimId: ID): MarketSummary!
+
+  "Subscribe to fact-check results"
+  factCheckCompleted: FactCheckResult!
+}

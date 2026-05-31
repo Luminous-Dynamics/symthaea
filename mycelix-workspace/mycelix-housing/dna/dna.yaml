@@ -1,0 +1,72 @@
+---
+manifest_version: "0"
+name: mycelix_housing_dna
+
+integrity:
+  network_seed: "mycelix-housing-v1"
+  zomes:
+    - name: units_integrity
+      path: "../target/wasm32-unknown-unknown/release/units_integrity.wasm"
+
+    - name: membership_integrity
+      path: "../target/wasm32-unknown-unknown/release/membership_integrity.wasm"
+
+    - name: finances_integrity
+      path: "../target/wasm32-unknown-unknown/release/finances_integrity.wasm"
+
+    - name: maintenance_integrity
+      path: "../target/wasm32-unknown-unknown/release/maintenance_integrity.wasm"
+
+    - name: clt_integrity
+      path: "../target/wasm32-unknown-unknown/release/clt_integrity.wasm"
+
+    - name: housing_governance_integrity
+      path: "../target/wasm32-unknown-unknown/release/housing_governance_integrity.wasm"
+
+    - name: housing_bridge_integrity
+      path: "../target/wasm32-unknown-unknown/release/housing_bridge_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: units
+      path: "../target/wasm32-unknown-unknown/release/units.wasm"
+      dependencies:
+        - name: units_integrity
+
+    - name: membership
+      path: "../target/wasm32-unknown-unknown/release/membership.wasm"
+      dependencies:
+        - name: membership_integrity
+        - name: units_integrity
+
+    - name: finances
+      path: "../target/wasm32-unknown-unknown/release/finances.wasm"
+      dependencies:
+        - name: finances_integrity
+        - name: membership_integrity
+
+    - name: maintenance
+      path: "../target/wasm32-unknown-unknown/release/maintenance.wasm"
+      dependencies:
+        - name: maintenance_integrity
+        - name: units_integrity
+
+    - name: clt
+      path: "../target/wasm32-unknown-unknown/release/clt.wasm"
+      dependencies:
+        - name: clt_integrity
+        - name: units_integrity
+
+    - name: housing_governance
+      path: "../target/wasm32-unknown-unknown/release/housing_governance.wasm"
+      dependencies:
+        - name: housing_governance_integrity
+        - name: membership_integrity
+
+    - name: housing_bridge
+      path: "../target/wasm32-unknown-unknown/release/housing_bridge.wasm"
+      dependencies:
+        - name: housing_bridge_integrity
+        - name: units_integrity
+        - name: membership_integrity
+        - name: finances_integrity

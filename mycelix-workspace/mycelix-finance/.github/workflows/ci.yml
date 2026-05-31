@@ -1,0 +1,168 @@
+name: Mycelix Finance CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy lints
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  build:
+    name: Build Zomes
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build all zomes (WASM)
+        run: |
+          cargo build --release --target wasm32-unknown-unknown \
+            --package cgc \
+            --package tend \
+            --package hearth \
+            --package payments \
+            --package lending \
+            --package treasury \
+            --package staking \
+            --package bridge \
+            --package credit_scoring
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run unit tests
+        run: cargo test --lib --all-features
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build, test-unit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Cache Nix store
+        uses: actions/cache@v4
+        with:
+          path: /nix/store
+          key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nix-
+
+      - name: Build DNA bundle
+        run: nix develop --command bash -c "hc dna pack dna/"
+
+      - name: Run integration tests
+        run: |
+          nix develop --command bash -c "
+            cd tests && cargo test --features integration
+          "
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run security audit
+        run: cargo audit
+
+  validation-coverage:
+    name: Validation Coverage Report
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check validation callbacks
+        run: |
+          echo "## Validation Callback Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Zome | Has Validate | Entry Validation | Link Validation |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------------|------------------|-----------------|" >> $GITHUB_STEP_SUMMARY
+
+          for zome_dir in zomes/*/integrity/src; do
+            zome_name=$(echo $zome_dir | cut -d'/' -f2)
+            lib_file="$zome_dir/lib.rs"
+
+            if [ -f "$lib_file" ]; then
+              has_validate=$(grep -c "fn validate" "$lib_file" || echo "0")
+              entry_val=$(grep -c "validate_create_\|validate_update_" "$lib_file" || echo "0")
+              link_val=$(grep -c "RegisterCreateLink\|RegisterDeleteLink" "$lib_file" || echo "0")
+
+              echo "| $zome_name | $has_validate | $entry_val | $link_val |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

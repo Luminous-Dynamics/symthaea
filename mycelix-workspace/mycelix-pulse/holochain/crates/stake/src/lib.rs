@@ -229,7 +229,8 @@ impl StakeBalance {
         let days_elapsed = (now - self.last_regeneration) / (24 * 60 * 60);
         if days_elapsed > 0 {
             let regeneration = days_elapsed * config.daily_regeneration;
-            self.available = (self.available + regeneration).min(config.max_total_stake - self.locked);
+            self.available =
+                (self.available + regeneration).min(config.max_total_stake - self.locked);
             self.last_regeneration = now;
         }
     }

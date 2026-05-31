@@ -1,0 +1,16 @@
+[package]
+name = "bridge"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+getrandom = { workspace = true }
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bridge_integrity = { path = "../integrity" }
+carbon_integrity = { path = "../../carbon/integrity" }
+projects_integrity = { path = "../../projects/integrity" }

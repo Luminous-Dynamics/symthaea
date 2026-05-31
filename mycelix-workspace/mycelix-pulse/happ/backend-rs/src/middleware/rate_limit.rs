@@ -7,17 +7,17 @@
 //! Uses a sliding window algorithm with configurable limits.
 
 use axum::{
+    Json,
     body::Body,
     extract::{ConnectInfo, State},
     http::{Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
 use governor::{
+    Quota, RateLimiter,
     clock::DefaultClock,
     state::{InMemoryState, NotKeyed},
-    Quota, RateLimiter,
 };
 use std::{
     collections::HashMap,
@@ -113,7 +113,10 @@ pub async fn rate_limit_middleware(
         return (
             StatusCode::TOO_MANY_REQUESTS,
             [("Retry-After", "60")],
-            Json(ApiError::new("RATE_LIMIT", "Too many requests. Please try again later.")),
+            Json(ApiError::new(
+                "RATE_LIMIT",
+                "Too many requests. Please try again later.",
+            )),
         )
             .into_response();
     }
@@ -136,10 +139,10 @@ pub struct EndpointRateLimits {
 impl Default for EndpointRateLimits {
     fn default() -> Self {
         Self {
-            login: Arc::new(RateLimitState::new(10, 3)),      // 10/min, burst 3
-            register: Arc::new(RateLimitState::new(5, 2)),    // 5/min, burst 2
+            login: Arc::new(RateLimitState::new(10, 3)), // 10/min, burst 3
+            register: Arc::new(RateLimitState::new(5, 2)), // 5/min, burst 2
             send_email: Arc::new(RateLimitState::new(30, 5)), // 30/min, burst 5
-            general: Arc::new(RateLimitState::new(100, 20)),  // 100/min, burst 20
+            general: Arc::new(RateLimitState::new(100, 20)), // 100/min, burst 20
         }
     }
 }

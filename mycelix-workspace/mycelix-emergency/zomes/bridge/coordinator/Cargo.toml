@@ -1,0 +1,14 @@
+[package]
+name = "emergency_bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Emergency bridge coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+emergency_bridge_integrity = { path = "../integrity" }

@@ -242,7 +242,10 @@ pub enum DeliveryStatus {
     /// Failed
     Failed { error: String, failed_at: Timestamp },
     /// Bounced
-    Bounced { reason: String, bounced_at: Timestamp },
+    Bounced {
+        reason: String,
+        bounced_at: Timestamp,
+    },
     /// Expired
     Expired,
 }
@@ -479,9 +482,7 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, action)
-            }
+            OpEntry::CreateEntry { app_entry, action } => validate_create_entry(app_entry, action),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -575,8 +576,7 @@ fn validate_route(
     }
 
     // Source and dest must be different
-    if route.source_network == route.dest_network
-        && route.source_pattern == route.dest_pattern {
+    if route.source_network == route.dest_network && route.source_pattern == route.dest_pattern {
         return Ok(ValidateCallbackResult::Invalid(
             "Route source and destination cannot be identical".to_string(),
         ));
@@ -631,7 +631,8 @@ fn validate_envelope(
 
     // Must have encrypted payload or be plaintext bridge
     if envelope.encrypted_payload.is_empty()
-        && envelope.encryption_meta.scheme != EncryptionScheme::Plaintext {
+        && envelope.encryption_meta.scheme != EncryptionScheme::Plaintext
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Envelope must have encrypted payload".to_string(),
         ));

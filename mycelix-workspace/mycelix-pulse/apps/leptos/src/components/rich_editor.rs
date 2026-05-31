@@ -29,7 +29,7 @@ pub fn RichEditor(
     let on_ol = move |_| exec("insertOrderedList", "");
     let on_code = move |_| {
         let _ = js_sys::eval(
-            "var s=window.getSelection();if(s.rangeCount){var r=s.getRangeAt(0);var c=document.createElement('code');c.className='inline-code';r.surroundContents(c)}"
+            "var s=window.getSelection();if(s.rangeCount){var r=s.getRangeAt(0);var c=document.createElement('code');c.className='inline-code';r.surroundContents(c)}",
         );
     };
     let on_blockquote = move |_| exec("formatBlock", "blockquote");

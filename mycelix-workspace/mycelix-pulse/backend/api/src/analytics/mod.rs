@@ -5,11 +5,11 @@
 //!
 //! Metrics, insights, and productivity dashboards
 
-use chrono::{DateTime, Utc, Duration, Datelike, Timelike};
+use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Analytics Service
@@ -39,7 +39,7 @@ impl AnalyticsService {
             WHERE user_id = $2 AND received_at >= $3
             GROUP BY period
             ORDER BY period
-            "#
+            "#,
         )
         .bind(&interval)
         .bind(user_id)
@@ -55,7 +55,7 @@ impl AnalyticsService {
             WHERE user_id = $2 AND sent_at >= $3
             GROUP BY period
             ORDER BY period
-            "#
+            "#,
         )
         .bind(&interval)
         .bind(user_id)
@@ -66,8 +66,14 @@ impl AnalyticsService {
 
         Ok(EmailVolumeStats {
             period,
-            received: received.into_iter().map(|(d, c)| DataPoint { date: d, value: c }).collect(),
-            sent: sent.into_iter().map(|(d, c)| DataPoint { date: d, value: c }).collect(),
+            received: received
+                .into_iter()
+                .map(|(d, c)| DataPoint { date: d, value: c })
+                .collect(),
+            sent: sent
+                .into_iter()
+                .map(|(d, c)| DataPoint { date: d, value: c })
+                .collect(),
             total_received: received.iter().map(|(_, c)| c).sum(),
             total_sent: sent.iter().map(|(_, c)| c).sum(),
         })
@@ -88,7 +94,7 @@ impl AnalyticsService {
             FROM sent_emails reply
             JOIN emails original ON reply.in_reply_to = original.message_id
             WHERE reply.user_id = $1 AND reply.sent_at >= $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(start_date)
@@ -140,7 +146,7 @@ impl AnalyticsService {
             GROUP BY from_address, from_name
             ORDER BY email_count DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit)
@@ -156,7 +162,7 @@ impl AnalyticsService {
             GROUP BY email
             ORDER BY email_count DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit)
@@ -184,7 +190,7 @@ impl AnalyticsService {
             FROM emails
             WHERE user_id = $1
             GROUP BY day_of_week, hour
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -200,7 +206,7 @@ impl AnalyticsService {
             FROM sent_emails
             WHERE user_id = $1
             GROUP BY day_of_week, hour
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -255,7 +261,7 @@ impl AnalyticsService {
             WHERE user_id = $1
             GROUP BY folder
             ORDER BY total_count DESC
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -282,7 +288,7 @@ impl AnalyticsService {
                 (SELECT COUNT(*) FROM sent_emails WHERE user_id = $1 AND sent_at >= $2) as sent
             FROM emails
             WHERE user_id = $1 AND received_at >= $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(week_ago)
@@ -307,13 +313,12 @@ impl AnalyticsService {
         .map_err(|e| AnalyticsError::Database(e.to_string()))?;
 
         // Unread count
-        let unread: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM emails WHERE user_id = $1 AND is_read = false"
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AnalyticsError::Database(e.to_string()))?;
+        let unread: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM emails WHERE user_id = $1 AND is_read = false")
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| AnalyticsError::Database(e.to_string()))?;
 
         // Email zero days this month
         let zero_inbox_days: (i64,) = sqlx::query_as(
@@ -321,7 +326,7 @@ impl AnalyticsService {
             SELECT COUNT(DISTINCT DATE(checked_at))
             FROM inbox_zero_log
             WHERE user_id = $1 AND checked_at >= date_trunc('month', NOW())
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_one(&self.pool)
@@ -429,8 +434,16 @@ impl TeamAnalyticsService {
             total_tickets: metrics.0,
             first_response_met: metrics.1,
             resolution_met: metrics.2,
-            first_response_rate: if metrics.0 > 0 { metrics.1 as f64 / metrics.0 as f64 * 100.0 } else { 0.0 },
-            resolution_rate: if metrics.0 > 0 { metrics.2 as f64 / metrics.0 as f64 * 100.0 } else { 0.0 },
+            first_response_rate: if metrics.0 > 0 {
+                metrics.1 as f64 / metrics.0 as f64 * 100.0
+            } else {
+                0.0
+            },
+            resolution_rate: if metrics.0 > 0 {
+                metrics.2 as f64 / metrics.0 as f64 * 100.0
+            } else {
+                0.0
+            },
         })
     }
 }
@@ -485,7 +498,7 @@ pub struct TopCorrespondents {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivityHeatmap {
-    pub received: Vec<Vec<i64>>,  // 7 days x 24 hours
+    pub received: Vec<Vec<i64>>, // 7 days x 24 hours
     pub sent: Vec<Vec<i64>>,
     pub peak_receive_hour: i32,
     pub peak_send_hour: i32,
@@ -503,7 +516,7 @@ pub struct FolderStats {
 pub struct ProductivityInsights {
     pub emails_received_this_week: i64,
     pub emails_sent_this_week: i64,
-    pub received_vs_last_week: f64,  // percentage change
+    pub received_vs_last_week: f64, // percentage change
     pub sent_vs_last_week: f64,
     pub current_unread: i64,
     pub inbox_zero_days_this_month: i64,

@@ -267,7 +267,8 @@ pub fn create_attestation(input: CreateAttestationInput) -> ExternResult<ActionH
         trust_level: input.trust_level,
         category: input.category,
     };
-    let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+    let encoded =
+        ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
     let _ = send_remote_signal(encoded, vec![input.trustee.clone()]);
 
     // Trigger score recomputation for trustee
@@ -286,7 +287,11 @@ fn hash_attestation_content(
     // Create a deterministic content string for signing
     let content = format!(
         "attestation:{}:{}:{}:{:?}:{}",
-        truster, trustee, trust_level, category, timestamp.as_micros()
+        truster,
+        trustee,
+        trust_level,
+        category,
+        timestamp.as_micros()
     );
     // Return content bytes directly for signing
     Ok(content.into_bytes())
@@ -327,10 +332,9 @@ pub fn revoke_attestation(attestation_hash: ActionHash) -> ExternResult<ActionHa
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     // Get existing attestation
-    let record = get(attestation_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Attestation not found".to_string()
-        )))?;
+    let record = get(attestation_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Attestation not found".to_string())
+    ))?;
 
     let mut attestation: TrustAttestation = record
         .entry()
@@ -351,7 +355,10 @@ pub fn revoke_attestation(attestation_hash: ActionHash) -> ExternResult<ActionHa
     attestation.revoked = true;
 
     // Update entry
-    let new_hash = update_entry(attestation_hash, EntryTypes::TrustAttestation(attestation.clone()))?;
+    let new_hash = update_entry(
+        attestation_hash,
+        EntryTypes::TrustAttestation(attestation.clone()),
+    )?;
 
     // Trigger score recomputation
     let _ = compute_trust_score(attestation.trustee);
@@ -393,15 +400,23 @@ pub fn compute_trust_score(subject: AgentPubKey) -> ExternResult<TrustScore> {
         calculate_transitive_trust(&my_agent, &subject, MAX_TRANSITIVE_DEPTH)?;
 
     // Step 3: Aggregate scores with weighted average
-    let (combined_score, combined_confidence) =
-        aggregate_trust_scores(direct_score, direct_confidence, transitive_score, transitive_confidence);
+    let (combined_score, combined_confidence) = aggregate_trust_scores(
+        direct_score,
+        direct_confidence,
+        transitive_score,
+        transitive_confidence,
+    );
 
     // Step 4: Check for Byzantine behavior
     let byzantine_flags = detect_byzantine_behavior(&subject, &attestations)?;
 
     // Step 5: Apply Byzantine penalty if detected
     let final_score = if !byzantine_flags.is_empty() {
-        let penalty: f64 = byzantine_flags.iter().map(|f| f.severity).sum::<f64>().min(0.5);
+        let penalty: f64 = byzantine_flags
+            .iter()
+            .map(|f| f.severity)
+            .sum::<f64>()
+            .min(0.5);
         (combined_score - penalty).max(0.0)
     } else {
         combined_score
@@ -411,10 +426,8 @@ pub fn compute_trust_score(subject: AgentPubKey) -> ExternResult<TrustScore> {
     let category_scores = calculate_category_scores(&attestations, now)?;
 
     // Step 7: Collect attestation hashes
-    let attestation_hashes: Vec<ActionHash> = attestations
-        .iter()
-        .map(|(hash, _)| hash.clone())
-        .collect();
+    let attestation_hashes: Vec<ActionHash> =
+        attestations.iter().map(|(hash, _)| hash.clone()).collect();
 
     let trust_score = TrustScore {
         agent: subject.clone(),
@@ -462,7 +475,10 @@ pub fn compute_trust_score(subject: AgentPubKey) -> ExternResult<TrustScore> {
 fn get_attestations_for_agent(
     agent: &AgentPubKey,
 ) -> ExternResult<Vec<(ActionHash, TrustAttestation)>> {
-    let links = get_links(LinkQuery::try_new(agent.clone(), LinkTypes::AgentToReceivedAttestations)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToReceivedAttestations)?,
+        GetStrategy::default(),
+    )?;
 
     let mut attestations = Vec::new();
 
@@ -521,8 +537,8 @@ fn calculate_direct_trust(
             .min(1.0);
 
         // Apply temporal decay
-        let age_days = (now.as_micros() - attestation.created_at.as_micros()) as f64
-            / (1_000_000.0 * 86400.0);
+        let age_days =
+            (now.as_micros() - attestation.created_at.as_micros()) as f64 / (1_000_000.0 * 86400.0);
         let decay = (-TEMPORAL_DECAY_RATE * age_days).exp();
 
         // Calculate weight including stake
@@ -589,7 +605,8 @@ fn calculate_transitive_trust(
         for (_, attestation) in &their_attestations {
             if attestation.trustee == *subject && !attestation.revoked {
                 let their_trust = (attestation.trust_level + 1.0) / 2.0;
-                let decayed_trust = accumulated_trust * their_trust * TRANSITIVE_DECAY_FACTOR.powi(depth as i32);
+                let decayed_trust =
+                    accumulated_trust * their_trust * TRANSITIVE_DECAY_FACTOR.powi(depth as i32);
 
                 total_trust += decayed_trust;
                 total_weight += TRANSITIVE_DECAY_FACTOR.powi(depth as i32);
@@ -598,7 +615,9 @@ fn calculate_transitive_trust(
 
             // Add their trustees to queue for further exploration
             if !attestation.revoked && attestation.trust_level > 0.0 {
-                let next_trust = accumulated_trust * ((attestation.trust_level + 1.0) / 2.0) * TRANSITIVE_DECAY_FACTOR;
+                let next_trust = accumulated_trust
+                    * ((attestation.trust_level + 1.0) / 2.0)
+                    * TRANSITIVE_DECAY_FACTOR;
                 queue.push_back((attestation.trustee.clone(), next_trust, depth + 1));
             }
         }
@@ -617,7 +636,10 @@ fn calculate_transitive_trust(
 fn get_attestations_given_by(
     agent: &AgentPubKey,
 ) -> ExternResult<Vec<(ActionHash, TrustAttestation)>> {
-    let links = get_links(LinkQuery::try_new(agent.clone(), LinkTypes::AgentToGivenAttestations)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToGivenAttestations)?,
+        GetStrategy::default(),
+    )?;
 
     let mut attestations = Vec::new();
 
@@ -655,11 +677,11 @@ fn aggregate_trust_scores(
     let direct_weight = direct_confidence * 1.5;
     let transitive_weight = transitive_confidence;
 
-    let combined_score =
-        (direct_score * direct_weight + transitive_score * transitive_weight)
-            / (direct_weight + transitive_weight);
+    let combined_score = (direct_score * direct_weight + transitive_score * transitive_weight)
+        / (direct_weight + transitive_weight);
 
-    let combined_confidence = ((direct_confidence.powi(2) + transitive_confidence.powi(2)).sqrt() / 1.414).min(1.0);
+    let combined_confidence =
+        ((direct_confidence.powi(2) + transitive_confidence.powi(2)).sqrt() / 1.414).min(1.0);
 
     (combined_score, combined_confidence)
 }
@@ -799,7 +821,10 @@ fn calculate_category_scores(
 #[hdk_extern]
 pub fn get_trust_score(agent: AgentPubKey) -> ExternResult<TrustScore> {
     // Try to get cached score
-    let links = get_links(LinkQuery::try_new(agent.clone(), LinkTypes::AgentToTrustScore)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToTrustScore)?,
+        GetStrategy::default(),
+    )?;
 
     // Get most recent score
     if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
@@ -829,13 +854,17 @@ pub fn get_trust_score(agent: AgentPubKey) -> ExternResult<TrustScore> {
 
 /// Get attestations about an agent
 #[hdk_extern]
-pub fn get_attestations_about(agent: AgentPubKey) -> ExternResult<Vec<(ActionHash, TrustAttestation)>> {
+pub fn get_attestations_about(
+    agent: AgentPubKey,
+) -> ExternResult<Vec<(ActionHash, TrustAttestation)>> {
     get_attestations_for_agent(&agent)
 }
 
 /// Get attestations made by an agent
 #[hdk_extern]
-pub fn get_attestations_by(agent: AgentPubKey) -> ExternResult<Vec<(ActionHash, TrustAttestation)>> {
+pub fn get_attestations_by(
+    agent: AgentPubKey,
+) -> ExternResult<Vec<(ActionHash, TrustAttestation)>> {
     get_attestations_given_by(&agent)
 }
 
@@ -877,7 +906,8 @@ pub fn create_introduction(input: TrustIntroduction) -> ExternResult<ActionHash>
         introduced: input.introduced,
         recommendation: input.recommendation_level,
     };
-    let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+    let encoded =
+        ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
     let _ = send_remote_signal(encoded, vec![input.target]);
 
     Ok(intro_hash)
@@ -888,10 +918,9 @@ pub fn create_introduction(input: TrustIntroduction) -> ExternResult<ActionHash>
 pub fn respond_to_introduction(input: (ActionHash, bool)) -> ExternResult<ActionHash> {
     let (intro_hash, accepted) = input;
 
-    let record = get(intro_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Introduction not found".to_string()
-        )))?;
+    let record = get(intro_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Introduction not found".to_string())
+    ))?;
 
     let mut intro: TrustIntroduction = record
         .entry()
@@ -971,9 +1000,10 @@ pub fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
 #[hdk_extern]
 pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // Grant capability for receiving signals
-    let functions = GrantedFunctions::Listed(HashSet::from([
-        (zome_info()?.name, "recv_remote_signal".into()),
-    ]));
+    let functions = GrantedFunctions::Listed(HashSet::from([(
+        zome_info()?.name,
+        "recv_remote_signal".into(),
+    )]));
 
     create_cap_grant(CapGrantEntry {
         tag: "recv_trust_signals".to_string(),

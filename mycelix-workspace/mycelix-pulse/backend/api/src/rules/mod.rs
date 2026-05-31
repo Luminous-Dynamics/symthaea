@@ -8,7 +8,7 @@
 pub mod engine;
 
 pub use engine::{
-    ActionType, ConditionField, ConditionOperator, ConditionValue,
-    EmailContext, LogicalOperator, Rule, RuleAction, RuleBuilder,
-    RuleCondition, RuleConditionGroup, RuleEvaluationResult, RulesEngine,
+    ActionType, ConditionField, ConditionOperator, ConditionValue, EmailContext, LogicalOperator,
+    Rule, RuleAction, RuleBuilder, RuleCondition, RuleConditionGroup, RuleEvaluationResult,
+    RulesEngine,
 };

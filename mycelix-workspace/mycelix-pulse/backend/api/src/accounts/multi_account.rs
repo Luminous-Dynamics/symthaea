@@ -6,9 +6,9 @@
 //! Allows users to manage multiple email accounts, identities,
 //! and unified inbox views.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Account types supported
@@ -245,7 +245,12 @@ impl MultiAccountService {
     }
 
     /// Update account status
-    pub fn update_status(&mut self, account_id: Uuid, status: ConnectionStatus, error: Option<String>) {
+    pub fn update_status(
+        &mut self,
+        account_id: Uuid,
+        status: ConnectionStatus,
+        error: Option<String>,
+    ) {
         if let Some(account) = self.accounts.get_mut(&account_id) {
             account.status = status;
             account.last_error = error;
@@ -280,25 +285,35 @@ impl MultiAccountService {
     /// Validate account configuration
     fn validate_account(&self, account: &EmailAccount) -> Result<(), AccountError> {
         if account.email_address.is_empty() {
-            return Err(AccountError::InvalidConfig("Email address is required".to_string()));
+            return Err(AccountError::InvalidConfig(
+                "Email address is required".to_string(),
+            ));
         }
 
         if !account.email_address.contains('@') {
-            return Err(AccountError::InvalidConfig("Invalid email address format".to_string()));
+            return Err(AccountError::InvalidConfig(
+                "Invalid email address format".to_string(),
+            ));
         }
 
         match account.account_type {
             AccountType::Imap => {
                 if account.imap_config.is_none() {
-                    return Err(AccountError::InvalidConfig("IMAP config required for IMAP accounts".to_string()));
+                    return Err(AccountError::InvalidConfig(
+                        "IMAP config required for IMAP accounts".to_string(),
+                    ));
                 }
                 if account.smtp_config.is_none() {
-                    return Err(AccountError::InvalidConfig("SMTP config required for sending".to_string()));
+                    return Err(AccountError::InvalidConfig(
+                        "SMTP config required for sending".to_string(),
+                    ));
                 }
             }
             AccountType::Google | AccountType::Microsoft => {
                 if account.oauth_config.is_none() {
-                    return Err(AccountError::InvalidConfig("OAuth config required".to_string()));
+                    return Err(AccountError::InvalidConfig(
+                        "OAuth config required".to_string(),
+                    ));
                 }
             }
             _ => {}

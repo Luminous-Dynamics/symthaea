@@ -1,0 +1,89 @@
+{
+  "name": "@mycelix/knowledge-client",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Mycelix Knowledge - Decentralized Knowledge Graph with Epistemic Classification",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.esm.js",
+      "require": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./svelte": {
+      "import": "./dist/svelte/index.esm.js",
+      "require": "./dist/svelte/index.js",
+      "types": "./dist/svelte/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && npm run build:esm",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "mycelix",
+    "knowledge-graph",
+    "epistemic-classification",
+    "holochain",
+    "fact-checking",
+    "belief-graphs",
+    "credibility",
+    "decentralized",
+    "truth",
+    "verification"
+  ],
+  "author": "Luminous Dynamics <dev@luminousdynamics.org>",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge.git",
+    "directory": "client"
+  },
+  "bugs": {
+    "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge/issues"
+  },
+  "homepage": "https://knowledge.mycelix.net",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0"
+  },
+  "peerDependencies": {
+    "@holochain/client": ">=0.17.0"
+  },
+  "peerDependenciesMeta": {
+    "@holochain/client": {
+      "optional": false
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

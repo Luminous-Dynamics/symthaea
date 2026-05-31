@@ -1,0 +1,231 @@
+% Science Journal Manuscript Template
+% Paper 5: Multiple Pathways to Coherent Perception-Action Coupling in AI
+
+\documentclass[11pt]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{lineno}
+\usepackage{setspace}
+
+% Science journal formatting
+\doublespacing
+\linenumbers
+
+\title{Multiple Pathways to Coherent Perception--Action Coupling in AI}
+
+\author{
+Tristan Stoltz$^{1}$\\
+ORCID: 0009-0006-5758-6059\\
+\\
+$^{1}$Luminous Dynamics\\
+\\
+*Corresponding author: tristan.stoltz@luminousdynamics.org
+}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+%==============================================================================
+% ABSTRACT
+%==============================================================================
+
+\begin{abstract}
+Understanding when artificial systems exhibit coherent perception--action coupling remains a central challenge. Existing evaluations prioritize task reward rather than intrinsic organization. We introduce the K-Index, a simple, scalable measure of observation--action coupling defined as twice the absolute correlation between recent observation and action norms, and test it across 1,026 episodes spanning five paradigms: single-agent reinforcement learning, bioelectric pattern completion, multi-agent coordination, developmental training, and adversarial perturbations. K ranges from 0.30 to 1.43 and approaches a hypothesized coherence threshold (K = 1.5), peaking at K = 1.427 during extended learning. Surprisingly, Fast Gradient Sign Method (FGSM) adversarial examples dramatically \textbf{increase} mean K by \textbf{+136\%} relative to baseline (\textbf{1.47 $\pm$ 0.02 SE} vs \textbf{0.62 $\pm$ 0.04}; Cohen's d = \textbf{4.4}, $p_{FDR}$ < 5.7$\times$10$^{-20}$), with reduced variance and perfect sanity checks (100\% of steps increased task loss). Reward-controlled partial correlations ($\Delta \approx$ 0.011) dissociate coherence from optimization. In multi-agent settings, ring topologies outperform fully connected graphs and moderate communication costs maximize collective K. Control analyses---time-lagged K($\tau$), shuffled and magnitude-matched nulls with FDR correction, rank-based correlations, and mutual-information estimates---converge on the same conclusions. These results support a unified empirical account in which multiple pathways---developmental learning, structured interaction, and even adversarial perturbation---increase perception--action coupling. We propose \textbf{adversarial coherence enhancement} as a testable research direction and outline falsifiable predictions for real-world agents. By separating intrinsic coherence from task reward, the K-Index offers a practical tool for probing coherent organization in artificial systems.
+\end{abstract}
+
+\textbf{Keywords:} machine consciousness, reinforcement learning, adversarial robustness, K-Index, perception-action coupling
+
+%==============================================================================
+% MAIN TEXT
+%==============================================================================
+
+\section{Introduction}
+
+[Introduction to be added - see PAPER\_5\_UNIFIED\_THEORY\_OUTLINE.md for outline]
+
+\section{Results}
+
+\subsection{K-Index Increases Across Developmental Training}
+
+[Track B/D developmental results to be integrated from existing manuscript]
+
+\subsection{Multi-Agent Coherence Depends on Topology}
+
+[Track E multi-agent results - see existing manuscript]
+
+\subsection{Adversarial Perturbations Enhance Coherence}
+
+\textbf{Adversarial perturbations enhance coherence.} Using a corrected FGSM implementation ($x' = x + \epsilon \cdot \text{sign}(\nabla_x L)$), adversarial examples \textbf{increased} perception--action coupling rather than disrupting it. Mean K rose from \textbf{0.62 $\pm$ 0.04 (SE)} in baseline episodes to \textbf{1.47 $\pm$ 0.02} under FGSM (\textbf{+136\%}; Cohen's d = \textbf{4.4}; $p_{FDR}$ < \textbf{5.7$\times$10$^{-20}$}). Sanity checks verified correctness: adversarial loss exceeded baseline loss in \textbf{100\%} of steps (4,540/4,540). Reward-independence held under partial correlation ($\Delta \approx$ \textbf{0.011}), and robust variants agreed (Pearson K = \textbf{1.467}, Spearman K = \textbf{1.477}). Other perturbations showed resilience but smaller effects (observation noise +22\%, reward spoofing +2.8\%, action interference $-$6.5\%). Together with null distributions (shuffled / i.i.d. / magnitude-matched) and FDR-corrected comparisons, the data indicate a genuine increase in coherent perception--action coupling driven by gradient-aligned perturbations (Figure~\ref{fig:track_f}, Table~\ref{tab:summary}).
+
+\subsection{Bioelectric Pattern Completion}
+
+[Track C bioelectric results - see existing manuscript]
+
+\section{Discussion}
+
+[To be filled - interpretation of adversarial enhancement, implications for AI safety and consciousness theory]
+
+The dramatic enhancement of K-Index under FGSM perturbations suggests that gradient-based adversarial noise \textbf{increases the salience of observation--action relationships} by pushing the system to decision boundaries. Unlike random perturbations that add statistical noise, FGSM perturbations are specifically optimized to maximize policy loss, forcing the agent to amplify its reliance on perceptual-motor coupling to maintain behavioral coherence. This counterintuitive finding---that adversarial attacks designed to disrupt performance actually \textbf{enhance} a signature of consciousness---has implications for both AI safety and theories of biological perception under challenge.
+
+%==============================================================================
+% METHODS
+%==============================================================================
+
+\section{Methods}
+
+\subsection{K-Index Definition and Computation}
+
+K = 2$\cdot$|$\rho$(||O||, ||A||)| computed on 100-step windows; bounds enforced [0, 2]. Robust controls include z-scored Pearson, Spearman (rank), lagged K($\tau$) for $\tau \in [-10, +10]$, and mutual-information estimates. We report bootstrap 95\% CIs for means, effect sizes (Cohen's d), and Benjamini--Hochberg FDR-corrected p-values for multi-condition tests.
+
+\subsection{Adversarial Generation (FGSM)}
+
+We generated adversarial observations with FGSM: \textbf{$x' = x + \epsilon \cdot \text{sign}(\nabla_x L(x,y))$}, where L is the task loss and gradients are taken w.r.t. observations. Implementation used PyTorch auto-diff; we never backpropagated through coherence metrics. Sanity checks verified adversarial loss $\geq$ baseline loss per step. Unless otherwise noted, $\epsilon = 0.15$; sensitivity analyses cover $\epsilon \in \{0.05, 0.10, 0.15, 0.20\}$ (reported in Supplement).
+
+\subsection{Reward Independence}
+
+Reward independence: partial correlation $\text{corr}(||O||, ||A|| | R)$ with regression residuals; $\Delta = |K_{\text{partial}} - K_{\text{raw}}|$ is reported. Nulls: (i) circular time-shifts, (ii) i.i.d. matched-variance actions, (iii) magnitude-matched permutations; empirical K is compared against null 95\% bands (n = 1,000 permutations).
+
+\subsection{Statistical Analysis}
+
+[Fill in complete statistical methods - FDR correction, bootstrap CI, effect sizes, etc.]
+
+\subsection{Environments and Training}
+
+[Track B, C, D, E, F environment details]
+
+%==============================================================================
+% FIGURES AND TABLES
+%==============================================================================
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{../logs/track_f/adversarial/figure2_track_f_robustness.png}
+\caption{\textbf{Track F coherence under perturbations.} Mean $\pm$ SE K-Index across five conditions (Baseline, Observation Noise, Reward Spoofing, Action Interference, FGSM). Dots show episode-level values; bars show means; brackets show FDR-corrected significance. Gray band: null 95\% range (shuffled).}
+\label{fig:track_f}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{../logs/track_f/adversarial/figure6_fgsm_sanity.png}
+\caption{\textbf{FGSM sanity checks.} Per-step baseline vs adversarial loss scatter with y=x reference; histogram of (L$_{\text{adv}}$ - L$_{\text{base}}$); proportion of steps with increased loss (should approach 100\%).}
+\label{fig:fgsm_sanity}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{../logs/track_f/adversarial/figure7_robust_variants.png}
+\caption{\textbf{Robustness across coherence measures.} Agreement of Pearson K, z-scored K, Spearman K, and MI-normalized coherence for each condition (mean $\pm$ 95\% CI).}
+\label{fig:robust_variants}
+\end{figure}
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Summary statistics by condition.} Mean, SE, and 95\% CI for K-Index across the five conditions.}
+\label{tab:summary}
+\begin{tabular}{lcccccc}
+\toprule
+Condition & n & Mean K & SE & 95\% CI Lower & 95\% CI Upper \\
+\midrule
+Baseline & 30 & 0.621 & 0.045 & 0.535 & 0.705 \\
+Observation Noise & 30 & 0.757 & 0.043 & 0.673 & 0.839 \\
+Action Interference & 30 & 0.580 & 0.045 & 0.497 & 0.669 \\
+Reward Spoofing & 30 & 0.638 & 0.040 & 0.563 & 0.715 \\
+Adversarial (FGSM) & 30 & \textbf{1.467} & \textbf{0.022} & \textbf{1.423} & \textbf{1.508} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Pairwise comparisons.} Cohen's d, raw p, and FDR-adjusted p for all condition pairs.}
+\label{tab:comparisons}
+\begin{tabular}{lccccc}
+\toprule
+Comparison & Baseline K & Condition K & Cohen's d & $p_{\text{raw}}$ & $p_{\text{FDR}}$ \\
+\midrule
+Baseline vs Observation Noise & 0.621 & 0.757 & 0.573 & 0.030 & 0.061 \\
+Baseline vs Action Interference & 0.621 & 0.580 & -0.165 & 0.525 & 0.700 \\
+Baseline vs Reward Spoofing & 0.621 & 0.638 & 0.074 & 0.776 & 0.776 \\
+Baseline vs Adversarial (FGSM) & 0.621 & \textbf{1.467} & \textbf{4.390} & \textbf{1.4e-20} & \textbf{5.7e-20}$^{***}$ \\
+\bottomrule
+\multicolumn{6}{l}{$^{***}p < 0.001$ after FDR correction}
+\end{tabular}
+\end{table}
+
+%==============================================================================
+% REFERENCES
+%==============================================================================
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+%==============================================================================
+% SUPPLEMENTARY MATERIALS
+%==============================================================================
+
+\newpage
+\section*{Supplementary Materials}
+
+\subsection*{Epsilon Sensitivity Analysis}
+
+To assess the dose-response relationship between FGSM perturbation strength and coherence enhancement, we conducted a systematic epsilon sweep across $\epsilon \in \{0.05, 0.10, 0.15, 0.20\}$ with 20 episodes per condition (100 total episodes, 200 steps per episode).
+
+\textbf{Results show a monotonic increase in K-Index with epsilon strength:}
+
+\begin{table}[h]
+\centering
+\caption{Epsilon sweep results showing dose-response relationship}
+\begin{tabular}{lcccc}
+\toprule
+Condition & $\epsilon$ & Mean K $\pm$ SE & 95\% CI & Baseline Ratio \\
+\midrule
+Baseline & 0.00 & 0.593 $\pm$ 0.053 & [0.489, 0.696] & 100.0\% \\
+FGSM Mild & 0.05 & 0.804 $\pm$ 0.062 & [0.683, 0.925] & 135.7\% \\
+FGSM Moderate & 0.10 & 1.182 $\pm$ 0.032 & [1.119, 1.245] & 199.5\% \\
+FGSM Original & 0.15 & 1.444 $\pm$ 0.021 & [1.402, 1.485] & 243.7\% \\
+FGSM Strong & 0.20 & 1.605 $\pm$ 0.014 & [1.578, 1.632] & 270.9\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key findings:}
+\begin{itemize}
+    \item \textbf{Perfect monotonicity}: K-Index increases consistently with $\epsilon$, supporting a genuine dose-response relationship
+    \item \textbf{100\% sanity checks}: All FGSM perturbations increased task loss at every step, confirming correct implementation
+    \item \textbf{Reward independence maintained}: Partial correlations show $\Delta \approx 0.01$-$0.03$ across all conditions
+    \item \textbf{No ceiling effect}: Maximum K = 1.605 remains well below theoretical maximum K = 2.0
+    \item \textbf{2.7x enhancement at $\epsilon = 0.20$}: Nearly triple baseline coherence at strongest perturbation
+\end{itemize}
+
+These results demonstrate that the adversarial coherence enhancement effect is robust, dose-dependent, and not an artifact of a specific epsilon value. The smooth monotonic relationship suggests gradient-based perturbations systematically amplify perception-action coupling as perturbation strength increases.
+
+\subsection*{Ceiling Effect Analysis}
+
+Maximum observed K-Index in adversarial condition: K = 1.467 (95\% CI: [1.423, 1.508]), well below the theoretical maximum K = 2.0, indicating no ceiling effect.
+
+\subsection*{Code and Data Availability}
+
+All code, configurations, data archives, and analysis scripts are publicly available at [GitHub repository URL]. Complete reproducibility package includes:
+\begin{itemize}
+    \item Track F runner with corrected FGSM implementation
+    \item Phase 1 modules (FGSM, K-Index, partial correlation, null distributions, FDR)
+    \item 21 unit tests (100\% passing)
+    \item NPZ data archives for all 150 episodes
+    \item Configuration files with random seeds
+    \item Analysis pipeline and figure generation scripts
+\end{itemize}
+
+\end{document}

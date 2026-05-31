@@ -4,7 +4,7 @@
 use leptos::prelude::*;
 use leptos_router::components::A;
 
-use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::holochain::{ConnectionStatus, use_holochain};
 use crate::mail_context::use_mail;
 use crate::offline::use_offline;
 use crate::theme::use_theme;

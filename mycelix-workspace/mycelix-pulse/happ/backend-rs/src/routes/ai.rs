@@ -6,17 +6,17 @@
 //! Endpoints for privacy-preserving AI features powered by Symthaea.
 
 use axum::{
+    Json, Router,
     extract::Extension,
     routing::{get, post},
-    Json, Router,
 };
 
 use crate::error::AppResult;
 use crate::middleware::Claims as JwtClaims;
 use crate::routes::AppState;
 use crate::services::ai::{
-    AIInsights, ConsciousnessState, EmailIntent, LocalAIService,
-    ReplySuggestion, ThreadSummary, TrustExplanation,
+    AIInsights, ConsciousnessState, EmailIntent, LocalAIService, ReplySuggestion, ThreadSummary,
+    TrustExplanation,
 };
 use crate::types::Email;
 
@@ -181,7 +181,11 @@ pub async fn explain_trust(
 ) -> AppResult<Json<TrustExplanation>> {
     let ai_service = LocalAIService::new();
     let explanation = ai_service
-        .explain_trust(&request.sender_did, request.trust_score, &request.trust_path)
+        .explain_trust(
+            &request.sender_did,
+            request.trust_score,
+            &request.trust_path,
+        )
         .await?;
     Ok(Json(explanation))
 }

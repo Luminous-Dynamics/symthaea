@@ -13,14 +13,14 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use prometheus::{
-    Counter, CounterVec, Gauge, GaugeVec, Histogram, HistogramVec,
-    Opts, Registry, TextEncoder, Encoder,
+    Counter, CounterVec, Encoder, Gauge, GaugeVec, Histogram, HistogramVec, Opts, Registry,
+    TextEncoder,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, span, Level};
+use tracing::{Level, error, info, span, warn};
 use uuid::Uuid;
 
 // ============================================================================
@@ -77,85 +77,108 @@ impl MetricsRegistry {
         let emails_received = CounterVec::new(
             Opts::new("mycelix_emails_received_total", "Total emails received"),
             &["account", "folder"],
-        ).unwrap();
-        registry.register(Box::new(emails_received.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(emails_received.clone()))
+            .unwrap();
 
         let emails_sent = CounterVec::new(
             Opts::new("mycelix_emails_sent_total", "Total emails sent"),
             &["account"],
-        ).unwrap();
+        )
+        .unwrap();
         registry.register(Box::new(emails_sent.clone())).unwrap();
 
         let emails_processed = HistogramVec::new(
             prometheus::HistogramOpts::new(
                 "mycelix_email_processing_seconds",
                 "Email processing duration",
-            ).buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]),
+            )
+            .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]),
             &["operation"],
-        ).unwrap();
-        registry.register(Box::new(emails_processed.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(emails_processed.clone()))
+            .unwrap();
 
         let email_size_bytes = HistogramVec::new(
-            prometheus::HistogramOpts::new(
-                "mycelix_email_size_bytes",
-                "Email size in bytes",
-            ).buckets(vec![1024.0, 10240.0, 102400.0, 1048576.0, 10485760.0]),
+            prometheus::HistogramOpts::new("mycelix_email_size_bytes", "Email size in bytes")
+                .buckets(vec![1024.0, 10240.0, 102400.0, 1048576.0, 10485760.0]),
             &["direction"],
-        ).unwrap();
-        registry.register(Box::new(email_size_bytes.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(email_size_bytes.clone()))
+            .unwrap();
 
         // Sync metrics
         let sync_operations = CounterVec::new(
             Opts::new("mycelix_sync_operations_total", "Total sync operations"),
             &["account", "type", "status"],
-        ).unwrap();
-        registry.register(Box::new(sync_operations.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(sync_operations.clone()))
+            .unwrap();
 
         let sync_duration = HistogramVec::new(
             prometheus::HistogramOpts::new(
                 "mycelix_sync_duration_seconds",
                 "Sync operation duration",
-            ).buckets(vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]),
+            )
+            .buckets(vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]),
             &["account", "type"],
-        ).unwrap();
+        )
+        .unwrap();
         registry.register(Box::new(sync_duration.clone())).unwrap();
 
         let sync_errors = CounterVec::new(
             Opts::new("mycelix_sync_errors_total", "Total sync errors"),
             &["account", "error_type"],
-        ).unwrap();
+        )
+        .unwrap();
         registry.register(Box::new(sync_errors.clone())).unwrap();
 
         let pending_sync_items = GaugeVec::new(
             Opts::new("mycelix_pending_sync_items", "Pending sync items"),
             &["account"],
-        ).unwrap();
-        registry.register(Box::new(pending_sync_items.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(pending_sync_items.clone()))
+            .unwrap();
 
         // API metrics
         let http_requests = CounterVec::new(
             Opts::new("mycelix_http_requests_total", "Total HTTP requests"),
             &["method", "path", "status"],
-        ).unwrap();
+        )
+        .unwrap();
         registry.register(Box::new(http_requests.clone())).unwrap();
 
         let http_request_duration = HistogramVec::new(
             prometheus::HistogramOpts::new(
                 "mycelix_http_request_duration_seconds",
                 "HTTP request duration",
-            ).buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]),
+            )
+            .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]),
             &["method", "path"],
-        ).unwrap();
-        registry.register(Box::new(http_request_duration.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(http_request_duration.clone()))
+            .unwrap();
 
         let http_request_size = HistogramVec::new(
-            prometheus::HistogramOpts::new(
-                "mycelix_http_request_size_bytes",
-                "HTTP request size",
-            ),
+            prometheus::HistogramOpts::new("mycelix_http_request_size_bytes", "HTTP request size"),
             &["method", "path"],
-        ).unwrap();
-        registry.register(Box::new(http_request_size.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(http_request_size.clone()))
+            .unwrap();
 
         let http_response_size = HistogramVec::new(
             prometheus::HistogramOpts::new(
@@ -163,33 +186,43 @@ impl MetricsRegistry {
                 "HTTP response size",
             ),
             &["method", "path"],
-        ).unwrap();
-        registry.register(Box::new(http_response_size.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(http_response_size.clone()))
+            .unwrap();
 
         // Connection metrics
         let active_connections = GaugeVec::new(
             Opts::new("mycelix_active_connections", "Active connections"),
             &["type"],
-        ).unwrap();
-        registry.register(Box::new(active_connections.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(active_connections.clone()))
+            .unwrap();
 
         let connection_pool_size = GaugeVec::new(
             Opts::new("mycelix_connection_pool_size", "Connection pool size"),
             &["pool"],
-        ).unwrap();
-        registry.register(Box::new(connection_pool_size.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(connection_pool_size.clone()))
+            .unwrap();
 
         let websocket_connections = Gauge::new(
             "mycelix_websocket_connections",
             "Active WebSocket connections",
-        ).unwrap();
-        registry.register(Box::new(websocket_connections.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(websocket_connections.clone()))
+            .unwrap();
 
         // Queue metrics
-        let queue_depth = GaugeVec::new(
-            Opts::new("mycelix_queue_depth", "Queue depth"),
-            &["queue"],
-        ).unwrap();
+        let queue_depth =
+            GaugeVec::new(Opts::new("mycelix_queue_depth", "Queue depth"), &["queue"]).unwrap();
         registry.register(Box::new(queue_depth.clone())).unwrap();
 
         let queue_processing_time = HistogramVec::new(
@@ -198,51 +231,64 @@ impl MetricsRegistry {
                 "Queue item processing time",
             ),
             &["queue"],
-        ).unwrap();
-        registry.register(Box::new(queue_processing_time.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(queue_processing_time.clone()))
+            .unwrap();
 
         // Trust metrics
         let trust_calculations = Counter::new(
             "mycelix_trust_calculations_total",
             "Total trust calculations",
-        ).unwrap();
-        registry.register(Box::new(trust_calculations.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(trust_calculations.clone()))
+            .unwrap();
 
         let attestations_created = Counter::new(
             "mycelix_attestations_created_total",
             "Total attestations created",
-        ).unwrap();
-        registry.register(Box::new(attestations_created.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(attestations_created.clone()))
+            .unwrap();
 
         let attestations_verified = Counter::new(
             "mycelix_attestations_verified_total",
             "Total attestations verified",
-        ).unwrap();
-        registry.register(Box::new(attestations_verified.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(attestations_verified.clone()))
+            .unwrap();
 
         // System metrics
-        let memory_usage_bytes = Gauge::new(
-            "mycelix_memory_usage_bytes",
-            "Memory usage in bytes",
-        ).unwrap();
-        registry.register(Box::new(memory_usage_bytes.clone())).unwrap();
+        let memory_usage_bytes =
+            Gauge::new("mycelix_memory_usage_bytes", "Memory usage in bytes").unwrap();
+        registry
+            .register(Box::new(memory_usage_bytes.clone()))
+            .unwrap();
 
-        let cpu_usage_percent = Gauge::new(
-            "mycelix_cpu_usage_percent",
-            "CPU usage percentage",
-        ).unwrap();
-        registry.register(Box::new(cpu_usage_percent.clone())).unwrap();
+        let cpu_usage_percent =
+            Gauge::new("mycelix_cpu_usage_percent", "CPU usage percentage").unwrap();
+        registry
+            .register(Box::new(cpu_usage_percent.clone()))
+            .unwrap();
 
         let disk_usage_bytes = GaugeVec::new(
             Opts::new("mycelix_disk_usage_bytes", "Disk usage in bytes"),
             &["mount"],
-        ).unwrap();
-        registry.register(Box::new(disk_usage_bytes.clone())).unwrap();
+        )
+        .unwrap();
+        registry
+            .register(Box::new(disk_usage_bytes.clone()))
+            .unwrap();
 
-        let uptime_seconds = Gauge::new(
-            "mycelix_uptime_seconds",
-            "Application uptime in seconds",
-        ).unwrap();
+        let uptime_seconds =
+            Gauge::new("mycelix_uptime_seconds", "Application uptime in seconds").unwrap();
         registry.register(Box::new(uptime_seconds.clone())).unwrap();
 
         Self {
@@ -285,14 +331,20 @@ impl MetricsRegistry {
 
     /// Record email received
     pub fn record_email_received(&self, account: &str, folder: &str, size: usize) {
-        self.emails_received.with_label_values(&[account, folder]).inc();
-        self.email_size_bytes.with_label_values(&["incoming"]).observe(size as f64);
+        self.emails_received
+            .with_label_values(&[account, folder])
+            .inc();
+        self.email_size_bytes
+            .with_label_values(&["incoming"])
+            .observe(size as f64);
     }
 
     /// Record email sent
     pub fn record_email_sent(&self, account: &str, size: usize) {
         self.emails_sent.with_label_values(&[account]).inc();
-        self.email_size_bytes.with_label_values(&["outgoing"]).observe(size as f64);
+        self.email_size_bytes
+            .with_label_values(&["outgoing"])
+            .observe(size as f64);
     }
 
     /// Record HTTP request
@@ -305,16 +357,28 @@ impl MetricsRegistry {
         request_size: usize,
         response_size: usize,
     ) {
-        self.http_requests.with_label_values(&[method, path, &status.to_string()]).inc();
-        self.http_request_duration.with_label_values(&[method, path]).observe(duration_secs);
-        self.http_request_size.with_label_values(&[method, path]).observe(request_size as f64);
-        self.http_response_size.with_label_values(&[method, path]).observe(response_size as f64);
+        self.http_requests
+            .with_label_values(&[method, path, &status.to_string()])
+            .inc();
+        self.http_request_duration
+            .with_label_values(&[method, path])
+            .observe(duration_secs);
+        self.http_request_size
+            .with_label_values(&[method, path])
+            .observe(request_size as f64);
+        self.http_response_size
+            .with_label_values(&[method, path])
+            .observe(response_size as f64);
     }
 
     /// Record sync operation
     pub fn record_sync(&self, account: &str, sync_type: &str, status: &str, duration_secs: f64) {
-        self.sync_operations.with_label_values(&[account, sync_type, status]).inc();
-        self.sync_duration.with_label_values(&[account, sync_type]).observe(duration_secs);
+        self.sync_operations
+            .with_label_values(&[account, sync_type, status])
+            .inc();
+        self.sync_duration
+            .with_label_values(&[account, sync_type])
+            .observe(duration_secs);
     }
 }
 
@@ -686,7 +750,10 @@ impl AlertManager {
         }
 
         // Track alert
-        self.active_alerts.write().await.insert(alert.id, alert.clone());
+        self.active_alerts
+            .write()
+            .await
+            .insert(alert.id, alert.clone());
         self.last_fired.write().await.insert(rule.id, now);
 
         Ok(())

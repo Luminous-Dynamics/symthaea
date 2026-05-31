@@ -46,18 +46,18 @@ impl Default for DecayConfig {
     fn default() -> Self {
         let mut context_rates = std::collections::HashMap::new();
         // Different contexts decay at different rates
-        context_rates.insert("email_verified".to_string(), 0.001);  // Very slow
-        context_rates.insert("identity_verified".to_string(), 0.0005);  // Slowest
-        context_rates.insert("met_in_person".to_string(), 0.002);  // Slow
-        context_rates.insert("professional".to_string(), 0.005);  // Medium
-        context_rates.insert("transaction".to_string(), 0.01);  // Faster
-        context_rates.insert("recommendation".to_string(), 0.02);  // Fast
+        context_rates.insert("email_verified".to_string(), 0.001); // Very slow
+        context_rates.insert("identity_verified".to_string(), 0.0005); // Slowest
+        context_rates.insert("met_in_person".to_string(), 0.002); // Slow
+        context_rates.insert("professional".to_string(), 0.005); // Medium
+        context_rates.insert("transaction".to_string(), 0.01); // Faster
+        context_rates.insert("recommendation".to_string(), 0.02); // Fast
 
         Self {
             function: DecayFunction::Exponential,
-            rate: 0.005,  // ~0.5% per day base rate
-            floor: 0.1,   // Never decay below 10%
-            grace_period_days: 30,  // No decay for first 30 days
+            rate: 0.005,           // ~0.5% per day base rate
+            floor: 0.1,            // Never decay below 10%
+            grace_period_days: 30, // No decay for first 30 days
             context_rates,
         }
     }
@@ -98,15 +98,11 @@ impl TrustDecayService {
             .unwrap_or(self.config.rate);
 
         let decayed = match self.config.function {
-            DecayFunction::Linear => {
-                original_score - (rate * effective_days)
-            }
-            DecayFunction::Exponential => {
-                original_score * (-rate * effective_days).exp()
-            }
+            DecayFunction::Linear => original_score - (rate * effective_days),
+            DecayFunction::Exponential => original_score * (-rate * effective_days).exp(),
             DecayFunction::Sigmoid => {
                 // S-curve decay: slow-fast-slow
-                let midpoint = 180.0;  // 6 months
+                let midpoint = 180.0; // 6 months
                 let steepness = 0.02;
                 let sigmoid = 1.0 / (1.0 + (steepness * (effective_days - midpoint)).exp());
                 original_score * sigmoid
@@ -195,7 +191,7 @@ impl TrustDecayService {
         context: &str,
         boost: Option<f64>,
     ) -> Result<f64, sqlx::Error> {
-        let boost_amount = boost.unwrap_or(0.0).min(0.2);  // Max 20% boost
+        let boost_amount = boost.unwrap_or(0.0).min(0.2); // Max 20% boost
 
         let result: (f64,) = sqlx::query_as(
             r#"
@@ -241,14 +237,11 @@ impl TrustDecayService {
                 .unwrap_or(self.config.rate);
 
             let projected_score = match self.config.function {
-                DecayFunction::Exponential => {
-                    current_score * (-rate * effective_days).exp()
-                }
-                DecayFunction::Linear => {
-                    current_score - (rate * effective_days)
-                }
+                DecayFunction::Exponential => current_score * (-rate * effective_days).exp(),
+                DecayFunction::Linear => current_score - (rate * effective_days),
                 _ => current_score,
-            }.max(self.config.floor);
+            }
+            .max(self.config.floor);
 
             forecasts.push(DecayForecast {
                 date: future_date,
@@ -393,13 +386,10 @@ mod tests {
             grace_period_days: 30,
             ..Default::default()
         };
-        let service = TrustDecayService::new(
-            unsafe { std::mem::zeroed() },
-            config,
-        );
+        let service = TrustDecayService::new(unsafe { std::mem::zeroed() }, config);
 
         let original = 1.0;
-        let last_interaction = Utc::now() - Duration::days(15);  // Within grace period
+        let last_interaction = Utc::now() - Duration::days(15); // Within grace period
 
         let decayed = service.calculate_decay(original, last_interaction, None);
 
@@ -411,14 +401,11 @@ mod tests {
     fn test_floor() {
         let config = DecayConfig {
             floor: 0.2,
-            rate: 1.0,  // Very high decay rate
+            rate: 1.0, // Very high decay rate
             grace_period_days: 0,
             ..Default::default()
         };
-        let service = TrustDecayService::new(
-            unsafe { std::mem::zeroed() },
-            config,
-        );
+        let service = TrustDecayService::new(unsafe { std::mem::zeroed() }, config);
 
         let original = 1.0;
         let last_interaction = Utc::now() - Duration::days(365);

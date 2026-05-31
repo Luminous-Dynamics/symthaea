@@ -8,12 +8,12 @@
 //! here is synchronous + uses `tokio::runtime::Handle::current().block_on`
 //! to call async code.
 
-use crate::parser::{parse_incoming, ParsedMessage};
+use crate::parser::{ParsedMessage, parse_incoming};
 use crate::rate_limit::PerIpLimiter;
 use crate::receiver::InboundPipeline;
 use crate::zome::ZomeBridge;
-use mailin_embedded::response::{INTERNAL_ERROR, OK};
 use mailin_embedded::Response;
+use mailin_embedded::response::{INTERNAL_ERROR, OK};
 use std::net::IpAddr;
 use std::sync::Arc;
 

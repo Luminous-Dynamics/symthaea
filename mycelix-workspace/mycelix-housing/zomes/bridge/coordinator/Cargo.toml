@@ -1,0 +1,14 @@
+[package]
+name = "housing_bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Housing bridge coordinator zome for cross-hApp integration"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+housing_bridge_integrity = { path = "../integrity" }

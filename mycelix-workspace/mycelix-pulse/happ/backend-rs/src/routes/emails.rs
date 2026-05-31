@@ -10,9 +10,9 @@
 //! - Integrates with identity-client for DID verification on send
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     routing::{delete, get, post},
-    Json, Router,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -21,7 +21,7 @@ use crate::middleware::AuthenticatedUser;
 use crate::routes::{AppState, notify_new_mail};
 use crate::services::bridge::{has_sufficient_reputation, spam_likelihood};
 use crate::types::{ApiError, Email, InboxFilter, PaginatedResponse, SendEmailInput};
-use crate::validation::{validate_did, validate_subject, validate_body, sanitize_string};
+use crate::validation::{sanitize_string, validate_body, validate_did, validate_subject};
 use mycelix_identity_client::AssuranceLevel;
 
 /// Create email routes
@@ -90,13 +90,17 @@ pub async fn send_email(
     let hash = state.holochain.send_message(message).await?;
 
     // Record positive interaction (we're sending to them)
-    let _ = state.holochain.record_positive_interaction(&input.to_did).await;
+    let _ = state
+        .holochain
+        .record_positive_interaction(&input.to_did)
+        .await;
 
     // Also report positive interaction to Bridge for cross-hApp reputation
-    if let Err(e) = state.bridge.report_positive_interaction(
-        &input.to_did,
-        "mail_sent",
-    ).await {
+    if let Err(e) = state
+        .bridge
+        .report_positive_interaction(&input.to_did, "mail_sent")
+        .await
+    {
         tracing::warn!("Failed to report positive interaction to Bridge: {}", e);
     }
 
@@ -193,8 +197,7 @@ pub async fn get_inbox(
             to_did: msg.to_did,
             subject: String::from_utf8_lossy(&msg.subject_encrypted).to_string(),
             body: String::new(), // Fetch from IPFS lazily
-            timestamp: chrono::DateTime::from_timestamp_micros(msg.timestamp)
-                .unwrap_or_default(),
+            timestamp: chrono::DateTime::from_timestamp_micros(msg.timestamp).unwrap_or_default(),
             thread_id: msg.thread_id,
             epistemic_tier: parse_epistemic_tier(&msg.epistemic_tier),
             sender_trust_score: sender_trust,
@@ -278,8 +281,7 @@ pub async fn get_outbox(
             to_did: msg.to_did,
             subject: String::from_utf8_lossy(&msg.subject_encrypted).to_string(),
             body: String::new(),
-            timestamp: chrono::DateTime::from_timestamp_micros(msg.timestamp)
-                .unwrap_or_default(),
+            timestamp: chrono::DateTime::from_timestamp_micros(msg.timestamp).unwrap_or_default(),
             thread_id: msg.thread_id,
             epistemic_tier: parse_epistemic_tier(&msg.epistemic_tier),
             sender_trust_score: None,
@@ -342,7 +344,8 @@ pub async fn get_email(
     let trust = state.trust_cache.get_trust(&message.from_did).await.ok();
 
     // Fetch body from IPFS/storage using body_cid
-    let body = fetch_email_body(&state, &message.body_cid, &user.did).await
+    let body = fetch_email_body(&state, &message.body_cid, &user.did)
+        .await
         .unwrap_or_else(|e| {
             tracing::warn!(
                 cid = %message.body_cid,
@@ -365,8 +368,7 @@ pub async fn get_email(
         to_did: message.to_did,
         subject,
         body,
-        timestamp: chrono::DateTime::from_timestamp_micros(message.timestamp)
-            .unwrap_or_default(),
+        timestamp: chrono::DateTime::from_timestamp_micros(message.timestamp).unwrap_or_default(),
         thread_id: message.thread_id,
         epistemic_tier: parse_epistemic_tier(&message.epistemic_tier),
         sender_trust_score: trust.as_ref().map(|t| t.score),
@@ -440,8 +442,7 @@ pub async fn get_thread(
             to_did: msg.to_did,
             subject: String::from_utf8_lossy(&msg.subject_encrypted).to_string(),
             body: String::new(),
-            timestamp: chrono::DateTime::from_timestamp_micros(msg.timestamp)
-                .unwrap_or_default(),
+            timestamp: chrono::DateTime::from_timestamp_micros(msg.timestamp).unwrap_or_default(),
             thread_id: msg.thread_id,
             epistemic_tier: parse_epistemic_tier(&msg.epistemic_tier),
             sender_trust_score: None,
@@ -534,13 +535,17 @@ pub async fn mark_not_spam(
     let hash = parse_action_hash(&id)?;
     if let Ok(Some(msg)) = state.holochain.get_message(hash).await {
         // Record positive interaction locally
-        state.holochain.record_positive_interaction(&msg.from_did).await?;
+        state
+            .holochain
+            .record_positive_interaction(&msg.from_did)
+            .await?;
 
         // Report positive interaction to Bridge for cross-hApp reputation
-        if let Err(e) = state.bridge.report_positive_interaction(
-            &msg.from_did,
-            "marked_not_spam",
-        ).await {
+        if let Err(e) = state
+            .bridge
+            .report_positive_interaction(&msg.from_did, "marked_not_spam")
+            .await
+        {
             tracing::warn!("Failed to report positive interaction to Bridge: {}", e);
         }
 
@@ -594,11 +599,14 @@ fn parse_action_hash(id: &str) -> AppResult<holochain_types::prelude::ActionHash
     use holochain_types::prelude::ActionHash;
 
     let id_clean = id.strip_prefix("msg_").unwrap_or(id);
-    let bytes = BASE64.decode(id_clean)
+    let bytes = BASE64
+        .decode(id_clean)
         .map_err(|_| AppError::ValidationError("Invalid email ID format".to_string()))?;
 
     if bytes.len() != 39 {
-        return Err(AppError::ValidationError("Invalid email ID length".to_string()));
+        return Err(AppError::ValidationError(
+            "Invalid email ID length".to_string(),
+        ));
     }
 
     Ok(ActionHash::from_raw_39(bytes.try_into().unwrap()))
@@ -661,7 +669,8 @@ async fn verify_sender_identity(state: &AppState, sender_did: &str) {
                 match state.identity.check_guardian_endorsement(sender_did).await {
                     Ok(guardians) => {
                         if !guardians.is_empty() {
-                            let endorsed_count = guardians.iter().filter(|g| g.has_endorsed).count();
+                            let endorsed_count =
+                                guardians.iter().filter(|g| g.has_endorsed).count();
                             tracing::debug!(
                                 did = %sender_did,
                                 total = guardians.len(),
@@ -730,11 +739,14 @@ async fn encrypt_subject_for_recipient(
 
     // Serialize the envelope into bytes for storage
     // Format: [ephemeral_pubkey (32)] + [nonce (12)] + [ciphertext (variable)]
-    let ephemeral_bytes = BASE64.decode(&envelope.ephemeral_pubkey)
+    let ephemeral_bytes = BASE64
+        .decode(&envelope.ephemeral_pubkey)
         .map_err(|_| AppError::EncryptionError("Invalid ephemeral pubkey encoding".to_string()))?;
-    let nonce_bytes = BASE64.decode(&envelope.nonce)
+    let nonce_bytes = BASE64
+        .decode(&envelope.nonce)
         .map_err(|_| AppError::EncryptionError("Invalid nonce encoding".to_string()))?;
-    let ciphertext = BASE64.decode(&envelope.ciphertext)
+    let ciphertext = BASE64
+        .decode(&envelope.ciphertext)
         .map_err(|_| AppError::EncryptionError("Invalid ciphertext encoding".to_string()))?;
 
     let mut encrypted_data = Vec::with_capacity(32 + 12 + ciphertext.len());
@@ -752,10 +764,7 @@ async fn encrypt_subject_for_recipient(
 }
 
 /// Resolve a recipient's X25519 public key from their DID
-async fn resolve_recipient_pubkey(
-    state: &AppState,
-    recipient_did: &str,
-) -> AppResult<[u8; 32]> {
+async fn resolve_recipient_pubkey(state: &AppState, recipient_did: &str) -> AppResult<[u8; 32]> {
     // First, try to resolve via Holochain DHT
     if let Ok(agent_pubkey) = state.holochain.resolve_did(recipient_did).await {
         // Convert Holochain agent pubkey to X25519 pubkey
@@ -831,10 +840,8 @@ async fn fetch_email_body(
 
     // Try to retrieve and decrypt from storage
     match retrieve_decrypted(&state.storage, body_cid, &encryption_key).await {
-        Ok(plaintext) => {
-            String::from_utf8(plaintext)
-                .map_err(|e| AppError::InternalError(format!("Invalid UTF-8 in body: {}", e)))
-        }
+        Ok(plaintext) => String::from_utf8(plaintext)
+            .map_err(|e| AppError::InternalError(format!("Invalid UTF-8 in body: {}", e))),
         Err(e) => {
             // If decryption fails, try retrieving raw content (for backwards compatibility)
             tracing::debug!(
@@ -876,8 +883,8 @@ fn decrypt_subject_for_recipient(
     let recipient_secret = derive_recipient_secret(recipient_did);
 
     // Compute shared secret via ECDH
-    use x25519_dalek::{PublicKey, StaticSecret};
     use sha2::{Digest, Sha256};
+    use x25519_dalek::{PublicKey, StaticSecret};
 
     let mut ephemeral_arr = [0u8; 32];
     ephemeral_arr.copy_from_slice(ephemeral_pubkey);

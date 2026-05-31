@@ -1,0 +1,61 @@
+{
+  "name": "@mycelix/media-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for Mycelix Media with integration helpers for Mycelix Knowledge.",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"No tests defined\"",
+    "lint": "eslint src/**/*.ts || true",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mycelix",
+    "media",
+    "knowledge-graph",
+    "epistemic",
+    "holochain"
+  ],
+  "author": "Luminous Dynamics",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix-media.git",
+    "directory": "client"
+  },
+  "bugs": {
+    "url": "https://github.com/Luminous-Dynamics/mycelix-media/issues"
+  },
+  "homepage": "https://media.mycelix.net",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.18.0",
+    "@mycelix/knowledge-client": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0"
+  },
+  "peerDependencies": {
+    "@holochain/client": ">=0.17.0",
+    "@mycelix/knowledge-client": ">=0.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

@@ -1,0 +1,15 @@
+[package]
+name = "matching"
+version = "0.1.0"
+edition = "2024"
+description = "Care matching coordinator zome - match discovery and management"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+matching_integrity = { path = "../integrity" }
+holochain_serialized_bytes = { workspace = true }

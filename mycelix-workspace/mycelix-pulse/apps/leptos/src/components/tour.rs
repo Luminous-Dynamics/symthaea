@@ -17,8 +17,7 @@ struct TourStep {
 const STEPS: &[TourStep] = &[
     TourStep {
         title: "Your Inbox",
-        body:
-            "All your encrypted messages appear here. Unread messages are bold with a cyan accent.",
+        body: "All your encrypted messages appear here. Unread messages are bold with a cyan accent.",
         selector: ".page-inbox .email-list, .page-inbox .skeleton-list",
         position: "bottom",
     },
@@ -36,8 +35,7 @@ const STEPS: &[TourStep] = &[
     },
     TourStep {
         title: "Encryption",
-        body:
-            "Every message is end-to-end encrypted. The shield badge shows the crypto suite used.",
+        body: "Every message is end-to-end encrypted. The shield badge shows the crypto suite used.",
         selector: ".encryption-badge, .email-indicators",
         position: "left",
     },

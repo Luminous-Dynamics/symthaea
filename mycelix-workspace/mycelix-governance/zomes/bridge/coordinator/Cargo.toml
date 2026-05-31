@@ -1,0 +1,15 @@
+[package]
+name = "governance_bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Cross-hApp bridge coordinator zome for Mycelix Governance"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "governance_bridge"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+governance_bridge_integrity = { path = "../integrity" }

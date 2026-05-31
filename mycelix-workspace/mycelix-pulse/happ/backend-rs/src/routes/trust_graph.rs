@@ -6,17 +6,16 @@
 //! Endpoints for visualizing and managing the trust graph.
 
 use axum::{
-    extract::{Extension, Path, Query},
-    routing::{get, post, delete},
     Json, Router,
+    extract::{Extension, Path, Query},
+    routing::{delete, get, post},
 };
 
 use crate::error::{AppError, AppResult};
 use crate::middleware::Claims as JwtClaims;
 use crate::routes::AppState;
 use crate::services::trust_graph::{
-    RelationType, TrustAttestation, TrustEdge, TrustGraph,
-    TrustGraphService, TrustPath,
+    RelationType, TrustAttestation, TrustEdge, TrustGraph, TrustGraphService, TrustPath,
 };
 
 /// Create the trust graph router
@@ -135,9 +134,9 @@ pub async fn create_attestation(
     let graph_service = TrustGraphService::new();
 
     let now = chrono::Utc::now();
-    let expires_at = request.expires_days.map(|days| {
-        now + chrono::Duration::days(days as i64)
-    });
+    let expires_at = request
+        .expires_days
+        .map(|days| now + chrono::Duration::days(days as i64));
 
     let attestation = TrustAttestation {
         id: uuid::Uuid::new_v4().to_string(),
@@ -150,7 +149,9 @@ pub async fn create_attestation(
         expires_at,
     };
 
-    graph_service.create_attestation(attestation.clone()).await?;
+    graph_service
+        .create_attestation(attestation.clone())
+        .await?;
 
     Ok(Json(CreateAttestationResponse { attestation }))
 }

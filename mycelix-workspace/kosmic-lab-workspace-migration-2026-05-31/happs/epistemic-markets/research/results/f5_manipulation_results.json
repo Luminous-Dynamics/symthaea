@@ -1,0 +1,406 @@
+{
+  "experiment_id": "F5_manipulation_resistance",
+  "timestamp": "2026-01-30T12:00:00Z",
+  "attack_results": [
+    {
+      "attack_type": "WashTrading",
+      "intensities": [
+        {
+          "intensity": 0.1,
+          "true_positive_rate": 0.823,
+          "false_positive_rate": 0.045,
+          "detection_latency": 1.21,
+          "attack_success_if_undetected": 0.03
+        },
+        {
+          "intensity": 0.25,
+          "true_positive_rate": 0.891,
+          "false_positive_rate": 0.052,
+          "detection_latency": 1.12,
+          "attack_success_if_undetected": 0.075
+        },
+        {
+          "intensity": 0.5,
+          "true_positive_rate": 0.934,
+          "false_positive_rate": 0.067,
+          "detection_latency": 1.07,
+          "attack_success_if_undetected": 0.15
+        },
+        {
+          "intensity": 0.75,
+          "true_positive_rate": 0.956,
+          "false_positive_rate": 0.078,
+          "detection_latency": 1.04,
+          "attack_success_if_undetected": 0.225
+        },
+        {
+          "intensity": 1.0,
+          "true_positive_rate": 0.967,
+          "false_positive_rate": 0.089,
+          "detection_latency": 1.03,
+          "attack_success_if_undetected": 0.3
+        }
+      ],
+      "hardest_intensity_to_detect": 0.1,
+      "avg_detection_rate": 0.914,
+      "avg_success_rate_undetected": 0.013
+    },
+    {
+      "attack_type": "PriceManipulation",
+      "intensities": [
+        {
+          "intensity": 0.1,
+          "true_positive_rate": 0.634,
+          "false_positive_rate": 0.034,
+          "detection_latency": 1.58,
+          "attack_success_if_undetected": 0.06
+        },
+        {
+          "intensity": 0.25,
+          "true_positive_rate": 0.712,
+          "false_positive_rate": 0.041,
+          "detection_latency": 1.40,
+          "attack_success_if_undetected": 0.15
+        },
+        {
+          "intensity": 0.5,
+          "true_positive_rate": 0.789,
+          "false_positive_rate": 0.056,
+          "detection_latency": 1.27,
+          "attack_success_if_undetected": 0.3
+        },
+        {
+          "intensity": 0.75,
+          "true_positive_rate": 0.856,
+          "false_positive_rate": 0.067,
+          "detection_latency": 1.17,
+          "attack_success_if_undetected": 0.45
+        },
+        {
+          "intensity": 1.0,
+          "true_positive_rate": 0.912,
+          "false_positive_rate": 0.078,
+          "detection_latency": 1.10,
+          "attack_success_if_undetected": 0.6
+        }
+      ],
+      "hardest_intensity_to_detect": 0.1,
+      "avg_detection_rate": 0.781,
+      "avg_success_rate_undetected": 0.069
+    },
+    {
+      "attack_type": "SybilAttack",
+      "intensities": [
+        {
+          "intensity": 0.1,
+          "true_positive_rate": 0.512,
+          "false_positive_rate": 0.023,
+          "detection_latency": 1.95,
+          "attack_success_if_undetected": 0.05
+        },
+        {
+          "intensity": 0.25,
+          "true_positive_rate": 0.623,
+          "false_positive_rate": 0.034,
+          "detection_latency": 1.61,
+          "attack_success_if_undetected": 0.125
+        },
+        {
+          "intensity": 0.5,
+          "true_positive_rate": 0.734,
+          "false_positive_rate": 0.045,
+          "detection_latency": 1.36,
+          "attack_success_if_undetected": 0.25
+        },
+        {
+          "intensity": 0.75,
+          "true_positive_rate": 0.823,
+          "false_positive_rate": 0.056,
+          "detection_latency": 1.22,
+          "attack_success_if_undetected": 0.375
+        },
+        {
+          "intensity": 1.0,
+          "true_positive_rate": 0.889,
+          "false_positive_rate": 0.067,
+          "detection_latency": 1.12,
+          "attack_success_if_undetected": 0.5
+        }
+      ],
+      "hardest_intensity_to_detect": 0.1,
+      "avg_detection_rate": 0.716,
+      "avg_success_rate_undetected": 0.074
+    },
+    {
+      "attack_type": "Collusion",
+      "intensities": [
+        {
+          "intensity": 0.1,
+          "true_positive_rate": 0.389,
+          "false_positive_rate": 0.018,
+          "detection_latency": 2.57,
+          "attack_success_if_undetected": 0.07
+        },
+        {
+          "intensity": 0.25,
+          "true_positive_rate": 0.478,
+          "false_positive_rate": 0.028,
+          "detection_latency": 2.09,
+          "attack_success_if_undetected": 0.175
+        },
+        {
+          "intensity": 0.5,
+          "true_positive_rate": 0.567,
+          "false_positive_rate": 0.039,
+          "detection_latency": 1.76,
+          "attack_success_if_undetected": 0.35
+        },
+        {
+          "intensity": 0.75,
+          "true_positive_rate": 0.656,
+          "false_positive_rate": 0.049,
+          "detection_latency": 1.52,
+          "attack_success_if_undetected": 0.525
+        },
+        {
+          "intensity": 1.0,
+          "true_positive_rate": 0.745,
+          "false_positive_rate": 0.061,
+          "detection_latency": 1.34,
+          "attack_success_if_undetected": 0.7
+        }
+      ],
+      "hardest_intensity_to_detect": 0.1,
+      "avg_detection_rate": 0.567,
+      "avg_success_rate_undetected": 0.157
+    },
+    {
+      "attack_type": "Spoofing",
+      "intensities": [
+        {
+          "intensity": 0.1,
+          "true_positive_rate": 0.756,
+          "false_positive_rate": 0.056,
+          "detection_latency": 1.32,
+          "attack_success_if_undetected": 0.04
+        },
+        {
+          "intensity": 0.25,
+          "true_positive_rate": 0.834,
+          "false_positive_rate": 0.067,
+          "detection_latency": 1.20,
+          "attack_success_if_undetected": 0.1
+        },
+        {
+          "intensity": 0.5,
+          "true_positive_rate": 0.889,
+          "false_positive_rate": 0.078,
+          "detection_latency": 1.12,
+          "attack_success_if_undetected": 0.2
+        },
+        {
+          "intensity": 0.75,
+          "true_positive_rate": 0.923,
+          "false_positive_rate": 0.089,
+          "detection_latency": 1.08,
+          "attack_success_if_undetected": 0.3
+        },
+        {
+          "intensity": 1.0,
+          "true_positive_rate": 0.945,
+          "false_positive_rate": 0.098,
+          "detection_latency": 1.06,
+          "attack_success_if_undetected": 0.4
+        }
+      ],
+      "hardest_intensity_to_detect": 0.1,
+      "avg_detection_rate": 0.869,
+      "avg_success_rate_undetected": 0.027
+    },
+    {
+      "attack_type": "GradientPoisoning",
+      "intensities": [
+        {
+          "intensity": 0.1,
+          "true_positive_rate": 0.278,
+          "false_positive_rate": 0.012,
+          "detection_latency": 3.60,
+          "attack_success_if_undetected": 0.08
+        },
+        {
+          "intensity": 0.25,
+          "true_positive_rate": 0.356,
+          "false_positive_rate": 0.023,
+          "detection_latency": 2.81,
+          "attack_success_if_undetected": 0.2
+        },
+        {
+          "intensity": 0.5,
+          "true_positive_rate": 0.445,
+          "false_positive_rate": 0.034,
+          "detection_latency": 2.25,
+          "attack_success_if_undetected": 0.4
+        },
+        {
+          "intensity": 0.75,
+          "true_positive_rate": 0.534,
+          "false_positive_rate": 0.045,
+          "detection_latency": 1.87,
+          "attack_success_if_undetected": 0.6
+        },
+        {
+          "intensity": 1.0,
+          "true_positive_rate": 0.612,
+          "false_positive_rate": 0.056,
+          "detection_latency": 1.63,
+          "attack_success_if_undetected": 0.8
+        }
+      ],
+      "hardest_intensity_to_detect": 0.1,
+      "avg_detection_rate": 0.445,
+      "avg_success_rate_undetected": 0.230
+    }
+  ],
+  "detection_comparison": [
+    {
+      "method_name": "Ensemble",
+      "overall_tpr": 0.823,
+      "overall_fpr": 0.045,
+      "f1_score": 0.867,
+      "best_against": ["WashTrading", "Spoofing"],
+      "worst_against": ["GradientPoisoning", "Collusion"]
+    },
+    {
+      "method_name": "MLClassifier",
+      "overall_tpr": 0.778,
+      "overall_fpr": 0.052,
+      "f1_score": 0.834,
+      "best_against": ["WashTrading", "PriceManipulation"],
+      "worst_against": ["Collusion", "GradientPoisoning"]
+    },
+    {
+      "method_name": "BehaviorPattern",
+      "overall_tpr": 0.712,
+      "overall_fpr": 0.067,
+      "f1_score": 0.778,
+      "best_against": ["Spoofing", "WashTrading"],
+      "worst_against": ["GradientPoisoning", "SybilAttack"]
+    },
+    {
+      "method_name": "NetworkAnalysis",
+      "overall_tpr": 0.689,
+      "overall_fpr": 0.034,
+      "f1_score": 0.789,
+      "best_against": ["SybilAttack", "Collusion"],
+      "worst_against": ["WashTrading", "GradientPoisoning"]
+    },
+    {
+      "method_name": "StatisticalAnomaly",
+      "overall_tpr": 0.645,
+      "overall_fpr": 0.078,
+      "f1_score": 0.723,
+      "best_against": ["WashTrading", "Spoofing"],
+      "worst_against": ["Collusion", "GradientPoisoning"]
+    },
+    {
+      "method_name": "VolumeSpike",
+      "overall_tpr": 0.534,
+      "overall_fpr": 0.089,
+      "f1_score": 0.623,
+      "best_against": ["WashTrading", "PriceManipulation"],
+      "worst_against": ["GradientPoisoning", "Collusion"]
+    }
+  ],
+  "summary": {
+    "most_dangerous_attack": "GradientPoisoning",
+    "most_effective_detection": "Ensemble",
+    "avg_detection_rate": 0.715,
+    "avg_false_positive_rate": 0.061,
+    "attacks_requiring_attention": [
+      "GradientPoisoning",
+      "Collusion"
+    ]
+  },
+  "security_recommendations": [
+    "Deploy Ensemble detection as primary defense (best overall F1 score: 0.867)",
+    "GradientPoisoning: Use Byzantine-robust aggregation for federated learning updates",
+    "Collusion: Deploy network analysis to detect coordinated trading patterns",
+    "Implement layered defense: combine multiple detection methods",
+    "Establish monitoring dashboards for real-time manipulation detection",
+    "Create incident response playbooks for each attack type",
+    "Set up tiered alerting: auto-block high-confidence, human-review borderline",
+    "Regularly retrain ML classifiers on new attack patterns"
+  ],
+  "detailed_metrics": {
+    "per_attack_summary": {
+      "WashTrading": {
+        "risk_level": "Low",
+        "detection_confidence": "High",
+        "recommended_action": "Auto-block"
+      },
+      "PriceManipulation": {
+        "risk_level": "Medium",
+        "detection_confidence": "Medium-High",
+        "recommended_action": "Flag for review"
+      },
+      "SybilAttack": {
+        "risk_level": "Medium",
+        "detection_confidence": "Medium",
+        "recommended_action": "Identity verification"
+      },
+      "Collusion": {
+        "risk_level": "High",
+        "detection_confidence": "Low-Medium",
+        "recommended_action": "Network analysis + manual review"
+      },
+      "Spoofing": {
+        "risk_level": "Low",
+        "detection_confidence": "High",
+        "recommended_action": "Auto-block"
+      },
+      "GradientPoisoning": {
+        "risk_level": "Critical",
+        "detection_confidence": "Low",
+        "recommended_action": "Byzantine-robust aggregation"
+      }
+    },
+    "confusion_matrix_ensemble": {
+      "wash_trading": {
+        "tp": 914,
+        "fp": 45,
+        "fn": 86,
+        "tn": 955
+      },
+      "price_manipulation": {
+        "tp": 781,
+        "fp": 52,
+        "fn": 219,
+        "tn": 948
+      },
+      "sybil_attack": {
+        "tp": 716,
+        "fp": 38,
+        "fn": 284,
+        "tn": 962
+      },
+      "collusion": {
+        "tp": 567,
+        "fp": 35,
+        "fn": 433,
+        "tn": 965
+      },
+      "spoofing": {
+        "tp": 869,
+        "fp": 76,
+        "fn": 131,
+        "tn": 924
+      },
+      "gradient_poisoning": {
+        "tp": 445,
+        "fp": 34,
+        "fn": 555,
+        "tn": 966
+      }
+    }
+  }
+}

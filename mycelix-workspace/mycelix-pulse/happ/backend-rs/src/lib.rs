@@ -16,21 +16,17 @@ pub mod types;
 pub mod validation;
 
 use axum::{
-    http::{header, Method},
     Extension, Router,
+    http::{Method, header},
 };
-use tower_http::{
-    compression::CompressionLayer,
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
 use crate::middleware::JwtSecret;
 use crate::openapi::ApiDoc;
-use crate::routes::{create_router, AppState};
+use crate::routes::{AppState, create_router};
 
 /// Create a test router for integration testing
 ///
@@ -49,12 +45,14 @@ pub async fn create_test_router() -> Router {
                 .filter_map(|o| o.parse().ok())
                 .collect::<Vec<_>>(),
         )
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_headers([
-            header::CONTENT_TYPE,
-            header::AUTHORIZATION,
-            header::ACCEPT,
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
         ])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
         .allow_credentials(true);
 
     Router::new()
@@ -78,15 +76,14 @@ pub fn create_test_token(did: &str, expiration_hours: i64) -> String {
 
     middleware::create_token(
         &claims,
-        &std::env::var("JWT_SECRET").unwrap_or_else(|_| "test_jwt_secret_for_testing_only_32chars!".to_string()),
+        &std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "test_jwt_secret_for_testing_only_32chars!".to_string()),
     )
     .expect("Failed to create test token")
 }
 
 /// Health check handler (for lib usage)
-async fn health_check(
-    Extension(state): Extension<AppState>,
-) -> axum::Json<types::HealthResponse> {
+async fn health_check(Extension(state): Extension<AppState>) -> axum::Json<types::HealthResponse> {
     use std::time::Instant;
     static START_TIME: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
     let start = START_TIME.get_or_init(Instant::now);

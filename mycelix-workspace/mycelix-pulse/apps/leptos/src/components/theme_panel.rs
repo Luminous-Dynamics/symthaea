@@ -4,7 +4,7 @@
 //! Theme customization panel — named themes, accent color picker, density slider, custom CSS.
 //! Reuses Hearth's 10 named themes adapted for the Pulse workspace.
 
-use crate::preferences::{clamp_font_scale, use_preferences, MAX_FONT_SCALE, MIN_FONT_SCALE};
+use crate::preferences::{MAX_FONT_SCALE, MIN_FONT_SCALE, clamp_font_scale, use_preferences};
 use crate::theme::use_theme;
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;

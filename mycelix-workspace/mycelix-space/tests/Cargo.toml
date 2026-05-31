@@ -1,0 +1,60 @@
+[package]
+name = "mycelix-space-tests"
+version = "0.1.0"
+edition = "2024"
+description = "Integration tests for mycelix-space orbital mechanics and Holochain types"
+publish = false
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Holochain testing dependencies (NO zome crate imports to avoid duplicate symbols)
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+hdk = "0.6"
+hdi = "0.7"
+
+# Async runtime
+tokio = { version = "1", features = ["full", "test-util"] }
+
+# Serialization (msgpack for Holochain entry deserialization)
+rmp-serde = "1.1"
+
+# Testing utilities
+anyhow = "1.0"
+pretty_assertions = "1.4"
+
+# Orbital mechanics library
+orbital-mechanics = { path = "../lib/orbital-mechanics" }
+
+# Shared types (for Holochain zome integration tests)
+mycelix-space-shared = { path = "../zomes/shared" }
+
+# Time handling
+chrono = "0.4"
+
+# Math
+nalgebra = { version = "0.32", features = ["serde-serialize"] }
+
+[[test]]
+name = "orbital_mechanics"
+path = "orbital_mechanics_tests.rs"
+
+[[test]]
+name = "conjunctions"
+path = "conjunctions_tests.rs"
+
+[[test]]
+name = "propagation"
+path = "propagation_tests.rs"
+
+[[test]]
+name = "shared_types"
+path = "integration/zome_tests.rs"
+
+# Sweettest Integration Tests (conductor-based)
+[[test]]
+name = "sweettest_integration"
+path = "sweettest_integration.rs"

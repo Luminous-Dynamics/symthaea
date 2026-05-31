@@ -6,7 +6,7 @@
 //! Bi-directional sync with Google Calendar, Microsoft Outlook, and CalDAV.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -235,10 +235,17 @@ pub enum ConflictResolution {
 pub trait CalendarSync: Send + Sync {
     fn provider(&self) -> CalendarProvider;
 
-    async fn authenticate(&self, auth_code: &str, redirect_uri: &str) -> Result<CalendarAccount, CalendarError>;
+    async fn authenticate(
+        &self,
+        auth_code: &str,
+        redirect_uri: &str,
+    ) -> Result<CalendarAccount, CalendarError>;
     async fn refresh_token(&self, account: &mut CalendarAccount) -> Result<(), CalendarError>;
 
-    async fn list_calendars(&self, account: &CalendarAccount) -> Result<Vec<CalendarInfo>, CalendarError>;
+    async fn list_calendars(
+        &self,
+        account: &CalendarAccount,
+    ) -> Result<Vec<CalendarInfo>, CalendarError>;
 
     async fn sync_events(
         &self,
@@ -346,7 +353,11 @@ impl CalendarSync for GoogleCalendarSync {
         CalendarProvider::Google
     }
 
-    async fn authenticate(&self, auth_code: &str, redirect_uri: &str) -> Result<CalendarAccount, CalendarError> {
+    async fn authenticate(
+        &self,
+        auth_code: &str,
+        redirect_uri: &str,
+    ) -> Result<CalendarAccount, CalendarError> {
         let token_response = self
             .client
             .post("https://oauth2.googleapis.com/token")
@@ -362,7 +373,9 @@ impl CalendarSync for GoogleCalendarSync {
             .map_err(|e| CalendarError::ApiError(e.to_string()))?;
 
         if !token_response.status().is_success() {
-            return Err(CalendarError::AuthError("Failed to exchange auth code".into()));
+            return Err(CalendarError::AuthError(
+                "Failed to exchange auth code".into(),
+            ));
         }
 
         let token_data: serde_json::Value = token_response
@@ -376,9 +389,14 @@ impl CalendarSync for GoogleCalendarSync {
             provider: CalendarProvider::Google,
             email: String::new(),
             name: "Google Calendar".to_string(),
-            access_token: token_data["access_token"].as_str().unwrap_or("").to_string(),
+            access_token: token_data["access_token"]
+                .as_str()
+                .unwrap_or("")
+                .to_string(),
             refresh_token: token_data["refresh_token"].as_str().map(String::from),
-            token_expires_at: Some(Utc::now() + Duration::seconds(token_data["expires_in"].as_i64().unwrap_or(3600))),
+            token_expires_at: Some(
+                Utc::now() + Duration::seconds(token_data["expires_in"].as_i64().unwrap_or(3600)),
+            ),
             sync_enabled: true,
             sync_direction: SyncDirection::Bidirectional,
             last_sync: None,
@@ -411,13 +429,20 @@ impl CalendarSync for GoogleCalendarSync {
             .await
             .map_err(|e| CalendarError::ApiError(e.to_string()))?;
 
-        account.access_token = token_data["access_token"].as_str().unwrap_or("").to_string();
-        account.token_expires_at = Some(Utc::now() + Duration::seconds(token_data["expires_in"].as_i64().unwrap_or(3600)));
+        account.access_token = token_data["access_token"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        account.token_expires_at =
+            Some(Utc::now() + Duration::seconds(token_data["expires_in"].as_i64().unwrap_or(3600)));
 
         Ok(())
     }
 
-    async fn list_calendars(&self, account: &CalendarAccount) -> Result<Vec<CalendarInfo>, CalendarError> {
+    async fn list_calendars(
+        &self,
+        account: &CalendarAccount,
+    ) -> Result<Vec<CalendarInfo>, CalendarError> {
         let response = self
             .client
             .get("https://www.googleapis.com/calendar/v3/users/me/calendarList")
@@ -442,7 +467,10 @@ impl CalendarSync for GoogleCalendarSync {
             .map(|cal| CalendarInfo {
                 id: cal["id"].as_str().unwrap_or("").to_string(),
                 name: cal["summary"].as_str().unwrap_or("").to_string(),
-                color: cal["backgroundColor"].as_str().unwrap_or("#4285F4").to_string(),
+                color: cal["backgroundColor"]
+                    .as_str()
+                    .unwrap_or("#4285F4")
+                    .to_string(),
                 primary: cal["primary"].as_bool().unwrap_or(false),
                 selected: true,
                 access_role: match cal["accessRole"].as_str() {
@@ -493,7 +521,9 @@ impl CalendarSync for GoogleCalendarSync {
 
         if response.status().as_u16() == 410 {
             // Sync token expired, need full sync
-            return Err(CalendarError::SyncConflict("Sync token expired, need full resync".into()));
+            return Err(CalendarError::SyncConflict(
+                "Sync token expired, need full resync".into(),
+            ));
         }
 
         let data: serde_json::Value = response
@@ -501,7 +531,10 @@ impl CalendarSync for GoogleCalendarSync {
             .await
             .map_err(|e| CalendarError::ApiError(e.to_string()))?;
 
-        let events_pulled = data["items"].as_array().map(|a| a.len() as u32).unwrap_or(0);
+        let events_pulled = data["items"]
+            .as_array()
+            .map(|a| a.len() as u32)
+            .unwrap_or(0);
 
         Ok(SyncResult {
             success: true,
@@ -583,9 +616,10 @@ impl CalendarSync for GoogleCalendarSync {
         calendar_id: &str,
         event: &CalendarEvent,
     ) -> Result<CalendarEvent, CalendarError> {
-        let external_id = event.external_id.as_ref().ok_or_else(|| {
-            CalendarError::EventNotFound("No external ID".into())
-        })?;
+        let external_id = event
+            .external_id
+            .as_ref()
+            .ok_or_else(|| CalendarError::EventNotFound("No external ID".into()))?;
 
         let url = format!(
             "https://www.googleapis.com/calendar/v3/calendars/{}/events/{}",
@@ -789,19 +823,29 @@ impl GoogleCalendarSync {
             })
             .collect();
 
-        let organizer = data["organizer"].as_object().map(|o| Attendee {
-            email: o["email"].as_ref().and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            name: o["displayName"].as_ref().and_then(|v| v.as_str()).map(String::from),
-            response_status: ResponseStatus::Accepted,
-            optional: false,
-            organizer: true,
-        }).unwrap_or(Attendee {
-            email: String::new(),
-            name: None,
-            response_status: ResponseStatus::Accepted,
-            optional: false,
-            organizer: true,
-        });
+        let organizer = data["organizer"]
+            .as_object()
+            .map(|o| Attendee {
+                email: o["email"]
+                    .as_ref()
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                name: o["displayName"]
+                    .as_ref()
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                response_status: ResponseStatus::Accepted,
+                optional: false,
+                organizer: true,
+            })
+            .unwrap_or(Attendee {
+                email: String::new(),
+                name: None,
+                response_status: ResponseStatus::Accepted,
+                optional: false,
+                organizer: true,
+            });
 
         let conference = data["conferenceData"]["entryPoints"]
             .as_array()
@@ -809,7 +853,9 @@ impl GoogleCalendarSync {
             .map(|ep| ConferenceInfo {
                 provider: ConferenceProvider::GoogleMeet,
                 url: ep["uri"].as_str().unwrap_or("").to_string(),
-                meeting_id: data["conferenceData"]["conferenceId"].as_str().map(String::from),
+                meeting_id: data["conferenceData"]["conferenceId"]
+                    .as_str()
+                    .map(String::from),
                 passcode: None,
                 phone_numbers: vec![],
             });
@@ -823,7 +869,10 @@ impl GoogleCalendarSync {
             start_time,
             end_time,
             all_day,
-            timezone: data["start"]["timeZone"].as_str().unwrap_or("UTC").to_string(),
+            timezone: data["start"]["timeZone"]
+                .as_str()
+                .unwrap_or("UTC")
+                .to_string(),
             attendees,
             organizer,
             status: match data["status"].as_str() {
@@ -930,13 +979,16 @@ impl CalendarSyncManager {
                 let time_min = Utc::now() - Duration::days(30);
                 let time_max = Utc::now() + Duration::days(365);
 
-                match sync.sync_events(
-                    account,
-                    &calendar.id,
-                    account.sync_token.as_deref(),
-                    time_min,
-                    time_max,
-                ).await {
+                match sync
+                    .sync_events(
+                        account,
+                        &calendar.id,
+                        account.sync_token.as_deref(),
+                        time_min,
+                        time_max,
+                    )
+                    .await
+                {
                     Ok(result) => results.push(result),
                     Err(e) => results.push(SyncResult {
                         success: false,

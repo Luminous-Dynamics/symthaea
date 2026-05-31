@@ -6,9 +6,9 @@
 //! Enables team-based email management with shared inboxes,
 //! assignment workflows, internal comments, and collaboration features.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// A team organization
@@ -268,7 +268,13 @@ impl TeamCollaborationService {
 
         self.members.entry(team_id).or_default().push(owner_member);
 
-        self.log_activity(team_id, owner_id, ActivityAction::Created, TargetType::Team, team_id);
+        self.log_activity(
+            team_id,
+            owner_id,
+            ActivityAction::Created,
+            TargetType::Team,
+            team_id,
+        );
 
         team
     }
@@ -302,15 +308,29 @@ impl TeamCollaborationService {
             invited_by: Some(invited_by),
         };
 
-        self.members.entry(team_id).or_default().push(member.clone());
+        self.members
+            .entry(team_id)
+            .or_default()
+            .push(member.clone());
 
-        self.log_activity(team_id, invited_by, ActivityAction::Created, TargetType::Member, member.id);
+        self.log_activity(
+            team_id,
+            invited_by,
+            ActivityAction::Created,
+            TargetType::Member,
+            member.id,
+        );
 
         Ok(member)
     }
 
     /// Remove a member from a team
-    pub fn remove_member(&mut self, team_id: Uuid, user_id: Uuid, removed_by: Uuid) -> Result<(), TeamError> {
+    pub fn remove_member(
+        &mut self,
+        team_id: Uuid,
+        user_id: Uuid,
+        removed_by: Uuid,
+    ) -> Result<(), TeamError> {
         if let Some(members) = self.members.get_mut(&team_id) {
             let original_len = members.len();
             members.retain(|m| m.user_id != user_id);
@@ -319,7 +339,13 @@ impl TeamCollaborationService {
                 return Err(TeamError::MemberNotFound(user_id));
             }
 
-            self.log_activity(team_id, removed_by, ActivityAction::Deleted, TargetType::Member, user_id);
+            self.log_activity(
+                team_id,
+                removed_by,
+                ActivityAction::Deleted,
+                TargetType::Member,
+                user_id,
+            );
         }
 
         Ok(())
@@ -353,7 +379,13 @@ impl TeamCollaborationService {
 
         self.shared_inboxes.insert(inbox.id, inbox.clone());
 
-        self.log_activity(team_id, created_by, ActivityAction::Created, TargetType::SharedInbox, inbox.id);
+        self.log_activity(
+            team_id,
+            created_by,
+            ActivityAction::Created,
+            TargetType::SharedInbox,
+            inbox.id,
+        );
 
         Ok(inbox)
     }
@@ -376,7 +408,9 @@ impl TeamCollaborationService {
         assignee_id: Uuid,
         assigned_by: Uuid,
     ) -> Result<EmailAssignment, TeamError> {
-        let inbox = self.shared_inboxes.get(&inbox_id)
+        let inbox = self
+            .shared_inboxes
+            .get(&inbox_id)
             .ok_or(TeamError::InboxNotFound(inbox_id))?;
 
         let assignment = EmailAssignment {
@@ -396,14 +430,22 @@ impl TeamCollaborationService {
 
         self.assignments.insert(assignment.id, assignment.clone());
 
-        self.log_activity(inbox.team_id, assigned_by, ActivityAction::Assigned, TargetType::Email, email_id);
+        self.log_activity(
+            inbox.team_id,
+            assigned_by,
+            ActivityAction::Assigned,
+            TargetType::Email,
+            email_id,
+        );
 
         Ok(assignment)
     }
 
     /// Claim an unassigned email
     pub fn claim_email(&mut self, assignment_id: Uuid, user_id: Uuid) -> Result<(), TeamError> {
-        let assignment = self.assignments.get_mut(&assignment_id)
+        let assignment = self
+            .assignments
+            .get_mut(&assignment_id)
             .ok_or(TeamError::AssignmentNotFound(assignment_id))?;
 
         if assignment.assignee_id.is_some() {
@@ -415,14 +457,26 @@ impl TeamCollaborationService {
         assignment.updated_at = Utc::now();
 
         let inbox = self.shared_inboxes.get(&assignment.inbox_id).unwrap();
-        self.log_activity(inbox.team_id, user_id, ActivityAction::Claimed, TargetType::Email, assignment.email_id);
+        self.log_activity(
+            inbox.team_id,
+            user_id,
+            ActivityAction::Claimed,
+            TargetType::Email,
+            assignment.email_id,
+        );
 
         Ok(())
     }
 
     /// Auto-assign using the configured strategy
-    pub fn auto_assign(&mut self, email_id: Uuid, inbox_id: Uuid) -> Result<EmailAssignment, TeamError> {
-        let inbox = self.shared_inboxes.get(&inbox_id)
+    pub fn auto_assign(
+        &mut self,
+        email_id: Uuid,
+        inbox_id: Uuid,
+    ) -> Result<EmailAssignment, TeamError> {
+        let inbox = self
+            .shared_inboxes
+            .get(&inbox_id)
             .ok_or(TeamError::InboxNotFound(inbox_id))?;
 
         let members = self.get_inbox_members(inbox_id)?;
@@ -448,15 +502,20 @@ impl TeamCollaborationService {
                 }
 
                 for assignment in self.assignments.values() {
-                    if assignment.inbox_id == inbox_id &&
-                       !matches!(assignment.status, AssignmentStatus::Resolved | AssignmentStatus::Closed) {
+                    if assignment.inbox_id == inbox_id
+                        && !matches!(
+                            assignment.status,
+                            AssignmentStatus::Resolved | AssignmentStatus::Closed
+                        )
+                    {
                         if let Some(assignee) = assignment.assignee_id {
                             *workloads.entry(assignee).or_insert(0) += 1;
                         }
                     }
                 }
 
-                workloads.into_iter()
+                workloads
+                    .into_iter()
                     .min_by_key(|(_, count)| *count)
                     .map(|(id, _)| id)
                     .unwrap_or(members[0].user_id)
@@ -473,10 +532,14 @@ impl TeamCollaborationService {
 
     /// Get members who can access an inbox
     fn get_inbox_members(&self, inbox_id: Uuid) -> Result<Vec<&TeamMember>, TeamError> {
-        let inbox = self.shared_inboxes.get(&inbox_id)
+        let inbox = self
+            .shared_inboxes
+            .get(&inbox_id)
             .ok_or(TeamError::InboxNotFound(inbox_id))?;
 
-        let team_members = self.members.get(&inbox.team_id)
+        let team_members = self
+            .members
+            .get(&inbox.team_id)
             .ok_or(TeamError::TeamNotFound(inbox.team_id))?;
 
         let members: Vec<&TeamMember> = team_members
@@ -501,7 +564,9 @@ impl TeamCollaborationService {
         user_id: Uuid,
         resolution_note: Option<String>,
     ) -> Result<(), TeamError> {
-        let assignment = self.assignments.get_mut(&assignment_id)
+        let assignment = self
+            .assignments
+            .get_mut(&assignment_id)
             .ok_or(TeamError::AssignmentNotFound(assignment_id))?;
 
         assignment.status = AssignmentStatus::Resolved;
@@ -510,7 +575,13 @@ impl TeamCollaborationService {
         assignment.updated_at = Utc::now();
 
         let inbox = self.shared_inboxes.get(&assignment.inbox_id).unwrap();
-        self.log_activity(inbox.team_id, user_id, ActivityAction::Resolved, TargetType::Email, assignment.email_id);
+        self.log_activity(
+            inbox.team_id,
+            user_id,
+            ActivityAction::Resolved,
+            TargetType::Email,
+            assignment.email_id,
+        );
 
         Ok(())
     }
@@ -538,7 +609,10 @@ impl TeamCollaborationService {
             edited_at: None,
         };
 
-        self.comments.entry(email_id).or_default().push(comment.clone());
+        self.comments
+            .entry(email_id)
+            .or_default()
+            .push(comment.clone());
 
         // Log mentions as separate activities
         for mentioned_user in mentions {
@@ -581,19 +655,28 @@ impl TeamCollaborationService {
             created_at: Utc::now(),
         };
 
-        self.canned_responses.entry(team_id).or_default().push(response.clone());
+        self.canned_responses
+            .entry(team_id)
+            .or_default()
+            .push(response.clone());
 
         response
     }
 
     /// Get canned responses for a team/inbox
-    pub fn get_canned_responses(&self, team_id: Uuid, inbox_id: Option<Uuid>) -> Vec<&CannedResponse> {
+    pub fn get_canned_responses(
+        &self,
+        team_id: Uuid,
+        inbox_id: Option<Uuid>,
+    ) -> Vec<&CannedResponse> {
         self.canned_responses
             .get(&team_id)
             .map(|responses| {
                 responses
                     .iter()
-                    .filter(|r| inbox_id.is_none() || r.inbox_id == inbox_id || r.inbox_id.is_none())
+                    .filter(|r| {
+                        inbox_id.is_none() || r.inbox_id == inbox_id || r.inbox_id.is_none()
+                    })
                     .collect()
             })
             .unwrap_or_default()
@@ -717,12 +800,14 @@ mod tests {
         let owner_id = Uuid::new_v4();
 
         let team = service.create_team("Support".to_string(), owner_id);
-        let inbox = service.create_shared_inbox(
-            team.id,
-            "Support Queue".to_string(),
-            "support@company.com".to_string(),
-            owner_id,
-        ).unwrap();
+        let inbox = service
+            .create_shared_inbox(
+                team.id,
+                "Support Queue".to_string(),
+                "support@company.com".to_string(),
+                owner_id,
+            )
+            .unwrap();
 
         assert_eq!(inbox.team_id, team.id);
         assert_eq!(inbox.email_address, "support@company.com");
@@ -736,16 +821,22 @@ mod tests {
         let email_id = Uuid::new_v4();
 
         let team = service.create_team("Support".to_string(), owner_id);
-        service.add_member(team.id, member_id, TeamRole::Member, owner_id).unwrap();
+        service
+            .add_member(team.id, member_id, TeamRole::Member, owner_id)
+            .unwrap();
 
-        let inbox = service.create_shared_inbox(
-            team.id,
-            "Queue".to_string(),
-            "queue@example.com".to_string(),
-            owner_id,
-        ).unwrap();
+        let inbox = service
+            .create_shared_inbox(
+                team.id,
+                "Queue".to_string(),
+                "queue@example.com".to_string(),
+                owner_id,
+            )
+            .unwrap();
 
-        let assignment = service.assign_email(email_id, inbox.id, member_id, owner_id).unwrap();
+        let assignment = service
+            .assign_email(email_id, inbox.id, member_id, owner_id)
+            .unwrap();
 
         assert_eq!(assignment.assignee_id, Some(member_id));
         assert_eq!(assignment.status, AssignmentStatus::Assigned);

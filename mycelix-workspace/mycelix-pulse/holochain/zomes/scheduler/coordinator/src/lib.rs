@@ -22,12 +22,7 @@ pub fn schedule_email(scheduled: ScheduledEmail) -> ExternResult<ActionHash> {
 
     // Link to all schedules
     let all_anchor = anchor_hash(ALL_SCHEDULES_ANCHOR)?;
-    create_link(
-        all_anchor,
-        action_hash.clone(),
-        LinkTypes::AllSchedules,
-        (),
-    )?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllSchedules, ())?;
 
     // Link to pending if status is pending
     if matches!(scheduled.status, ScheduleStatus::Pending) {
@@ -85,14 +80,18 @@ pub fn get_schedule(hash: ActionHash) -> ExternResult<Option<ScheduledEmail>> {
 pub fn update_schedule(scheduled: ScheduledEmail) -> ExternResult<ActionHash> {
     // Find existing schedule by ID
     let all_anchor = anchor_hash(ALL_SCHEDULES_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(all_anchor, LinkTypes::AllSchedules)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(all_anchor, LinkTypes::AllSchedules)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(existing) = get_schedule(hash.clone())? {
                 if existing.id == scheduled.id {
                     // Update the entry
-                    let new_hash = update_entry(hash.clone(), EntryTypes::ScheduledEmail(scheduled.clone()))?;
+                    let new_hash =
+                        update_entry(hash.clone(), EntryTypes::ScheduledEmail(scheduled.clone()))?;
 
                     // Update pending links if status changed
                     update_status_links(&scheduled, &hash, &new_hash)?;
@@ -132,7 +131,10 @@ pub fn cancel_schedule(hash: ActionHash) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn get_all_schedules(_: ()) -> ExternResult<Vec<ScheduledEmail>> {
     let anchor = anchor_hash(ALL_SCHEDULES_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AllSchedules)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::AllSchedules)?,
+        GetStrategy::default(),
+    )?;
 
     let mut schedules = Vec::new();
     for link in links {
@@ -153,7 +155,10 @@ pub fn get_all_schedules(_: ()) -> ExternResult<Vec<ScheduledEmail>> {
 #[hdk_extern]
 pub fn get_pending_schedules(_: ()) -> ExternResult<Vec<ScheduledEmail>> {
     let anchor = anchor_hash(PENDING_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::PendingSchedules)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::PendingSchedules)?,
+        GetStrategy::default(),
+    )?;
 
     let now = sys_time()?.as_micros() as u64;
     let mut schedules = Vec::new();
@@ -179,7 +184,10 @@ pub fn get_pending_schedules(_: ()) -> ExternResult<Vec<ScheduledEmail>> {
 #[hdk_extern]
 pub fn get_recurring_schedules(_: ()) -> ExternResult<Vec<ScheduledEmail>> {
     let anchor = anchor_hash(RECURRING_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::RecurringSchedules)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::RecurringSchedules)?,
+        GetStrategy::default(),
+    )?;
 
     let mut schedules = Vec::new();
     for link in links {
@@ -198,7 +206,10 @@ pub fn get_recurring_schedules(_: ()) -> ExternResult<Vec<ScheduledEmail>> {
 /// Get schedule for draft
 #[hdk_extern]
 pub fn get_schedule_for_draft(draft_hash: ActionHash) -> ExternResult<Option<ScheduledEmail>> {
-    let links = get_links(LinkQuery::try_new(draft_hash, LinkTypes::DraftToSchedule)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(draft_hash, LinkTypes::DraftToSchedule)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.first() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -245,7 +256,10 @@ pub struct SnoozeInput {
 #[hdk_extern]
 pub fn get_due_reminders(_: ()) -> ExternResult<Vec<SnoozeReminder>> {
     let anchor = anchor_hash(SNOOZE_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::SnoozeReminders)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::SnoozeReminders)?,
+        GetStrategy::default(),
+    )?;
 
     let now = sys_time()?.as_micros() as u64;
     let mut reminders = Vec::new();
@@ -320,7 +334,10 @@ fn update_status_links(
 
 fn remove_pending_link(hash: &ActionHash) -> ExternResult<()> {
     let pending_anchor = anchor_hash(PENDING_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(pending_anchor, LinkTypes::PendingSchedules)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(pending_anchor, LinkTypes::PendingSchedules)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(target_hash) = link.target.clone().into_action_hash() {

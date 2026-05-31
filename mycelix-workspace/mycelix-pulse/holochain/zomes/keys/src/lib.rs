@@ -256,9 +256,8 @@ pub fn get_current_key_bundle(agent: AgentPubKey) -> ExternResult<Option<KeyLook
         return Ok(None);
     }
 
-    let action_hash = ActionHash::try_from(links[0].target.clone()).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-    })?;
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
     let key_bundle = get_key_bundle(action_hash.clone())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Key bundle not found".into())))?;
@@ -279,15 +278,17 @@ pub fn get_current_key_bundle(agent: AgentPubKey) -> ExternResult<Option<KeyLook
 pub fn get_key_bundle_by_email(email: String) -> ExternResult<Option<KeyLookupResult>> {
     let email_anchor = email_anchor_hash(&email)?;
 
-    let links = get_links(LinkQuery::try_new(email_anchor, LinkTypes::EmailToAgent)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(email_anchor, LinkTypes::EmailToAgent)?,
+        GetStrategy::default(),
+    )?;
 
     if links.is_empty() {
         return Ok(None);
     }
 
-    let agent = AgentPubKey::try_from(links[0].target.clone()).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Invalid agent key".into()))
-    })?;
+    let agent = AgentPubKey::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent key".into())))?;
 
     get_current_key_bundle(agent)
 }
@@ -295,7 +296,10 @@ pub fn get_key_bundle_by_email(email: String) -> ExternResult<Option<KeyLookupRe
 /// Get all key bundles for an agent (including rotated ones)
 #[hdk_extern]
 pub fn get_agent_key_bundles(agent: AgentPubKey) -> ExternResult<Vec<KeyLookupResult>> {
-    let links = get_links(LinkQuery::try_new(agent.clone(), LinkTypes::AgentToKeys)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToKeys)?,
+        GetStrategy::default(),
+    )?;
 
     let mut results = Vec::new();
     let mut current_hash: Option<ActionHash> = None;
@@ -303,17 +307,17 @@ pub fn get_agent_key_bundles(agent: AgentPubKey) -> ExternResult<Vec<KeyLookupRe
     // Find current key
     for link in &links {
         if link.tag == LinkTag::new("current") {
-            current_hash = Some(ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-            })?);
+            current_hash =
+                Some(ActionHash::try_from(link.target.clone()).map_err(|_| {
+                    wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
+                })?);
             break;
         }
     }
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
         if let Some(key_bundle) = get_key_bundle(action_hash.clone())? {
             let is_current = current_hash.as_ref() == Some(&action_hash);
@@ -369,7 +373,9 @@ fn get_key_bundle(action_hash: ActionHash) -> ExternResult<Option<KeyBundle>> {
     let record = get(action_hash, GetOptions::default())?;
     match record {
         Some(r) => {
-            let entry = r.entry().to_app_option::<KeyBundle>()
+            let entry = r
+                .entry()
+                .to_app_option::<KeyBundle>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
             Ok(entry)
         }
@@ -415,11 +421,12 @@ pub enum LinkTypes {
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, .. } |
-            OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
-                EntryTypes::KeyBundle(key_bundle) => validate_key_bundle(key_bundle),
-                EntryTypes::RevokedKey(revoked) => validate_revoked_key(revoked),
-            },
+            OpEntry::CreateEntry { app_entry, .. } | OpEntry::UpdateEntry { app_entry, .. } => {
+                match app_entry {
+                    EntryTypes::KeyBundle(key_bundle) => validate_key_bundle(key_bundle),
+                    EntryTypes::RevokedKey(revoked) => validate_revoked_key(revoked),
+                }
+            }
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
@@ -432,12 +439,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // Only the agent can create links from themselves
                 Ok(ValidateCallbackResult::Valid)
             }
-            LinkTypes::EmailToAgent => {
-                Ok(ValidateCallbackResult::Valid)
-            }
-            LinkTypes::KeyToRevocation => {
-                Ok(ValidateCallbackResult::Valid)
-            }
+            LinkTypes::EmailToAgent => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::KeyToRevocation => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -453,7 +456,8 @@ fn validate_key_bundle(key_bundle: KeyBundle) -> ExternResult<ValidateCallbackRe
     }
 
     // Dilithium3 public key should be 1952 bytes
-    if key_bundle.dilithium_public_key.len() != 1952 && !key_bundle.dilithium_public_key.is_empty() {
+    if key_bundle.dilithium_public_key.len() != 1952 && !key_bundle.dilithium_public_key.is_empty()
+    {
         // Allow empty for testing
         // return Ok(ValidateCallbackResult::Invalid(
         //     "Invalid Dilithium public key size".into()
@@ -463,14 +467,14 @@ fn validate_key_bundle(key_bundle: KeyBundle) -> ExternResult<ValidateCallbackRe
     // Version must be positive
     if key_bundle.version == 0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Key version must be positive".into()
+            "Key version must be positive".into(),
         ));
     }
 
     // If rotation, signature must be present
     if key_bundle.version > 1 && key_bundle.rotation_signature.is_none() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Rotation requires signature from previous key".into()
+            "Rotation requires signature from previous key".into(),
         ));
     }
 
@@ -481,14 +485,14 @@ fn validate_revoked_key(revoked: RevokedKey) -> ExternResult<ValidateCallbackRes
     // Revocation must have a signature
     if revoked.revocation_signature.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Revocation must include signature".into()
+            "Revocation must include signature".into(),
         ));
     }
 
     // Reason must not be empty
     if revoked.reason.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            "Revocation reason required".into()
+            "Revocation reason required".into(),
         ));
     }
 

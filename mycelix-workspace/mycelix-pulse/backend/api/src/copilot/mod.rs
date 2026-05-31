@@ -149,18 +149,27 @@ pub struct ProposedTime {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MeetingLocation {
-    Physical { address: String, room: Option<String> },
-    Virtual { platform: String, link: Option<String> },
-    Hybrid { address: String, link: String },
+    Physical {
+        address: String,
+        room: Option<String>,
+    },
+    Virtual {
+        platform: String,
+        link: Option<String>,
+    },
+    Hybrid {
+        address: String,
+        link: String,
+    },
     ToBeDetermined,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SentimentScore {
-    pub overall: f32,  // -1.0 to 1.0
-    pub urgency: f32,  // 0.0 to 1.0
+    pub overall: f32,    // -1.0 to 1.0
+    pub urgency: f32,    // 0.0 to 1.0
     pub formality: f32,  // 0.0 to 1.0
-    pub positivity: f32,  // 0.0 to 1.0
+    pub positivity: f32, // 0.0 to 1.0
     pub emotions: Vec<DetectedEmotion>,
 }
 
@@ -338,7 +347,8 @@ impl SummarizationService {
         .await?;
 
         // Calculate original word count
-        let word_count_original: u32 = emails.iter()
+        let word_count_original: u32 = emails
+            .iter()
             .map(|e| e.body.split_whitespace().count() as u32)
             .sum();
 
@@ -402,25 +412,24 @@ impl SummarizationService {
     }
 
     fn build_thread_context(&self, emails: &[EmailContent]) -> String {
-        emails.iter()
-            .map(|e| format!(
-                "From: {}\nDate: {}\nSubject: {}\n\n{}\n\n---\n",
-                e.sender,
-                e.sent_at.format("%Y-%m-%d %H:%M"),
-                e.subject.as_deref().unwrap_or("(no subject)"),
-                e.body
-            ))
+        emails
+            .iter()
+            .map(|e| {
+                format!(
+                    "From: {}\nDate: {}\nSubject: {}\n\n{}\n\n---\n",
+                    e.sender,
+                    e.sent_at.format("%Y-%m-%d %H:%M"),
+                    e.subject.as_deref().unwrap_or("(no subject)"),
+                    e.body
+                )
+            })
             .collect()
     }
 
     async fn call_ai_model(&self, prompt: &str, task: &str) -> Result<String> {
         match &self.model_config.provider {
-            AiProvider::Ollama { host } => {
-                self.call_ollama(host, prompt, task).await
-            }
-            AiProvider::Local { engine } => {
-                self.call_local_model(engine, prompt, task).await
-            }
+            AiProvider::Ollama { host } => self.call_ollama(host, prompt, task).await,
+            AiProvider::Local { engine } => self.call_local_model(engine, prompt, task).await,
             _ => {
                 // Fallback to extractive summarization
                 Ok(self.extractive_summarize(prompt))
@@ -449,14 +458,20 @@ impl SummarizationService {
         Ok(response["response"].as_str().unwrap_or("").to_string())
     }
 
-    async fn call_local_model(&self, _engine: &LocalEngine, prompt: &str, _task: &str) -> Result<String> {
+    async fn call_local_model(
+        &self,
+        _engine: &LocalEngine,
+        prompt: &str,
+        _task: &str,
+    ) -> Result<String> {
         // Local model inference - would integrate with llama.cpp, candle, etc.
         Ok(self.extractive_summarize(prompt))
     }
 
     fn extractive_summarize(&self, text: &str) -> String {
         // Simple extractive summarization as fallback
-        let sentences: Vec<&str> = text.split(|c| c == '.' || c == '!' || c == '?')
+        let sentences: Vec<&str> = text
+            .split(|c| c == '.' || c == '!' || c == '?')
             .filter(|s| !s.trim().is_empty())
             .collect();
 
@@ -474,7 +489,11 @@ impl SummarizationService {
         summary.join(". ") + "."
     }
 
-    fn parse_summary_response(&self, response: &str, _emails: &[EmailContent]) -> Result<ParsedSummary> {
+    fn parse_summary_response(
+        &self,
+        response: &str,
+        _emails: &[EmailContent],
+    ) -> Result<ParsedSummary> {
         Ok(ParsedSummary {
             summary: response.to_string(),
             key_points: self.extract_key_points(response),
@@ -485,28 +504,36 @@ impl SummarizationService {
     fn extract_key_points(&self, text: &str) -> Vec<String> {
         text.lines()
             .filter(|line| line.starts_with("- ") || line.starts_with("• "))
-            .map(|line| line.trim_start_matches(|c| c == '-' || c == '•' || c == ' ').to_string())
+            .map(|line| {
+                line.trim_start_matches(|c| c == '-' || c == '•' || c == ' ')
+                    .to_string()
+            })
             .collect()
     }
 
-    async fn extract_participants(&self, emails: &[EmailContent]) -> Result<Vec<ParticipantSummary>> {
+    async fn extract_participants(
+        &self,
+        emails: &[EmailContent],
+    ) -> Result<Vec<ParticipantSummary>> {
         let mut participants: std::collections::HashMap<String, ParticipantSummary> =
             std::collections::HashMap::new();
 
         for email in emails {
-            let entry = participants.entry(email.sender.clone()).or_insert(ParticipantSummary {
-                email: email.sender.clone(),
-                name: None,
-                message_count: 0,
-                sentiment: SentimentScore {
-                    overall: 0.0,
-                    urgency: 0.0,
-                    formality: 0.5,
-                    positivity: 0.5,
-                    emotions: Vec::new(),
-                },
-                key_contributions: Vec::new(),
-            });
+            let entry = participants
+                .entry(email.sender.clone())
+                .or_insert(ParticipantSummary {
+                    email: email.sender.clone(),
+                    name: None,
+                    message_count: 0,
+                    sentiment: SentimentScore {
+                        overall: 0.0,
+                        urgency: 0.0,
+                        formality: 0.5,
+                        positivity: 0.5,
+                        emotions: Vec::new(),
+                    },
+                    key_contributions: Vec::new(),
+                });
             entry.message_count += 1;
         }
 
@@ -541,12 +568,9 @@ impl ActionExtractionService {
     }
 
     pub async fn extract_actions(&self, email_id: Uuid) -> Result<Vec<ActionItem>> {
-        let email = sqlx::query!(
-            "SELECT body, thread_id FROM emails WHERE id = $1",
-            email_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let email = sqlx::query!("SELECT body, thread_id FROM emails WHERE id = $1", email_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         let actions = self.detect_actions(&email.body).await?;
 
@@ -585,7 +609,10 @@ impl ActionExtractionService {
             (r"(?i)need(?:s)?\s+to\s+(\w+)", ActionPriority::High),
             (r"(?i)must\s+(\w+)", ActionPriority::Critical),
             (r"(?i)deadline[:\s]+([^.]+)", ActionPriority::High),
-            (r"(?i)by\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", ActionPriority::High),
+            (
+                r"(?i)by\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
+                ActionPriority::High,
+            ),
             (r"(?i)asap", ActionPriority::Critical),
             (r"(?i)urgent", ActionPriority::Critical),
         ];
@@ -596,9 +623,13 @@ impl ActionExtractionService {
                 if let Some(matched) = cap.get(0) {
                     actions.push(ActionItem {
                         id: Uuid::new_v4(),
-                        email_id: Uuid::nil(),  // Will be set by caller
+                        email_id: Uuid::nil(), // Will be set by caller
                         thread_id: None,
-                        description: self.expand_action_context(text, matched.start(), matched.end()),
+                        description: self.expand_action_context(
+                            text,
+                            matched.start(),
+                            matched.end(),
+                        ),
                         assignee: self.detect_assignee(text, matched.start()),
                         deadline: self.detect_deadline(text),
                         priority: priority.clone(),
@@ -619,11 +650,13 @@ impl ActionExtractionService {
         let before = &text[..start];
         let after = &text[end..];
 
-        let sentence_start = before.rfind(|c| c == '.' || c == '!' || c == '?')
+        let sentence_start = before
+            .rfind(|c| c == '.' || c == '!' || c == '?')
             .map(|i| i + 1)
             .unwrap_or(0);
 
-        let sentence_end = after.find(|c| c == '.' || c == '!' || c == '?')
+        let sentence_end = after
+            .find(|c| c == '.' || c == '!' || c == '?')
             .map(|i| end + i + 1)
             .unwrap_or(text.len());
 
@@ -653,7 +686,7 @@ impl ActionExtractionService {
                 if let Some(cap) = re.captures(text) {
                     if let Some(date_str) = cap.get(1) {
                         // Parse date - simplified
-                        return None;  // Would parse properly
+                        return None; // Would parse properly
                     }
                 }
             }
@@ -740,7 +773,9 @@ impl SmartReplyService {
         let reply_types = self.get_appropriate_reply_types(&intent);
 
         for (i, reply_type) in reply_types.into_iter().take(count as usize).enumerate() {
-            let content = self.generate_reply_content(&email.body, &reply_type).await?;
+            let content = self
+                .generate_reply_content(&email.body, &reply_type)
+                .await?;
             replies.push(SmartReply {
                 id: Uuid::new_v4(),
                 email_id,
@@ -758,7 +793,10 @@ impl SmartReplyService {
     fn detect_intent(&self, body: &str) -> Result<EmailIntent> {
         let body_lower = body.to_lowercase();
 
-        if body_lower.contains("meeting") || body_lower.contains("schedule") || body_lower.contains("call") {
+        if body_lower.contains("meeting")
+            || body_lower.contains("schedule")
+            || body_lower.contains("call")
+        {
             Ok(EmailIntent::MeetingRequest)
         } else if body_lower.contains("?") {
             Ok(EmailIntent::Question)
@@ -790,32 +828,45 @@ impl SmartReplyService {
                 ReplyType::Decline,
                 ReplyType::RequestInfo,
             ],
-            EmailIntent::Gratitude => vec![
-                ReplyType::Acknowledgment,
-            ],
+            EmailIntent::Gratitude => vec![ReplyType::Acknowledgment],
             EmailIntent::StatusUpdate => vec![
                 ReplyType::Acknowledgment,
                 ReplyType::RequestInfo,
                 ReplyType::FollowUp,
             ],
-            EmailIntent::Informational => vec![
-                ReplyType::Acknowledgment,
-                ReplyType::RequestInfo,
-            ],
+            EmailIntent::Informational => vec![ReplyType::Acknowledgment, ReplyType::RequestInfo],
         }
     }
 
-    async fn generate_reply_content(&self, _original: &str, reply_type: &ReplyType) -> Result<String> {
+    async fn generate_reply_content(
+        &self,
+        _original: &str,
+        reply_type: &ReplyType,
+    ) -> Result<String> {
         // Generate contextual reply - would use AI model in production
         let content = match reply_type {
-            ReplyType::Acknowledgment => "Thank you for your email. I've received this and will review it shortly.",
-            ReplyType::Acceptance => "Thank you for reaching out. I'd be happy to help with this. Let me know the next steps.",
-            ReplyType::Decline => "Thank you for thinking of me, but unfortunately I won't be able to help with this at the moment.",
-            ReplyType::RequestInfo => "Thank you for your email. Could you please provide more details about this?",
+            ReplyType::Acknowledgment => {
+                "Thank you for your email. I've received this and will review it shortly."
+            }
+            ReplyType::Acceptance => {
+                "Thank you for reaching out. I'd be happy to help with this. Let me know the next steps."
+            }
+            ReplyType::Decline => {
+                "Thank you for thinking of me, but unfortunately I won't be able to help with this at the moment."
+            }
+            ReplyType::RequestInfo => {
+                "Thank you for your email. Could you please provide more details about this?"
+            }
             ReplyType::ProvideInfo => "Here's the information you requested:",
-            ReplyType::ScheduleMeeting => "I'd be happy to schedule a meeting. Here are some times that work for me:",
-            ReplyType::Delegate => "I'm forwarding this to the appropriate person who can better assist you.",
-            ReplyType::FollowUp => "I wanted to follow up on this. Please let me know if you need anything else.",
+            ReplyType::ScheduleMeeting => {
+                "I'd be happy to schedule a meeting. Here are some times that work for me:"
+            }
+            ReplyType::Delegate => {
+                "I'm forwarding this to the appropriate person who can better assist you."
+            }
+            ReplyType::FollowUp => {
+                "I wanted to follow up on this. Please let me know if you need anything else."
+            }
             ReplyType::Custom => "",
         };
 
@@ -843,20 +894,18 @@ impl MeetingExtractionService {
     }
 
     pub async fn extract_meeting(&self, email_id: Uuid) -> Result<Option<MeetingExtraction>> {
-        let email = sqlx::query!(
-            "SELECT subject, body FROM emails WHERE id = $1",
-            email_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let email = sqlx::query!("SELECT subject, body FROM emails WHERE id = $1", email_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         // Check if this looks like a meeting request
         let body_lower = email.body.to_lowercase();
-        if !body_lower.contains("meeting") &&
-           !body_lower.contains("schedule") &&
-           !body_lower.contains("call") &&
-           !body_lower.contains("zoom") &&
-           !body_lower.contains("teams") {
+        if !body_lower.contains("meeting")
+            && !body_lower.contains("schedule")
+            && !body_lower.contains("call")
+            && !body_lower.contains("zoom")
+            && !body_lower.contains("teams")
+        {
             return Ok(None);
         }
 
@@ -892,7 +941,7 @@ impl MeetingExtractionService {
                 for cap in re.captures_iter(text) {
                     if let Some(matched) = cap.get(0) {
                         times.push(ProposedTime {
-                            start: Utc::now(),  // Would parse properly
+                            start: Utc::now(), // Would parse properly
                             end: None,
                             timezone: None,
                             is_flexible: text.to_lowercase().contains("flexible"),
@@ -912,22 +961,22 @@ impl MeetingExtractionService {
         if text_lower.contains("zoom") {
             Ok(MeetingLocation::Virtual {
                 platform: "Zoom".to_string(),
-                link: self.extract_url(text, "zoom")
+                link: self.extract_url(text, "zoom"),
             })
         } else if text_lower.contains("teams") || text_lower.contains("microsoft teams") {
             Ok(MeetingLocation::Virtual {
                 platform: "Microsoft Teams".to_string(),
-                link: self.extract_url(text, "teams")
+                link: self.extract_url(text, "teams"),
             })
         } else if text_lower.contains("meet.google") || text_lower.contains("google meet") {
             Ok(MeetingLocation::Virtual {
                 platform: "Google Meet".to_string(),
-                link: self.extract_url(text, "meet.google")
+                link: self.extract_url(text, "meet.google"),
             })
         } else if text_lower.contains("jitsi") {
             Ok(MeetingLocation::Virtual {
                 platform: "Jitsi".to_string(),
-                link: self.extract_url(text, "jitsi")
+                link: self.extract_url(text, "jitsi"),
             })
         } else {
             Ok(MeetingLocation::ToBeDetermined)
@@ -957,7 +1006,8 @@ impl MeetingExtractionService {
         let text_lower = text.to_lowercase();
         if let Some(idx) = text_lower.find("agenda") {
             let start = idx + 6;
-            let end = text[start..].find('\n')
+            let end = text[start..]
+                .find('\n')
                 .map(|i| start + i)
                 .unwrap_or(text.len().min(start + 200));
             Some(text[start..end].trim().to_string())
@@ -968,17 +1018,24 @@ impl MeetingExtractionService {
 
     fn extract_duration(&self, text: &str) -> Option<u32> {
         let re = regex::Regex::new(r"(\d+)\s*(?:min(?:ute)?s?|hour?s?)").ok()?;
-        re.captures(text).and_then(|cap| {
-            cap.get(1).and_then(|m| m.as_str().parse().ok())
-        })
+        re.captures(text)
+            .and_then(|cap| cap.get(1).and_then(|m| m.as_str().parse().ok()))
     }
 
-    pub async fn create_calendar_event(&self, extraction: &MeetingExtraction) -> Result<CalendarEvent> {
+    pub async fn create_calendar_event(
+        &self,
+        extraction: &MeetingExtraction,
+    ) -> Result<CalendarEvent> {
         // Would integrate with CalDAV or Nextcloud Calendar
         Ok(CalendarEvent {
             id: Uuid::new_v4(),
-            title: extraction.title.clone().unwrap_or_else(|| "Meeting".to_string()),
-            start: extraction.proposed_times.first()
+            title: extraction
+                .title
+                .clone()
+                .unwrap_or_else(|| "Meeting".to_string()),
+            start: extraction
+                .proposed_times
+                .first()
                 .map(|t| t.start)
                 .unwrap_or_else(Utc::now),
             end: None,
@@ -1029,13 +1086,22 @@ impl ToneAnalysisService {
         let content_lower = content.to_lowercase();
 
         // Count formal vs informal indicators
-        let formal_words = ["sincerely", "regards", "respectfully", "pursuant", "hereby", "enclosed"];
+        let formal_words = [
+            "sincerely",
+            "regards",
+            "respectfully",
+            "pursuant",
+            "hereby",
+            "enclosed",
+        ];
         let casual_words = ["hey", "hi", "thanks!", "cheers", "cool", "awesome"];
 
-        let formal_count: usize = formal_words.iter()
+        let formal_count: usize = formal_words
+            .iter()
             .filter(|w| content_lower.contains(*w))
             .count();
-        let casual_count: usize = casual_words.iter()
+        let casual_count: usize = casual_words
+            .iter()
             .filter(|w| content_lower.contains(*w))
             .count();
 
@@ -1064,32 +1130,51 @@ impl ToneAnalysisService {
                 issues.push(ToneIssue {
                     issue_type: ToneIssueType::Passive,
                     description: "Consider using active voice for clarity".to_string(),
-                    location: TextSpan { start: pos, end: pos + indicator.len() },
+                    location: TextSpan {
+                        start: pos,
+                        end: pos + indicator.len(),
+                    },
                     severity: IssueSeverity::Suggestion,
                 });
             }
         }
 
         // Check for jargon
-        let jargon = ["synergy", "leverage", "bandwidth", "circle back", "deep dive"];
+        let jargon = [
+            "synergy",
+            "leverage",
+            "bandwidth",
+            "circle back",
+            "deep dive",
+        ];
         for word in jargon {
             if let Some(pos) = content.to_lowercase().find(word) {
                 issues.push(ToneIssue {
                     issue_type: ToneIssueType::Jargon,
                     description: format!("'{}' may be unclear to some readers", word),
-                    location: TextSpan { start: pos, end: pos + word.len() },
+                    location: TextSpan {
+                        start: pos,
+                        end: pos + word.len(),
+                    },
                     severity: IssueSeverity::Suggestion,
                 });
             }
         }
 
         // Check for overly long sentences
-        for (i, sentence) in content.split(|c| c == '.' || c == '!' || c == '?').enumerate() {
+        for (i, sentence) in content
+            .split(|c| c == '.' || c == '!' || c == '?')
+            .enumerate()
+        {
             let word_count = sentence.split_whitespace().count();
             if word_count > 30 {
                 issues.push(ToneIssue {
                     issue_type: ToneIssueType::TooLong,
-                    description: format!("Sentence {} has {} words - consider breaking it up", i + 1, word_count),
+                    description: format!(
+                        "Sentence {} has {} words - consider breaking it up",
+                        i + 1,
+                        word_count
+                    ),
                     location: TextSpan { start: 0, end: 0 },
                     severity: IssueSeverity::Warning,
                 });
@@ -1128,7 +1213,10 @@ impl ToneAnalysisService {
     fn calculate_readability(&self, content: &str) -> f32 {
         // Simplified Flesch-Kincaid
         let words: Vec<&str> = content.split_whitespace().collect();
-        let sentences = content.matches(|c| c == '.' || c == '!' || c == '?').count().max(1);
+        let sentences = content
+            .matches(|c| c == '.' || c == '!' || c == '?')
+            .count()
+            .max(1);
         let syllables: usize = words.iter().map(|w| self.count_syllables(w)).sum();
 
         let words_per_sentence = words.len() as f32 / sentences as f32;
@@ -1158,9 +1246,8 @@ impl ToneAnalysisService {
 
     fn calculate_clarity(&self, content: &str) -> f32 {
         let words: Vec<&str> = content.split_whitespace().collect();
-        let avg_word_length: f32 = words.iter()
-            .map(|w| w.len() as f32)
-            .sum::<f32>() / words.len().max(1) as f32;
+        let avg_word_length: f32 =
+            words.iter().map(|w| w.len() as f32).sum::<f32>() / words.len().max(1) as f32;
 
         // Shorter average word length = higher clarity (normalized)
         (1.0 - (avg_word_length - 4.0) / 10.0).clamp(0.0, 1.0)
@@ -1178,15 +1265,14 @@ impl TranslationService {
     }
 
     pub async fn translate(&self, email_id: Uuid, target_language: &str) -> Result<Translation> {
-        let email = sqlx::query!(
-            "SELECT body FROM emails WHERE id = $1",
-            email_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let email = sqlx::query!("SELECT body FROM emails WHERE id = $1", email_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         let source_language = self.detect_language(&email.body)?;
-        let translated_text = self.perform_translation(&email.body, &source_language, target_language).await?;
+        let translated_text = self
+            .perform_translation(&email.body, &source_language, target_language)
+            .await?;
         let cultural_notes = self.generate_cultural_notes(&source_language, target_language);
 
         let translation = Translation {
@@ -1226,13 +1312,25 @@ impl TranslationService {
 
         if text_lower.chars().any(|c| matches!(c, 'ñ' | '¿' | '¡')) {
             Ok("es".to_string())
-        } else if text_lower.chars().any(|c| matches!(c, 'ß' | 'ü' | 'ö' | 'ä')) {
+        } else if text_lower
+            .chars()
+            .any(|c| matches!(c, 'ß' | 'ü' | 'ö' | 'ä'))
+        {
             Ok("de".to_string())
-        } else if text_lower.chars().any(|c| matches!(c, 'é' | 'è' | 'ê' | 'ç')) {
+        } else if text_lower
+            .chars()
+            .any(|c| matches!(c, 'é' | 'è' | 'ê' | 'ç'))
+        {
             Ok("fr".to_string())
-        } else if text_lower.chars().any(|c| c >= '\u{4e00}' && c <= '\u{9fff}') {
+        } else if text_lower
+            .chars()
+            .any(|c| c >= '\u{4e00}' && c <= '\u{9fff}')
+        {
             Ok("zh".to_string())
-        } else if text_lower.chars().any(|c| c >= '\u{3040}' && c <= '\u{309f}') {
+        } else if text_lower
+            .chars()
+            .any(|c| c >= '\u{3040}' && c <= '\u{309f}')
+        {
             Ok("ja".to_string())
         } else {
             Ok("en".to_string())
@@ -1252,12 +1350,15 @@ impl TranslationService {
         if from == "en" && to == "ja" {
             notes.push(CulturalNote {
                 note_type: CulturalNoteType::FormalityDifference,
-                description: "Japanese email typically requires honorific language (keigo)".to_string(),
+                description: "Japanese email typically requires honorific language (keigo)"
+                    .to_string(),
                 suggestion: Some("Consider using more formal expressions".to_string()),
             });
             notes.push(CulturalNote {
                 note_type: CulturalNoteType::BusinessEtiquette,
-                description: "Starting with a seasonal greeting is common in Japanese business emails".to_string(),
+                description:
+                    "Starting with a seasonal greeting is common in Japanese business emails"
+                        .to_string(),
                 suggestion: None,
             });
         }
@@ -1266,7 +1367,9 @@ impl TranslationService {
             notes.push(CulturalNote {
                 note_type: CulturalNoteType::FormalityDifference,
                 description: "German business email typically uses 'Sie' (formal you)".to_string(),
-                suggestion: Some("Use formal address unless you know the recipient well".to_string()),
+                suggestion: Some(
+                    "Use formal address unless you know the recipient well".to_string(),
+                ),
             });
         }
 
@@ -1275,16 +1378,56 @@ impl TranslationService {
 
     pub async fn get_supported_languages(&self) -> Vec<LanguageInfo> {
         vec![
-            LanguageInfo { code: "en".to_string(), name: "English".to_string(), native_name: "English".to_string() },
-            LanguageInfo { code: "es".to_string(), name: "Spanish".to_string(), native_name: "Español".to_string() },
-            LanguageInfo { code: "fr".to_string(), name: "French".to_string(), native_name: "Français".to_string() },
-            LanguageInfo { code: "de".to_string(), name: "German".to_string(), native_name: "Deutsch".to_string() },
-            LanguageInfo { code: "ja".to_string(), name: "Japanese".to_string(), native_name: "日本語".to_string() },
-            LanguageInfo { code: "zh".to_string(), name: "Chinese".to_string(), native_name: "中文".to_string() },
-            LanguageInfo { code: "pt".to_string(), name: "Portuguese".to_string(), native_name: "Português".to_string() },
-            LanguageInfo { code: "it".to_string(), name: "Italian".to_string(), native_name: "Italiano".to_string() },
-            LanguageInfo { code: "ru".to_string(), name: "Russian".to_string(), native_name: "Русский".to_string() },
-            LanguageInfo { code: "ko".to_string(), name: "Korean".to_string(), native_name: "한국어".to_string() },
+            LanguageInfo {
+                code: "en".to_string(),
+                name: "English".to_string(),
+                native_name: "English".to_string(),
+            },
+            LanguageInfo {
+                code: "es".to_string(),
+                name: "Spanish".to_string(),
+                native_name: "Español".to_string(),
+            },
+            LanguageInfo {
+                code: "fr".to_string(),
+                name: "French".to_string(),
+                native_name: "Français".to_string(),
+            },
+            LanguageInfo {
+                code: "de".to_string(),
+                name: "German".to_string(),
+                native_name: "Deutsch".to_string(),
+            },
+            LanguageInfo {
+                code: "ja".to_string(),
+                name: "Japanese".to_string(),
+                native_name: "日本語".to_string(),
+            },
+            LanguageInfo {
+                code: "zh".to_string(),
+                name: "Chinese".to_string(),
+                native_name: "中文".to_string(),
+            },
+            LanguageInfo {
+                code: "pt".to_string(),
+                name: "Portuguese".to_string(),
+                native_name: "Português".to_string(),
+            },
+            LanguageInfo {
+                code: "it".to_string(),
+                name: "Italian".to_string(),
+                native_name: "Italiano".to_string(),
+            },
+            LanguageInfo {
+                code: "ru".to_string(),
+                name: "Russian".to_string(),
+                native_name: "Русский".to_string(),
+            },
+            LanguageInfo {
+                code: "ko".to_string(),
+                name: "Korean".to_string(),
+                native_name: "한국어".to_string(),
+            },
         ]
     }
 }
@@ -1302,7 +1445,9 @@ pub struct LanguageInfo {
 
 pub fn create_summarization_service(pool: PgPool) -> SummarizationService {
     let config = AiModelConfig {
-        provider: AiProvider::Ollama { host: "http://localhost:11434".to_string() },
+        provider: AiProvider::Ollama {
+            host: "http://localhost:11434".to_string(),
+        },
         model_id: "llama3.2".to_string(),
         endpoint: None,
         api_key_ref: None,
@@ -1315,7 +1460,9 @@ pub fn create_summarization_service(pool: PgPool) -> SummarizationService {
 
 pub fn create_action_extraction_service(pool: PgPool) -> ActionExtractionService {
     let config = AiModelConfig {
-        provider: AiProvider::Ollama { host: "http://localhost:11434".to_string() },
+        provider: AiProvider::Ollama {
+            host: "http://localhost:11434".to_string(),
+        },
         model_id: "llama3.2".to_string(),
         endpoint: None,
         api_key_ref: None,
@@ -1328,7 +1475,9 @@ pub fn create_action_extraction_service(pool: PgPool) -> ActionExtractionService
 
 pub fn create_smart_reply_service(pool: PgPool) -> SmartReplyService {
     let config = AiModelConfig {
-        provider: AiProvider::Ollama { host: "http://localhost:11434".to_string() },
+        provider: AiProvider::Ollama {
+            host: "http://localhost:11434".to_string(),
+        },
         model_id: "llama3.2".to_string(),
         endpoint: None,
         api_key_ref: None,

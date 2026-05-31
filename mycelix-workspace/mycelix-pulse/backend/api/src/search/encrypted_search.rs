@@ -89,11 +89,7 @@ impl EncryptedSearchService {
     }
 
     /// Search encrypted documents
-    pub async fn search(
-        &self,
-        query: &str,
-        limit: u32,
-    ) -> Result<Vec<SearchResult>, sqlx::Error> {
+    pub async fn search(&self, query: &str, limit: u32) -> Result<Vec<SearchResult>, sqlx::Error> {
         let query_words = self.tokenize(query);
         let query_tokens: Vec<Vec<u8>> = query_words
             .iter()
@@ -190,10 +186,7 @@ impl EncryptedSearchService {
             return self.search(phrase, limit).await;
         }
 
-        let tokens: Vec<Vec<u8>> = words
-            .iter()
-            .map(|w| self.create_blind_index(w))
-            .collect();
+        let tokens: Vec<Vec<u8>> = words.iter().map(|w| self.create_blind_index(w)).collect();
 
         // Find documents where tokens appear consecutively
         let first_token = &tokens[0];
@@ -326,10 +319,7 @@ mod tests {
 
     #[test]
     fn test_blind_index_deterministic() {
-        let service = EncryptedSearchService::new(
-            unsafe { std::mem::zeroed() },
-            b"test_key",
-        );
+        let service = EncryptedSearchService::new(unsafe { std::mem::zeroed() }, b"test_key");
 
         let token1 = service.create_blind_index("hello");
         let token2 = service.create_blind_index("hello");

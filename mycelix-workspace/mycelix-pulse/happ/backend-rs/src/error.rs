@@ -4,9 +4,9 @@
 //! Error handling for Mycelix-Mail backend
 
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use thiserror::Error;
 
@@ -64,42 +64,58 @@ impl IntoResponse for AppError {
             AppError::AuthenticationError(msg) => {
                 (StatusCode::UNAUTHORIZED, "AUTH_ERROR", msg.clone())
             }
-            AppError::AuthorizationDenied(msg) => {
-                (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone())
-            }
-            AppError::NotFound(msg) => {
-                (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone())
-            }
+            AppError::AuthorizationDenied(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
             AppError::ValidationError(msg) => {
                 (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.clone())
             }
             AppError::HolochainError(msg) => {
                 (StatusCode::BAD_GATEWAY, "HOLOCHAIN_ERROR", msg.clone())
             }
-            AppError::DidNotFound(did) => {
-                (StatusCode::NOT_FOUND, "DID_NOT_FOUND", format!("DID not registered: {}", did))
-            }
-            AppError::DidAlreadyExists(did) => {
-                (StatusCode::CONFLICT, "DID_EXISTS", format!("DID already registered: {}", did))
-            }
-            AppError::TrustUnavailable(did) => {
-                (StatusCode::SERVICE_UNAVAILABLE, "TRUST_UNAVAILABLE", format!("Trust score unavailable for: {}", did))
-            }
-            AppError::RateLimitExceeded => {
-                (StatusCode::TOO_MANY_REQUESTS, "RATE_LIMIT", "Rate limit exceeded".to_string())
-            }
+            AppError::DidNotFound(did) => (
+                StatusCode::NOT_FOUND,
+                "DID_NOT_FOUND",
+                format!("DID not registered: {}", did),
+            ),
+            AppError::DidAlreadyExists(did) => (
+                StatusCode::CONFLICT,
+                "DID_EXISTS",
+                format!("DID already registered: {}", did),
+            ),
+            AppError::TrustUnavailable(did) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "TRUST_UNAVAILABLE",
+                format!("Trust score unavailable for: {}", did),
+            ),
+            AppError::RateLimitExceeded => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "RATE_LIMIT",
+                "Rate limit exceeded".to_string(),
+            ),
             AppError::EncryptionError(msg) => {
                 tracing::error!("Encryption error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "ENCRYPTION_ERROR", "Encryption operation failed".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "ENCRYPTION_ERROR",
+                    "Encryption operation failed".to_string(),
+                )
             }
             AppError::InternalError(msg) => {
                 // Log internal errors but don't expose details
                 tracing::error!("Internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "An internal error occurred".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL_ERROR",
+                    "An internal error occurred".to_string(),
+                )
             }
             AppError::ConfigError(msg) => {
                 tracing::error!("Configuration error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "CONFIG_ERROR", "Server configuration error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "CONFIG_ERROR",
+                    "Server configuration error".to_string(),
+                )
             }
         };
 

@@ -6,9 +6,9 @@
 //! Implements data subject rights: access, erasure, portability,
 //! consent management, and data processing records.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Types of data subject requests
@@ -225,7 +225,9 @@ impl GdprService {
 
     /// Verify a data subject request
     pub fn verify_request(&mut self, request_id: Uuid, token: &str) -> Result<(), GdprError> {
-        let request = self.requests.get_mut(&request_id)
+        let request = self
+            .requests
+            .get_mut(&request_id)
             .ok_or(GdprError::RequestNotFound(request_id))?;
 
         if request.verification_token.as_deref() != Some(token) {
@@ -245,7 +247,9 @@ impl GdprService {
         request_id: Uuid,
         processor_id: Uuid,
     ) -> Result<(), GdprError> {
-        let request = self.requests.get_mut(&request_id)
+        let request = self
+            .requests
+            .get_mut(&request_id)
             .ok_or(GdprError::RequestNotFound(request_id))?;
 
         if request.verified_at.is_none() {
@@ -283,7 +287,9 @@ impl GdprService {
         request_id: Uuid,
         export_path: Option<String>,
     ) -> Result<(), GdprError> {
-        let request = self.requests.get_mut(&request_id)
+        let request = self
+            .requests
+            .get_mut(&request_id)
             .ok_or(GdprError::RequestNotFound(request_id))?;
 
         request.status = RequestStatus::Completed;
@@ -297,11 +303,12 @@ impl GdprService {
     pub fn get_requests_due_soon(&self, days: i64) -> Vec<&DataSubjectRequest> {
         let threshold = Utc::now() + Duration::days(days);
 
-        self.requests.values()
+        self.requests
+            .values()
             .filter(|r| {
-                r.status != RequestStatus::Completed &&
-                r.status != RequestStatus::Rejected &&
-                r.due_date <= threshold
+                r.status != RequestStatus::Completed
+                    && r.status != RequestStatus::Rejected
+                    && r.due_date <= threshold
             })
             .collect()
     }
@@ -390,8 +397,9 @@ impl GdprService {
             "sessions",
         ];
 
-        let tasks: Vec<ErasureTask> = data_types.iter().map(|dt| {
-            ErasureTask {
+        let tasks: Vec<ErasureTask> = data_types
+            .iter()
+            .map(|dt| ErasureTask {
                 id: Uuid::new_v4(),
                 request_id,
                 user_id,
@@ -400,8 +408,8 @@ impl GdprService {
                 started_at: None,
                 completed_at: None,
                 error: None,
-            }
-        }).collect();
+            })
+            .collect();
 
         self.erasure_tasks.insert(request_id, tasks);
     }
@@ -412,10 +420,13 @@ impl GdprService {
         request_id: Uuid,
         task_id: Uuid,
     ) -> Result<(), GdprError> {
-        let tasks = self.erasure_tasks.get_mut(&request_id)
+        let tasks = self
+            .erasure_tasks
+            .get_mut(&request_id)
             .ok_or(GdprError::RequestNotFound(request_id))?;
 
-        let task = tasks.iter_mut()
+        let task = tasks
+            .iter_mut()
             .find(|t| t.id == task_id)
             .ok_or(GdprError::TaskNotFound(task_id))?;
 
@@ -432,12 +443,20 @@ impl GdprService {
 
     /// Get erasure progress
     pub fn get_erasure_progress(&self, request_id: Uuid) -> Result<ErasureProgress, GdprError> {
-        let tasks = self.erasure_tasks.get(&request_id)
+        let tasks = self
+            .erasure_tasks
+            .get(&request_id)
             .ok_or(GdprError::RequestNotFound(request_id))?;
 
         let total = tasks.len();
-        let completed = tasks.iter().filter(|t| t.status == ErasureStatus::Completed).count();
-        let failed = tasks.iter().filter(|t| t.status == ErasureStatus::Failed).count();
+        let completed = tasks
+            .iter()
+            .filter(|t| t.status == ErasureStatus::Completed)
+            .count();
+        let failed = tasks
+            .iter()
+            .filter(|t| t.status == ErasureStatus::Failed)
+            .count();
 
         Ok(ErasureProgress {
             total,
@@ -476,7 +495,10 @@ impl GdprService {
             version: policy_version,
         };
 
-        self.consents.entry(user_id).or_default().push(record.clone());
+        self.consents
+            .entry(user_id)
+            .or_default()
+            .push(record.clone());
         record
     }
 
@@ -509,20 +531,14 @@ impl GdprService {
         user_id: Uuid,
         consent_type: ConsentType,
     ) -> Result<(), GdprError> {
-        self.record_consent(
-            user_id,
-            consent_type,
-            false,
-            None,
-            None,
-            String::new(),
-        );
+        self.record_consent(user_id, consent_type, false, None, None, String::new());
         Ok(())
     }
 
     /// Get consent history for a user
     pub fn get_consent_history(&self, user_id: Uuid) -> Vec<&ConsentRecord> {
-        self.consents.get(&user_id)
+        self.consents
+            .get(&user_id)
             .map(|v| v.iter().collect())
             .unwrap_or_default()
     }
@@ -649,7 +665,9 @@ mod tests {
         assert!(service.has_consent(user_id, &ConsentType::MarketingEmails));
         assert!(!service.has_consent(user_id, &ConsentType::AnalyticsCookies));
 
-        service.revoke_consent(user_id, ConsentType::MarketingEmails).unwrap();
+        service
+            .revoke_consent(user_id, ConsentType::MarketingEmails)
+            .unwrap();
         assert!(!service.has_consent(user_id, &ConsentType::MarketingEmails));
     }
 }

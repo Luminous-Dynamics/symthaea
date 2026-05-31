@@ -9,7 +9,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::sync::mpsc;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 /// Scheduled email status
@@ -117,13 +117,9 @@ impl ScheduledEmailService {
     ) -> Result<UndoHandle, sqlx::Error> {
         let send_at = Utc::now() + Duration::seconds(self.undo_config.delay_seconds as i64);
 
-        let scheduled = self.schedule_email(
-            email_id,
-            user_id,
-            tenant_id,
-            send_at,
-            "UTC",
-        ).await?;
+        let scheduled = self
+            .schedule_email(email_id, user_id, tenant_id, send_at, "UTC")
+            .await?;
 
         Ok(UndoHandle {
             scheduled_id: scheduled.id,
@@ -161,7 +157,7 @@ impl ScheduledEmailService {
         // Check if still within undo window
         if Utc::now() >= scheduled.scheduled_at {
             return Err(ScheduledError::CannotCancel(
-                "Undo window has expired".to_string()
+                "Undo window has expired".to_string(),
             ));
         }
 
@@ -211,7 +207,7 @@ impl ScheduledEmailService {
         // Validate new time is in the future
         if new_send_at <= Utc::now() {
             return Err(ScheduledError::InvalidTime(
-                "Scheduled time must be in the future".to_string()
+                "Scheduled time must be in the future".to_string(),
             ));
         }
 
@@ -288,11 +284,7 @@ impl ScheduledEmailService {
     }
 
     /// Mark email as failed
-    pub async fn mark_failed(
-        &self,
-        scheduled_id: Uuid,
-        error: &str,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn mark_failed(&self, scheduled_id: Uuid, error: &str) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
             UPDATE scheduled_emails
@@ -381,10 +373,7 @@ impl std::fmt::Display for ScheduledError {
 impl std::error::Error for ScheduledError {}
 
 /// Background worker for processing scheduled emails
-pub async fn scheduled_email_worker(
-    pool: PgPool,
-    mut shutdown: mpsc::Receiver<()>,
-) {
+pub async fn scheduled_email_worker(pool: PgPool, mut shutdown: mpsc::Receiver<()>) {
     let service = ScheduledEmailService::new(pool.clone(), UndoSendConfig::default());
 
     info!("Scheduled email worker started");
@@ -451,7 +440,9 @@ async fn process_scheduled_email(
             status = %email.status,
             "Email is not in sendable state"
         );
-        service.mark_failed(scheduled.id, &format!("Email status is {}", email.status)).await?;
+        service
+            .mark_failed(scheduled.id, &format!("Email status is {}", email.status))
+            .await?;
         return Ok(());
     }
 

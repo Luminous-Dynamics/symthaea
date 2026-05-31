@@ -1,0 +1,16 @@
+[package]
+name = "care_bridge_integrity"
+version = "0.1.0"
+edition = "2024"
+description = "Care bridge integrity zome - cross-hApp integration types"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+getrandom = { workspace = true }

@@ -1,0 +1,21 @@
+---
+# Mycelix Property hApp Bundle
+# Land, housing, and asset registries
+
+manifest_version: "0"
+name: mycelix-property
+description: |
+  Land, housing, and asset registries for the Mycelix ecosystem.
+  Features property transfer, dispute resolution, and commons management.
+
+roles:
+  - name: property
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_property.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

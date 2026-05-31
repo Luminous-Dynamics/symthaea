@@ -6,8 +6,8 @@
 //! These types mirror the integrity zome types but are optimized for JSON serialization
 //! and frontend consumption. They convert to/from the Holochain types.
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Epistemic tiers from Mycelix Epistemic Charter v2.0

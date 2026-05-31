@@ -133,7 +133,10 @@ impl PhishingDetector {
 
     fn compile_sensitive_patterns() -> Vec<Regex> {
         vec![
-            Regex::new(r"(?i)(enter|confirm|verify|update) (your )?(password|pin|ssn|social security)").unwrap(),
+            Regex::new(
+                r"(?i)(enter|confirm|verify|update) (your )?(password|pin|ssn|social security)",
+            )
+            .unwrap(),
             Regex::new(r"(?i)credit card (number|details|information)").unwrap(),
             Regex::new(r"(?i)bank (account|details|information)").unwrap(),
             Regex::new(r"(?i)login credentials").unwrap(),
@@ -149,7 +152,8 @@ impl PhishingDetector {
         indicators.extend(self.check_sender(&email.from, &email.reply_to));
 
         // Check links
-        let (link_indicators, safe_links) = self.check_links(&email.body_html.as_deref().unwrap_or(&email.body_text));
+        let (link_indicators, safe_links) =
+            self.check_links(&email.body_html.as_deref().unwrap_or(&email.body_text));
         indicators.extend(link_indicators);
 
         // Check content
@@ -190,7 +194,10 @@ impl PhishingDetector {
                 indicators.push(PhishingIndicator {
                     indicator_type: IndicatorType::DomainSpoofing,
                     severity: RiskLevel::Critical,
-                    description: format!("Domain '{}' looks similar to trusted domain '{}'", from_domain, trusted),
+                    description: format!(
+                        "Domain '{}' looks similar to trusted domain '{}'",
+                        from_domain, trusted
+                    ),
                     evidence: Some(from.to_string()),
                 });
             }
@@ -243,7 +250,8 @@ impl PhishingDetector {
                     indicators.push(PhishingIndicator {
                         indicator_type: IndicatorType::MismatchedUrls,
                         severity: RiskLevel::High,
-                        description: "Link displays different URL than actual destination".to_string(),
+                        description: "Link displays different URL than actual destination"
+                            .to_string(),
                         evidence: Some(format!("Shows: {}, Goes to: {}", display_text, url)),
                     });
                     warnings.push("Display text doesn't match actual URL".to_string());
@@ -280,7 +288,9 @@ impl PhishingDetector {
                     indicators.push(PhishingIndicator {
                         indicator_type: IndicatorType::HomoglyphAttack,
                         severity: RiskLevel::High,
-                        description: "Link contains non-ASCII characters (potential homograph attack)".to_string(),
+                        description:
+                            "Link contains non-ASCII characters (potential homograph attack)"
+                                .to_string(),
                         evidence: Some(domain.to_string()),
                     });
                     warnings.push("Contains non-ASCII characters".to_string());
@@ -288,7 +298,11 @@ impl PhishingDetector {
                 }
 
                 // Check for IP address URLs
-                if parsed_url.host().map(|h| h.is_ipv4() || h.is_ipv6()).unwrap_or(false) {
+                if parsed_url
+                    .host()
+                    .map(|h| h.is_ipv4() || h.is_ipv6())
+                    .unwrap_or(false)
+                {
                     indicators.push(PhishingIndicator {
                         indicator_type: IndicatorType::SuspiciousLink,
                         severity: RiskLevel::High,
@@ -302,7 +316,11 @@ impl PhishingDetector {
                 safe_links.push(SafeLink {
                     original_url: url.to_string(),
                     display_text: display_text.to_string(),
-                    safe_url: if is_safe { url.to_string() } else { String::new() },
+                    safe_url: if is_safe {
+                        url.to_string()
+                    } else {
+                        String::new()
+                    },
                     domain: domain.to_string(),
                     is_safe,
                     warnings,
@@ -345,7 +363,10 @@ impl PhishingDetector {
         indicators
     }
 
-    fn check_headers(&self, headers: &std::collections::HashMap<String, String>) -> Vec<PhishingIndicator> {
+    fn check_headers(
+        &self,
+        headers: &std::collections::HashMap<String, String>,
+    ) -> Vec<PhishingIndicator> {
         let mut indicators = Vec::new();
 
         // Check for SPF/DKIM/DMARC failures
@@ -379,19 +400,20 @@ impl PhishingDetector {
         let mut indicators = Vec::new();
 
         let dangerous_extensions = [
-            ".exe", ".scr", ".bat", ".cmd", ".vbs", ".js", ".jar",
-            ".msi", ".dll", ".hta", ".ps1", ".wsf",
+            ".exe", ".scr", ".bat", ".cmd", ".vbs", ".js", ".jar", ".msi", ".dll", ".hta", ".ps1",
+            ".wsf",
         ];
 
-        let suspicious_extensions = [
-            ".zip", ".rar", ".7z", ".iso", ".img",
-        ];
+        let suspicious_extensions = [".zip", ".rar", ".7z", ".iso", ".img"];
 
         for attachment in attachments {
             let filename_lower = attachment.filename.to_lowercase();
 
             // Check for dangerous file types
-            if dangerous_extensions.iter().any(|ext| filename_lower.ends_with(ext)) {
+            if dangerous_extensions
+                .iter()
+                .any(|ext| filename_lower.ends_with(ext))
+            {
                 indicators.push(PhishingIndicator {
                     indicator_type: IndicatorType::SuspiciousAttachment,
                     severity: RiskLevel::Critical,
@@ -404,18 +426,24 @@ impl PhishingDetector {
             let parts: Vec<&str> = attachment.filename.split('.').collect();
             if parts.len() > 2 {
                 let second_last = parts[parts.len() - 2].to_lowercase();
-                if ["pdf", "doc", "docx", "xls", "xlsx", "jpg", "png"].contains(&second_last.as_str()) {
+                if ["pdf", "doc", "docx", "xls", "xlsx", "jpg", "png"]
+                    .contains(&second_last.as_str())
+                {
                     indicators.push(PhishingIndicator {
                         indicator_type: IndicatorType::SuspiciousAttachment,
                         severity: RiskLevel::High,
-                        description: "Attachment uses double extension (common malware technique)".to_string(),
+                        description: "Attachment uses double extension (common malware technique)"
+                            .to_string(),
                         evidence: Some(attachment.filename.clone()),
                     });
                 }
             }
 
             // Check for password-protected archives (sometimes used to bypass scanning)
-            if suspicious_extensions.iter().any(|ext| filename_lower.ends_with(ext)) {
+            if suspicious_extensions
+                .iter()
+                .any(|ext| filename_lower.ends_with(ext))
+            {
                 indicators.push(PhishingIndicator {
                     indicator_type: IndicatorType::SuspiciousAttachment,
                     severity: RiskLevel::Low,
@@ -435,8 +463,13 @@ impl PhishingDetector {
 
         // Check for common substitutions
         let substitutions = [
-            ('o', '0'), ('l', '1'), ('i', '1'), ('e', '3'),
-            ('a', '4'), ('s', '5'), ('g', '9'),
+            ('o', '0'),
+            ('l', '1'),
+            ('i', '1'),
+            ('e', '3'),
+            ('a', '4'),
+            ('s', '5'),
+            ('g', '9'),
         ];
 
         let mut normalized = domain.to_lowercase();
@@ -485,7 +518,11 @@ impl PhishingDetector {
         (is_phishing, confidence, risk_level)
     }
 
-    fn generate_recommendations(&self, indicators: &[PhishingIndicator], is_phishing: bool) -> Vec<String> {
+    fn generate_recommendations(
+        &self,
+        indicators: &[PhishingIndicator],
+        is_phishing: bool,
+    ) -> Vec<String> {
         let mut recommendations = Vec::new();
 
         if is_phishing {
@@ -497,16 +534,25 @@ impl PhishingDetector {
         for indicator in indicators {
             match indicator.indicator_type {
                 IndicatorType::SensitiveInfoRequest => {
-                    recommendations.push("Legitimate companies never ask for sensitive information via email".to_string());
+                    recommendations.push(
+                        "Legitimate companies never ask for sensitive information via email"
+                            .to_string(),
+                    );
                 }
                 IndicatorType::UrgentLanguage => {
-                    recommendations.push("Be suspicious of emails creating urgency or fear".to_string());
+                    recommendations
+                        .push("Be suspicious of emails creating urgency or fear".to_string());
                 }
                 IndicatorType::MismatchedUrls => {
-                    recommendations.push("Hover over links to see the real destination before clicking".to_string());
+                    recommendations.push(
+                        "Hover over links to see the real destination before clicking".to_string(),
+                    );
                 }
                 IndicatorType::DomainSpoofing => {
-                    recommendations.push("Verify the sender by contacting them through official channels".to_string());
+                    recommendations.push(
+                        "Verify the sender by contacting them through official channels"
+                            .to_string(),
+                    );
                 }
                 _ => {}
             }
@@ -550,20 +596,32 @@ fn levenshtein(a: &str, b: &str) -> usize {
     let m = a_chars.len();
     let n = b_chars.len();
 
-    if m == 0 { return n; }
-    if n == 0 { return m; }
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
 
     let mut dp = vec![vec![0; n + 1]; m + 1];
 
-    for i in 0..=m { dp[i][0] = i; }
-    for j in 0..=n { dp[0][j] = j; }
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
 
     for i in 1..=m {
         for j in 1..=n {
-            let cost = if a_chars[i-1] == b_chars[j-1] { 0 } else { 1 };
-            dp[i][j] = (dp[i-1][j] + 1)
-                .min(dp[i][j-1] + 1)
-                .min(dp[i-1][j-1] + cost);
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
         }
     }
 
@@ -584,7 +642,9 @@ mod tests {
             reply_to: Some("hacker@evil.tk".to_string()),
             subject: "URGENT: Your account will be suspended!".to_string(),
             body_text: "Click here immediately to verify your account and password.".to_string(),
-            body_html: Some(r#"<a href="http://evil.tk/steal">Click here to verify</a>"#.to_string()),
+            body_html: Some(
+                r#"<a href="http://evil.tk/steal">Click here to verify</a>"#.to_string(),
+            ),
             headers: std::collections::HashMap::new(),
             attachments: Vec::new(),
         };

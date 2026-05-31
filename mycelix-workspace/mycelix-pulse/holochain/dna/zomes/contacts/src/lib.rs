@@ -56,10 +56,7 @@ pub struct UpdateContactInput {
     pub is_favorite: Option<bool>,
 }
 
-entry_defs![
-    PathEntry::entry_def(),
-    Contact::entry_def()
-];
+entry_defs![PathEntry::entry_def(), Contact::entry_def()];
 
 #[hdk_link_types]
 pub enum LinkTypes {
@@ -136,17 +133,14 @@ pub fn add_contact(input: CreateContactInput) -> ExternResult<ActionHash> {
 pub fn get_contacts(_: ()) -> ExternResult<Vec<ContactWithInfo>> {
     let owner = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(owner, LinkTypes::OwnerToContacts)?
-            .build(),
-    )?;
+    let links =
+        get_links(GetLinksInputBuilder::try_new(owner, LinkTypes::OwnerToContacts)?.build())?;
 
     let mut contacts = Vec::new();
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e)))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e))))?;
 
         if let Some(contact_info) = get_contact_by_hash(action_hash)? {
             contacts.push(contact_info);
@@ -154,23 +148,29 @@ pub fn get_contacts(_: ()) -> ExternResult<Vec<ContactWithInfo>> {
     }
 
     // Sort by favorite first, then by alias/name
-    contacts.sort_by(|a, b| {
-        match (a.contact.is_favorite, b.contact.is_favorite) {
+    contacts.sort_by(
+        |a, b| match (a.contact.is_favorite, b.contact.is_favorite) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
             _ => {
-                let name_a = a.contact.alias.as_ref()
+                let name_a = a
+                    .contact
+                    .alias
+                    .as_ref()
                     .or(a.profile_name.as_ref())
                     .map(|s| s.to_lowercase())
                     .unwrap_or_default();
-                let name_b = b.contact.alias.as_ref()
+                let name_b = b
+                    .contact
+                    .alias
+                    .as_ref()
                     .or(b.profile_name.as_ref())
                     .map(|s| s.to_lowercase())
                     .unwrap_or_default();
                 name_a.cmp(&name_b)
             }
-        }
-    });
+        },
+    );
 
     Ok(contacts)
 }
@@ -180,10 +180,8 @@ pub fn get_contacts(_: ()) -> ExternResult<Vec<ContactWithInfo>> {
 pub fn get_contact_for_agent(agent: AgentPubKey) -> ExternResult<Option<ContactWithInfo>> {
     let owner = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(owner, LinkTypes::OwnerToContacts)?
-            .build(),
-    )?;
+    let links =
+        get_links(GetLinksInputBuilder::try_new(owner, LinkTypes::OwnerToContacts)?.build())?;
 
     for link in links {
         // Check tag (which contains the agent pubkey)
@@ -231,8 +229,9 @@ fn get_contact_by_hash(action_hash: ActionHash) -> ExternResult<Option<ContactWi
 /// Update a contact
 #[hdk_extern]
 pub fn update_contact(input: UpdateContactInput) -> ExternResult<ActionHash> {
-    let current = get_contact_by_hash(input.action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contact not found".to_string())))?;
+    let current = get_contact_by_hash(input.action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contact not found".to_string())
+    ))?;
 
     let updated = Contact {
         agent: current.contact.agent,
@@ -251,8 +250,9 @@ pub fn update_contact(input: UpdateContactInput) -> ExternResult<ActionHash> {
 pub fn block_contact(action_hash: ActionHash) -> ExternResult<ActionHash> {
     let owner = agent_info()?.agent_initial_pubkey;
 
-    let current = get_contact_by_hash(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contact not found".to_string())))?;
+    let current = get_contact_by_hash(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contact not found".to_string())
+    ))?;
 
     let updated = Contact {
         is_blocked: true,
@@ -262,12 +262,7 @@ pub fn block_contact(action_hash: ActionHash) -> ExternResult<ActionHash> {
     let new_hash = update_entry(action_hash, &updated)?;
 
     // Add to blocked list
-    create_link(
-        owner,
-        new_hash.clone(),
-        LinkTypes::BlockedContacts,
-        (),
-    )?;
+    create_link(owner, new_hash.clone(), LinkTypes::BlockedContacts, ())?;
 
     Ok(new_hash)
 }
@@ -275,8 +270,9 @@ pub fn block_contact(action_hash: ActionHash) -> ExternResult<ActionHash> {
 /// Unblock a contact
 #[hdk_extern]
 pub fn unblock_contact(action_hash: ActionHash) -> ExternResult<ActionHash> {
-    let current = get_contact_by_hash(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contact not found".to_string())))?;
+    let current = get_contact_by_hash(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contact not found".to_string())
+    ))?;
 
     let updated = Contact {
         is_blocked: false,
@@ -291,17 +287,14 @@ pub fn unblock_contact(action_hash: ActionHash) -> ExternResult<ActionHash> {
 pub fn get_blocked_contacts(_: ()) -> ExternResult<Vec<ContactWithInfo>> {
     let owner = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(owner, LinkTypes::BlockedContacts)?
-            .build(),
-    )?;
+    let links =
+        get_links(GetLinksInputBuilder::try_new(owner, LinkTypes::BlockedContacts)?.build())?;
 
     let mut contacts = Vec::new();
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e)))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e))))?;
 
         if let Some(contact) = get_contact_by_hash(action_hash)? {
             if contact.contact.is_blocked {
@@ -318,8 +311,9 @@ pub fn get_blocked_contacts(_: ()) -> ExternResult<Vec<ContactWithInfo>> {
 pub fn toggle_favorite(action_hash: ActionHash) -> ExternResult<ActionHash> {
     let owner = agent_info()?.agent_initial_pubkey;
 
-    let current = get_contact_by_hash(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contact not found".to_string())))?;
+    let current = get_contact_by_hash(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contact not found".to_string())
+    ))?;
 
     let new_favorite = !current.contact.is_favorite;
 
@@ -332,12 +326,7 @@ pub fn toggle_favorite(action_hash: ActionHash) -> ExternResult<ActionHash> {
 
     // Update favorite links
     if new_favorite {
-        create_link(
-            owner,
-            new_hash.clone(),
-            LinkTypes::FavoriteContacts,
-            (),
-        )?;
+        create_link(owner, new_hash.clone(), LinkTypes::FavoriteContacts, ())?;
     }
 
     Ok(new_hash)
@@ -348,17 +337,14 @@ pub fn toggle_favorite(action_hash: ActionHash) -> ExternResult<ActionHash> {
 pub fn get_favorite_contacts(_: ()) -> ExternResult<Vec<ContactWithInfo>> {
     let owner = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(owner, LinkTypes::FavoriteContacts)?
-            .build(),
-    )?;
+    let links =
+        get_links(GetLinksInputBuilder::try_new(owner, LinkTypes::FavoriteContacts)?.build())?;
 
     let mut contacts = Vec::new();
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e)))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e))))?;
 
         if let Some(contact) = get_contact_by_hash(action_hash)? {
             if contact.contact.is_favorite {
@@ -384,9 +370,8 @@ pub fn get_contacts_by_tag(tag: String) -> ExternResult<Vec<ContactWithInfo>> {
     let mut contacts = Vec::new();
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e)))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e))))?;
 
         if let Some(contact) = get_contact_by_hash(action_hash)? {
             contacts.push(contact);

@@ -105,9 +105,9 @@ pub enum RecipientRelationship {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WritingStyle {
-    pub formality: f32,       // 0 = casual, 1 = formal
-    pub verbosity: f32,       // 0 = brief, 1 = detailed
-    pub emoji_usage: f32,     // 0 = never, 1 = frequent
+    pub formality: f32,   // 0 = casual, 1 = formal
+    pub verbosity: f32,   // 0 = brief, 1 = detailed
+    pub emoji_usage: f32, // 0 = never, 1 = frequent
     pub greeting_style: GreetingStyle,
     pub closing_style: ClosingStyle,
 }
@@ -115,18 +115,18 @@ pub struct WritingStyle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GreetingStyle {
     None,
-    Simple,      // "Hi John,"
-    Formal,      // "Dear Mr. Smith,"
-    Friendly,    // "Hey John!"
+    Simple,       // "Hi John,"
+    Formal,       // "Dear Mr. Smith,"
+    Friendly,     // "Hey John!"
     Professional, // "Hello John,"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClosingStyle {
     None,
-    Simple,      // "Thanks,"
-    Formal,      // "Sincerely,"
-    Friendly,    // "Cheers,"
+    Simple,       // "Thanks,"
+    Formal,       // "Sincerely,"
+    Friendly,     // "Cheers,"
     Professional, // "Best regards,"
 }
 
@@ -161,106 +161,224 @@ impl SmartReplyGenerator {
         let mut templates = HashMap::new();
 
         // Meeting-related patterns
-        templates.insert("meeting".to_string(), vec![
-            ReplyTemplate {
-                pattern: "can we meet|schedule a meeting|set up a call".into(),
-                replies: vec![
-                    ("Sure, I'm available. When works best for you?".into(), ReplyTone::Professional, ReplyIntent::Confirm),
-                    ("Yes, let me check my calendar and get back to you.".into(), ReplyTone::Professional, ReplyIntent::Confirm),
-                    ("I'd be happy to meet. How about tomorrow afternoon?".into(), ReplyTone::Friendly, ReplyIntent::Schedule),
-                    ("Unfortunately I'm not available this week. Can we look at next week?".into(), ReplyTone::Professional, ReplyIntent::Decline),
-                ],
-            },
-            ReplyTemplate {
-                pattern: "meeting invite|calendar invite".into(),
-                replies: vec![
-                    ("I'll be there!".into(), ReplyTone::Friendly, ReplyIntent::Confirm),
-                    ("Thank you for the invite. I've accepted.".into(), ReplyTone::Professional, ReplyIntent::Confirm),
-                    ("I have a conflict at that time. Could we reschedule?".into(), ReplyTone::Professional, ReplyIntent::Decline),
-                ],
-            },
-        ]);
+        templates.insert(
+            "meeting".to_string(),
+            vec![
+                ReplyTemplate {
+                    pattern: "can we meet|schedule a meeting|set up a call".into(),
+                    replies: vec![
+                        (
+                            "Sure, I'm available. When works best for you?".into(),
+                            ReplyTone::Professional,
+                            ReplyIntent::Confirm,
+                        ),
+                        (
+                            "Yes, let me check my calendar and get back to you.".into(),
+                            ReplyTone::Professional,
+                            ReplyIntent::Confirm,
+                        ),
+                        (
+                            "I'd be happy to meet. How about tomorrow afternoon?".into(),
+                            ReplyTone::Friendly,
+                            ReplyIntent::Schedule,
+                        ),
+                        (
+                            "Unfortunately I'm not available this week. Can we look at next week?"
+                                .into(),
+                            ReplyTone::Professional,
+                            ReplyIntent::Decline,
+                        ),
+                    ],
+                },
+                ReplyTemplate {
+                    pattern: "meeting invite|calendar invite".into(),
+                    replies: vec![
+                        (
+                            "I'll be there!".into(),
+                            ReplyTone::Friendly,
+                            ReplyIntent::Confirm,
+                        ),
+                        (
+                            "Thank you for the invite. I've accepted.".into(),
+                            ReplyTone::Professional,
+                            ReplyIntent::Confirm,
+                        ),
+                        (
+                            "I have a conflict at that time. Could we reschedule?".into(),
+                            ReplyTone::Professional,
+                            ReplyIntent::Decline,
+                        ),
+                    ],
+                },
+            ],
+        );
 
         // Request-related patterns
-        templates.insert("request".to_string(), vec![
-            ReplyTemplate {
+        templates.insert(
+            "request".to_string(),
+            vec![ReplyTemplate {
                 pattern: "can you|could you|would you|please".into(),
                 replies: vec![
-                    ("Sure, I'll take care of it.".into(), ReplyTone::Professional, ReplyIntent::Confirm),
-                    ("I'll get this done today.".into(), ReplyTone::Professional, ReplyIntent::Confirm),
-                    ("Of course! I'll have it ready by end of day.".into(), ReplyTone::Friendly, ReplyIntent::Confirm),
-                    ("I need a bit more information to proceed. Could you clarify...".into(), ReplyTone::Professional, ReplyIntent::RequestInfo),
+                    (
+                        "Sure, I'll take care of it.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::Confirm,
+                    ),
+                    (
+                        "I'll get this done today.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::Confirm,
+                    ),
+                    (
+                        "Of course! I'll have it ready by end of day.".into(),
+                        ReplyTone::Friendly,
+                        ReplyIntent::Confirm,
+                    ),
+                    (
+                        "I need a bit more information to proceed. Could you clarify...".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::RequestInfo,
+                    ),
                 ],
-            },
-        ]);
+            }],
+        );
 
         // Thank you patterns
-        templates.insert("thanks".to_string(), vec![
-            ReplyTemplate {
+        templates.insert(
+            "thanks".to_string(),
+            vec![ReplyTemplate {
                 pattern: "thank you|thanks|appreciate".into(),
                 replies: vec![
-                    ("You're welcome!".into(), ReplyTone::Friendly, ReplyIntent::Acknowledge),
-                    ("Happy to help!".into(), ReplyTone::Friendly, ReplyIntent::Acknowledge),
-                    ("Glad I could assist.".into(), ReplyTone::Professional, ReplyIntent::Acknowledge),
-                    ("No problem at all!".into(), ReplyTone::Casual, ReplyIntent::Acknowledge),
+                    (
+                        "You're welcome!".into(),
+                        ReplyTone::Friendly,
+                        ReplyIntent::Acknowledge,
+                    ),
+                    (
+                        "Happy to help!".into(),
+                        ReplyTone::Friendly,
+                        ReplyIntent::Acknowledge,
+                    ),
+                    (
+                        "Glad I could assist.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::Acknowledge,
+                    ),
+                    (
+                        "No problem at all!".into(),
+                        ReplyTone::Casual,
+                        ReplyIntent::Acknowledge,
+                    ),
                 ],
-            },
-        ]);
+            }],
+        );
 
         // Question patterns
-        templates.insert("question".to_string(), vec![
-            ReplyTemplate {
+        templates.insert(
+            "question".to_string(),
+            vec![ReplyTemplate {
                 pattern: "\\?|what|how|when|where|why|who".into(),
                 replies: vec![
-                    ("Good question. Let me look into this and get back to you.".into(), ReplyTone::Professional, ReplyIntent::FollowUp),
-                    ("I'll find out and follow up shortly.".into(), ReplyTone::Professional, ReplyIntent::FollowUp),
-                    ("I can answer that! Here's what I know...".into(), ReplyTone::Friendly, ReplyIntent::ProvideInfo),
+                    (
+                        "Good question. Let me look into this and get back to you.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::FollowUp,
+                    ),
+                    (
+                        "I'll find out and follow up shortly.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::FollowUp,
+                    ),
+                    (
+                        "I can answer that! Here's what I know...".into(),
+                        ReplyTone::Friendly,
+                        ReplyIntent::ProvideInfo,
+                    ),
                 ],
-            },
-        ]);
+            }],
+        );
 
         // Status update patterns
-        templates.insert("status".to_string(), vec![
-            ReplyTemplate {
+        templates.insert(
+            "status".to_string(),
+            vec![ReplyTemplate {
                 pattern: "status|update|progress|how.*(going|coming)".into(),
                 replies: vec![
-                    ("Thanks for checking in. Here's where we are...".into(), ReplyTone::Professional, ReplyIntent::ProvideInfo),
-                    ("Good news - we're on track to finish by the deadline.".into(), ReplyTone::Professional, ReplyIntent::ProvideInfo),
-                    ("I'll send over a detailed update by end of day.".into(), ReplyTone::Professional, ReplyIntent::FollowUp),
+                    (
+                        "Thanks for checking in. Here's where we are...".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::ProvideInfo,
+                    ),
+                    (
+                        "Good news - we're on track to finish by the deadline.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::ProvideInfo,
+                    ),
+                    (
+                        "I'll send over a detailed update by end of day.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::FollowUp,
+                    ),
                 ],
-            },
-        ]);
+            }],
+        );
 
         // Confirmation patterns
-        templates.insert("confirm".to_string(), vec![
-            ReplyTemplate {
+        templates.insert(
+            "confirm".to_string(),
+            vec![ReplyTemplate {
                 pattern: "confirm|verify|correct|right".into(),
                 replies: vec![
-                    ("Yes, that's correct!".into(), ReplyTone::Professional, ReplyIntent::Confirm),
+                    (
+                        "Yes, that's correct!".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::Confirm,
+                    ),
                     ("Confirmed!".into(), ReplyTone::Casual, ReplyIntent::Confirm),
-                    ("That's right. Let me know if you need anything else.".into(), ReplyTone::Professional, ReplyIntent::Confirm),
+                    (
+                        "That's right. Let me know if you need anything else.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::Confirm,
+                    ),
                 ],
-            },
-        ]);
+            }],
+        );
 
         // Apology/issue patterns
-        templates.insert("issue".to_string(), vec![
-            ReplyTemplate {
+        templates.insert(
+            "issue".to_string(),
+            vec![ReplyTemplate {
                 pattern: "sorry|apologize|issue|problem|bug|error".into(),
                 replies: vec![
-                    ("No worries at all!".into(), ReplyTone::Friendly, ReplyIntent::Acknowledge),
-                    ("Thanks for letting me know. I'll look into it right away.".into(), ReplyTone::Professional, ReplyIntent::Acknowledge),
-                    ("I understand. Let's figure out how to resolve this.".into(), ReplyTone::Professional, ReplyIntent::FollowUp),
+                    (
+                        "No worries at all!".into(),
+                        ReplyTone::Friendly,
+                        ReplyIntent::Acknowledge,
+                    ),
+                    (
+                        "Thanks for letting me know. I'll look into it right away.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::Acknowledge,
+                    ),
+                    (
+                        "I understand. Let's figure out how to resolve this.".into(),
+                        ReplyTone::Professional,
+                        ReplyIntent::FollowUp,
+                    ),
                 ],
-            },
-        ]);
+            }],
+        );
 
         Self { templates }
     }
 
     pub fn generate(&self, context: &EmailContext) -> Vec<SmartReply> {
         let mut replies = Vec::new();
-        let body = context.original_body.as_deref().unwrap_or("").to_lowercase();
+        let body = context
+            .original_body
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
 
         // Check each template category
         for (category, category_templates) in &self.templates {
@@ -268,7 +386,8 @@ impl SmartReplyGenerator {
                 if self.matches_pattern(&body, &template.pattern) {
                     for (text, tone, intent) in &template.replies {
                         // Adjust text based on relationship
-                        let adjusted_text = self.adjust_for_relationship(text, &context.recipient_relationship);
+                        let adjusted_text =
+                            self.adjust_for_relationship(text, &context.recipient_relationship);
 
                         replies.push(SmartReply {
                             id: format!("{}-{}", category, replies.len()),
@@ -358,46 +477,87 @@ impl ComposeSuggestionGenerator {
     pub fn new() -> Self {
         let mut common_phrases = HashMap::new();
 
-        common_phrases.insert("follow_up".into(), vec![
-            "Following up on our previous conversation...".into(),
-            "Just checking in on...".into(),
-            "I wanted to follow up regarding...".into(),
-            "Circling back on...".into(),
-        ]);
+        common_phrases.insert(
+            "follow_up".into(),
+            vec![
+                "Following up on our previous conversation...".into(),
+                "Just checking in on...".into(),
+                "I wanted to follow up regarding...".into(),
+                "Circling back on...".into(),
+            ],
+        );
 
-        common_phrases.insert("introduction".into(), vec![
-            "I hope this email finds you well.".into(),
-            "I hope you're having a great week.".into(),
-            "I wanted to reach out about...".into(),
-            "I'm writing to inquire about...".into(),
-        ]);
+        common_phrases.insert(
+            "introduction".into(),
+            vec![
+                "I hope this email finds you well.".into(),
+                "I hope you're having a great week.".into(),
+                "I wanted to reach out about...".into(),
+                "I'm writing to inquire about...".into(),
+            ],
+        );
 
-        common_phrases.insert("request".into(), vec![
-            "Would you be able to...".into(),
-            "I was wondering if you could...".into(),
-            "Could you please...".into(),
-            "I'd appreciate it if you could...".into(),
-        ]);
+        common_phrases.insert(
+            "request".into(),
+            vec![
+                "Would you be able to...".into(),
+                "I was wondering if you could...".into(),
+                "Could you please...".into(),
+                "I'd appreciate it if you could...".into(),
+            ],
+        );
 
-        common_phrases.insert("availability".into(), vec![
-            "Please let me know what works best for you.".into(),
-            "I'm flexible and can adjust to your schedule.".into(),
-            "Let me know your availability.".into(),
-            "What times work on your end?".into(),
-        ]);
+        common_phrases.insert(
+            "availability".into(),
+            vec![
+                "Please let me know what works best for you.".into(),
+                "I'm flexible and can adjust to your schedule.".into(),
+                "Let me know your availability.".into(),
+                "What times work on your end?".into(),
+            ],
+        );
 
         let greetings = vec![
             (GreetingStyle::Simple, vec!["Hi".into(), "Hello".into()]),
-            (GreetingStyle::Formal, vec!["Dear".into(), "Good morning".into(), "Good afternoon".into()]),
-            (GreetingStyle::Friendly, vec!["Hey".into(), "Hi there".into()]),
-            (GreetingStyle::Professional, vec!["Hello".into(), "Hi".into(), "Good day".into()]),
+            (
+                GreetingStyle::Formal,
+                vec![
+                    "Dear".into(),
+                    "Good morning".into(),
+                    "Good afternoon".into(),
+                ],
+            ),
+            (
+                GreetingStyle::Friendly,
+                vec!["Hey".into(), "Hi there".into()],
+            ),
+            (
+                GreetingStyle::Professional,
+                vec!["Hello".into(), "Hi".into(), "Good day".into()],
+            ),
         ];
 
         let closings = vec![
-            (ClosingStyle::Simple, vec!["Thanks".into(), "Thank you".into()]),
-            (ClosingStyle::Formal, vec!["Sincerely".into(), "Respectfully".into(), "Kind regards".into()]),
-            (ClosingStyle::Friendly, vec!["Cheers".into(), "Take care".into(), "All the best".into()]),
-            (ClosingStyle::Professional, vec!["Best regards".into(), "Best".into(), "Regards".into()]),
+            (
+                ClosingStyle::Simple,
+                vec!["Thanks".into(), "Thank you".into()],
+            ),
+            (
+                ClosingStyle::Formal,
+                vec![
+                    "Sincerely".into(),
+                    "Respectfully".into(),
+                    "Kind regards".into(),
+                ],
+            ),
+            (
+                ClosingStyle::Friendly,
+                vec!["Cheers".into(), "Take care".into(), "All the best".into()],
+            ),
+            (
+                ClosingStyle::Professional,
+                vec!["Best regards".into(), "Best".into(), "Regards".into()],
+            ),
         ];
 
         Self {
@@ -433,7 +593,11 @@ impl ComposeSuggestionGenerator {
         suggestions
     }
 
-    pub fn suggest_opening(&self, context: &EmailContext, recipient_name: Option<&str>) -> Vec<ComposeSuggestion> {
+    pub fn suggest_opening(
+        &self,
+        context: &EmailContext,
+        recipient_name: Option<&str>,
+    ) -> Vec<ComposeSuggestion> {
         let mut suggestions = Vec::new();
 
         // Find appropriate greetings for style
@@ -471,7 +635,11 @@ impl ComposeSuggestionGenerator {
         suggestions
     }
 
-    pub fn suggest_closing(&self, context: &EmailContext, user_name: &str) -> Vec<ComposeSuggestion> {
+    pub fn suggest_closing(
+        &self,
+        context: &EmailContext,
+        user_name: &str,
+    ) -> Vec<ComposeSuggestion> {
         let mut suggestions = Vec::new();
 
         for (style, closings) in &self.closings {
@@ -490,7 +658,11 @@ impl ComposeSuggestionGenerator {
         suggestions
     }
 
-    pub fn autocomplete(&self, current_text: &str, cursor_position: usize) -> Vec<ComposeSuggestion> {
+    pub fn autocomplete(
+        &self,
+        current_text: &str,
+        cursor_position: usize,
+    ) -> Vec<ComposeSuggestion> {
         let mut suggestions = Vec::new();
 
         // Get text before cursor
@@ -498,7 +670,13 @@ impl ComposeSuggestionGenerator {
         let last_words: Vec<&str> = text_before.split_whitespace().rev().take(3).collect();
 
         // Check for common phrase triggers
-        let trigger = last_words.iter().rev().cloned().collect::<Vec<_>>().join(" ").to_lowercase();
+        let trigger = last_words
+            .iter()
+            .rev()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase();
 
         // Phrase completions
         let completions: Vec<(&str, &str)> = vec![
@@ -519,7 +697,9 @@ impl ComposeSuggestionGenerator {
                 suggestions.push(ComposeSuggestion {
                     suggestion_type: SuggestionType::Autocomplete,
                     text: completion.to_string(),
-                    position: InsertPosition::Insert { position: cursor_position },
+                    position: InsertPosition::Insert {
+                        position: cursor_position,
+                    },
                     confidence: 0.85,
                 });
             }
@@ -563,17 +743,29 @@ impl ComposeAssistant {
         // Subject suggestions if empty
         if current_text.is_empty() {
             suggestions.extend(self.suggestion_generator.suggest_subject(context));
-            suggestions.extend(self.suggestion_generator.suggest_opening(context, recipient_name));
+            suggestions.extend(
+                self.suggestion_generator
+                    .suggest_opening(context, recipient_name),
+            );
         }
 
         // Autocomplete
         if !current_text.is_empty() {
-            suggestions.extend(self.suggestion_generator.autocomplete(current_text, cursor_position));
+            suggestions.extend(
+                self.suggestion_generator
+                    .autocomplete(current_text, cursor_position),
+            );
         }
 
         // Closing suggestions near end
-        if current_text.len() > 100 && !current_text.contains("regards") && !current_text.contains("thanks") {
-            suggestions.extend(self.suggestion_generator.suggest_closing(context, user_name));
+        if current_text.len() > 100
+            && !current_text.contains("regards")
+            && !current_text.contains("thanks")
+        {
+            suggestions.extend(
+                self.suggestion_generator
+                    .suggest_closing(context, user_name),
+            );
         }
 
         suggestions
@@ -616,7 +808,11 @@ mod tests {
 
         let replies = generator.generate(&context);
         assert!(!replies.is_empty());
-        assert!(replies.iter().any(|r| r.intent == ReplyIntent::Confirm || r.intent == ReplyIntent::Schedule));
+        assert!(
+            replies
+                .iter()
+                .any(|r| r.intent == ReplyIntent::Confirm || r.intent == ReplyIntent::Schedule)
+        );
     }
 
     #[test]

@@ -7,9 +7,9 @@
 //! This replaces the Python DID Registry entirely.
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, post},
-    Json, Router,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 

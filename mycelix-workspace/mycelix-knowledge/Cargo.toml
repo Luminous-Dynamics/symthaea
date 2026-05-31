@@ -1,0 +1,51 @@
+[workspace]
+resolver = "2"
+members = [
+    "zomes/claims/integrity",
+    "zomes/claims/coordinator",
+    "zomes/graph/integrity",
+    "zomes/graph/coordinator",
+    "zomes/query/integrity",
+    "zomes/query/coordinator",
+    "zomes/inference/integrity",
+    "zomes/inference/coordinator",
+    "zomes/bridge/integrity",
+    "zomes/bridge/coordinator",
+    "zomes/markets_integration/integrity",
+    "zomes/markets_integration/coordinator",
+    "zomes/factcheck/integrity",
+    "zomes/factcheck/coordinator",
+    # DKG - Distributed Knowledge Graph (Truth Engine)
+    "zomes/dkg_integrity",
+    "zomes/dkg",
+]
+
+[workspace.dependencies]
+# Holochain 0.6 compatible (per official compatibility table)
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+thiserror = "1.0"
+derive_more = "0.99"
+
+# WASM compatibility - getrandom 0.2 with "js" feature for Holochain WASM runtime
+getrandom = { version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false

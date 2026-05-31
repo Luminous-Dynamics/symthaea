@@ -9,10 +9,10 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
-use super::copilot::{LLMProvider, CompletionOptions, CopilotError};
+use super::copilot::{CompletionOptions, CopilotError, LLMProvider};
 
 // ============================================================================
 // Smart Compose Service
@@ -70,7 +70,8 @@ impl SmartComposeService {
         }
 
         // Get the last incomplete sentence/phrase
-        let last_text = context.current_text
+        let last_text = context
+            .current_text
             .lines()
             .last()
             .unwrap_or(&context.current_text);
@@ -95,11 +96,17 @@ Complete the current sentence/thought:"#,
             context.current_text
         );
 
-        let completion = self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 50,
-            temperature: 0.3,
-            stop_sequences: vec!["\n".to_string(), ".".to_string()],
-        }).await?;
+        let completion = self
+            .llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 50,
+                    temperature: 0.3,
+                    stop_sequences: vec!["\n".to_string(), ".".to_string()],
+                },
+            )
+            .await?;
 
         if completion.trim().is_empty() {
             return Ok(None);
@@ -134,11 +141,16 @@ Improved text:"#,
             instruction, text
         );
 
-        self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: (text.len() * 2).min(1000) as u32,
-            temperature: 0.5,
-            ..Default::default()
-        }).await
+        self.llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: (text.len() * 2).min(1000) as u32,
+                    temperature: 0.5,
+                    ..Default::default()
+                },
+            )
+            .await
     }
 
     /// Generate email from bullet points
@@ -164,15 +176,24 @@ Writing style: {}
 Write a complete, well-structured email:"#,
             context.to.as_deref().unwrap_or("[recipient]"),
             context.subject.as_deref().unwrap_or("[subject]"),
-            bullets.iter().map(|b| format!("• {}", b)).collect::<Vec<_>>().join("\n"),
+            bullets
+                .iter()
+                .map(|b| format!("• {}", b))
+                .collect::<Vec<_>>()
+                .join("\n"),
             user_style
         );
 
-        self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 500,
-            temperature: 0.7,
-            ..Default::default()
-        }).await
+        self.llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 500,
+                    temperature: 0.7,
+                    ..Default::default()
+                },
+            )
+            .await
     }
 
     /// Get smart reply suggestions
@@ -208,11 +229,17 @@ NEGATIVE: [declining/negative response]"#,
             email.body_text.chars().take(500).collect::<String>()
         );
 
-        let response = self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 200,
-            temperature: 0.7,
-            ..Default::default()
-        }).await?;
+        let response = self
+            .llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 200,
+                    temperature: 0.7,
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         // Parse responses
         let mut replies = Vec::new();
@@ -260,7 +287,8 @@ NEGATIVE: [declining/negative response]"#,
         &self,
         context: &ComposeContext,
     ) -> Result<Option<Vec<Suggestion>>, CopilotError> {
-        let last_words: String = context.current_text
+        let last_words: String = context
+            .current_text
             .split_whitespace()
             .rev()
             .take(3)
@@ -273,24 +301,75 @@ NEGATIVE: [declining/negative response]"#,
 
         // Common phrase completions
         let completions: HashMap<&str, Vec<&str>> = HashMap::from([
-            ("thank you for", vec!["your time", "your help", "getting back to me", "your quick response"]),
-            ("i wanted to", vec!["follow up on", "check in about", "let you know", "ask about"]),
-            ("please let me know", vec!["if you have any questions", "if this works for you", "your thoughts"]),
-            ("looking forward to", vec!["hearing from you", "your response", "working together", "meeting you"]),
-            ("i hope this", vec!["helps", "email finds you well", "makes sense", "answers your question"]),
-            ("as discussed", vec!["in our meeting", "earlier", "on the call", "previously"]),
-            ("i am writing to", vec!["follow up", "inquire about", "request", "confirm"]),
-            ("could you please", vec!["send me", "let me know", "confirm", "provide"]),
+            (
+                "thank you for",
+                vec![
+                    "your time",
+                    "your help",
+                    "getting back to me",
+                    "your quick response",
+                ],
+            ),
+            (
+                "i wanted to",
+                vec![
+                    "follow up on",
+                    "check in about",
+                    "let you know",
+                    "ask about",
+                ],
+            ),
+            (
+                "please let me know",
+                vec![
+                    "if you have any questions",
+                    "if this works for you",
+                    "your thoughts",
+                ],
+            ),
+            (
+                "looking forward to",
+                vec![
+                    "hearing from you",
+                    "your response",
+                    "working together",
+                    "meeting you",
+                ],
+            ),
+            (
+                "i hope this",
+                vec![
+                    "helps",
+                    "email finds you well",
+                    "makes sense",
+                    "answers your question",
+                ],
+            ),
+            (
+                "as discussed",
+                vec!["in our meeting", "earlier", "on the call", "previously"],
+            ),
+            (
+                "i am writing to",
+                vec!["follow up", "inquire about", "request", "confirm"],
+            ),
+            (
+                "could you please",
+                vec!["send me", "let me know", "confirm", "provide"],
+            ),
         ]);
 
         for (phrase, options) in completions {
             if last_words.ends_with(phrase) {
                 return Ok(Some(
-                    options.iter().map(|o| Suggestion {
-                        text: format!(" {}", o),
-                        suggestion_type: SuggestionType::PhraseCompletion,
-                        confidence: 0.9,
-                    }).collect()
+                    options
+                        .iter()
+                        .map(|o| Suggestion {
+                            text: format!(" {}", o),
+                            suggestion_type: SuggestionType::PhraseCompletion,
+                            confidence: 0.9,
+                        })
+                        .collect(),
                 ));
             }
         }
@@ -327,27 +406,37 @@ impl TemplateEngine {
         let mut templates = HashMap::new();
 
         // Built-in templates
-        templates.insert("meeting_request".to_string(), EmailTemplate {
-            id: "meeting_request".to_string(),
-            name: "Meeting Request".to_string(),
-            category: TemplateCategory::Meeting,
-            subject: "Meeting Request: {{topic}}".to_string(),
-            body: r#"Hi {{name}},
+        templates.insert(
+            "meeting_request".to_string(),
+            EmailTemplate {
+                id: "meeting_request".to_string(),
+                name: "Meeting Request".to_string(),
+                category: TemplateCategory::Meeting,
+                subject: "Meeting Request: {{topic}}".to_string(),
+                body: r#"Hi {{name}},
 
 I hope this message finds you well. I would like to schedule a meeting to discuss {{topic}}.
 
 Would you be available {{time_suggestion}}? Please let me know what works best for your schedule.
 
-Best regards"#.to_string(),
-            variables: vec!["name".to_string(), "topic".to_string(), "time_suggestion".to_string()],
-        });
+Best regards"#
+                    .to_string(),
+                variables: vec![
+                    "name".to_string(),
+                    "topic".to_string(),
+                    "time_suggestion".to_string(),
+                ],
+            },
+        );
 
-        templates.insert("follow_up".to_string(), EmailTemplate {
-            id: "follow_up".to_string(),
-            name: "Follow Up".to_string(),
-            category: TemplateCategory::FollowUp,
-            subject: "Following Up: {{topic}}".to_string(),
-            body: r#"Hi {{name}},
+        templates.insert(
+            "follow_up".to_string(),
+            EmailTemplate {
+                id: "follow_up".to_string(),
+                name: "Follow Up".to_string(),
+                category: TemplateCategory::FollowUp,
+                subject: "Following Up: {{topic}}".to_string(),
+                body: r#"Hi {{name}},
 
 I wanted to follow up on {{topic}} from our previous conversation.
 
@@ -355,31 +444,48 @@ I wanted to follow up on {{topic}} from our previous conversation.
 
 Please let me know if you have any updates or if there's anything else you need from me.
 
-Best regards"#.to_string(),
-            variables: vec!["name".to_string(), "topic".to_string(), "additional_context".to_string()],
-        });
+Best regards"#
+                    .to_string(),
+                variables: vec![
+                    "name".to_string(),
+                    "topic".to_string(),
+                    "additional_context".to_string(),
+                ],
+            },
+        );
 
-        templates.insert("thank_you".to_string(), EmailTemplate {
-            id: "thank_you".to_string(),
-            name: "Thank You".to_string(),
-            category: TemplateCategory::ThankYou,
-            subject: "Thank You".to_string(),
-            body: r#"Hi {{name}},
+        templates.insert(
+            "thank_you".to_string(),
+            EmailTemplate {
+                id: "thank_you".to_string(),
+                name: "Thank You".to_string(),
+                category: TemplateCategory::ThankYou,
+                subject: "Thank You".to_string(),
+                body: r#"Hi {{name}},
 
 Thank you so much for {{reason}}. I really appreciate {{specific_detail}}.
 
 {{next_steps}}
 
-Best regards"#.to_string(),
-            variables: vec!["name".to_string(), "reason".to_string(), "specific_detail".to_string(), "next_steps".to_string()],
-        });
+Best regards"#
+                    .to_string(),
+                variables: vec![
+                    "name".to_string(),
+                    "reason".to_string(),
+                    "specific_detail".to_string(),
+                    "next_steps".to_string(),
+                ],
+            },
+        );
 
-        templates.insert("introduction".to_string(), EmailTemplate {
-            id: "introduction".to_string(),
-            name: "Introduction".to_string(),
-            category: TemplateCategory::Introduction,
-            subject: "Introduction: {{your_name}} - {{context}}".to_string(),
-            body: r#"Hi {{name}},
+        templates.insert(
+            "introduction".to_string(),
+            EmailTemplate {
+                id: "introduction".to_string(),
+                name: "Introduction".to_string(),
+                category: TemplateCategory::Introduction,
+                subject: "Introduction: {{your_name}} - {{context}}".to_string(),
+                body: r#"Hi {{name}},
 
 My name is {{your_name}}, and I'm reaching out because {{reason}}.
 
@@ -389,23 +495,42 @@ I would love to {{call_to_action}}.
 
 Looking forward to connecting.
 
-Best regards"#.to_string(),
-            variables: vec!["name".to_string(), "your_name".to_string(), "reason".to_string(), "background".to_string(), "call_to_action".to_string(), "context".to_string()],
-        });
+Best regards"#
+                    .to_string(),
+                variables: vec![
+                    "name".to_string(),
+                    "your_name".to_string(),
+                    "reason".to_string(),
+                    "background".to_string(),
+                    "call_to_action".to_string(),
+                    "context".to_string(),
+                ],
+            },
+        );
 
         Self { templates }
     }
 
-    fn get_templates(&self, category: TemplateCategory) -> Result<Vec<EmailTemplate>, CopilotError> {
-        Ok(self.templates
+    fn get_templates(
+        &self,
+        category: TemplateCategory,
+    ) -> Result<Vec<EmailTemplate>, CopilotError> {
+        Ok(self
+            .templates
             .values()
             .filter(|t| t.category == category || matches!(category, TemplateCategory::All))
             .cloned()
             .collect())
     }
 
-    fn apply(&self, template_id: &str, variables: &HashMap<String, String>) -> Result<String, CopilotError> {
-        let template = self.templates.get(template_id)
+    fn apply(
+        &self,
+        template_id: &str,
+        variables: &HashMap<String, String>,
+    ) -> Result<String, CopilotError> {
+        let template = self
+            .templates
+            .get(template_id)
             .ok_or_else(|| CopilotError::InvalidRequest("Template not found".to_string()))?;
 
         let mut result = template.body.clone();

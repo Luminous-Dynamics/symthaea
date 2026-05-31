@@ -245,7 +245,11 @@ impl RateLimiter {
     }
 
     /// Check if a request should be allowed
-    pub fn check(&self, agent: &AgentPubKey, trust_level: Option<f64>) -> ExternResult<RateLimitResult> {
+    pub fn check(
+        &self,
+        agent: &AgentPubKey,
+        trust_level: Option<f64>,
+    ) -> ExternResult<RateLimitResult> {
         let now = sys_time()?.as_millis() as u64;
         let window_start = now.saturating_sub(self.config.window_ms);
 
@@ -297,10 +301,7 @@ impl RateLimiter {
         if !result.allowed {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Rate limit exceeded for {}: {} requests in {}ms (limit: {})",
-                self.operation,
-                result.current_count,
-                self.config.window_ms,
-                result.max_allowed
+                self.operation, result.current_count, self.config.window_ms, result.max_allowed
             ))));
         }
 
@@ -339,7 +340,9 @@ impl RateLimiter {
         for record in records {
             if let Some(entry) = record.entry().as_option() {
                 if let Ok(rate_entry) = RateLimitTracker::try_from(entry.clone()) {
-                    if rate_entry.operation == self.operation && rate_entry.timestamp >= window_start {
+                    if rate_entry.operation == self.operation
+                        && rate_entry.timestamp >= window_start
+                    {
                         count += 1;
                     }
                 }

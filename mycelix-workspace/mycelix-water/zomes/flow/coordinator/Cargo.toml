@@ -1,0 +1,15 @@
+[package]
+name = "flow"
+version = "0.1.0"
+edition = "2024"
+description = "Water allocation and H2O credits coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+getrandom_03 = { workspace = true }
+flow_integrity = { path = "../integrity" }

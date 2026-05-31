@@ -1,0 +1,202 @@
+{
+  "name": "mycelix-knowledge",
+  "displayName": "Mycelix Knowledge - Fact Checker",
+  "description": "Fact-check text, explore claims, and contribute to the decentralized knowledge graph",
+  "version": "0.1.0",
+  "publisher": "luminous-dynamics",
+  "license": "AGPL-3.0-or-later",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#8b5cf6",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/v/luminous-dynamics.mycelix-knowledge",
+      "href": "https://marketplace.visualstudio.com/items?itemName=luminous-dynamics.mycelix-knowledge",
+      "description": "Version"
+    },
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/i/luminous-dynamics.mycelix-knowledge",
+      "href": "https://marketplace.visualstudio.com/items?itemName=luminous-dynamics.mycelix-knowledge",
+      "description": "Installs"
+    }
+  ],
+  "preview": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge.git",
+    "directory": "vscode-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge/issues"
+  },
+  "homepage": "https://knowledge.mycelix.net/integrations/vscode",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Education",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "fact-check",
+    "knowledge",
+    "epistemic",
+    "truth",
+    "verification",
+    "claims",
+    "holochain"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mycelix.factCheck",
+        "title": "Fact Check Selection",
+        "category": "Mycelix"
+      },
+      {
+        "command": "mycelix.submitClaim",
+        "title": "Submit as Claim",
+        "category": "Mycelix"
+      },
+      {
+        "command": "mycelix.searchClaims",
+        "title": "Search Knowledge Graph",
+        "category": "Mycelix"
+      },
+      {
+        "command": "mycelix.classifyText",
+        "title": "Classify Epistemic Type",
+        "category": "Mycelix"
+      },
+      {
+        "command": "mycelix.showCredibility",
+        "title": "Show Credibility Score",
+        "category": "Mycelix"
+      },
+      {
+        "command": "mycelix.connectHolochain",
+        "title": "Connect to Holochain",
+        "category": "Mycelix"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "mycelix.factCheck",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "mycelix.submitClaim",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorHasSelection"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "mycelix.factCheck",
+          "when": "editorHasSelection",
+          "group": "mycelix@1"
+        },
+        {
+          "command": "mycelix.submitClaim",
+          "when": "editorHasSelection",
+          "group": "mycelix@2"
+        },
+        {
+          "command": "mycelix.classifyText",
+          "when": "editorHasSelection",
+          "group": "mycelix@3"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mycelix-knowledge",
+          "title": "Mycelix Knowledge",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mycelix-knowledge": [
+        {
+          "id": "mycelix-claims",
+          "name": "Recent Claims"
+        },
+        {
+          "id": "mycelix-factchecks",
+          "name": "Fact Check Results"
+        },
+        {
+          "id": "mycelix-graph",
+          "name": "Knowledge Graph"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Mycelix Knowledge",
+      "properties": {
+        "mycelix.holochainUrl": {
+          "type": "string",
+          "default": "ws://localhost:8888",
+          "description": "Holochain conductor WebSocket URL"
+        },
+        "mycelix.appId": {
+          "type": "string",
+          "default": "mycelix-knowledge",
+          "description": "Holochain app ID"
+        },
+        "mycelix.autoFactCheck": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically fact-check selected text on hover"
+        },
+        "mycelix.minCredibilityThreshold": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum credibility score to show in results"
+        },
+        "mycelix.showInlineDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline credibility decorations"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "dependencies": {
+    "@mycelix/knowledge-client": "^0.1.0"
+  }
+}

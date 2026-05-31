@@ -10,7 +10,7 @@
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
-use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::holochain::{ConnectionStatus, use_holochain};
 use crate::toasts::use_toasts;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

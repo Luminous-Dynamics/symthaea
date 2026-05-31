@@ -14,7 +14,7 @@
 use axum::{
     body::Body,
     extract::{ConnectInfo, State},
-    http::{header, HeaderMap, HeaderValue, Method, Request, StatusCode},
+    http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -121,7 +121,10 @@ pub async fn rate_limit_middleware(
 
             let mut response = (
                 StatusCode::TOO_MANY_REQUESTS,
-                format!("Rate limit exceeded. Try again in {} seconds.", err.reset_in),
+                format!(
+                    "Rate limit exceeded. Try again in {} seconds.",
+                    err.reset_in
+                ),
             )
                 .into_response();
 
@@ -130,10 +133,7 @@ pub async fn rate_limit_middleware(
                 "X-RateLimit-Limit",
                 HeaderValue::from_str(&err.limit.to_string()).unwrap(),
             );
-            headers.insert(
-                "X-RateLimit-Remaining",
-                HeaderValue::from_static("0"),
-            );
+            headers.insert("X-RateLimit-Remaining", HeaderValue::from_static("0"));
             headers.insert(
                 "Retry-After",
                 HeaderValue::from_str(&err.reset_in.to_string()).unwrap(),
@@ -182,10 +182,7 @@ pub async fn security_headers_middleware(request: Request<Body>, next: Next) -> 
     );
 
     // X-Frame-Options
-    headers.insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
 
     // X-XSS-Protection
     headers.insert(
@@ -419,7 +416,12 @@ impl AuditLogger {
     }
 
     pub fn log_security_event(&self, event_type: &str, details: &str, ip: &str) {
-        warn!(event_type = event_type, details = details, ip = ip, "Security event");
+        warn!(
+            event_type = event_type,
+            details = details,
+            ip = ip,
+            "Security event"
+        );
     }
 }
 
@@ -475,7 +477,7 @@ pub fn timeout_layer(timeout_secs: u64) -> TimeoutLayer {
 // Combined Security Stack
 // ============================================================================
 
-use axum::{middleware, Router};
+use axum::{Router, middleware};
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 
@@ -507,8 +509,14 @@ where
             rate_limiter,
             rate_limit_middleware,
         ))
-        .layer(middleware::from_fn_with_state(ip_blocker, ip_block_middleware))
-        .layer(middleware::from_fn_with_state(audit_logger, audit_middleware))
+        .layer(middleware::from_fn_with_state(
+            ip_blocker,
+            ip_block_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            audit_logger,
+            audit_middleware,
+        ))
 }
 
 // ============================================================================

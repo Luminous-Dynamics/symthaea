@@ -1,0 +1,15 @@
+[package]
+name = "timebank"
+version = "0.1.0"
+edition = "2024"
+description = "Timebank coordinator zome - service exchange logic"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+getrandom_03 = { workspace = true }
+timebank_integrity = { path = "../integrity" }

@@ -5,9 +5,9 @@
 //!
 //! ML-based email importance ranking and suggested responses
 
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Timelike, Datelike};
 
 /// Email priority result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,11 +26,11 @@ pub struct PriorityResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PriorityLevel {
-    Critical,    // Needs immediate attention
-    High,        // Important, respond soon
-    Normal,      // Regular priority
-    Low,         // Can wait
-    Bulk,        // Newsletters, notifications
+    Critical, // Needs immediate attention
+    High,     // Important, respond soon
+    Normal,   // Regular priority
+    Low,      // Can wait
+    Bulk,     // Newsletters, notifications
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +136,10 @@ impl PriorityScorer {
                 factors.push(PriorityFactor {
                     name: "frequent_contact".to_string(),
                     weight: bonus,
-                    description: format!("Frequent contact ({} interactions)", stats.interaction_count),
+                    description: format!(
+                        "Frequent contact ({} interactions)",
+                        stats.interaction_count
+                    ),
                 });
             }
         }
@@ -227,8 +230,12 @@ impl PriorityScorer {
         }
 
         // Factor 7: Has deadline mentioned
-        if content.contains("by") && (content.contains("friday") || content.contains("monday")
-            || content.contains("tomorrow") || content.contains("end of")) {
+        if content.contains("by")
+            && (content.contains("friday")
+                || content.contains("monday")
+                || content.contains("tomorrow")
+                || content.contains("end of"))
+        {
             total_score += 0.2;
             factors.push(PriorityFactor {
                 name: "has_deadline".to_string(),
@@ -304,48 +311,66 @@ impl SmartReplyGenerator {
     pub fn new() -> Self {
         let mut templates = HashMap::new();
 
-        templates.insert(ReplyType::Acknowledgment, vec![
-            "Got it, thanks!",
-            "Thanks for letting me know.",
-            "Acknowledged, thank you.",
-            "Noted, thanks!",
-        ]);
+        templates.insert(
+            ReplyType::Acknowledgment,
+            vec![
+                "Got it, thanks!",
+                "Thanks for letting me know.",
+                "Acknowledged, thank you.",
+                "Noted, thanks!",
+            ],
+        );
 
-        templates.insert(ReplyType::Affirmative, vec![
-            "Yes, that works for me.",
-            "Sounds good!",
-            "I'm on board with that.",
-            "Agreed, let's proceed.",
-            "Yes, I can do that.",
-        ]);
+        templates.insert(
+            ReplyType::Affirmative,
+            vec![
+                "Yes, that works for me.",
+                "Sounds good!",
+                "I'm on board with that.",
+                "Agreed, let's proceed.",
+                "Yes, I can do that.",
+            ],
+        );
 
-        templates.insert(ReplyType::Negative, vec![
-            "Unfortunately, I won't be able to.",
-            "I'm sorry, but that doesn't work for me.",
-            "I'll have to pass on this one.",
-            "Not this time, but thanks for asking.",
-        ]);
+        templates.insert(
+            ReplyType::Negative,
+            vec![
+                "Unfortunately, I won't be able to.",
+                "I'm sorry, but that doesn't work for me.",
+                "I'll have to pass on this one.",
+                "Not this time, but thanks for asking.",
+            ],
+        );
 
-        templates.insert(ReplyType::ThankYou, vec![
-            "Thank you so much!",
-            "Thanks, I really appreciate it!",
-            "Thank you for your help!",
-            "Thanks for getting back to me!",
-        ]);
+        templates.insert(
+            ReplyType::ThankYou,
+            vec![
+                "Thank you so much!",
+                "Thanks, I really appreciate it!",
+                "Thank you for your help!",
+                "Thanks for getting back to me!",
+            ],
+        );
 
-        templates.insert(ReplyType::Scheduling, vec![
-            "How about Tuesday at 2pm?",
-            "I'm free tomorrow afternoon.",
-            "Let me check my calendar and get back to you.",
-            "Would next week work for you?",
-        ]);
+        templates.insert(
+            ReplyType::Scheduling,
+            vec![
+                "How about Tuesday at 2pm?",
+                "I'm free tomorrow afternoon.",
+                "Let me check my calendar and get back to you.",
+                "Would next week work for you?",
+            ],
+        );
 
-        templates.insert(ReplyType::Question, vec![
-            "Could you provide more details?",
-            "When do you need this by?",
-            "Who else should be involved?",
-            "What's the priority on this?",
-        ]);
+        templates.insert(
+            ReplyType::Question,
+            vec![
+                "Could you provide more details?",
+                "When do you need this by?",
+                "Who else should be involved?",
+                "What's the priority on this?",
+            ],
+        );
 
         Self { templates }
     }
@@ -356,7 +381,10 @@ impl SmartReplyGenerator {
         let content = format!("{} {}", email.subject, email.body_preview).to_lowercase();
 
         // Detect email type and generate appropriate replies
-        if content.contains("meeting") || content.contains("schedule") || content.contains("calendar") {
+        if content.contains("meeting")
+            || content.contains("schedule")
+            || content.contains("calendar")
+        {
             suggestions.extend(self.get_replies(ReplyType::Scheduling, 0.8));
             suggestions.extend(self.get_replies(ReplyType::Affirmative, 0.7));
         }
@@ -370,7 +398,10 @@ impl SmartReplyGenerator {
             suggestions.extend(self.get_replies(ReplyType::Negative, 0.6));
         }
 
-        if content.contains("fyi") || content.contains("update") || content.contains("letting you know") {
+        if content.contains("fyi")
+            || content.contains("update")
+            || content.contains("letting you know")
+        {
             suggestions.extend(self.get_replies(ReplyType::Acknowledgment, 0.9));
             suggestions.extend(self.get_replies(ReplyType::ThankYou, 0.7));
         }
@@ -456,7 +487,10 @@ mod tests {
 
         let result = scorer.score(&email);
         assert!(result.score >= 0.7);
-        assert!(matches!(result.level, PriorityLevel::High | PriorityLevel::Critical));
+        assert!(matches!(
+            result.level,
+            PriorityLevel::High | PriorityLevel::Critical
+        ));
     }
 
     #[test]
@@ -477,7 +511,10 @@ mod tests {
 
         let result = scorer.score(&email);
         assert!(result.score < 0.4);
-        assert!(matches!(result.level, PriorityLevel::Low | PriorityLevel::Bulk));
+        assert!(matches!(
+            result.level,
+            PriorityLevel::Low | PriorityLevel::Bulk
+        ));
     }
 
     #[test]
@@ -498,7 +535,8 @@ mod tests {
 
         let replies = generator.generate(&email);
         assert!(!replies.is_empty());
-        assert!(replies.iter().any(|r| r.reply_type == ReplyType::Scheduling
-            || r.reply_type == ReplyType::Affirmative));
+        assert!(replies.iter().any(
+            |r| r.reply_type == ReplyType::Scheduling || r.reply_type == ReplyType::Affirmative
+        ));
     }
 }

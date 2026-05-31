@@ -9,13 +9,13 @@
 //! - DID resolutions complete
 
 use axum::{
+    Router,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::{Deserialize, Serialize};
@@ -41,9 +41,7 @@ pub enum WsEvent {
         is_byzantine: bool,
     },
     /// Connection established
-    Connected {
-        session_id: String,
-    },
+    Connected { session_id: String },
     /// Heartbeat to keep connection alive
     Ping,
     /// Acknowledgment
@@ -55,15 +53,11 @@ pub type EventBroadcast = broadcast::Sender<WsEvent>;
 
 /// Create WebSocket routes
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/events", get(ws_handler))
+    Router::new().route("/events", get(ws_handler))
 }
 
 /// WebSocket connection handler
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 

@@ -322,12 +322,10 @@ impl TemplateService {
 
     /// Increment template use count
     pub async fn increment_use_count(&self, template_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE email_templates SET use_count = use_count + 1 WHERE id = $1",
-        )
-        .bind(template_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE email_templates SET use_count = use_count + 1 WHERE id = $1")
+            .bind(template_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
@@ -338,13 +336,11 @@ impl TemplateService {
         template_id: Uuid,
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "DELETE FROM email_templates WHERE id = $1 AND user_id = $2",
-        )
-        .bind(template_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
+        let result = sqlx::query("DELETE FROM email_templates WHERE id = $1 AND user_id = $2")
+            .bind(template_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -383,7 +379,10 @@ fn format_date_helper(
     out: &mut dyn handlebars::Output,
 ) -> handlebars::HelperResult {
     let date = h.param(0).and_then(|v| v.value().as_str()).unwrap_or("");
-    let format = h.param(1).and_then(|v| v.value().as_str()).unwrap_or("%B %d, %Y");
+    let format = h
+        .param(1)
+        .and_then(|v| v.value().as_str())
+        .unwrap_or("%B %d, %Y");
 
     if let Ok(dt) = DateTime::parse_from_rfc3339(date) {
         out.write(&dt.format(format).to_string())?;

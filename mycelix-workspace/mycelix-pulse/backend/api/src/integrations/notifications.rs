@@ -227,41 +227,48 @@ impl NotificationService {
     }
 
     /// Validate webhook URL format for platform
-    fn validate_webhook_url(&self, url: &str, platform: &NotificationPlatform) -> Result<(), NotificationError> {
+    fn validate_webhook_url(
+        &self,
+        url: &str,
+        platform: &NotificationPlatform,
+    ) -> Result<(), NotificationError> {
         match platform {
             NotificationPlatform::Slack => {
                 if !url.starts_with("https://hooks.slack.com/") {
                     return Err(NotificationError::InvalidWebhookUrl(
-                        "Slack webhooks must start with https://hooks.slack.com/".to_string()
+                        "Slack webhooks must start with https://hooks.slack.com/".to_string(),
                     ));
                 }
             }
             NotificationPlatform::MicrosoftTeams => {
                 if !url.contains("webhook.office.com") && !url.contains("microsoft.com") {
                     return Err(NotificationError::InvalidWebhookUrl(
-                        "Teams webhooks must be from webhook.office.com or microsoft.com".to_string()
+                        "Teams webhooks must be from webhook.office.com or microsoft.com"
+                            .to_string(),
                     ));
                 }
             }
             NotificationPlatform::Discord => {
-                if !url.starts_with("https://discord.com/api/webhooks/") &&
-                   !url.starts_with("https://discordapp.com/api/webhooks/") {
+                if !url.starts_with("https://discord.com/api/webhooks/")
+                    && !url.starts_with("https://discordapp.com/api/webhooks/")
+                {
                     return Err(NotificationError::InvalidWebhookUrl(
-                        "Discord webhooks must start with https://discord.com/api/webhooks/".to_string()
+                        "Discord webhooks must start with https://discord.com/api/webhooks/"
+                            .to_string(),
                     ));
                 }
             }
             NotificationPlatform::Mattermost => {
                 if !url.contains("/hooks/") {
                     return Err(NotificationError::InvalidWebhookUrl(
-                        "Mattermost webhooks must contain /hooks/".to_string()
+                        "Mattermost webhooks must contain /hooks/".to_string(),
                     ));
                 }
             }
             NotificationPlatform::CustomWebhook => {
                 if !url.starts_with("https://") {
                     return Err(NotificationError::InvalidWebhookUrl(
-                        "Custom webhooks must use HTTPS".to_string()
+                        "Custom webhooks must use HTTPS".to_string(),
                     ));
                 }
             }
@@ -278,7 +285,9 @@ impl NotificationService {
         filters: NotificationFilters,
         priority: NotificationPriority,
     ) -> Result<NotificationRule, NotificationError> {
-        let channel = self.channels.get_mut(&channel_id)
+        let channel = self
+            .channels
+            .get_mut(&channel_id)
             .ok_or(NotificationError::ChannelNotFound)?;
 
         let rule = NotificationRule {
@@ -297,8 +306,14 @@ impl NotificationService {
     }
 
     /// Remove a rule
-    pub async fn remove_rule(&mut self, channel_id: Uuid, rule_id: Uuid) -> Result<(), NotificationError> {
-        let channel = self.channels.get_mut(&channel_id)
+    pub async fn remove_rule(
+        &mut self,
+        channel_id: Uuid,
+        rule_id: Uuid,
+    ) -> Result<(), NotificationError> {
+        let channel = self
+            .channels
+            .get_mut(&channel_id)
             .ok_or(NotificationError::ChannelNotFound)?;
 
         channel.rules.retain(|r| r.id != rule_id);
@@ -319,7 +334,9 @@ impl NotificationService {
         let mut results = Vec::new();
 
         // Find all channels for this user
-        let channel_ids: Vec<Uuid> = self.channels.iter()
+        let channel_ids: Vec<Uuid> = self
+            .channels
+            .iter()
             .filter(|(_, c)| c.user_id == user_id && c.enabled)
             .map(|(id, _)| *id)
             .collect();
@@ -359,25 +376,29 @@ impl NotificationService {
                 }
 
                 // Build notification
-                let payload = NotificationPayload {
-                    id: Uuid::new_v4(),
-                    channel_id,
-                    trigger: rule.trigger.clone(),
-                    title: format!("New email from {}", email_from),
-                    message: email_subject.to_string(),
-                    preview: if channel.settings.include_preview {
-                        Some(self.truncate_preview(email_preview, channel.settings.max_preview_length))
-                    } else {
-                        None
-                    },
-                    url: Some(format!("/mail/inbox/{}", email_id)),
-                    metadata: HashMap::from([
-                        ("from".to_string(), email_from.to_string()),
-                        ("trust_score".to_string(), trust_score.to_string()),
-                    ]),
-                    priority: rule.priority.clone(),
-                    created_at: Utc::now(),
-                };
+                let payload =
+                    NotificationPayload {
+                        id: Uuid::new_v4(),
+                        channel_id,
+                        trigger: rule.trigger.clone(),
+                        title: format!("New email from {}", email_from),
+                        message: email_subject.to_string(),
+                        preview: if channel.settings.include_preview {
+                            Some(self.truncate_preview(
+                                email_preview,
+                                channel.settings.max_preview_length,
+                            ))
+                        } else {
+                            None
+                        },
+                        url: Some(format!("/mail/inbox/{}", email_id)),
+                        metadata: HashMap::from([
+                            ("from".to_string(), email_from.to_string()),
+                            ("trust_score".to_string(), trust_score.to_string()),
+                        ]),
+                        priority: rule.priority.clone(),
+                        created_at: Utc::now(),
+                    };
 
                 // Send notification
                 let result = self.send_notification(&channel, payload).await;
@@ -410,8 +431,8 @@ impl NotificationService {
             }
             NotificationTrigger::SearchMatch { query } => {
                 let query_lower = query.to_lowercase();
-                subject.to_lowercase().contains(&query_lower) ||
-                from.to_lowercase().contains(&query_lower)
+                subject.to_lowercase().contains(&query_lower)
+                    || from.to_lowercase().contains(&query_lower)
             }
             _ => false,
         };
@@ -449,7 +470,10 @@ impl NotificationService {
 
         // Subject contains
         if let Some(terms) = &filters.subject_contains {
-            if !terms.iter().any(|t| subject_lower.contains(&t.to_lowercase())) {
+            if !terms
+                .iter()
+                .any(|t| subject_lower.contains(&t.to_lowercase()))
+            {
                 return false;
             }
         }
@@ -525,9 +549,15 @@ impl NotificationService {
     ) -> DeliveryResult {
         let body = match channel.platform {
             NotificationPlatform::Slack => self.build_slack_payload(&payload, &channel.settings),
-            NotificationPlatform::MicrosoftTeams => self.build_teams_payload(&payload, &channel.settings),
-            NotificationPlatform::Discord => self.build_discord_payload(&payload, &channel.settings),
-            NotificationPlatform::Mattermost => self.build_mattermost_payload(&payload, &channel.settings),
+            NotificationPlatform::MicrosoftTeams => {
+                self.build_teams_payload(&payload, &channel.settings)
+            }
+            NotificationPlatform::Discord => {
+                self.build_discord_payload(&payload, &channel.settings)
+            }
+            NotificationPlatform::Mattermost => {
+                self.build_mattermost_payload(&payload, &channel.settings)
+            }
             NotificationPlatform::CustomWebhook => self.build_generic_payload(&payload),
         };
 
@@ -553,7 +583,11 @@ impl NotificationService {
     }
 
     /// Build Slack Block Kit payload
-    fn build_slack_payload(&self, payload: &NotificationPayload, settings: &ChannelSettings) -> serde_json::Value {
+    fn build_slack_payload(
+        &self,
+        payload: &NotificationPayload,
+        settings: &ChannelSettings,
+    ) -> serde_json::Value {
         let mut blocks = vec![
             serde_json::json!({
                 "type": "header",
@@ -612,7 +646,11 @@ impl NotificationService {
     }
 
     /// Build Microsoft Teams Adaptive Card payload
-    fn build_teams_payload(&self, payload: &NotificationPayload, settings: &ChannelSettings) -> serde_json::Value {
+    fn build_teams_payload(
+        &self,
+        payload: &NotificationPayload,
+        settings: &ChannelSettings,
+    ) -> serde_json::Value {
         let mut body = vec![
             serde_json::json!({
                 "type": "TextBlock",
@@ -661,7 +699,11 @@ impl NotificationService {
     }
 
     /// Build Discord embed payload
-    fn build_discord_payload(&self, payload: &NotificationPayload, settings: &ChannelSettings) -> serde_json::Value {
+    fn build_discord_payload(
+        &self,
+        payload: &NotificationPayload,
+        settings: &ChannelSettings,
+    ) -> serde_json::Value {
         let color = match payload.priority {
             NotificationPriority::Urgent => 15158332, // Red
             NotificationPriority::High => 15105570,   // Orange
@@ -703,7 +745,11 @@ impl NotificationService {
     }
 
     /// Build Mattermost payload
-    fn build_mattermost_payload(&self, payload: &NotificationPayload, settings: &ChannelSettings) -> serde_json::Value {
+    fn build_mattermost_payload(
+        &self,
+        payload: &NotificationPayload,
+        settings: &ChannelSettings,
+    ) -> serde_json::Value {
         let mut result = serde_json::json!({
             "text": format!("**{}**\n{}", payload.title, payload.message),
             "attachments": [{
@@ -744,8 +790,13 @@ impl NotificationService {
     }
 
     /// Send a test notification
-    pub async fn send_test_notification(&mut self, channel_id: Uuid) -> Result<DeliveryResult, NotificationError> {
-        let channel = self.channels.get(&channel_id)
+    pub async fn send_test_notification(
+        &mut self,
+        channel_id: Uuid,
+    ) -> Result<DeliveryResult, NotificationError> {
+        let channel = self
+            .channels
+            .get(&channel_id)
             .ok_or(NotificationError::ChannelNotFound)?
             .clone();
 
@@ -767,15 +818,22 @@ impl NotificationService {
 
     /// Delete a channel
     pub async fn delete_channel(&mut self, channel_id: Uuid) -> Result<(), NotificationError> {
-        self.channels.remove(&channel_id)
+        self.channels
+            .remove(&channel_id)
             .ok_or(NotificationError::ChannelNotFound)?;
         self.rate_counters.remove(&channel_id);
         Ok(())
     }
 
     /// Enable/disable a channel
-    pub async fn set_channel_enabled(&mut self, channel_id: Uuid, enabled: bool) -> Result<(), NotificationError> {
-        let channel = self.channels.get_mut(&channel_id)
+    pub async fn set_channel_enabled(
+        &mut self,
+        channel_id: Uuid,
+        enabled: bool,
+    ) -> Result<(), NotificationError> {
+        let channel = self
+            .channels
+            .get_mut(&channel_id)
             .ok_or(NotificationError::ChannelNotFound)?;
         channel.enabled = enabled;
         Ok(())
@@ -783,7 +841,8 @@ impl NotificationService {
 
     /// Get user's channels
     pub fn get_channels(&self, user_id: Uuid) -> Vec<&NotificationChannel> {
-        self.channels.values()
+        self.channels
+            .values()
             .filter(|c| c.user_id == user_id)
             .collect()
     }
@@ -795,7 +854,8 @@ impl NotificationService {
 
     /// Get notification history
     pub fn get_history(&self, channel_id: Uuid, limit: usize) -> Vec<&DeliveryResult> {
-        self.history.iter()
+        self.history
+            .iter()
             .filter(|r| r.channel_id == channel_id)
             .rev()
             .take(limit)
@@ -812,9 +872,15 @@ impl NotificationService {
     ) -> Vec<DeliveryResult> {
         let mut results = Vec::new();
 
-        let channel_ids: Vec<Uuid> = self.channels.iter()
+        let channel_ids: Vec<Uuid> = self
+            .channels
+            .iter()
             .filter(|(_, c)| c.user_id == user_id && c.enabled)
-            .filter(|(_, c)| c.rules.iter().any(|r| matches!(r.trigger, NotificationTrigger::DailyDigest { .. })))
+            .filter(|(_, c)| {
+                c.rules
+                    .iter()
+                    .any(|r| matches!(r.trigger, NotificationTrigger::DailyDigest { .. }))
+            })
             .map(|(id, _)| *id)
             .collect();
 
@@ -824,7 +890,8 @@ impl NotificationService {
                 None => continue,
             };
 
-            let top_senders_text = top_senders.iter()
+            let top_senders_text = top_senders
+                .iter()
                 .take(5)
                 .map(|(sender, count)| format!("• {} ({} emails)", sender, count))
                 .collect::<Vec<_>>()
@@ -843,7 +910,10 @@ impl NotificationService {
                 url: Some("/mail/inbox".to_string()),
                 metadata: HashMap::from([
                     ("unread_count".to_string(), unread_count.to_string()),
-                    ("high_priority_count".to_string(), high_priority_count.to_string()),
+                    (
+                        "high_priority_count".to_string(),
+                        high_priority_count.to_string(),
+                    ),
                 ]),
                 priority: NotificationPriority::Low,
                 created_at: Utc::now(),
@@ -890,13 +960,16 @@ mod tests {
         let mut service = NotificationService::new();
         let user_id = Uuid::new_v4();
 
-        let channel = service.create_channel(
-            user_id,
-            NotificationPlatform::Slack,
-            "My Slack".to_string(),
-            "https://hooks.slack.com/services/T00/B00/XXX".to_string(),
-            None,
-        ).await.unwrap();
+        let channel = service
+            .create_channel(
+                user_id,
+                NotificationPlatform::Slack,
+                "My Slack".to_string(),
+                "https://hooks.slack.com/services/T00/B00/XXX".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
 
         assert_eq!(channel.platform, NotificationPlatform::Slack);
         assert!(channel.enabled);
@@ -907,21 +980,27 @@ mod tests {
         let mut service = NotificationService::new();
         let user_id = Uuid::new_v4();
 
-        let channel = service.create_channel(
-            user_id,
-            NotificationPlatform::Discord,
-            "My Discord".to_string(),
-            "https://discord.com/api/webhooks/123/abc".to_string(),
-            None,
-        ).await.unwrap();
+        let channel = service
+            .create_channel(
+                user_id,
+                NotificationPlatform::Discord,
+                "My Discord".to_string(),
+                "https://discord.com/api/webhooks/123/abc".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
 
-        let rule = service.add_rule(
-            channel.id,
-            "VIP Emails".to_string(),
-            NotificationTrigger::HighTrustEmail { min_score: 0.8 },
-            NotificationFilters::default(),
-            NotificationPriority::High,
-        ).await.unwrap();
+        let rule = service
+            .add_rule(
+                channel.id,
+                "VIP Emails".to_string(),
+                NotificationTrigger::HighTrustEmail { min_score: 0.8 },
+                NotificationFilters::default(),
+                NotificationPriority::High,
+            )
+            .await
+            .unwrap();
 
         assert!(rule.enabled);
 
@@ -940,33 +1019,12 @@ mod tests {
         };
 
         // Should match
-        assert!(service.rule_matches(
-            &trigger,
-            &filters,
-            "alice@example.com",
-            "Hello",
-            0.9,
-            &[]
-        ));
+        assert!(service.rule_matches(&trigger, &filters, "alice@example.com", "Hello", 0.9, &[]));
 
         // Low trust score - no match
-        assert!(!service.rule_matches(
-            &trigger,
-            &filters,
-            "alice@example.com",
-            "Hello",
-            0.5,
-            &[]
-        ));
+        assert!(!service.rule_matches(&trigger, &filters, "alice@example.com", "Hello", 0.5, &[]));
 
         // Wrong domain - no match
-        assert!(!service.rule_matches(
-            &trigger,
-            &filters,
-            "alice@other.com",
-            "Hello",
-            0.9,
-            &[]
-        ));
+        assert!(!service.rule_matches(&trigger, &filters, "alice@other.com", "Hello", 0.9, &[]));
     }
 }

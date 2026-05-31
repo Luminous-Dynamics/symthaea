@@ -5,8 +5,8 @@
 //!
 //! Append-only audit log operations.
 
-use hdk::prelude::*;
 use audit_integrity::*;
+use hdk::prelude::*;
 
 const ALL_ENTRIES_ANCHOR: &str = "all_audit_entries";
 const SUMMARIES_ANCHOR: &str = "audit_summaries";
@@ -113,15 +113,24 @@ pub fn get_entries(query: Option<AuditQuery>) -> ExternResult<Vec<AuditEntry>> {
     let links = if let Some(correlation_id) = &query.correlation_id {
         // Query by correlation
         let anchor = correlation_anchor(correlation_id)?;
-        get_links(LinkQuery::try_new(anchor, LinkTypes::EntriesByCorrelation)?, GetStrategy::default())?
+        get_links(
+            LinkQuery::try_new(anchor, LinkTypes::EntriesByCorrelation)?,
+            GetStrategy::default(),
+        )?
     } else if let Some(agent) = &query.actor_agent {
         // Query by actor
-        get_links(LinkQuery::try_new(agent.clone(), LinkTypes::EntriesByActor)?, GetStrategy::default())?
+        get_links(
+            LinkQuery::try_new(agent.clone(), LinkTypes::EntriesByActor)?,
+            GetStrategy::default(),
+        )?
     } else if let Some(categories) = &query.categories {
         // Query by first category
         if let Some(category) = categories.first() {
             let anchor = category_anchor(category)?;
-            get_links(LinkQuery::try_new(anchor, LinkTypes::EntriesByCategory)?, GetStrategy::default())?
+            get_links(
+                LinkQuery::try_new(anchor, LinkTypes::EntriesByCategory)?,
+                GetStrategy::default(),
+            )?
         } else {
             get_all_entry_links()?
         }
@@ -129,7 +138,10 @@ pub fn get_entries(query: Option<AuditQuery>) -> ExternResult<Vec<AuditEntry>> {
         // Query by first severity
         if let Some(severity) = severities.first() {
             let anchor = severity_anchor(severity)?;
-            get_links(LinkQuery::try_new(anchor, LinkTypes::EntriesBySeverity)?, GetStrategy::default())?
+            get_links(
+                LinkQuery::try_new(anchor, LinkTypes::EntriesBySeverity)?,
+                GetStrategy::default(),
+            )?
         } else {
             get_all_entry_links()?
         }
@@ -217,7 +229,10 @@ pub fn get_entry_by_id(id: String) -> ExternResult<Option<AuditEntry>> {
 #[hdk_extern]
 pub fn get_correlated_entries(correlation_id: String) -> ExternResult<Vec<AuditEntry>> {
     let anchor = correlation_anchor(&correlation_id)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::EntriesByCorrelation)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::EntriesByCorrelation)?,
+        GetStrategy::default(),
+    )?;
 
     let mut entries = Vec::new();
     for link in links {
@@ -260,8 +275,12 @@ pub fn generate_summary(input: SummaryInput) -> ExternResult<AuditSummary> {
     let mut actors: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for entry in &entries {
-        *by_category.entry(format!("{:?}", entry.category)).or_insert(0) += 1;
-        *by_severity.entry(format!("{:?}", entry.severity)).or_insert(0) += 1;
+        *by_category
+            .entry(format!("{:?}", entry.category))
+            .or_insert(0) += 1;
+        *by_severity
+            .entry(format!("{:?}", entry.severity))
+            .or_insert(0) += 1;
 
         if let Some(ref email) = entry.actor.email {
             actors.insert(email.clone());
@@ -306,7 +325,10 @@ pub struct SummaryInput {
 #[hdk_extern]
 pub fn get_summaries(_: ()) -> ExternResult<Vec<AuditSummary>> {
     let anchor = anchor_hash(SUMMARIES_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuditSummaries)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::AuditSummaries)?,
+        GetStrategy::default(),
+    )?;
 
     let mut summaries = Vec::new();
     for link in links {
@@ -359,5 +381,8 @@ fn correlation_anchor(id: &str) -> ExternResult<EntryHash> {
 
 fn get_all_entry_links() -> ExternResult<Vec<Link>> {
     let anchor = anchor_hash(ALL_ENTRIES_ANCHOR)?;
-    get_links(LinkQuery::try_new(anchor, LinkTypes::AllAuditEntries)?, GetStrategy::default())
+    get_links(
+        LinkQuery::try_new(anchor, LinkTypes::AllAuditEntries)?,
+        GetStrategy::default(),
+    )
 }

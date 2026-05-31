@@ -11,15 +11,15 @@
 //! - Session management
 
 use axum::{
+    Json, Router,
     extract::{Query, State},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Redirect},
     routing::{get, post},
-    Json, Router,
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use rand::{distributions::Alphanumeric, Rng};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use rand::{Rng, distributions::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -53,14 +53,14 @@ pub struct OAuthProvider {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,           // User ID
+    pub sub: String, // User ID
     pub email: String,
     pub name: Option<String>,
-    pub iat: i64,              // Issued at
-    pub exp: i64,              // Expiration
-    pub iss: String,           // Issuer
-    pub aud: String,           // Audience
-    pub jti: String,           // JWT ID (for revocation)
+    pub iat: i64,    // Issued at
+    pub exp: i64,    // Expiration
+    pub iss: String, // Issuer
+    pub aud: String, // Audience
+    pub jti: String, // JWT ID (for revocation)
     pub scope: Vec<String>,
 }
 
@@ -68,7 +68,7 @@ pub struct Claims {
 pub struct RefreshTokenClaims {
     pub sub: String,
     pub jti: String,
-    pub family: String,        // Token family for rotation
+    pub family: String, // Token family for rotation
     pub iat: i64,
     pub exp: i64,
 }
@@ -175,7 +175,12 @@ async fn authorize(
     Query(params): Query<AuthorizationRequest>,
 ) -> impl IntoResponse {
     // Find provider
-    let provider = match state.config.oauth_providers.iter().find(|p| p.name == params.provider) {
+    let provider = match state
+        .config
+        .oauth_providers
+        .iter()
+        .find(|p| p.name == params.provider)
+    {
         Some(p) => p,
         None => {
             return (StatusCode::BAD_REQUEST, "Unknown provider").into_response();
@@ -194,7 +199,9 @@ async fn authorize(
         state_token.clone(),
         PendingAuth {
             provider: params.provider.clone(),
-            redirect_uri: params.redirect_uri.unwrap_or_else(|| provider.redirect_uri.clone()),
+            redirect_uri: params
+                .redirect_uri
+                .unwrap_or_else(|| provider.redirect_uri.clone()),
             code_challenge: params.code_challenge,
             created_at: Utc::now(),
         },
@@ -202,7 +209,8 @@ async fn authorize(
 
     // Build authorization URL
     let mut auth_url = url::Url::parse(&provider.auth_url).unwrap();
-    auth_url.query_pairs_mut()
+    auth_url
+        .query_pairs_mut()
         .append_pair("client_id", &provider.client_id)
         .append_pair("redirect_uri", &provider.redirect_uri)
         .append_pair("response_type", "code")
@@ -211,9 +219,13 @@ async fn authorize(
 
     // Add PKCE if provided
     if let Some(ref challenge) = params.code_challenge {
-        auth_url.query_pairs_mut()
+        auth_url
+            .query_pairs_mut()
             .append_pair("code_challenge", challenge)
-            .append_pair("code_challenge_method", params.code_challenge_method.as_deref().unwrap_or("S256"));
+            .append_pair(
+                "code_challenge_method",
+                params.code_challenge_method.as_deref().unwrap_or("S256"),
+            );
     }
 
     Redirect::temporary(auth_url.as_str()).into_response()
@@ -238,7 +250,12 @@ async fn callback(
     }
 
     // Find provider
-    let provider = match state.config.oauth_providers.iter().find(|p| p.name == pending.provider) {
+    let provider = match state
+        .config
+        .oauth_providers
+        .iter()
+        .find(|p| p.name == pending.provider)
+    {
         Some(p) => p,
         None => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Provider not found").into_response();
@@ -304,9 +321,7 @@ async fn callback(
     // Redirect with tokens (in production, use secure cookie or fragment)
     let redirect_url = format!(
         "{}#access_token={}&token_type=Bearer&expires_in={}",
-        pending.redirect_uri,
-        tokens.access_token,
-        tokens.expires_in
+        pending.redirect_uri, tokens.access_token, tokens.expires_in
     );
 
     Redirect::temporary(&redirect_url).into_response()
@@ -493,7 +508,11 @@ fn generate_tokens(
         iss: state.config.jwt_issuer.clone(),
         aud: state.config.jwt_audience.clone(),
         jti: access_token_id,
-        scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+        scope: vec![
+            "openid".to_string(),
+            "email".to_string(),
+            "profile".to_string(),
+        ],
     };
 
     // Refresh token claims
@@ -540,7 +559,10 @@ fn generate_tokens(
     }
 }
 
-fn decode_access_token(config: &AuthConfig, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+fn decode_access_token(
+    config: &AuthConfig,
+    token: &str,
+) -> Result<Claims, jsonwebtoken::errors::Error> {
     let mut validation = Validation::new(Algorithm::HS512);
     validation.set_issuer(&[&config.jwt_issuer]);
     validation.set_audience(&[&config.jwt_audience]);
@@ -554,7 +576,10 @@ fn decode_access_token(config: &AuthConfig, token: &str) -> Result<Claims, jsonw
     Ok(token_data.claims)
 }
 
-fn decode_refresh_token(config: &AuthConfig, token: &str) -> Result<RefreshTokenClaims, jsonwebtoken::errors::Error> {
+fn decode_refresh_token(
+    config: &AuthConfig,
+    token: &str,
+) -> Result<RefreshTokenClaims, jsonwebtoken::errors::Error> {
     let validation = Validation::new(Algorithm::HS512);
 
     let token_data = decode::<RefreshTokenClaims>(

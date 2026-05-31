@@ -8,8 +8,8 @@
 
 use crate::mail_context::use_mail;
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 
 /// Keyboard selection state — tracks which email is focused via j/k.
 #[derive(Clone, Copy)]

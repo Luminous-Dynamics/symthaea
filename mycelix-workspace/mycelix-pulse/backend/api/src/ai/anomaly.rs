@@ -6,11 +6,11 @@
 //! Detects suspicious patterns in email behavior, login attempts,
 //! and trust network changes to identify potential threats.
 
+use chrono::{DateTime, Timelike, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
-use chrono::{DateTime, Utc, Timelike};
-use serde::{Deserialize, Serialize};
 
 /// Types of anomalies that can be detected
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -194,7 +194,14 @@ impl AnomalyDetector {
         let mut anomalies = Vec::new();
 
         match event {
-            SecurityEvent::LoginAttempt { user_id, success, ip_address, device_fingerprint, location, timestamp } => {
+            SecurityEvent::LoginAttempt {
+                user_id,
+                success,
+                ip_address,
+                device_fingerprint,
+                location,
+                timestamp,
+            } => {
                 // Track failed logins for brute force detection
                 if !success {
                     let key = format!("login_fail:{}", user_id);
@@ -216,7 +223,8 @@ impl AnomalyDetector {
                                 ("ip_address".to_string(), ip_address.to_string()),
                                 ("fail_count".to_string(), fail_count.to_string()),
                             ]),
-                            recommended_action: "Temporarily lock account and require CAPTCHA".to_string(),
+                            recommended_action: "Temporarily lock account and require CAPTCHA"
+                                .to_string(),
                             auto_mitigated: false,
                         });
                     }
@@ -242,7 +250,13 @@ impl AnomalyDetector {
                 }
             }
 
-            SecurityEvent::EmailSent { user_id, recipient_count, has_attachments, attachment_types, timestamp } => {
+            SecurityEvent::EmailSent {
+                user_id,
+                recipient_count,
+                has_attachments,
+                attachment_types,
+                timestamp,
+            } => {
                 let key = format!("email_send:{}", user_id);
                 self.email_send_limiter.record(&key);
 
@@ -263,9 +277,13 @@ impl AnomalyDetector {
                         user_id: user_id.clone(),
                         evidence: HashMap::from([
                             ("current_count".to_string(), send_count.to_string()),
-                            ("typical_daily".to_string(), profile.typical_send_volume_per_day.to_string()),
+                            (
+                                "typical_daily".to_string(),
+                                profile.typical_send_volume_per_day.to_string(),
+                            ),
                         ]),
-                        recommended_action: "Rate limit outbound emails and verify user".to_string(),
+                        recommended_action: "Rate limit outbound emails and verify user"
+                            .to_string(),
                         auto_mitigated: false,
                     });
                 }
@@ -280,9 +298,7 @@ impl AnomalyDetector {
                         description: format!("Email sent at unusual hour: {}:00", hour),
                         detected_at: *timestamp,
                         user_id: user_id.clone(),
-                        evidence: HashMap::from([
-                            ("hour".to_string(), hour.to_string()),
-                        ]),
+                        evidence: HashMap::from([("hour".to_string(), hour.to_string())]),
                         recommended_action: "Log for pattern analysis".to_string(),
                         auto_mitigated: false,
                     });
@@ -300,10 +316,12 @@ impl AnomalyDetector {
                                 description: format!("Suspicious attachment type: .{}", ext),
                                 detected_at: *timestamp,
                                 user_id: user_id.clone(),
-                                evidence: HashMap::from([
-                                    ("attachment_type".to_string(), ext.clone()),
-                                ]),
-                                recommended_action: "Quarantine email and scan attachment".to_string(),
+                                evidence: HashMap::from([(
+                                    "attachment_type".to_string(),
+                                    ext.clone(),
+                                )]),
+                                recommended_action: "Quarantine email and scan attachment"
+                                    .to_string(),
                                 auto_mitigated: false,
                             });
                         }
@@ -311,7 +329,13 @@ impl AnomalyDetector {
                 }
             }
 
-            SecurityEvent::TrustChange { user_id, target_user, old_score, new_score, timestamp } => {
+            SecurityEvent::TrustChange {
+                user_id,
+                target_user,
+                old_score,
+                new_score,
+                timestamp,
+            } => {
                 let change_magnitude = (new_score - old_score).abs();
 
                 // Detect sudden large trust changes
@@ -319,7 +343,11 @@ impl AnomalyDetector {
                     anomalies.push(Anomaly {
                         id: uuid::Uuid::new_v4().to_string(),
                         anomaly_type: AnomalyType::TrustManipulation,
-                        severity: if change_magnitude > 0.8 { Severity::High } else { Severity::Medium },
+                        severity: if change_magnitude > 0.8 {
+                            Severity::High
+                        } else {
+                            Severity::Medium
+                        },
                         description: format!(
                             "Large trust score change: {:.2} -> {:.2} (delta: {:.2})",
                             old_score, new_score, change_magnitude
@@ -337,12 +365,21 @@ impl AnomalyDetector {
                 }
             }
 
-            SecurityEvent::BulkOperation { user_id, operation_type, affected_count, timestamp } => {
+            SecurityEvent::BulkOperation {
+                user_id,
+                operation_type,
+                affected_count,
+                timestamp,
+            } => {
                 if *affected_count > 100 {
                     anomalies.push(Anomaly {
                         id: uuid::Uuid::new_v4().to_string(),
                         anomaly_type: AnomalyType::BulkOperation,
-                        severity: if *affected_count > 1000 { Severity::High } else { Severity::Medium },
+                        severity: if *affected_count > 1000 {
+                            Severity::High
+                        } else {
+                            Severity::Medium
+                        },
                         description: format!(
                             "Bulk {} operation affecting {} items",
                             operation_type, affected_count
@@ -370,9 +407,14 @@ impl AnomalyDetector {
 
         // Check for urgency language
         let urgency_patterns = [
-            "urgent", "immediate action", "account suspended",
-            "verify your account", "confirm your identity",
-            "limited time", "act now", "expires soon",
+            "urgent",
+            "immediate action",
+            "account suspended",
+            "verify your account",
+            "confirm your identity",
+            "limited time",
+            "act now",
+            "expires soon",
         ];
 
         let content_lower = email.content.to_lowercase();
@@ -392,7 +434,10 @@ impl AnomalyDetector {
         // Check for suspicious sender
         if email.sender_domain_age_days < 30 {
             risk_score += 20;
-            indicators.push(format!("New sender domain ({} days old)", email.sender_domain_age_days));
+            indicators.push(format!(
+                "New sender domain ({} days old)",
+                email.sender_domain_age_days
+            ));
         }
 
         // Check for credential request
@@ -407,16 +452,23 @@ impl AnomalyDetector {
         // Check sender trust score
         if email.sender_trust_score < 0.3 {
             risk_score += 25;
-            indicators.push(format!("Low sender trust score: {:.2}", email.sender_trust_score));
+            indicators.push(format!(
+                "Low sender trust score: {:.2}",
+                email.sender_trust_score
+            ));
         }
 
         if risk_score >= 40 {
             Some(Anomaly {
                 id: uuid::Uuid::new_v4().to_string(),
                 anomaly_type: AnomalyType::PhishingIndicator,
-                severity: if risk_score >= 70 { Severity::Critical }
-                         else if risk_score >= 50 { Severity::High }
-                         else { Severity::Medium },
+                severity: if risk_score >= 70 {
+                    Severity::Critical
+                } else if risk_score >= 50 {
+                    Severity::High
+                } else {
+                    Severity::Medium
+                },
                 description: format!("Potential phishing email (risk score: {})", risk_score),
                 detected_at: Utc::now(),
                 user_id: email.recipient_id.clone(),
@@ -449,11 +501,17 @@ impl AnomalyDetector {
 
     /// Update user profile based on observed behavior
     pub fn update_profile(&mut self, user_id: &str, event: &SecurityEvent) {
-        let profile = self.profiles.entry(user_id.to_string())
+        let profile = self
+            .profiles
+            .entry(user_id.to_string())
             .or_insert_with(|| UserBehaviorProfile::new(user_id.to_string()));
 
         match event {
-            SecurityEvent::LoginAttempt { device_fingerprint, success, .. } => {
+            SecurityEvent::LoginAttempt {
+                device_fingerprint,
+                success,
+                ..
+            } => {
                 if *success && !profile.known_devices.contains(device_fingerprint) {
                     profile.known_devices.push(device_fingerprint.clone());
                 }
@@ -524,7 +582,9 @@ struct VolumeAnomalyRule {
 
 impl VolumeAnomalyRule {
     fn new(multiplier_threshold: f64) -> Self {
-        Self { multiplier_threshold }
+        Self {
+            multiplier_threshold,
+        }
     }
 }
 

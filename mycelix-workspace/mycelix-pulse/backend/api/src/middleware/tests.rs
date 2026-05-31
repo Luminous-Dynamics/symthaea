@@ -204,10 +204,7 @@ mod cors_tests {
 
     #[test]
     fn test_cors_layer_invalid_origins() {
-        let origins = vec![
-            "not-a-valid-url".to_string(),
-            "also invalid".to_string(),
-        ];
+        let origins = vec!["not-a-valid-url".to_string(), "also invalid".to_string()];
 
         // Should handle invalid origins gracefully
         let layer = cors_layer(origins);

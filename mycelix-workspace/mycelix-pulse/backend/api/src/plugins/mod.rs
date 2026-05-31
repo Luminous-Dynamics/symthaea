@@ -362,7 +362,10 @@ impl PluginManager {
     ) -> Result<(), PluginError> {
         let id = plugin.id().to_string();
         let plugin_arc: Arc<dyn IntegrationPlugin> = Arc::new(plugin);
-        self.integration_plugins.write().await.insert(id, plugin_arc);
+        self.integration_plugins
+            .write()
+            .await
+            .insert(id, plugin_arc);
         Ok(())
     }
 
@@ -510,7 +513,10 @@ impl PluginManager {
         plugin_id: &str,
         config: PluginConfig,
     ) -> Result<(), PluginError> {
-        self.configs.write().await.insert(plugin_id.to_string(), config);
+        self.configs
+            .write()
+            .await
+            .insert(plugin_id.to_string(), config);
         Ok(())
     }
 }
@@ -582,10 +588,9 @@ impl EmailPlugin for SpamFilterPlugin {
         // Simple spam detection (would use ML in production)
         let spam_score = calculate_spam_score(email);
 
-        email.metadata.insert(
-            "spam_score".to_string(),
-            serde_json::json!(spam_score),
-        );
+        email
+            .metadata
+            .insert("spam_score".to_string(), serde_json::json!(spam_score));
 
         if spam_score > self.threshold {
             Ok(EmailAction::Quarantine(format!(
@@ -597,7 +602,10 @@ impl EmailPlugin for SpamFilterPlugin {
         }
     }
 
-    async fn process_outgoing(&self, _email: &mut EmailContext) -> Result<EmailAction, PluginError> {
+    async fn process_outgoing(
+        &self,
+        _email: &mut EmailContext,
+    ) -> Result<EmailAction, PluginError> {
         Ok(EmailAction::Continue)
     }
 
@@ -612,8 +620,14 @@ fn calculate_spam_score(email: &EmailContext) -> f64 {
 
     // Simple keyword detection
     let spam_keywords = [
-        "buy now", "limited time", "act now", "free", "winner",
-        "congratulations", "urgent", "click here",
+        "buy now",
+        "limited time",
+        "act now",
+        "free",
+        "winner",
+        "congratulations",
+        "urgent",
+        "click here",
     ];
 
     for keyword in spam_keywords {

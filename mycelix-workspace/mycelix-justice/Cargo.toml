@@ -1,0 +1,65 @@
+[workspace]
+resolver = "2"
+members = [
+    # Unified integrity zome (primary implementation)
+    "dna/integrity",
+    # Coordinator zomes (primary implementation)
+    "dna/coordinator/cases",
+    "dna/coordinator/arbitration",
+    "dna/coordinator/restorative",
+    "dna/coordinator/enforcement",
+    # Bridge zomes for cross-hApp communication
+    "zomes/bridge/integrity",
+    "zomes/bridge/coordinator",
+    # Individual zomes (non-colliding names only)
+    "zomes/complaints/integrity",
+    "zomes/complaints/coordinator",
+    "zomes/evidence/integrity",
+    "zomes/evidence/coordinator",
+]
+exclude = [
+    # These collide with dna/coordinator/* package names
+    "zomes/arbitration",
+    "zomes/enforcement",
+]
+# Note: zomes/ directory contains legacy separate zome structure
+# Use dna/ structure for new development
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/mycelix-workspace"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+
+[workspace.dependencies]
+# Holochain 0.6 compatible (per official compatibility table)
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+derive_more = "0.99"
+thiserror = "1.0"
+
+# WASM compatibility - getrandom 0.2 with "js" feature for Holochain WASM runtime
+getrandom = { version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+# Mycelix ecosystem
+mycelix-sdk = { path = "../../sdk" }
+
+# Internal crates
+mycelix_justice_integrity = { path = "dna/integrity" }
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = true

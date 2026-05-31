@@ -1,0 +1,866 @@
+openapi: 3.1.0
+info:
+  title: Mycelix Knowledge API
+  description: |
+    # Mycelix Knowledge - Decentralized Knowledge Graph API
+
+    A decentralized knowledge graph with epistemic classification, credibility scoring,
+    and bidirectional integration with Epistemic Markets.
+
+    ## Key Concepts
+
+    ### Epistemic Classification (E-N-M)
+    Every claim is classified along three dimensions:
+    - **Empirical**: Verifiable through observation (0-1)
+    - **Normative**: Value-based, ethical claims (0-1)
+    - **Mythic**: Meaning-making, narrative claims (0-1)
+
+    ### Credibility Scoring
+    Claims receive credibility scores based on:
+    - Source diversity and quality
+    - Author reputation
+    - Cross-validation with other claims
+    - Temporal consistency
+
+    ### Fact-Checking
+    The API provides automated fact-checking with verdicts:
+    True, MostlyTrue, Mixed, MostlyFalse, False, Unverifiable, InsufficientEvidence
+
+  version: 0.1.0
+  contact:
+    name: Mycelix Team
+    email: dev@mycelix.net
+    url: https://mycelix.net
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.mycelix.net/v1
+    description: Production server
+  - url: https://staging-api.mycelix.net/v1
+    description: Staging server
+  - url: http://localhost:8888/v1
+    description: Local development
+
+tags:
+  - name: Claims
+    description: Create, read, update claims in the knowledge graph
+  - name: Graph
+    description: Navigate relationships and belief propagation
+  - name: Query
+    description: Search and filter claims
+  - name: Inference
+    description: Credibility scoring and reputation
+  - name: FactCheck
+    description: Fact-checking API for external applications
+  - name: Markets
+    description: Verification market integration
+
+paths:
+  /claims:
+    get:
+      tags: [Claims]
+      summary: List claims
+      description: Retrieve a paginated list of claims with optional filtering
+      operationId: listClaims
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - name: author
+          in: query
+          schema:
+            type: string
+          description: Filter by author DID
+        - name: minCredibility
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+          description: Minimum credibility score
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by tags
+      responses:
+        '200':
+          description: List of claims
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      tags: [Claims]
+      summary: Create a new claim
+      description: Submit a new claim to the knowledge graph
+      operationId: createClaim
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClaimInput'
+      responses:
+        '201':
+          description: Claim created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /claims/{claimId}:
+    get:
+      tags: [Claims]
+      summary: Get a claim by ID
+      operationId: getClaim
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      responses:
+        '200':
+          description: Claim details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Claims]
+      summary: Update a claim
+      operationId: updateClaim
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClaimInput'
+      responses:
+        '200':
+          description: Claim updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /claims/{claimId}/credibility:
+    get:
+      tags: [Inference]
+      summary: Get credibility score for a claim
+      operationId: getClaimCredibility
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      responses:
+        '200':
+          description: Credibility score with factors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnhancedCredibilityScore'
+
+  /claims/{claimId}/relationships:
+    get:
+      tags: [Graph]
+      summary: Get relationships for a claim
+      operationId: getClaimRelationships
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/RelationshipType'
+          description: Filter by relationship type
+      responses:
+        '200':
+          description: List of relationships
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Relationship'
+
+    post:
+      tags: [Graph]
+      summary: Create a relationship
+      operationId: createRelationship
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelationshipInput'
+      responses:
+        '201':
+          description: Relationship created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+
+  /claims/{claimId}/dependency-tree:
+    get:
+      tags: [Graph]
+      summary: Get dependency tree for a claim
+      operationId: getDependencyTree
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+        - name: maxDepth
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 3
+          description: Maximum tree depth
+      responses:
+        '200':
+          description: Dependency tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DependencyTree'
+
+  /claims/{claimId}/markets:
+    get:
+      tags: [Markets]
+      summary: Get verification markets for a claim
+      operationId: getClaimMarkets
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      responses:
+        '200':
+          description: List of associated markets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketSummary'
+
+    post:
+      tags: [Markets]
+      summary: Spawn a verification market
+      operationId: spawnVerificationMarket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpawnMarketInput'
+      responses:
+        '201':
+          description: Market spawned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketCreated'
+
+  /search:
+    get:
+      tags: [Query]
+      summary: Search claims
+      operationId: searchClaims
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+          description: Search query
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - name: epistemicType
+          in: query
+          schema:
+            type: string
+            enum: [empirical, normative, mythic, mixed]
+          description: Filter by dominant epistemic type
+        - name: minCredibility
+          in: query
+          schema:
+            type: number
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [relevance, credibility, date, informationValue]
+            default: relevance
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+
+  /factcheck:
+    post:
+      tags: [FactCheck]
+      summary: Fact-check a statement
+      description: |
+        Analyze a statement against the knowledge graph and return a verdict.
+        This is the primary API for external applications to integrate fact-checking.
+      operationId: factCheck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FactCheckInput'
+      responses:
+        '200':
+          description: Fact-check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactCheckResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /factcheck/batch:
+    post:
+      tags: [FactCheck]
+      summary: Batch fact-check multiple statements
+      operationId: batchFactCheck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [statements]
+              properties:
+                statements:
+                  type: array
+                  maxItems: 50
+                  items:
+                    $ref: '#/components/schemas/FactCheckInput'
+      responses:
+        '200':
+          description: Batch results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FactCheckResult'
+
+  /authors/{authorDid}/reputation:
+    get:
+      tags: [Inference]
+      summary: Get author reputation
+      operationId: getAuthorReputation
+      parameters:
+        - name: authorDid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Author DID
+      responses:
+        '200':
+          description: Author reputation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorReputation'
+
+  /graph/propagate/{claimId}:
+    post:
+      tags: [Graph]
+      summary: Propagate belief updates
+      description: Trigger belief propagation from a claim through its dependencies
+      operationId: propagateBelief
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/claimIdParam'
+      responses:
+        '200':
+          description: Propagation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropagationResult'
+
+  /graph/information-value:
+    get:
+      tags: [Graph]
+      summary: Get claims ranked by information value
+      operationId: rankByInformationValue
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        '200':
+          description: Ranked claims
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InformationValueRecord'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Holochain authentication
+
+  parameters:
+    claimIdParam:
+      name: claimId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Claim entry hash
+
+    limitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum items to return
+
+    offsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of items to skip
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Claim:
+      type: object
+      required: [id, content, classification, author, createdAt]
+      properties:
+        id:
+          type: string
+          description: Entry hash
+        content:
+          type: string
+          description: The claim text
+        classification:
+          $ref: '#/components/schemas/EpistemicClassification'
+        author:
+          type: string
+          description: Author DID
+        createdAt:
+          type: integer
+          format: int64
+          description: Unix timestamp
+        updatedAt:
+          type: integer
+          format: int64
+        tags:
+          type: array
+          items:
+            type: string
+        sourceCount:
+          type: integer
+
+    ClaimList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimSummary'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    ClaimSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+          maxLength: 200
+        classification:
+          $ref: '#/components/schemas/EpistemicClassification'
+        credibility:
+          type: number
+        author:
+          type: string
+
+    EpistemicClassification:
+      type: object
+      required: [empirical, normative, mythic]
+      properties:
+        empirical:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Verifiable through observation
+        normative:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Value-based, ethical
+        mythic:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Meaning-making, narrative
+
+    CreateClaimInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 10
+          maxLength: 5000
+        classification:
+          $ref: '#/components/schemas/EpistemicClassification'
+        tags:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: string
+
+    UpdateClaimInput:
+      type: object
+      properties:
+        content:
+          type: string
+        classification:
+          $ref: '#/components/schemas/EpistemicClassification'
+        tags:
+          type: array
+          items:
+            type: string
+
+    ClaimCreated:
+      type: object
+      properties:
+        id:
+          type: string
+        actionHash:
+          type: string
+
+    Relationship:
+      type: object
+      required: [id, sourceId, targetId, type, weight]
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        targetId:
+          type: string
+        type:
+          $ref: '#/components/schemas/RelationshipType'
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+        createdAt:
+          type: integer
+
+    RelationshipType:
+      type: string
+      enum: [supports, contradicts, refines, depends_on, authored, cites]
+
+    CreateRelationshipInput:
+      type: object
+      required: [targetId, type, weight]
+      properties:
+        targetId:
+          type: string
+        type:
+          $ref: '#/components/schemas/RelationshipType'
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    DependencyTree:
+      type: object
+      properties:
+        root:
+          $ref: '#/components/schemas/TreeNode'
+        depth:
+          type: integer
+        totalNodes:
+          type: integer
+
+    TreeNode:
+      type: object
+      properties:
+        claimId:
+          type: string
+        content:
+          type: string
+        credibility:
+          type: number
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TreeNode'
+        relationshipType:
+          $ref: '#/components/schemas/RelationshipType'
+
+    EnhancedCredibilityScore:
+      type: object
+      properties:
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        factors:
+          type: object
+          properties:
+            sourceDiversity:
+              type: number
+            authorReputation:
+              type: number
+            temporalConsistency:
+              type: number
+            crossValidation:
+              type: number
+            matlComposite:
+              type: number
+        confidence:
+          type: number
+        calculatedAt:
+          type: integer
+
+    AuthorReputation:
+      type: object
+      properties:
+        did:
+          type: string
+        overallScore:
+          type: number
+        domainScores:
+          type: object
+          additionalProperties:
+            type: number
+        claimCount:
+          type: integer
+        accuracyHistory:
+          type: number
+
+    FactCheckInput:
+      type: object
+      required: [statement]
+      properties:
+        statement:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        context:
+          type: string
+          maxLength: 1000
+        minEpistemicLevel:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 2
+        minConfidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.6
+
+    FactCheckResult:
+      type: object
+      properties:
+        verdict:
+          $ref: '#/components/schemas/Verdict'
+        confidence:
+          type: number
+        explanation:
+          type: string
+        supportingClaims:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimSummary'
+        contradictingClaims:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimSummary'
+        sources:
+          type: array
+          items:
+            type: string
+        checkedAt:
+          type: integer
+
+    Verdict:
+      type: string
+      enum:
+        - True
+        - MostlyTrue
+        - Mixed
+        - MostlyFalse
+        - False
+        - Unverifiable
+        - InsufficientEvidence
+
+    MarketSummary:
+      type: object
+      properties:
+        marketId:
+          type: string
+        claimId:
+          type: string
+        targetE:
+          type: integer
+        currentProbability:
+          type: number
+        volume:
+          type: number
+        closesAt:
+          type: integer
+        status:
+          type: string
+          enum: [open, closed, resolved]
+
+    SpawnMarketInput:
+      type: object
+      required: [targetE]
+      properties:
+        targetE:
+          type: integer
+          minimum: 1
+          maximum: 5
+        minConfidence:
+          type: number
+          default: 0.7
+        closesAt:
+          type: integer
+        initialSubsidy:
+          type: number
+          default: 100
+
+    MarketCreated:
+      type: object
+      properties:
+        marketId:
+          type: string
+        claimId:
+          type: string
+
+    PropagationResult:
+      type: object
+      properties:
+        claimsUpdated:
+          type: integer
+        iterations:
+          type: integer
+        converged:
+          type: boolean
+        affectedClaims:
+          type: array
+          items:
+            type: string
+
+    InformationValueRecord:
+      type: object
+      properties:
+        claimId:
+          type: string
+        content:
+          type: string
+        informationValue:
+          type: number
+        currentCredibility:
+          type: number
+        dependentCount:
+          type: integer
+
+    SearchResults:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimSummary'
+        total:
+          type: integer
+        query:
+          type: string
+        took:
+          type: integer
+          description: Query time in milliseconds
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object

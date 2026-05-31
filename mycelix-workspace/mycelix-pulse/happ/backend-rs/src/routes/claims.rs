@@ -6,17 +6,17 @@
 //! Endpoints for verifiable claims and credentials.
 
 use axum::{
+    Json, Router,
     extract::{Extension, Path},
     routing::{get, post},
-    Json, Router,
 };
 
 use crate::error::{AppError, AppResult};
 use crate::middleware::Claims as JwtClaims;
 use crate::routes::AppState;
 use crate::services::claims::{
-    AssuranceLevel, ClaimVerification, ClaimsService,
-    EmailClaims, ProofType, VerifiableClaim, VerifiableCredential,
+    AssuranceLevel, ClaimVerification, ClaimsService, EmailClaims, ProofType, VerifiableClaim,
+    VerifiableCredential,
 };
 
 /// Create the claims router
@@ -65,7 +65,9 @@ pub async fn verify_claims(
 
     let email_claims = EmailClaims {
         claims: request.claims,
-        assurance_level: request.assurance_level.unwrap_or(AssuranceLevel::E0Anonymous),
+        assurance_level: request
+            .assurance_level
+            .unwrap_or(AssuranceLevel::E0Anonymous),
         verifications: vec![],
     };
 

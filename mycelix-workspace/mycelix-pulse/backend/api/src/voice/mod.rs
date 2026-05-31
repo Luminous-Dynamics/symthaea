@@ -79,7 +79,10 @@ pub struct DictationService {
 
 impl DictationService {
     pub fn new(pool: PgPool, speech_endpoint: String) -> Self {
-        Self { pool, speech_endpoint }
+        Self {
+            pool,
+            speech_endpoint,
+        }
     }
 
     pub async fn start_session(
@@ -280,7 +283,11 @@ impl VoiceCommandService {
         Self { pool }
     }
 
-    pub async fn parse_command(&self, user_id: Uuid, text: &str) -> Result<VoiceCommand, VoiceError> {
+    pub async fn parse_command(
+        &self,
+        user_id: Uuid,
+        text: &str,
+    ) -> Result<VoiceCommand, VoiceError> {
         let text_lower = text.to_lowercase();
 
         // Check custom commands first
@@ -449,9 +456,9 @@ pub struct TtsVoice {
 pub struct TtsRequest {
     pub text: String,
     pub voice_id: String,
-    pub speed: f32,      // 0.5 to 2.0
-    pub pitch: f32,      // 0.5 to 2.0
-    pub volume: f32,     // 0.0 to 1.0
+    pub speed: f32,  // 0.5 to 2.0
+    pub pitch: f32,  // 0.5 to 2.0
+    pub volume: f32, // 0.0 to 1.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -481,7 +488,10 @@ impl TtsService {
         Ok(vec![])
     }
 
-    pub async fn get_available_voices(&self, language: Option<&str>) -> Result<Vec<TtsVoice>, VoiceError> {
+    pub async fn get_available_voices(
+        &self,
+        language: Option<&str>,
+    ) -> Result<Vec<TtsVoice>, VoiceError> {
         // Return common voice options
         Ok(vec![
             TtsVoice {
@@ -642,7 +652,14 @@ fn html_to_text(html: &str) -> String {
 
 fn remove_signature(text: &str) -> String {
     // Look for common signature separators
-    let separators = ["--\n", "-- \n", "___", "Best regards,", "Sincerely,", "Thanks,"];
+    let separators = [
+        "--\n",
+        "-- \n",
+        "___",
+        "Best regards,",
+        "Sincerely,",
+        "Thanks,",
+    ];
 
     for sep in separators {
         if let Some(pos) = text.find(sep) {
@@ -739,15 +756,19 @@ impl AccessibilityService {
         Ok(settings
             .map(|s| AccessibilitySettings {
                 high_contrast: s.high_contrast,
-                contrast_level: serde_json::from_str(&s.contrast_level).unwrap_or(ContrastLevel::Normal),
+                contrast_level: serde_json::from_str(&s.contrast_level)
+                    .unwrap_or(ContrastLevel::Normal),
                 font_size: serde_json::from_str(&s.font_size).unwrap_or(FontSize::Medium),
                 reduced_motion: s.reduced_motion,
                 screen_reader_optimized: s.screen_reader_optimized,
                 keyboard_only_mode: s.keyboard_only_mode,
-                focus_indicators: serde_json::from_str(&s.focus_style).unwrap_or(FocusIndicatorStyle::Default),
+                focus_indicators: serde_json::from_str(&s.focus_style)
+                    .unwrap_or(FocusIndicatorStyle::Default),
                 link_underlines: s.link_underlines,
                 dyslexia_friendly_font: s.dyslexia_font,
-                color_blind_mode: s.color_blind_mode.and_then(|m| serde_json::from_str(&m).ok()),
+                color_blind_mode: s
+                    .color_blind_mode
+                    .and_then(|m| serde_json::from_str(&m).ok()),
             })
             .unwrap_or(AccessibilitySettings {
                 high_contrast: false,
@@ -798,7 +819,9 @@ impl AccessibilityService {
             serde_json::to_string(&settings.focus_indicators).unwrap(),
             settings.link_underlines,
             settings.dyslexia_friendly_font,
-            settings.color_blind_mode.map(|m| serde_json::to_string(&m).unwrap())
+            settings
+                .color_blind_mode
+                .map(|m| serde_json::to_string(&m).unwrap())
         )
         .execute(&self.pool)
         .await?;
@@ -1029,7 +1052,10 @@ impl KeyboardService {
         ]
     }
 
-    pub async fn get_user_shortcuts(&self, user_id: Uuid) -> Result<Vec<KeyboardShortcut>, VoiceError> {
+    pub async fn get_user_shortcuts(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<KeyboardShortcut>, VoiceError> {
         // Get user customizations and merge with defaults
         let customizations = sqlx::query!(
             r#"

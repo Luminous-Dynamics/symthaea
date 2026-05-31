@@ -1,0 +1,56 @@
+---
+# Mycelix Energy DNA
+# Energy projects, investments, and grid coordination
+
+manifest_version: "0"
+name: mycelix_energy
+integrity:
+  network_seed: ~
+  properties:
+    # Regenerative exit configuration
+    regenerative_reserve_rate: 0.03
+    community_ownership_threshold: 0.51
+
+    # MATL integration
+    quality_weight: 0.4
+    consistency_weight: 0.3
+    reputation_weight: 0.3
+
+  zomes:
+    - name: projects_integrity
+      path: ../target/wasm32-unknown-unknown/release/projects_integrity.wasm
+    - name: investments_integrity
+      path: ../target/wasm32-unknown-unknown/release/investments_integrity.wasm
+    - name: regenerative_integrity
+      path: ../target/wasm32-unknown-unknown/release/regenerative_integrity.wasm
+    - name: grid_integrity
+      path: ../target/wasm32-unknown-unknown/release/grid_integrity.wasm
+    - name: energy_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/energy_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: projects
+      path: ../target/wasm32-unknown-unknown/release/projects.wasm
+      dependencies:
+        - name: projects_integrity
+    - name: investments
+      path: ../target/wasm32-unknown-unknown/release/investments.wasm
+      dependencies:
+        - name: investments_integrity
+        - name: projects_integrity
+    - name: regenerative
+      path: ../target/wasm32-unknown-unknown/release/regenerative.wasm
+      dependencies:
+        - name: regenerative_integrity
+        - name: projects_integrity
+        - name: investments_integrity
+    - name: grid
+      path: ../target/wasm32-unknown-unknown/release/grid.wasm
+      dependencies:
+        - name: grid_integrity
+        - name: projects_integrity
+    - name: energy_bridge
+      path: ../target/wasm32-unknown-unknown/release/energy_bridge.wasm
+      dependencies:
+        - name: energy_bridge_integrity

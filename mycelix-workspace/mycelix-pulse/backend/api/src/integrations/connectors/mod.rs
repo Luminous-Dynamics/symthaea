@@ -22,7 +22,8 @@ pub trait IntegrationConnector: Send + Sync {
     fn category(&self) -> ConnectorCategory;
     fn auth_type(&self) -> AuthType;
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError>;
+    async fn authenticate(&self, credentials: AuthCredentials)
+    -> Result<AuthToken, ConnectorError>;
     async fn refresh_token(&self, token: &AuthToken) -> Result<AuthToken, ConnectorError>;
     async fn test_connection(&self, token: &AuthToken) -> Result<bool, ConnectorError>;
     async fn disconnect(&self, token: &AuthToken) -> Result<(), ConnectorError>;
@@ -150,14 +151,29 @@ impl SlackConnector {
 
 #[async_trait]
 impl IntegrationConnector for SlackConnector {
-    fn id(&self) -> &'static str { "slack" }
-    fn name(&self) -> &'static str { "Slack" }
-    fn description(&self) -> &'static str { "Send emails to Slack channels and receive notifications" }
-    fn icon_url(&self) -> &'static str { "/integrations/icons/slack.svg" }
-    fn category(&self) -> ConnectorCategory { ConnectorCategory::Communication }
-    fn auth_type(&self) -> AuthType { AuthType::OAuth2 }
+    fn id(&self) -> &'static str {
+        "slack"
+    }
+    fn name(&self) -> &'static str {
+        "Slack"
+    }
+    fn description(&self) -> &'static str {
+        "Send emails to Slack channels and receive notifications"
+    }
+    fn icon_url(&self) -> &'static str {
+        "/integrations/icons/slack.svg"
+    }
+    fn category(&self) -> ConnectorCategory {
+        ConnectorCategory::Communication
+    }
+    fn auth_type(&self) -> AuthType {
+        AuthType::OAuth2
+    }
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError> {
+    async fn authenticate(
+        &self,
+        credentials: AuthCredentials,
+    ) -> Result<AuthToken, ConnectorError> {
         // OAuth2 flow implementation
         Ok(AuthToken {
             access_token: String::new(),
@@ -248,13 +264,12 @@ impl IntegrationConnector for SlackConnector {
                 // Implementation
                 Ok(serde_json::json!({ "message_id": "msg_123" }))
             }
-            "share_email" => {
-                Ok(serde_json::json!({ "message_id": "msg_456" }))
-            }
-            "list_channels" => {
-                Ok(serde_json::json!({ "channels": [] }))
-            }
-            _ => Err(ConnectorError::InvalidRequest(format!("Unknown action: {}", action))),
+            "share_email" => Ok(serde_json::json!({ "message_id": "msg_456" })),
+            "list_channels" => Ok(serde_json::json!({ "channels": [] })),
+            _ => Err(ConnectorError::InvalidRequest(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 
@@ -302,14 +317,29 @@ impl NotionConnector {
 
 #[async_trait]
 impl IntegrationConnector for NotionConnector {
-    fn id(&self) -> &'static str { "notion" }
-    fn name(&self) -> &'static str { "Notion" }
-    fn description(&self) -> &'static str { "Save emails to Notion pages and databases" }
-    fn icon_url(&self) -> &'static str { "/integrations/icons/notion.svg" }
-    fn category(&self) -> ConnectorCategory { ConnectorCategory::ProjectManagement }
-    fn auth_type(&self) -> AuthType { AuthType::OAuth2 }
+    fn id(&self) -> &'static str {
+        "notion"
+    }
+    fn name(&self) -> &'static str {
+        "Notion"
+    }
+    fn description(&self) -> &'static str {
+        "Save emails to Notion pages and databases"
+    }
+    fn icon_url(&self) -> &'static str {
+        "/integrations/icons/notion.svg"
+    }
+    fn category(&self) -> ConnectorCategory {
+        ConnectorCategory::ProjectManagement
+    }
+    fn auth_type(&self) -> AuthType {
+        AuthType::OAuth2
+    }
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError> {
+    async fn authenticate(
+        &self,
+        credentials: AuthCredentials,
+    ) -> Result<AuthToken, ConnectorError> {
         Ok(AuthToken {
             access_token: String::new(),
             refresh_token: None,
@@ -405,18 +435,27 @@ impl IntegrationConnector for NotionConnector {
             "create_page" => Ok(serde_json::json!({ "page_id": "page_123" })),
             "add_to_database" => Ok(serde_json::json!({ "page_id": "page_456" })),
             "list_databases" => Ok(serde_json::json!({ "databases": [] })),
-            _ => Err(ConnectorError::InvalidRequest(format!("Unknown action: {}", action))),
+            _ => Err(ConnectorError::InvalidRequest(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 
-    fn webhook_events(&self) -> Vec<WebhookEvent> { vec![] }
+    fn webhook_events(&self) -> Vec<WebhookEvent> {
+        vec![]
+    }
 
     async fn handle_webhook(
         &self,
         event: &str,
         payload: serde_json::Value,
     ) -> Result<WebhookResponse, ConnectorError> {
-        Ok(WebhookResponse { success: true, message: None, data: None })
+        Ok(WebhookResponse {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 }
 
@@ -430,20 +469,37 @@ pub struct LinearConnector {
 
 impl LinearConnector {
     pub fn new() -> Self {
-        Self { client: reqwest::Client::new() }
+        Self {
+            client: reqwest::Client::new(),
+        }
     }
 }
 
 #[async_trait]
 impl IntegrationConnector for LinearConnector {
-    fn id(&self) -> &'static str { "linear" }
-    fn name(&self) -> &'static str { "Linear" }
-    fn description(&self) -> &'static str { "Create issues from emails and track project updates" }
-    fn icon_url(&self) -> &'static str { "/integrations/icons/linear.svg" }
-    fn category(&self) -> ConnectorCategory { ConnectorCategory::ProjectManagement }
-    fn auth_type(&self) -> AuthType { AuthType::OAuth2 }
+    fn id(&self) -> &'static str {
+        "linear"
+    }
+    fn name(&self) -> &'static str {
+        "Linear"
+    }
+    fn description(&self) -> &'static str {
+        "Create issues from emails and track project updates"
+    }
+    fn icon_url(&self) -> &'static str {
+        "/integrations/icons/linear.svg"
+    }
+    fn category(&self) -> ConnectorCategory {
+        ConnectorCategory::ProjectManagement
+    }
+    fn auth_type(&self) -> AuthType {
+        AuthType::OAuth2
+    }
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError> {
+    async fn authenticate(
+        &self,
+        credentials: AuthCredentials,
+    ) -> Result<AuthToken, ConnectorError> {
         Ok(AuthToken {
             access_token: String::new(),
             refresh_token: None,
@@ -515,15 +571,13 @@ impl IntegrationConnector for LinearConnector {
                 id: "list_projects".to_string(),
                 name: "List Projects".to_string(),
                 description: "Get projects for a team".to_string(),
-                parameters: vec![
-                    ActionParameter {
-                        name: "team_id".to_string(),
-                        param_type: "string".to_string(),
-                        required: true,
-                        description: "Team ID".to_string(),
-                        default: None,
-                    },
-                ],
+                parameters: vec![ActionParameter {
+                    name: "team_id".to_string(),
+                    param_type: "string".to_string(),
+                    required: true,
+                    description: "Team ID".to_string(),
+                    default: None,
+                }],
                 returns: Some("projects[]".to_string()),
             },
         ]
@@ -539,7 +593,10 @@ impl IntegrationConnector for LinearConnector {
             "create_issue" => Ok(serde_json::json!({ "issue_id": "issue_123" })),
             "list_teams" => Ok(serde_json::json!({ "teams": [] })),
             "list_projects" => Ok(serde_json::json!({ "projects": [] })),
-            _ => Err(ConnectorError::InvalidRequest(format!("Unknown action: {}", action))),
+            _ => Err(ConnectorError::InvalidRequest(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 
@@ -565,7 +622,11 @@ impl IntegrationConnector for LinearConnector {
         event: &str,
         payload: serde_json::Value,
     ) -> Result<WebhookResponse, ConnectorError> {
-        Ok(WebhookResponse { success: true, message: None, data: None })
+        Ok(WebhookResponse {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 }
 
@@ -579,20 +640,37 @@ pub struct GitHubConnector {
 
 impl GitHubConnector {
     pub fn new() -> Self {
-        Self { client: reqwest::Client::new() }
+        Self {
+            client: reqwest::Client::new(),
+        }
     }
 }
 
 #[async_trait]
 impl IntegrationConnector for GitHubConnector {
-    fn id(&self) -> &'static str { "github" }
-    fn name(&self) -> &'static str { "GitHub" }
-    fn description(&self) -> &'static str { "Create issues, get PR notifications in email" }
-    fn icon_url(&self) -> &'static str { "/integrations/icons/github.svg" }
-    fn category(&self) -> ConnectorCategory { ConnectorCategory::Development }
-    fn auth_type(&self) -> AuthType { AuthType::OAuth2 }
+    fn id(&self) -> &'static str {
+        "github"
+    }
+    fn name(&self) -> &'static str {
+        "GitHub"
+    }
+    fn description(&self) -> &'static str {
+        "Create issues, get PR notifications in email"
+    }
+    fn icon_url(&self) -> &'static str {
+        "/integrations/icons/github.svg"
+    }
+    fn category(&self) -> ConnectorCategory {
+        ConnectorCategory::Development
+    }
+    fn auth_type(&self) -> AuthType {
+        AuthType::OAuth2
+    }
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError> {
+    async fn authenticate(
+        &self,
+        credentials: AuthCredentials,
+    ) -> Result<AuthToken, ConnectorError> {
         Ok(AuthToken {
             access_token: String::new(),
             refresh_token: None,
@@ -672,15 +750,27 @@ impl IntegrationConnector for GitHubConnector {
         match action {
             "create_issue" => Ok(serde_json::json!({ "issue_url": "https://github.com/..." })),
             "list_repos" => Ok(serde_json::json!({ "repos": [] })),
-            _ => Err(ConnectorError::InvalidRequest(format!("Unknown action: {}", action))),
+            _ => Err(ConnectorError::InvalidRequest(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 
     fn webhook_events(&self) -> Vec<WebhookEvent> {
         vec![
-            WebhookEvent { event: "push".to_string(), description: "Push to repository".to_string() },
-            WebhookEvent { event: "pull_request".to_string(), description: "PR opened/updated".to_string() },
-            WebhookEvent { event: "issues".to_string(), description: "Issue created/updated".to_string() },
+            WebhookEvent {
+                event: "push".to_string(),
+                description: "Push to repository".to_string(),
+            },
+            WebhookEvent {
+                event: "pull_request".to_string(),
+                description: "PR opened/updated".to_string(),
+            },
+            WebhookEvent {
+                event: "issues".to_string(),
+                description: "Issue created/updated".to_string(),
+            },
         ]
     }
 
@@ -689,7 +779,11 @@ impl IntegrationConnector for GitHubConnector {
         event: &str,
         payload: serde_json::Value,
     ) -> Result<WebhookResponse, ConnectorError> {
-        Ok(WebhookResponse { success: true, message: None, data: None })
+        Ok(WebhookResponse {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 }
 
@@ -703,20 +797,37 @@ pub struct SalesforceConnector {
 
 impl SalesforceConnector {
     pub fn new() -> Self {
-        Self { client: reqwest::Client::new() }
+        Self {
+            client: reqwest::Client::new(),
+        }
     }
 }
 
 #[async_trait]
 impl IntegrationConnector for SalesforceConnector {
-    fn id(&self) -> &'static str { "salesforce" }
-    fn name(&self) -> &'static str { "Salesforce" }
-    fn description(&self) -> &'static str { "Sync contacts and log email activities in Salesforce" }
-    fn icon_url(&self) -> &'static str { "/integrations/icons/salesforce.svg" }
-    fn category(&self) -> ConnectorCategory { ConnectorCategory::CRM }
-    fn auth_type(&self) -> AuthType { AuthType::OAuth2 }
+    fn id(&self) -> &'static str {
+        "salesforce"
+    }
+    fn name(&self) -> &'static str {
+        "Salesforce"
+    }
+    fn description(&self) -> &'static str {
+        "Sync contacts and log email activities in Salesforce"
+    }
+    fn icon_url(&self) -> &'static str {
+        "/integrations/icons/salesforce.svg"
+    }
+    fn category(&self) -> ConnectorCategory {
+        ConnectorCategory::CRM
+    }
+    fn auth_type(&self) -> AuthType {
+        AuthType::OAuth2
+    }
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError> {
+    async fn authenticate(
+        &self,
+        credentials: AuthCredentials,
+    ) -> Result<AuthToken, ConnectorError> {
         Ok(AuthToken {
             access_token: String::new(),
             refresh_token: None,
@@ -767,15 +878,13 @@ impl IntegrationConnector for SalesforceConnector {
                 id: "find_contact".to_string(),
                 name: "Find Contact".to_string(),
                 description: "Find a Salesforce contact by email".to_string(),
-                parameters: vec![
-                    ActionParameter {
-                        name: "email".to_string(),
-                        param_type: "string".to_string(),
-                        required: true,
-                        description: "Email address to search".to_string(),
-                        default: None,
-                    },
-                ],
+                parameters: vec![ActionParameter {
+                    name: "email".to_string(),
+                    param_type: "string".to_string(),
+                    required: true,
+                    description: "Email address to search".to_string(),
+                    default: None,
+                }],
                 returns: Some("contact".to_string()),
             },
             ConnectorAction {
@@ -820,18 +929,27 @@ impl IntegrationConnector for SalesforceConnector {
             "log_email" => Ok(serde_json::json!({ "activity_id": "act_123" })),
             "find_contact" => Ok(serde_json::json!({ "contact": null })),
             "create_contact" => Ok(serde_json::json!({ "contact_id": "con_123" })),
-            _ => Err(ConnectorError::InvalidRequest(format!("Unknown action: {}", action))),
+            _ => Err(ConnectorError::InvalidRequest(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 
-    fn webhook_events(&self) -> Vec<WebhookEvent> { vec![] }
+    fn webhook_events(&self) -> Vec<WebhookEvent> {
+        vec![]
+    }
 
     async fn handle_webhook(
         &self,
         event: &str,
         payload: serde_json::Value,
     ) -> Result<WebhookResponse, ConnectorError> {
-        Ok(WebhookResponse { success: true, message: None, data: None })
+        Ok(WebhookResponse {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 }
 
@@ -845,20 +963,37 @@ pub struct ZapierConnector {
 
 impl ZapierConnector {
     pub fn new() -> Self {
-        Self { client: reqwest::Client::new() }
+        Self {
+            client: reqwest::Client::new(),
+        }
     }
 }
 
 #[async_trait]
 impl IntegrationConnector for ZapierConnector {
-    fn id(&self) -> &'static str { "zapier" }
-    fn name(&self) -> &'static str { "Zapier" }
-    fn description(&self) -> &'static str { "Connect Mycelix to 5000+ apps through Zapier" }
-    fn icon_url(&self) -> &'static str { "/integrations/icons/zapier.svg" }
-    fn category(&self) -> ConnectorCategory { ConnectorCategory::Automation }
-    fn auth_type(&self) -> AuthType { AuthType::OAuth2 }
+    fn id(&self) -> &'static str {
+        "zapier"
+    }
+    fn name(&self) -> &'static str {
+        "Zapier"
+    }
+    fn description(&self) -> &'static str {
+        "Connect Mycelix to 5000+ apps through Zapier"
+    }
+    fn icon_url(&self) -> &'static str {
+        "/integrations/icons/zapier.svg"
+    }
+    fn category(&self) -> ConnectorCategory {
+        ConnectorCategory::Automation
+    }
+    fn auth_type(&self) -> AuthType {
+        AuthType::OAuth2
+    }
 
-    async fn authenticate(&self, credentials: AuthCredentials) -> Result<AuthToken, ConnectorError> {
+    async fn authenticate(
+        &self,
+        credentials: AuthCredentials,
+    ) -> Result<AuthToken, ConnectorError> {
         Ok(AuthToken {
             access_token: String::new(),
             refresh_token: None,
@@ -882,30 +1017,28 @@ impl IntegrationConnector for ZapierConnector {
     }
 
     fn supported_actions(&self) -> Vec<ConnectorAction> {
-        vec![
-            ConnectorAction {
-                id: "trigger_zap".to_string(),
-                name: "Trigger Zap".to_string(),
-                description: "Trigger a Zapier zap with email data".to_string(),
-                parameters: vec![
-                    ActionParameter {
-                        name: "webhook_url".to_string(),
-                        param_type: "string".to_string(),
-                        required: true,
-                        description: "Zapier webhook URL".to_string(),
-                        default: None,
-                    },
-                    ActionParameter {
-                        name: "data".to_string(),
-                        param_type: "object".to_string(),
-                        required: true,
-                        description: "Data to send".to_string(),
-                        default: None,
-                    },
-                ],
-                returns: Some("success".to_string()),
-            },
-        ]
+        vec![ConnectorAction {
+            id: "trigger_zap".to_string(),
+            name: "Trigger Zap".to_string(),
+            description: "Trigger a Zapier zap with email data".to_string(),
+            parameters: vec![
+                ActionParameter {
+                    name: "webhook_url".to_string(),
+                    param_type: "string".to_string(),
+                    required: true,
+                    description: "Zapier webhook URL".to_string(),
+                    default: None,
+                },
+                ActionParameter {
+                    name: "data".to_string(),
+                    param_type: "object".to_string(),
+                    required: true,
+                    description: "Data to send".to_string(),
+                    default: None,
+                },
+            ],
+            returns: Some("success".to_string()),
+        }]
     }
 
     async fn execute_action(
@@ -916,18 +1049,27 @@ impl IntegrationConnector for ZapierConnector {
     ) -> Result<serde_json::Value, ConnectorError> {
         match action {
             "trigger_zap" => Ok(serde_json::json!({ "success": true })),
-            _ => Err(ConnectorError::InvalidRequest(format!("Unknown action: {}", action))),
+            _ => Err(ConnectorError::InvalidRequest(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 
-    fn webhook_events(&self) -> Vec<WebhookEvent> { vec![] }
+    fn webhook_events(&self) -> Vec<WebhookEvent> {
+        vec![]
+    }
 
     async fn handle_webhook(
         &self,
         event: &str,
         payload: serde_json::Value,
     ) -> Result<WebhookResponse, ConnectorError> {
-        Ok(WebhookResponse { success: true, message: None, data: None })
+        Ok(WebhookResponse {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 }
 
@@ -957,7 +1099,8 @@ impl ConnectorRegistry {
     }
 
     pub fn register(&mut self, connector: Box<dyn IntegrationConnector>) {
-        self.connectors.insert(connector.id().to_string(), connector);
+        self.connectors
+            .insert(connector.id().to_string(), connector);
     }
 
     pub fn get(&self, id: &str) -> Option<&dyn IntegrationConnector> {

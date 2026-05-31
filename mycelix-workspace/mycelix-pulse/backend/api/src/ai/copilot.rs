@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Copilot Service
@@ -24,8 +24,16 @@ pub struct CopilotService {
 
 #[async_trait]
 pub trait LLMProvider: Send + Sync {
-    async fn complete(&self, prompt: &str, options: CompletionOptions) -> Result<String, CopilotError>;
-    async fn chat(&self, messages: Vec<ChatMessage>, options: CompletionOptions) -> Result<String, CopilotError>;
+    async fn complete(
+        &self,
+        prompt: &str,
+        options: CompletionOptions,
+    ) -> Result<String, CopilotError>;
+    async fn chat(
+        &self,
+        messages: Vec<ChatMessage>,
+        options: CompletionOptions,
+    ) -> Result<String, CopilotError>;
     async fn embed(&self, text: &str) -> Result<Vec<f32>, CopilotError>;
 }
 
@@ -81,35 +89,43 @@ impl CopilotService {
 
         // Execute based on intent
         let response = match intent {
-            CopilotIntent::SummarizeUnread => {
-                self.handle_summarize_unread(user_id).await?
-            }
+            CopilotIntent::SummarizeUnread => self.handle_summarize_unread(user_id).await?,
             CopilotIntent::SummarizeEmail { email_id } => {
                 self.handle_summarize_email(user_id, email_id).await?
             }
-            CopilotIntent::DraftReply { email_id, instructions } => {
-                self.handle_draft_reply(user_id, email_id, &instructions).await?
+            CopilotIntent::DraftReply {
+                email_id,
+                instructions,
+            } => {
+                self.handle_draft_reply(user_id, email_id, &instructions)
+                    .await?
             }
-            CopilotIntent::ComposeEmail { to, subject, instructions } => {
-                self.handle_compose_email(user_id, to, subject, &instructions).await?
+            CopilotIntent::ComposeEmail {
+                to,
+                subject,
+                instructions,
+            } => {
+                self.handle_compose_email(user_id, to, subject, &instructions)
+                    .await?
             }
             CopilotIntent::SearchEmails { query } => {
                 self.handle_search_emails(user_id, &query).await?
             }
             CopilotIntent::ScheduleFollowUp { email_id, when } => {
-                self.handle_schedule_followup(user_id, email_id, when).await?
+                self.handle_schedule_followup(user_id, email_id, when)
+                    .await?
             }
-            CopilotIntent::GetPriority => {
-                self.handle_get_priority(user_id).await?
-            }
+            CopilotIntent::GetPriority => self.handle_get_priority(user_id).await?,
             CopilotIntent::Unknown { query } => {
-                self.handle_general_query(user_id, &query, conversation_id).await?
+                self.handle_general_query(user_id, &query, conversation_id)
+                    .await?
             }
         };
 
         // Store conversation history
         if let Some(conv_id) = conversation_id {
-            self.store_conversation(conv_id, user_id, command, &response).await?;
+            self.store_conversation(conv_id, user_id, command, &response)
+                .await?;
         }
 
         Ok(response)
@@ -133,18 +149,29 @@ impl CopilotService {
         if command_lower.contains("reply") || command_lower.contains("respond") {
             if let Some(email_id) = self.extract_email_id(&command_lower) {
                 let instructions = self.extract_instructions(command);
-                return Ok(CopilotIntent::DraftReply { email_id, instructions });
+                return Ok(CopilotIntent::DraftReply {
+                    email_id,
+                    instructions,
+                });
             }
         }
 
-        if command_lower.starts_with("compose") || command_lower.starts_with("write") ||
-           command_lower.starts_with("draft") || command_lower.contains("email to") {
+        if command_lower.starts_with("compose")
+            || command_lower.starts_with("write")
+            || command_lower.starts_with("draft")
+            || command_lower.contains("email to")
+        {
             let (to, subject, instructions) = self.extract_compose_params(command);
-            return Ok(CopilotIntent::ComposeEmail { to, subject, instructions });
+            return Ok(CopilotIntent::ComposeEmail {
+                to,
+                subject,
+                instructions,
+            });
         }
 
         if command_lower.starts_with("search") || command_lower.starts_with("find") {
-            let query = command.trim_start_matches(|c: char| !c.is_alphabetic())
+            let query = command
+                .trim_start_matches(|c: char| !c.is_alphabetic())
                 .trim_start_matches("search")
                 .trim_start_matches("find")
                 .trim()
@@ -159,13 +186,17 @@ impl CopilotService {
             }
         }
 
-        if command_lower.contains("priority") || command_lower.contains("important") ||
-           command_lower.contains("urgent") {
+        if command_lower.contains("priority")
+            || command_lower.contains("important")
+            || command_lower.contains("urgent")
+        {
             return Ok(CopilotIntent::GetPriority);
         }
 
         // Fall back to general query
-        Ok(CopilotIntent::Unknown { query: command.to_string() })
+        Ok(CopilotIntent::Unknown {
+            query: command.to_string(),
+        })
     }
 
     fn extract_email_id(&self, _text: &str) -> Option<Uuid> {
@@ -193,9 +224,7 @@ impl CopilotService {
         };
 
         let subject = if text.contains("about") {
-            text.split("about")
-                .nth(1)
-                .map(|s| s.trim().to_string())
+            text.split("about").nth(1).map(|s| s.trim().to_string())
         } else {
             None
         };
@@ -220,7 +249,10 @@ impl CopilotService {
     // Intent Handlers
     // ========================================================================
 
-    async fn handle_summarize_unread(&self, user_id: Uuid) -> Result<CopilotResponse, CopilotError> {
+    async fn handle_summarize_unread(
+        &self,
+        user_id: Uuid,
+    ) -> Result<CopilotResponse, CopilotError> {
         // Get unread emails
         let unread: Vec<EmailSummaryRow> = sqlx::query_as(
             r#"
@@ -247,11 +279,14 @@ impl CopilotService {
         // Build summary prompt
         let email_list: String = unread
             .iter()
-            .map(|e| format!("- From: {}\n  Subject: {}\n  Preview: {}",
-                e.from_address,
-                e.subject,
-                e.body_text.chars().take(100).collect::<String>()
-            ))
+            .map(|e| {
+                format!(
+                    "- From: {}\n  Subject: {}\n  Preview: {}",
+                    e.from_address,
+                    e.subject,
+                    e.body_text.chars().take(100).collect::<String>()
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n\n");
 
@@ -261,17 +296,23 @@ impl CopilotService {
             email_list
         );
 
-        let summary = self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 500,
-            temperature: 0.3,
-            ..Default::default()
-        }).await?;
+        let summary = self
+            .llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 500,
+                    temperature: 0.3,
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         Ok(CopilotResponse {
             message: format!("You have {} unread emails:\n\n{}", unread.len(), summary),
-            actions: vec![
-                CopilotAction::ViewEmails { filter: "is:unread".to_string() },
-            ],
+            actions: vec![CopilotAction::ViewEmails {
+                filter: "is:unread".to_string(),
+            }],
             data: Some(serde_json::json!({
                 "unread_count": unread.len(),
                 "email_ids": unread.iter().map(|e| e.id).collect::<Vec<_>>()
@@ -298,11 +339,17 @@ impl CopilotService {
             email.from_address, email.subject, email.body_text
         );
 
-        let summary = self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 200,
-            temperature: 0.3,
-            ..Default::default()
-        }).await?;
+        let summary = self
+            .llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 200,
+                    temperature: 0.3,
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         Ok(CopilotResponse {
             message: summary,
@@ -348,15 +395,25 @@ Write a clear, professional reply. Match the tone of the original. Be concise."#
             email.from_address,
             email.subject,
             email.body_text.chars().take(1000).collect::<String>(),
-            if instructions.is_empty() { "Write an appropriate response" } else { instructions },
+            if instructions.is_empty() {
+                "Write an appropriate response"
+            } else {
+                instructions
+            },
             user_context
         );
 
-        let draft = self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 500,
-            temperature: 0.7,
-            ..Default::default()
-        }).await?;
+        let draft = self
+            .llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 500,
+                    temperature: 0.7,
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         Ok(CopilotResponse {
             message: format!("Here's a draft reply:\n\n{}", draft),
@@ -396,11 +453,17 @@ Write a clear, professional email. Be concise and direct."#,
             user_context
         );
 
-        let draft = self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 500,
-            temperature: 0.7,
-            ..Default::default()
-        }).await?;
+        let draft = self
+            .llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 500,
+                    temperature: 0.7,
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         Ok(CopilotResponse {
             message: format!("Here's your draft:\n\n{}", draft),
@@ -426,9 +489,9 @@ Write a clear, professional email. Be concise and direct."#,
 
         Ok(CopilotResponse {
             message: format!("Searching for: {}", search_query),
-            actions: vec![
-                CopilotAction::Search { query: search_query },
-            ],
+            actions: vec![CopilotAction::Search {
+                query: search_query,
+            }],
             data: None,
         })
     }
@@ -457,8 +520,10 @@ Write a clear, professional email. Be concise and direct."#,
         .map_err(|e| CopilotError::Database(e.to_string()))?;
 
         Ok(CopilotResponse {
-            message: format!("I'll remind you to follow up on {}",
-                reminder_time.format("%B %d at %H:%M")),
+            message: format!(
+                "I'll remind you to follow up on {}",
+                reminder_time.format("%B %d at %H:%M")
+            ),
             actions: vec![],
             data: Some(serde_json::json!({
                 "reminder_time": reminder_time
@@ -466,10 +531,7 @@ Write a clear, professional email. Be concise and direct."#,
         })
     }
 
-    async fn handle_get_priority(
-        &self,
-        user_id: Uuid,
-    ) -> Result<CopilotResponse, CopilotError> {
+    async fn handle_get_priority(&self, user_id: Uuid) -> Result<CopilotResponse, CopilotError> {
         // Get high priority emails
         let priority_emails: Vec<PriorityEmailRow> = sqlx::query_as(
             r#"
@@ -498,21 +560,24 @@ Write a clear, professional email. Be concise and direct."#,
         let list: String = priority_emails
             .iter()
             .enumerate()
-            .map(|(i, e)| format!(
-                "{}. **{}** from {}\n   Trust: {:.0}%",
-                i + 1,
-                e.subject,
-                e.from_address,
-                e.trust_score.unwrap_or(0.5) * 100.0
-            ))
+            .map(|(i, e)| {
+                format!(
+                    "{}. **{}** from {}\n   Trust: {:.0}%",
+                    i + 1,
+                    e.subject,
+                    e.from_address,
+                    e.trust_score.unwrap_or(0.5) * 100.0
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n\n");
 
         Ok(CopilotResponse {
             message: format!("Here are your priority emails:\n\n{}", list),
-            actions: priority_emails.iter().map(|e|
-                CopilotAction::ViewEmail { email_id: e.id }
-            ).collect(),
+            actions: priority_emails
+                .iter()
+                .map(|e| CopilotAction::ViewEmail { email_id: e.id })
+                .collect(),
             data: None,
         })
     }
@@ -530,19 +595,18 @@ Write a clear, professional email. Be concise and direct."#,
             vec![]
         };
 
-        let mut messages = vec![
-            ChatMessage {
-                role: ChatRole::System,
-                content: r#"You are a helpful email assistant for Mycelix Mail. You can help users:
+        let mut messages = vec![ChatMessage {
+            role: ChatRole::System,
+            content: r#"You are a helpful email assistant for Mycelix Mail. You can help users:
 - Summarize emails and threads
 - Draft replies and new emails
 - Search for emails
 - Manage their inbox
 - Schedule follow-ups and reminders
 
-Be concise and helpful. If you need to perform an action, describe what you would do."#.to_string(),
-            }
-        ];
+Be concise and helpful. If you need to perform an action, describe what you would do."#
+                .to_string(),
+        }];
 
         messages.extend(history);
         messages.push(ChatMessage {
@@ -550,11 +614,17 @@ Be concise and helpful. If you need to perform an action, describe what you woul
             content: query.to_string(),
         });
 
-        let response = self.llm_provider.chat(messages, CompletionOptions {
-            max_tokens: 500,
-            temperature: 0.7,
-            ..Default::default()
-        }).await?;
+        let response = self
+            .llm_provider
+            .chat(
+                messages,
+                CompletionOptions {
+                    max_tokens: 500,
+                    temperature: 0.7,
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         Ok(CopilotResponse {
             message: response,
@@ -568,15 +638,15 @@ Be concise and helpful. If you need to perform an action, describe what you woul
     // ========================================================================
 
     async fn get_user_context(&self, user_id: Uuid) -> Result<String, CopilotError> {
-        let user: Option<UserContextRow> = sqlx::query_as(
-            "SELECT name, email FROM users WHERE id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| CopilotError::Database(e.to_string()))?;
+        let user: Option<UserContextRow> =
+            sqlx::query_as("SELECT name, email FROM users WHERE id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| CopilotError::Database(e.to_string()))?;
 
-        Ok(user.map(|u| format!("User: {} <{}>", u.name.unwrap_or_default(), u.email))
+        Ok(user
+            .map(|u| format!("User: {} <{}>", u.name.unwrap_or_default(), u.email))
             .unwrap_or_default())
     }
 
@@ -591,14 +661,22 @@ Return only the search query, nothing else."#,
             natural_query
         );
 
-        self.llm_provider.complete(&prompt, CompletionOptions {
-            max_tokens: 100,
-            temperature: 0.1,
-            ..Default::default()
-        }).await
+        self.llm_provider
+            .complete(
+                &prompt,
+                CompletionOptions {
+                    max_tokens: 100,
+                    temperature: 0.1,
+                    ..Default::default()
+                },
+            )
+            .await
     }
 
-    async fn get_conversation_history(&self, conv_id: Uuid) -> Result<Vec<ChatMessage>, CopilotError> {
+    async fn get_conversation_history(
+        &self,
+        conv_id: Uuid,
+    ) -> Result<Vec<ChatMessage>, CopilotError> {
         let messages: Vec<ConversationRow> = sqlx::query_as(
             r#"
             SELECT role, content FROM copilot_conversations
@@ -612,10 +690,17 @@ Return only the search query, nothing else."#,
         .await
         .map_err(|e| CopilotError::Database(e.to_string()))?;
 
-        Ok(messages.into_iter().map(|m| ChatMessage {
-            role: if m.role == "user" { ChatRole::User } else { ChatRole::Assistant },
-            content: m.content,
-        }).collect())
+        Ok(messages
+            .into_iter()
+            .map(|m| ChatMessage {
+                role: if m.role == "user" {
+                    ChatRole::User
+                } else {
+                    ChatRole::Assistant
+                },
+                content: m.content,
+            })
+            .collect())
     }
 
     async fn store_conversation(
@@ -662,13 +747,29 @@ Return only the search query, nothing else."#,
 #[derive(Debug, Clone)]
 pub enum CopilotIntent {
     SummarizeUnread,
-    SummarizeEmail { email_id: Uuid },
-    DraftReply { email_id: Uuid, instructions: String },
-    ComposeEmail { to: Option<String>, subject: Option<String>, instructions: String },
-    SearchEmails { query: String },
-    ScheduleFollowUp { email_id: Uuid, when: Option<DateTime<Utc>> },
+    SummarizeEmail {
+        email_id: Uuid,
+    },
+    DraftReply {
+        email_id: Uuid,
+        instructions: String,
+    },
+    ComposeEmail {
+        to: Option<String>,
+        subject: Option<String>,
+        instructions: String,
+    },
+    SearchEmails {
+        query: String,
+    },
+    ScheduleFollowUp {
+        email_id: Uuid,
+        when: Option<DateTime<Utc>>,
+    },
     GetPriority,
-    Unknown { query: String },
+    Unknown {
+        query: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -681,13 +782,30 @@ pub struct CopilotResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CopilotAction {
-    ViewEmail { email_id: Uuid },
-    ViewEmails { filter: String },
-    ReplyToEmail { email_id: Uuid },
-    OpenCompose { to: Option<String>, subject: Option<String>, body: Option<String> },
-    UseDraft { email_id: Option<Uuid>, draft: String },
-    EditDraft { draft: String },
-    Search { query: String },
+    ViewEmail {
+        email_id: Uuid,
+    },
+    ViewEmails {
+        filter: String,
+    },
+    ReplyToEmail {
+        email_id: Uuid,
+    },
+    OpenCompose {
+        to: Option<String>,
+        subject: Option<String>,
+        body: Option<String>,
+    },
+    UseDraft {
+        email_id: Option<Uuid>,
+        draft: String,
+    },
+    EditDraft {
+        draft: String,
+    },
+    Search {
+        query: String,
+    },
 }
 
 struct ContextManager {

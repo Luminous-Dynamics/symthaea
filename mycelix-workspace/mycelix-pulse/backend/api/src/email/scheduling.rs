@@ -6,10 +6,10 @@
 //! Schedule emails for future delivery and provide an undo window
 //! before emails are actually sent.
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -139,7 +139,10 @@ impl EmailScheduler {
             send_later_reason: None,
         };
 
-        self.scheduled_emails.write().await.insert(scheduled.id, scheduled.clone());
+        self.scheduled_emails
+            .write()
+            .await
+            .insert(scheduled.id, scheduled.clone());
 
         Ok(scheduled)
     }
@@ -156,15 +159,16 @@ impl EmailScheduler {
         // Validate schedule time
         if send_at <= now {
             return Err(SchedulingError::InvalidScheduleTime(
-                "Cannot schedule email in the past".to_string()
+                "Cannot schedule email in the past".to_string(),
             ));
         }
 
         let max_future = now + Duration::days(self.config.max_schedule_days as i64);
         if send_at > max_future {
-            return Err(SchedulingError::InvalidScheduleTime(
-                format!("Cannot schedule more than {} days in advance", self.config.max_schedule_days)
-            ));
+            return Err(SchedulingError::InvalidScheduleTime(format!(
+                "Cannot schedule more than {} days in advance",
+                self.config.max_schedule_days
+            )));
         }
 
         let scheduled = ScheduledEmail {
@@ -192,7 +196,10 @@ impl EmailScheduler {
             send_later_reason: email.send_later_reason,
         };
 
-        self.scheduled_emails.write().await.insert(scheduled.id, scheduled.clone());
+        self.scheduled_emails
+            .write()
+            .await
+            .insert(scheduled.id, scheduled.clone());
 
         Ok(scheduled)
     }
@@ -201,7 +208,8 @@ impl EmailScheduler {
     pub async fn cancel(&self, user_id: Uuid, email_id: Uuid) -> Result<(), SchedulingError> {
         let mut emails = self.scheduled_emails.write().await;
 
-        let email = emails.get_mut(&email_id)
+        let email = emails
+            .get_mut(&email_id)
             .ok_or(SchedulingError::NotFound(email_id))?;
 
         if email.user_id != user_id {
@@ -209,21 +217,14 @@ impl EmailScheduler {
         }
 
         match email.status {
-            ScheduledEmailStatus::PendingConfirmation |
-            ScheduledEmailStatus::Scheduled => {
+            ScheduledEmailStatus::PendingConfirmation | ScheduledEmailStatus::Scheduled => {
                 email.status = ScheduledEmailStatus::Cancelled;
                 email.cancelled_at = Some(Utc::now());
                 Ok(())
             }
-            ScheduledEmailStatus::Sending => {
-                Err(SchedulingError::AlreadySending)
-            }
-            ScheduledEmailStatus::Sent => {
-                Err(SchedulingError::AlreadySent)
-            }
-            ScheduledEmailStatus::Cancelled => {
-                Err(SchedulingError::AlreadyCancelled)
-            }
+            ScheduledEmailStatus::Sending => Err(SchedulingError::AlreadySending),
+            ScheduledEmailStatus::Sent => Err(SchedulingError::AlreadySent),
+            ScheduledEmailStatus::Cancelled => Err(SchedulingError::AlreadyCancelled),
             ScheduledEmailStatus::Failed => {
                 // Allow cancelling failed emails
                 email.status = ScheduledEmailStatus::Cancelled;
@@ -242,16 +243,17 @@ impl EmailScheduler {
     ) -> Result<ScheduledEmail, SchedulingError> {
         let mut emails = self.scheduled_emails.write().await;
 
-        let email = emails.get_mut(&email_id)
+        let email = emails
+            .get_mut(&email_id)
             .ok_or(SchedulingError::NotFound(email_id))?;
 
         if email.user_id != user_id {
             return Err(SchedulingError::Unauthorized);
         }
 
-        if !matches!(email.status,
-            ScheduledEmailStatus::PendingConfirmation |
-            ScheduledEmailStatus::Scheduled
+        if !matches!(
+            email.status,
+            ScheduledEmailStatus::PendingConfirmation | ScheduledEmailStatus::Scheduled
         ) {
             return Err(SchedulingError::CannotReschedule);
         }
@@ -259,7 +261,7 @@ impl EmailScheduler {
         let now = Utc::now();
         if new_time <= now {
             return Err(SchedulingError::InvalidScheduleTime(
-                "Cannot reschedule to past time".to_string()
+                "Cannot reschedule to past time".to_string(),
             ));
         }
 
@@ -274,11 +276,12 @@ impl EmailScheduler {
         let now = Utc::now();
         let emails = self.scheduled_emails.read().await;
 
-        emails.values()
+        emails
+            .values()
             .filter(|e| {
-                (e.status == ScheduledEmailStatus::Scheduled ||
-                 e.status == ScheduledEmailStatus::PendingConfirmation) &&
-                e.scheduled_for <= now
+                (e.status == ScheduledEmailStatus::Scheduled
+                    || e.status == ScheduledEmailStatus::PendingConfirmation)
+                    && e.scheduled_for <= now
             })
             .cloned()
             .collect()
@@ -289,11 +292,12 @@ impl EmailScheduler {
         let now = Utc::now();
         let emails = self.scheduled_emails.read().await;
 
-        emails.values()
+        emails
+            .values()
             .filter(|e| {
-                e.user_id == user_id &&
-                e.status == ScheduledEmailStatus::PendingConfirmation &&
-                e.undo_until > now
+                e.user_id == user_id
+                    && e.status == ScheduledEmailStatus::PendingConfirmation
+                    && e.undo_until > now
             })
             .cloned()
             .collect()
@@ -303,13 +307,14 @@ impl EmailScheduler {
     pub async fn get_user_scheduled(&self, user_id: Uuid) -> Vec<ScheduledEmail> {
         let emails = self.scheduled_emails.read().await;
 
-        emails.values()
+        emails
+            .values()
             .filter(|e| {
-                e.user_id == user_id &&
-                matches!(e.status,
-                    ScheduledEmailStatus::Scheduled |
-                    ScheduledEmailStatus::PendingConfirmation
-                )
+                e.user_id == user_id
+                    && matches!(
+                        e.status,
+                        ScheduledEmailStatus::Scheduled | ScheduledEmailStatus::PendingConfirmation
+                    )
             })
             .cloned()
             .collect()
@@ -319,7 +324,8 @@ impl EmailScheduler {
     pub async fn mark_sending(&self, email_id: Uuid) -> Result<(), SchedulingError> {
         let mut emails = self.scheduled_emails.write().await;
 
-        let email = emails.get_mut(&email_id)
+        let email = emails
+            .get_mut(&email_id)
             .ok_or(SchedulingError::NotFound(email_id))?;
 
         email.status = ScheduledEmailStatus::Sending;
@@ -333,7 +339,8 @@ impl EmailScheduler {
     pub async fn mark_sent(&self, email_id: Uuid) -> Result<(), SchedulingError> {
         let mut emails = self.scheduled_emails.write().await;
 
-        let email = emails.get_mut(&email_id)
+        let email = emails
+            .get_mut(&email_id)
             .ok_or(SchedulingError::NotFound(email_id))?;
 
         email.status = ScheduledEmailStatus::Sent;
@@ -350,7 +357,8 @@ impl EmailScheduler {
     ) -> Result<bool, SchedulingError> {
         let mut emails = self.scheduled_emails.write().await;
 
-        let email = emails.get_mut(&email_id)
+        let email = emails
+            .get_mut(&email_id)
             .ok_or(SchedulingError::NotFound(email_id))?;
 
         email.last_error = Some(error);
@@ -369,12 +377,17 @@ impl EmailScheduler {
 
     /// Set user's undo window preference
     pub async fn set_user_undo_window(&self, user_id: Uuid, seconds: u32) {
-        self.user_undo_settings.write().await.insert(user_id, seconds);
+        self.user_undo_settings
+            .write()
+            .await
+            .insert(user_id, seconds);
     }
 
     /// Get user's undo window (in seconds)
     async fn get_user_undo_window(&self, user_id: Uuid) -> u32 {
-        self.user_undo_settings.read().await
+        self.user_undo_settings
+            .read()
+            .await
             .get(&user_id)
             .copied()
             .unwrap_or(self.config.default_undo_window_secs)
@@ -387,11 +400,7 @@ impl EmailScheduler {
         emails.get(&email_id).and_then(|e| {
             if e.status == ScheduledEmailStatus::PendingConfirmation {
                 let remaining = (e.undo_until - Utc::now()).num_seconds();
-                if remaining > 0 {
-                    Some(remaining)
-                } else {
-                    None
-                }
+                if remaining > 0 { Some(remaining) } else { None }
             } else {
                 None
             }
@@ -403,15 +412,11 @@ impl EmailScheduler {
         let cutoff = Utc::now() - Duration::days(older_than_days as i64);
         let mut emails = self.scheduled_emails.write().await;
 
-        emails.retain(|_, e| {
-            match e.status {
-                ScheduledEmailStatus::Sent |
-                ScheduledEmailStatus::Cancelled |
-                ScheduledEmailStatus::Failed => {
-                    e.created_at > cutoff
-                }
-                _ => true
-            }
+        emails.retain(|_, e| match e.status {
+            ScheduledEmailStatus::Sent
+            | ScheduledEmailStatus::Cancelled
+            | ScheduledEmailStatus::Failed => e.created_at > cutoff,
+            _ => true,
         });
     }
 }
@@ -476,8 +481,7 @@ impl SendTimeSuggester {
         // 3. Timezone considerations
         // 4. Business hours
 
-        let tz = chrono_tz::Tz::from_str_insensitive(recipient_timezone)
-            .unwrap_or(chrono_tz::UTC);
+        let tz = chrono_tz::Tz::from_str_insensitive(recipient_timezone).unwrap_or(chrono_tz::UTC);
 
         let now = Utc::now().with_timezone(&tz);
         let today = now.date_naive();
@@ -547,7 +551,8 @@ mod tests {
 
         let draft = EmailDraft {
             to: vec!["test@example.com".to_string()],
-            cc: None, bcc: None,
+            cc: None,
+            bcc: None,
             subject: "Test".to_string(),
             body_text: "Test".to_string(),
             body_html: None,
@@ -562,6 +567,9 @@ mod tests {
         scheduler.cancel(user_id, scheduled.id).await.unwrap();
 
         let emails = scheduler.scheduled_emails.read().await;
-        assert_eq!(emails.get(&scheduled.id).unwrap().status, ScheduledEmailStatus::Cancelled);
+        assert_eq!(
+            emails.get(&scheduled.id).unwrap().status,
+            ScheduledEmailStatus::Cancelled
+        );
     }
 }

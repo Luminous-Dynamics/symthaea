@@ -5,8 +5,8 @@
 //!
 //! Performance and stress testing for Mycelix Mail
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 
@@ -199,181 +199,200 @@ pub mod scenarios {
     use super::*;
 
     /// Email listing endpoint load test
-    pub async fn email_list_load_test(base_url: &str, token: &str, config: LoadTestConfig) -> LoadTestResults {
+    pub async fn email_list_load_test(
+        base_url: &str,
+        token: &str,
+        config: LoadTestConfig,
+    ) -> LoadTestResults {
         let client = reqwest::Client::new();
         let url = format!("{}/api/emails", base_url);
         let token = token.to_string();
 
         let runner = LoadTestRunner::new(config);
 
-        runner.run(move |_i| {
-            let client = client.clone();
-            let url = url.clone();
-            let token = token.clone();
+        runner
+            .run(move |_i| {
+                let client = client.clone();
+                let url = url.clone();
+                let token = token.clone();
 
-            async move {
-                let start = Instant::now();
-                let response = client
-                    .get(&url)
-                    .header("Authorization", format!("Bearer {}", token))
-                    .send()
-                    .await;
+                async move {
+                    let start = Instant::now();
+                    let response = client
+                        .get(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .send()
+                        .await;
 
-                match response {
-                    Ok(resp) => RequestResult {
-                        success: resp.status().is_success(),
-                        latency: start.elapsed(),
-                        status_code: Some(resp.status().as_u16()),
-                        error: None,
-                    },
-                    Err(e) => RequestResult {
-                        success: false,
-                        latency: start.elapsed(),
-                        status_code: None,
-                        error: Some(e.to_string()),
-                    },
+                    match response {
+                        Ok(resp) => RequestResult {
+                            success: resp.status().is_success(),
+                            latency: start.elapsed(),
+                            status_code: Some(resp.status().as_u16()),
+                            error: None,
+                        },
+                        Err(e) => RequestResult {
+                            success: false,
+                            latency: start.elapsed(),
+                            status_code: None,
+                            error: Some(e.to_string()),
+                        },
+                    }
                 }
-            }
-        }).await
+            })
+            .await
     }
 
     /// Email search endpoint load test
-    pub async fn search_load_test(base_url: &str, token: &str, config: LoadTestConfig) -> LoadTestResults {
+    pub async fn search_load_test(
+        base_url: &str,
+        token: &str,
+        config: LoadTestConfig,
+    ) -> LoadTestResults {
         let client = reqwest::Client::new();
         let url = format!("{}/api/search", base_url);
         let token = token.to_string();
 
-        let queries = vec![
-            "important",
-            "meeting",
-            "urgent",
-            "project",
-            "deadline",
-        ];
+        let queries = vec!["important", "meeting", "urgent", "project", "deadline"];
 
         let runner = LoadTestRunner::new(config);
 
-        runner.run(move |i| {
-            let client = client.clone();
-            let url = url.clone();
-            let token = token.clone();
-            let query = queries[i as usize % queries.len()].to_string();
+        runner
+            .run(move |i| {
+                let client = client.clone();
+                let url = url.clone();
+                let token = token.clone();
+                let query = queries[i as usize % queries.len()].to_string();
 
-            async move {
-                let start = Instant::now();
-                let response = client
-                    .get(&url)
-                    .query(&[("q", &query)])
-                    .header("Authorization", format!("Bearer {}", token))
-                    .send()
-                    .await;
+                async move {
+                    let start = Instant::now();
+                    let response = client
+                        .get(&url)
+                        .query(&[("q", &query)])
+                        .header("Authorization", format!("Bearer {}", token))
+                        .send()
+                        .await;
 
-                match response {
-                    Ok(resp) => RequestResult {
-                        success: resp.status().is_success(),
-                        latency: start.elapsed(),
-                        status_code: Some(resp.status().as_u16()),
-                        error: None,
-                    },
-                    Err(e) => RequestResult {
-                        success: false,
-                        latency: start.elapsed(),
-                        status_code: None,
-                        error: Some(e.to_string()),
-                    },
+                    match response {
+                        Ok(resp) => RequestResult {
+                            success: resp.status().is_success(),
+                            latency: start.elapsed(),
+                            status_code: Some(resp.status().as_u16()),
+                            error: None,
+                        },
+                        Err(e) => RequestResult {
+                            success: false,
+                            latency: start.elapsed(),
+                            status_code: None,
+                            error: Some(e.to_string()),
+                        },
+                    }
                 }
-            }
-        }).await
+            })
+            .await
     }
 
     /// Trust score calculation load test
-    pub async fn trust_score_load_test(base_url: &str, token: &str, agent_ids: Vec<String>, config: LoadTestConfig) -> LoadTestResults {
+    pub async fn trust_score_load_test(
+        base_url: &str,
+        token: &str,
+        agent_ids: Vec<String>,
+        config: LoadTestConfig,
+    ) -> LoadTestResults {
         let client = reqwest::Client::new();
         let base = base_url.to_string();
         let token = token.to_string();
 
         let runner = LoadTestRunner::new(config);
 
-        runner.run(move |i| {
-            let client = client.clone();
-            let base = base.clone();
-            let token = token.clone();
-            let agent_id = agent_ids[i as usize % agent_ids.len()].clone();
+        runner
+            .run(move |i| {
+                let client = client.clone();
+                let base = base.clone();
+                let token = token.clone();
+                let agent_id = agent_ids[i as usize % agent_ids.len()].clone();
 
-            async move {
-                let url = format!("{}/api/trust/{}/score", base, agent_id);
-                let start = Instant::now();
+                async move {
+                    let url = format!("{}/api/trust/{}/score", base, agent_id);
+                    let start = Instant::now();
 
-                let response = client
-                    .get(&url)
-                    .header("Authorization", format!("Bearer {}", token))
-                    .send()
-                    .await;
+                    let response = client
+                        .get(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .send()
+                        .await;
 
-                match response {
-                    Ok(resp) => RequestResult {
-                        success: resp.status().is_success(),
-                        latency: start.elapsed(),
-                        status_code: Some(resp.status().as_u16()),
-                        error: None,
-                    },
-                    Err(e) => RequestResult {
-                        success: false,
-                        latency: start.elapsed(),
-                        status_code: None,
-                        error: Some(e.to_string()),
-                    },
+                    match response {
+                        Ok(resp) => RequestResult {
+                            success: resp.status().is_success(),
+                            latency: start.elapsed(),
+                            status_code: Some(resp.status().as_u16()),
+                            error: None,
+                        },
+                        Err(e) => RequestResult {
+                            success: false,
+                            latency: start.elapsed(),
+                            status_code: None,
+                            error: Some(e.to_string()),
+                        },
+                    }
                 }
-            }
-        }).await
+            })
+            .await
     }
 
     /// Mixed workload simulation
-    pub async fn mixed_workload_test(base_url: &str, token: &str, config: LoadTestConfig) -> LoadTestResults {
+    pub async fn mixed_workload_test(
+        base_url: &str,
+        token: &str,
+        config: LoadTestConfig,
+    ) -> LoadTestResults {
         let client = reqwest::Client::new();
         let base = base_url.to_string();
         let token = token.to_string();
 
         let runner = LoadTestRunner::new(config);
 
-        runner.run(move |i| {
-            let client = client.clone();
-            let base = base.clone();
-            let token = token.clone();
+        runner
+            .run(move |i| {
+                let client = client.clone();
+                let base = base.clone();
+                let token = token.clone();
 
-            async move {
-                // Mix of different endpoints (simulating real usage)
-                let endpoint = match i % 10 {
-                    0..=4 => format!("{}/api/emails", base),           // 50% list emails
-                    5..=6 => format!("{}/api/search?q=test", base),    // 20% search
-                    7 => format!("{}/api/contacts", base),             // 10% contacts
-                    8 => format!("{}/api/labels", base),               // 10% labels
-                    _ => format!("{}/api/settings", base),             // 10% settings
-                };
+                async move {
+                    // Mix of different endpoints (simulating real usage)
+                    let endpoint = match i % 10 {
+                        0..=4 => format!("{}/api/emails", base), // 50% list emails
+                        5..=6 => format!("{}/api/search?q=test", base), // 20% search
+                        7 => format!("{}/api/contacts", base),   // 10% contacts
+                        8 => format!("{}/api/labels", base),     // 10% labels
+                        _ => format!("{}/api/settings", base),   // 10% settings
+                    };
 
-                let start = Instant::now();
-                let response = client
-                    .get(&endpoint)
-                    .header("Authorization", format!("Bearer {}", token))
-                    .send()
-                    .await;
+                    let start = Instant::now();
+                    let response = client
+                        .get(&endpoint)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .send()
+                        .await;
 
-                match response {
-                    Ok(resp) => RequestResult {
-                        success: resp.status().is_success(),
-                        latency: start.elapsed(),
-                        status_code: Some(resp.status().as_u16()),
-                        error: None,
-                    },
-                    Err(e) => RequestResult {
-                        success: false,
-                        latency: start.elapsed(),
-                        status_code: None,
-                        error: Some(e.to_string()),
-                    },
+                    match response {
+                        Ok(resp) => RequestResult {
+                            success: resp.status().is_success(),
+                            latency: start.elapsed(),
+                            status_code: Some(resp.status().as_u16()),
+                            error: None,
+                        },
+                        Err(e) => RequestResult {
+                            success: false,
+                            latency: start.elapsed(),
+                            status_code: None,
+                            error: Some(e.to_string()),
+                        },
+                    }
                 }
-            }
-        }).await
+            })
+            .await
     }
 }
 
@@ -383,12 +402,16 @@ pub fn print_results(name: &str, results: &LoadTestResults) {
     println!("Load Test Results: {}", name);
     println!("{'='*60}");
     println!("Total Requests:    {}", results.total_requests);
-    println!("Successful:        {} ({:.1}%)",
+    println!(
+        "Successful:        {} ({:.1}%)",
         results.successful_requests,
         (results.successful_requests as f64 / results.total_requests as f64) * 100.0
     );
     println!("Failed:            {}", results.failed_requests);
-    println!("Duration:          {:.2}s", results.total_duration.as_secs_f64());
+    println!(
+        "Duration:          {:.2}s",
+        results.total_duration.as_secs_f64()
+    );
     println!("Requests/sec:      {:.2}", results.requests_per_second);
     println!("\nLatency:");
     println!("  Min:    {:?}", results.latency_min);

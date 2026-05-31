@@ -113,9 +113,10 @@ fn validate_create_pre_key_bundle(
     // Validate one-time pre-key lengths
     for otpk in &bundle.one_time_pre_keys {
         if otpk.public_key.len() != 32 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("One-time pre-key {} must be 32 bytes", otpk.key_id),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "One-time pre-key {} must be 32 bytes",
+                otpk.key_id
+            )));
         }
     }
 
@@ -168,13 +169,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
-                EntryTypes::PreKeyBundle(bundle) => {
-                    validate_create_pre_key_bundle(action, bundle)
-                }
+                EntryTypes::PreKeyBundle(bundle) => validate_create_pre_key_bundle(action, bundle),
                 EntryTypes::UsedPreKey(used) => validate_create_used_pre_key(action, used),
-                EntryTypes::KeyRotation(rotation) => {
-                    validate_create_key_rotation(action, rotation)
-                }
+                EntryTypes::KeyRotation(rotation) => validate_create_key_rotation(action, rotation),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::PreKeyBundle(bundle) => {

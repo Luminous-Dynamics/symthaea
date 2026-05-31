@@ -34,7 +34,10 @@ pub enum BackupSignal {
     /// Restore progress
     RestoreProgress { restore_id: String, percent: u8 },
     /// Restore completed
-    RestoreCompleted { restore_id: String, entries_restored: u32 },
+    RestoreCompleted {
+        restore_id: String,
+        entries_restored: u32,
+    },
     /// Restore failed
     RestoreFailed { restore_id: String, error: String },
 }
@@ -285,8 +288,8 @@ fn serialize_backup_data(data: &BackupData) -> ExternResult<Vec<u8>> {
 }
 
 fn count_entries(data: &[u8]) -> ExternResult<u32> {
-    let backup_data: BackupData = serde_json::from_slice(data)
-        .map_err(|e| wasm_error!(e.to_string()))?;
+    let backup_data: BackupData =
+        serde_json::from_slice(data).map_err(|e| wasm_error!(e.to_string()))?;
 
     Ok((backup_data.emails.len()
         + backup_data.drafts.len()
@@ -349,8 +352,7 @@ pub fn restore_backup(input: RestoreInput) -> ExternResult<ActionHash> {
     })?;
 
     // Get backup manifest
-    let manifest = get_backup_manifest(&input.backup_id)?
-        .ok_or(wasm_error!("Backup not found"))?;
+    let manifest = get_backup_manifest(&input.backup_id)?.ok_or(wasm_error!("Backup not found"))?;
 
     // Get contents to restore (use backup contents if not specified)
     let contents = input.contents.unwrap_or(manifest.contents.clone());
@@ -373,7 +375,12 @@ pub fn restore_backup(input: RestoreInput) -> ExternResult<ActionHash> {
 
     let restore_hash = create_entry(EntryTypes::RestoreOperation(restore_op))?;
 
-    create_link(agent.clone(), restore_hash.clone(), LinkTypes::AgentToRestores, ())?;
+    create_link(
+        agent.clone(),
+        restore_hash.clone(),
+        LinkTypes::AgentToRestores,
+        (),
+    )?;
 
     emit_signal(BackupSignal::RestoreProgress {
         restore_id: restore_id.clone(),
@@ -407,7 +414,11 @@ pub fn restore_backup(input: RestoreInput) -> ExternResult<ActionHash> {
         if input.password.is_none() {
             return Err(wasm_error!("Password required for encrypted backup"));
         }
-        decrypt_backup_data(&backup_data, &manifest.encryption, input.password.as_ref().unwrap())?
+        decrypt_backup_data(
+            &backup_data,
+            &manifest.encryption,
+            input.password.as_ref().unwrap(),
+        )?
     } else {
         backup_data
     };
@@ -448,7 +459,10 @@ pub fn restore_backup(input: RestoreInput) -> ExternResult<ActionHash> {
 fn get_backup_manifest(backup_id: &str) -> ExternResult<Option<BackupManifest>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToBackups)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToBackups)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -508,7 +522,10 @@ fn restore_entries(
 pub fn get_backups(_: ()) -> ExternResult<Vec<BackupManifest>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToBackups)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToBackups)?,
+        GetStrategy::default(),
+    )?;
 
     let mut backups = Vec::new();
 
@@ -542,7 +559,10 @@ pub fn get_backup(backup_id: String) -> ExternResult<Option<BackupManifest>> {
 pub fn get_restore_operations(_: ()) -> ExternResult<Vec<RestoreOperation>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToRestores)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToRestores)?,
+        GetStrategy::default(),
+    )?;
 
     let mut operations = Vec::new();
 
@@ -580,8 +600,7 @@ pub fn delete_backup(backup_id: String) -> ExternResult<bool> {
 /// Export backup to external format
 #[hdk_extern]
 pub fn export_backup(input: ExportBackupInput) -> ExternResult<Vec<u8>> {
-    let manifest = get_backup_manifest(&input.backup_id)?
-        .ok_or(wasm_error!("Backup not found"))?;
+    let manifest = get_backup_manifest(&input.backup_id)?.ok_or(wasm_error!("Backup not found"))?;
 
     let data = collect_backup_chunks(&manifest)?;
 
@@ -635,7 +654,10 @@ pub fn set_backup_schedule(schedule: BackupSchedule) -> ExternResult<ActionHash>
 pub fn get_backup_schedule(_: ()) -> ExternResult<Option<BackupSchedule>> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToSchedule)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToSchedule)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.last() {
         if let Some(hash) = link.target.clone().into_action_hash() {

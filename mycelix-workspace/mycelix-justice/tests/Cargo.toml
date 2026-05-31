@@ -1,0 +1,64 @@
+# Tests for mycelix-justice hApp
+# Includes standalone unit tests and sweettest conductor-based integration tests
+
+[package]
+name = "mycelix-justice-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+# Keep this crate out of the parent workspace
+[workspace]
+
+[dependencies]
+lazy_static = "1.4"
+
+# Holochain testing dependencies (NO zome crate imports to avoid duplicate symbols)
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+hdk = "0.6"
+hdi = "0.7"
+
+# Async runtime for tests
+tokio = { version = "1.35", features = ["full", "test-util"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Serialization (msgpack for Holochain entry deserialization)
+rmp-serde = "1.1"
+
+[[test]]
+name = "integrity"
+path = "integrity_tests.rs"
+
+[[test]]
+name = "case_lifecycle"
+path = "case_lifecycle_tests.rs"
+
+[[test]]
+name = "evidence"
+path = "evidence_tests.rs"
+
+[[test]]
+name = "arbitration"
+path = "arbitration_tests.rs"
+
+[[test]]
+name = "enforcement"
+path = "enforcement_tests.rs"
+
+[[test]]
+name = "restorative"
+path = "restorative_tests.rs"
+
+[[test]]
+name = "access_control"
+path = "access_control_tests.rs"
+
+# Sweettest Integration Tests (conductor-based)
+[[test]]
+name = "sweettest_integration"
+path = "sweettest_integration.rs"

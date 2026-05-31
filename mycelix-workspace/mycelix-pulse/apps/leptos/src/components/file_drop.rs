@@ -4,8 +4,8 @@
 //! Drag-and-drop file attachment zone for compose page.
 
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Attachment {

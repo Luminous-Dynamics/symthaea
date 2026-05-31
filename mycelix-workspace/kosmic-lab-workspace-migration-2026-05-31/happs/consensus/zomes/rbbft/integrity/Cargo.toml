@@ -1,0 +1,18 @@
+[package]
+name = "rbbft_integrity"
+version = "0.1.0"
+edition = "2024"
+description = "RB-BFT Consensus Integrity Zome - Validation for reputation-based Byzantine fault tolerance"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "rbbft_integrity"
+
+[dependencies]
+getrandom = { workspace = true }
+hdi = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+
+[features]
+default = []

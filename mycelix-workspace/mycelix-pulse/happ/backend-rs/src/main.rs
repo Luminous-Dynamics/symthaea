@@ -43,14 +43,10 @@ use std::net::SocketAddr;
 use std::time::Instant;
 
 use axum::{
-    http::{header, Method},
     Extension, Router,
+    http::{Method, header},
 };
-use tower_http::{
-    compression::CompressionLayer,
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -59,7 +55,7 @@ use mycelix_mail_backend::{
     config::Config,
     middleware::JwtSecret,
     openapi::ApiDoc,
-    routes::{create_router, AppState},
+    routes::{AppState, create_router},
     types,
 };
 
@@ -87,12 +83,22 @@ async fn main() -> anyhow::Result<()> {
     if config.is_stub_mode() {
         tracing::info!("Holochain STUB MODE enabled - no real conductor connection");
     } else {
-        tracing::info!("Connecting to Holochain at {}", config.holochain_conductor_url);
+        tracing::info!(
+            "Connecting to Holochain at {}",
+            config.holochain_conductor_url
+        );
     }
     if let Err(e) = state.holochain.connect().await {
-        tracing::warn!("Failed to connect to Holochain: {}. Will retry on first request.", e);
+        tracing::warn!(
+            "Failed to connect to Holochain: {}. Will retry on first request.",
+            e
+        );
     } else {
-        let mode = if config.is_stub_mode() { "stub" } else { "production" };
+        let mode = if config.is_stub_mode() {
+            "stub"
+        } else {
+            "production"
+        };
         tracing::info!("Holochain service initialized in {} mode", mode);
     }
 
@@ -110,7 +116,10 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Bridge URL not configured - will use Holochain Bridge zome if available");
     }
     if let Err(e) = state.bridge.connect().await {
-        tracing::warn!("Failed to connect to Bridge: {}. Cross-hApp features will use fallback.", e);
+        tracing::warn!(
+            "Failed to connect to Bridge: {}. Cross-hApp features will use fallback.",
+            e
+        );
     } else {
         let bridge_state = state.bridge.connection_state().await;
         tracing::info!("Bridge service initialized in {:?} mode", bridge_state);
@@ -125,12 +134,14 @@ async fn main() -> anyhow::Result<()> {
                 .filter_map(|o| o.parse().ok())
                 .collect::<Vec<_>>(),
         )
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_headers([
-            header::CONTENT_TYPE,
-            header::AUTHORIZATION,
-            header::ACCEPT,
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
         ])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
         .allow_credentials(true);
 
     // Build the router

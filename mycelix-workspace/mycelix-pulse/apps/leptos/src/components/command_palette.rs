@@ -7,8 +7,8 @@
 
 use crate::mail_context::use_mail;
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 
 const SHORTCUT_KEY: &str = "mycelix_pulse_palette_shortcut";
 const PINNED_ACTIONS_KEY: &str = "mycelix_pulse_pinned_actions";

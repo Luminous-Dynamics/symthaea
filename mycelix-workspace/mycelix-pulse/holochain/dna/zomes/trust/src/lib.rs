@@ -73,10 +73,7 @@ pub struct TrustPath {
 }
 
 // Entry definitions
-entry_defs![
-    PathEntry::entry_def(),
-    TrustAttestation::entry_def()
-];
+entry_defs![PathEntry::entry_def(), TrustAttestation::entry_def()];
 
 /// Link types for the trust zome
 #[hdk_link_types]
@@ -162,7 +159,9 @@ pub fn create_attestation(input: CreateAttestationInput) -> ExternResult<ActionH
 
 /// Get all attestations for an agent
 #[hdk_extern]
-pub fn get_attestations(input: GetAttestationsInput) -> ExternResult<Vec<TrustAttestationWithAuthor>> {
+pub fn get_attestations(
+    input: GetAttestationsInput,
+) -> ExternResult<Vec<TrustAttestationWithAuthor>> {
     let links = get_links(
         GetLinksInputBuilder::try_new(input.subject.clone(), LinkTypes::AgentToAttestations)?
             .build(),
@@ -173,14 +172,20 @@ pub fn get_attestations(input: GetAttestationsInput) -> ExternResult<Vec<TrustAt
 
     for link in links {
         let action_hash = ActionHash::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid action hash: {:?}", e)))
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid action hash: {:?}",
+                e
+            )))
         })?;
 
         if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-            if let Some(attestation) = record
-                .entry()
-                .to_app_option::<TrustAttestation>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
+            if let Some(attestation) =
+                record
+                    .entry()
+                    .to_app_option::<TrustAttestation>()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+                    })?
             {
                 // Filter by context if specified
                 if let Some(ref ctx) = input.context {
@@ -271,8 +276,7 @@ pub fn find_trust_path(input: (AgentPubKey, AgentPubKey)) -> ExternResult<Option
 
         // Get trust connections from current agent
         let links = get_links(
-            GetLinksInputBuilder::try_new(current.clone(), LinkTypes::TrustConnection)?
-                .build(),
+            GetLinksInputBuilder::try_new(current.clone(), LinkTypes::TrustConnection)?.build(),
         )?;
 
         for link in links {
@@ -312,8 +316,9 @@ pub fn find_trust_path(input: (AgentPubKey, AgentPubKey)) -> ExternResult<Option
 #[hdk_extern]
 pub fn revoke_attestation(action_hash: ActionHash) -> ExternResult<ActionHash> {
     // Verify caller is the author
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Attestation not found".to_string())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Attestation not found".to_string())
+    ))?;
 
     let author = record.action().author();
     let caller = agent_info()?.agent_initial_pubkey;
@@ -333,23 +338,27 @@ pub fn revoke_attestation(action_hash: ActionHash) -> ExternResult<ActionHash> {
 pub fn get_my_attestations(_: ()) -> ExternResult<Vec<TrustAttestationWithAuthor>> {
     let author = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(
-        GetLinksInputBuilder::try_new(author, LinkTypes::AuthorToAttestations)?
-            .build(),
-    )?;
+    let links =
+        get_links(GetLinksInputBuilder::try_new(author, LinkTypes::AuthorToAttestations)?.build())?;
 
     let mut attestations = Vec::new();
 
     for link in links {
         let action_hash = ActionHash::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid action hash: {:?}", e)))
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid action hash: {:?}",
+                e
+            )))
         })?;
 
         if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-            if let Some(attestation) = record
-                .entry()
-                .to_app_option::<TrustAttestation>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
+            if let Some(attestation) =
+                record
+                    .entry()
+                    .to_app_option::<TrustAttestation>()
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+                    })?
             {
                 attestations.push(TrustAttestationWithAuthor {
                     attestation,
@@ -381,8 +390,7 @@ fn calculate_path_trust(path: &[AgentPubKey]) -> ExternResult<f64> {
 
         // Get attestation from 'from' to 'to'
         let links = get_links(
-            GetLinksInputBuilder::try_new(from.clone(), LinkTypes::TrustConnection)?
-                .build(),
+            GetLinksInputBuilder::try_new(from.clone(), LinkTypes::TrustConnection)?.build(),
         )?;
 
         let mut found_trust = 0.5; // Default if not found
@@ -422,19 +430,17 @@ fn calculate_path_trust(path: &[AgentPubKey]) -> ExternResult<f64> {
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<TrustAttestation, ()>()? {
-        FlatOp::StoreEntry(store_entry) => {
-            match store_entry {
-                OpEntry::CreateEntry { entry, .. } => {
-                    if let Entry::App(app_entry) = entry {
-                        let attestation: TrustAttestation = app_entry.into_sb().try_into()?;
-                        validate_attestation(&attestation)
-                    } else {
-                        Ok(ValidateCallbackResult::Valid)
-                    }
+        FlatOp::StoreEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { entry, .. } => {
+                if let Entry::App(app_entry) = entry {
+                    let attestation: TrustAttestation = app_entry.into_sb().try_into()?;
+                    validate_attestation(&attestation)
+                } else {
+                    Ok(ValidateCallbackResult::Valid)
                 }
-                _ => Ok(ValidateCallbackResult::Valid),
             }
-        }
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

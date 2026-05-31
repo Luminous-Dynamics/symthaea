@@ -1,0 +1,14 @@
+[package]
+name = "care_plans"
+version = "0.1.0"
+edition = "2024"
+description = "Care plans coordinator zome - care plan management and session logging"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+care_plans_integrity = { path = "../integrity" }

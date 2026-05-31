@@ -5,7 +5,7 @@
 //!
 //! Enterprise single sign-on with SAML 2.0 and OIDC support
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Duration, Utc};
 use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
@@ -94,10 +94,7 @@ impl SsoService {
     }
 
     /// Get provider for tenant
-    pub async fn get_provider(
-        &self,
-        tenant_id: Uuid,
-    ) -> Result<Option<SsoProvider>, sqlx::Error> {
+    pub async fn get_provider(&self, tenant_id: Uuid) -> Result<Option<SsoProvider>, sqlx::Error> {
         sqlx::query_as::<_, SsoProviderRow>(
             "SELECT * FROM sso_providers WHERE tenant_id = $1 AND enabled = true",
         )
@@ -184,19 +181,22 @@ impl SsoService {
 </samlp:AuthnRequest>"#,
             request_id,
             issue_instant,
-            provider.saml_sso_url.as_ref().ok_or(SsoError::MissingConfig("saml_sso_url"))?,
+            provider
+                .saml_sso_url
+                .as_ref()
+                .ok_or(SsoError::MissingConfig("saml_sso_url"))?,
             self.our_acs_url,
             self.our_entity_id
         );
 
         // Deflate and base64 encode
-        let mut encoder = flate2::write::DeflateEncoder::new(
-            Vec::new(),
-            flate2::Compression::default(),
-        );
+        let mut encoder =
+            flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
         std::io::Write::write_all(&mut encoder, saml_request.as_bytes())
             .map_err(|e| SsoError::Encoding(e.to_string()))?;
-        let compressed = encoder.finish().map_err(|e| SsoError::Encoding(e.to_string()))?;
+        let compressed = encoder
+            .finish()
+            .map_err(|e| SsoError::Encoding(e.to_string()))?;
 
         Ok(STANDARD.encode(&compressed))
     }
@@ -208,9 +208,16 @@ impl SsoService {
         relay_state: Option<&str>,
     ) -> Result<String, SsoError> {
         let saml_request = self.create_saml_request(provider)?;
-        let sso_url = provider.saml_sso_url.as_ref().ok_or(SsoError::MissingConfig("saml_sso_url"))?;
+        let sso_url = provider
+            .saml_sso_url
+            .as_ref()
+            .ok_or(SsoError::MissingConfig("saml_sso_url"))?;
 
-        let mut url = format!("{}?SAMLRequest={}", sso_url, urlencoding::encode(&saml_request));
+        let mut url = format!(
+            "{}?SAMLRequest={}",
+            sso_url,
+            urlencoding::encode(&saml_request)
+        );
 
         if let Some(state) = relay_state {
             url.push_str(&format!("&RelayState={}", urlencoding::encode(state)));
@@ -230,8 +237,8 @@ impl SsoService {
             .decode(saml_response)
             .map_err(|e| SsoError::InvalidResponse(e.to_string()))?;
 
-        let response_xml = String::from_utf8(decoded)
-            .map_err(|e| SsoError::InvalidResponse(e.to_string()))?;
+        let response_xml =
+            String::from_utf8(decoded).map_err(|e| SsoError::InvalidResponse(e.to_string()))?;
 
         // Validate signature if certificate is provided
         if let Some(cert_pem) = &provider.saml_certificate {
@@ -274,7 +281,11 @@ impl SsoService {
 
         for event in parser {
             match event {
-                Ok(XmlEvent::StartElement { name, attributes: attrs, .. }) => {
+                Ok(XmlEvent::StartElement {
+                    name,
+                    attributes: attrs,
+                    ..
+                }) => {
                     current_element = name.local_name.clone();
 
                     if name.local_name == "Attribute" {
@@ -306,7 +317,9 @@ impl SsoService {
                 Ok(XmlEvent::Characters(text)) => {
                     if current_element == "NameID" {
                         name_id = text.clone();
-                    } else if current_element == "AttributeValue" && !current_attribute_name.is_empty() {
+                    } else if current_element == "AttributeValue"
+                        && !current_attribute_name.is_empty()
+                    {
                         attributes
                             .entry(current_attribute_name.clone())
                             .or_insert_with(Vec::new)
@@ -375,9 +388,11 @@ impl SsoService {
             first_name: mapping.first_name.as_ref().and_then(|n| get_attr(n)),
             last_name: mapping.last_name.as_ref().and_then(|n| get_attr(n)),
             display_name: mapping.display_name.as_ref().and_then(|n| get_attr(n)),
-            groups: mapping.groups.as_ref().and_then(|n| {
-                result.attributes.get(n).cloned()
-            }).unwrap_or_default(),
+            groups: mapping
+                .groups
+                .as_ref()
+                .and_then(|n| result.attributes.get(n).cloned())
+                .unwrap_or_default(),
             department: mapping.department.as_ref().and_then(|n| get_attr(n)),
         }
     }

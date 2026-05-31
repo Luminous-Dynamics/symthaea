@@ -95,11 +95,7 @@ impl CryptoSuiteView {
     }
 
     pub fn short_label(&self) -> &'static str {
-        if self.is_post_quantum() {
-            "PQC"
-        } else {
-            "E2E"
-        }
+        if self.is_post_quantum() { "PQC" } else { "E2E" }
     }
 }
 
@@ -198,7 +194,7 @@ impl ContactView {
             .as_deref()
             .map(|k| {
                 if k.len() > 12 {
-                    format!("{}...{}", &k[..6], &k[k.len()-6..])
+                    format!("{}...{}", &k[..6], &k[k.len() - 6..])
                 } else {
                     k.to_string()
                 }
@@ -228,18 +224,29 @@ pub struct TrustScoreView {
 
 impl TrustScoreView {
     pub fn tier_label(&self) -> &'static str {
-        if self.score >= 0.8 { "Trusted" }
-        else if self.score >= 0.5 { "Known" }
-        else if self.score >= 0.2 { "Acquaintance" }
-        else if self.score >= 0.0 { "Unknown" }
-        else { "Distrusted" }
+        if self.score >= 0.8 {
+            "Trusted"
+        } else if self.score >= 0.5 {
+            "Known"
+        } else if self.score >= 0.2 {
+            "Acquaintance"
+        } else if self.score >= 0.0 {
+            "Unknown"
+        } else {
+            "Distrusted"
+        }
     }
 
     pub fn tier_css(&self) -> &'static str {
-        if self.score >= 0.8 { "trust-high" }
-        else if self.score >= 0.5 { "trust-medium" }
-        else if self.score >= 0.0 { "trust-low" }
-        else { "trust-negative" }
+        if self.score >= 0.8 {
+            "trust-high"
+        } else if self.score >= 0.5 {
+            "trust-medium"
+        } else if self.score >= 0.0 {
+            "trust-low"
+        } else {
+            "trust-negative"
+        }
     }
 }
 
@@ -306,7 +313,12 @@ impl ThreadView {
             0 => "No participants".into(),
             1 => self.participants[0].clone(),
             2 => format!("{}, {}", self.participants[0], self.participants[1]),
-            n => format!("{}, {} and {} others", self.participants[0], self.participants[1], n - 2),
+            n => format!(
+                "{}, {} and {} others",
+                self.participants[0],
+                self.participants[1],
+                n - 2
+            ),
         }
     }
 }
@@ -316,12 +328,24 @@ impl ThreadView {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComposeMode {
     New,
-    Reply { email_hash: String, sender: String, sender_name: String, subject: String, body: String, thread_id: Option<String> },
-    Forward { subject: String, body: String },
+    Reply {
+        email_hash: String,
+        sender: String,
+        sender_name: String,
+        subject: String,
+        body: String,
+        thread_id: Option<String>,
+    },
+    Forward {
+        subject: String,
+        body: String,
+    },
 }
 
 impl Default for ComposeMode {
-    fn default() -> Self { Self::New }
+    fn default() -> Self {
+        Self::New
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -358,28 +382,51 @@ pub enum StarType {
 
 impl StarType {
     pub const ALL: &[StarType] = &[
-        Self::Yellow, Self::Blue, Self::Red, Self::Orange, Self::Green, Self::Purple,
-        Self::BangYellow, Self::BangBlue, Self::CheckGreen, Self::QuestionPurple,
-        Self::InfoBlue, Self::WarningRed,
+        Self::Yellow,
+        Self::Blue,
+        Self::Red,
+        Self::Orange,
+        Self::Green,
+        Self::Purple,
+        Self::BangYellow,
+        Self::BangBlue,
+        Self::CheckGreen,
+        Self::QuestionPurple,
+        Self::InfoBlue,
+        Self::WarningRed,
     ];
 
     pub fn icon(&self) -> &'static str {
         match self {
-            Self::Yellow => "\u{2B50}", Self::Blue => "\u{1F535}", Self::Red => "\u{1F534}",
-            Self::Orange => "\u{1F7E0}", Self::Green => "\u{1F7E2}", Self::Purple => "\u{1F7E3}",
-            Self::BangYellow => "\u{2757}", Self::BangBlue => "\u{2755}",
-            Self::CheckGreen => "\u{2705}", Self::QuestionPurple => "\u{2753}",
-            Self::InfoBlue => "\u{2139}", Self::WarningRed => "\u{26A0}",
+            Self::Yellow => "\u{2B50}",
+            Self::Blue => "\u{1F535}",
+            Self::Red => "\u{1F534}",
+            Self::Orange => "\u{1F7E0}",
+            Self::Green => "\u{1F7E2}",
+            Self::Purple => "\u{1F7E3}",
+            Self::BangYellow => "\u{2757}",
+            Self::BangBlue => "\u{2755}",
+            Self::CheckGreen => "\u{2705}",
+            Self::QuestionPurple => "\u{2753}",
+            Self::InfoBlue => "\u{2139}",
+            Self::WarningRed => "\u{26A0}",
         }
     }
 
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Yellow => "Star", Self::Blue => "Blue star", Self::Red => "Red star",
-            Self::Orange => "Orange star", Self::Green => "Green star", Self::Purple => "Purple star",
-            Self::BangYellow => "Important", Self::BangBlue => "Note",
-            Self::CheckGreen => "Done", Self::QuestionPurple => "Question",
-            Self::InfoBlue => "Info", Self::WarningRed => "Warning",
+            Self::Yellow => "Star",
+            Self::Blue => "Blue star",
+            Self::Red => "Red star",
+            Self::Orange => "Orange star",
+            Self::Green => "Green star",
+            Self::Purple => "Purple star",
+            Self::BangYellow => "Important",
+            Self::BangBlue => "Note",
+            Self::CheckGreen => "Done",
+            Self::QuestionPurple => "Question",
+            Self::InfoBlue => "Info",
+            Self::WarningRed => "Warning",
         }
     }
 
@@ -391,7 +438,9 @@ impl StarType {
 }
 
 impl Default for StarType {
-    fn default() -> Self { Self::Yellow }
+    fn default() -> Self {
+        Self::Yellow
+    }
 }
 
 // ── Labels (#2) ──
@@ -478,23 +527,32 @@ pub enum SwipeAction {
 impl SwipeAction {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Archive => "Archive", Self::Delete => "Delete",
-            Self::MarkRead => "Mark Read", Self::Star => "Star",
-            Self::Snooze => "Snooze", Self::MoveToFolder => "Move",
+            Self::Archive => "Archive",
+            Self::Delete => "Delete",
+            Self::MarkRead => "Mark Read",
+            Self::Star => "Star",
+            Self::Snooze => "Snooze",
+            Self::MoveToFolder => "Move",
         }
     }
     pub fn icon(&self) -> &'static str {
         match self {
-            Self::Archive => "\u{1F4E6}", Self::Delete => "\u{1F5D1}",
-            Self::MarkRead => "\u{2709}", Self::Star => "\u{2B50}",
-            Self::Snooze => "\u{23F0}", Self::MoveToFolder => "\u{1F4C1}",
+            Self::Archive => "\u{1F4E6}",
+            Self::Delete => "\u{1F5D1}",
+            Self::MarkRead => "\u{2709}",
+            Self::Star => "\u{2B50}",
+            Self::Snooze => "\u{23F0}",
+            Self::MoveToFolder => "\u{1F4C1}",
         }
     }
     pub fn color(&self) -> &'static str {
         match self {
-            Self::Archive => "#4ade80", Self::Delete => "#ef4444",
-            Self::MarkRead => "#60a5fa", Self::Star => "#fbbf24",
-            Self::Snooze => "#a78bfa", Self::MoveToFolder => "#06D6C8",
+            Self::Archive => "#4ade80",
+            Self::Delete => "#ef4444",
+            Self::MarkRead => "#60a5fa",
+            Self::Star => "#fbbf24",
+            Self::Snooze => "#a78bfa",
+            Self::MoveToFolder => "#06D6C8",
         }
     }
 }
@@ -510,15 +568,25 @@ pub enum ReadingPanePosition {
 
 impl ReadingPanePosition {
     pub fn label(&self) -> &'static str {
-        match self { Self::Off => "Off", Self::Right => "Right", Self::Bottom => "Bottom" }
+        match self {
+            Self::Off => "Off",
+            Self::Right => "Right",
+            Self::Bottom => "Bottom",
+        }
     }
     pub fn next(&self) -> Self {
-        match self { Self::Off => Self::Right, Self::Right => Self::Bottom, Self::Bottom => Self::Off }
+        match self {
+            Self::Off => Self::Right,
+            Self::Right => Self::Bottom,
+            Self::Bottom => Self::Off,
+        }
     }
 }
 
 impl Default for ReadingPanePosition {
-    fn default() -> Self { Self::Off }
+    fn default() -> Self {
+        Self::Off
+    }
 }
 
 // ── Theme ──
@@ -531,18 +599,29 @@ pub enum Theme {
 
 impl Theme {
     pub fn label(&self) -> &'static str {
-        match self { Self::Dark => "Dark", Self::Light => "Light" }
+        match self {
+            Self::Dark => "Dark",
+            Self::Light => "Light",
+        }
     }
     pub fn toggle(&self) -> Self {
-        match self { Self::Dark => Self::Light, Self::Light => Self::Dark }
+        match self {
+            Self::Dark => Self::Light,
+            Self::Light => Self::Dark,
+        }
     }
     pub fn data_attr(&self) -> &'static str {
-        match self { Self::Dark => "dark", Self::Light => "light" }
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+        }
     }
 }
 
 impl Default for Theme {
-    fn default() -> Self { Self::Dark }
+    fn default() -> Self {
+        Self::Dark
+    }
 }
 
 // ── Density ──
@@ -556,18 +635,32 @@ pub enum Density {
 
 impl Density {
     pub fn label(&self) -> &'static str {
-        match self { Self::Compact => "Compact", Self::Default => "Default", Self::Comfortable => "Comfortable" }
+        match self {
+            Self::Compact => "Compact",
+            Self::Default => "Default",
+            Self::Comfortable => "Comfortable",
+        }
     }
     pub fn data_attr(&self) -> &'static str {
-        match self { Self::Compact => "compact", Self::Default => "default", Self::Comfortable => "comfortable" }
+        match self {
+            Self::Compact => "compact",
+            Self::Default => "default",
+            Self::Comfortable => "comfortable",
+        }
     }
     pub fn next(&self) -> Self {
-        match self { Self::Compact => Self::Default, Self::Default => Self::Comfortable, Self::Comfortable => Self::Compact }
+        match self {
+            Self::Compact => Self::Default,
+            Self::Default => Self::Comfortable,
+            Self::Comfortable => Self::Compact,
+        }
     }
 }
 
 impl Default for Density {
-    fn default() -> Self { Self::Default }
+    fn default() -> Self {
+        Self::Default
+    }
 }
 
 // ── Email Templates (#6) ──
@@ -585,12 +678,28 @@ pub struct EmailTemplate {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OfflineAction {
-    ToggleStar { hash: String },
-    ToggleRead { hash: String },
-    Archive { hash: String },
-    Delete { hash: String },
-    MoveToFolder { hash: String, folder_hash: String },
-    Send { to: String, subject: String, body: String, use_pqc: bool },
+    ToggleStar {
+        hash: String,
+    },
+    ToggleRead {
+        hash: String,
+    },
+    Archive {
+        hash: String,
+    },
+    Delete {
+        hash: String,
+    },
+    MoveToFolder {
+        hash: String,
+        folder_hash: String,
+    },
+    Send {
+        to: String,
+        subject: String,
+        body: String,
+        use_pqc: bool,
+    },
 }
 
 // ── Signal Types (real-time from conductor) ──
@@ -661,10 +770,20 @@ pub enum RsvpStatus {
 
 impl RsvpStatus {
     pub fn label(&self) -> &'static str {
-        match self { Self::Going => "Going", Self::Maybe => "Maybe", Self::NotGoing => "Not Going", Self::NeedsAction => "Respond" }
+        match self {
+            Self::Going => "Going",
+            Self::Maybe => "Maybe",
+            Self::NotGoing => "Not Going",
+            Self::NeedsAction => "Respond",
+        }
     }
     pub fn css_class(&self) -> &'static str {
-        match self { Self::Going => "rsvp-going", Self::Maybe => "rsvp-maybe", Self::NotGoing => "rsvp-no", Self::NeedsAction => "rsvp-pending" }
+        match self {
+            Self::Going => "rsvp-going",
+            Self::Maybe => "rsvp-maybe",
+            Self::NotGoing => "rsvp-no",
+            Self::NeedsAction => "rsvp-pending",
+        }
     }
 }
 
@@ -740,10 +859,20 @@ pub enum PresenceStatus {
 
 impl PresenceStatus {
     pub fn label(&self) -> &'static str {
-        match self { Self::Online => "Online", Self::Away => "Away", Self::DoNotDisturb => "DND", Self::Offline => "Offline" }
+        match self {
+            Self::Online => "Online",
+            Self::Away => "Away",
+            Self::DoNotDisturb => "DND",
+            Self::Offline => "Offline",
+        }
     }
     pub fn css_class(&self) -> &'static str {
-        match self { Self::Online => "presence-online", Self::Away => "presence-away", Self::DoNotDisturb => "presence-dnd", Self::Offline => "presence-offline" }
+        match self {
+            Self::Online => "presence-online",
+            Self::Away => "presence-away",
+            Self::DoNotDisturb => "presence-dnd",
+            Self::Offline => "presence-offline",
+        }
     }
 }
 

@@ -47,8 +47,8 @@ impl Default for BridgeConfig {
 }
 
 pub fn load_config() -> Result<BridgeConfig> {
-    let config_path = std::env::var("MAIL_BRIDGE_CONFIG")
-        .unwrap_or_else(|_| "bridge-config.toml".to_string());
+    let config_path =
+        std::env::var("MAIL_BRIDGE_CONFIG").unwrap_or_else(|_| "bridge-config.toml".to_string());
 
     if std::path::Path::new(&config_path).exists() {
         let content = std::fs::read_to_string(&config_path)?;

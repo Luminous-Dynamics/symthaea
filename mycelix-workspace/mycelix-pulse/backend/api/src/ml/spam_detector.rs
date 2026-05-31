@@ -27,8 +27,8 @@ pub struct SpamResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum SpamClassification {
-    Ham,       // Not spam
-    Spam,      // Definite spam
+    Ham,        // Not spam
+    Spam,       // Definite spam
     Suspicious, // Possibly spam
 }
 
@@ -41,10 +41,10 @@ pub struct SpamFeature {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum SpamAction {
-    Deliver,      // Normal delivery
-    Quarantine,   // Hold for review
-    Reject,       // Block/delete
-    Flag,         // Deliver but mark
+    Deliver,    // Normal delivery
+    Quarantine, // Hold for review
+    Reject,     // Block/delete
+    Flag,       // Deliver but mark
 }
 
 /// Spam detector using Naive Bayes with additional heuristics
@@ -434,6 +434,11 @@ mod tests {
         };
 
         let result = detector.analyze(&email);
-        assert!(result.features.iter().any(|f| f.name == "dangerous_attachment"));
+        assert!(
+            result
+                .features
+                .iter()
+                .any(|f| f.name == "dangerous_attachment")
+        );
     }
 }

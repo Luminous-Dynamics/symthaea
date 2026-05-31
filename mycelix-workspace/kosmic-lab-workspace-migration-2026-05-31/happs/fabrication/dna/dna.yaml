@@ -1,0 +1,97 @@
+---
+# Fabrication DNA Configuration
+# Decentralized Manufacturing Commons for Mycelix Civilizational OS
+
+manifest_version: "0"
+name: fabrication
+integrity:
+  network_seed: ~
+  properties:
+    # HDC (Hyperdimensional Computing) Configuration
+    hdc:
+      dimensions: 10000
+      binding_method: "circular"
+      similarity_threshold: 0.7
+      codebook_size: 1024
+
+    # Proof of Grounded Fabrication (PoGF) Weights
+    pog:
+      energy_weight: 0.3
+      material_weight: 0.3
+      quality_weight: 0.2
+      local_weight: 0.2
+      min_score_for_mycelium: 0.6
+
+    # Safety Classification
+    safety_classes:
+      - "Class0Decorative"
+      - "Class1Functional"
+      - "Class2LoadBearing"
+      - "Class3BodyContact"
+      - "Class4Medical"
+      - "Class5Critical"
+
+    # MATL Integration
+    matl:
+      quality_weight: 0.4
+      consistency_weight: 0.3
+      reputation_weight: 0.3
+
+  zomes:
+    - name: designs_integrity
+      path: ../target/wasm32-unknown-unknown/release/designs_integrity.wasm
+
+    - name: printers_integrity
+      path: ../target/wasm32-unknown-unknown/release/printers_integrity.wasm
+
+    - name: prints_integrity
+      path: ../target/wasm32-unknown-unknown/release/prints_integrity.wasm
+
+    - name: materials_integrity
+      path: ../target/wasm32-unknown-unknown/release/materials_integrity.wasm
+
+    - name: verification_integrity
+      path: ../target/wasm32-unknown-unknown/release/verification_integrity.wasm
+
+    - name: bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/bridge_integrity.wasm
+
+    - name: symthaea_integrity
+      path: ../target/wasm32-unknown-unknown/release/symthaea_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: designs_coordinator
+      path: ../target/wasm32-unknown-unknown/release/designs_coordinator.wasm
+      dependencies:
+        - name: designs_integrity
+
+    - name: printers_coordinator
+      path: ../target/wasm32-unknown-unknown/release/printers_coordinator.wasm
+      dependencies:
+        - name: printers_integrity
+
+    - name: prints_coordinator
+      path: ../target/wasm32-unknown-unknown/release/prints_coordinator.wasm
+      dependencies:
+        - name: prints_integrity
+
+    - name: materials_coordinator
+      path: ../target/wasm32-unknown-unknown/release/materials_coordinator.wasm
+      dependencies:
+        - name: materials_integrity
+
+    - name: verification_coordinator
+      path: ../target/wasm32-unknown-unknown/release/verification_coordinator.wasm
+      dependencies:
+        - name: verification_integrity
+
+    - name: bridge_coordinator
+      path: ../target/wasm32-unknown-unknown/release/bridge_coordinator.wasm
+      dependencies:
+        - name: bridge_integrity
+
+    - name: symthaea_coordinator
+      path: ../target/wasm32-unknown-unknown/release/symthaea_coordinator.wasm
+      dependencies:
+        - name: symthaea_integrity

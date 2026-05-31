@@ -5,11 +5,11 @@
 //!
 //! Intelligent notification filtering - only alert for important emails
 
-use chrono::{DateTime, Utc, Timelike};
+use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Smart Notification Service
@@ -62,7 +62,10 @@ impl SmartNotificationService {
         }
 
         // Calculate importance score
-        let importance = self.importance_scorer.score(user_id, email, &self.pool).await?;
+        let importance = self
+            .importance_scorer
+            .score(user_id, email, &self.pool)
+            .await?;
 
         // Check against threshold
         let threshold = prefs.importance_threshold.unwrap_or(0.5);
@@ -125,21 +128,29 @@ impl SmartNotificationService {
         let summary = if pending.len() == 1 {
             format!("1 new email from {}", pending[0].from_address)
         } else {
-            let top_senders: Vec<_> = pending.iter()
+            let top_senders: Vec<_> = pending
+                .iter()
                 .take(3)
                 .map(|e| e.from_address.clone())
                 .collect();
-            format!("{} new emails including from {}", pending.len(), top_senders.join(", "))
+            format!(
+                "{} new emails including from {}",
+                pending.len(),
+                top_senders.join(", ")
+            )
         };
 
         Ok(BatchSummary {
             count: pending.len(),
-            top_emails: pending.into_iter().map(|e| BatchedEmail {
-                id: e.id,
-                subject: e.subject,
-                from: e.from_address,
-                importance: e.importance_score,
-            }).collect(),
+            top_emails: pending
+                .into_iter()
+                .map(|e| BatchedEmail {
+                    id: e.id,
+                    subject: e.subject,
+                    from: e.from_address,
+                    importance: e.importance_score,
+                })
+                .collect(),
             summary,
         })
     }
@@ -241,14 +252,19 @@ impl SmartNotificationService {
         .map_err(|e| NotificationError::Database(e.to_string()))?;
 
         // Update importance model based on feedback
-        self.importance_scorer.learn_from_feedback(user_id, email_id, feedback, &self.pool).await?;
+        self.importance_scorer
+            .learn_from_feedback(user_id, email_id, feedback, &self.pool)
+            .await?;
 
         Ok(())
     }
 
     // Private helpers
 
-    async fn get_user_preferences(&self, user_id: Uuid) -> Result<NotificationPreferences, NotificationError> {
+    async fn get_user_preferences(
+        &self,
+        user_id: Uuid,
+    ) -> Result<NotificationPreferences, NotificationError> {
         let prefs: Option<PreferencesRow> = sqlx::query_as(
             r#"
             SELECT importance_threshold, batch_notifications, quiet_hours_start,
@@ -263,16 +279,18 @@ impl SmartNotificationService {
         .await
         .map_err(|e| NotificationError::Database(e.to_string()))?;
 
-        Ok(prefs.map(|p| NotificationPreferences {
-            importance_threshold: p.importance_threshold,
-            batch_notifications: p.batch_notifications,
-            quiet_hours_start: p.quiet_hours_start,
-            quiet_hours_end: p.quiet_hours_end,
-            focus_mode_enabled: p.focus_mode_enabled,
-            focus_mode_until: p.focus_mode_until,
-            vip_senders: p.vip_senders,
-            muted_senders: p.muted_senders,
-        }).unwrap_or_default())
+        Ok(prefs
+            .map(|p| NotificationPreferences {
+                importance_threshold: p.importance_threshold,
+                batch_notifications: p.batch_notifications,
+                quiet_hours_start: p.quiet_hours_start,
+                quiet_hours_end: p.quiet_hours_end,
+                focus_mode_enabled: p.focus_mode_enabled,
+                focus_mode_until: p.focus_mode_until,
+                vip_senders: p.vip_senders,
+                muted_senders: p.muted_senders,
+            })
+            .unwrap_or_default())
     }
 
     fn is_quiet_hours(&self, prefs: &NotificationPreferences) -> bool {
@@ -336,7 +354,10 @@ impl ImportanceScorer {
 
         // Factor 4: Reply to user's email
         if email.in_reply_to.is_some() {
-            if self.is_reply_to_user(user_id, &email.in_reply_to, pool).await? {
+            if self
+                .is_reply_to_user(user_id, &email.in_reply_to, pool)
+                .await?
+            {
                 score += 0.3;
                 factors.push(ImportanceFactor::ReplyToMe);
             }
@@ -350,7 +371,10 @@ impl ImportanceScorer {
         }
 
         // Factor 6: Mentions user's name
-        if self.mentions_user(user_id, &email.body_preview, pool).await? {
+        if self
+            .mentions_user(user_id, &email.body_preview, pool)
+            .await?
+        {
             score += 0.15;
             factors.push(ImportanceFactor::MentionsMe);
         }
@@ -396,44 +420,65 @@ impl ImportanceScorer {
         Ok(())
     }
 
-    async fn get_sender_trust(&self, user_id: Uuid, sender: &str, pool: &PgPool) -> Result<f64, NotificationError> {
-        let result: Option<(f64,)> = sqlx::query_as(
-            "SELECT trust_score FROM contacts WHERE user_id = $1 AND email = $2",
-        )
-        .bind(user_id)
-        .bind(sender)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| NotificationError::Database(e.to_string()))?;
+    async fn get_sender_trust(
+        &self,
+        user_id: Uuid,
+        sender: &str,
+        pool: &PgPool,
+    ) -> Result<f64, NotificationError> {
+        let result: Option<(f64,)> =
+            sqlx::query_as("SELECT trust_score FROM contacts WHERE user_id = $1 AND email = $2")
+                .bind(user_id)
+                .bind(sender)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| NotificationError::Database(e.to_string()))?;
 
         Ok(result.map(|r| r.0).unwrap_or(0.5))
     }
 
-    async fn is_vip_sender(&self, user_id: Uuid, sender: &str, pool: &PgPool) -> Result<bool, NotificationError> {
-        let result: Option<(Vec<String>,)> = sqlx::query_as(
-            "SELECT vip_senders FROM notification_preferences WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| NotificationError::Database(e.to_string()))?;
+    async fn is_vip_sender(
+        &self,
+        user_id: Uuid,
+        sender: &str,
+        pool: &PgPool,
+    ) -> Result<bool, NotificationError> {
+        let result: Option<(Vec<String>,)> =
+            sqlx::query_as("SELECT vip_senders FROM notification_preferences WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| NotificationError::Database(e.to_string()))?;
 
-        Ok(result.map(|r| r.0.contains(&sender.to_string())).unwrap_or(false))
+        Ok(result
+            .map(|r| r.0.contains(&sender.to_string()))
+            .unwrap_or(false))
     }
 
-    async fn is_muted_sender(&self, user_id: Uuid, sender: &str, pool: &PgPool) -> Result<bool, NotificationError> {
-        let result: Option<(Vec<String>,)> = sqlx::query_as(
-            "SELECT muted_senders FROM notification_preferences WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| NotificationError::Database(e.to_string()))?;
+    async fn is_muted_sender(
+        &self,
+        user_id: Uuid,
+        sender: &str,
+        pool: &PgPool,
+    ) -> Result<bool, NotificationError> {
+        let result: Option<(Vec<String>,)> =
+            sqlx::query_as("SELECT muted_senders FROM notification_preferences WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| NotificationError::Database(e.to_string()))?;
 
-        Ok(result.map(|r| r.0.contains(&sender.to_string())).unwrap_or(false))
+        Ok(result
+            .map(|r| r.0.contains(&sender.to_string()))
+            .unwrap_or(false))
     }
 
-    async fn is_reply_to_user(&self, user_id: Uuid, in_reply_to: &Option<String>, pool: &PgPool) -> Result<bool, NotificationError> {
+    async fn is_reply_to_user(
+        &self,
+        user_id: Uuid,
+        in_reply_to: &Option<String>,
+        pool: &PgPool,
+    ) -> Result<bool, NotificationError> {
         if let Some(message_id) = in_reply_to {
             let exists: Option<(i64,)> = sqlx::query_as(
                 "SELECT 1 FROM emails WHERE user_id = $1 AND message_id = $2 AND is_outgoing = true",
@@ -450,14 +495,18 @@ impl ImportanceScorer {
         }
     }
 
-    async fn mentions_user(&self, user_id: Uuid, text: &str, pool: &PgPool) -> Result<bool, NotificationError> {
-        let user: Option<(Option<String>,)> = sqlx::query_as(
-            "SELECT name FROM users WHERE id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| NotificationError::Database(e.to_string()))?;
+    async fn mentions_user(
+        &self,
+        user_id: Uuid,
+        text: &str,
+        pool: &PgPool,
+    ) -> Result<bool, NotificationError> {
+        let user: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT name FROM users WHERE id = $1")
+                .bind(user_id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| NotificationError::Database(e.to_string()))?;
 
         if let Some((Some(name),)) = user {
             Ok(text.to_lowercase().contains(&name.to_lowercase()))
@@ -469,13 +518,18 @@ impl ImportanceScorer {
     fn detect_urgency(&self, subject: &str, body: &str) -> f64 {
         let text = format!("{} {}", subject, body).to_lowercase();
         let urgent_keywords = [
-            "urgent", "asap", "immediately", "critical", "emergency",
-            "deadline", "today", "right away", "time sensitive"
+            "urgent",
+            "asap",
+            "immediately",
+            "critical",
+            "emergency",
+            "deadline",
+            "today",
+            "right away",
+            "time sensitive",
         ];
 
-        let matches = urgent_keywords.iter()
-            .filter(|k| text.contains(*k))
-            .count();
+        let matches = urgent_keywords.iter().filter(|k| text.contains(*k)).count();
 
         (matches as f64 / 3.0).min(1.0)
     }

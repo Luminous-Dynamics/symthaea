@@ -1,0 +1,14 @@
+[package]
+name = "clt"
+version = "0.1.0"
+edition = "2024"
+description = "Community Land Trust coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clt_integrity = { path = "../integrity" }

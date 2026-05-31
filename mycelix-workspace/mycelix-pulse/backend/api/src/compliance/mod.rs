@@ -8,8 +8,8 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Retention Policy Service
@@ -65,7 +65,10 @@ impl RetentionService {
     }
 
     /// Get all policies for an organization
-    pub async fn get_policies(&self, org_id: Uuid) -> Result<Vec<RetentionPolicy>, ComplianceError> {
+    pub async fn get_policies(
+        &self,
+        org_id: Uuid,
+    ) -> Result<Vec<RetentionPolicy>, ComplianceError> {
         let policies: Vec<RetentionPolicy> = sqlx::query_as(
             r#"
             SELECT id, org_id, name, description, retention_days, applies_to, action, enabled, created_at
@@ -272,13 +275,11 @@ impl LegalHoldService {
         hold_id: Uuid,
         released_by: Uuid,
     ) -> Result<(), ComplianceError> {
-        let hold: (Uuid,) = sqlx::query_as(
-            "SELECT org_id FROM legal_holds WHERE id = $1",
-        )
-        .bind(hold_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ComplianceError::Database(e.to_string()))?;
+        let hold: (Uuid,) = sqlx::query_as("SELECT org_id FROM legal_holds WHERE id = $1")
+            .bind(hold_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ComplianceError::Database(e.to_string()))?;
 
         sqlx::query(
             "UPDATE legal_holds SET status = 'released', released_at = NOW(), released_by = $2 WHERE id = $1",
@@ -429,18 +430,14 @@ impl EDiscoveryService {
     }
 
     /// Execute an eDiscovery search
-    pub async fn execute_search(
-        &self,
-        search_id: Uuid,
-    ) -> Result<i64, ComplianceError> {
+    pub async fn execute_search(&self, search_id: Uuid) -> Result<i64, ComplianceError> {
         // Get search parameters
-        let search: EDiscoverySearch = sqlx::query_as(
-            "SELECT * FROM ediscovery_searches WHERE id = $1",
-        )
-        .bind(search_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ComplianceError::Database(e.to_string()))?;
+        let search: EDiscoverySearch =
+            sqlx::query_as("SELECT * FROM ediscovery_searches WHERE id = $1")
+                .bind(search_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| ComplianceError::Database(e.to_string()))?;
 
         // Update status to running
         sqlx::query("UPDATE ediscovery_searches SET status = 'running' WHERE id = $1")
@@ -675,31 +672,27 @@ impl GDPRService {
     /// Export all user data (GDPR right to data portability)
     pub async fn export_user_data(&self, user_id: Uuid) -> Result<UserDataExport, ComplianceError> {
         // Get user profile
-        let profile: Option<serde_json::Value> = sqlx::query_scalar(
-            "SELECT row_to_json(u) FROM users u WHERE id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| ComplianceError::Database(e.to_string()))?;
+        let profile: Option<serde_json::Value> =
+            sqlx::query_scalar("SELECT row_to_json(u) FROM users u WHERE id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| ComplianceError::Database(e.to_string()))?;
 
         // Get emails count
-        let email_count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM emails WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ComplianceError::Database(e.to_string()))?;
+        let email_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM emails WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ComplianceError::Database(e.to_string()))?;
 
         // Get contacts count
-        let contact_count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM contacts WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ComplianceError::Database(e.to_string()))?;
+        let contact_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM contacts WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| ComplianceError::Database(e.to_string()))?;
 
         Ok(UserDataExport {
             user_id,

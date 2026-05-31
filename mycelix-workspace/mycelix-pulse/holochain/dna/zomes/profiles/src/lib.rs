@@ -52,10 +52,7 @@ pub struct ProfileSearchResult {
     pub total: u32,
 }
 
-entry_defs![
-    PathEntry::entry_def(),
-    Profile::entry_def()
-];
+entry_defs![PathEntry::entry_def(), Profile::entry_def()];
 
 #[hdk_link_types]
 pub enum LinkTypes {
@@ -87,8 +84,7 @@ pub fn create_profile(profile: Profile) -> ExternResult<ActionHash> {
     let action_hash = if let Some(existing_profile) = existing {
         // Update existing profile
         let links = get_links(
-            GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::AgentToProfile)?
-                .build(),
+            GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::AgentToProfile)?.build(),
         )?;
 
         if let Some(link) = links.first() {
@@ -126,7 +122,12 @@ pub fn create_profile(profile: Profile) -> ExternResult<ActionHash> {
     )?;
 
     // Name index for search
-    let name_prefix = profile.display_name.to_lowercase().chars().take(3).collect::<String>();
+    let name_prefix = profile
+        .display_name
+        .to_lowercase()
+        .chars()
+        .take(3)
+        .collect::<String>();
     let name_path = Path::from(format!("names/{}", name_prefix));
     name_path.ensure()?;
     create_link(
@@ -150,14 +151,12 @@ pub fn get_my_profile(_: ()) -> ExternResult<Option<ProfileWithAgent>> {
 #[hdk_extern]
 pub fn get_profile_for_agent(agent: AgentPubKey) -> ExternResult<Option<ProfileWithAgent>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::AgentToProfile)?
-            .build(),
+        GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::AgentToProfile)?.build(),
     )?;
 
     if let Some(link) = links.last() {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e)))
-        })?;
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid hash: {:?}", e))))?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
             if let Some(profile) = record
@@ -189,9 +188,8 @@ pub fn get_agent_by_email(email: String) -> ExternResult<Option<AgentPubKey>> {
     )?;
 
     if let Some(link) = links.first() {
-        let agent = AgentPubKey::try_from(link.target.clone()).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid agent: {:?}", e)))
-        })?;
+        let agent = AgentPubKey::try_from(link.target.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid agent: {:?}", e))))?;
         return Ok(Some(agent));
     }
 
@@ -213,8 +211,7 @@ pub fn search_profiles(query: String) -> ExternResult<ProfileSearchResult> {
     let name_path = Path::from(format!("names/{}", prefix));
 
     let links = get_links(
-        GetLinksInputBuilder::try_new(name_path.path_entry_hash()?, LinkTypes::NameIndex)?
-            .build(),
+        GetLinksInputBuilder::try_new(name_path.path_entry_hash()?, LinkTypes::NameIndex)?.build(),
     )?;
 
     let mut profiles = Vec::new();
@@ -226,9 +223,8 @@ pub fn search_profiles(query: String) -> ExternResult<ProfileSearchResult> {
             continue;
         }
 
-        let agent = AgentPubKey::try_from(link.target).map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!("Invalid agent: {:?}", e)))
-        })?;
+        let agent = AgentPubKey::try_from(link.target)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid agent: {:?}", e))))?;
 
         if let Some(profile) = get_profile_for_agent(agent)? {
             profiles.push(profile);
@@ -243,8 +239,9 @@ pub fn search_profiles(query: String) -> ExternResult<ProfileSearchResult> {
 /// Update profile fields
 #[hdk_extern]
 pub fn update_profile(input: UpdateProfileInput) -> ExternResult<ActionHash> {
-    let current = get_my_profile(())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No profile exists".to_string())))?;
+    let current = get_my_profile(())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "No profile exists".to_string()
+    )))?;
 
     let updated = Profile {
         display_name: input.display_name.unwrap_or(current.profile.display_name),
@@ -311,29 +308,27 @@ fn validate_profile(profile: &Profile) -> ExternResult<()> {
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<Profile, ()>()? {
-        FlatOp::StoreEntry(store_entry) => {
-            match store_entry {
-                OpEntry::CreateEntry { entry, .. } => {
-                    if let Entry::App(app_entry) = entry {
-                        let profile: Profile = app_entry.into_sb().try_into()?;
+        FlatOp::StoreEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { entry, .. } => {
+                if let Entry::App(app_entry) = entry {
+                    let profile: Profile = app_entry.into_sb().try_into()?;
 
-                        if profile.display_name.is_empty() {
-                            return Ok(ValidateCallbackResult::Invalid(
-                                "Display name required".to_string(),
-                            ));
-                        }
-
-                        if profile.pq_public_key.is_empty() {
-                            return Ok(ValidateCallbackResult::Invalid(
-                                "PQ public key required".to_string(),
-                            ));
-                        }
+                    if profile.display_name.is_empty() {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Display name required".to_string(),
+                        ));
                     }
-                    Ok(ValidateCallbackResult::Valid)
+
+                    if profile.pq_public_key.is_empty() {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PQ public key required".to_string(),
+                        ));
+                    }
                 }
-                _ => Ok(ValidateCallbackResult::Valid),
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

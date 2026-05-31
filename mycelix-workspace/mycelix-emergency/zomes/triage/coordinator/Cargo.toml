@@ -1,0 +1,14 @@
+[package]
+name = "triage"
+version = "0.1.0"
+edition = "2024"
+description = "Emergency triage coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+triage_integrity = { path = "../integrity" }

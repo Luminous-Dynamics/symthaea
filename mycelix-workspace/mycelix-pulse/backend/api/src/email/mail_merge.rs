@@ -7,10 +7,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
-use super::templates::{EmailTemplate, TemplateService, TemplateError};
+use super::templates::{EmailTemplate, TemplateError, TemplateService};
 
 /// Data source for mail merge
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,7 +178,9 @@ impl MailMergeService {
         settings: MergeSettings,
     ) -> Result<MailMergeJob, MailMergeError> {
         // Validate template exists
-        let _template = self.template_service.get_template(template_id)
+        let _template = self
+            .template_service
+            .get_template(template_id)
             .ok_or(MailMergeError::TemplateNotFound)?;
 
         // Parse recipients from data source
@@ -214,7 +216,10 @@ impl MailMergeService {
     }
 
     /// Parse data source into recipients
-    async fn parse_data_source(&self, source: DataSource) -> Result<Vec<MergeRecipient>, MailMergeError> {
+    async fn parse_data_source(
+        &self,
+        source: DataSource,
+    ) -> Result<Vec<MergeRecipient>, MailMergeError> {
         match source {
             DataSource::Csv(content) => self.parse_csv(&content),
             DataSource::Json(data) => self.parse_json(data),
@@ -232,19 +237,24 @@ impl MailMergeService {
         let mut lines = content.lines();
 
         // Parse header
-        let headers: Vec<String> = lines.next()
+        let headers: Vec<String> = lines
+            .next()
             .ok_or(MailMergeError::InvalidDataSource("Empty CSV".to_string()))?
             .split(',')
             .map(|s| s.trim().trim_matches('"').to_lowercase())
             .collect();
 
         // Find email column
-        let email_idx = headers.iter()
+        let email_idx = headers
+            .iter()
             .position(|h| h == "email" || h == "e-mail" || h == "email_address")
-            .ok_or(MailMergeError::InvalidDataSource("No email column found".to_string()))?;
+            .ok_or(MailMergeError::InvalidDataSource(
+                "No email column found".to_string(),
+            ))?;
 
         // Find name column (optional)
-        let name_idx = headers.iter()
+        let name_idx = headers
+            .iter()
             .position(|h| h == "name" || h == "full_name" || h == "fullname");
 
         // Parse rows
@@ -308,11 +318,15 @@ impl MailMergeService {
     }
 
     /// Parse JSON data
-    fn parse_json(&self, data: Vec<HashMap<String, String>>) -> Result<Vec<MergeRecipient>, MailMergeError> {
+    fn parse_json(
+        &self,
+        data: Vec<HashMap<String, String>>,
+    ) -> Result<Vec<MergeRecipient>, MailMergeError> {
         let mut recipients = Vec::new();
 
         for row in data {
-            let email = row.get("email")
+            let email = row
+                .get("email")
                 .or_else(|| row.get("e-mail"))
                 .or_else(|| row.get("email_address"))
                 .ok_or_else(|| MailMergeError::InvalidDataSource("No email field".to_string()))?
@@ -322,9 +336,7 @@ impl MailMergeService {
                 continue;
             }
 
-            let name = row.get("name")
-                .or_else(|| row.get("full_name"))
-                .cloned();
+            let name = row.get("name").or_else(|| row.get("full_name")).cloned();
 
             let mut variables = row.clone();
             variables.remove("email");
@@ -349,12 +361,16 @@ impl MailMergeService {
 
     /// Validate job before sending
     pub async fn validate_job(&mut self, job_id: Uuid) -> Result<ValidationResult, MailMergeError> {
-        let job = self.jobs.get_mut(&job_id)
+        let job = self
+            .jobs
+            .get_mut(&job_id)
             .ok_or(MailMergeError::JobNotFound)?;
 
         job.status = MergeJobStatus::Validating;
 
-        let template = self.template_service.get_template(job.template_id)
+        let template = self
+            .template_service
+            .get_template(job.template_id)
             .ok_or(MailMergeError::TemplateNotFound)?;
 
         let mut result = ValidationResult {
@@ -378,10 +394,11 @@ impl MailMergeService {
             all_vars.extend(recipient.variables.clone());
 
             for var in &template.variables {
-                if var.required && !all_vars.contains_key(&var.name) && var.default_value.is_none() {
-                    result.missing_variables.push(format!(
-                        "{}: missing '{}'", recipient.email, var.name
-                    ));
+                if var.required && !all_vars.contains_key(&var.name) && var.default_value.is_none()
+                {
+                    result
+                        .missing_variables
+                        .push(format!("{}: missing '{}'", recipient.email, var.name));
                 }
             }
 
@@ -410,10 +427,11 @@ impl MailMergeService {
         job_id: Uuid,
         recipient_email: &str,
     ) -> Result<MergePreview, MailMergeError> {
-        let job = self.jobs.get(&job_id)
-            .ok_or(MailMergeError::JobNotFound)?;
+        let job = self.jobs.get(&job_id).ok_or(MailMergeError::JobNotFound)?;
 
-        let recipient = job.recipients.iter()
+        let recipient = job
+            .recipients
+            .iter()
             .find(|r| r.email == recipient_email)
             .ok_or(MailMergeError::RecipientNotFound)?;
 
@@ -425,7 +443,9 @@ impl MailMergeService {
             variables.insert("name".to_string(), name.clone());
         }
 
-        let rendered = self.template_service.render(job.template_id, variables)
+        let rendered = self
+            .template_service
+            .render(job.template_id, variables)
             .map_err(|e| MailMergeError::RenderFailed(e.to_string()))?;
 
         Ok(MergePreview {
@@ -439,7 +459,9 @@ impl MailMergeService {
 
     /// Start executing the mail merge job
     pub async fn start_job(&mut self, job_id: Uuid) -> Result<(), MailMergeError> {
-        let job = self.jobs.get_mut(&job_id)
+        let job = self
+            .jobs
+            .get_mut(&job_id)
             .ok_or(MailMergeError::JobNotFound)?;
 
         if job.status != MergeJobStatus::Draft && job.status != MergeJobStatus::Paused {
@@ -464,7 +486,9 @@ impl MailMergeService {
 
     /// Execute job sending
     async fn execute_job(&mut self, job_id: Uuid) -> Result<(), MailMergeError> {
-        let job = self.jobs.get(&job_id)
+        let job = self
+            .jobs
+            .get(&job_id)
             .ok_or(MailMergeError::JobNotFound)?
             .clone();
 
@@ -489,7 +513,10 @@ impl MailMergeService {
 
             // Add unsubscribe link if enabled
             if job.settings.include_unsubscribe {
-                let unsub_url = job.settings.unsubscribe_url.clone()
+                let unsub_url = job
+                    .settings
+                    .unsubscribe_url
+                    .clone()
                     .unwrap_or_else(|| format!("/unsubscribe?email={}", recipient.email));
                 variables.insert("unsubscribe_url".to_string(), unsub_url);
             }
@@ -517,16 +544,16 @@ impl MailMergeService {
             // Rate limiting delay
             if job.settings.send_delay_ms > 0 {
                 tokio::time::sleep(tokio::time::Duration::from_millis(
-                    job.settings.send_delay_ms
-                )).await;
+                    job.settings.send_delay_ms,
+                ))
+                .await;
             }
 
             // Batch delay
             if let Some(batch_delay) = job.settings.batch_delay_minutes {
                 if (idx + 1) % batch_size == 0 && idx + 1 < job.recipients.len() {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(
-                        batch_delay as u64 * 60
-                    )).await;
+                    tokio::time::sleep(tokio::time::Duration::from_secs(batch_delay as u64 * 60))
+                        .await;
                 }
             }
         }
@@ -559,7 +586,10 @@ impl MailMergeService {
         variables: &HashMap<String, String>,
     ) -> SendResult {
         // Render template
-        let rendered = match self.template_service.render(job.template_id, variables.clone()) {
+        let rendered = match self
+            .template_service
+            .render(job.template_id, variables.clone())
+        {
             Ok(r) => r,
             Err(e) => {
                 return SendResult {
@@ -574,7 +604,9 @@ impl MailMergeService {
 
         // In test mode, redirect to test email
         let target_email = if job.settings.test_mode {
-            job.settings.test_email.as_ref()
+            job.settings
+                .test_email
+                .as_ref()
                 .unwrap_or(&recipient.email)
                 .clone()
         } else {
@@ -595,7 +627,9 @@ impl MailMergeService {
 
     /// Pause a running job
     pub async fn pause_job(&mut self, job_id: Uuid) -> Result<(), MailMergeError> {
-        let job = self.jobs.get_mut(&job_id)
+        let job = self
+            .jobs
+            .get_mut(&job_id)
             .ok_or(MailMergeError::JobNotFound)?;
 
         if job.status != MergeJobStatus::Running {
@@ -608,7 +642,9 @@ impl MailMergeService {
 
     /// Cancel a job
     pub async fn cancel_job(&mut self, job_id: Uuid) -> Result<(), MailMergeError> {
-        let job = self.jobs.get_mut(&job_id)
+        let job = self
+            .jobs
+            .get_mut(&job_id)
             .ok_or(MailMergeError::JobNotFound)?;
 
         job.status = MergeJobStatus::Cancelled;
@@ -622,26 +658,25 @@ impl MailMergeService {
 
     /// List jobs for user
     pub fn list_jobs(&self, user_id: Uuid) -> Vec<&MailMergeJob> {
-        self.jobs.values()
+        self.jobs
+            .values()
             .filter(|j| j.user_id == user_id)
             .collect()
     }
 
     /// Get send results for job
     pub fn get_results(&self, job_id: Uuid) -> Vec<&SendResult> {
-        self.results.get(&job_id)
+        self.results
+            .get(&job_id)
             .map(|r| r.iter().collect())
             .unwrap_or_default()
     }
 
     /// Export job report
     pub fn export_report(&self, job_id: Uuid) -> Result<JobReport, MailMergeError> {
-        let job = self.jobs.get(&job_id)
-            .ok_or(MailMergeError::JobNotFound)?;
+        let job = self.jobs.get(&job_id).ok_or(MailMergeError::JobNotFound)?;
 
-        let results = self.results.get(&job_id)
-            .cloned()
-            .unwrap_or_default();
+        let results = self.results.get(&job_id).cloned().unwrap_or_default();
 
         Ok(JobReport {
             job_name: job.name.clone(),
@@ -789,7 +824,10 @@ charlie@test.io,Charlie Brown,Peanuts"#;
         assert_eq!(recipients.len(), 3);
         assert_eq!(recipients[0].email, "alice@example.com");
         assert_eq!(recipients[0].name, Some("Alice Smith".to_string()));
-        assert_eq!(recipients[0].variables.get("company"), Some(&"Acme Inc".to_string()));
+        assert_eq!(
+            recipients[0].variables.get("company"),
+            Some(&"Acme Inc".to_string())
+        );
     }
 
     #[tokio::test]
@@ -799,22 +837,23 @@ charlie@test.io,Charlie Brown,Peanuts"#;
 
         let template_id = *service.template_service.shared_templates.first().unwrap();
 
-        let recipients = vec![
-            MergeRecipient {
-                email: "test@example.com".to_string(),
-                name: Some("Test User".to_string()),
-                variables: HashMap::new(),
-            },
-        ];
+        let recipients = vec![MergeRecipient {
+            email: "test@example.com".to_string(),
+            name: Some("Test User".to_string()),
+            variables: HashMap::new(),
+        }];
 
-        let job = service.create_job(
-            user_id,
-            "Test Campaign".to_string(),
-            template_id,
-            DataSource::Manual(recipients),
-            HashMap::new(),
-            MergeSettings::default(),
-        ).await.unwrap();
+        let job = service
+            .create_job(
+                user_id,
+                "Test Campaign".to_string(),
+                template_id,
+                DataSource::Manual(recipients),
+                HashMap::new(),
+                MergeSettings::default(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(job.name, "Test Campaign");
         assert_eq!(job.progress.total_recipients, 1);

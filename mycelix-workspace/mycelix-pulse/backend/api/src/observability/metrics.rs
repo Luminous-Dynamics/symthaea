@@ -7,9 +7,8 @@
 
 use once_cell::sync::Lazy;
 use opentelemetry::{
-    global,
-    metrics::{Counter, Histogram, UpDownCounter, Unit},
-    KeyValue,
+    KeyValue, global,
+    metrics::{Counter, Histogram, Unit, UpDownCounter},
 };
 use std::time::Instant;
 
@@ -295,7 +294,9 @@ pub struct Timer {
 
 impl Timer {
     pub fn start() -> Self {
-        Self { start: Instant::now() }
+        Self {
+            start: Instant::now(),
+        }
     }
 
     pub fn elapsed_seconds(&self) -> f64 {
@@ -321,17 +322,19 @@ impl Timer {
             KeyValue::new("success", success.to_string()),
         ];
 
-        EMAIL_METRICS.email_processing_duration.record(duration, &attributes);
+        EMAIL_METRICS
+            .email_processing_duration
+            .record(duration, &attributes);
         EMAIL_METRICS.emails_processed.add(1, &attributes);
     }
 
     pub fn record_trust_calculation(&self, cache_hit: bool) {
         let duration = self.elapsed_seconds();
-        let attributes = [
-            KeyValue::new("cache_hit", cache_hit.to_string()),
-        ];
+        let attributes = [KeyValue::new("cache_hit", cache_hit.to_string())];
 
-        TRUST_METRICS.trust_calculation_duration.record(duration, &attributes);
+        TRUST_METRICS
+            .trust_calculation_duration
+            .record(duration, &attributes);
         TRUST_METRICS.trust_calculations.add(1, &attributes);
 
         if cache_hit {
@@ -368,44 +371,39 @@ pub fn record_email_received(folder: &str, has_attachments: bool, encrypted: boo
 }
 
 pub fn record_email_sent(encrypted: bool) {
-    let attributes = [
-        KeyValue::new("encrypted", encrypted.to_string()),
-    ];
+    let attributes = [KeyValue::new("encrypted", encrypted.to_string())];
     EMAIL_METRICS.emails_sent.add(1, &attributes);
 }
 
 pub fn record_spam_detected(confidence: f64) {
-    let attributes = [
-        KeyValue::new("confidence_bucket", format!("{:.1}", (confidence * 10.0).floor() / 10.0)),
-    ];
+    let attributes = [KeyValue::new(
+        "confidence_bucket",
+        format!("{:.1}", (confidence * 10.0).floor() / 10.0),
+    )];
     EMAIL_METRICS.spam_detected.add(1, &attributes);
 }
 
 /// Record trust events
 pub fn record_attestation_created(level: i32) {
-    let attributes = [
-        KeyValue::new("level", level.to_string()),
-    ];
+    let attributes = [KeyValue::new("level", level.to_string())];
     TRUST_METRICS.attestations_created.add(1, &attributes);
 }
 
 pub fn record_attestation_revoked(reason: &str) {
-    let attributes = [
-        KeyValue::new("reason", reason.to_string()),
-    ];
+    let attributes = [KeyValue::new("reason", reason.to_string())];
     TRUST_METRICS.attestations_revoked.add(1, &attributes);
 }
 
 pub fn record_trust_score(email: &str, score: f64, path_length: usize) {
     TRUST_METRICS.trust_score_distribution.record(score, &[]);
-    TRUST_METRICS.trust_path_length.record(path_length as f64, &[]);
+    TRUST_METRICS
+        .trust_path_length
+        .record(path_length as f64, &[]);
 }
 
 /// Record auth events
 pub fn record_login_attempt(success: bool, method: &str) {
-    let attributes = [
-        KeyValue::new("method", method.to_string()),
-    ];
+    let attributes = [KeyValue::new("method", method.to_string())];
 
     AUTH_METRICS.login_attempts.add(1, &attributes);
     if success {

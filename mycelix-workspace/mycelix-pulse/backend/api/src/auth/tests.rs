@@ -186,7 +186,10 @@ mod session_tests {
         }
 
         async fn set(&self, key: &str, value: &str) {
-            self.sessions.write().await.insert(key.to_string(), value.to_string());
+            self.sessions
+                .write()
+                .await
+                .insert(key.to_string(), value.to_string());
         }
 
         async fn get(&self, key: &str) -> Option<String> {
@@ -202,7 +205,9 @@ mod session_tests {
     async fn test_session_creation() {
         let store = MockSessionStore::new();
 
-        store.set("session:abc123", r#"{"user_id": "user-1"}"#).await;
+        store
+            .set("session:abc123", r#"{"user_id": "user-1"}"#)
+            .await;
 
         let session = store.get("session:abc123").await;
         assert!(session.is_some());
@@ -252,9 +257,6 @@ mod permission_tests {
         let access = TokenType::Access;
         let refresh = TokenType::Refresh;
 
-        assert_ne!(
-            format!("{:?}", access),
-            format!("{:?}", refresh)
-        );
+        assert_ne!(format!("{:?}", access), format!("{:?}", refresh));
     }
 }

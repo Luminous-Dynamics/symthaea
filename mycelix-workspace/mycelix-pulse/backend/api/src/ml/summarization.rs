@@ -104,8 +104,14 @@ pub enum TimelineEventType {
 /// Summarization provider trait
 #[async_trait]
 pub trait SummarizationProvider: Send + Sync {
-    async fn summarize_email(&self, content: &EmailContent) -> Result<EmailSummary, SummarizationError>;
-    async fn summarize_thread(&self, emails: &[EmailContent]) -> Result<ThreadSummary, SummarizationError>;
+    async fn summarize_email(
+        &self,
+        content: &EmailContent,
+    ) -> Result<EmailSummary, SummarizationError>;
+    async fn summarize_thread(
+        &self,
+        emails: &[EmailContent],
+    ) -> Result<ThreadSummary, SummarizationError>;
 }
 
 #[derive(Debug, Clone)]
@@ -202,18 +208,39 @@ impl LocalSummarizer {
         let text_lower = text.to_lowercase();
 
         let positive_words = [
-            "thank", "great", "excellent", "happy", "pleased", "wonderful",
-            "appreciate", "good", "fantastic", "amazing", "love", "helpful",
+            "thank",
+            "great",
+            "excellent",
+            "happy",
+            "pleased",
+            "wonderful",
+            "appreciate",
+            "good",
+            "fantastic",
+            "amazing",
+            "love",
+            "helpful",
         ];
         let negative_words = [
-            "sorry", "unfortunately", "problem", "issue", "disappointed",
-            "frustrated", "urgent", "asap", "critical", "failed", "error",
+            "sorry",
+            "unfortunately",
+            "problem",
+            "issue",
+            "disappointed",
+            "frustrated",
+            "urgent",
+            "asap",
+            "critical",
+            "failed",
+            "error",
         ];
 
-        let positive_count = positive_words.iter()
+        let positive_count = positive_words
+            .iter()
             .filter(|w| text_lower.contains(*w))
             .count();
-        let negative_count = negative_words.iter()
+        let negative_count = negative_words
+            .iter()
             .filter(|w| text_lower.contains(*w))
             .count();
 
@@ -231,11 +258,22 @@ impl LocalSummarizer {
         let text_lower = text.to_lowercase();
 
         let urgent_indicators = [
-            "urgent", "asap", "immediately", "critical", "emergency",
-            "right away", "time sensitive", "deadline",
+            "urgent",
+            "asap",
+            "immediately",
+            "critical",
+            "emergency",
+            "right away",
+            "time sensitive",
+            "deadline",
         ];
         let high_indicators = [
-            "important", "priority", "soon", "today", "eod", "by tomorrow",
+            "important",
+            "priority",
+            "soon",
+            "today",
+            "eod",
+            "by tomorrow",
         ];
 
         if urgent_indicators.iter().any(|w| text_lower.contains(w)) {
@@ -252,8 +290,16 @@ impl LocalSummarizer {
         let mut actions = Vec::new();
 
         let action_patterns = [
-            "please", "could you", "can you", "need to", "must",
-            "should", "will you", "todo", "action:", "action item",
+            "please",
+            "could you",
+            "can you",
+            "need to",
+            "must",
+            "should",
+            "will you",
+            "todo",
+            "action:",
+            "action item",
         ];
 
         for sentence in text.split(|c| c == '.' || c == '!' || c == '?') {
@@ -270,7 +316,9 @@ impl LocalSummarizer {
                     description: sentence.trim().to_string(),
                     assignee,
                     due_date,
-                    priority: if sentence_lower.contains("urgent") || sentence_lower.contains("asap") {
+                    priority: if sentence_lower.contains("urgent")
+                        || sentence_lower.contains("asap")
+                    {
                         ActionPriority::High
                     } else {
                         ActionPriority::Medium
@@ -314,7 +362,14 @@ impl LocalSummarizer {
         if text.contains("by friday") {
             // Find next Friday
             let days_until_friday = (5 - today.weekday().num_days_from_monday() as i64 + 7) % 7;
-            return Some(today + chrono::Duration::days(if days_until_friday == 0 { 7 } else { days_until_friday }));
+            return Some(
+                today
+                    + chrono::Duration::days(if days_until_friday == 0 {
+                        7
+                    } else {
+                        days_until_friday
+                    }),
+            );
         }
 
         None
@@ -326,22 +381,20 @@ impl LocalSummarizer {
 
         // Common stop words to ignore
         let stop_words = [
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "have", "has", "had", "do", "does", "did", "will", "would",
-            "could", "should", "may", "might", "must", "shall", "can",
-            "this", "that", "these", "those", "i", "you", "he", "she",
-            "it", "we", "they", "what", "which", "who", "when", "where",
-            "why", "how", "all", "each", "every", "both", "few", "more",
-            "most", "other", "some", "such", "no", "nor", "not", "only",
-            "own", "same", "so", "than", "too", "very", "just", "and",
-            "but", "if", "or", "because", "as", "until", "while", "of",
-            "at", "by", "for", "with", "about", "against", "between",
-            "into", "through", "during", "before", "after", "above",
-            "below", "to", "from", "up", "down", "in", "out", "on", "off",
+            "the", "a", "an", "is", "are", "was", "were", "be", "been", "have", "has", "had", "do",
+            "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall",
+            "can", "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they",
+            "what", "which", "who", "when", "where", "why", "how", "all", "each", "every", "both",
+            "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own",
+            "same", "so", "than", "too", "very", "just", "and", "but", "if", "or", "because", "as",
+            "until", "while", "of", "at", "by", "for", "with", "about", "against", "between",
+            "into", "through", "during", "before", "after", "above", "below", "to", "from", "up",
+            "down", "in", "out", "on", "off",
         ];
 
         for word in text.split_whitespace() {
-            let word = word.to_lowercase()
+            let word = word
+                .to_lowercase()
                 .chars()
                 .filter(|c| c.is_alphanumeric())
                 .collect::<String>();
@@ -354,18 +407,19 @@ impl LocalSummarizer {
         let mut topics: Vec<(String, usize)> = word_freq.into_iter().collect();
         topics.sort_by(|a, b| b.1.cmp(&a.1));
 
-        topics.into_iter()
-            .take(5)
-            .map(|(word, _)| word)
-            .collect()
+        topics.into_iter().take(5).map(|(word, _)| word).collect()
     }
 }
 
 #[async_trait]
 impl SummarizationProvider for LocalSummarizer {
-    async fn summarize_email(&self, content: &EmailContent) -> Result<EmailSummary, SummarizationError> {
+    async fn summarize_email(
+        &self,
+        content: &EmailContent,
+    ) -> Result<EmailSummary, SummarizationError> {
         let key_sentences = self.extract_key_sentences(&content.body, 3);
-        let one_liner = key_sentences.first()
+        let one_liner = key_sentences
+            .first()
             .cloned()
             .unwrap_or_else(|| content.subject.clone());
 
@@ -386,7 +440,10 @@ impl SummarizationProvider for LocalSummarizer {
         })
     }
 
-    async fn summarize_thread(&self, emails: &[EmailContent]) -> Result<ThreadSummary, SummarizationError> {
+    async fn summarize_thread(
+        &self,
+        emails: &[EmailContent],
+    ) -> Result<ThreadSummary, SummarizationError> {
         if emails.is_empty() {
             return Err(SummarizationError::EmptyInput);
         }
@@ -456,14 +513,20 @@ impl LLMSummarizer {
 
 #[async_trait]
 impl SummarizationProvider for LLMSummarizer {
-    async fn summarize_email(&self, content: &EmailContent) -> Result<EmailSummary, SummarizationError> {
+    async fn summarize_email(
+        &self,
+        content: &EmailContent,
+    ) -> Result<EmailSummary, SummarizationError> {
         // This would call an external LLM API
         // For now, fall back to local summarization
         let local = LocalSummarizer::new();
         local.summarize_email(content).await
     }
 
-    async fn summarize_thread(&self, emails: &[EmailContent]) -> Result<ThreadSummary, SummarizationError> {
+    async fn summarize_thread(
+        &self,
+        emails: &[EmailContent],
+    ) -> Result<ThreadSummary, SummarizationError> {
         let local = LocalSummarizer::new();
         local.summarize_thread(emails).await
     }
@@ -505,7 +568,8 @@ mod tests {
                    We have completed the first phase successfully. \
                    Please review the attached documents by tomorrow. \
                    The next milestone is due next week. \
-                   Thank you for your hard work!".to_string(),
+                   Thank you for your hard work!"
+                .to_string(),
             timestamp: chrono::Utc::now(),
         };
 

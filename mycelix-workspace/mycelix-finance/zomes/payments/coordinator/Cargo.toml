@@ -1,0 +1,16 @@
+[package]
+name = "payments"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "payments"
+
+[dependencies]
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+payments_integrity = { path = "../integrity" }

@@ -10,9 +10,9 @@
 //! - Bridge status and statistics
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -21,8 +21,8 @@ use crate::error::AppResult;
 use crate::middleware::AuthenticatedUser;
 use crate::routes::AppState;
 use crate::services::bridge::{
-    BridgeCacheStats, CrossHappIdentity, CrossHappReputation,
-    HappId, HappReputationScore, has_sufficient_reputation, spam_likelihood,
+    BridgeCacheStats, CrossHappIdentity, CrossHappReputation, HappId, HappReputationScore,
+    has_sufficient_reputation, spam_likelihood,
 };
 use crate::types::ApiError;
 
@@ -253,7 +253,10 @@ pub async fn get_full_reputation(
         HappId::Marketplace,
     ];
 
-    let reputation = state.bridge.get_reputation_with_context(&did, &context_happs).await?;
+    let reputation = state
+        .bridge
+        .get_reputation_with_context(&did, &context_happs)
+        .await?;
     Ok(Json(reputation))
 }
 
@@ -349,10 +352,19 @@ pub async fn report_positive(
     user: AuthenticatedUser,
     Json(input): Json<ReputationReportInput>,
 ) -> AppResult<Json<serde_json::Value>> {
-    tracing::info!("User {} reporting positive interaction with {}", user.did, input.did);
+    tracing::info!(
+        "User {} reporting positive interaction with {}",
+        user.did,
+        input.did
+    );
 
-    let context = input.context.unwrap_or_else(|| "positive_interaction".to_string());
-    state.bridge.report_positive_interaction(&input.did, &context).await?;
+    let context = input
+        .context
+        .unwrap_or_else(|| "positive_interaction".to_string());
+    state
+        .bridge
+        .report_positive_interaction(&input.did, &context)
+        .await?;
 
     Ok(Json(serde_json::json!({
         "reported": true,
@@ -378,10 +390,19 @@ pub async fn report_negative(
     user: AuthenticatedUser,
     Json(input): Json<ReputationReportInput>,
 ) -> AppResult<Json<serde_json::Value>> {
-    tracing::info!("User {} reporting negative interaction with {}", user.did, input.did);
+    tracing::info!(
+        "User {} reporting negative interaction with {}",
+        user.did,
+        input.did
+    );
 
-    let context = input.context.unwrap_or_else(|| "negative_interaction".to_string());
-    state.bridge.report_negative_interaction(&input.did, &context).await?;
+    let context = input
+        .context
+        .unwrap_or_else(|| "negative_interaction".to_string());
+    state
+        .bridge
+        .report_negative_interaction(&input.did, &context)
+        .await?;
 
     Ok(Json(serde_json::json!({
         "reported": true,

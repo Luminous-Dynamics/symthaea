@@ -1,0 +1,17 @@
+[package]
+name = "finance_bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Cross-hApp bridge coordinator zome for Mycelix Finance"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "finance_bridge"
+
+[dependencies]
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+finance_bridge_integrity = { path = "../integrity" }

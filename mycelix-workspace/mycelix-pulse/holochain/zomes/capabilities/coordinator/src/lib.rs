@@ -7,8 +7,8 @@
 //! Manages fine-grained access control, shared mailboxes, and delegation.
 
 use hdk::prelude::*;
-use std::collections::{BTreeSet, HashSet};
 use mail_capabilities_integrity::*;
+use std::collections::{BTreeSet, HashSet};
 
 /// Signal types for capability events
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -122,7 +122,8 @@ pub fn grant_capability(input: GrantCapabilityInput) -> ExternResult<ActionHash>
         grantor: my_agent,
         access_type: input.access_type,
     };
-    let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+    let encoded =
+        ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
     let _ = send_remote_signal(encoded, vec![input.grantee]);
 
     // Audit log
@@ -159,10 +160,9 @@ pub fn revoke_capability(input: (ActionHash, Option<String>)) -> ExternResult<Ac
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     // Get capability
-    let record = get(cap_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Capability not found".to_string()
-        )))?;
+    let record = get(cap_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Capability not found".to_string())
+    ))?;
 
     let mut capability: MailboxCapability = record
         .entry()
@@ -183,7 +183,10 @@ pub fn revoke_capability(input: (ActionHash, Option<String>)) -> ExternResult<Ac
     capability.revoked = true;
     capability.revocation_reason = reason.clone();
 
-    let new_hash = update_entry(cap_hash.clone(), EntryTypes::MailboxCapability(capability.clone()))?;
+    let new_hash = update_entry(
+        cap_hash.clone(),
+        EntryTypes::MailboxCapability(capability.clone()),
+    )?;
 
     // NOTE: delete_cap_grant in HDK 0.6 takes ActionHash, not CapSecret.
     // The capability is already marked revoked=true above, which is the authoritative check.
@@ -195,7 +198,8 @@ pub fn revoke_capability(input: (ActionHash, Option<String>)) -> ExternResult<Ac
         grantor: my_agent,
         reason,
     };
-    let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+    let encoded =
+        ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
     let _ = send_remote_signal(encoded, vec![capability.grantee]);
 
     // Audit log
@@ -212,10 +216,9 @@ pub fn verify_capability(input: (ActionHash, AuditAction)) -> ExternResult<bool>
     let (cap_hash, action) = input;
     let caller = agent_info()?.agent_initial_pubkey;
 
-    let record = get(cap_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Capability not found".to_string()
-        )))?;
+    let record = get(cap_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Capability not found".to_string())
+    ))?;
 
     let capability: MailboxCapability = record
         .entry()
@@ -263,7 +266,9 @@ pub fn verify_capability(input: (ActionHash, AuditAction)) -> ExternResult<bool>
 
 /// Create a shared mailbox
 #[hdk_extern]
-pub fn create_shared_mailbox(input: (String, String, SharedMailboxSettings)) -> ExternResult<ActionHash> {
+pub fn create_shared_mailbox(
+    input: (String, String, SharedMailboxSettings),
+) -> ExternResult<ActionHash> {
     let (name, email_address, settings) = input;
     let my_agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -317,17 +322,21 @@ pub fn create_shared_mailbox(input: (String, String, SharedMailboxSettings)) -> 
 /// Add member to shared mailbox
 #[hdk_extern]
 pub fn add_shared_mailbox_member(
-    input: (ActionHash, AgentPubKey, SharedMailboxRole, MailboxPermissions),
+    input: (
+        ActionHash,
+        AgentPubKey,
+        SharedMailboxRole,
+        MailboxPermissions,
+    ),
 ) -> ExternResult<ActionHash> {
     let (mailbox_hash, new_member, role, permissions) = input;
     let my_agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
     // Get mailbox
-    let record = get(mailbox_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Shared mailbox not found".to_string()
-        )))?;
+    let record = get(mailbox_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Shared mailbox not found".to_string())
+    ))?;
 
     let mut mailbox: SharedMailbox = record
         .entry()
@@ -366,7 +375,10 @@ pub fn add_shared_mailbox_member(
 
     mailbox.members.push(member);
 
-    let new_hash = update_entry(mailbox_hash.clone(), EntryTypes::SharedMailbox(mailbox.clone()))?;
+    let new_hash = update_entry(
+        mailbox_hash.clone(),
+        EntryTypes::SharedMailbox(mailbox.clone()),
+    )?;
 
     // Link to new member
     create_link(
@@ -382,7 +394,8 @@ pub fn add_shared_mailbox_member(
         mailbox_name: mailbox.name,
         role,
     };
-    let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+    let encoded =
+        ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
     let _ = send_remote_signal(encoded, vec![new_member]);
 
     Ok(new_hash)
@@ -396,10 +409,16 @@ pub fn get_my_shared_mailboxes(_: ()) -> ExternResult<Vec<(ActionHash, SharedMai
     let mut mailboxes = Vec::new();
 
     // Get owned mailboxes
-    let owned_links = get_links(LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToOwnedSharedMailboxes)?, GetStrategy::default())?;
+    let owned_links = get_links(
+        LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToOwnedSharedMailboxes)?,
+        GetStrategy::default(),
+    )?;
 
     // Get member mailboxes
-    let member_links = get_links(LinkQuery::try_new(my_agent, LinkTypes::AgentToMemberSharedMailboxes)?, GetStrategy::default())?;
+    let member_links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::AgentToMemberSharedMailboxes)?,
+        GetStrategy::default(),
+    )?;
 
     for link in owned_links.into_iter().chain(member_links.into_iter()) {
         let hash = ActionHash::try_from(link.target)
@@ -454,7 +473,9 @@ fn log_capability_action(
 
 /// Log an action using a capability
 #[hdk_extern]
-pub fn log_action(input: (ActionHash, AuditAction, bool, Option<String>)) -> ExternResult<ActionHash> {
+pub fn log_action(
+    input: (ActionHash, AuditAction, bool, Option<String>),
+) -> ExternResult<ActionHash> {
     let (cap_hash, action, success, error) = input;
 
     // Verify capability first
@@ -471,7 +492,10 @@ pub fn log_action(input: (ActionHash, AuditAction, bool, Option<String>)) -> Ext
 /// Get audit logs for a capability
 #[hdk_extern]
 pub fn get_audit_logs(capability_hash: ActionHash) -> ExternResult<Vec<CapabilityAuditLog>> {
-    let links = get_links(LinkQuery::try_new(capability_hash, LinkTypes::CapabilityToAuditLogs)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(capability_hash, LinkTypes::CapabilityToAuditLogs)?,
+        GetStrategy::default(),
+    )?;
 
     let mut logs = Vec::new();
 
@@ -503,7 +527,10 @@ pub fn get_audit_logs(capability_hash: ActionHash) -> ExternResult<Vec<Capabilit
 pub fn get_granted_capabilities(_: ()) -> ExternResult<Vec<(ActionHash, MailboxCapability)>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(my_agent, LinkTypes::AgentToGrantedCapabilities)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::AgentToGrantedCapabilities)?,
+        GetStrategy::default(),
+    )?;
 
     let mut capabilities = Vec::new();
 
@@ -530,7 +557,10 @@ pub fn get_granted_capabilities(_: ()) -> ExternResult<Vec<(ActionHash, MailboxC
 pub fn get_received_capabilities(_: ()) -> ExternResult<Vec<(ActionHash, MailboxCapability)>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(my_agent, LinkTypes::AgentToReceivedCapabilities)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::AgentToReceivedCapabilities)?,
+        GetStrategy::default(),
+    )?;
 
     let mut capabilities = Vec::new();
 
@@ -582,9 +612,10 @@ pub fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
 #[hdk_extern]
 pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // Grant capability for receiving signals
-    let functions = GrantedFunctions::Listed(HashSet::from([
-        (zome_info()?.name, "recv_remote_signal".into()),
-    ]));
+    let functions = GrantedFunctions::Listed(HashSet::from([(
+        zome_info()?.name,
+        "recv_remote_signal".into(),
+    )]));
 
     create_cap_grant(CapGrantEntry {
         tag: "recv_cap_signals".to_string(),

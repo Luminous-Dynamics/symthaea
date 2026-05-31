@@ -9,14 +9,14 @@
 //! SECURITY: Password hashes are stored in a secure local file encrypted with
 //! ChaCha20-Poly1305. The encryption key is derived from an environment variable.
 
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+};
 use axum::{
+    Json, Router,
     extract::State,
     routing::{get, post},
-    Json, Router,
-};
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use std::collections::HashMap;
@@ -54,7 +54,10 @@ impl CredentialStore {
 
         // Load existing credentials from disk
         if let Err(e) = store.load_from_disk_sync() {
-            tracing::warn!("Could not load credentials from disk: {}. Starting fresh.", e);
+            tracing::warn!(
+                "Could not load credentials from disk: {}. Starting fresh.",
+                e
+            );
         }
 
         store
@@ -62,13 +65,12 @@ impl CredentialStore {
 
     /// Get the storage path for credentials file
     fn get_storage_path() -> PathBuf {
-        let data_dir = std::env::var("MYCELIX_DATA_DIR")
-            .unwrap_or_else(|_| {
-                // Default to .mycelix-mail in current directory or home
-                std::env::var("HOME")
-                    .map(|home| format!("{}/.mycelix-mail", home))
-                    .unwrap_or_else(|_| ".mycelix-mail".to_string())
-            });
+        let data_dir = std::env::var("MYCELIX_DATA_DIR").unwrap_or_else(|_| {
+            // Default to .mycelix-mail in current directory or home
+            std::env::var("HOME")
+                .map(|home| format!("{}/.mycelix-mail", home))
+                .unwrap_or_else(|_| ".mycelix-mail".to_string())
+        });
 
         PathBuf::from(data_dir).join("credentials.enc")
     }
@@ -102,7 +104,10 @@ impl CredentialStore {
         use crate::services::crypto::decrypt_symmetric;
 
         if !self.storage_path.exists() {
-            tracing::debug!("Credentials file does not exist yet: {:?}", self.storage_path);
+            tracing::debug!(
+                "Credentials file does not exist yet: {:?}",
+                self.storage_path
+            );
             return Ok(());
         }
 
@@ -126,10 +131,7 @@ impl CredentialStore {
         let mut store = futures::executor::block_on(self.hashes.write());
         *store = hashes;
 
-        tracing::info!(
-            "Loaded {} credential(s) from secure storage",
-            store.len()
-        );
+        tracing::info!("Loaded {} credential(s) from secure storage", store.len());
 
         Ok(())
     }
@@ -157,10 +159,7 @@ impl CredentialStore {
 
         tokio::fs::write(&self.storage_path, &encrypted_data).await?;
 
-        tracing::debug!(
-            "Saved {} credential(s) to secure storage",
-            hashes.len()
-        );
+        tracing::debug!("Saved {} credential(s) to secure storage", hashes.len());
 
         Ok(())
     }
@@ -271,7 +270,9 @@ pub async fn register(
 
     // Store password hash in credential store
     // SECURITY NOTE: In production, use persistent encrypted storage
-    CREDENTIAL_STORE.store_hash(&input.did, &password_hash).await;
+    CREDENTIAL_STORE
+        .store_hash(&input.did, &password_hash)
+        .await;
     tracing::info!("Password hash stored for DID: {}", input.did);
 
     // Create JWT token
@@ -288,8 +289,7 @@ pub async fn register(
         token,
         did: input.did,
         agent_pub_key: agent_pubkey_b64,
-        expires_at: chrono::DateTime::from_timestamp(claims.exp, 0)
-            .unwrap_or_default(),
+        expires_at: chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_default(),
     }))
 }
 
@@ -336,8 +336,7 @@ pub async fn login(
         token,
         did: input.did,
         agent_pub_key: agent_pubkey_b64,
-        expires_at: chrono::DateTime::from_timestamp(claims.exp, 0)
-            .unwrap_or_default(),
+        expires_at: chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_default(),
     }))
 }
 
@@ -394,8 +393,7 @@ pub async fn refresh_token(
         token,
         did: user.did,
         agent_pub_key: user.agent_pub_key,
-        expires_at: chrono::DateTime::from_timestamp(claims.exp, 0)
-            .unwrap_or_default(),
+        expires_at: chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_default(),
     }))
 }
 
@@ -456,13 +454,10 @@ fn hash_password(password: &str) -> AppResult<String> {
 /// - The hash format is invalid
 async fn verify_password(did: &str, password: &str) -> AppResult<()> {
     // Retrieve stored hash
-    let stored_hash = CREDENTIAL_STORE
-        .get_hash(did)
-        .await
-        .ok_or_else(|| {
-            tracing::warn!("No password hash found for DID: {}", did);
-            AppError::AuthenticationError("Invalid credentials".to_string())
-        })?;
+    let stored_hash = CREDENTIAL_STORE.get_hash(did).await.ok_or_else(|| {
+        tracing::warn!("No password hash found for DID: {}", did);
+        AppError::AuthenticationError("Invalid credentials".to_string())
+    })?;
 
     // Parse the PHC format hash
     let parsed_hash = PasswordHash::new(&stored_hash).map_err(|e| {

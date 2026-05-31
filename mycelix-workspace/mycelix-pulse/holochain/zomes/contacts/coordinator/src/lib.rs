@@ -8,8 +8,8 @@
 #[cfg(test)]
 mod tests;
 
-use hdk::prelude::*;
 use contacts_integrity::*;
+use hdk::prelude::*;
 
 /// Anchor for all contacts
 const ALL_CONTACTS_ANCHOR: &str = "all_contacts";
@@ -27,12 +27,7 @@ pub fn create_contact(contact: Contact) -> ExternResult<ActionHash> {
 
     // Link to all contacts anchor
     let anchor = anchor_hash(ALL_CONTACTS_ANCHOR)?;
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::AllContacts,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::AllContacts, ())?;
 
     // Link by email for lookup
     for email in &contact.emails {
@@ -98,7 +93,10 @@ pub fn delete_contact(hash: ActionHash) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn get_all_contacts(_: ()) -> ExternResult<Vec<Contact>> {
     let anchor = anchor_hash(ALL_CONTACTS_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AllContacts)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::AllContacts)?,
+        GetStrategy::default(),
+    )?;
 
     let mut contacts = Vec::new();
     for link in links {
@@ -119,7 +117,10 @@ pub fn get_all_contacts(_: ()) -> ExternResult<Vec<Contact>> {
 #[hdk_extern]
 pub fn get_contact_by_email(email: String) -> ExternResult<Option<Contact>> {
     let email_anchor = email_anchor_hash(&email)?;
-    let links = get_links(LinkQuery::try_new(email_anchor, LinkTypes::EmailToContact)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(email_anchor, LinkTypes::EmailToContact)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.first() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -133,7 +134,10 @@ pub fn get_contact_by_email(email: String) -> ExternResult<Option<Contact>> {
 /// Get contact by agent
 #[hdk_extern]
 pub fn get_contact_by_agent(agent: AgentPubKey) -> ExternResult<Option<Contact>> {
-    let links = get_links(LinkQuery::try_new(agent, LinkTypes::AgentToContact)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToContact)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.first() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -152,12 +156,7 @@ pub fn create_group(group: ContactGroup) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::ContactGroup(group))?;
 
     let anchor = anchor_hash(ALL_GROUPS_ANCHOR)?;
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::AllGroups,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::AllGroups, ())?;
 
     Ok(action_hash)
 }
@@ -166,7 +165,10 @@ pub fn create_group(group: ContactGroup) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn get_all_groups(_: ()) -> ExternResult<Vec<ContactGroup>> {
     let anchor = anchor_hash(ALL_GROUPS_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AllGroups)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::AllGroups)?,
+        GetStrategy::default(),
+    )?;
 
     let mut groups = Vec::new();
     for link in links {
@@ -215,7 +217,10 @@ pub struct GroupMembershipInput {
 /// Remove contact from group
 #[hdk_extern]
 pub fn remove_from_group(input: GroupMembershipInput) -> ExternResult<()> {
-    let links = get_links(LinkQuery::try_new(input.contact_hash.clone(), LinkTypes::ContactToGroups)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(input.contact_hash.clone(), LinkTypes::ContactToGroups)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         // Check if this link is for the specified group
@@ -254,12 +259,7 @@ pub fn block_contact(hash: ActionHash) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::BlockedContact(blocked))?;
 
     let anchor = anchor_hash(BLOCKED_ANCHOR)?;
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::BlockedContacts,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::BlockedContacts, ())?;
 
     Ok(action_hash)
 }
@@ -268,7 +268,10 @@ pub fn block_contact(hash: ActionHash) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn unblock_contact(hash: ActionHash) -> ExternResult<()> {
     let anchor = anchor_hash(BLOCKED_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::BlockedContacts)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::BlockedContacts)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(blocked_hash) = link.target.clone().into_action_hash() {
@@ -295,7 +298,10 @@ pub fn unblock_contact(hash: ActionHash) -> ExternResult<()> {
 #[hdk_extern]
 pub fn get_blocked_contacts(_: ()) -> ExternResult<Vec<ActionHash>> {
     let anchor = anchor_hash(BLOCKED_ANCHOR)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::BlockedContacts)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::BlockedContacts)?,
+        GetStrategy::default(),
+    )?;
 
     let mut blocked = Vec::new();
     for link in links {

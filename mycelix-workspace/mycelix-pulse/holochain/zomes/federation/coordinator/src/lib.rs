@@ -63,20 +63,14 @@ pub enum FederationSignal {
         to_network: String,
     },
     /// Delivery failed
-    DeliveryFailed {
-        envelope_id: String,
-        error: String,
-    },
+    DeliveryFailed { envelope_id: String, error: String },
     /// Bridge status changed
     BridgeStatusChanged {
         bridge_agent: AgentPubKey,
         is_active: bool,
     },
     /// Route changed
-    RouteChanged {
-        route_id: String,
-        is_active: bool,
-    },
+    RouteChanged { route_id: String, is_active: bool },
     /// Peer status changed
     PeerStatusChanged {
         network_id: String,
@@ -152,9 +146,10 @@ pub fn register_network(input: RegisterNetworkInput) -> ExternResult<ActionHash>
     // Check for duplicate network ID
     let existing = get_network(input.network_id.clone())?;
     if existing.is_some() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network with ID '{}' already exists", input.network_id)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network with ID '{}' already exists",
+            input.network_id
+        ))));
     }
 
     let network = FederatedNetwork {
@@ -206,7 +201,10 @@ pub fn register_network(input: RegisterNetworkInput) -> ExternResult<ActionHash>
 pub fn get_network(network_id: String) -> ExternResult<Option<FederatedNetwork>> {
     let network_id_anchor = network_anchor(&network_id)?;
 
-    let links = get_links(LinkQuery::try_new(network_id_anchor, LinkTypes::NetworkIdToNetwork)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(network_id_anchor, LinkTypes::NetworkIdToNetwork)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.last() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -297,7 +295,11 @@ pub fn create_route(input: CreateRouteInput) -> ExternResult<ActionHash> {
     let source_hash = network_anchor(&input.source_network)?;
     create_link(source_hash, hash.clone(), LinkTypes::NetworkToRoutes, ())?;
 
-    log_federation_action(FederationAction::RouteCreated, &input.source_network, Some(&input.dest_network))?;
+    log_federation_action(
+        FederationAction::RouteCreated,
+        &input.source_network,
+        Some(&input.dest_network),
+    )?;
 
     emit_signal(FederationSignal::RouteChanged {
         route_id: route.route_id,
@@ -312,7 +314,10 @@ pub fn create_route(input: CreateRouteInput) -> ExternResult<ActionHash> {
 pub fn get_routes(network_id: String) -> ExternResult<Vec<FederationRoute>> {
     let network_hash = network_anchor(&network_id)?;
 
-    let links = get_links(LinkQuery::try_new(network_hash, LinkTypes::NetworkToRoutes)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(network_hash, LinkTypes::NetworkToRoutes)?,
+        GetStrategy::default(),
+    )?;
 
     let mut routes = Vec::new();
 
@@ -374,7 +379,12 @@ pub fn send_federated(input: SendFederatedInput) -> ExternResult<SendFederatedOu
         .ok_or(wasm_error!("No route to destination network"))?;
 
     // Generate envelope ID
-    let envelope_id = format!("env:{}:{}:{}", our_network, input.dest_network, now.as_micros());
+    let envelope_id = format!(
+        "env:{}:{}:{}",
+        our_network,
+        input.dest_network,
+        now.as_micros()
+    );
 
     // Create encryption metadata
     let encryption_meta = EnvelopeEncryption {
@@ -678,7 +688,10 @@ pub fn register_bridge(input: RegisterBridgeInput) -> ExternResult<ActionHash> {
 pub fn get_bridges(network_id: String) -> ExternResult<Vec<BridgeAgent>> {
     let network_hash = network_anchor(&network_id)?;
 
-    let links = get_links(LinkQuery::try_new(network_hash, LinkTypes::NetworkToBridges)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(network_hash, LinkTypes::NetworkToBridges)?,
+        GetStrategy::default(),
+    )?;
 
     let mut bridges = Vec::new();
 
@@ -737,7 +750,12 @@ pub fn register_domain(input: RegisterDomainInput) -> ExternResult<ActionHash> {
 
     // Link by domain for lookup
     let domain_hash = domain_anchor(&input.domain)?;
-    create_link(domain_hash, hash.clone(), LinkTypes::DomainToRegistration, ())?;
+    create_link(
+        domain_hash,
+        hash.clone(),
+        LinkTypes::DomainToRegistration,
+        (),
+    )?;
 
     log_federation_action(FederationAction::DomainRegistered, &input.domain, None)?;
 
@@ -749,7 +767,10 @@ pub fn register_domain(input: RegisterDomainInput) -> ExternResult<ActionHash> {
 pub fn lookup_domain(domain: String) -> ExternResult<Option<DomainRegistration>> {
     let domain_hash = domain_anchor(&domain)?;
 
-    let links = get_links(LinkQuery::try_new(domain_hash, LinkTypes::DomainToRegistration)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(domain_hash, LinkTypes::DomainToRegistration)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.last() {
         if let Some(hash) = link.target.clone().into_action_hash() {
@@ -865,7 +886,10 @@ fn log_federation_action(
 pub fn get_federation_audit_logs(network_id: String) -> ExternResult<Vec<FederationAuditLog>> {
     let network_hash = network_anchor(&network_id)?;
 
-    let links = get_links(LinkQuery::try_new(network_hash, LinkTypes::NetworkToAuditLogs)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(network_hash, LinkTypes::NetworkToAuditLogs)?,
+        GetStrategy::default(),
+    )?;
 
     let mut logs = Vec::new();
 

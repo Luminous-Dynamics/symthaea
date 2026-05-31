@@ -342,18 +342,14 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, action)
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                validate_update_entry(app_entry, action)
-            }
+            OpEntry::CreateEntry { app_entry, action } => validate_create_entry(app_entry, action),
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => validate_update_entry(app_entry, action),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreRecord(store_record) => match store_record {
-            OpRecord::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, action)
-            }
+            OpRecord::CreateEntry { app_entry, action } => validate_create_entry(app_entry, action),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -365,9 +361,7 @@ fn validate_create_entry(
     action: Create,
 ) -> ExternResult<ValidateCallbackResult> {
     match entry {
-        EntryTypes::TrustAttestation(attestation) => {
-            validate_attestation(&attestation, &action)
-        }
+        EntryTypes::TrustAttestation(attestation) => validate_attestation(&attestation, &action),
         EntryTypes::TrustScore(score) => validate_score(&score, &action),
         EntryTypes::TrustDispute(dispute) => validate_dispute(&dispute, &action),
         EntryTypes::TrustIntroduction(intro) => validate_introduction(&intro, &action),
@@ -421,7 +415,10 @@ fn validate_attestation(
     }
 
     // Trust level must be in valid range and finite
-    if !attestation.trust_level.is_finite() || attestation.trust_level < -1.0 || attestation.trust_level > 1.0 {
+    if !attestation.trust_level.is_finite()
+        || attestation.trust_level < -1.0
+        || attestation.trust_level > 1.0
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust level must be a finite number between -1.0 and 1.0".to_string(),
         ));
@@ -525,7 +522,10 @@ fn validate_introduction(
     }
 
     // Recommendation level must be valid and finite
-    if !intro.recommendation_level.is_finite() || intro.recommendation_level < 0.0 || intro.recommendation_level > 1.0 {
+    if !intro.recommendation_level.is_finite()
+        || intro.recommendation_level < 0.0
+        || intro.recommendation_level > 1.0
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Recommendation level must be a finite number between 0.0 and 1.0".to_string(),
         ));

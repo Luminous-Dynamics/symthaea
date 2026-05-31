@@ -9,14 +9,14 @@
 
 use leptos::prelude::*;
 use send_wrapper::SendWrapper;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::spawn_local;
 
 use mycelix_leptos_client::{
-    decode, encode, BrowserWsTransport, ConnectConfig, HolochainTransport,
+    BrowserWsTransport, ConnectConfig, HolochainTransport, decode, encode,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

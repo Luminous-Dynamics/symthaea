@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tauri v2 desktop shell for Mycelix Pulse.
 
-#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 use serde::Serialize;
 use tauri::{
-    menu::{Menu, MenuItem, Submenu},
     AppHandle, Manager, WebviewWindow,
+    menu::{Menu, MenuItem, Submenu},
 };
 
 // ==================== COMMANDS ====================
@@ -32,7 +35,8 @@ fn desktop_runtime_info() -> DesktopRuntimeInfo<'static> {
 
 #[tauri::command]
 fn open_route(app: AppHandle, path: String) -> Result<(), String> {
-    let window = app.get_webview_window("main")
+    let window = app
+        .get_webview_window("main")
         .ok_or_else(|| "main window unavailable".to_string())?;
     navigate_spa(&window, &path)?;
     focus_main_window(&app);
@@ -83,7 +87,11 @@ fn normalize_linux_webview(window: &WebviewWindow) {
 fn normalize_linux_webview(_window: &WebviewWindow) {}
 
 fn navigate_spa(window: &WebviewWindow, path: &str) -> Result<(), String> {
-    let normalized = if path.starts_with('/') { path.to_string() } else { format!("/{path}") };
+    let normalized = if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    };
     let script = format!(
         "window.history.pushState({{}}, '', {}); window.dispatchEvent(new PopStateEvent('popstate'));",
         serde_json::to_string(&normalized).map_err(|e| e.to_string())?
@@ -138,19 +146,38 @@ const NORMALIZE_PAGE_RENDERING_JS: &str = r#"
 // ==================== MENU ====================
 
 fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
-    let file_menu = Submenu::with_items(app, "File", true, &[
-        &MenuItem::with_id(app, "compose", "New Message", true, Some("CmdOrCtrl+N"))?,
-        &MenuItem::with_id(app, "quit", "Quit", true, Some("CmdOrCtrl+Q"))?,
-    ])?;
-    let view_menu = Submenu::with_items(app, "View", true, &[
-        &MenuItem::with_id(app, "inbox", "Inbox", true, Some("CmdOrCtrl+1"))?,
-        &MenuItem::with_id(app, "sent", "Sent", true, Some("CmdOrCtrl+2"))?,
-        &MenuItem::with_id(app, "drafts", "Drafts", true, Some("CmdOrCtrl+3"))?,
-        &MenuItem::with_id(app, "settings", "Settings", true, Some("CmdOrCtrl+,"))?,
-    ])?;
-    let help_menu = Submenu::with_items(app, "Help", true, &[
-        &MenuItem::with_id(app, "about", "About Mycelix Pulse", true, None::<&str>)?,
-    ])?;
+    let file_menu = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[
+            &MenuItem::with_id(app, "compose", "New Message", true, Some("CmdOrCtrl+N"))?,
+            &MenuItem::with_id(app, "quit", "Quit", true, Some("CmdOrCtrl+Q"))?,
+        ],
+    )?;
+    let view_menu = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[
+            &MenuItem::with_id(app, "inbox", "Inbox", true, Some("CmdOrCtrl+1"))?,
+            &MenuItem::with_id(app, "sent", "Sent", true, Some("CmdOrCtrl+2"))?,
+            &MenuItem::with_id(app, "drafts", "Drafts", true, Some("CmdOrCtrl+3"))?,
+            &MenuItem::with_id(app, "settings", "Settings", true, Some("CmdOrCtrl+,"))?,
+        ],
+    )?;
+    let help_menu = Submenu::with_items(
+        app,
+        "Help",
+        true,
+        &[&MenuItem::with_id(
+            app,
+            "about",
+            "About Mycelix Pulse",
+            true,
+            None::<&str>,
+        )?],
+    )?;
     Menu::with_items(app, &[&file_menu, &view_menu, &help_menu])
 }
 

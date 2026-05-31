@@ -560,8 +560,12 @@ impl ApiClient {
         }
     }
 
-    async fn send_email(&self, email: SendEmailRequest) -> Result<String, Box<dyn std::error::Error>> {
-        let resp = self.client
+    async fn send_email(
+        &self,
+        email: SendEmailRequest,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let resp = self
+            .client
             .post(format!("{}/api/emails/send", self.base_url))
             .json(&email)
             .send()
@@ -575,10 +579,20 @@ impl ApiClient {
         }
     }
 
-    async fn search(&self, query: &str, folder: &str, limit: u32) -> Result<Vec<Email>, Box<dyn std::error::Error>> {
-        let resp = self.client
+    async fn search(
+        &self,
+        query: &str,
+        folder: &str,
+        limit: u32,
+    ) -> Result<Vec<Email>, Box<dyn std::error::Error>> {
+        let resp = self
+            .client
             .get(format!("{}/api/emails/search", self.base_url))
-            .query(&[("q", query), ("folder", folder), ("limit", &limit.to_string())])
+            .query(&[
+                ("q", query),
+                ("folder", folder),
+                ("limit", &limit.to_string()),
+            ])
             .send()
             .await?;
 
@@ -589,8 +603,14 @@ impl ApiClient {
         }
     }
 
-    async fn list_emails(&self, folder: &str, limit: u32, unread: bool) -> Result<Vec<Email>, Box<dyn std::error::Error>> {
-        let resp = self.client
+    async fn list_emails(
+        &self,
+        folder: &str,
+        limit: u32,
+        unread: bool,
+    ) -> Result<Vec<Email>, Box<dyn std::error::Error>> {
+        let resp = self
+            .client
             .get(format!("{}/api/emails", self.base_url))
             .query(&[
                 ("folder", folder),
@@ -608,7 +628,8 @@ impl ApiClient {
     }
 
     async fn get_email(&self, id: &str) -> Result<EmailDetail, Box<dyn std::error::Error>> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{}/api/emails/{}", self.base_url, id))
             .send()
             .await?;
@@ -620,8 +641,13 @@ impl ApiClient {
         }
     }
 
-    async fn delete_email(&self, id: &str, permanent: bool) -> Result<(), Box<dyn std::error::Error>> {
-        let resp = self.client
+    async fn delete_email(
+        &self,
+        id: &str,
+        permanent: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let resp = self
+            .client
             .delete(format!("{}/api/emails/{}", self.base_url, id))
             .query(&[("permanent", permanent.to_string())])
             .send()
@@ -635,7 +661,8 @@ impl ApiClient {
     }
 
     async fn list_folders(&self) -> Result<Vec<Folder>, Box<dyn std::error::Error>> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{}/api/folders", self.base_url))
             .send()
             .await?;
@@ -647,7 +674,11 @@ impl ApiClient {
         }
     }
 
-    async fn sync(&self, account: Option<&str>, full: bool) -> Result<(), Box<dyn std::error::Error>> {
+    async fn sync(
+        &self,
+        account: Option<&str>,
+        full: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut req = self.client.post(format!("{}/api/sync", self.base_url));
 
         if let Some(acc) = account {
@@ -667,7 +698,8 @@ impl ApiClient {
     }
 
     async fn status(&self) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{}/api/status", self.base_url))
             .send()
             .await?;
@@ -696,7 +728,7 @@ struct SendEmailRequest {
 struct AttachmentData {
     filename: String,
     content_type: String,
-    data: String,  // base64 encoded
+    data: String, // base64 encoded
 }
 
 // ============================================================================
@@ -754,8 +786,12 @@ fn print_email_detail(email: &EmailDetail) {
     println!("{}: {}", "Subject".cyan(), email.subject.bold());
 
     if !email.attachments.is_empty() {
-        println!("{}: {}", "Attachments".cyan(),
-            email.attachments.iter()
+        println!(
+            "{}: {}",
+            "Attachments".cyan(),
+            email
+                .attachments
+                .iter()
                 .map(|a| format!("{} ({})", a.filename, format_size(a.size)))
                 .collect::<Vec<_>>()
                 .join(", ")
@@ -774,7 +810,8 @@ fn print_folders(folders: &[Folder], indent: usize) {
         } else {
             String::new()
         };
-        println!("{}{} [{}/{}]{}",
+        println!(
+            "{}{} [{}/{}]{}",
             prefix,
             folder.name.cyan(),
             folder.unread,
@@ -804,13 +841,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Load config
-    let config = Config::default();  // Would load from file
+    let config = Config::default(); // Would load from file
 
     let api_url = cli.api_url.unwrap_or(config.api_url);
     let client = ApiClient::new(api_url);
 
     match cli.command {
-        Commands::Send { to, cc, bcc, subject, body, file, attach, html, from, dry_run } => {
+        Commands::Send {
+            to,
+            cc,
+            bcc,
+            subject,
+            body,
+            file,
+            attach,
+            html,
+            from,
+            dry_run,
+        } => {
             let body_content = if let Some(b) = body {
                 b
             } else if let Some(path) = file {
@@ -829,7 +877,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 subject,
                 body: body_content,
                 is_html: html,
-                attachments: Vec::new(),  // Would process attach
+                attachments: Vec::new(), // Would process attach
                 from,
             };
 
@@ -842,7 +890,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Commands::Search { query, folder, limit, body: _, unread: _, since: _, until: _ } => {
+        Commands::Search {
+            query,
+            folder,
+            limit,
+            body: _,
+            unread: _,
+            since: _,
+            until: _,
+        } => {
             let emails = client.search(&query, &folder, limit).await?;
 
             if emails.is_empty() {
@@ -853,7 +909,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Commands::List { folder, limit, unread, threads: _ } => {
+        Commands::List {
+            folder,
+            limit,
+            unread,
+            threads: _,
+        } => {
             let emails = client.list_emails(&folder, limit, unread).await?;
 
             if emails.is_empty() {
@@ -863,14 +924,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Commands::Read { id, headers: _, raw: _, mark_read: _ } => {
+        Commands::Read {
+            id,
+            headers: _,
+            raw: _,
+            mark_read: _,
+        } => {
             let email = client.get_email(&id).await?;
             print_email_detail(&email);
         }
 
-        Commands::Delete { ids, force, permanent } => {
+        Commands::Delete {
+            ids,
+            force,
+            permanent,
+        } => {
             if !force {
-                println!("Are you sure you want to delete {} email(s)? [y/N]", ids.len());
+                println!(
+                    "Are you sure you want to delete {} email(s)? [y/N]",
+                    ids.len()
+                );
                 let mut input = String::new();
                 std::io::stdin().read_line(&mut input)?;
                 if !input.trim().eq_ignore_ascii_case("y") {
@@ -885,25 +958,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Commands::Folder { action } => {
-            match action {
-                FolderCommands::List => {
-                    let folders = client.list_folders().await?;
-                    print_folders(&folders, 0);
-                }
-                FolderCommands::Create { name, parent: _ } => {
-                    println!("{} Created folder: {}", "✓".green(), name);
-                }
-                FolderCommands::Delete { name } => {
-                    println!("{} Deleted folder: {}", "✓".green(), name);
-                }
-                FolderCommands::Info { name } => {
-                    println!("Folder info for: {}", name);
-                }
+        Commands::Folder { action } => match action {
+            FolderCommands::List => {
+                let folders = client.list_folders().await?;
+                print_folders(&folders, 0);
             }
-        }
+            FolderCommands::Create { name, parent: _ } => {
+                println!("{} Created folder: {}", "✓".green(), name);
+            }
+            FolderCommands::Delete { name } => {
+                println!("{} Deleted folder: {}", "✓".green(), name);
+            }
+            FolderCommands::Info { name } => {
+                println!("Folder info for: {}", name);
+            }
+        },
 
-        Commands::Sync { account, full, watch } => {
+        Commands::Sync {
+            account,
+            full,
+            watch,
+        } => {
             println!("Syncing...");
             client.sync(account.as_deref(), full).await?;
             println!("{} Sync complete", "✓".green());

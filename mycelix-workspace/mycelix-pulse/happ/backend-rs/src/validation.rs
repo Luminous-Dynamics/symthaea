@@ -49,7 +49,10 @@ pub fn validate_did(did: &str) -> AppResult<()> {
     }
 
     // Validate method characters (lowercase alphanumeric only)
-    if !method.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) {
+    if !method
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    {
         return Err(AppError::ValidationError(
             "DID method must be lowercase alphanumeric".to_string(),
         ));
@@ -106,7 +109,10 @@ pub fn validate_subject(subject: &str) -> AppResult<()> {
     }
 
     // Check for control characters (except newline/tab)
-    if subject.chars().any(|c| c.is_control() && c != '\n' && c != '\t') {
+    if subject
+        .chars()
+        .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
         return Err(AppError::ValidationError(
             "Subject contains invalid control characters".to_string(),
         ));
@@ -129,11 +135,11 @@ pub fn validate_body(body: &str) -> AppResult<()> {
 
 /// Validate a base64-encoded string
 pub fn validate_base64(input: &str, field_name: &str) -> AppResult<Vec<u8>> {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
 
-    STANDARD
-        .decode(input)
-        .map_err(|_| AppError::ValidationError(format!("Invalid base64 encoding for {}", field_name)))
+    STANDARD.decode(input).map_err(|_| {
+        AppError::ValidationError(format!("Invalid base64 encoding for {}", field_name))
+    })
 }
 
 /// Validate an action hash (39 bytes base64)
@@ -154,10 +160,7 @@ pub fn validate_action_hash(input: &str) -> AppResult<[u8; 39]> {
 
 /// Sanitize a string by removing null bytes and trimming
 pub fn sanitize_string(input: &str) -> String {
-    input
-        .replace('\0', "")
-        .trim()
-        .to_string()
+    input.replace('\0', "").trim().to_string()
 }
 
 /// Rate limit configuration

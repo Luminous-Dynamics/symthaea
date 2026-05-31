@@ -10,8 +10,8 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 // ============================================================================
 // Core Types
@@ -242,20 +242,23 @@ impl UnsubscribeService {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(subscriptions.into_iter().map(|s| Subscription {
-            id: Uuid::new_v4(),
-            user_id,
-            sender_email: s.sender_email,
-            sender_name: s.sender_name,
-            list_id: s.list_id,
-            unsubscribe_url: s.unsubscribe_url,
-            unsubscribe_email: s.unsubscribe_email,
-            first_seen: s.first_seen,
-            last_seen: s.last_seen,
-            email_count: s.email_count as u32,
-            status: SubscriptionStatus::Active,
-            category: EmailCategory::Newsletters,
-        }).collect())
+        Ok(subscriptions
+            .into_iter()
+            .map(|s| Subscription {
+                id: Uuid::new_v4(),
+                user_id,
+                sender_email: s.sender_email,
+                sender_name: s.sender_name,
+                list_id: s.list_id,
+                unsubscribe_url: s.unsubscribe_url,
+                unsubscribe_email: s.unsubscribe_email,
+                first_seen: s.first_seen,
+                last_seen: s.last_seen,
+                email_count: s.email_count as u32,
+                status: SubscriptionStatus::Active,
+                category: EmailCategory::Newsletters,
+            })
+            .collect())
     }
 
     pub async fn unsubscribe(&self, subscription_id: Uuid) -> Result<UnsubscribeResult> {
@@ -274,7 +277,11 @@ impl UnsubscribeService {
             // Send unsubscribe email
             self.unsubscribe_via_email(email).await
         } else {
-            (false, UnsubscribeMethod::Manual, "No automatic unsubscribe available".to_string())
+            (
+                false,
+                UnsubscribeMethod::Manual,
+                "No automatic unsubscribe available".to_string(),
+            )
         };
 
         // Update subscription status
@@ -307,35 +314,51 @@ impl UnsubscribeService {
 
         // Check for one-click unsubscribe (RFC 8058)
         if url.contains("mailto:") {
-            return self.unsubscribe_via_email(&clean_url.replace("mailto:", "")).await;
+            return self
+                .unsubscribe_via_email(&clean_url.replace("mailto:", ""))
+                .await;
         }
 
         // HTTP(S) unsubscribe
         let client = reqwest::Client::new();
-        match client.post(clean_url)
+        match client
+            .post(clean_url)
             .header("List-Unsubscribe", "One-Click")
             .send()
             .await
         {
-            Ok(response) if response.status().is_success() => {
-                (true, UnsubscribeMethod::OneClickLink, "Successfully unsubscribed".to_string())
-            }
-            Ok(response) => {
-                (false, UnsubscribeMethod::OneClickLink, format!("Server returned: {}", response.status()))
-            }
-            Err(e) => {
-                (false, UnsubscribeMethod::OneClickLink, format!("Request failed: {}", e))
-            }
+            Ok(response) if response.status().is_success() => (
+                true,
+                UnsubscribeMethod::OneClickLink,
+                "Successfully unsubscribed".to_string(),
+            ),
+            Ok(response) => (
+                false,
+                UnsubscribeMethod::OneClickLink,
+                format!("Server returned: {}", response.status()),
+            ),
+            Err(e) => (
+                false,
+                UnsubscribeMethod::OneClickLink,
+                format!("Request failed: {}", e),
+            ),
         }
     }
 
     async fn unsubscribe_via_email(&self, email: &str) -> (bool, UnsubscribeMethod, String) {
         // Would send actual unsubscribe email
         // For now, return pending status
-        (true, UnsubscribeMethod::EmailRequest, format!("Unsubscribe request sent to {}", email))
+        (
+            true,
+            UnsubscribeMethod::EmailRequest,
+            format!("Unsubscribe request sent to {}", email),
+        )
     }
 
-    pub async fn bulk_unsubscribe(&self, subscription_ids: Vec<Uuid>) -> Result<Vec<UnsubscribeResult>> {
+    pub async fn bulk_unsubscribe(
+        &self,
+        subscription_ids: Vec<Uuid>,
+    ) -> Result<Vec<UnsubscribeResult>> {
         let mut results = Vec::new();
         for id in subscription_ids {
             let result = self.unsubscribe(id).await?;
@@ -378,8 +401,8 @@ pub struct DigestConfig {
     pub name: String,
     pub senders: Vec<String>,
     pub frequency: DigestFrequency,
-    pub delivery_time: String,  // "09:00"
-    pub delivery_day: Option<String>,  // For weekly: "monday"
+    pub delivery_time: String,        // "09:00"
+    pub delivery_day: Option<String>, // For weekly: "monday"
     pub enabled: bool,
     pub created_at: DateTime<Utc>,
 }
@@ -420,7 +443,11 @@ impl DigestService {
         Self { pool }
     }
 
-    pub async fn create_digest_config(&self, user_id: Uuid, config: DigestConfig) -> Result<DigestConfig> {
+    pub async fn create_digest_config(
+        &self,
+        user_id: Uuid,
+        config: DigestConfig,
+    ) -> Result<DigestConfig> {
         sqlx::query!(
             r#"
             INSERT INTO digest_configs (id, user_id, name, senders, frequency, delivery_time, delivery_day, enabled, created_at)
@@ -473,13 +500,16 @@ impl DigestService {
         .fetch_all(&self.pool)
         .await?;
 
-        let items: Vec<DigestItem> = emails.into_iter().map(|e| DigestItem {
-            email_id: e.id,
-            subject: e.subject.unwrap_or_default(),
-            from: e.sender,
-            preview: e.body.chars().take(200).collect(),
-            received_at: e.received_at,
-        }).collect();
+        let items: Vec<DigestItem> = emails
+            .into_iter()
+            .map(|e| DigestItem {
+                email_id: e.id,
+                subject: e.subject.unwrap_or_default(),
+                from: e.sender,
+                preview: e.body.chars().take(200).collect(),
+                received_at: e.received_at,
+            })
+            .collect();
 
         // Mark original emails as archived (bundled into digest)
         for item in &items {
@@ -503,8 +533,8 @@ impl DigestService {
 
     fn calculate_period_start(&self, config: &DigestConfigRow) -> DateTime<Utc> {
         let now = Utc::now();
-        let frequency: DigestFrequency = serde_json::from_str(&config.frequency)
-            .unwrap_or(DigestFrequency::Daily);
+        let frequency: DigestFrequency =
+            serde_json::from_str(&config.frequency).unwrap_or(DigestFrequency::Daily);
 
         match frequency {
             DigestFrequency::Daily => now - Duration::days(1),
@@ -576,21 +606,31 @@ impl EmailDebtService {
         .fetch_all(&self.pool)
         .await?;
 
-        let overdue_replies: Vec<OverdueEmail> = overdue.into_iter().map(|r| {
-            let days = r.days_old.unwrap_or(0) as u32;
-            OverdueEmail {
-                email_id: r.id,
-                subject: r.subject.unwrap_or_default(),
-                from: r.sender,
-                received_at: r.received_at,
-                days_overdue: days.saturating_sub(2),
-                priority: if days > 7 { EmailPriority::Critical }
-                         else if days > 4 { EmailPriority::High }
-                         else { EmailPriority::Medium },
-                suggested_action: if days > 14 { SuggestedAction::Archive }
-                                  else { SuggestedAction::ReplyNow },
-            }
-        }).collect();
+        let overdue_replies: Vec<OverdueEmail> = overdue
+            .into_iter()
+            .map(|r| {
+                let days = r.days_old.unwrap_or(0) as u32;
+                OverdueEmail {
+                    email_id: r.id,
+                    subject: r.subject.unwrap_or_default(),
+                    from: r.sender,
+                    received_at: r.received_at,
+                    days_overdue: days.saturating_sub(2),
+                    priority: if days > 7 {
+                        EmailPriority::Critical
+                    } else if days > 4 {
+                        EmailPriority::High
+                    } else {
+                        EmailPriority::Medium
+                    },
+                    suggested_action: if days > 14 {
+                        SuggestedAction::Archive
+                    } else {
+                        SuggestedAction::ReplyNow
+                    },
+                }
+            })
+            .collect();
 
         // Find aging unread emails
         let aging = sqlx::query_as!(
@@ -610,14 +650,17 @@ impl EmailDebtService {
         .fetch_all(&self.pool)
         .await?;
 
-        let aging_unread: Vec<AgingEmail> = aging.into_iter().map(|a| AgingEmail {
-            email_id: a.id,
-            subject: a.subject.unwrap_or_default(),
-            from: a.sender,
-            received_at: a.received_at,
-            age_days: a.age_days.unwrap_or(0) as u32,
-            category: EmailCategory::Primary,
-        }).collect();
+        let aging_unread: Vec<AgingEmail> = aging
+            .into_iter()
+            .map(|a| AgingEmail {
+                email_id: a.id,
+                subject: a.subject.unwrap_or_default(),
+                from: a.sender,
+                received_at: a.received_at,
+                age_days: a.age_days.unwrap_or(0) as u32,
+                category: EmailCategory::Primary,
+            })
+            .collect();
 
         // Calculate average response time
         let avg_response = sqlx::query!(
@@ -634,9 +677,7 @@ impl EmailDebtService {
         .fetch_one(&self.pool)
         .await?;
 
-        let oldest_unread = aging_unread.first()
-            .map(|a| a.age_days)
-            .unwrap_or(0);
+        let oldest_unread = aging_unread.first().map(|a| a.age_days).unwrap_or(0);
 
         let debt_score = self.calculate_debt_score(&overdue_replies, &aging_unread);
 
@@ -650,7 +691,8 @@ impl EmailDebtService {
     }
 
     fn calculate_debt_score(&self, overdue: &[OverdueEmail], aging: &[AgingEmail]) -> f32 {
-        let overdue_score: f32 = overdue.iter()
+        let overdue_score: f32 = overdue
+            .iter()
             .map(|e| match e.priority {
                 EmailPriority::Critical => 10.0,
                 EmailPriority::High => 5.0,
@@ -659,14 +701,18 @@ impl EmailDebtService {
             })
             .sum();
 
-        let aging_score: f32 = aging.iter()
+        let aging_score: f32 = aging
+            .iter()
             .map(|e| (e.age_days as f32 / 7.0).min(5.0))
             .sum();
 
         (overdue_score + aging_score).min(100.0)
     }
 
-    pub async fn get_inbox_zero_streak(&self, user_id: Uuid) -> Result<(u32, Option<DateTime<Utc>>)> {
+    pub async fn get_inbox_zero_streak(
+        &self,
+        user_id: Uuid,
+    ) -> Result<(u32, Option<DateTime<Utc>>)> {
         let streak = sqlx::query!(
             r#"
             SELECT
@@ -680,7 +726,8 @@ impl EmailDebtService {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(streak.map(|s| (s.streak_days as u32, s.last_inbox_zero))
+        Ok(streak
+            .map(|s| (s.streak_days as u32, s.last_inbox_zero))
             .unwrap_or((0, None)))
     }
 
@@ -790,7 +837,11 @@ impl BulkActionService {
         Self { pool }
     }
 
-    pub async fn execute(&self, user_id: Uuid, request: BulkActionRequest) -> Result<BulkActionResult> {
+    pub async fn execute(
+        &self,
+        user_id: Uuid,
+        request: BulkActionRequest,
+    ) -> Result<BulkActionResult> {
         // Get affected emails
         let email_ids = if let Some(ids) = request.email_ids {
             ids
@@ -974,9 +1025,9 @@ pub struct QuietHoursConfig {
     pub id: Uuid,
     pub user_id: Uuid,
     pub enabled: bool,
-    pub start_time: String,  // "22:00"
-    pub end_time: String,    // "07:00"
-    pub days: Vec<String>,   // ["monday", "tuesday", ...]
+    pub start_time: String, // "22:00"
+    pub end_time: String,   // "07:00"
+    pub days: Vec<String>,  // ["monday", "tuesday", ...]
     pub exceptions: Vec<QuietHoursException>,
     pub auto_defer_low_priority: bool,
 }
@@ -1042,9 +1093,14 @@ impl QuietHoursService {
         Ok(false)
     }
 
-    pub async fn should_notify(&self, user_id: Uuid, email_sender: &str, labels: &[String]) -> Result<bool> {
+    pub async fn should_notify(
+        &self,
+        user_id: Uuid,
+        email_sender: &str,
+        labels: &[String],
+    ) -> Result<bool> {
         if !self.is_quiet_hours(user_id).await? {
-            return Ok(true);  // Not in quiet hours, allow notification
+            return Ok(true); // Not in quiet hours, allow notification
         }
 
         let config = sqlx::query_as!(
@@ -1060,7 +1116,9 @@ impl QuietHoursService {
         for exception in exceptions {
             match exception.exception_type {
                 ExceptionType::Sender if email_sender == exception.value => return Ok(true),
-                ExceptionType::Domain if email_sender.ends_with(&exception.value) => return Ok(true),
+                ExceptionType::Domain if email_sender.ends_with(&exception.value) => {
+                    return Ok(true);
+                }
                 ExceptionType::Label if labels.contains(&exception.value) => return Ok(true),
                 ExceptionType::VIP => {
                     // Check VIP list
@@ -1081,7 +1139,7 @@ impl QuietHoursService {
             }
         }
 
-        Ok(false)  // In quiet hours with no exceptions
+        Ok(false) // In quiet hours with no exceptions
     }
 }
 
@@ -1174,7 +1232,8 @@ impl SenderReputationService {
         let delete_rate = stats.delete_count.unwrap_or(0) as f32 / total;
 
         // Calculate reputation score
-        let reputation_score = (open_rate * 0.4) + ((1.0 - delete_rate) * 0.3) + ((1.0 - archive_rate) * 0.3);
+        let reputation_score =
+            (open_rate * 0.4) + ((1.0 - delete_rate) * 0.3) + ((1.0 - archive_rate) * 0.3);
 
         Ok(SenderReputation {
             sender: sender.to_string(),
@@ -1182,7 +1241,7 @@ impl SenderReputationService {
             reputation_score,
             email_count: stats.email_count.unwrap_or(0) as u32,
             open_rate,
-            reply_rate: 0.0,  // Would calculate from sent emails
+            reply_rate: 0.0, // Would calculate from sent emails
             archive_rate,
             delete_rate,
             unsubscribe_rate: 0.0,
@@ -1282,7 +1341,7 @@ impl InboxHealthService {
         let health_score = self.calculate_health_score(
             stats.unread.unwrap_or(0) as u32,
             email_debt.total_debt_score,
-            streak
+            streak,
         );
 
         Ok(InboxHealth {
@@ -1293,8 +1352,8 @@ impl InboxHealthService {
             last_inbox_zero: last_zero,
             health_score,
             email_debt,
-            categories: Vec::new(),  // Would calculate category breakdown
-            recommendations: Vec::new(),  // Would generate recommendations
+            categories: Vec::new(),      // Would calculate category breakdown
+            recommendations: Vec::new(), // Would generate recommendations
             calculated_at: Utc::now(),
         })
     }

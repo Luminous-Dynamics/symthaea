@@ -29,7 +29,10 @@ pub struct ExtractedMeeting {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MeetingLocation {
     Physical(String),
-    Virtual { platform: String, link: Option<String> },
+    Virtual {
+        platform: String,
+        link: Option<String>,
+    },
     Phone(String),
     TBD,
 }
@@ -117,9 +120,20 @@ impl ContentExtractor {
 
         // Meeting indicators
         let meeting_keywords = [
-            "meeting", "call", "sync", "standup", "stand-up", "check-in",
-            "discussion", "session", "workshop", "presentation", "demo",
-            "interview", "conference", "webinar",
+            "meeting",
+            "call",
+            "sync",
+            "standup",
+            "stand-up",
+            "check-in",
+            "discussion",
+            "session",
+            "workshop",
+            "presentation",
+            "demo",
+            "interview",
+            "conference",
+            "webinar",
         ];
 
         // Check if this looks like a meeting email
@@ -180,11 +194,17 @@ impl ContentExtractor {
             (r"(?i)could you\s+(.+?)(?:\.|$|\?)", ActionPriority::Low),
             (r"(?i)need(?:s)? to\s+(.+?)(?:\.|$)", ActionPriority::High),
             (r"(?i)must\s+(.+?)(?:\.|$)", ActionPriority::High),
-            (r"(?i)action(?:\s+item)?:\s*(.+?)(?:\.|$)", ActionPriority::High),
+            (
+                r"(?i)action(?:\s+item)?:\s*(.+?)(?:\.|$)",
+                ActionPriority::High,
+            ),
             (r"(?i)todo:\s*(.+?)(?:\.|$)", ActionPriority::Medium),
             (r"(?i)(?:@\w+)\s+(.+?)(?:\.|$)", ActionPriority::Medium),
             (r"(?i)asap[:\s]+(.+?)(?:\.|$)", ActionPriority::Urgent),
-            (r"(?i)urgent(?:ly)?[:\s]+(.+?)(?:\.|$)", ActionPriority::Urgent),
+            (
+                r"(?i)urgent(?:ly)?[:\s]+(.+?)(?:\.|$)",
+                ActionPriority::Urgent,
+            ),
         ];
 
         for (pattern, priority) in action_patterns {
@@ -219,9 +239,7 @@ impl ContentExtractor {
         }
 
         // Deduplicate similar actions
-        actions.dedup_by(|a, b| {
-            similarity(&a.description, &b.description) > 0.8
-        });
+        actions.dedup_by(|a, b| similarity(&a.description, &b.description) > 0.8);
 
         actions
     }
@@ -231,13 +249,15 @@ impl ContentExtractor {
         let mut contacts = Vec::new();
 
         // Extract emails
-        let emails: Vec<String> = self.email_regex
+        let emails: Vec<String> = self
+            .email_regex
             .find_iter(text)
             .map(|m| m.as_str().to_string())
             .collect();
 
         // Extract phones
-        let phones: Vec<String> = self.phone_regex
+        let phones: Vec<String> = self
+            .phone_regex
             .find_iter(text)
             .map(|m| m.as_str().to_string())
             .collect();
@@ -257,9 +277,9 @@ impl ContentExtractor {
 
         // Match phones to contacts or create new ones
         for phone in phones {
-            let existing = contacts.iter_mut().find(|c| {
-                c.name.as_ref().map(|n| text.contains(n)).unwrap_or(false)
-            });
+            let existing = contacts
+                .iter_mut()
+                .find(|c| c.name.as_ref().map(|n| text.contains(n)).unwrap_or(false));
 
             if let Some(contact) = existing {
                 contact.phone = Some(phone);
@@ -286,7 +306,10 @@ impl ContentExtractor {
             (r"(?i)deadline[:\s]+(.+?)(?:\.|$)", true),
             (r"(?i)due by[:\s]+(.+?)(?:\.|$)", true),
             (r"(?i)due[:\s]+(.+?)(?:\.|$)", true),
-            (r"(?i)by\s+((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d+)", false),
+            (
+                r"(?i)by\s+((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d+)",
+                false,
+            ),
             (r"(?i)before[:\s]+(.+?)(?:\.|$)", false),
             (r"(?i)no later than[:\s]+(.+?)(?:\.|$)", true),
         ];
@@ -361,7 +384,9 @@ impl ContentExtractor {
         for (name, weekday) in days {
             if text_lower.contains(name) {
                 let days_ahead = (weekday.num_days_from_monday() as i64
-                    - today.weekday().num_days_from_monday() as i64 + 7) % 7;
+                    - today.weekday().num_days_from_monday() as i64
+                    + 7)
+                    % 7;
                 let days_ahead = if days_ahead == 0 { 7 } else { days_ahead };
                 return Some(today + chrono::Duration::days(days_ahead));
             }
@@ -485,7 +510,11 @@ impl ContentExtractor {
 
         // First line often contains the title
         if let Some(first_line) = lines.first() {
-            if first_line.len() < 100 && keywords.iter().any(|kw| first_line.to_lowercase().contains(kw)) {
+            if first_line.len() < 100
+                && keywords
+                    .iter()
+                    .any(|kw| first_line.to_lowercase().contains(kw))
+            {
                 return Some(first_line.trim().to_string());
             }
         }
@@ -508,7 +537,8 @@ impl ContentExtractor {
     }
 
     fn extract_duration(&self, text: &str) -> Option<i32> {
-        let duration_regex = Regex::new(r"(?i)(\d+)\s*(?:hour|hr|h)s?|(\d+)\s*(?:minute|min|m)s?").unwrap();
+        let duration_regex =
+            Regex::new(r"(?i)(\d+)\s*(?:hour|hr|h)s?|(\d+)\s*(?:minute|min|m)s?").unwrap();
 
         if let Some(cap) = duration_regex.captures(text) {
             if let Some(hours) = cap.get(1) {
@@ -554,10 +584,18 @@ impl ContentExtractor {
     ) -> f64 {
         let mut score = 0.2; // Base score for having meeting keywords
 
-        if has_date { score += 0.25; }
-        if has_time { score += 0.25; }
-        if has_location { score += 0.15; }
-        if has_attendees { score += 0.15; }
+        if has_date {
+            score += 0.25;
+        }
+        if has_time {
+            score += 0.25;
+        }
+        if has_location {
+            score += 0.15;
+        }
+        if has_attendees {
+            score += 0.15;
+        }
 
         score.min(1.0)
     }
@@ -565,7 +603,8 @@ impl ContentExtractor {
     fn extract_assignee_from_text(&self, text: &str) -> Option<String> {
         let mention_regex = Regex::new(r"@([a-zA-Z0-9_]+)").unwrap();
 
-        mention_regex.captures(text)
+        mention_regex
+            .captures(text)
             .and_then(|cap| cap.get(1))
             .map(|m| m.as_str().to_string())
     }
@@ -573,8 +612,14 @@ impl ContentExtractor {
     fn extract_name_near_email(&self, email: &str, text: &str) -> Option<String> {
         // Look for name patterns near the email
         let patterns = [
-            format!(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*<{}>", regex::escape(email)),
-            format!(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+{}", regex::escape(email)),
+            format!(
+                r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*<{}>",
+                regex::escape(email)
+            ),
+            format!(
+                r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+{}",
+                regex::escape(email)
+            ),
         ];
 
         for pattern in patterns {
@@ -639,7 +684,10 @@ mod tests {
 
         assert!(!meetings.is_empty());
         assert!(meetings[0].time.is_some());
-        assert!(matches!(meetings[0].location, Some(MeetingLocation::Virtual { .. })));
+        assert!(matches!(
+            meetings[0].location,
+            Some(MeetingLocation::Virtual { .. })
+        ));
     }
 
     #[test]

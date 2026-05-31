@@ -10,7 +10,7 @@
 //! Runs inside `mailin-embedded`'s blocking I/O model, which we wrap
 //! with `tokio::task::spawn_blocking` from main.
 
-use mailin_embedded::{response::*, Handler, Response};
+use mailin_embedded::{Handler, Response, response::*};
 use std::net::IpAddr;
 
 /// Trait for the receiver's downstream pipeline. Abstracts out so we can

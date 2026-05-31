@@ -4,7 +4,7 @@
 //! Inbox with pinned conversations, date separators, split view, thread grouping, batch actions.
 
 use crate::components::{EmailCard, NotificationPrompt, PullToRefresh};
-use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::holochain::{ConnectionStatus, use_holochain};
 use crate::mail_context::use_mail;
 use crate::semantic;
 use crate::summary::use_pulse_summary;

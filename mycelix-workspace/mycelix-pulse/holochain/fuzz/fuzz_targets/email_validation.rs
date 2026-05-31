@@ -25,7 +25,14 @@ fuzz_target!(|data: &[u8]| {
 
     // Test: CryptoSuite string parsing doesn't panic
     let suite_str = std::str::from_utf8(&data[4..data.len().min(20)]).unwrap_or("");
-    let valid_suites = ["ed25519", "dilithium3", "dilithium2", "x25519", "kyber1024", "kyber768"];
+    let valid_suites = [
+        "ed25519",
+        "dilithium3",
+        "dilithium2",
+        "x25519",
+        "kyber1024",
+        "kyber768",
+    ];
     let _ = valid_suites.contains(&suite_str);
 
     // Test: chunk validation boundaries

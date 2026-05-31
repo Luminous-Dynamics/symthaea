@@ -5,14 +5,8 @@ use hdk::prelude::*;
 use mycelix_mail_integrity::*;
 
 // Mycelix SDK imports for MATL integration
-use mycelix_sdk::matl::{
-    ReputationScore as MATLReputationScore,
-    DEFAULT_BYZANTINE_THRESHOLD,
-};
-use mycelix_sdk::bridge::{
-    CrossHappReputation,
-    HappReputationScore,
-};
+use mycelix_sdk::bridge::{CrossHappReputation, HappReputationScore};
+use mycelix_sdk::matl::{DEFAULT_BYZANTINE_THRESHOLD, ReputationScore as MATLReputationScore};
 
 /// Input for spam reporting
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -138,7 +132,7 @@ pub fn filter_inbox(min_trust: f64) -> ExternResult<Vec<MailMessage>> {
         _ => {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Zome call failed".into()
-            )))
+            )));
         }
     };
 
@@ -316,7 +310,10 @@ pub struct MATLTrustResult {
 /// This uses the SDK's ReputationScore for proper Bayesian smoothing
 #[hdk_extern]
 pub fn update_trust_with_matl(input: MATLTrustUpdateInput) -> ExternResult<ActionHash> {
-    debug!("MATL trust update for {}: positive={}", input.did, input.is_positive);
+    debug!(
+        "MATL trust update for {}: positive={}",
+        input.did, input.is_positive
+    );
 
     // Get existing trust score to preserve counts (for future use when we track counts)
     let _existing_score = check_sender_trust(input.did.clone())?;
@@ -360,9 +357,7 @@ pub fn evaluate_trust_matl(did: String) -> ExternResult<MATLTrustResult> {
     // Get spam reports to estimate interactions
     let since = Timestamp::from_micros(0);
     let spam_reports = get_spam_reports(GetSpamReportsInput { since })?;
-    let negative_count = spam_reports.iter()
-        .filter(|r| r.spammer_did == did)
-        .count() as u64;
+    let negative_count = spam_reports.iter().filter(|r| r.spammer_did == did).count() as u64;
 
     // Estimate total interactions (rough heuristic)
     // In production, would track actual message counts
