@@ -50,6 +50,8 @@ datasets/*.json
 # Nix build
 result
 result-*
+.direnv/
+.cuda_cache/
 
 # Rust specific
 **/*.rs.bk
