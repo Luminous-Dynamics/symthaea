@@ -11,6 +11,8 @@
   "min_broca_selection_score": 0.95,
   "min_repair_success_rate": 0.0,
   "max_repair_attempts": 0,
+  "max_geodesic_rejection_shadow_false_positives": 0,
+  "max_hard_geodesic_rejections": 0,
   "min_category_pass_rates": {
     "async": 0.9,
     "generic": 0.9,

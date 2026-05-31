@@ -142,6 +142,34 @@ def main() -> int:
         failures,
         baseline_key="min_repair_memory_success_rate",
     )
+    check_min(
+        report,
+        baseline,
+        "geodesic_rejection_shadow_hits",
+        failures,
+        baseline_key="min_geodesic_rejection_shadow_hits",
+    )
+    check_min(
+        report,
+        baseline,
+        "geodesic_rejection_shadow_true_positives",
+        failures,
+        baseline_key="min_geodesic_rejection_shadow_true_positives",
+    )
+    check_max(
+        report,
+        baseline,
+        "geodesic_rejection_shadow_false_positives",
+        failures,
+        baseline_key="max_geodesic_rejection_shadow_false_positives",
+    )
+    check_max(
+        report,
+        baseline,
+        "hard_geodesic_rejections",
+        failures,
+        baseline_key="max_hard_geodesic_rejections",
+    )
     check_category_pass_rates(report, baseline, failures)
 
     if failures:
@@ -167,6 +195,9 @@ def main() -> int:
         f"repair_prior_uses={report.get('repair_prior_uses')} "
         f"repair_memory_hits={report.get('repair_memory_hits')} "
         f"repair_memory_success_rate={report.get('repair_memory_success_rate')} "
+        f"geodesic_shadow_hits={report.get('geodesic_rejection_shadow_hits')} "
+        f"geodesic_shadow_fp={report.get('geodesic_rejection_shadow_false_positives')} "
+        f"hard_geodesic_rejections={report.get('hard_geodesic_rejections')} "
         f"sheaf_incoherent={report.get('certificates_sheaf_incoherent')} "
         f"broca_selection_score={report.get('broca_selection_score')}"
     )

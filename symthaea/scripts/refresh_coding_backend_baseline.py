@@ -57,6 +57,16 @@ def main() -> int:
             report.get("repair_memory_success_rate", 0.0) * 0.9,
             3,
         ),
+        "min_geodesic_rejection_shadow_hits": report.get(
+            "geodesic_rejection_shadow_hits", 0
+        ),
+        "min_geodesic_rejection_shadow_true_positives": report.get(
+            "geodesic_rejection_shadow_true_positives", 0
+        ),
+        "max_geodesic_rejection_shadow_false_positives": report.get(
+            "geodesic_rejection_shadow_false_positives", 0
+        ),
+        "max_hard_geodesic_rejections": report.get("hard_geodesic_rejections", 0),
         "min_category_pass_rates": {
             category: round(data["pass_rate"] * 0.9, 3)
             for category, data in sorted(report.get("category_pass_rates", {}).items())

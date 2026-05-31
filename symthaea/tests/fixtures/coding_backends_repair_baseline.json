@@ -15,6 +15,8 @@
   "max_repair_attempts": 8,
   "min_repair_prior_uses": 8,
   "min_repair_prior_label_count": 8,
+  "max_geodesic_rejection_shadow_false_positives": 0,
+  "max_hard_geodesic_rejections": 0,
   "min_category_pass_rates": {
     "repair": 0.95,
     "repair_memory": 0.95

@@ -13,6 +13,7 @@ on:
       - "scripts/coding_backend_structural_memory_ab.sh"
       - "scripts/coding_agent_quality_gate.sh"
       - "scripts/check_coding_backend_baseline.py"
+      - "scripts/test_check_coding_backend_baseline.py"
       - "scripts/check_repair_memory_ab.py"
       - "scripts/merge_repair_lessons.py"
       - "tests/fixtures/coding_backends_baseline.json"
@@ -60,6 +61,9 @@ jobs:
 
       - name: Run coding backend regression
         run: scripts/coding_backend_regression.sh
+
+      - name: Test coding backend baseline checker
+        run: python3 scripts/test_check_coding_backend_baseline.py
 
       - name: Run hard geodesic shadow gate
         env:
