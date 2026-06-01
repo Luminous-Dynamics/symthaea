@@ -67,6 +67,25 @@ pub fn repair_hint_for_category(category: &str) -> &'static str {
         "sheaf_failure" => {
             "repair local data-flow facts: definitions, return shape, ownership, and stubs"
         }
+        "off_by_one" => {
+            "check inclusive/exclusive bounds, index origins, and final accumulator adjustment"
+        }
+        "boolean_inversion" => {
+            "invert the predicate or swap branch bodies so the boolean semantic contract matches"
+        }
+        "numeric_value_mismatch" => {
+            "repair the arithmetic formula, operator, or accumulator update against the examples"
+        }
+        "empty_result_mismatch" => {
+            "check early returns, initial values, filters, and whether matching items are appended"
+        }
+        "order_mismatch" => "preserve insertion order or sort deterministically before returning",
+        "partial_value_mismatch" => {
+            "repair string/list assembly so no required component is missing, extra, or truncated"
+        }
+        "semantic_value_mismatch" => {
+            "treat expected/actual values as the core semantic contract, not only a syntax issue"
+        }
         "test_failure" => "treat examples and generated tests as executable semantic constraints",
         "analogy_miss" => "fall back to direct synthesis from the signature and task purpose",
         "energy_budget" => {
