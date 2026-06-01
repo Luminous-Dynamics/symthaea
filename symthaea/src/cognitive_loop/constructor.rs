@@ -1008,6 +1008,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             last_mental_movie: None,
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
+            #[cfg(feature = "safety-agents")]
             safety_supervisor: super::safety_supervisor::SafetySupervisor::new(),
             tracer: super::observability::CognitiveTracer::new(1000),
             #[cfg(feature = "scientific_method")]

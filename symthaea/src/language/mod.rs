@@ -22,6 +22,7 @@ pub mod semantic_intent;
 
 // Domain plugins
 pub mod code_assistant_plugin;
+pub mod coding_feedback_core;
 pub mod general_assistant_plugin;
 pub mod math_plugin;
 pub mod nixos_plugin;

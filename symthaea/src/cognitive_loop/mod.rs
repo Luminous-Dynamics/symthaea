@@ -182,6 +182,7 @@ pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub mod observability;
+#[cfg(feature = "safety-agents")]
 pub mod safety_supervisor;
 pub(crate) mod subsystem_trait;
 pub(crate) mod threshold_overrides;
@@ -1004,6 +1005,7 @@ pub struct CognitiveLoopService {
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
 
     /// Safety Supervisor: Centralized immune system orchestration.
+    #[cfg(feature = "safety-agents")]
     pub(crate) safety_supervisor: safety_supervisor::SafetySupervisor,
 
     /// Cognitive Tracer: High-resolution thought observability.
