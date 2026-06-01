@@ -312,6 +312,7 @@ FULL_DATA="$OUT_DIR/curriculum-full.jsonl"
 TRAIN_DATA="$OUT_DIR/train-gate.jsonl"
 CHECKPOINT="$OUT_DIR/broca-gated.bin"
 REPORT="${BROCA_GATE_REPORT:-$OUT_DIR/quality-$EVAL_LANE.json}"
+DECODER_REPORT="${BROCA_GATE_DECODER_REPORT:-$OUT_DIR/decoder-ab.json}"
 CANONICAL="${BROCA_GATE_CANONICAL:-crates/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl}"
 
 mkdir -p "$OUT_DIR"
@@ -592,3 +593,18 @@ fi
 
 echo "  checkpoint: $CHECKPOINT"
 echo "  report:     $REPORT"
+
+if [[ "${BROCA_GATE_DECODER_AB:-0}" == "1" ]]; then
+    DECODER_AB_DECODERS="${BROCA_GATE_DECODER_AB_DECODERS:-direct,structured}"
+    DECODER_AB_EVAL_LIMIT="${BROCA_GATE_DECODER_AB_EVAL_LIMIT:-$EVAL_LIMIT}"
+    DECODER_AB_MAX_GEN_TOKENS="${BROCA_GATE_DECODER_AB_MAX_GEN_TOKENS:-$MAX_GEN_TOKENS}"
+    echo "[broca-gate] running decoder A/B: $DECODER_AB_DECODERS"
+    run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-decoder-ab -- \
+        --checkpoint "$CHECKPOINT" \
+        --canonical-eval "$CANONICAL" \
+        --eval-limit "$DECODER_AB_EVAL_LIMIT" \
+        --max-gen-tokens "$DECODER_AB_MAX_GEN_TOKENS" \
+        --decoder "$DECODER_AB_DECODERS" \
+        --json-out "$DECODER_REPORT"
+    echo "  decoder report: $DECODER_REPORT"
+fi

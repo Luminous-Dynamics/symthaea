@@ -119,7 +119,6 @@ required-features = ["mamba-cpu"]
 [[bin]]
 name = "broca-decoder-ab"
 path = "src/bin/broca_decoder_ab.rs"
-required-features = ["mamba-cpu"]
 
 [[bin]]
 name = "broca-embedding-stats"

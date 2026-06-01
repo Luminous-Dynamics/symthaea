@@ -180,11 +180,16 @@ fn run(opts: Options) -> Result<()> {
     }
     let structured_decoder =
         wants(&opts, BrocaDecoderKind::Structured).then(|| StructuredDecoder::new(&genesis));
+    #[cfg(feature = "mamba-cpu")]
     let mut mamba_generator = if wants(&opts, BrocaDecoderKind::Mamba) {
         Some(load_mamba_generator(&opts, &genesis)?)
     } else {
         None
     };
+    #[cfg(not(feature = "mamba-cpu"))]
+    if wants(&opts, BrocaDecoderKind::Mamba) {
+        anyhow::bail!("mamba decoder requires the mamba-cpu or mamba feature");
+    }
 
     let cases = limited_cases(&dataset, opts.eval_limit);
     let mut case_results = Vec::with_capacity(cases.len());
@@ -211,6 +216,7 @@ fn run(opts: Options) -> Result<()> {
             structured_case(readout, opts.include_structured_molecule)
         });
 
+        #[cfg(feature = "mamba-cpu")]
         let mamba = match mamba_generator.as_mut() {
             Some(generator) => {
                 let result = generator.generate(&channels);
@@ -225,6 +231,8 @@ fn run(opts: Options) -> Result<()> {
             }
             None => None,
         };
+        #[cfg(not(feature = "mamba-cpu"))]
+        let mamba = None;
         case_results.push(DecoderAbCase {
             case_index,
             case_id: case.id.clone(),
@@ -349,19 +357,16 @@ fn load_mamba_generator(opts: &Options, genesis: &GenesisSeed) -> Result<LiquidM
     Ok(generator)
 }
 
-#[cfg(not(feature = "mamba-cpu"))]
-fn load_mamba_generator(_opts: &Options, _genesis: &GenesisSeed) -> Result<()> {
-    anyhow::bail!("mamba decoder requires the mamba-cpu or mamba feature")
-}
-
 fn direct_case(result: GenerationResult, semantic_drift: Option<f32>) -> DirectCase {
+    let hallucination_flag =
+        result.hallucination_flag || generation_hallucination_marker(&result.text);
     DirectCase {
         evidence_level: "measured".to_string(),
         text: result.text,
         token_ids: result.token_ids,
         num_tokens: result.num_tokens,
         final_coherence: result.final_coherence,
-        hallucination_flag: result.hallucination_flag,
+        hallucination_flag,
         eos_terminated: result.eos_terminated,
         semantic_drift,
     }
@@ -369,22 +374,24 @@ fn direct_case(result: GenerationResult, semantic_drift: Option<f32>) -> DirectC
 
 #[cfg(feature = "mamba-cpu")]
 fn mamba_case(result: GenerationResult, semantic_drift: Option<f32>) -> MambaCase {
+    let hallucination_flag =
+        result.hallucination_flag || generation_hallucination_marker(&result.text);
     MambaCase {
         evidence_level: "measured".to_string(),
         text: result.text,
         token_ids: result.token_ids,
         num_tokens: result.num_tokens,
         final_coherence: result.final_coherence,
-        hallucination_flag: result.hallucination_flag,
+        hallucination_flag,
         eos_terminated: result.eos_terminated,
         semantic_pe: Some(result.semantic_pe),
         semantic_drift,
     }
 }
 
-#[cfg(not(feature = "mamba-cpu"))]
-fn mamba_case(_result: GenerationResult, _semantic_drift: Option<f32>) -> MambaCase {
-    unreachable!("mamba result cannot be produced without mamba-cpu")
+fn generation_hallucination_marker(text: &str) -> bool {
+    let trimmed = text.trim();
+    trimmed.is_empty() || trimmed.contains("<unk>") || trimmed.contains('\u{fffd}')
 }
 
 fn structured_case(readout: StructuredReadout, include_molecule: bool) -> StructuredCase {

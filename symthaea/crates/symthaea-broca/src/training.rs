@@ -2371,6 +2371,7 @@ fn cross_entropy_loss_smooth(logits: &[f32], target: usize, label_smoothing: f32
     }
 }
 
+#[cfg(feature = "gpu")]
 #[derive(Debug, Clone, Copy)]
 struct LogitProbe {
     target_rank: usize,
@@ -2379,6 +2380,7 @@ struct LogitProbe {
     selected_token_id: usize,
 }
 
+#[cfg(feature = "gpu")]
 fn logit_probe(logits: &[f32], target: usize) -> LogitProbe {
     if logits.is_empty() || target >= logits.len() {
         return LogitProbe {
