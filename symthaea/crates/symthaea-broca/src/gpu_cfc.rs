@@ -1116,6 +1116,48 @@ impl GpuTrainer {
         Ok(weight * violation)
     }
 
+    /// Apply a targeted update when `<unk>` outranks the target token.
+    pub fn gpu_unknown_token_penalty_gradient(
+        &mut self,
+        logits: &[f32],
+        target: usize,
+        unknown_token: usize,
+        lr: f32,
+        grad_clip: f32,
+        weight: f32,
+        margin: f32,
+    ) -> Result<f32> {
+        if weight <= 0.0
+            || target >= logits.len()
+            || unknown_token >= logits.len()
+            || target == unknown_token
+        {
+            return Ok(0.0);
+        }
+        let violation = logits[unknown_token] + margin - logits[target];
+        if violation <= 0.0 {
+            return Ok(0.0);
+        }
+
+        let raw_output = self.network.output()?;
+        let raw_norm = raw_output.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?;
+        let output_hat = (&raw_output / &norm_bc)?;
+
+        let n = logits.len();
+        let mut errors = vec![0.0f32; n];
+        let step = (self.logit_scale * lr * weight).clamp(-grad_clip, grad_clip);
+        errors[target] = -step;
+        errors[unknown_token] = step;
+
+        let error_tensor = Tensor::from_vec(errors, (n, 1), &self.device)?;
+        let grad_matrix = error_tensor.matmul(&output_hat)?;
+        self.embeddings = (&self.embeddings - &grad_matrix)?;
+        self.renormalize_embeddings()?;
+
+        Ok(weight * violation)
+    }
+
     /// Apply KL-style distribution anchoring against cached reference logits.
     ///
     /// Computes the gradient of KL(reference || current) w.r.t. the output

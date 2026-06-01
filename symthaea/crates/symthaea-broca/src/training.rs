@@ -364,6 +364,15 @@ pub struct TrainingConfig {
     /// inactive. Default 0.0 means only penalize wrong top tokens.
     pub top_token_anticollapse_margin: f32,
 
+    // ── Unknown-Token Anti-Collapse ──
+    /// Margin loss weight that penalizes `<unk>` outranking the target token.
+    ///
+    /// Generation already suppresses `<unk>`, but teacher-forced logits can
+    /// still collapse toward it. This term attacks that root cause directly.
+    pub unknown_token_penalty_weight: f32,
+    /// Required target-vs-`<unk>` logit margin before the penalty is inactive.
+    pub unknown_token_penalty_margin: f32,
+
     // ── Adaptive Veto Warmup ──
     /// Target veto threshold to ramp toward during training (0.0 = disabled).
     /// When > 0, the generator's veto_threshold is linearly ramped from 0.0
@@ -449,6 +458,8 @@ impl Default for TrainingConfig {
             logit_anchor_weight: 0.0,
             top_token_anticollapse_weight: 0.0,
             top_token_anticollapse_margin: 0.0,
+            unknown_token_penalty_weight: 0.0,
+            unknown_token_penalty_margin: 0.0,
             best_checkpoint_path: String::new(),
             hidden_dropout: 0.0,
             adaptive_veto_target: 0.0, // disabled by default
@@ -898,6 +909,7 @@ pub fn train_with_adam(
 
     let use_sampled = config.negative_samples > 0;
     let vocab_size = generator.tokenizer().vocab_size();
+    let unknown_token_id = generator.tokenizer().unk_id as usize;
 
     // Pre-compute curriculum ordering (indices into dataset)
     let curriculum_order: Vec<usize> = match &config.curriculum {
@@ -1262,6 +1274,18 @@ pub fn train_with_adam(
                                 )?;
                                 total_loss += anti_loss;
                             }
+                            if config.unknown_token_penalty_weight > 0.0 {
+                                let unk_loss = trainer.gpu_unknown_token_penalty_gradient(
+                                    &logits,
+                                    target_id as usize,
+                                    unknown_token_id,
+                                    lr,
+                                    effective_grad_clip,
+                                    config.unknown_token_penalty_weight,
+                                    config.unknown_token_penalty_margin,
+                                )?;
+                                total_loss += unk_loss;
+                            }
                         }
 
                         gpu_prev_token = target_id;
@@ -1503,6 +1527,19 @@ pub fn train_with_adam(
                             );
                             total_loss += anti_loss;
                         }
+                        if config.unknown_token_penalty_weight > 0.0 {
+                            let unk_loss = apply_token_margin_penalty_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                unknown_token_id,
+                                lr,
+                                effective_grad_clip,
+                                config.unknown_token_penalty_weight,
+                                config.unknown_token_penalty_margin,
+                            );
+                            total_loss += unk_loss;
+                        }
                         result
                     } else {
                         let result = apply_weight_tied_gradient(
@@ -1546,6 +1583,19 @@ pub fn train_with_adam(
                                 config.top_token_anticollapse_margin,
                             );
                             total_loss += anti_loss;
+                        }
+                        if config.unknown_token_penalty_weight > 0.0 {
+                            let unk_loss = apply_token_margin_penalty_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                unknown_token_id,
+                                lr,
+                                effective_grad_clip,
+                                config.unknown_token_penalty_weight,
+                                config.unknown_token_penalty_margin,
+                            );
+                            total_loss += unk_loss;
                         }
                         result
                     };
@@ -2470,6 +2520,52 @@ fn apply_top_token_anticollapse_gradient(
     }
     if top_id < embeddings.len() {
         for (j, emb_val) in embeddings[top_id].values.iter_mut().enumerate() {
+            if j < output_slice.len() {
+                *emb_val -= step * output_slice[j];
+            }
+        }
+    }
+
+    weight * violation
+}
+
+fn apply_token_margin_penalty_gradient(
+    controller: &mut crate::controller::LanguageController,
+    logits: &[f32],
+    target: usize,
+    penalized_token: usize,
+    lr: f32,
+    grad_clip: f32,
+    weight: f32,
+    margin: f32,
+) -> f32 {
+    if weight <= 0.0
+        || target >= logits.len()
+        || penalized_token >= logits.len()
+        || target == penalized_token
+    {
+        return 0.0;
+    }
+    let violation = logits[penalized_token] + margin - logits[target];
+    if violation <= 0.0 {
+        return 0.0;
+    }
+
+    let output_hv = controller.output_hv();
+    let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
+    let step = (lr * weight * scale).clamp(-grad_clip, grad_clip);
+    let embeddings = controller.token_embeddings_mut();
+
+    if target < embeddings.len() {
+        for (j, emb_val) in embeddings[target].values.iter_mut().enumerate() {
+            if j < output_slice.len() {
+                *emb_val += step * output_slice[j];
+            }
+        }
+    }
+    if penalized_token < embeddings.len() {
+        for (j, emb_val) in embeddings[penalized_token].values.iter_mut().enumerate() {
             if j < output_slice.len() {
                 *emb_val -= step * output_slice[j];
             }

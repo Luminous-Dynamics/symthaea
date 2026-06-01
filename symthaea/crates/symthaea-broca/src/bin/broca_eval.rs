@@ -414,6 +414,8 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_logit_anchor: parse_env_f32("BROCA_TRAIN_LOGIT_ANCHOR"),
         train_top_token_anticollapse: parse_env_f32("BROCA_TRAIN_TOP_TOKEN_ANTICOLLAPSE"),
         train_top_token_margin: parse_env_f32("BROCA_TRAIN_TOP_TOKEN_MARGIN"),
+        train_unknown_token_penalty: parse_env_f32("BROCA_TRAIN_UNKNOWN_TOKEN_PENALTY"),
+        train_unknown_token_margin: parse_env_f32("BROCA_TRAIN_UNKNOWN_TOKEN_MARGIN"),
         train_thought_logit_residual: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_RESIDUAL"),
         train_semantic_attractor: std::env::var("BROCA_TRAIN_SEMANTIC_ATTRACTOR").ok(),
         train_semantic_attractor_strength: parse_env_f32("BROCA_TRAIN_SEMANTIC_ATTRACTOR_STRENGTH"),

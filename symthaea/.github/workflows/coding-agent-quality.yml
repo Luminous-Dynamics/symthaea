@@ -14,6 +14,8 @@ on:
       - "scripts/coding_deepswe_smoke.sh"
       - "scripts/check_coding_backend_baseline.py"
       - "scripts/test_check_coding_backend_baseline.py"
+      - "scripts/summarize_broca_quality.py"
+      - "scripts/test_summarize_broca_quality.py"
       - "scripts/check_forecastbench_baseline.py"
       - "tests/fixtures/coding_backends*.json"
       - "tests/fixtures/forecastbench*.json*"
@@ -78,6 +80,9 @@ jobs:
 
       - name: Test coding baseline checker
         run: python3 scripts/test_check_coding_backend_baseline.py
+
+      - name: Test Broca quality summary
+        run: python3 scripts/test_summarize_broca_quality.py
 
       - name: Upload quality reports
         if: always()

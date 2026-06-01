@@ -248,6 +248,10 @@ pub struct QualityRunMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_top_token_margin: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_unknown_token_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_unknown_token_margin: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_thought_logit_residual: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_semantic_attractor: Option<String>,

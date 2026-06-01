@@ -116,6 +116,21 @@ fn main() {
     // from broca-collect), so we always re-tokenize for CfC-HDC compatibility.
     let tokenizer = generator.tokenizer().clone();
     dataset.retokenize_all(&tokenizer);
+    let unk_target_tokens = dataset
+        .pairs
+        .iter()
+        .flat_map(|pair| pair.target_ids.iter())
+        .filter(|&&id| id == tokenizer.unk_id)
+        .count();
+    let total_target_tokens: usize = dataset.pairs.iter().map(|pair| pair.target_ids.len()).sum();
+    if total_target_tokens > 0 {
+        tracing::info!(
+            unk_target_tokens,
+            total_target_tokens,
+            unk_target_rate = unk_target_tokens as f32 / total_target_tokens as f32,
+            "Retokenized training target unknown-token rate"
+        );
+    }
 
     // Load validation dataset for early stopping if --eval was provided
     let validation_dataset = opts.eval_path.as_ref().and_then(|eval_path| {
@@ -182,6 +197,8 @@ fn main() {
         logit_anchor_weight: opts.logit_anchor_weight,
         top_token_anticollapse_weight: opts.top_token_anticollapse_weight,
         top_token_anticollapse_margin: opts.top_token_anticollapse_margin,
+        unknown_token_penalty_weight: opts.unknown_token_penalty_weight,
+        unknown_token_penalty_margin: opts.unknown_token_penalty_margin,
         best_checkpoint_path: best_path,
         hidden_dropout: opts.hidden_dropout,
         adaptive_veto_target: opts.adaptive_veto_target,
@@ -426,6 +443,10 @@ struct TrainOpts {
     top_token_anticollapse_weight: f32,
     /// Required target-vs-wrong-top logit margin for anti-collapse (default: 0.0).
     top_token_anticollapse_margin: f32,
+    /// `<unk>` margin penalty loss weight (default: 0.0 = disabled).
+    unknown_token_penalty_weight: f32,
+    /// Required target-vs-`<unk>` logit margin for penalty (default: 0.0).
+    unknown_token_penalty_margin: f32,
     /// Direct thought-logit residual blend during decoding (default: 0.0).
     thought_logit_residual_weight: f32,
     /// Save best checkpoint path (auto-generated from output if not specified).
@@ -490,6 +511,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         logit_anchor_weight: 0.0,
         top_token_anticollapse_weight: 0.0,
         top_token_anticollapse_margin: 0.0,
+        unknown_token_penalty_weight: 0.0,
+        unknown_token_penalty_margin: 0.0,
         thought_logit_residual_weight: 0.0,
         best_checkpoint_path: String::new(),
         no_save_adam: false,
@@ -747,6 +770,22 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--top-token-margin must be a float")?;
             }
+            "--unk-token-penalty" => {
+                i += 1;
+                opts.unknown_token_penalty_weight = args
+                    .get(i)
+                    .ok_or("--unk-token-penalty requires a number")?
+                    .parse()
+                    .map_err(|_| "--unk-token-penalty must be a float")?;
+            }
+            "--unk-token-margin" => {
+                i += 1;
+                opts.unknown_token_penalty_margin = args
+                    .get(i)
+                    .ok_or("--unk-token-margin requires a number")?
+                    .parse()
+                    .map_err(|_| "--unk-token-margin must be a float")?;
+            }
             "--thought-logit-residual" => {
                 i += 1;
                 opts.thought_logit_residual_weight = args
@@ -881,6 +920,8 @@ fn print_usage() {
         "  --top-token-anticollapse F  Penalize wrong argmax token dominance (default: 0.0 = off)"
     );
     eprintln!("  --top-token-margin F Required target-vs-wrong-top margin (default: 0.0)");
+    eprintln!("  --unk-token-penalty F  Penalize <unk> outranking target (default: 0.0 = off)");
+    eprintln!("  --unk-token-margin F   Required target-vs-<unk> margin (default: 0.0)");
     eprintln!(
         "  --thought-logit-residual F  Blend direct thought logits into decoder logits (default: 0.0 = off)"
     );
