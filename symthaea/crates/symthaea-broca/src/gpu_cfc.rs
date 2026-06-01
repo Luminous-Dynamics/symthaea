@@ -959,23 +959,33 @@ impl GpuTrainer {
         target: usize,
         lr: f32,
         grad_clip: f32,
-    ) -> Result<()> {
+    ) -> Result<(f32, bool)> {
         let n = logits.len();
         let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
         let sum_exp: f32 = exps.iter().sum();
         if sum_exp < 1e-10 {
-            return Ok(());
+            return Ok((0.0, false));
         }
 
         let scale = self.logit_scale;
+        let mut sum_sq = 0.0f32;
+        let mut was_clipped = false;
 
         // Compute error vector (CPU — cheap, just V floats)
         let errors: Vec<f32> = (0..n)
             .map(|i| {
                 let prob = exps[i] / sum_exp;
                 let error = if i == target { prob - 1.0 } else { prob };
-                (scale * error * lr).clamp(-grad_clip, grad_clip)
+                if error.abs() >= 1e-4 {
+                    sum_sq += error * error;
+                }
+                let raw = scale * error * lr;
+                let clipped = raw.clamp(-grad_clip, grad_clip);
+                if (clipped - raw).abs() > 1e-10 {
+                    was_clipped = true;
+                }
+                clipped
             })
             .collect();
 
@@ -993,7 +1003,7 @@ impl GpuTrainer {
         self.embeddings = (&self.embeddings - &grad_matrix)?;
         self.renormalize_embeddings()?;
 
-        Ok(())
+        Ok((sum_sq.sqrt(), was_clipped))
     }
 
     /// Apply an auxiliary embedding update from the thought HV directly.
@@ -1057,6 +1067,53 @@ impl GpuTrainer {
         self.renormalize_embeddings()?;
 
         Ok(weight * loss)
+    }
+
+    /// Apply a targeted anti-collapse update when a wrong token is the argmax.
+    pub fn gpu_top_token_anticollapse_gradient(
+        &mut self,
+        logits: &[f32],
+        target: usize,
+        lr: f32,
+        grad_clip: f32,
+        weight: f32,
+        margin: f32,
+    ) -> Result<f32> {
+        if weight <= 0.0 || target >= logits.len() {
+            return Ok(0.0);
+        }
+        let Some((top_id, &top_logit)) = logits
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        else {
+            return Ok(0.0);
+        };
+        if top_id == target {
+            return Ok(0.0);
+        }
+        let violation = top_logit + margin - logits[target];
+        if violation <= 0.0 {
+            return Ok(0.0);
+        }
+
+        let raw_output = self.network.output()?;
+        let raw_norm = raw_output.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?;
+        let output_hat = (&raw_output / &norm_bc)?;
+
+        let n = logits.len();
+        let mut errors = vec![0.0f32; n];
+        let step = (self.logit_scale * lr * weight).clamp(-grad_clip, grad_clip);
+        errors[target] = -step;
+        errors[top_id] = step;
+
+        let error_tensor = Tensor::from_vec(errors, (n, 1), &self.device)?;
+        let grad_matrix = error_tensor.matmul(&output_hat)?;
+        self.embeddings = (&self.embeddings - &grad_matrix)?;
+        self.renormalize_embeddings()?;
+
+        Ok(weight * violation)
     }
 
     /// Apply KL-style distribution anchoring against cached reference logits.

@@ -681,9 +681,9 @@ fn parse_args(args: &[String]) -> Result<Options> {
                 i += 1;
                 opts.eval_limit = value(args, i, "--eval-limit")?.parse()?;
             }
-            "--max-r#gen-tokens" => {
+            "--max-gen-tokens" | "--max-r#gen-tokens" => {
                 i += 1;
-                opts.max_gen_tokens = value(args, i, "--max-r#gen-tokens")?.parse()?;
+                opts.max_gen_tokens = value(args, i, "--max-gen-tokens")?.parse()?;
             }
             "--genesis" => {
                 i += 1;
@@ -735,7 +735,7 @@ fn parse_args(args: &[String]) -> Result<Options> {
     }
 
     if opts.max_gen_tokens == 0 {
-        anyhow::bail!("--max-r#gen-tokens must be greater than zero");
+        anyhow::bail!("--max-gen-tokens must be greater than zero");
     }
     if !(0.0..=2.0).contains(&opts.max_direct_drift) || !(0.0..=2.0).contains(&opts.max_mamba_drift)
     {
@@ -775,7 +775,7 @@ fn value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str> {
 
 fn print_usage() {
     eprintln!(
-        "Usage: broca-decoder-ab [--checkpoint PATH] [--mamba-projection-checkpoint PATH] [--decoder direct,structured,mamba,hybrid] [--canonical-eval PATH] [--eval-limit N] [--max-r#gen-tokens N] [--json-out PATH] [--fail-on-gate] [--include-structured-molecule] [--max-direct-drift F] [--max-mamba-drift F] [--max-hallucination-rate F] [--min-structured-validity F] [--min-structured-required-role-rate F]"
+        "Usage: broca-decoder-ab [--checkpoint PATH] [--mamba-projection-checkpoint PATH] [--decoder direct,structured,mamba,hybrid] [--canonical-eval PATH] [--eval-limit N] [--max-gen-tokens N] [--json-out PATH] [--fail-on-gate] [--include-structured-molecule] [--max-direct-drift F] [--max-mamba-drift F] [--max-hallucination-rate F] [--min-structured-validity F] [--min-structured-required-role-rate F]"
     );
 }
 

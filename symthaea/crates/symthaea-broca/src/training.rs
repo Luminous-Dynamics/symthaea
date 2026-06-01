@@ -355,6 +355,15 @@ pub struct TrainingConfig {
     /// in GPU memory.
     pub logit_anchor_weight: f32,
 
+    // ── Top-Token Anti-Collapse ──
+    /// Margin loss weight that penalizes a wrong argmax token outranking the
+    /// target. This directly attacks degenerate runs where one token dominates
+    /// teacher-forced logits despite improving average CE.
+    pub top_token_anticollapse_weight: f32,
+    /// Required target-vs-wrong-top margin before the anti-collapse term is
+    /// inactive. Default 0.0 means only penalize wrong top tokens.
+    pub top_token_anticollapse_margin: f32,
+
     // ── Adaptive Veto Warmup ──
     /// Target veto threshold to ramp toward during training (0.0 = disabled).
     /// When > 0, the generator's veto_threshold is linearly ramped from 0.0
@@ -438,6 +447,8 @@ impl Default for TrainingConfig {
             label_smoothing: 0.0,
             thought_logit_aux_weight: 0.0,
             logit_anchor_weight: 0.0,
+            top_token_anticollapse_weight: 0.0,
+            top_token_anticollapse_margin: 0.0,
             best_checkpoint_path: String::new(),
             hidden_dropout: 0.0,
             adaptive_veto_target: 0.0, // disabled by default
@@ -1209,12 +1220,16 @@ pub fn train_with_adam(
                         // Embedding gradient: SGD on GPU via outer product matmul
                         // (replaces CPU Adam — avoids CPU↔GPU embedding sync)
                         if !config.freeze_embeddings {
-                            trainer.gpu_embedding_gradient(
+                            let (grad_norm, was_clipped) = trainer.gpu_embedding_gradient(
                                 &logits,
                                 target_id as usize,
                                 lr,
                                 effective_grad_clip,
                             )?;
+                            if let Some(ref mut diag) = diagnostics {
+                                diag.record_step(grad_norm, was_clipped);
+                            }
+                            gpu_sequence.record_gradient(grad_norm, was_clipped);
                             if config.thought_logit_aux_weight > 0.0 {
                                 let aux_loss = trainer.gpu_thought_logit_aux_gradient(
                                     &thought_tensor,
@@ -1235,6 +1250,17 @@ pub fn train_with_adam(
                                     config.logit_anchor_weight,
                                 )?;
                                 total_loss += anchor_loss;
+                            }
+                            if config.top_token_anticollapse_weight > 0.0 {
+                                let anti_loss = trainer.gpu_top_token_anticollapse_gradient(
+                                    &logits,
+                                    target_id as usize,
+                                    lr,
+                                    effective_grad_clip,
+                                    config.top_token_anticollapse_weight,
+                                    config.top_token_anticollapse_margin,
+                                )?;
+                                total_loss += anti_loss;
                             }
                         }
 
@@ -1465,6 +1491,18 @@ pub fn train_with_adam(
                             );
                             total_loss += anchor_loss;
                         }
+                        if config.top_token_anticollapse_weight > 0.0 {
+                            let anti_loss = apply_top_token_anticollapse_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                lr,
+                                effective_grad_clip,
+                                config.top_token_anticollapse_weight,
+                                config.top_token_anticollapse_margin,
+                            );
+                            total_loss += anti_loss;
+                        }
                         result
                     } else {
                         let result = apply_weight_tied_gradient(
@@ -1496,6 +1534,18 @@ pub fn train_with_adam(
                                 config.logit_anchor_weight,
                             );
                             total_loss += anchor_loss;
+                        }
+                        if config.top_token_anticollapse_weight > 0.0 {
+                            let anti_loss = apply_top_token_anticollapse_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                lr,
+                                effective_grad_clip,
+                                config.top_token_anticollapse_weight,
+                                config.top_token_anticollapse_margin,
+                            );
+                            total_loss += anti_loss;
                         }
                         result
                     };
@@ -2378,6 +2428,57 @@ fn apply_thought_logit_aux_gradient(
     weight * loss
 }
 
+fn apply_top_token_anticollapse_gradient(
+    controller: &mut crate::controller::LanguageController,
+    logits: &[f32],
+    target: usize,
+    lr: f32,
+    grad_clip: f32,
+    weight: f32,
+    margin: f32,
+) -> f32 {
+    if weight <= 0.0 || target >= logits.len() {
+        return 0.0;
+    }
+    let Some((top_id, &top_logit)) = logits
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+    else {
+        return 0.0;
+    };
+    if top_id == target {
+        return 0.0;
+    }
+    let violation = top_logit + margin - logits[target];
+    if violation <= 0.0 {
+        return 0.0;
+    }
+
+    let output_hv = controller.output_hv();
+    let output_slice = output_hv.as_slice();
+    let scale = controller.config().logit_scale;
+    let step = (lr * weight * scale).clamp(-grad_clip, grad_clip);
+    let embeddings = controller.token_embeddings_mut();
+
+    if target < embeddings.len() {
+        for (j, emb_val) in embeddings[target].values.iter_mut().enumerate() {
+            if j < output_slice.len() {
+                *emb_val += step * output_slice[j];
+            }
+        }
+    }
+    if top_id < embeddings.len() {
+        for (j, emb_val) in embeddings[top_id].values.iter_mut().enumerate() {
+            if j < output_slice.len() {
+                *emb_val -= step * output_slice[j];
+            }
+        }
+    }
+
+    weight * violation
+}
+
 fn logit_anchor_for_step(
     enabled: bool,
     cache: &mut std::collections::HashMap<(usize, usize), Vec<f32>>,
@@ -2872,6 +2973,7 @@ pub fn compute_validation_loss_sampled(
         let channels = pair.to_thought_channels();
         let thought_hv = generator.encoder().encode(&channels);
         generator.controller_mut().reset();
+        generator.controller_mut().seed_from_thought(&thought_hv);
 
         let mut prev_token = generator.tokenizer().thought_id;
         let window_end = pair.target_ids.len().min(bptt_window);

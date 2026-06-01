@@ -180,6 +180,8 @@ fn main() {
         label_smoothing: opts.label_smoothing,
         thought_logit_aux_weight: opts.thought_logit_aux_weight,
         logit_anchor_weight: opts.logit_anchor_weight,
+        top_token_anticollapse_weight: opts.top_token_anticollapse_weight,
+        top_token_anticollapse_margin: opts.top_token_anticollapse_margin,
         best_checkpoint_path: best_path,
         hidden_dropout: opts.hidden_dropout,
         adaptive_veto_target: opts.adaptive_veto_target,
@@ -420,6 +422,10 @@ struct TrainOpts {
     thought_logit_aux_weight: f32,
     /// KL-style logit distribution anchor weight (default: 0.0 = disabled).
     logit_anchor_weight: f32,
+    /// Wrong-argmax anti-collapse margin loss weight (default: 0.0 = disabled).
+    top_token_anticollapse_weight: f32,
+    /// Required target-vs-wrong-top logit margin for anti-collapse (default: 0.0).
+    top_token_anticollapse_margin: f32,
     /// Direct thought-logit residual blend during decoding (default: 0.0).
     thought_logit_residual_weight: f32,
     /// Save best checkpoint path (auto-generated from output if not specified).
@@ -482,6 +488,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         label_smoothing: 0.0,
         thought_logit_aux_weight: 0.0,
         logit_anchor_weight: 0.0,
+        top_token_anticollapse_weight: 0.0,
+        top_token_anticollapse_margin: 0.0,
         thought_logit_residual_weight: 0.0,
         best_checkpoint_path: String::new(),
         no_save_adam: false,
@@ -723,6 +731,22 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--logit-anchor must be a float")?;
             }
+            "--top-token-anticollapse" => {
+                i += 1;
+                opts.top_token_anticollapse_weight = args
+                    .get(i)
+                    .ok_or("--top-token-anticollapse requires a number")?
+                    .parse()
+                    .map_err(|_| "--top-token-anticollapse must be a float")?;
+            }
+            "--top-token-margin" => {
+                i += 1;
+                opts.top_token_anticollapse_margin = args
+                    .get(i)
+                    .ok_or("--top-token-margin requires a number")?
+                    .parse()
+                    .map_err(|_| "--top-token-margin must be a float")?;
+            }
             "--thought-logit-residual" => {
                 i += 1;
                 opts.thought_logit_residual_weight = args
@@ -853,6 +877,10 @@ fn print_usage() {
         "  --thought-logit-aux F  Thought-to-logit auxiliary loss weight (default: 0.0 = off)"
     );
     eprintln!("  --logit-anchor F     KL-style logit anchor weight (default: 0.0 = off)");
+    eprintln!(
+        "  --top-token-anticollapse F  Penalize wrong argmax token dominance (default: 0.0 = off)"
+    );
+    eprintln!("  --top-token-margin F Required target-vs-wrong-top margin (default: 0.0)");
     eprintln!(
         "  --thought-logit-residual F  Blend direct thought logits into decoder logits (default: 0.0 = off)"
     );

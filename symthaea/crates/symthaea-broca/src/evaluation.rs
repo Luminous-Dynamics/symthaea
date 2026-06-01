@@ -91,6 +91,10 @@ pub struct EvalResult {
     /// Fraction of generated tokens that are syntax-heavy code contaminants.
     /// This is most useful for non-code canonical slices.
     pub code_token_rate: Option<f32>,
+    /// Fraction of teacher-forced positions whose argmax prediction is the
+    /// single most common predicted token. High values indicate token collapse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_token_collapse_rate: Option<f32>,
 }
 
 /// Per-intent quality metrics.
@@ -227,6 +231,10 @@ pub struct QualityRunMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_logit_anchor: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_top_token_anticollapse: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_top_token_margin: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_thought_logit_residual: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_semantic_attractor: Option<String>,
@@ -273,6 +281,12 @@ pub struct QualityDelta {
     pub raw_code_token_rate: Option<f32>,
     pub gated_code_token_rate: Option<f32>,
     pub code_token_rate: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_top_token_collapse_rate: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gated_top_token_collapse_rate: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_token_collapse_rate: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -394,6 +408,9 @@ pub struct CanonicalQualityThresholds {
     /// Gated non-code generations must not emit code contaminants above this
     /// token fraction.
     pub max_gated_code_token_rate: Option<f32>,
+    /// Gated teacher-forced argmax predictions must not collapse to one token
+    /// above this fraction.
+    pub max_gated_top_token_collapse_rate: Option<f32>,
 }
 
 impl Default for CanonicalQualityThresholds {
@@ -411,6 +428,7 @@ impl Default for CanonicalQualityThresholds {
             min_structured_output_validity_rate: None,
             max_gated_unknown_token_rate: None,
             max_gated_code_token_rate: None,
+            max_gated_top_token_collapse_rate: None,
         }
     }
 }
@@ -522,6 +540,19 @@ pub fn code_token_rate(token_ids: &[u32], tokenizer: &BpeTokenizer) -> f32 {
     }
 }
 
+/// Fraction of predictions represented by the most frequent token id.
+pub fn top_token_collapse_rate(token_ids: &[u32]) -> f32 {
+    if token_ids.is_empty() {
+        return 0.0;
+    }
+    let mut counts: HashMap<u32, usize> = HashMap::new();
+    for &id in token_ids {
+        *counts.entry(id).or_insert(0) += 1;
+    }
+    let max_count = counts.values().copied().max().unwrap_or(0);
+    max_count as f32 / token_ids.len() as f32
+}
+
 /// Run full evaluation: perplexity + generation quality + per-intent breakdown.
 pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResult {
     let mut total_ce = 0.0f32;
@@ -530,6 +561,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let mut total_coherence = 0.0f32;
     let mut gen_count = 0usize;
     let mut all_gen_token_ids: Vec<u32> = Vec::new(); // for distinct-n computation
+    let mut all_teacher_forced_top_ids: Vec<u32> = Vec::new();
     let mut total_target_overlap = 0.0f32;
     let mut target_overlap_count = 0usize;
     let mut moral_refusal_count = 0usize;
@@ -564,6 +596,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         if config.compute_perplexity {
             let thought_hv = generator.encoder().encode(&channels);
             generator.controller_mut().reset();
+            generator.controller_mut().seed_from_thought(&thought_hv);
             let mut prev_token = generator.tokenizer().thought_id;
             let window = pair.target_ids.len().min(config.max_gen_tokens);
 
@@ -571,6 +604,13 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
                 let logits = generator
                     .controller_mut()
                     .forward_step(&thought_hv, prev_token, pos);
+                if let Some((top_id, _)) = logits
+                    .iter()
+                    .enumerate()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                {
+                    all_teacher_forced_top_ids.push(top_id as u32);
+                }
                 let loss = cross_entropy_loss(&logits, target_id as usize);
                 pair_ce += loss;
                 pair_tokens += 1;
@@ -737,6 +777,11 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     } else {
         None
     };
+    let top_token_collapse_rate = if all_teacher_forced_top_ids.is_empty() {
+        None
+    } else {
+        Some(top_token_collapse_rate(&all_teacher_forced_top_ids))
+    };
 
     EvalResult {
         perplexity,
@@ -752,6 +797,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         moral_refusal_rate,
         unknown_token_rate,
         code_token_rate,
+        top_token_collapse_rate,
     }
 }
 
@@ -1334,6 +1380,13 @@ fn quality_delta(raw: &EvalResult, gated: &EvalResult) -> QualityDelta {
             (Some(raw), Some(gated)) => Some(gated - raw),
             _ => None,
         },
+        raw_top_token_collapse_rate: raw.top_token_collapse_rate,
+        gated_top_token_collapse_rate: gated.top_token_collapse_rate,
+        top_token_collapse_rate: match (raw.top_token_collapse_rate, gated.top_token_collapse_rate)
+        {
+            (Some(raw), Some(gated)) => Some(gated - raw),
+            _ => None,
+        },
     }
 }
 
@@ -1409,6 +1462,19 @@ pub fn check_quality_suite(
                 observed,
                 threshold,
                 message: "gated code-token contamination exceeded maximum".to_string(),
+            });
+        }
+    }
+    if let (Some(threshold), Some(observed)) = (
+        thresholds.max_gated_top_token_collapse_rate,
+        result.gated_generation.top_token_collapse_rate,
+    ) {
+        if observed > threshold {
+            failures.push(QualityGateFailure {
+                metric: "gated_top_token_collapse_rate".to_string(),
+                observed,
+                threshold,
+                message: "gated teacher-forced predictions collapsed to one token".to_string(),
             });
         }
     }
@@ -1579,6 +1645,9 @@ pub fn format_eval_report(result: &EvalResult) -> String {
     }
     if let Some(code) = result.code_token_rate {
         s.push_str(&format!("Code-token rate:   {:.4}\n", code));
+    }
+    if let Some(collapse) = result.top_token_collapse_rate {
+        s.push_str(&format!("Top-token collapse:{:.4}\n", collapse));
     }
 
     if !result.intent_scores.is_empty() {
@@ -2082,6 +2151,7 @@ pub fn evaluate_liquid_mamba(
         moral_refusal_rate: None,
         unknown_token_rate: None,
         code_token_rate: None,
+        top_token_collapse_rate: None,
     };
 
     // --- Consciousness gating test ---
@@ -2740,6 +2810,7 @@ mod tests {
             moral_refusal_rate: Some(0.8),
             unknown_token_rate: Some(0.0),
             code_token_rate: Some(0.0),
+            top_token_collapse_rate: Some(0.0),
         };
         let gated = EvalResult {
             perplexity: 20.0,
@@ -2755,6 +2826,7 @@ mod tests {
             moral_refusal_rate: Some(0.2),
             unknown_token_rate: Some(0.25),
             code_token_rate: Some(0.35),
+            top_token_collapse_rate: Some(0.75),
         };
         let mut categories = HashMap::new();
         categories.insert(
@@ -2865,6 +2937,7 @@ mod tests {
                 min_structured_output_validity_rate: Some(0.5),
                 max_gated_unknown_token_rate: Some(0.1),
                 max_gated_code_token_rate: Some(0.1),
+                max_gated_top_token_collapse_rate: Some(0.5),
             },
         );
         assert!(failures.iter().any(|f| f.metric == "gated_perplexity"));
@@ -2956,6 +3029,55 @@ mod tests {
             result.perplexity > 0.0,
             "Perplexity should be positive: {}",
             result.perplexity
+        );
+    }
+
+    #[test]
+    fn test_perplexity_uses_thought_seeded_state() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut r#gen = BrocaGenerator::new(&genesis, config);
+        let dataset = make_dataset(&r#gen);
+
+        let pair = &dataset.pairs[0];
+        let target_len = pair.target_ids.len();
+        let channels = pair.to_thought_channels();
+        let thought_hv = r#gen.encoder().encode(&channels);
+        r#gen.controller_mut().reset();
+        r#gen.controller_mut().seed_from_thought(&thought_hv);
+
+        let mut manual_ce = 0.0f32;
+        let mut manual_tokens = 0usize;
+        let mut prev_token = r#gen.tokenizer().thought_id;
+        for (pos, &target_id) in pair.target_ids.iter().enumerate() {
+            let logits = r#gen
+                .controller_mut()
+                .forward_step(&thought_hv, prev_token, pos);
+            manual_ce += cross_entropy_loss(&logits, target_id as usize);
+            manual_tokens += 1;
+            prev_token = target_id;
+        }
+        let manual_ppl = (manual_ce / manual_tokens as f32).exp();
+
+        let result = evaluate(
+            &mut r#gen,
+            &EvalConfig {
+                dataset,
+                compute_perplexity: true,
+                compute_english_ratio: false,
+                per_intent_breakdown: false,
+                max_gen_tokens: target_len,
+                eval_limit: 1,
+                progress: false,
+                compute_contrastive_intent: false,
+            },
+        );
+
+        assert!(
+            (result.perplexity - manual_ppl).abs() < 1e-3,
+            "eval perplexity should match the thought-seeded teacher-forced path: eval={} manual={}",
+            result.perplexity,
+            manual_ppl
         );
     }
 
@@ -3075,6 +3197,7 @@ mod tests {
             moral_refusal_rate: None,
             unknown_token_rate: None,
             code_token_rate: None,
+            top_token_collapse_rate: None,
         };
 
         let report = format_eval_report(&result);
@@ -3156,6 +3279,13 @@ mod tests {
     }
 
     #[test]
+    fn test_top_token_collapse_rate() {
+        let collapsed = top_token_collapse_rate(&[37, 37, 37, 12]);
+        assert!((collapsed - 0.75).abs() < 1e-6);
+        assert_eq!(top_token_collapse_rate(&[]), 0.0);
+    }
+
+    #[test]
     fn test_contrastive_intent_score_empty() {
         assert_eq!(contrastive_intent_score(&[]), 0.0);
         assert_eq!(contrastive_intent_score(&["single".to_string()]), 0.0);
@@ -3201,6 +3331,7 @@ mod tests {
                     moral_refusal_rate: None,
                     unknown_token_rate: None,
                     code_token_rate: None,
+                    top_token_collapse_rate: None,
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
@@ -3312,6 +3443,7 @@ mod tests {
                     moral_refusal_rate: None,
                     unknown_token_rate: None,
                     code_token_rate: None,
+                    top_token_collapse_rate: None,
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,

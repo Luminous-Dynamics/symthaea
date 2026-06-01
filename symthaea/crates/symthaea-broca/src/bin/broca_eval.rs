@@ -412,6 +412,8 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_label_smoothing: parse_env_f32("BROCA_TRAIN_LABEL_SMOOTHING"),
         train_thought_logit_aux: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_AUX"),
         train_logit_anchor: parse_env_f32("BROCA_TRAIN_LOGIT_ANCHOR"),
+        train_top_token_anticollapse: parse_env_f32("BROCA_TRAIN_TOP_TOKEN_ANTICOLLAPSE"),
+        train_top_token_margin: parse_env_f32("BROCA_TRAIN_TOP_TOKEN_MARGIN"),
         train_thought_logit_residual: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_RESIDUAL"),
         train_semantic_attractor: std::env::var("BROCA_TRAIN_SEMANTIC_ATTRACTOR").ok(),
         train_semantic_attractor_strength: parse_env_f32("BROCA_TRAIN_SEMANTIC_ATTRACTOR_STRENGTH"),
@@ -907,13 +909,13 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                     .parse()
                     .map_err(|_| "--eval-limit must be a number")?;
             }
-            "--max-r#gen-tokens" => {
+            "--max-gen-tokens" | "--max-r#gen-tokens" => {
                 i += 1;
                 opts.max_gen_tokens = args
                     .get(i)
-                    .ok_or("--max-r#gen-tokens requires a number")?
+                    .ok_or("--max-gen-tokens requires a number")?
                     .parse()
-                    .map_err(|_| "--max-r#gen-tokens must be a number")?;
+                    .map_err(|_| "--max-gen-tokens must be a number")?;
             }
             "--max-gated-perplexity" => {
                 i += 1;
@@ -1024,6 +1026,15 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                         .map_err(|_| "--max-gated-code-token-rate must be a float")?,
                 );
             }
+            "--max-gated-top-token-collapse-rate" => {
+                i += 1;
+                opts.quality_thresholds.max_gated_top_token_collapse_rate = Some(
+                    args.get(i)
+                        .ok_or("--max-gated-top-token-collapse-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-gated-top-token-collapse-rate must be a float")?,
+                );
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -1054,7 +1065,7 @@ fn print_usage() {
         "  --dump-generations PATH  Write raw/gated canonical generation diagnostics as JSONL"
     );
     eprintln!("  --eval-limit N         Limit eval pairs (default: all)");
-    eprintln!("  --max-r#gen-tokens N     Max teacher-forced/generated tokens (default: 64)");
+    eprintln!("  --max-gen-tokens N       Max teacher-forced/generated tokens (default: 64)");
     eprintln!("  --report-only          Emit canonical quality JSON without applying thresholds");
     eprintln!("  --teacher-forced-only  Skip generation-heavy canonical metrics");
     eprintln!("  --max-gated-perplexity F        Fail canonical eval above this gated PPL");
@@ -1094,6 +1105,9 @@ fn print_usage() {
     );
     eprintln!("  --max-gated-unknown-token-rate F  Fail if gated <unk> token fraction exceeds F");
     eprintln!("  --max-gated-code-token-rate F  Fail if gated code-token contamination exceeds F");
+    eprintln!(
+        "  --max-gated-top-token-collapse-rate F  Fail if gated argmax predictions collapse above F"
+    );
     eprintln!(
         "  --allow-checkpoint-recovery  Load legacy/recovery checkpoints with explicit compatibility bypass"
     );

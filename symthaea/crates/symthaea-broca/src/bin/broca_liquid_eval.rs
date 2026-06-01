@@ -463,9 +463,9 @@ fn parse_args(args: &[String]) -> Result<Options> {
                 i += 1;
                 opts.eval_limit = value(args, i, "--eval-limit")?.parse()?;
             }
-            "--max-r#gen-tokens" => {
+            "--max-gen-tokens" | "--max-r#gen-tokens" => {
                 i += 1;
-                opts.max_gen_tokens = value(args, i, "--max-r#gen-tokens")?.parse()?;
+                opts.max_gen_tokens = value(args, i, "--max-gen-tokens")?.parse()?;
             }
             "--min-new-tokens" => {
                 i += 1;
@@ -582,7 +582,7 @@ fn env_u64(name: &str) -> Option<u64> {
 fn print_usage() {
     eprintln!(
         "Usage: broca-liquid-eval --checkpoint projection.bin [--canonical-eval eval.jsonl] \\
-         [--eval-limit N] [--max-r#gen-tokens N] [--min-new-tokens N] [--top-k N] [--json-out report.json] \\
+         [--eval-limit N] [--max-gen-tokens N] [--min-new-tokens N] [--top-k N] [--json-out report.json] \\
          [--dump-generations dump.jsonl] [--allow-checkpoint-recovery] \\
          [--semantic-attractor|--no-semantic-attractor]"
     );

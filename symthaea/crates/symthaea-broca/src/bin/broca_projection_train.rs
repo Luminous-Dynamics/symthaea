@@ -899,13 +899,13 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .parse()
                     .map_err(|_| "--pos-enc-unfreeze must be a positive integer")?;
             }
-            "--max-r#gen-tokens" => {
+            "--max-gen-tokens" | "--max-r#gen-tokens" => {
                 i += 1;
                 opts.max_gen_tokens = args
                     .get(i)
-                    .ok_or("--max-r#gen-tokens requires a number")?
+                    .ok_or("--max-gen-tokens requires a number")?
                     .parse()
-                    .map_err(|_| "--max-r#gen-tokens must be a positive integer")?;
+                    .map_err(|_| "--max-gen-tokens must be a positive integer")?;
             }
             "--chunk-size" => {
                 i += 1;
@@ -1139,7 +1139,7 @@ fn print_usage() {
         "  --pos-enc-unfreeze N        Epoch to unfreeze learned pos_enc (0 = always learned, requires --learned-pos-enc)"
     );
     eprintln!(
-        "  --max-r#gen-tokens N          Max tokens per generation during training (default: 16)"
+        "  --max-gen-tokens N            Max tokens per generation during training (default: 16)"
     );
     eprintln!();
     eprintln!("Architecture improvements (A-F):");

@@ -93,12 +93,15 @@ fn call_ollama(opts: &Options) -> Result<String> {
         prompt: &opts.prompt,
         stream: false,
     };
-    let response: OllamaGenerateResponse = ureq::post(&opts.url)
+    let body = serde_json::to_string(&req).context("encoding Ollama request JSON")?;
+    let response_body = ureq::post(&opts.url)
         .set("Content-Type", "application/json")
-        .send_json(serde_json::to_value(req)?)
+        .send_string(&body)
         .with_context(|| format!("posting to {}", opts.url))?
-        .into_json()
-        .context("decoding Ollama response JSON")?;
+        .into_string()
+        .context("reading Ollama response body")?;
+    let response: OllamaGenerateResponse =
+        serde_json::from_str(&response_body).context("decoding Ollama response JSON")?;
     if let Some(error) = response.error {
         anyhow::bail!(error);
     }
