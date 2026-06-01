@@ -1104,7 +1104,8 @@ impl GpuTrainer {
 
         let n = logits.len();
         let mut errors = vec![0.0f32; n];
-        let step = (self.logit_scale * lr * weight).clamp(-grad_clip, grad_clip);
+        let violation_scale = violation.clamp(0.0, 10.0);
+        let step = (self.logit_scale * lr * weight * violation_scale).clamp(-grad_clip, grad_clip);
         errors[target] = -step;
         errors[top_id] = step;
 
@@ -1146,7 +1147,8 @@ impl GpuTrainer {
 
         let n = logits.len();
         let mut errors = vec![0.0f32; n];
-        let step = (self.logit_scale * lr * weight).clamp(-grad_clip, grad_clip);
+        let violation_scale = violation.clamp(0.0, 10.0);
+        let step = (self.logit_scale * lr * weight * violation_scale).clamp(-grad_clip, grad_clip);
         errors[target] = -step;
         errors[unknown_token] = step;
 

@@ -24,7 +24,7 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::checkpoint::AdamState;
 use crate::encoder::ThoughtChannels;
 use crate::generator::BrocaGenerator;
-use crate::tokenizer::BpeTokenizer;
+use crate::tokenizer::{BpeTokenizer, is_code_contamination_token};
 
 mod sequence;
 pub use sequence::{SequenceResult, TrainingBackend};
@@ -342,6 +342,17 @@ pub struct TrainingConfig {
     /// different thought channels should create different token logit rankings
     /// even before the decoder has learned strong temporal dynamics.
     pub thought_logit_aux_weight: f32,
+    /// Number of prefit epochs to run on the direct thought-to-logit path before
+    /// recurrent teacher-forced training starts.
+    ///
+    /// This isolates the binding question: can the positioned thought vector
+    /// predict target tokens at all before CfC sequence dynamics are involved?
+    /// Default 0 preserves existing behavior.
+    pub thought_logit_prefit_epochs: usize,
+    /// Weight used by the direct thought-logit prefit loss.
+    pub thought_logit_prefit_weight: f32,
+    /// Learning-rate multiplier for direct thought-logit prefit.
+    pub thought_logit_prefit_lr_scale: f32,
 
     // ── Distribution Anchoring ──
     /// KL-style anchor loss weight (0.0 = disabled).
@@ -363,6 +374,21 @@ pub struct TrainingConfig {
     /// Required target-vs-wrong-top margin before the anti-collapse term is
     /// inactive. Default 0.0 means only penalize wrong top tokens.
     pub top_token_anticollapse_margin: f32,
+
+    // ── Common-Token Overuse Prior ──
+    /// Online loss weight for tokens whose teacher-forced argmax rate exceeds
+    /// their target-token frequency in the current curriculum.
+    ///
+    /// This is a targeted fix for collapse onto legal but overused English
+    /// tokens such as "it" or "are": they remain available, but once the model
+    /// predicts them far more often than the data uses them, wrong predictions
+    /// receive an extra margin penalty.
+    pub common_token_prior_weight: f32,
+    /// Extra allowed argmax rate above target frequency before the common-token
+    /// prior activates. Default 0.05 allows normal function-word reuse.
+    pub common_token_prior_slack: f32,
+    /// Target-vs-overused-token margin for the common-token prior.
+    pub common_token_prior_margin: f32,
 
     // ── Unknown-Token Anti-Collapse ──
     /// Margin loss weight that penalizes `<unk>` outranking the target token.
@@ -455,9 +481,15 @@ impl Default for TrainingConfig {
             scheduled_sampling_max: 0.0,
             label_smoothing: 0.0,
             thought_logit_aux_weight: 0.0,
+            thought_logit_prefit_epochs: 0,
+            thought_logit_prefit_weight: 1.0,
+            thought_logit_prefit_lr_scale: 1.0,
             logit_anchor_weight: 0.0,
             top_token_anticollapse_weight: 0.0,
             top_token_anticollapse_margin: 0.0,
+            common_token_prior_weight: 0.0,
+            common_token_prior_slack: 0.05,
+            common_token_prior_margin: 0.05,
             unknown_token_penalty_weight: 0.0,
             unknown_token_penalty_margin: 0.0,
             best_checkpoint_path: String::new(),
@@ -910,6 +942,10 @@ pub fn train_with_adam(
     let use_sampled = config.negative_samples > 0;
     let vocab_size = generator.tokenizer().vocab_size();
     let unknown_token_ids = unknown_token_ids(generator.tokenizer());
+    let code_token_ids = code_token_ids(generator.tokenizer());
+    let target_token_rates = target_token_rates(dataset, vocab_size);
+    let mut predicted_top_counts = vec![0usize; vocab_size];
+    let mut predicted_top_total = 0usize;
 
     // Pre-compute curriculum ordering (indices into dataset)
     let curriculum_order: Vec<usize> = match &config.curriculum {
@@ -1011,6 +1047,101 @@ pub fn train_with_adam(
     } else {
         None
     };
+
+    if config.thought_logit_prefit_epochs > 0 && config.thought_logit_prefit_weight > 0.0 {
+        let prefit_lr = config.learning_rate * config.thought_logit_prefit_lr_scale * lr_multiplier;
+        for prefit_epoch in 0..config.thought_logit_prefit_epochs {
+            let mut prefit_loss = 0.0f32;
+            let mut prefit_tokens = 0usize;
+
+            #[cfg(feature = "gpu")]
+            if let Some(ref mut trainer) = gpu_trainer {
+                let result: candle_core::Result<()> = (|| {
+                    for &dataset_idx in &curriculum_order {
+                        let pair = &dataset.pairs[dataset_idx];
+                        if pair.target_ids.is_empty() {
+                            continue;
+                        }
+                        let channels = pair.to_thought_channels();
+                        let thought_hv = generator.encoder().encode(&channels);
+                        let thought_tensor = candle_core::Tensor::from_vec(
+                            thought_hv.as_slice().to_vec(),
+                            (1, thought_hv.as_slice().len()),
+                            &trainer.device,
+                        )?;
+                        for (pos, &target_id) in
+                            pair.target_ids.iter().take(config.bptt_window).enumerate()
+                        {
+                            let loss = trainer.gpu_thought_logit_aux_gradient(
+                                &thought_tensor,
+                                target_id as usize,
+                                pos,
+                                prefit_lr,
+                                effective_grad_clip,
+                                config.thought_logit_prefit_weight,
+                            )?;
+                            prefit_loss += loss;
+                            prefit_tokens += 1;
+                        }
+                    }
+                    trainer.sync_to_cpu(generator.controller_mut())?;
+                    trainer.sync_embeddings_to_cpu(generator.controller_mut())?;
+                    Ok(())
+                })();
+                if let Err(err) = result {
+                    tracing::warn!(
+                        error = %err,
+                        "GPU thought-logit prefit failed; continuing with current weights"
+                    );
+                }
+                if config.progress {
+                    use std::io::Write;
+                    let avg = prefit_loss / prefit_tokens.max(1) as f32;
+                    let _ = writeln!(
+                        std::io::stderr(),
+                        "[prefit] thought-logit epoch {prefit_epoch}/{} loss={avg:.4} tokens={prefit_tokens}",
+                        config.thought_logit_prefit_epochs
+                    );
+                    std::io::stderr().flush().ok();
+                }
+                continue;
+            }
+
+            for &dataset_idx in &curriculum_order {
+                let pair = &dataset.pairs[dataset_idx];
+                if pair.target_ids.is_empty() {
+                    continue;
+                }
+                let channels = pair.to_thought_channels();
+                let thought_hv = generator.encoder().encode(&channels);
+                for (pos, &target_id) in pair.target_ids.iter().take(config.bptt_window).enumerate()
+                {
+                    let loss = apply_thought_logit_aux_gradient(
+                        generator.controller_mut(),
+                        &thought_hv,
+                        target_id as usize,
+                        pos,
+                        prefit_lr,
+                        effective_grad_clip,
+                        config.thought_logit_prefit_weight,
+                    );
+                    prefit_loss += loss;
+                    prefit_tokens += 1;
+                }
+            }
+
+            if config.progress {
+                use std::io::Write;
+                let avg = prefit_loss / prefit_tokens.max(1) as f32;
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "[prefit] thought-logit epoch {prefit_epoch}/{} loss={avg:.4} tokens={prefit_tokens}",
+                    config.thought_logit_prefit_epochs
+                );
+                std::io::stderr().flush().ok();
+            }
+        }
+    }
 
     for epoch in 0..config.epochs {
         // Training-time fusion: enable/disable fusion flags based on epoch.
@@ -1197,7 +1328,28 @@ pub fn train_with_adam(
                         );
 
                         // Forward on GPU
-                        let logits = trainer.forward_step(&thought_tensor, gpu_prev_token, pos)?;
+                        let mut logits =
+                            trainer.forward_step(&thought_tensor, gpu_prev_token, pos)?;
+                        suppress_decode_forbidden_logits(
+                            &mut logits,
+                            target_id as usize,
+                            vocab_size,
+                            &unknown_token_ids,
+                            if code_intent_active(&channels) {
+                                &[]
+                            } else {
+                                &code_token_ids
+                            },
+                        );
+                        let common_prior = common_token_prior_for_logits(
+                            &logits,
+                            target_id as usize,
+                            &mut predicted_top_counts,
+                            &target_token_rates,
+                            &mut predicted_top_total,
+                            config.common_token_prior_weight,
+                            config.common_token_prior_slack,
+                        );
                         let anchor_logits = logit_anchor_for_step(
                             anchor_enabled,
                             &mut logit_anchor_cache,
@@ -1287,6 +1439,18 @@ pub fn train_with_adam(
                                     )?;
                                     total_loss += unk_loss;
                                 }
+                            }
+                            if let Some((token_id, weight)) = common_prior {
+                                let prior_loss = trainer.gpu_unknown_token_penalty_gradient(
+                                    &logits,
+                                    target_id as usize,
+                                    token_id,
+                                    lr,
+                                    effective_grad_clip,
+                                    weight,
+                                    config.common_token_prior_margin,
+                                )?;
+                                total_loss += prior_loss;
                             }
                         }
 
@@ -1379,7 +1543,7 @@ pub fn train_with_adam(
                     );
                     generator.controller_mut().set_learning_rate(lr);
 
-                    let logits = if use_sampled {
+                    let mut logits = if use_sampled {
                         neg_seed = neg_seed.wrapping_add(global_step as u64);
                         let active = sample_negatives(
                             target_id as usize,
@@ -1398,6 +1562,26 @@ pub fn train_with_adam(
                             .controller_mut()
                             .forward_step(&thought_hv, prev_token, pos)
                     };
+                    suppress_decode_forbidden_logits(
+                        &mut logits,
+                        target_id as usize,
+                        vocab_size,
+                        &unknown_token_ids,
+                        if code_intent_active(&channels) {
+                            &[]
+                        } else {
+                            &code_token_ids
+                        },
+                    );
+                    let common_prior = common_token_prior_for_logits(
+                        &logits,
+                        target_id as usize,
+                        &mut predicted_top_counts,
+                        &target_token_rates,
+                        &mut predicted_top_total,
+                        config.common_token_prior_weight,
+                        config.common_token_prior_slack,
+                    );
                     let anchor_logits = if !use_sampled {
                         logit_anchor_for_step(
                             anchor_enabled,
@@ -1544,6 +1728,19 @@ pub fn train_with_adam(
                                 total_loss += unk_loss;
                             }
                         }
+                        if let Some((token_id, weight)) = common_prior {
+                            let prior_loss = apply_token_margin_penalty_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                token_id,
+                                lr,
+                                effective_grad_clip,
+                                weight,
+                                config.common_token_prior_margin,
+                            );
+                            total_loss += prior_loss;
+                        }
                         result
                     } else {
                         let result = apply_weight_tied_gradient(
@@ -1602,6 +1799,19 @@ pub fn train_with_adam(
                                 );
                                 total_loss += unk_loss;
                             }
+                        }
+                        if let Some((token_id, weight)) = common_prior {
+                            let prior_loss = apply_token_margin_penalty_gradient(
+                                generator.controller_mut(),
+                                &logits,
+                                target_id as usize,
+                                token_id,
+                                lr,
+                                effective_grad_clip,
+                                weight,
+                                config.common_token_prior_margin,
+                            );
+                            total_loss += prior_loss;
                         }
                         result
                     };
@@ -2026,6 +2236,105 @@ fn unknown_token_ids(tokenizer: &BpeTokenizer) -> Vec<usize> {
         ids.push(canonical);
     }
     ids
+}
+
+fn code_token_ids(tokenizer: &BpeTokenizer) -> Vec<usize> {
+    (0..tokenizer.vocab_size())
+        .filter(|&id| is_code_contamination_token(tokenizer.token_str(id as u32)))
+        .collect()
+}
+
+fn code_intent_active(channels: &ThoughtChannels) -> bool {
+    channels
+        .channels
+        .get(24..28)
+        .map(|code_channels| {
+            code_channels
+                .iter()
+                .copied()
+                .fold(0.0f32, f32::max)
+                .max(code_channels.iter().copied().sum::<f32>() * 0.25)
+                > 0.25
+        })
+        .unwrap_or(false)
+}
+
+fn target_token_rates(dataset: &TrainingDataset, vocab_size: usize) -> Vec<f32> {
+    let mut counts = vec![0usize; vocab_size];
+    let mut total = 0usize;
+    for pair in &dataset.pairs {
+        for &id in &pair.target_ids {
+            let id = id as usize;
+            if id < vocab_size {
+                counts[id] += 1;
+                total += 1;
+            }
+        }
+    }
+    if total == 0 {
+        return vec![0.0; vocab_size];
+    }
+    counts
+        .into_iter()
+        .map(|count| count as f32 / total as f32)
+        .collect()
+}
+
+fn common_token_prior_for_logits(
+    logits: &[f32],
+    target: usize,
+    predicted_counts: &mut [usize],
+    target_rates: &[f32],
+    predicted_total: &mut usize,
+    weight: f32,
+    slack: f32,
+) -> Option<(usize, f32)> {
+    if weight <= 0.0 || target >= logits.len() {
+        return None;
+    }
+    let (top_id, _) = logits
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))?;
+    if top_id >= predicted_counts.len() {
+        return None;
+    }
+    predicted_counts[top_id] += 1;
+    *predicted_total += 1;
+    if top_id == target || *predicted_total == 0 {
+        return None;
+    }
+    let predicted_rate = predicted_counts[top_id] as f32 / *predicted_total as f32;
+    let target_rate = target_rates.get(top_id).copied().unwrap_or(0.0);
+    let overuse = predicted_rate - target_rate - slack.max(0.0);
+    if overuse <= 0.0 {
+        return None;
+    }
+    Some((top_id, weight * overuse.min(1.0)))
+}
+
+fn suppress_decode_forbidden_logits(
+    logits: &mut [f32],
+    target: usize,
+    vocab_size: usize,
+    unknown_tokens: &[usize],
+    code_tokens: &[usize],
+) {
+    for id in vocab_size..logits.len() {
+        if target != id {
+            logits[id] = f32::NEG_INFINITY;
+        }
+    }
+    for &unknown_token in unknown_tokens {
+        if unknown_token < logits.len() && target != unknown_token {
+            logits[unknown_token] = f32::NEG_INFINITY;
+        }
+    }
+    for &code_token in code_tokens {
+        if code_token < logits.len() && target != code_token {
+            logits[code_token] = f32::NEG_INFINITY;
+        }
+    }
 }
 
 /// Cross-entropy loss with optional label smoothing.
@@ -2525,7 +2834,8 @@ fn apply_top_token_anticollapse_gradient(
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
     let scale = controller.config().logit_scale;
-    let step = (lr * weight * scale).clamp(-grad_clip, grad_clip);
+    let violation_scale = violation.clamp(0.0, 10.0);
+    let step = (lr * weight * scale * violation_scale).clamp(-grad_clip, grad_clip);
     let embeddings = controller.token_embeddings_mut();
 
     if target < embeddings.len() {
@@ -2571,7 +2881,8 @@ fn apply_token_margin_penalty_gradient(
     let output_hv = controller.output_hv();
     let output_slice = output_hv.as_slice();
     let scale = controller.config().logit_scale;
-    let step = (lr * weight * scale).clamp(-grad_clip, grad_clip);
+    let violation_scale = violation.clamp(0.0, 10.0);
+    let step = (lr * weight * scale * violation_scale).clamp(-grad_clip, grad_clip);
     let embeddings = controller.token_embeddings_mut();
 
     if target < embeddings.len() {

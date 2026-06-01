@@ -246,11 +246,23 @@ pub struct QualityRunMetadata {
     pub train_label_smoothing: Option<f32>,
     pub train_thought_logit_aux: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_thought_logit_prefit_epochs: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_thought_logit_prefit_weight: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_thought_logit_prefit_lr_scale: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_logit_anchor: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_top_token_anticollapse: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_top_token_margin: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_common_token_prior: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_common_token_slack: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_common_token_margin: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub train_unknown_token_penalty: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

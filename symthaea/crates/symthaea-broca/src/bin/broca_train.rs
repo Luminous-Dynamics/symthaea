@@ -197,9 +197,15 @@ fn main() {
         scheduled_sampling_max: opts.scheduled_sampling,
         label_smoothing: opts.label_smoothing,
         thought_logit_aux_weight: opts.thought_logit_aux_weight,
+        thought_logit_prefit_epochs: opts.thought_logit_prefit_epochs,
+        thought_logit_prefit_weight: opts.thought_logit_prefit_weight,
+        thought_logit_prefit_lr_scale: opts.thought_logit_prefit_lr_scale,
         logit_anchor_weight: opts.logit_anchor_weight,
         top_token_anticollapse_weight: opts.top_token_anticollapse_weight,
         top_token_anticollapse_margin: opts.top_token_anticollapse_margin,
+        common_token_prior_weight: opts.common_token_prior_weight,
+        common_token_prior_slack: opts.common_token_prior_slack,
+        common_token_prior_margin: opts.common_token_prior_margin,
         unknown_token_penalty_weight: opts.unknown_token_penalty_weight,
         unknown_token_penalty_margin: opts.unknown_token_penalty_margin,
         best_checkpoint_path: best_path,
@@ -440,12 +446,24 @@ struct TrainOpts {
     label_smoothing: f32,
     /// Thought-to-logit auxiliary loss weight (default: 0.0 = disabled).
     thought_logit_aux_weight: f32,
+    /// Direct thought-logit prefit epochs before recurrent training.
+    thought_logit_prefit_epochs: usize,
+    /// Direct thought-logit prefit loss weight.
+    thought_logit_prefit_weight: f32,
+    /// Direct thought-logit prefit learning-rate multiplier.
+    thought_logit_prefit_lr_scale: f32,
     /// KL-style logit distribution anchor weight (default: 0.0 = disabled).
     logit_anchor_weight: f32,
     /// Wrong-argmax anti-collapse margin loss weight (default: 0.0 = disabled).
     top_token_anticollapse_weight: f32,
     /// Required target-vs-wrong-top logit margin for anti-collapse (default: 0.0).
     top_token_anticollapse_margin: f32,
+    /// Online common-token overuse prior weight (default: 0.0 = disabled).
+    common_token_prior_weight: f32,
+    /// Allowed predicted-vs-target frequency slack for common-token prior.
+    common_token_prior_slack: f32,
+    /// Required target-vs-overused-token logit margin for common-token prior.
+    common_token_prior_margin: f32,
     /// `<unk>` margin penalty loss weight (default: 0.0 = disabled).
     unknown_token_penalty_weight: f32,
     /// Required target-vs-`<unk>` logit margin for penalty (default: 0.0).
@@ -511,9 +529,15 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         scheduled_sampling: 0.0,
         label_smoothing: 0.0,
         thought_logit_aux_weight: 0.0,
+        thought_logit_prefit_epochs: 0,
+        thought_logit_prefit_weight: 1.0,
+        thought_logit_prefit_lr_scale: 1.0,
         logit_anchor_weight: 0.0,
         top_token_anticollapse_weight: 0.0,
         top_token_anticollapse_margin: 0.0,
+        common_token_prior_weight: 0.0,
+        common_token_prior_slack: 0.05,
+        common_token_prior_margin: 0.05,
         unknown_token_penalty_weight: 0.0,
         unknown_token_penalty_margin: 0.0,
         thought_logit_residual_weight: 0.0,
@@ -749,6 +773,30 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--thought-logit-aux must be a float")?;
             }
+            "--thought-logit-prefit-epochs" => {
+                i += 1;
+                opts.thought_logit_prefit_epochs = args
+                    .get(i)
+                    .ok_or("--thought-logit-prefit-epochs requires a number")?
+                    .parse()
+                    .map_err(|_| "--thought-logit-prefit-epochs must be an integer")?;
+            }
+            "--thought-logit-prefit-weight" => {
+                i += 1;
+                opts.thought_logit_prefit_weight = args
+                    .get(i)
+                    .ok_or("--thought-logit-prefit-weight requires a number")?
+                    .parse()
+                    .map_err(|_| "--thought-logit-prefit-weight must be a float")?;
+            }
+            "--thought-logit-prefit-lr-scale" => {
+                i += 1;
+                opts.thought_logit_prefit_lr_scale = args
+                    .get(i)
+                    .ok_or("--thought-logit-prefit-lr-scale requires a number")?
+                    .parse()
+                    .map_err(|_| "--thought-logit-prefit-lr-scale must be a float")?;
+            }
             "--logit-anchor" => {
                 i += 1;
                 opts.logit_anchor_weight = args
@@ -772,6 +820,30 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .ok_or("--top-token-margin requires a number")?
                     .parse()
                     .map_err(|_| "--top-token-margin must be a float")?;
+            }
+            "--common-token-prior" => {
+                i += 1;
+                opts.common_token_prior_weight = args
+                    .get(i)
+                    .ok_or("--common-token-prior requires a number")?
+                    .parse()
+                    .map_err(|_| "--common-token-prior must be a float")?;
+            }
+            "--common-token-slack" => {
+                i += 1;
+                opts.common_token_prior_slack = args
+                    .get(i)
+                    .ok_or("--common-token-slack requires a number")?
+                    .parse()
+                    .map_err(|_| "--common-token-slack must be a float")?;
+            }
+            "--common-token-margin" => {
+                i += 1;
+                opts.common_token_prior_margin = args
+                    .get(i)
+                    .ok_or("--common-token-margin requires a number")?
+                    .parse()
+                    .map_err(|_| "--common-token-margin must be a float")?;
             }
             "--unk-token-penalty" => {
                 i += 1;
@@ -918,11 +990,21 @@ fn print_usage() {
     eprintln!(
         "  --thought-logit-aux F  Thought-to-logit auxiliary loss weight (default: 0.0 = off)"
     );
+    eprintln!(
+        "  --thought-logit-prefit-epochs N  Prefit direct thought logits before sequence training"
+    );
+    eprintln!("  --thought-logit-prefit-weight F  Prefit loss weight (default: 1.0)");
+    eprintln!("  --thought-logit-prefit-lr-scale F  Prefit LR multiplier (default: 1.0)");
     eprintln!("  --logit-anchor F     KL-style logit anchor weight (default: 0.0 = off)");
     eprintln!(
         "  --top-token-anticollapse F  Penalize wrong argmax token dominance (default: 0.0 = off)"
     );
     eprintln!("  --top-token-margin F Required target-vs-wrong-top margin (default: 0.0)");
+    eprintln!(
+        "  --common-token-prior F  Penalize overused common argmax tokens (default: 0.0 = off)"
+    );
+    eprintln!("  --common-token-slack F  Allowed argmax-vs-target frequency slack (default: 0.05)");
+    eprintln!("  --common-token-margin F Required target-vs-overused-token margin (default: 0.05)");
     eprintln!("  --unk-token-penalty F  Penalize <unk> outranking target (default: 0.0 = off)");
     eprintln!("  --unk-token-margin F   Required target-vs-<unk> margin (default: 0.0)");
     eprintln!(
