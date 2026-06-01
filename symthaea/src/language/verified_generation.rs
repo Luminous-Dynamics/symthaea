@@ -1531,6 +1531,7 @@ fn build_compile_retry_context<'a>(
         past_examples: context.past_examples.clone(),
         mcts_plan_confidence: context.mcts_plan_confidence,
         negative_prototypes: context.negative_prototypes.clone(),
+        substrate_cost_model: context.substrate_cost_model.clone(),
         error_hints,
         diagnostic_hvs,
         issue_text: context.issue_text.clone(),
@@ -1660,6 +1661,7 @@ fn build_test_retry_context<'a>(
         past_examples: context.past_examples.clone(),
         mcts_plan_confidence: context.mcts_plan_confidence,
         negative_prototypes: context.negative_prototypes.clone(),
+        substrate_cost_model: context.substrate_cost_model.clone(),
         error_hints,
         diagnostic_hvs: {
             let mut diagnostic_hvs = context.diagnostic_hvs.clone();
