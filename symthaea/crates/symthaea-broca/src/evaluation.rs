@@ -95,6 +95,19 @@ pub struct EvalResult {
     /// single most common predicted token. High values indicate token collapse.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub top_token_collapse_rate: Option<f32>,
+    /// Identity of the most common teacher-forced argmax token, when collapse
+    /// diagnostics are available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_token_collapse: Option<TokenCollapseReport>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenCollapseReport {
+    pub token_id: u32,
+    pub token: String,
+    pub count: usize,
+    pub total: usize,
+    pub rate: f32,
 }
 
 /// Per-intent quality metrics.
@@ -553,6 +566,32 @@ pub fn top_token_collapse_rate(token_ids: &[u32]) -> f32 {
     max_count as f32 / token_ids.len() as f32
 }
 
+pub fn top_token_collapse_report(
+    token_ids: &[u32],
+    tokenizer: &BpeTokenizer,
+) -> Option<TokenCollapseReport> {
+    if token_ids.is_empty() {
+        return None;
+    }
+    let mut counts: HashMap<u32, usize> = HashMap::new();
+    for &id in token_ids {
+        *counts.entry(id).or_insert(0) += 1;
+    }
+    let (token_id, count) = counts
+        .into_iter()
+        .max_by(|(a_id, a_count), (b_id, b_count)| {
+            a_count.cmp(b_count).then_with(|| b_id.cmp(a_id))
+        })?;
+    let total = token_ids.len();
+    Some(TokenCollapseReport {
+        token_id,
+        token: tokenizer.token_str(token_id).to_string(),
+        count,
+        total,
+        rate: count as f32 / total as f32,
+    })
+}
+
 /// Run full evaluation: perplexity + generation quality + per-intent breakdown.
 pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResult {
     let mut total_ce = 0.0f32;
@@ -782,6 +821,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     } else {
         Some(top_token_collapse_rate(&all_teacher_forced_top_ids))
     };
+    let top_token_collapse =
+        top_token_collapse_report(&all_teacher_forced_top_ids, generator.tokenizer());
 
     EvalResult {
         perplexity,
@@ -798,6 +839,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         unknown_token_rate,
         code_token_rate,
         top_token_collapse_rate,
+        top_token_collapse,
     }
 }
 
@@ -2152,6 +2194,7 @@ pub fn evaluate_liquid_mamba(
         unknown_token_rate: None,
         code_token_rate: None,
         top_token_collapse_rate: None,
+        top_token_collapse: None,
     };
 
     // --- Consciousness gating test ---
@@ -2811,6 +2854,7 @@ mod tests {
             unknown_token_rate: Some(0.0),
             code_token_rate: Some(0.0),
             top_token_collapse_rate: Some(0.0),
+            top_token_collapse: None,
         };
         let gated = EvalResult {
             perplexity: 20.0,
@@ -2827,6 +2871,7 @@ mod tests {
             unknown_token_rate: Some(0.25),
             code_token_rate: Some(0.35),
             top_token_collapse_rate: Some(0.75),
+            top_token_collapse: None,
         };
         let mut categories = HashMap::new();
         categories.insert(
@@ -3198,6 +3243,7 @@ mod tests {
             unknown_token_rate: None,
             code_token_rate: None,
             top_token_collapse_rate: None,
+            top_token_collapse: None,
         };
 
         let report = format_eval_report(&result);
@@ -3286,6 +3332,19 @@ mod tests {
     }
 
     #[test]
+    fn test_top_token_collapse_report_identifies_token() {
+        let tokenizer = BpeTokenizer::default_4k();
+        let report =
+            top_token_collapse_report(&[tokenizer.unk_id, 7, tokenizer.unk_id], &tokenizer)
+                .expect("collapse report");
+        assert_eq!(report.token_id, tokenizer.unk_id);
+        assert_eq!(report.token, "<unk>");
+        assert_eq!(report.count, 2);
+        assert_eq!(report.total, 3);
+        assert!((report.rate - (2.0 / 3.0)).abs() < 1e-6);
+    }
+
+    #[test]
     fn test_contrastive_intent_score_empty() {
         assert_eq!(contrastive_intent_score(&[]), 0.0);
         assert_eq!(contrastive_intent_score(&["single".to_string()]), 0.0);
@@ -3332,6 +3391,7 @@ mod tests {
                     unknown_token_rate: None,
                     code_token_rate: None,
                     top_token_collapse_rate: None,
+                    top_token_collapse: None,
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
@@ -3444,6 +3504,7 @@ mod tests {
                     unknown_token_rate: None,
                     code_token_rate: None,
                     top_token_collapse_rate: None,
+                    top_token_collapse: None,
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,
