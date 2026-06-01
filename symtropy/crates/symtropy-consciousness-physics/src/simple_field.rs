@@ -372,6 +372,20 @@ impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
         }
     }
 
+    fn record_work(&mut self, body: BodyHandle, work_joules: f64) {
+        if let Some(entity) = self.entities.get_mut(&body) {
+            if work_joules > 0.0 {
+                let actual_consumed = entity.energy.consume(work_joules);
+                self.ledger.record_action(actual_consumed, 1.0);
+                entity.energy.dissipate_heat(actual_consumed * 0.1);
+            } else {
+                let recovered = work_joules.abs() * 0.4;
+                entity.energy.regenerate(recovered);
+                self.ledger.lifetime_energy -= recovered;
+            }
+        }
+    }
+
     fn apply_trauma(&mut self, _: &symtropy_physics::CollisionEvent<D>) {}
 }
 

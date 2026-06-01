@@ -61,6 +61,14 @@ impl<const D: usize> Constraint<D> for FixedJoint<D> {
         (self.body_a, self.body_b)
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
         // Compute world-space anchor positions
         let world_a = body_a.transform.translation.0
@@ -92,7 +100,13 @@ impl<const D: usize> Constraint<D> for FixedJoint<D> {
         }
     }
 
-    fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
+    fn solve_velocity(
+        &self,
+        body_a: &mut RigidBody<D>,
+        body_b: &mut RigidBody<D>,
+        _dt: f64,
+        _callback: Option<&mut dyn crate::world::PhysicsCallback<D>>,
+    ) {
         // Damp all relative velocity at the joint point
         let rel_vel = body_b.linear_velocity - body_a.linear_velocity;
         let speed = rel_vel.norm();

@@ -104,6 +104,14 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
         (self.body_a, self.body_b)
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
         // === Positional constraint (same as BallJoint) ===
         let world_a = body_a.transform.translation.0
@@ -133,7 +141,13 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
         }
     }
 
-    fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
+    fn solve_velocity(
+        &self,
+        body_a: &mut RigidBody<D>,
+        body_b: &mut RigidBody<D>,
+        _dt: f64,
+        mut callback: Option<&mut dyn crate::world::PhysicsCallback<D>>,
+    ) {
         // === Positional velocity constraint (same as BallJoint) ===
         let world_a = body_a.transform.translation.0
             + body_a.transform.rotation.rotate_vector(&self.anchor_a);
@@ -161,16 +175,10 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
 
         // === Angular constraint: project out disallowed angular velocity ===
         // The hinge allows rotation only in the (plane_axis_a, plane_axis_b) plane.
-        // All other angular velocity components of the RELATIVE rotation should be zero.
-        //
-        // Using bivector representation: the relative angular velocity
-        // should only have a component in the allowed plane.
-        // === Angular constraint: project out disallowed angular velocity ===
-        // The hinge allows rotation only in the (plane_axis_a, plane_axis_b) plane.
         // For each bivector plane that is NOT the allowed plane,
         // damp the relative angular velocity.
         let num_bivector_components = D * (D - 1) / 2;
-        if num_bivector_components <= 1 {
+        if num_bivector_components <= 1 && self.motor.is_none() {
             return; // 2D: only one rotation plane, hinge is trivially satisfied
         }
 
@@ -221,6 +229,17 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
             let torque = (motor.kp * (motor.target_pos - rel_angular_vel)
                 - rel_angular_vel * motor.kd)
                 .clamp(-motor.max_force, motor.max_force);
+
+            // METABOLIC HEARTBEAT: Calculate Work and Energy Recovery
+            // Work (Power) = Torque * AngularVelocity
+            // Positive = Consuming, Negative = Regenerating
+            let power = torque * rel_angular_vel;
+            let work_joules = power * _dt;
+
+            if let Some(ref mut cb) = callback {
+                // Charge/Drain from the thermodynamic ledger
+                cb.record_work(self.body_b, work_joules);
+            }
 
             let impulse = torque * _dt;
             if body_a.is_dynamic() {

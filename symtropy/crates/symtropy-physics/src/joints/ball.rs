@@ -74,6 +74,14 @@ impl<const D: usize> Constraint<D> for BallJoint<D> {
         (self.body_a, self.body_b)
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
         let (world_a, world_b) = self.world_anchors(body_a, body_b);
         let error = world_b - world_a;
@@ -100,7 +108,13 @@ impl<const D: usize> Constraint<D> for BallJoint<D> {
         }
     }
 
-    fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
+    fn solve_velocity(
+        &self,
+        body_a: &mut RigidBody<D>,
+        body_b: &mut RigidBody<D>,
+        _dt: f64,
+        _callback: Option<&mut dyn crate::world::PhysicsCallback<D>>,
+    ) {
         // Compute relative velocity at the joint anchor points
         // For ball joints, we only constrain translational velocity at the anchor;
         // rotational velocity is free.

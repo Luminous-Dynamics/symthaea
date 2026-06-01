@@ -3,14 +3,14 @@
 //! Platform types for Symthaea robotics platforms.
 
 /// Robotic platform type — maps to symthaea's EmbodimentPlatform.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub enum PlatformType {
     /// Quadrotor drone (4 actuators).
     Quadrotor,
     /// Autonomous car (3 actuators: steering, throttle, brake).
     Vehicle,
-    /// Bipedal humanoid (21 DOF).
+    /// Bipedal humanoid (64 DOF FullSpine core).
     Humanoid,
     /// Autonomous underwater vehicle (8 thrusters).
     Auv,
@@ -44,7 +44,7 @@ impl PlatformType {
         match self {
             Self::Quadrotor => 4,
             Self::Vehicle => 3,
-            Self::Humanoid => 21,
+            Self::Humanoid => 64, // Upgraded to Flagship 64-DOF FullSpine
             Self::Auv => 8,
             Self::Helicopter => 6,
             Self::Manipulator => 8,
@@ -60,7 +60,7 @@ impl PlatformType {
         match self {
             Self::Quadrotor => 0.027,   // Crazyflie
             Self::Vehicle => 1500.0,    // Car
-            Self::Humanoid => 70.0,     // Adult
+            Self::Humanoid => 95.0,     // Flagship 64-DOF FullSpine Chassis
             Self::Auv => 50.0,          // REMUS-class
             Self::Helicopter => 2500.0, // SAR helicopter
             Self::Manipulator => 20.0,  // Robot arm
@@ -76,7 +76,7 @@ impl PlatformType {
         match self {
             Self::Quadrotor => 0.1,
             Self::Vehicle => 2.5,
-            Self::Humanoid => 0.5,
+            Self::Humanoid => 0.85, // Enveloping 64-DOF articulated volume
             Self::Auv => 1.0,
             Self::Helicopter => 5.0,
             Self::Manipulator => 1.0,

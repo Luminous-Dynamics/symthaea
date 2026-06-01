@@ -434,10 +434,16 @@ impl<const D: usize> ConsciousnessField<D> {
     /// Tracks consumption in the thermodynamic ledger.
     pub fn consume_energy(&mut self, handle: BodyHandle, amount: f64) -> f64 {
         let phi = self.phi(handle);
+
+        // Dimensional Scaling: higher DOF platforms require more baseline maintenance
+        // actual_cost = base_cost * (1.0 + (D as f64 - 3.0) * 0.1)
+        let dimensional_multiplier = 1.0 + (D as f64 - 3.0).max(0.0) * 0.1;
+        let scaled_amount = amount * dimensional_multiplier;
+
         let consumed = self
             .entities
             .get_mut(&handle)
-            .map(|e| e.energy.consume(amount))
+            .map(|e| e.energy.consume(scaled_amount))
             .unwrap_or(0.0);
         if consumed > 0.0 {
             self.ledger.record_action(consumed, phi);
@@ -532,7 +538,7 @@ impl<const D: usize> ConsciousnessField<D> {
         positions: &[(BodyHandle, symtropy_math::Point<D>)],
         dt: f64,
     ) {
-        use crate::harmony_field::{contagion_update, EMOTIONAL_CONTAGION_IDX};
+        use crate::harmony_field::{EMOTIONAL_CONTAGION_IDX, contagion_update};
 
         // Snapshot: (position_as_svector, emotion, phi) for all entities
         let sources: Vec<(SVector<f64, D>, f64, f64)> = positions
@@ -702,6 +708,9 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
 
             // Wire dissipate_heat: collision energy becomes heat (raises temperature + entropy)
             entity.energy.dissipate_heat(consumed * 0.5);
+
+            // Record global dissipation (Phase 3 fix)
+            self.ledger.record_dissipation(consumed * 0.5);
         }
         if let Some(entity) = self.entities.get_mut(&event.body_b) {
             let surprise_factor = (1.0 - resonance).max(0.1);
@@ -710,19 +719,50 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
             let drain = event.impulse * drain_rate;
             let consumed = entity.energy.consume(drain);
             entity.energy.dissipate_heat(consumed * 0.5);
+
+            // Record global dissipation (Phase 3 fix)
+            self.ledger.record_dissipation(consumed * 0.5);
         }
     }
 
     fn record_dissipation(&mut self, energy: f64) {
         self.drain_sanctuary_absorption();
-        self.ledger.record_dissipation(energy);
+
+        // Dimensional Entropy: higher DOF systems dissipate heat more efficiently
+        // due to increased surface area and joint friction.
+        let entropy_multiplier = 1.0 + (D as f64 - 3.0).max(0.0) * 0.05;
+        let scaled_dissipation = energy * entropy_multiplier;
+
+        self.ledger.record_dissipation(scaled_dissipation);
 
         // Distribute damping heat across all entities (simplified: equal share)
         let n = self.entities.len();
-        if n > 0 && energy > 1e-15 {
-            let per_entity = energy / n as f64;
+        if n > 0 && scaled_dissipation > 1e-15 {
+            let per_entity = scaled_dissipation / n as f64;
             for entity in self.entities.values_mut() {
                 entity.energy.dissipate_heat(per_entity);
+            }
+        }
+    }
+
+    fn record_work(&mut self, body: BodyHandle, work_joules: f64) {
+        let phi = self.phi(body);
+
+        if let Some(entity) = self.entities.get_mut(&body) {
+            if work_joules > 0.0 {
+                // Motor is consuming energy (driving motion)
+                let actual_consumed = entity.energy.consume(work_joules);
+                self.ledger.record_action(actual_consumed, phi);
+
+                // Some motor inefficiency becomes heat
+                entity.energy.dissipate_heat(actual_consumed * 0.1);
+            } else {
+                // Motor is recovering energy (regenerative braking)
+                let recovered = work_joules.abs() * 0.4; // 40% efficiency for v0 recovery
+                entity.energy.regenerate(recovered);
+
+                // Track in ledger as negative action (energy returned)
+                self.ledger.lifetime_energy -= recovered;
             }
         }
     }

@@ -18,8 +18,8 @@ let
   hcPkgs = holochainPackages;
 
   # Rust toolchain with WASM target
-  # Using latest stable - see docs/technical/RUST_COMPATIBILITY_ISSUES.md for mio/wait-timeout workarounds
-  rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+  # Using 1.95.0 - see docs/technical/RUST_COMPATIBILITY_ISSUES.md for mio/wait-timeout workarounds
+  rustToolchain = pkgs.rust-bin.stable."1.95.0".default.override {
     targets = [ "wasm32-unknown-unknown" ];
     extensions = [ "rust-src" "rust-analyzer" "clippy" ];
   };

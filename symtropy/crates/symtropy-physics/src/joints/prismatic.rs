@@ -58,6 +58,14 @@ impl<const D: usize> Constraint<D> for PrismaticJoint<D> {
         (self.body_a, self.body_b)
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
         let delta = body_b.transform.translation.0 - body_a.transform.translation.0;
 
@@ -111,7 +119,13 @@ impl<const D: usize> Constraint<D> for PrismaticJoint<D> {
         }
     }
 
-    fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, dt: f64) {
+    fn solve_velocity(
+        &self,
+        body_a: &mut RigidBody<D>,
+        body_b: &mut RigidBody<D>,
+        dt: f64,
+        mut callback: Option<&mut dyn crate::world::PhysicsCallback<D>>,
+    ) {
         let total_inv = body_a.inv_mass + body_b.inv_mass;
         if total_inv < 1e-15 {
             return;
@@ -143,6 +157,13 @@ impl<const D: usize> Constraint<D> for PrismaticJoint<D> {
 
             // PD controller: impulse = (kp * (target - pos) + kd * (target_vel - vel)) * dt
             let impulse = motor.calculate_impulse(displacement, rel_vel, dt);
+
+            // METABOLIC HEARTBEAT: Calculate Work and Energy Recovery
+            // Work = Impulse * Velocity
+            let work_joules = impulse * rel_vel;
+            if let Some(ref mut cb) = callback {
+                cb.record_work(self.body_b, work_joules);
+            }
 
             if body_a.is_dynamic() {
                 body_a.linear_velocity[self.axis] -= impulse * body_a.inv_mass;

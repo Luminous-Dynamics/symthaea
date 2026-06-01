@@ -105,15 +105,16 @@
           name = "luminous-dynamics-dev";
 
           buildInputs = [
-            # Rust 1.94 via rust-overlay (consistent with holochain shell)
+            # Rust 1.95.0 via rust-overlay (consistent with holochain shell)
             (pkgs.rust-bin.stable.latest.default.override {
               targets = [ "wasm32-unknown-unknown" ];
               extensions = [ "rust-src" "rust-analyzer" "clippy" ];
             })
-          ] ++ (with pkgs; [
+            ] ++ (with pkgs; [
             # Common tools across all projects
-            nodejs_20
+            nodejs_22
             bacon
+
             cargo-nextest
 
             # Linker (required by symthaea/.cargo/config.toml: -fuse-ld=mold)

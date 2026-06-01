@@ -6,9 +6,15 @@
 use crate::body::{BodyHandle, RigidBody};
 
 /// A constraint between two rigid bodies.
-pub trait Constraint<const D: usize>: Send + Sync {
+pub trait Constraint<const D: usize>: Send + Sync + std::any::Any {
     /// The two bodies this constraint connects.
     fn bodies(&self) -> (BodyHandle, BodyHandle);
+
+    /// Cast to std::any::Any for downcasting in tests/lab.
+    fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Cast to std::any::Any for downcasting in tests/lab.
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     /// Solve the constraint by applying positional corrections.
     /// Called multiple times per frame for iterative convergence.
@@ -17,7 +23,14 @@ pub trait Constraint<const D: usize>: Send + Sync {
     /// Optional velocity-level correction (impulse-based, Fix 7).
     /// Called after position solve for hybrid PBD+impulse dynamics.
     /// Default: no-op (pure PBD).
-    fn solve_velocity(&self, _body_a: &mut RigidBody<D>, _body_b: &mut RigidBody<D>, _dt: f64) {}
+    fn solve_velocity(
+        &self,
+        _body_a: &mut RigidBody<D>,
+        _body_b: &mut RigidBody<D>,
+        _dt: f64,
+        _callback: Option<&mut dyn crate::world::PhysicsCallback<D>>,
+    ) {
+    }
 }
 
 /// Distance constraint: keeps two bodies at a fixed distance.
@@ -31,6 +44,14 @@ pub struct DistanceConstraint<const D: usize> {
 impl<const D: usize> Constraint<D> for DistanceConstraint<D> {
     fn bodies(&self) -> (BodyHandle, BodyHandle) {
         (self.body_a, self.body_b)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
@@ -59,7 +80,13 @@ impl<const D: usize> Constraint<D> for DistanceConstraint<D> {
         }
     }
 
-    fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
+    fn solve_velocity(
+        &self,
+        body_a: &mut RigidBody<D>,
+        body_b: &mut RigidBody<D>,
+        _dt: f64,
+        _callback: Option<&mut dyn crate::world::PhysicsCallback<D>>,
+    ) {
         let delta = body_b.transform.translation.0 - body_a.transform.translation.0;
         let dist = delta.norm();
         if dist < 1e-15 {

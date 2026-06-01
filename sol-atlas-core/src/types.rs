@@ -103,7 +103,7 @@ impl Layer {
             Self::Earthquakes => "#e53e3e",
             Self::Fires => "#ed8936",
             Self::Storms => "#4299e1",
-            Self::Volcanos => "#e53e3e",
+            Self::Volcanoes => "#e53e3e",
             Self::Infrastructure => "#9f7aea",
             Self::Chokepoints => "#ed8936",
             Self::DeSciEvidence => "#0066CC",

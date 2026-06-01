@@ -182,6 +182,18 @@ pub struct GuardianVeto {
     /// Required for Charter Guardian Authority vetoes (post-sunset).
     #[serde(default)]
     pub threat_category: Option<String>,
+    /// Haptic proof from robotic sensors justifying the veto (Moral Manifold).
+    #[serde(default)]
+    pub haptic_proof: Option<HapticVerification>,
+}
+
+/// Hardware-signed haptic proof for a constitutional veto.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct HapticVerification {
+    pub joint_id: String,
+    pub surprise_magnitude: f64,
+    pub hardware_signature: Vec<u8>,
+    pub enclave_pubkey: [u8; 32],
 }
 
 /// A vote to override a guardian veto
@@ -459,7 +471,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::GuardianVeto(veto) => validate_create_veto(action, veto),
                 EntryTypes::FundAllocation(alloc) => validate_create_fund_allocation(action, alloc),
                 EntryTypes::VetoOverrideVote(vote) => validate_create_override_vote(action, vote),
-                EntryTypes::VetoOverrideResult(result) => validate_create_override_result(action, result),
+                EntryTypes::VetoOverrideResult(result) => {
+                    validate_create_override_result(action, result)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -483,16 +497,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         "Vetoes cannot be modified".into(),
                     ))
                 }
-                EntryTypes::VetoOverrideVote(_) => {
-                    Ok(ValidateCallbackResult::Invalid(
-                        "Override votes cannot be modified".into(),
-                    ))
-                }
-                EntryTypes::VetoOverrideResult(_) => {
-                    Ok(ValidateCallbackResult::Invalid(
-                        "Override results cannot be modified".into(),
-                    ))
-                }
+                EntryTypes::VetoOverrideVote(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Override votes cannot be modified".into(),
+                )),
+                EntryTypes::VetoOverrideResult(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Override results cannot be modified".into(),
+                )),
                 EntryTypes::FundAllocation(alloc) => {
                     validate_update_fund_allocation(action, alloc, original_action_hash)
                 }
@@ -1032,13 +1042,20 @@ mod tests {
 
         // Too short
         v.justification_hash = Some("abc123".into());
-        assert!(check_create_veto(&v).unwrap_err().contains("64-character hex"));
+        assert!(
+            check_create_veto(&v)
+                .unwrap_err()
+                .contains("64-character hex")
+        );
 
         // Non-hex chars
-        v.justification_hash = Some(
-            "g1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".into(),
+        v.justification_hash =
+            Some("g1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".into());
+        assert!(
+            check_create_veto(&v)
+                .unwrap_err()
+                .contains("64-character hex")
         );
-        assert!(check_create_veto(&v).unwrap_err().contains("64-character hex"));
 
         // None is valid (backward compat)
         v.justification_hash = None;
@@ -1049,7 +1066,11 @@ mod tests {
     fn test_veto_threat_category_not_empty() {
         let mut v = make_veto();
         v.threat_category = Some(String::new());
-        assert!(check_create_veto(&v).unwrap_err().contains("threat_category"));
+        assert!(
+            check_create_veto(&v)
+                .unwrap_err()
+                .contains("threat_category")
+        );
 
         v.threat_category = Some("fiscal".into());
         assert!(check_create_veto(&v).is_ok());

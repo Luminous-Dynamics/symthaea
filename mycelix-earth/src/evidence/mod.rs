@@ -17,6 +17,8 @@ pub enum EarthDataSource {
     CommunityReport,
     /// Fused Sentinel-1 (Radar) and Sentinel-2 (Optical) data
     OrbitalFusion,
+    /// Mobile robotic tactile/proprioceptive attestation
+    Tactile,
 }
 
 /// A human attestation to a physical event or reading.

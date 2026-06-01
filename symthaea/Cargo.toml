@@ -231,6 +231,7 @@ dashmap = "5.5"
 lru = "0.16"
 rayon = "1.10"
 proptest = "1.4"
+symtropy-robotics-bridge-core = { path = "../symtropy/crates/symtropy-robotics-bridge-core" }
 
 [package]
 name = "symthaea"
@@ -324,6 +325,7 @@ mycelix-crypto = { path = "../mycelix-identity/crates/mycelix-crypto", optional 
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
 # Symthaea Swarm - P2P collective consciousness
 symthaea_swarm = { path = "crates/symthaea-swarm", optional = true, package = "symthaea-swarm" }
+symtropy-robotics-bridge-core = { workspace = true, optional = true }
 
 # Symthaea Sentinel - Zero-shot temporal audio pattern recognition
 symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
@@ -634,7 +636,7 @@ wait-timeout = "0.2"
 default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
-swarm = ["iroh", "dep:symthaea_swarm"]  # P2P collective consciousness
+swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
 
 
 # ── Binary build gates ──────────────────────────────────────────────

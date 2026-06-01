@@ -53,6 +53,11 @@ pub trait PhysicsCallback<const D: usize> {
     /// Called after each physics step to record energy dissipated.
     fn record_dissipation(&mut self, energy: f64);
 
+    /// Record mechanical work performed (or energy recovered) by an actuator.
+    /// Positive work = energy consumed (motor driving motion).
+    /// Negative work = energy recovered (regenerative braking).
+    fn record_work(&mut self, body: BodyHandle, work_joules: f64);
+
     /// Calculates and applies the long-term effect of a collision event
     /// (e.g., trauma, fatigue, shock) to the entity's internal state.
     /// This is the primary hook for persistent state change based on impact.
@@ -74,6 +79,7 @@ impl<const D: usize> PhysicsCallback<D> for NoOpCallback {
     }
     fn on_collision(&mut self, _: &CollisionEvent<D>) {}
     fn record_dissipation(&mut self, _: f64) {}
+    fn record_work(&mut self, _: BodyHandle, _: f64) {}
     fn apply_trauma(&mut self, _: &CollisionEvent<D>) {}
 }
 
@@ -270,15 +276,16 @@ impl<const D: usize> PhysicsWorld<D> {
     /// The callback modulates forces, impulses, and friction based on
     /// consciousness state, closing the consciousness-physics loop.
     pub fn step_with_callback(&mut self, dt: f64, callback: &mut dyn PhysicsCallback<D>) {
-        self.step_internal(dt, Some(callback));
+        self.step_internal(dt, callback);
     }
 
     /// Step without consciousness coupling (pure physics).
     pub fn step(&mut self, dt: f64) {
-        self.step_internal(dt, None);
+        let mut noop = NoOpCallback;
+        self.step_internal(dt, &mut noop);
     }
 
-    fn step_internal(&mut self, dt: f64, mut callback: Option<&mut dyn PhysicsCallback<D>>) {
+    fn step_internal(&mut self, dt: f64, callback: &mut dyn PhysicsCallback<D>) {
         // 0. Clear events from previous step
         self.collision_events.clear();
         self.sensor_events.clear();
@@ -305,10 +312,8 @@ impl<const D: usize> PhysicsWorld<D> {
         }
         for body in &mut self.bodies {
             if !body.sleeping {
-                if let Some(cb) = callback.as_mut() {
-                    body.force_accumulator =
-                        cb.modulate_force(body.handle, &body.force_accumulator);
-                }
+                body.force_accumulator =
+                    callback.modulate_force(body.handle, &body.force_accumulator);
                 integrator::integrate(body, &self.gravity, dt);
             }
         }
@@ -440,7 +445,7 @@ impl<const D: usize> PhysicsWorld<D> {
             for &ci in &active_contact_indices {
                 if ci < self.contacts.len() {
                     let contact = self.contacts[ci].clone();
-                    let updated = self.resolve_contact(contact, dt, &mut callback);
+                    let updated = self.resolve_contact(contact, dt, callback);
                     self.contacts[ci] = updated;
                 }
             }
@@ -493,10 +498,20 @@ impl<const D: usize> PhysicsWorld<D> {
                 if let (Some(a), Some(b)) = (idx_a, idx_b) {
                     if a < b {
                         let (left, right) = self.bodies.split_at_mut(b);
-                        self.constraints[ci].solve_velocity(&mut left[a], &mut right[0], dt);
+                        self.constraints[ci].solve_velocity(
+                            &mut left[a],
+                            &mut right[0],
+                            dt,
+                            Some(callback),
+                        );
                     } else {
                         let (left, right) = self.bodies.split_at_mut(a);
-                        self.constraints[ci].solve_velocity(&mut right[0], &mut left[b], dt);
+                        self.constraints[ci].solve_velocity(
+                            &mut right[0],
+                            &mut left[b],
+                            dt,
+                            Some(callback),
+                        );
                     }
                 }
             }
@@ -510,9 +525,7 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
         // 8. State Decay: Apply natural recovery/decay to all conscious entities.
-        if let Some(cb) = callback.as_mut() {
-            self.decay_state(*cb, dt);
-        }
+        self.decay_state(callback, dt);
     }
 
     /// Decay the consciousness state over time.
@@ -594,7 +607,7 @@ impl<const D: usize> PhysicsWorld<D> {
         &mut self,
         mut contact: ContactManifold<D>,
         dt: f64,
-        callback: &mut Option<&mut dyn PhysicsCallback<D>>,
+        callback: &mut dyn PhysicsCallback<D>,
     ) -> ContactManifold<D> {
         let (idx_a, idx_b) = self.find_body_indices(contact.body_a, contact.body_b);
         let (Some(a), Some(b)) = (idx_a, idx_b) else {
@@ -639,11 +652,7 @@ impl<const D: usize> PhysicsWorld<D> {
 
             if actual_delta.abs() > 1e-15 {
                 // ═══ CONSCIOUSNESS MODULATION: sanctuary + harmony fields ═══
-                let modulated_delta = if let Some(cb) = callback.as_mut() {
-                    cb.modulate_impulse(actual_delta, &pt.position)
-                } else {
-                    actual_delta
-                };
+                let modulated_delta = callback.modulate_impulse(actual_delta, &pt.position);
 
                 let impulse = contact.normal * modulated_delta;
                 integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
@@ -665,9 +674,7 @@ impl<const D: usize> PhysicsWorld<D> {
                 let mut mu = (self.bodies[a].friction * self.bodies[b].friction).sqrt();
 
                 // ═══ HARMONY FIELD FRICTION MODULATION ═══
-                if let Some(cb) = callback.as_mut() {
-                    mu *= cb.friction_multiplier(&primary_pt, contact.body_a);
-                }
+                mu *= callback.friction_multiplier(&primary_pt, contact.body_a);
 
                 let j_t_desired = -v_t_mag / total_inv_mass;
                 let j_t = j_t_desired.clamp(-mu * total_normal_impulse, mu * total_normal_impulse);
@@ -676,9 +683,7 @@ impl<const D: usize> PhysicsWorld<D> {
                 integrator::apply_impulse(&mut self.bodies[b], &friction_impulse);
 
                 // Record friction dissipation for consciousness energy budget
-                if let Some(cb) = callback.as_mut() {
-                    cb.record_dissipation(j_t.abs() * 0.1);
-                }
+                callback.record_dissipation(j_t.abs() * 0.1);
             }
 
             // ─── Emit collision event ───
@@ -692,13 +697,9 @@ impl<const D: usize> PhysicsWorld<D> {
 
             // ═══ CONSCIOUSNESS FEEDBACK: collision → prediction error ═══
             // 1. Call the general on_collision hook (for immediate reaction)
-            if let Some(cb) = callback.as_mut() {
-                cb.on_collision(&event);
-            }
+            callback.on_collision(&event);
             // 2. Call the dedicated trauma/state update hook (for persistent state)
-            if let Some(cb) = callback.as_mut() {
-                cb.apply_trauma(&event);
-            }
+            callback.apply_trauma(&event);
         }
 
         contact

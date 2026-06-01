@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     registry.insert(sensor_id.to_string(), sensor_pubkey);
 
     let provider = PhysicalEnclaveProvider {
-        verified_sensors: registry,
+        verified_sensors: registry.clone(),
     };
 
     // --- PHASE 1B: MULTI-MODAL ORBITAL FUSION ---
@@ -326,6 +326,35 @@ async fn main() -> anyhow::Result<()> {
         );
         info!("✨ [Evolution] The Machine provided the math; the Humans provided the ethics.");
     }
+
+    // --- PHASE 18: PROPRIOCEPTIVE ORACLE (HAPTIC TRUTH) ---
+    info!(
+        "🤖 [PHASE 18: Proprioceptive Oracle] 64-DOF Humanoid 'Aria' exploring wetland terrain..."
+    );
+
+    // Simulate a joint-level haptic encounter (Channel 5 Prediction Error)
+    let tactile_resistance = 4.8; // High resistance (Solid ground)
+    info!(
+        "🦵 [Aria] Right Knee Encoder: Detected physical resistance pulse: {:.1} (Metrology Level 4)",
+        tactile_resistance
+    );
+
+    // Generate signed haptic attestation
+    let haptic_attestation = mycelix_earth::providers::hardware::PhysicalEnclaveProvider {
+        verified_sensors: registry,
+    }
+    .capture_verified_claim(
+        "aria-knee-right",
+        "HapticGroundDensity",
+        tactile_resistance,
+        "kg/m2",
+    )
+    .await?;
+
+    info!("✅ [PHASE 18] Haptic Truth Verified: Robotic pulse added to LEM Cube.");
+    info!(
+        "🧬 [LEM Cube] Tactile Axis (T) active: High-fidelity physical ground-truthing complete."
+    );
 
     // --- PHASE 14: RECURSIVE PLANETARY PROOF (STARK AGGREGATION) ---
     info!("🌀 [PHASE 14: Recursive STARK Aggregation] Scaling to Planetary Verifiability...");

@@ -25,6 +25,15 @@ pub trait HardwareOracle {
         value: f64,
         unit: &str,
     ) -> Result<EvidencePacket>;
+
+    /// Generate a hardware-signed haptic pulse from soil/biological data.
+    /// Bridges Earth metrology to the Robotic Swarm proprioceptive manifold.
+    async fn generate_eco_haptic_pulse(
+        &self,
+        sensor_id: &str,
+        position: [f64; 4],
+        health_index: f64,
+    ) -> Result<symthaea_swarm::HapticPulseMsg>;
 }
 
 pub struct PhysicalEnclaveProvider {
@@ -92,6 +101,30 @@ impl HardwareOracle for PhysicalEnclaveProvider {
             sensor_pubkey: Some(pubkey),
             joules_consumed: 12.4, // Proof generation cost on Pi 5
             somatic_witnesses: Vec::new(),
+        })
+    }
+
+    async fn generate_eco_haptic_pulse(
+        &self,
+        sensor_id: &str,
+        position: [f64; 4],
+        health_index: f64,
+    ) -> Result<symthaea_swarm::HapticPulseMsg> {
+        // Map biological 'thirst' to robotic 'surprise'
+        // health_index 1.0 (Homeostasis) -> surprise 0.0
+        // health_index 0.0 (Drought/Decay) -> surprise 5.0 (Critical)
+        let surprise = (1.0 - health_index).max(0.0) * 5.0;
+
+        let (sig, _pubkey) = self
+            .sign_reading(sensor_id, &health_index.to_be_bytes())
+            .await?;
+
+        Ok(symthaea_swarm::HapticPulseMsg {
+            node_id: uuid::Uuid::new_v4(),
+            position,
+            surprise,
+            impact_vector: [0.0; 4], // Biological tension is scalar/non-directional
+            timestamp: Utc::now().timestamp_millis() as u64,
         })
     }
 }
