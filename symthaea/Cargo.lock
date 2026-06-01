@@ -18617,6 +18617,7 @@ dependencies = [
  "symthaea-cell-foundry",
  "symthaea-clime",
  "symthaea-clinical",
+ "symthaea-coding-feedback",
  "symthaea-consciousness-equation",
  "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
@@ -18950,6 +18951,10 @@ dependencies = [
  "serde_json",
  "symthaea-core",
 ]
+
+[[package]]
+name = "symthaea-coding-feedback"
+version = "0.1.0"
 
 [[package]]
 name = "symthaea-consciousness-equation"

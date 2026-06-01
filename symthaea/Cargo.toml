@@ -72,6 +72,7 @@ members = [
     "crates/symthaea-zkproof",
     "crates/symthaea-zkproof/core",
     "crates/symthaea-broca",
+    "crates/symthaea-coding-feedback",
     "crates/symthaea-geodesic",
     "crates/symthaea-consciousness-equation",
     "crates/symthaea-neuromodulators",
@@ -386,6 +387,9 @@ symthaea-openfoam-bridge = { path = "crates/symthaea-openfoam-bridge", optional 
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
+# Symthaea Coding Feedback - lightweight semantic failure taxonomy and repair hints
+symthaea-coding-feedback = { path = "crates/symthaea-coding-feedback" }
 
 # Symthaea Spore - WASM consciousness kernel (BrocaLite fallback for always-on language)
 symthaea-spore = { path = "crates/symthaea-spore", optional = true, default-features = false }
