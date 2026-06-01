@@ -99,6 +99,10 @@ pub struct EvalResult {
     /// diagnostics are available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub top_token_collapse: Option<TokenCollapseReport>,
+    /// Top teacher-forced argmax tokens by frequency. This exposes secondary
+    /// attractors after the dominant token is suppressed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub top_token_collapse_top: Vec<TokenCollapseReport>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -489,6 +493,50 @@ pub fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
     -log_softmax_target
 }
 
+fn suppress_collapse_forbidden_logits(
+    logits: &mut [f32],
+    target: usize,
+    tokenizer: &crate::tokenizer::BpeTokenizer,
+    channels: &ThoughtChannels,
+) {
+    for id in tokenizer.vocab_size()..logits.len() {
+        if target != id {
+            logits[id] = f32::NEG_INFINITY;
+        }
+    }
+    for id in 0..tokenizer.vocab_size() {
+        if tokenizer.token_str(id as u32) == "<unk>" && id < logits.len() && target != id {
+            logits[id] = f32::NEG_INFINITY;
+        }
+    }
+    let canonical = tokenizer.unk_id as usize;
+    if canonical < logits.len() && target != canonical {
+        logits[canonical] = f32::NEG_INFINITY;
+    }
+    if !code_intent_active(channels) {
+        for id in 0..tokenizer.vocab_size().min(logits.len()) {
+            if target != id && is_code_contamination_token(tokenizer.token_str(id as u32)) {
+                logits[id] = f32::NEG_INFINITY;
+            }
+        }
+    }
+}
+
+fn code_intent_active(channels: &ThoughtChannels) -> bool {
+    channels
+        .channels
+        .get(24..28)
+        .map(|code_channels| {
+            code_channels
+                .iter()
+                .copied()
+                .fold(0.0f32, f32::max)
+                .max(code_channels.iter().copied().sum::<f32>() * 0.25)
+                > 0.25
+        })
+        .unwrap_or(false)
+}
+
 /// Compute English word ratio: fraction of token IDs that correspond to
 /// multi-character vocabulary words (not single bytes, not special tokens).
 pub fn english_word_ratio(token_ids: &[u32], tokenizer: &crate::tokenizer::BpeTokenizer) -> f32 {
@@ -574,26 +622,41 @@ pub fn top_token_collapse_report(
     token_ids: &[u32],
     tokenizer: &BpeTokenizer,
 ) -> Option<TokenCollapseReport> {
+    top_token_collapse_reports(token_ids, tokenizer, 1)
+        .into_iter()
+        .next()
+}
+
+pub fn top_token_collapse_reports(
+    token_ids: &[u32],
+    tokenizer: &BpeTokenizer,
+    limit: usize,
+) -> Vec<TokenCollapseReport> {
     if token_ids.is_empty() {
-        return None;
+        return Vec::new();
     }
     let mut counts: HashMap<u32, usize> = HashMap::new();
     for &id in token_ids {
         *counts.entry(id).or_insert(0) += 1;
     }
-    let (token_id, count) = counts
-        .into_iter()
-        .max_by(|(a_id, a_count), (b_id, b_count)| {
-            a_count.cmp(b_count).then_with(|| b_id.cmp(a_id))
-        })?;
     let total = token_ids.len();
-    Some(TokenCollapseReport {
-        token_id,
-        token: tokenizer.token_str(token_id).to_string(),
-        count,
-        total,
-        rate: count as f32 / total as f32,
-    })
+    let mut reports: Vec<TokenCollapseReport> = counts
+        .into_iter()
+        .map(|(token_id, count)| TokenCollapseReport {
+            token_id,
+            token: tokenizer.token_str(token_id).to_string(),
+            count,
+            total,
+            rate: count as f32 / total as f32,
+        })
+        .collect();
+    reports.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.token_id.cmp(&b.token_id))
+    });
+    reports.truncate(limit);
+    reports
 }
 
 /// Run full evaluation: perplexity + generation quality + per-intent breakdown.
@@ -647,7 +710,14 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
                 let logits = generator
                     .controller_mut()
                     .forward_step(&thought_hv, prev_token, pos);
-                if let Some((top_id, _)) = logits
+                let mut collapse_logits = logits.clone();
+                suppress_collapse_forbidden_logits(
+                    &mut collapse_logits,
+                    target_id as usize,
+                    generator.tokenizer(),
+                    &channels,
+                );
+                if let Some((top_id, _)) = collapse_logits
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
@@ -827,6 +897,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     };
     let top_token_collapse =
         top_token_collapse_report(&all_teacher_forced_top_ids, generator.tokenizer());
+    let top_token_collapse_top =
+        top_token_collapse_reports(&all_teacher_forced_top_ids, generator.tokenizer(), 5);
 
     EvalResult {
         perplexity,
@@ -844,6 +916,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         code_token_rate,
         top_token_collapse_rate,
         top_token_collapse,
+        top_token_collapse_top,
     }
 }
 
@@ -2199,6 +2272,7 @@ pub fn evaluate_liquid_mamba(
         code_token_rate: None,
         top_token_collapse_rate: None,
         top_token_collapse: None,
+        top_token_collapse_top: Vec::new(),
     };
 
     // --- Consciousness gating test ---
@@ -2859,6 +2933,7 @@ mod tests {
             code_token_rate: Some(0.0),
             top_token_collapse_rate: Some(0.0),
             top_token_collapse: None,
+            top_token_collapse_top: Vec::new(),
         };
         let gated = EvalResult {
             perplexity: 20.0,
@@ -2876,6 +2951,7 @@ mod tests {
             code_token_rate: Some(0.35),
             top_token_collapse_rate: Some(0.75),
             top_token_collapse: None,
+            top_token_collapse_top: Vec::new(),
         };
         let mut categories = HashMap::new();
         categories.insert(
@@ -3248,6 +3324,7 @@ mod tests {
             code_token_rate: None,
             top_token_collapse_rate: None,
             top_token_collapse: None,
+            top_token_collapse_top: Vec::new(),
         };
 
         let report = format_eval_report(&result);
@@ -3349,6 +3426,19 @@ mod tests {
     }
 
     #[test]
+    fn test_top_token_collapse_reports_exposes_secondary_attractors() {
+        let tokenizer = BpeTokenizer::default_4k();
+        let reports = top_token_collapse_reports(&[9, 7, 9, 8, 7, 9, 8], &tokenizer, 2);
+
+        assert_eq!(reports.len(), 2);
+        assert_eq!(reports[0].token_id, 9);
+        assert_eq!(reports[0].count, 3);
+        assert_eq!(reports[1].token_id, 7);
+        assert_eq!(reports[1].count, 2);
+        assert!(reports.iter().all(|report| report.total == 7));
+    }
+
+    #[test]
     fn test_contrastive_intent_score_empty() {
         assert_eq!(contrastive_intent_score(&[]), 0.0);
         assert_eq!(contrastive_intent_score(&["single".to_string()]), 0.0);
@@ -3396,6 +3486,7 @@ mod tests {
                     code_token_rate: None,
                     top_token_collapse_rate: None,
                     top_token_collapse: None,
+                    top_token_collapse_top: Vec::new(),
                 },
                 avg_semantic_pe: 0.72,
                 avg_effective_rank: 18.5,
@@ -3509,6 +3600,7 @@ mod tests {
                     code_token_rate: None,
                     top_token_collapse_rate: None,
                     top_token_collapse: None,
+                    top_token_collapse_top: Vec::new(),
                 },
                 avg_semantic_pe: 0.9,
                 avg_effective_rank: 2.0,

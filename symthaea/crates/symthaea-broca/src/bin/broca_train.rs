@@ -116,11 +116,14 @@ fn main() {
     // from broca-collect), so we always re-tokenize for CfC-HDC compatibility.
     let tokenizer = generator.tokenizer().clone();
     dataset.retokenize_all(&tokenizer);
+    let unknown_token_ids: std::collections::HashSet<u32> = (0..tokenizer.vocab_size() as u32)
+        .filter(|&id| id == tokenizer.unk_id || tokenizer.token_str(id) == "<unk>")
+        .collect();
     let unk_target_tokens = dataset
         .pairs
         .iter()
         .flat_map(|pair| pair.target_ids.iter())
-        .filter(|&&id| id == tokenizer.unk_id)
+        .filter(|&&id| unknown_token_ids.contains(&id))
         .count();
     let total_target_tokens: usize = dataset.pairs.iter().map(|pair| pair.target_ids.len()).sum();
     if total_target_tokens > 0 {

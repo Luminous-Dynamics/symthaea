@@ -909,7 +909,7 @@ pub fn train_with_adam(
 
     let use_sampled = config.negative_samples > 0;
     let vocab_size = generator.tokenizer().vocab_size();
-    let unknown_token_id = generator.tokenizer().unk_id as usize;
+    let unknown_token_ids = unknown_token_ids(generator.tokenizer());
 
     // Pre-compute curriculum ordering (indices into dataset)
     let curriculum_order: Vec<usize> = match &config.curriculum {
@@ -1275,16 +1275,18 @@ pub fn train_with_adam(
                                 total_loss += anti_loss;
                             }
                             if config.unknown_token_penalty_weight > 0.0 {
-                                let unk_loss = trainer.gpu_unknown_token_penalty_gradient(
-                                    &logits,
-                                    target_id as usize,
-                                    unknown_token_id,
-                                    lr,
-                                    effective_grad_clip,
-                                    config.unknown_token_penalty_weight,
-                                    config.unknown_token_penalty_margin,
-                                )?;
-                                total_loss += unk_loss;
+                                for &unknown_token_id in &unknown_token_ids {
+                                    let unk_loss = trainer.gpu_unknown_token_penalty_gradient(
+                                        &logits,
+                                        target_id as usize,
+                                        unknown_token_id,
+                                        lr,
+                                        effective_grad_clip,
+                                        config.unknown_token_penalty_weight,
+                                        config.unknown_token_penalty_margin,
+                                    )?;
+                                    total_loss += unk_loss;
+                                }
                             }
                         }
 
@@ -1528,17 +1530,19 @@ pub fn train_with_adam(
                             total_loss += anti_loss;
                         }
                         if config.unknown_token_penalty_weight > 0.0 {
-                            let unk_loss = apply_token_margin_penalty_gradient(
-                                generator.controller_mut(),
-                                &logits,
-                                target_id as usize,
-                                unknown_token_id,
-                                lr,
-                                effective_grad_clip,
-                                config.unknown_token_penalty_weight,
-                                config.unknown_token_penalty_margin,
-                            );
-                            total_loss += unk_loss;
+                            for &unknown_token_id in &unknown_token_ids {
+                                let unk_loss = apply_token_margin_penalty_gradient(
+                                    generator.controller_mut(),
+                                    &logits,
+                                    target_id as usize,
+                                    unknown_token_id,
+                                    lr,
+                                    effective_grad_clip,
+                                    config.unknown_token_penalty_weight,
+                                    config.unknown_token_penalty_margin,
+                                );
+                                total_loss += unk_loss;
+                            }
                         }
                         result
                     } else {
@@ -1585,17 +1589,19 @@ pub fn train_with_adam(
                             total_loss += anti_loss;
                         }
                         if config.unknown_token_penalty_weight > 0.0 {
-                            let unk_loss = apply_token_margin_penalty_gradient(
-                                generator.controller_mut(),
-                                &logits,
-                                target_id as usize,
-                                unknown_token_id,
-                                lr,
-                                effective_grad_clip,
-                                config.unknown_token_penalty_weight,
-                                config.unknown_token_penalty_margin,
-                            );
-                            total_loss += unk_loss;
+                            for &unknown_token_id in &unknown_token_ids {
+                                let unk_loss = apply_token_margin_penalty_gradient(
+                                    generator.controller_mut(),
+                                    &logits,
+                                    target_id as usize,
+                                    unknown_token_id,
+                                    lr,
+                                    effective_grad_clip,
+                                    config.unknown_token_penalty_weight,
+                                    config.unknown_token_penalty_margin,
+                                );
+                                total_loss += unk_loss;
+                            }
                         }
                         result
                     };
@@ -2009,6 +2015,17 @@ pub fn train_with_adam(
 /// Cross-entropy loss for a single position.
 fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
     cross_entropy_loss_smooth(logits, target, 0.0)
+}
+
+fn unknown_token_ids(tokenizer: &BpeTokenizer) -> Vec<usize> {
+    let mut ids: Vec<usize> = (0..tokenizer.vocab_size())
+        .filter(|&id| tokenizer.token_str(id as u32) == "<unk>")
+        .collect();
+    let canonical = tokenizer.unk_id as usize;
+    if canonical < tokenizer.vocab_size() && !ids.contains(&canonical) {
+        ids.push(canonical);
+    }
+    ids
 }
 
 /// Cross-entropy loss with optional label smoothing.
