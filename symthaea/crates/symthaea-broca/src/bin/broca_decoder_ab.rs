@@ -8,7 +8,10 @@ use std::process;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use symthaea_broca::decoder::{StructuredDecoder, StructuredReadout, StructuredRoleFill};
+use symthaea_broca::decoder::{
+    StructuredDecoder, StructuredProseTranslator, StructuredReadout, StructuredRoleFill,
+    StructuredTranslation,
+};
 use symthaea_broca::evaluation::{CanonicalEvalCase, CanonicalEvalDataset};
 use symthaea_broca::generator::{BrocaConfig, BrocaDecoderKind, BrocaGenerator, GenerationResult};
 use symthaea_broca::training::TrainingPair;
@@ -96,6 +99,7 @@ struct DecoderAbCase {
 struct StructuredCase {
     evidence_level: String,
     readout: StructuredReadoutReport,
+    translation: StructuredTranslationReport,
     role_count: usize,
     required_roles_present: usize,
     has_required_roles: bool,
@@ -112,6 +116,16 @@ struct StructuredReadoutReport {
     surface: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     molecule: Option<symthaea_core::hdc::universal_semantics::SemanticMolecule>,
+}
+
+#[derive(Debug, Serialize)]
+struct StructuredTranslationReport {
+    translator: String,
+    source_decoder: String,
+    grounding_surface: String,
+    text: String,
+    confidence: f32,
+    evidence_level: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -397,6 +411,7 @@ fn generation_hallucination_marker(text: &str) -> bool {
 fn structured_case(readout: StructuredReadout, include_molecule: bool) -> StructuredCase {
     const REQUIRED_ROLES: &[&str] = &["AGENT", "ACTION", "PATIENT", "PREDICATE", "EVALUATOR"];
 
+    let translation = StructuredProseTranslator::new().translate(&readout);
     let required_roles_present = REQUIRED_ROLES
         .iter()
         .filter(|role| readout.roles.iter().any(|fill| fill.role == **role))
@@ -426,6 +441,18 @@ fn structured_case(readout: StructuredReadout, include_molecule: bool) -> Struct
         has_required_roles: required_roles_present == REQUIRED_ROLES.len(),
         validity,
         readout,
+        translation: structured_translation_case(translation),
+    }
+}
+
+fn structured_translation_case(translation: StructuredTranslation) -> StructuredTranslationReport {
+    StructuredTranslationReport {
+        translator: translation.translator,
+        source_decoder: translation.source_decoder,
+        grounding_surface: translation.grounding_surface,
+        text: translation.text,
+        confidence: translation.confidence,
+        evidence_level: translation.evidence_level,
     }
 }
 

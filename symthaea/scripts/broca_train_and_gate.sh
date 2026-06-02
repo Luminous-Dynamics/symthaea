@@ -439,9 +439,12 @@ echo "[broca-gate] common-token prior/slack/margin: $COMMON_TOKEN_PRIOR / $COMMO
 echo "[broca-gate] unknown-token penalty/margin: $UNKNOWN_TOKEN_PENALTY / $UNKNOWN_TOKEN_MARGIN"
 echo "[broca-gate] semantic attractor enabled/strength/top-k/max-adjustment/normalize: $SEMANTIC_ATTRACTOR / $SEMANTIC_ATTRACTOR_STRENGTH / $SEMANTIC_ATTRACTOR_TOP_K / $SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT / $SEMANTIC_ATTRACTOR_NORMALIZE"
 echo "[broca-gate] generating curriculum data"
+curriculum_start=$SECONDS
 run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- \
     --curriculum "$FULL_DATA" \
     --curriculum-style "$CURRICULUM_STYLE"
+curriculum_seconds=$((SECONDS - curriculum_start))
+echo "[broca-gate] curriculum generation completed in ${curriculum_seconds}s"
 
 case "$PAIR_SELECTION" in
     head)
@@ -489,6 +492,7 @@ case "$PAIR_SELECTION" in
         ;;
 esac
 echo "[broca-gate] training $PAIR_COUNT pairs for $EPOCHS epoch(s)"
+train_start=$SECONDS
 run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- \
     --data "$TRAIN_DATA" \
     --epochs "$EPOCHS" \
@@ -522,8 +526,11 @@ run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- 
     --no-save-adam \
     --output "$CHECKPOINT" \
     --samples 0
+train_seconds=$((SECONDS - train_start))
+echo "[broca-gate] training completed in ${train_seconds}s"
 
 echo "[broca-gate] running canonical quality gate"
+eval_start=$SECONDS
 eval_features=()
 if [[ "$BACKEND" == "gpu" ]]; then
     eval_features+=(gpu)
@@ -581,11 +588,15 @@ if run env \
     --json-out "$REPORT" \
     --thought-logit-residual "$THOUGHT_LOGIT_RESIDUAL" \
     "${threshold_args[@]}"; then
+    eval_seconds=$((SECONDS - eval_start))
     summarize_quality_report
+    echo "[broca-gate] canonical quality gate completed in ${eval_seconds}s"
     echo "[broca-gate] PASS"
 else
     status=$?
+    eval_seconds=$((SECONDS - eval_start))
     summarize_quality_report
+    echo "[broca-gate] canonical quality gate completed in ${eval_seconds}s"
     echo "[broca-gate] FAIL (exit $status)"
     echo "  report: $REPORT"
     exit "$status"
@@ -598,13 +609,33 @@ if [[ "${BROCA_GATE_DECODER_AB:-0}" == "1" ]]; then
     DECODER_AB_DECODERS="${BROCA_GATE_DECODER_AB_DECODERS:-direct,structured}"
     DECODER_AB_EVAL_LIMIT="${BROCA_GATE_DECODER_AB_EVAL_LIMIT:-$EVAL_LIMIT}"
     DECODER_AB_MAX_GEN_TOKENS="${BROCA_GATE_DECODER_AB_MAX_GEN_TOKENS:-$MAX_GEN_TOKENS}"
+    DECODER_AB_MAX_DIRECT_DRIFT="${BROCA_GATE_DECODER_AB_MAX_DIRECT_DRIFT:-1.10}"
+    DECODER_AB_MAX_MAMBA_DRIFT="${BROCA_GATE_DECODER_AB_MAX_MAMBA_DRIFT:-1.10}"
+    DECODER_AB_MAX_HALLUCINATION_RATE="${BROCA_GATE_DECODER_AB_MAX_HALLUCINATION_RATE:-1.0}"
+    DECODER_AB_MIN_STRUCTURED_VALIDITY="${BROCA_GATE_DECODER_AB_MIN_STRUCTURED_VALIDITY:-0.85}"
+    DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE="${BROCA_GATE_DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE:-1.0}"
+    decoder_ab_gate_args=(
+        --max-direct-drift "$DECODER_AB_MAX_DIRECT_DRIFT"
+        --max-mamba-drift "$DECODER_AB_MAX_MAMBA_DRIFT"
+        --max-hallucination-rate "$DECODER_AB_MAX_HALLUCINATION_RATE"
+        --min-structured-validity "$DECODER_AB_MIN_STRUCTURED_VALIDITY"
+        --min-structured-required-role-rate "$DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE"
+    )
+    if [[ "${BROCA_GATE_DECODER_AB_FAIL_ON_GATE:-0}" == "1" ]]; then
+        decoder_ab_gate_args+=(--fail-on-gate)
+    fi
     echo "[broca-gate] running decoder A/B: $DECODER_AB_DECODERS"
+    echo "[broca-gate] decoder A/B gates: direct-drift<=$DECODER_AB_MAX_DIRECT_DRIFT mamba-drift<=$DECODER_AB_MAX_MAMBA_DRIFT hallucination<=$DECODER_AB_MAX_HALLUCINATION_RATE structured-validity>=$DECODER_AB_MIN_STRUCTURED_VALIDITY roles>=$DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE"
+    decoder_ab_start=$SECONDS
     run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-decoder-ab -- \
         --checkpoint "$CHECKPOINT" \
         --canonical-eval "$CANONICAL" \
         --eval-limit "$DECODER_AB_EVAL_LIMIT" \
         --max-gen-tokens "$DECODER_AB_MAX_GEN_TOKENS" \
         --decoder "$DECODER_AB_DECODERS" \
-        --json-out "$DECODER_REPORT"
+        --json-out "$DECODER_REPORT" \
+        "${decoder_ab_gate_args[@]}"
+    decoder_ab_seconds=$((SECONDS - decoder_ab_start))
+    echo "[broca-gate] decoder A/B completed in ${decoder_ab_seconds}s"
     echo "  decoder report: $DECODER_REPORT"
 fi

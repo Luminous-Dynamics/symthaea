@@ -100,7 +100,10 @@ pub use code_analysis::{
 };
 pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
-pub use decoder::{StructuredDecoder, StructuredReadout, StructuredRoleFill};
+pub use decoder::{
+    StructuredDecoder, StructuredProseTranslator, StructuredReadout, StructuredRoleFill,
+    StructuredTranslation,
+};
 pub use dreaming::DreamingService;
 pub use encoder::{
     EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, ThoughtChannels, ThoughtLanguageEncoder,
