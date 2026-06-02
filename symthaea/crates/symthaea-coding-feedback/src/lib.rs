@@ -40,6 +40,118 @@ pub fn repair_hint_for_prediction_error_category(category: &str) -> &'static str
     }
 }
 
+pub fn categorize_rejection(reason: &str) -> &'static str {
+    let lower = reason.to_ascii_lowercase();
+    if lower.contains("energy budget") {
+        "energy_budget"
+    } else if lower.contains("stub") || lower.contains("todo") || lower.contains("unimplemented") {
+        "stub"
+    } else if lower.contains("does not parse")
+        || lower.contains("parse")
+        || lower.contains("expected one of")
+    {
+        "parse_failure"
+    } else if lower.contains("not found in this scope")
+        || lower.contains("cannot find value")
+        || lower.contains("unresolved")
+    {
+        "unresolved_identifier"
+    } else if lower.contains("mismatched types")
+        || lower.contains("type mismatch")
+        || lower.contains("returns a value")
+        || lower.contains("unit-returning")
+        || lower.contains("return type")
+        || lower.contains("signature expects")
+    {
+        "type_mismatch"
+    } else if lower.contains("borrow") || lower.contains("moved") || lower.contains("move") {
+        "ownership"
+    } else if lower.contains("test") {
+        "test_failure"
+    } else if lower.contains("compile") || lower.contains("rustc") {
+        "compile_failure"
+    } else if lower.contains("sheaf") || lower.contains("coherence") {
+        "sheaf_failure"
+    } else if lower.contains("no similar") || lower.contains("analogy") {
+        "analogy_miss"
+    } else if lower.contains("llm") {
+        "llm_failure"
+    } else {
+        "other"
+    }
+}
+
+pub fn repair_hint_for_rejection_category(category: &str) -> &'static str {
+    match category {
+        "type_mismatch" | "compile_failure" => {
+            "regenerate with the declared signature as the source of truth for arguments and return type"
+        }
+        "unresolved_identifier" => {
+            "only use parameters and locals that are in scope, or introduce the binding first"
+        }
+        "ownership" => {
+            "prefer borrowing, cloning, copying, or statement-only mutation according to the signature"
+        }
+        "stub" => "replace placeholders with concrete expressions or accumulator statements",
+        "parse_failure" => {
+            "emit complete Rust syntax with balanced delimiters and valid separators"
+        }
+        "sheaf_failure" => {
+            "repair local data-flow facts: definitions, return shape, ownership, and stubs"
+        }
+        "off_by_one" => {
+            "check inclusive/exclusive bounds, index origins, and final accumulator adjustment"
+        }
+        "boolean_inversion" => {
+            "invert the predicate or swap branch bodies so the boolean semantic contract matches"
+        }
+        "numeric_value_mismatch" => {
+            "repair the arithmetic formula, operator, or accumulator update against the examples"
+        }
+        "empty_result_mismatch" => {
+            "check early returns, initial values, filters, and whether matching items are appended"
+        }
+        "order_mismatch" => "preserve insertion order or sort deterministically before returning",
+        "partial_value_mismatch" => {
+            "repair string/list assembly so no required component is missing, extra, or truncated"
+        }
+        "semantic_value_mismatch" => {
+            "treat expected/actual values as the core semantic contract, not only a syntax issue"
+        }
+        "test_failure" => "treat examples and generated tests as executable semantic constraints",
+        "analogy_miss" => "fall back to direct synthesis from the signature and task purpose",
+        "energy_budget" => {
+            "prefer low-cost deterministic templates before expensive fallback tiers"
+        }
+        _ => "use the previous failure as a concrete negative example for the next candidate",
+    }
+}
+
+pub fn repair_lesson_for_rejection(reason: &str) -> String {
+    if let Some(hint) = extract_embedded_repair_hint(reason) {
+        return hint;
+    }
+    let category =
+        extract_embedded_category(reason).unwrap_or_else(|| categorize_rejection(reason));
+    repair_hint_for_rejection_category(category).to_string()
+}
+
+pub fn extract_embedded_category(reason: &str) -> Option<&str> {
+    let start = reason.find("category=")? + "category=".len();
+    let rest = &reason[start..];
+    let end = rest.find([';', ']']).unwrap_or(rest.len());
+    let category = rest[..end].trim();
+    (!category.is_empty()).then_some(category)
+}
+
+pub fn extract_embedded_repair_hint(reason: &str) -> Option<String> {
+    let start = reason.find("repair_hint=")? + "repair_hint=".len();
+    let rest = &reason[start..];
+    let end = rest.find(']').unwrap_or(rest.len());
+    let hint = rest[..end].trim();
+    (!hint.is_empty()).then(|| hint.to_string())
+}
+
 pub fn categorize_test_failure_diagnostic(diagnostic: &str) -> &'static str {
     let lower = diagnostic.to_ascii_lowercase();
     let Some((expected, actual)) = expected_actual_from_constraint(diagnostic) else {
@@ -198,5 +310,50 @@ mod tests {
         );
         assert!(repair_hint_for_prediction_error_category("boolean_inversion").contains("Invert"));
         assert!(repair_hint_for_prediction_error_category("test_panic").contains("unchecked"));
+    }
+
+    #[test]
+    fn classifies_rejection_shapes() {
+        assert_eq!(
+            categorize_rejection("candidate contains todo! placeholder"),
+            "stub"
+        );
+        assert_eq!(
+            categorize_rejection("cannot find value `items` in this scope"),
+            "unresolved_identifier"
+        );
+        assert_eq!(
+            categorize_rejection("borrow of moved value in generated candidate"),
+            "ownership"
+        );
+        assert_eq!(
+            categorize_rejection("CONSTRAINT: test expected 3 but got 4"),
+            "test_failure"
+        );
+    }
+
+    #[test]
+    fn embedded_repair_lessons_take_precedence() {
+        assert_eq!(
+            extract_embedded_category("[category=off_by_one; repair_hint=check bounds]").unwrap(),
+            "off_by_one"
+        );
+        assert_eq!(
+            extract_embedded_repair_hint("[category=off_by_one; repair_hint=check bounds]")
+                .unwrap(),
+            "check bounds"
+        );
+        assert_eq!(
+            repair_lesson_for_rejection("[category=off_by_one; repair_hint=check bounds]"),
+            "check bounds"
+        );
+    }
+
+    #[test]
+    fn rejection_hints_cover_semantic_categories() {
+        assert!(
+            repair_hint_for_rejection_category("numeric_value_mismatch").contains("arithmetic")
+        );
+        assert!(repair_hint_for_rejection_category("energy_budget").contains("low-cost"));
     }
 }
