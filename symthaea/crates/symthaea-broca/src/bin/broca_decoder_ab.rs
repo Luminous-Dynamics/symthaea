@@ -40,6 +40,9 @@ struct Options {
     max_hallucination_rate: f32,
     min_structured_validity: f32,
     min_structured_required_role_rate: f32,
+    min_structured_translation_validity: f32,
+    min_structured_translation_grounding_rate: f32,
+    max_structured_translation_drift: f32,
     include_structured_molecule: bool,
 }
 
@@ -66,6 +69,10 @@ struct DecoderAbAggregate {
     avg_structured_intensity: Option<f32>,
     avg_structured_validity: Option<f32>,
     structured_required_role_rate: Option<f32>,
+    avg_structured_translation_validity: Option<f32>,
+    structured_translation_grounding_rate: Option<f32>,
+    structured_translation_hallucination_rate: Option<f32>,
+    avg_structured_translation_semantic_drift: Option<f32>,
     avg_mamba_coherence: Option<f32>,
     mamba_hallucination_rate: Option<f32>,
     avg_mamba_semantic_drift: Option<f32>,
@@ -126,6 +133,10 @@ struct StructuredTranslationReport {
     text: String,
     confidence: f32,
     evidence_level: String,
+    grounding_preserved: bool,
+    hallucination_flag: bool,
+    validity: f32,
+    semantic_drift: f32,
 }
 
 #[derive(Debug, Serialize)]
@@ -412,6 +423,7 @@ fn structured_case(readout: StructuredReadout, include_molecule: bool) -> Struct
     const REQUIRED_ROLES: &[&str] = &["AGENT", "ACTION", "PATIENT", "PREDICATE", "EVALUATOR"];
 
     let translation = StructuredProseTranslator::new().translate(&readout);
+    let translation_report = structured_translation_case(&readout, translation);
     let required_roles_present = REQUIRED_ROLES
         .iter()
         .filter(|role| readout.roles.iter().any(|fill| fill.role == **role))
@@ -441,11 +453,33 @@ fn structured_case(readout: StructuredReadout, include_molecule: bool) -> Struct
         has_required_roles: required_roles_present == REQUIRED_ROLES.len(),
         validity,
         readout,
-        translation: structured_translation_case(translation),
+        translation: translation_report,
     }
 }
 
-fn structured_translation_case(translation: StructuredTranslation) -> StructuredTranslationReport {
+fn structured_translation_case(
+    readout: &StructuredReadout,
+    translation: StructuredTranslation,
+) -> StructuredTranslationReport {
+    let grounding_preserved = translation.grounding_surface == readout.surface;
+    let hallucination_flag = generation_hallucination_marker(&translation.text);
+    let nonempty = if translation.text.trim().is_empty() {
+        0.0
+    } else {
+        1.0
+    };
+    let no_hallucination = if hallucination_flag { 0.0 } else { 1.0 };
+    let grounding = if grounding_preserved { 1.0 } else { 0.0 };
+    let confidence = translation.confidence.clamp(0.0, 1.0);
+    let role_coverage = structured_translation_role_coverage(readout, &translation);
+    let validity = (0.35 * grounding
+        + 0.25 * no_hallucination
+        + 0.2 * role_coverage
+        + 0.1 * confidence
+        + 0.1 * nonempty)
+        .clamp(0.0, 1.0);
+    let semantic_drift = 1.0 - validity;
+
     StructuredTranslationReport {
         translator: translation.translator,
         source_decoder: translation.source_decoder,
@@ -453,7 +487,51 @@ fn structured_translation_case(translation: StructuredTranslation) -> Structured
         text: translation.text,
         confidence: translation.confidence,
         evidence_level: translation.evidence_level,
+        grounding_preserved,
+        hallucination_flag,
+        validity,
+        semantic_drift,
     }
+}
+
+fn structured_translation_role_coverage(
+    readout: &StructuredReadout,
+    translation: &StructuredTranslation,
+) -> f32 {
+    let text = translation.text.to_ascii_lowercase();
+    let mut expected = Vec::new();
+    expected.push(readout.intent.as_str());
+    for fill in &readout.roles {
+        match (fill.role.as_str(), fill.prime.as_str()) {
+            ("ACTION", "THINK") => expected.push("thinking"),
+            ("ACTION", "DO") => expected.push("act"),
+            ("ACTION", "SAY") => expected.push("explain"),
+            ("ACTION", "WANT") => expected.push("clarify"),
+            ("ACTION", "KNOW") => expected.push("answer"),
+            ("ACTION", "FEEL") => expected.push("state"),
+            ("ACTION", "WITH") => expected.push("relating"),
+            ("PREDICATE", "KNOW") => expected.push("known"),
+            ("PREDICATE", "THINK") => expected.push("reasoned"),
+            ("PREDICATE", "MAYBE") => expected.push("uncertain"),
+            ("EVALUATOR", "TRUE") => expected.push("consistent"),
+            ("EVALUATOR", "GOOD") => expected.push("favorable"),
+            ("EVALUATOR", "BAD") => expected.push("unfavorable"),
+            ("EVALUATOR", "MAYBE") => expected.push("verification"),
+            ("TIME", "NOW") => expected.push("now"),
+            ("REASON", "MAYBE") => expected.push("context"),
+            _ => {}
+        }
+    }
+    expected.sort_unstable();
+    expected.dedup();
+    if expected.is_empty() {
+        return 1.0;
+    }
+    let present = expected
+        .iter()
+        .filter(|needle| text.contains(**needle))
+        .count();
+    present as f32 / expected.len() as f32
 }
 
 fn aggregate(cases: &[DecoderAbCase]) -> DecoderAbAggregate {
@@ -466,6 +544,18 @@ fn aggregate(cases: &[DecoderAbCase]) -> DecoderAbAggregate {
         avg_structured_intensity: avg_structured(cases, |case| case.readout.intensity),
         avg_structured_validity: avg_structured(cases, |case| case.validity),
         structured_required_role_rate: rate_structured(cases, |case| case.has_required_roles),
+        avg_structured_translation_validity: avg_structured(cases, |case| {
+            case.translation.validity
+        }),
+        structured_translation_grounding_rate: rate_structured(cases, |case| {
+            case.translation.grounding_preserved
+        }),
+        structured_translation_hallucination_rate: rate_structured(cases, |case| {
+            case.translation.hallucination_flag
+        }),
+        avg_structured_translation_semantic_drift: avg_structured(cases, |case| {
+            case.translation.semantic_drift
+        }),
         avg_mamba_coherence: avg_mamba(cases, |case| case.final_coherence),
         mamba_hallucination_rate: rate_mamba(cases, |case| case.hallucination_flag),
         avg_mamba_semantic_drift: avg_mamba(cases, |case| case.semantic_drift.unwrap_or(0.0)),
@@ -509,6 +599,24 @@ fn decoder_gates(aggregate: &DecoderAbAggregate, opts: &Options) -> DecoderAbGat
         "structured_required_role_rate",
         aggregate.structured_required_role_rate,
         opts.min_structured_required_role_rate,
+    );
+    check_min(
+        &mut failures,
+        "avg_structured_translation_validity",
+        aggregate.avg_structured_translation_validity,
+        opts.min_structured_translation_validity,
+    );
+    check_min(
+        &mut failures,
+        "structured_translation_grounding_rate",
+        aggregate.structured_translation_grounding_rate,
+        opts.min_structured_translation_grounding_rate,
+    );
+    check_max(
+        &mut failures,
+        "avg_structured_translation_semantic_drift",
+        aggregate.avg_structured_translation_semantic_drift,
+        opts.max_structured_translation_drift,
     );
     DecoderAbGates {
         passed: failures.is_empty(),
@@ -688,6 +796,9 @@ fn parse_args(args: &[String]) -> Result<Options> {
         max_hallucination_rate: 1.0,
         min_structured_validity: 0.5,
         min_structured_required_role_rate: 1.0,
+        min_structured_translation_validity: 0.75,
+        min_structured_translation_grounding_rate: 1.0,
+        max_structured_translation_drift: 0.25,
         include_structured_molecule: false,
     };
 
@@ -759,6 +870,21 @@ fn parse_args(args: &[String]) -> Result<Options> {
                 opts.min_structured_required_role_rate =
                     value(args, i, "--min-structured-required-role-rate")?.parse()?;
             }
+            "--min-structured-translation-validity" => {
+                i += 1;
+                opts.min_structured_translation_validity =
+                    value(args, i, "--min-structured-translation-validity")?.parse()?;
+            }
+            "--min-structured-translation-grounding-rate" => {
+                i += 1;
+                opts.min_structured_translation_grounding_rate =
+                    value(args, i, "--min-structured-translation-grounding-rate")?.parse()?;
+            }
+            "--max-structured-translation-drift" => {
+                i += 1;
+                opts.max_structured_translation_drift =
+                    value(args, i, "--max-structured-translation-drift")?.parse()?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -780,8 +906,13 @@ fn parse_args(args: &[String]) -> Result<Options> {
     }
     if !(0.0..=1.0).contains(&opts.min_structured_validity)
         || !(0.0..=1.0).contains(&opts.min_structured_required_role_rate)
+        || !(0.0..=1.0).contains(&opts.min_structured_translation_validity)
+        || !(0.0..=1.0).contains(&opts.min_structured_translation_grounding_rate)
     {
         anyhow::bail!("structured thresholds must be between 0.0 and 1.0");
+    }
+    if !(0.0..=1.0).contains(&opts.max_structured_translation_drift) {
+        anyhow::bail!("--max-structured-translation-drift must be between 0.0 and 1.0");
     }
     Ok(opts)
 }
@@ -809,7 +940,7 @@ fn value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str> {
 
 fn print_usage() {
     eprintln!(
-        "Usage: broca-decoder-ab [--checkpoint PATH] [--mamba-projection-checkpoint PATH] [--decoder direct,structured,mamba,hybrid] [--canonical-eval PATH] [--eval-limit N] [--max-gen-tokens N] [--json-out PATH] [--fail-on-gate] [--include-structured-molecule] [--max-direct-drift F] [--max-mamba-drift F] [--max-hallucination-rate F] [--min-structured-validity F] [--min-structured-required-role-rate F]"
+        "Usage: broca-decoder-ab [--checkpoint PATH] [--mamba-projection-checkpoint PATH] [--decoder direct,structured,mamba,hybrid] [--canonical-eval PATH] [--eval-limit N] [--max-gen-tokens N] [--json-out PATH] [--fail-on-gate] [--include-structured-molecule] [--max-direct-drift F] [--max-mamba-drift F] [--max-hallucination-rate F] [--min-structured-validity F] [--min-structured-required-role-rate F] [--min-structured-translation-validity F] [--min-structured-translation-grounding-rate F] [--max-structured-translation-drift F]"
     );
 }
 

@@ -24,6 +24,9 @@ struct Options {
     max_structured_confidence_regression: f64,
     max_structured_validity_regression: f64,
     max_structured_required_role_rate_regression: f64,
+    max_structured_translation_validity_regression: f64,
+    max_structured_translation_grounding_rate_regression: f64,
+    max_structured_translation_drift_regression: f64,
     require_all_metrics: bool,
 }
 
@@ -205,6 +208,51 @@ fn compare(opts: &Options) -> Result<CompareReport> {
     compare_metric(
         &mut metrics,
         &mut missing_metrics,
+        "decoder.avg_structured_translation_validity",
+        MetricDirection::HigherIsBetter,
+        value_at(
+            baseline_decoder.as_ref(),
+            &["aggregate", "avg_structured_translation_validity"],
+        ),
+        value_at(
+            candidate_decoder.as_ref(),
+            &["aggregate", "avg_structured_translation_validity"],
+        ),
+        opts.max_structured_translation_validity_regression,
+    );
+    compare_metric(
+        &mut metrics,
+        &mut missing_metrics,
+        "decoder.structured_translation_grounding_rate",
+        MetricDirection::HigherIsBetter,
+        value_at(
+            baseline_decoder.as_ref(),
+            &["aggregate", "structured_translation_grounding_rate"],
+        ),
+        value_at(
+            candidate_decoder.as_ref(),
+            &["aggregate", "structured_translation_grounding_rate"],
+        ),
+        opts.max_structured_translation_grounding_rate_regression,
+    );
+    compare_metric(
+        &mut metrics,
+        &mut missing_metrics,
+        "decoder.avg_structured_translation_semantic_drift",
+        MetricDirection::LowerIsBetter,
+        value_at(
+            baseline_decoder.as_ref(),
+            &["aggregate", "avg_structured_translation_semantic_drift"],
+        ),
+        value_at(
+            candidate_decoder.as_ref(),
+            &["aggregate", "avg_structured_translation_semantic_drift"],
+        ),
+        opts.max_structured_translation_drift_regression,
+    );
+    compare_metric(
+        &mut metrics,
+        &mut missing_metrics,
         "exercism.compile_success_rate",
         MetricDirection::HigherIsBetter,
         success_rate(
@@ -335,6 +383,9 @@ fn parse_args() -> Result<Options> {
         max_structured_confidence_regression: 0.05,
         max_structured_validity_regression: 0.05,
         max_structured_required_role_rate_regression: 0.0,
+        max_structured_translation_validity_regression: 0.02,
+        max_structured_translation_grounding_rate_regression: 0.0,
+        max_structured_translation_drift_regression: 0.02,
         require_all_metrics: false,
     };
 
@@ -390,6 +441,25 @@ fn parse_args() -> Result<Options> {
                 opts.max_structured_required_role_rate_regression =
                     value(&args, i, "--max-structured-required-role-rate-regression")?.parse()?;
             }
+            "--max-structured-translation-validity-regression" => {
+                i += 1;
+                opts.max_structured_translation_validity_regression =
+                    value(&args, i, "--max-structured-translation-validity-regression")?.parse()?;
+            }
+            "--max-structured-translation-grounding-rate-regression" => {
+                i += 1;
+                opts.max_structured_translation_grounding_rate_regression = value(
+                    &args,
+                    i,
+                    "--max-structured-translation-grounding-rate-regression",
+                )?
+                .parse()?;
+            }
+            "--max-structured-translation-drift-regression" => {
+                i += 1;
+                opts.max_structured_translation_drift_regression =
+                    value(&args, i, "--max-structured-translation-drift-regression")?.parse()?;
+            }
             "-h" | "--help" => {
                 print_usage();
                 std::process::exit(0);
@@ -413,7 +483,7 @@ fn value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str> {
 
 fn print_usage() {
     eprintln!(
-        "Usage: broca-checkpoint-compare --baseline-dir DIR --candidate-dir DIR [--json-out PATH] [--fail-on-regression] [--require-all-metrics] [--max-drift-regression F] [--max-hallucination-regression F] [--max-compile-rate-regression F] [--max-test-rate-regression F] [--max-structured-confidence-regression F] [--max-structured-validity-regression F] [--max-structured-required-role-rate-regression F]"
+        "Usage: broca-checkpoint-compare --baseline-dir DIR --candidate-dir DIR [--json-out PATH] [--fail-on-regression] [--require-all-metrics] [--max-drift-regression F] [--max-hallucination-regression F] [--max-compile-rate-regression F] [--max-test-rate-regression F] [--max-structured-confidence-regression F] [--max-structured-validity-regression F] [--max-structured-required-role-rate-regression F] [--max-structured-translation-validity-regression F] [--max-structured-translation-grounding-rate-regression F] [--max-structured-translation-drift-regression F]"
     );
 }
 
@@ -435,6 +505,9 @@ mod tests {
             max_structured_confidence_regression: 0.05,
             max_structured_validity_regression: 0.05,
             max_structured_required_role_rate_regression: 0.0,
+            max_structured_translation_validity_regression: 0.02,
+            max_structured_translation_grounding_rate_regression: 0.0,
+            max_structured_translation_drift_regression: 0.02,
             require_all_metrics: false,
         }
     }
@@ -456,7 +529,10 @@ mod tests {
                 "direct_hallucination_rate": hallucination,
                 "avg_structured_confidence": confidence,
                 "avg_structured_validity": validity,
-                "structured_required_role_rate": required_role_rate
+                "structured_required_role_rate": required_role_rate,
+                "avg_structured_translation_validity": validity,
+                "structured_translation_grounding_rate": required_role_rate,
+                "avg_structured_translation_semantic_drift": 1.0 - validity
             }
         });
         let exercism = json!({
@@ -543,6 +619,25 @@ mod tests {
                 .failures
                 .iter()
                 .any(|failure| failure.metric == "decoder.avg_structured_validity")
+        );
+    }
+
+    #[test]
+    fn structured_translation_regression_fails() {
+        let temp = tempfile::tempdir().unwrap();
+        let baseline = temp.path().join("baseline");
+        let candidate = temp.path().join("candidate");
+        write_artifacts(&baseline, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+        write_artifacts(&candidate, 0.4, 0.2, 0.8, 0.82, 1.0, 2, 1);
+
+        let report = compare(&opts(baseline, candidate)).unwrap();
+        assert!(!report.promotion.passed);
+        assert!(
+            report
+                .promotion
+                .failures
+                .iter()
+                .any(|failure| { failure.metric == "decoder.avg_structured_translation_validity" })
         );
     }
 

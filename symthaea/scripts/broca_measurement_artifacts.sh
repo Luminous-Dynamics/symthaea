@@ -49,6 +49,9 @@ JSON
   echo "broca_max_hallucination_rate=${BROCA_MAX_HALLUCINATION_RATE:-1.0}"
   echo "broca_min_structured_validity=${BROCA_MIN_STRUCTURED_VALIDITY:-0.5}"
   echo "broca_min_structured_required_role_rate=${BROCA_MIN_STRUCTURED_REQUIRED_ROLE_RATE:-1.0}"
+  echo "broca_min_structured_translation_validity=${BROCA_MIN_STRUCTURED_TRANSLATION_VALIDITY:-0.75}"
+  echo "broca_min_structured_translation_grounding_rate=${BROCA_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE:-1.0}"
+  echo "broca_max_structured_translation_drift=${BROCA_MAX_STRUCTURED_TRANSLATION_DRIFT:-0.25}"
   echo "broca_include_structured_molecule=${BROCA_INCLUDE_STRUCTURED_MOLECULE:-0}"
   echo "broca_cargo_unlocked=${BROCA_CARGO_UNLOCKED:-0}"
   broca_write_runtime_manifest
@@ -71,6 +74,9 @@ decoder_cmd=(
   --max-hallucination-rate "${BROCA_MAX_HALLUCINATION_RATE:-1.0}"
   --min-structured-validity "${BROCA_MIN_STRUCTURED_VALIDITY:-0.5}"
   --min-structured-required-role-rate "${BROCA_MIN_STRUCTURED_REQUIRED_ROLE_RATE:-1.0}"
+  --min-structured-translation-validity "${BROCA_MIN_STRUCTURED_TRANSLATION_VALIDITY:-0.75}"
+  --min-structured-translation-grounding-rate "${BROCA_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE:-1.0}"
+  --max-structured-translation-drift "${BROCA_MAX_STRUCTURED_TRANSLATION_DRIFT:-0.25}"
   --json-out "$OUT_DIR/decoder-ab.json"
 )
 if [[ "${BROCA_INCLUDE_STRUCTURED_MOLECULE:-0}" == "1" ]]; then
@@ -143,6 +149,9 @@ if [[ -n "${BROCA_BASELINE_ARTIFACT_DIR:-}" ]]; then
     --max-structured-confidence-regression "${BROCA_MAX_STRUCTURED_CONFIDENCE_REGRESSION:-0.05}" \
     --max-structured-validity-regression "${BROCA_MAX_STRUCTURED_VALIDITY_REGRESSION:-0.05}" \
     --max-structured-required-role-rate-regression "${BROCA_MAX_STRUCTURED_REQUIRED_ROLE_RATE_REGRESSION:-0.0}" \
+    --max-structured-translation-validity-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_VALIDITY_REGRESSION:-0.02}" \
+    --max-structured-translation-grounding-rate-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_GROUNDING_RATE_REGRESSION:-0.0}" \
+    --max-structured-translation-drift-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_DRIFT_REGRESSION:-0.02}" \
     ${BROCA_REQUIRE_ALL_COMPARISON_METRICS:+--require-all-metrics} \
     ${BROCA_FAIL_ON_REGRESSION:+--fail-on-regression}
 fi

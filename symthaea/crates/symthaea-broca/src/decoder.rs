@@ -137,7 +137,8 @@ impl StructuredProseTranslator {
         let urgent = role_prime(readout, "TIME") == Some("NOW");
         let uncertain_reason = role_prime(readout, "REASON") == Some("MAYBE");
 
-        let mut clauses = vec![action_sentence(action, patient).to_string()];
+        let mut clauses =
+            vec![action_sentence(readout.intent.as_str(), action, patient).to_string()];
         if let Some(clause) = predicate_clause(predicate) {
             clauses.push(clause.to_string());
         }
@@ -197,16 +198,23 @@ fn role_prime<'a>(readout: &'a StructuredReadout, role: &str) -> Option<&'a str>
         .map(|fill| fill.prime.as_str())
 }
 
-fn action_sentence(action: &str, patient: &str) -> &'static str {
-    match action {
-        "THINK" => "I am thinking about this.",
-        "DO" => "I can act on this.",
-        "SAY" => "I can explain this.",
-        "WANT" => "I want to clarify this.",
-        "KNOW" => "I know enough to answer.",
-        "FEEL" => "I feel this state changing.",
-        "WITH" => "I am relating this to nearby context.",
-        "MAYBE" => "I am uncertain about this.",
+fn action_sentence(intent: &str, action: &str, patient: &str) -> &'static str {
+    match (intent, action) {
+        ("analyze", "THINK") => "I am analyzing the situation.",
+        ("create", "DO") => "I can create a concrete next step.",
+        ("explain", "SAY") => "I can explain the situation.",
+        ("question", "WANT") => "I want to ask a clarifying question.",
+        ("answer", "KNOW") => "I know enough to answer.",
+        ("reflect", "FEEL") => "I am reflecting on the state change.",
+        ("relate", "WITH") => "I am relating this to nearby context.",
+        (_, "THINK") => "I am thinking about this.",
+        (_, "DO") => "I can act on this.",
+        (_, "SAY") => "I can explain this.",
+        (_, "WANT") => "I want to clarify this.",
+        (_, "KNOW") => "I know enough to answer.",
+        (_, "FEEL") => "I feel this state changing.",
+        (_, "WITH") => "I am relating this to nearby context.",
+        (_, "MAYBE") => "I am uncertain about this.",
         _ if patient == "SOMETHING" => "I am attending to something.",
         _ => "I am attending to this.",
     }

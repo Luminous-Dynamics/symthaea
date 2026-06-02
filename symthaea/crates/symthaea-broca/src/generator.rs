@@ -45,9 +45,9 @@ pub enum SamplingStrategy {
 #[serde(rename_all = "kebab-case")]
 pub enum BrocaDecoderKind {
     /// Native CfC/HDC controller with weight-tied lexical readout.
-    #[default]
     Direct,
     /// Deterministic semantic molecule / thought-structure readout.
+    #[default]
     Structured,
     /// Liquid-Mamba vocal-tract translator.
     Mamba,
@@ -81,8 +81,10 @@ impl BrocaDecoderKind {
 pub struct BrocaConfig {
     /// Preferred decoder path for external orchestration.
     ///
-    /// `BrocaGenerator` itself remains the native direct CfC/HDC decoder; Mamba
-    /// and structured/hybrid paths are selected by eval/orchestration harnesses.
+    /// `BrocaGenerator` itself remains the native direct CfC/HDC decoder.
+    /// External orchestration should prefer structured output as the grounded
+    /// product path and treat direct/Mamba token generation as experimental or
+    /// translator paths until their gates pass.
     #[serde(default)]
     pub decoder_kind: BrocaDecoderKind,
     /// Controller configuration.
@@ -190,7 +192,7 @@ fn default_nsm_coverage_veto_scale() -> f32 {
 impl Default for BrocaConfig {
     fn default() -> Self {
         Self {
-            decoder_kind: BrocaDecoderKind::Direct,
+            decoder_kind: BrocaDecoderKind::Structured,
             controller: LanguageControllerConfig::default(),
             gating: GatingConfig::default(),
             sampling: SamplingStrategy::Greedy,

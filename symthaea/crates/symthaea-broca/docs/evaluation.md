@@ -161,6 +161,27 @@ or `BROCA_GATE_BACKEND=gpu` to force either path. GPU mode sets
 `CUDA_COMPUTE_CAP=75` by default for the RTX 2070-class training host; override with
 `BROCA_GATE_CUDA_COMPUTE_CAP` when running on different NVIDIA hardware.
 
+Broca v0.1 treats structured readout as the grounded product path. Direct CfC/HDC
+token generation and Mamba translation remain measurable decoder paths, but they
+should not be promoted as the source of truth until their drift, hallucination,
+and collapse gates pass. Enable decoder comparison with:
+
+```bash
+BROCA_GATE_DECODER_AB=1 \
+BROCA_GATE_DECODER_AB_DECODERS=structured,direct \
+BROCA_GATE_DECODER_AB_FAIL_ON_GATE=1 \
+BROCA_GATE_DECODER_AB_MIN_STRUCTURED_VALIDITY=0.85 \
+BROCA_GATE_DECODER_AB_MIN_STRUCTURED_TRANSLATION_VALIDITY=0.75 \
+BROCA_GATE_DECODER_AB_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE=1.0 \
+BROCA_GATE_DECODER_AB_MAX_STRUCTURED_TRANSLATION_DRIFT=0.25 \
+scripts/broca_train_and_gate.sh
+```
+
+The structured translator is deterministic. Its report includes the role/filler
+grounding surface, prose text, grounding preservation, hallucination markers,
+translation validity, and a simple semantic-drift proxy. Use Mamba as an
+optional humanizer outside that grounded path, not as the cognitive truth layer.
+
 Add threshold flags to turn the canonical suite into a CI gate:
 
 ```bash
