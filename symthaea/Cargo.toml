@@ -48,6 +48,7 @@ members = [
     "crates/symthaea-vocal-tract",
     "crates/symthaea-voice",
     "crates/symthaea-vehicle",
+    "crates/symthaea-morphogenesis",
     # New platforms (uncomment after creating crates):
     "crates/symthaea-exoskeleton",
     "crates/symthaea-surgical",
@@ -180,6 +181,7 @@ nonsensical_open_options = "deny"
 unused_io_amount = "deny"
 
 [workspace.dependencies]
+mycelix-zkp-core = { path = "../crates/mycelix-zkp-core", features = ["dilithium"] }
 no-panic = "0.1"
 parry3d = "0.17"
 uom = { version = "0.36", features = ["f64", "si"] }
@@ -210,6 +212,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 blake3 = "1.5"
 uuid = { version = "1.6", features = ["serde", "v4"] }
+itertools = "0.13"
 chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
 once_cell = "1.19"
@@ -230,8 +233,12 @@ syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
 lru = "0.16"
+serial_test = "3.2"
 rayon = "1.10"
 proptest = "1.4"
+num-complex = "0.4"
+libc = "0.2"
+csv = "1.3"
 symtropy-robotics-bridge-core = { path = "../symtropy/crates/symtropy-robotics-bridge-core" }
 
 [package]
@@ -254,6 +261,7 @@ categories = ["science", "algorithms", "data-structures"]
 workspace = true
 
 [dependencies]
+mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "symthaea-core" }
 # Shared epistemic types (E/N/M, Prismatic context, provenance)
@@ -280,7 +288,6 @@ symthaea-dream = { path = "crates/symthaea-dream" }
 
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
 symthaea-phi-search = { path = "crates/symthaea-phi-search" }
-mycelix-zkp-core = { path = "crates/mycelix-zkp-core", features = ["dilithium"] }
 sha2 = { version = "0.10", optional = true }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)
@@ -1203,6 +1210,10 @@ required-features = ["code_generation"]
 [[test]]
 name = "hardware_stress"
 required-features = ["code_generation"]
+
+[[test]]
+name = "vision_manifold_closure"
+required-features = ["vision-manifold"]
 
 [[example]]
 name = "helicopter_phi_benchmark"

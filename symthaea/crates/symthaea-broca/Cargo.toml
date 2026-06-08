@@ -15,7 +15,7 @@ symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hodge = { path = "../symthaea-hodge" }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 symthaea-hdc-store = { path = "../symthaea-hdc-store" }
-mycelix-zkp-core = { path = "../mycelix-zkp-core", features = ["dilithium"] }
+mycelix-zkp-core = { workspace = true }
 symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
