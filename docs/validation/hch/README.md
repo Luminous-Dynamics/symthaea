@@ -1,20 +1,23 @@
-# HCH Bakeoff
+# RHN Bakeoff
 
-Hierarchical Cantor Hypervectors are evaluated as an experimental topology
-bakeoff, not as a Broca default.
+Resonant Hypergraph Network (RHN) is the broader topology research line.
+Hierarchical Cantor Hypervectors (HCH) are the initial Cantor-backed topology
+inside RHN, not the whole architecture.
 
-Run the v0.6 bakeoff:
+RHN is evaluated as an experimental topology bakeoff, not as a Broca default.
+
+Run the current bakeoff:
 
 ```bash
 cargo run -p symthaea-core \
   --features cantor-hdc \
   --bin hch_bakeoff \
   --release \
-  -- --objects 128 --seeds 3 --out /tmp/hch_v06.json
+  -- --objects 128 --seeds 3 --out /tmp/rhn_v07.json
 ```
 
 The runner writes both JSON and CSV reports. If `--out` is
-`/tmp/hch_v06.json`, the CSV report is written to `/tmp/hch_v06.csv`.
+`/tmp/rhn_v07.json`, the CSV report is written to `/tmp/rhn_v07.csv`.
 
 Primary metrics:
 
@@ -23,13 +26,16 @@ Primary metrics:
 - `abstention_rate`: fraction of queries below the configured margin threshold.
 - `answered_accuracy`: top-1 accuracy over non-abstained queries.
 - `load_entropy`, `max_leaf_load`, `mean_leaf_load`: routing balance.
-- `oracle_gap_top1`, `oracle_gap_margin`: distance from the high-capacity
-  `OracleApprox` control.
+- `oracle_gap_top1`, `oracle_gap_margin`: distance from the
+  `OracleHighCapacity` control.
 
 Interpretation:
 
-- Large oracle gap: routing is likely the bottleneck.
-- Low oracle result: bundling/retrieval is likely the bottleneck.
+- Large high-capacity oracle gap: routing or fixed-capacity assignment is likely
+  the bottleneck.
+- `OracleSameCapacity` near the best practical router with `OracleHighCapacity`
+  much higher: fixed leaf capacity/load is likely the bottleneck.
+- Low high-capacity oracle result: bundling/retrieval is likely the bottleneck.
 - Strong answered accuracy with high abstention: topology may be useful as a
   confidence/calibration mechanism even before raw top-1 improves.
 
