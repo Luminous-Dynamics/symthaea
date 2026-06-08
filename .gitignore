@@ -1,5 +1,8 @@
 # Build artifacts
 target/
+
+# Generated RHN/HCH bakeoff reports
+symthaea-core/reports/
 target-test/
 symthaea-core/target/
 

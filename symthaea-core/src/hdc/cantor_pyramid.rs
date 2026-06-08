@@ -588,6 +588,126 @@ impl PyramidCantorVector {
             .find(|n| n.level == level && n.index == index)
     }
 
+    /// Split a node into children, increasing local resolution.
+    pub fn split_at_node(&mut self, node_idx: usize) -> bool {
+        let node = &self.nodes[node_idx];
+        if !node.children.is_empty() {
+            return false; // Already split
+        }
+
+        let range = node.range.clone();
+        let branching = self.config.branching;
+        if range.len() < branching * 8 {
+            return false; // Too small to split further
+        }
+
+        let child_dim = range.len() / branching;
+        let mut children = Vec::new();
+        let current_level = node.level;
+
+        let child_level = current_level + 1;
+        let mut next_level_index = self
+            .nodes
+            .iter()
+            .filter(|existing| existing.level == child_level)
+            .map(|existing| existing.index)
+            .max()
+            .map(|idx| idx + 1)
+            .unwrap_or(0);
+
+        for i in 0..branching {
+            let child_start = range.start + i * child_dim;
+            let child_end = if i == branching - 1 {
+                range.end
+            } else {
+                child_start + child_dim
+            };
+
+            let child_idx = self.nodes.len();
+            self.nodes.push(CantorNode {
+                level: child_level,
+                index: next_level_index,
+                range: child_start..child_end,
+                parent: Some(node_idx),
+                children: Vec::new(),
+            });
+            next_level_index += 1;
+            children.push(child_idx);
+        }
+
+        self.nodes[node_idx].children = children;
+        true
+    }
+
+    /// Find the best match for a role in the routed leaf and its neighbors.
+    pub fn retrieve_multi_leaf(
+        &self,
+        role: &ContinuousHV,
+        context: &ContinuousHV,
+        router: &dyn CantorRouter,
+        codebook: &[ContinuousHV],
+        top_k_leaves: usize,
+    ) -> Vec<(usize, f32)> {
+        let candidates = self.routed_leaf_candidates(role, context, router, top_k_leaves);
+
+        let mut best_by_codebook = vec![f32::NEG_INFINITY; codebook.len()];
+        for leaf_idx in candidates {
+            if let Some(node) = self.find_node(1, leaf_idx) {
+                let data = self.node_data(node);
+                let recovered = ContinuousHV::from_slice(data).bind(&role.inverse());
+                for (idx, cand) in codebook.iter().enumerate() {
+                    best_by_codebook[idx] = best_by_codebook[idx].max(recovered.similarity(cand));
+                }
+            }
+        }
+
+        let mut results: Vec<(usize, f32)> = best_by_codebook
+            .into_iter()
+            .enumerate()
+            .filter(|(_, score)| score.is_finite())
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        results
+    }
+
+    fn routed_leaf_candidates(
+        &self,
+        role: &ContinuousHV,
+        context: &ContinuousHV,
+        router: &dyn CantorRouter,
+        top_k_leaves: usize,
+    ) -> Vec<usize> {
+        let branching = self.config.branching;
+        if branching == 0 || top_k_leaves == 0 {
+            return Vec::new();
+        }
+
+        let primary_idx = router.route(role, context, branching);
+        let mut candidates = vec![primary_idx];
+
+        let dimensions = branching.next_power_of_two().trailing_zeros() as usize;
+        for neighbor in HypercubeRouter::hamming_neighbors(primary_idx, dimensions) {
+            if neighbor < branching && !candidates.contains(&neighbor) {
+                candidates.push(neighbor);
+                if candidates.len() >= top_k_leaves {
+                    return candidates;
+                }
+            }
+        }
+
+        for offset in 1..branching {
+            let neighbor = (primary_idx + offset) % branching;
+            if !candidates.contains(&neighbor) {
+                candidates.push(neighbor);
+                if candidates.len() >= top_k_leaves {
+                    break;
+                }
+            }
+        }
+
+        candidates
+    }
+
     /// Access the data for a specific node.
     pub fn node_data(&self, node: &CantorNode) -> &[f32] {
         &self.data.as_slice()[node.range.clone()]
@@ -596,6 +716,53 @@ impl PyramidCantorVector {
     /// Access the mutable data for a specific node.
     pub fn node_data_mut(&mut self, node: &CantorNode) -> &mut [f32] {
         &mut self.data.as_mut_slice()[node.range.clone()]
+    }
+
+    /// Bundle a concept within a node, splitting if saturation is detected.
+    pub fn bundle_at_node_adaptive(
+        &mut self,
+        node_idx: usize,
+        other: &ContinuousHV,
+        load_threshold: usize,
+        current_load: usize,
+    ) -> usize {
+        if current_load >= load_threshold {
+            if self.split_at_node(node_idx) {
+                // Node was split, route to a child
+                // For simplicity, we'll use a local hash router here
+                use std::hash::{Hash, Hasher};
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                for &val in other.as_slice().iter().take(16) {
+                    val.to_bits().hash(&mut hasher);
+                }
+                let branching = self.config.branching;
+                let child_local_idx = (hasher.finish() as usize) % branching;
+                let child_node_idx = self.nodes[node_idx].children[child_local_idx];
+
+                // Recurse into child
+                return self.bundle_at_node_adaptive(child_node_idx, other, load_threshold, 0);
+            }
+        }
+
+        let node = &self.nodes[node_idx].clone();
+        self.bundle_at_node(node, other);
+        node_idx
+    }
+
+    /// Bundle a concept redundantly across multiple nodes (e.g. for small-world robustness).
+    pub fn bundle_multi_leaf(
+        &mut self,
+        role: &ContinuousHV,
+        context: &ContinuousHV,
+        router: &dyn CantorRouter,
+        binding: &ContinuousHV,
+        k: usize,
+    ) {
+        for leaf_idx in self.routed_leaf_candidates(role, context, router, k) {
+            if let Some(node) = self.find_node(1, leaf_idx).cloned() {
+                self.bundle_at_node(&node, binding);
+            }
+        }
     }
 
     /// Bind a concept ONLY within a specific node.
@@ -625,7 +792,7 @@ impl PyramidCantorVector {
             BundleMode::Mean => {
                 // Approximate mean requires tracking counts; here we use simple decay or scaling
                 // For this v0.3, we'll implement simple UnitNormalize as a proxy for stable aggregation
-                let mut norm_sq = 0.0;
+                let mut norm_sq: f32 = 0.0;
                 for &v in target.iter() {
                     norm_sq += v * v;
                 }
@@ -637,7 +804,7 @@ impl PyramidCantorVector {
                 }
             }
             BundleMode::UnitNormalize => {
-                let mut norm_sq = 0.0;
+                let mut norm_sq: f32 = 0.0;
                 for &v in target.iter() {
                     norm_sq += v * v;
                 }
@@ -649,7 +816,7 @@ impl PyramidCantorVector {
                 }
             }
             BundleMode::Clipped { max_norm } => {
-                let mut norm_sq = 0.0;
+                let mut norm_sq: f32 = 0.0;
                 for &v in target.iter() {
                     norm_sq += v * v;
                 }
@@ -855,5 +1022,69 @@ mod tests {
         for &val in l0_data {
             assert_eq!(val, 0.0);
         }
+    }
+
+    #[test]
+    fn test_adaptive_splitting() {
+        let config = CantorHdcConfig {
+            total_dim: 1024,
+            levels: 1,
+            branching: 4,
+            leaf_dim: 128,
+            ..CantorHdcConfig::default()
+        };
+
+        let mut pyramid = PyramidCantorVector::new(config, None);
+        assert_eq!(pyramid.nodes.len(), 1); // Only root
+
+        let role = ContinuousHV::random(1024, 42);
+
+        // Bundle with threshold 1. First bundle should be at root.
+        let node_idx = pyramid.bundle_at_node_adaptive(0, &role, 1, 0);
+        assert_eq!(node_idx, 0);
+        assert_eq!(pyramid.nodes.len(), 1);
+
+        // Second bundle at root should trigger split.
+        let node_idx2 = pyramid.bundle_at_node_adaptive(0, &role, 1, 1);
+        assert!(node_idx2 > 0);
+        assert_eq!(pyramid.nodes.len(), 1 + 4); // Root + 4 children
+        assert_eq!(pyramid.nodes[0].children.len(), 4);
+
+        let child_indices: Vec<usize> = pyramid.nodes[0]
+            .children
+            .iter()
+            .map(|idx| pyramid.nodes[*idx].index)
+            .collect();
+        assert_eq!(child_indices, vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_multi_leaf_retrieval_deduplicates_codebook_scores() {
+        let config = CantorHdcConfig {
+            total_dim: 1024,
+            levels: 2,
+            branching: 4,
+            leaf_dim: 256,
+            bundle_mode: BundleMode::UnitNormalize,
+        };
+        let mut pyramid = PyramidCantorVector::new(config, None);
+        let role = ContinuousHV::random(256, 91);
+        let target = ContinuousHV::random(256, 92);
+        let decoy = ContinuousHV::random(256, 93);
+        let binding = role.bind(&target);
+        let router = OracleRouter { target_leaf: 0 };
+
+        pyramid.bundle_multi_leaf(&role, &ContinuousHV::zero(256), &router, &binding, 2);
+
+        let results = pyramid.retrieve_multi_leaf(
+            &role,
+            &ContinuousHV::zero(256),
+            &router,
+            &[target, decoy],
+            2,
+        );
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, 0);
     }
 }

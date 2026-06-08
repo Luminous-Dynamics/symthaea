@@ -6,6 +6,13 @@ inside RHN, not the whole architecture.
 
 RHN is evaluated as an experimental topology bakeoff, not as a Broca default.
 
+Current status:
+
+- RHN v0.7 adds same-capacity and high-capacity oracle diagnostics.
+- RHN v0.8 adds prototype adaptive splitting and multi-leaf storage/retrieval.
+- These APIs are ready for controlled Broca, Vision, and coding-router
+  experiments behind feature flags, not default integration.
+
 Run the current bakeoff:
 
 ```bash
@@ -41,3 +48,7 @@ Interpretation:
 
 Broca integration should wait until a router wins on top-3, margin,
 answered accuracy, or a Broca-specific semantic-role task.
+
+Adaptive splitting caveat: `split_at_node` currently increases local resolution
+for new writes, but it does not rebalance existing bundled state. Treat it as a
+research control surface until migration/rebalancing invariants are added.
