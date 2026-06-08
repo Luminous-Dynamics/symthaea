@@ -10,6 +10,9 @@ Current status:
 
 - RHN v0.7 adds same-capacity and high-capacity oracle diagnostics.
 - RHN v0.8 adds prototype adaptive splitting and multi-leaf storage/retrieval.
+- RHN v0.9 adds explicit split/retrieval semantics: stable `NodePath`
+  identities, `SplitMigrationPolicy`, `RetrievalPolicy`, and split/retrieval
+  reports for capacity/fanout accounting.
 - These APIs are ready for controlled Broca, Vision, and coding-router
   experiments behind feature flags, not default integration.
 
@@ -52,3 +55,17 @@ answered accuracy, or a Broca-specific semantic-role task.
 Adaptive splitting caveat: `split_at_node` currently increases local resolution
 for new writes, but it does not rebalance existing bundled state. Treat it as a
 research control surface until migration/rebalancing invariants are added.
+
+Split semantics:
+
+- Children are subrange views into the parent range, not independent storage.
+- The parent remains a summary/fallback attractor after splitting.
+- Children specialize future writes and finer retrieval.
+- `SplitMigrationPolicy::ViewSubrangeSummary` records this current behavior; it
+  does not copy historical bundled state.
+- `RetrievalPolicy::ChildFirstParentFallback` searches children first and then
+  falls back to the parent summary when child-local evidence is insufficient or
+  dimensionally incompatible.
+
+Before default Broca/Vision integration, RHN still needs domain-transfer
+evidence and storage/fanout accounting from the bakeoff runner.

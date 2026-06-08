@@ -491,6 +491,57 @@ impl CantorNode {
     }
 }
 
+/// Stable hierarchical node identity expressed as sibling ordinals from the root.
+///
+/// Unlike `CantorNode::index`, this remains unambiguous after adaptive splits because
+/// it follows parent/child links rather than level-local allocation counters. The root
+/// node has an empty path.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NodePath {
+    pub segments: Vec<usize>,
+}
+
+/// Policy used when a node is split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum SplitMigrationPolicy {
+    /// Do not move existing bundled state. New writes route into children.
+    None,
+    /// Current HCH storage uses child ranges as views into the parent range, so the
+    /// parent remains a summary/fallback without copying bytes into independent storage.
+    ViewSubrangeSummary,
+}
+
+/// Retrieval semantics for split nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum RetrievalPolicy {
+    /// Search only the requested node.
+    LeafOnly,
+    /// Search children first when present, then the parent as a summary fallback.
+    ChildFirstParentFallback,
+    /// Search the requested node and a bounded number of descendants/ancestors.
+    MultiLevel { fanout: usize },
+}
+
+/// Report emitted when an adaptive split succeeds.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RhnSplitReport {
+    pub parent_idx: usize,
+    pub parent_path: NodePath,
+    pub child_indices: Vec<usize>,
+    pub migration_policy: SplitMigrationPolicy,
+    pub copied_values: usize,
+    pub logical_storage_multiplier: f32,
+}
+
+/// Report emitted by policy-driven retrieval.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RhnRetrievalReport {
+    pub results: Vec<(usize, f32)>,
+    pub searched_nodes: Vec<usize>,
+    pub fanout: usize,
+    pub used_parent_fallback: bool,
+}
+
 /// Pyramid Cantor Vector: a hypervector with hierarchical topology.
 #[derive(Debug, Clone)]
 pub struct PyramidCantorVector {
@@ -588,6 +639,45 @@ impl PyramidCantorVector {
             .find(|n| n.level == level && n.index == index)
     }
 
+    /// Return the stable sibling-ordinal path for a node.
+    pub fn node_path(&self, node_idx: usize) -> Option<NodePath> {
+        if node_idx >= self.nodes.len() {
+            return None;
+        }
+
+        let mut segments = Vec::new();
+        let mut current_idx = node_idx;
+        while let Some(parent_idx) = self.nodes[current_idx].parent {
+            let ordinal = self.nodes[parent_idx]
+                .children
+                .iter()
+                .position(|child_idx| *child_idx == current_idx)?;
+            segments.push(ordinal);
+            current_idx = parent_idx;
+        }
+        segments.reverse();
+
+        Some(NodePath { segments })
+    }
+
+    /// Resolve a stable sibling-ordinal path back to a node.
+    pub fn find_node_by_path(&self, path: &NodePath) -> Option<&CantorNode> {
+        let mut current_idx = 0usize;
+        for segment in &path.segments {
+            current_idx = *self.nodes[current_idx].children.get(*segment)?;
+        }
+        self.nodes.get(current_idx)
+    }
+
+    fn logical_storage_multiplier(&self) -> f32 {
+        if self.config.total_dim == 0 {
+            return 0.0;
+        }
+
+        let logical_dims: usize = self.nodes.iter().map(|node| node.range.len()).sum();
+        logical_dims as f32 / self.config.total_dim as f32
+    }
+
     /// Split a node into children, increasing local resolution.
     pub fn split_at_node(&mut self, node_idx: usize) -> bool {
         let node = &self.nodes[node_idx];
@@ -637,6 +727,31 @@ impl PyramidCantorVector {
 
         self.nodes[node_idx].children = children;
         true
+    }
+
+    /// Split a node and return explicit RHN split semantics.
+    ///
+    /// The current topology stores children as subrange views inside the parent range.
+    /// Therefore migration is reported as zero copied values; the parent remains a
+    /// summary/fallback surface and children specialize new writes.
+    pub fn split_at_node_with_policy(
+        &mut self,
+        node_idx: usize,
+        migration_policy: SplitMigrationPolicy,
+    ) -> Option<RhnSplitReport> {
+        let parent_path = self.node_path(node_idx)?;
+        if !self.split_at_node(node_idx) {
+            return None;
+        }
+
+        Some(RhnSplitReport {
+            parent_idx: node_idx,
+            parent_path,
+            child_indices: self.nodes[node_idx].children.clone(),
+            migration_policy,
+            copied_values: 0,
+            logical_storage_multiplier: self.logical_storage_multiplier(),
+        })
     }
 
     /// Find the best match for a role in the routed leaf and its neighbors.
@@ -706,6 +821,85 @@ impl PyramidCantorVector {
         }
 
         candidates
+    }
+
+    /// Retrieve from a node using explicit split semantics.
+    pub fn retrieve_with_policy(
+        &self,
+        node_idx: usize,
+        role: &ContinuousHV,
+        codebook: &[ContinuousHV],
+        policy: RetrievalPolicy,
+    ) -> RhnRetrievalReport {
+        let mut searched_nodes = Vec::new();
+        let mut used_parent_fallback = false;
+
+        match policy {
+            RetrievalPolicy::LeafOnly => {
+                searched_nodes.push(node_idx);
+            }
+            RetrievalPolicy::ChildFirstParentFallback => {
+                if let Some(node) = self.nodes.get(node_idx) {
+                    searched_nodes.extend(node.children.iter().copied());
+                    searched_nodes.push(node_idx);
+                    used_parent_fallback = !node.children.is_empty();
+                }
+            }
+            RetrievalPolicy::MultiLevel { fanout } => {
+                let mut queue = vec![node_idx];
+                while let Some(candidate) = queue.pop() {
+                    if searched_nodes.contains(&candidate) {
+                        continue;
+                    }
+                    searched_nodes.push(candidate);
+                    if searched_nodes.len() >= fanout.max(1) {
+                        break;
+                    }
+
+                    if let Some(node) = self.nodes.get(candidate) {
+                        for child in node.children.iter().rev() {
+                            queue.push(*child);
+                        }
+                        if let Some(parent) = node.parent {
+                            queue.push(parent);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut best_by_codebook = vec![f32::NEG_INFINITY; codebook.len()];
+        let role_inverse = role.inverse();
+        for node_idx in &searched_nodes {
+            let Some(node) = self.nodes.get(*node_idx) else {
+                continue;
+            };
+            let data = self.node_data(node);
+            if data.len() != role.dim() {
+                continue;
+            }
+
+            let recovered = ContinuousHV::from_slice(data).bind(&role_inverse);
+            for (idx, cand) in codebook.iter().enumerate() {
+                if cand.dim() == recovered.dim() {
+                    best_by_codebook[idx] = best_by_codebook[idx].max(recovered.similarity(cand));
+                }
+            }
+        }
+
+        let mut results: Vec<(usize, f32)> = best_by_codebook
+            .into_iter()
+            .enumerate()
+            .filter(|(_, score)| score.is_finite())
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        RhnRetrievalReport {
+            fanout: searched_nodes.len(),
+            results,
+            searched_nodes,
+            used_parent_fallback,
+        }
     }
 
     /// Access the data for a specific node.
@@ -1056,6 +1250,74 @@ mod tests {
             .map(|idx| pyramid.nodes[*idx].index)
             .collect();
         assert_eq!(child_indices, vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_node_path_round_trip_after_dynamic_split() {
+        let config = CantorHdcConfig {
+            total_dim: 1024,
+            levels: 1,
+            branching: 4,
+            leaf_dim: 128,
+            ..CantorHdcConfig::default()
+        };
+
+        let mut pyramid = PyramidCantorVector::new(config, None);
+        let report = pyramid
+            .split_at_node_with_policy(0, SplitMigrationPolicy::ViewSubrangeSummary)
+            .unwrap();
+
+        assert_eq!(report.parent_path, NodePath { segments: vec![] });
+        assert_eq!(report.child_indices.len(), 4);
+        assert_eq!(report.copied_values, 0);
+        assert!(report.logical_storage_multiplier > 1.0);
+
+        for (ordinal, child_idx) in report.child_indices.iter().enumerate() {
+            let path = pyramid.node_path(*child_idx).unwrap();
+            assert_eq!(
+                path,
+                NodePath {
+                    segments: vec![ordinal]
+                }
+            );
+            assert_eq!(
+                pyramid.find_node_by_path(&path).unwrap(),
+                &pyramid.nodes[*child_idx]
+            );
+        }
+    }
+
+    #[test]
+    fn test_child_first_parent_fallback_preserves_summary_lookup() {
+        let config = CantorHdcConfig {
+            total_dim: 1024,
+            levels: 1,
+            branching: 4,
+            leaf_dim: 128,
+            bundle_mode: BundleMode::UnitNormalize,
+        };
+        let mut pyramid = PyramidCantorVector::new(config, None);
+        let role = ContinuousHV::random(1024, 101);
+        let target = ContinuousHV::random(1024, 102);
+        let decoy = ContinuousHV::random(1024, 103);
+        let binding = role.bind(&target);
+
+        let root = pyramid.nodes[0].clone();
+        pyramid.bundle_at_node(&root, &binding);
+        pyramid
+            .split_at_node_with_policy(0, SplitMigrationPolicy::ViewSubrangeSummary)
+            .unwrap();
+
+        let report = pyramid.retrieve_with_policy(
+            0,
+            &role,
+            &[target, decoy],
+            RetrievalPolicy::ChildFirstParentFallback,
+        );
+
+        assert!(report.used_parent_fallback);
+        assert_eq!(report.fanout, 5);
+        assert_eq!(report.results[0].0, 0);
     }
 
     #[test]
