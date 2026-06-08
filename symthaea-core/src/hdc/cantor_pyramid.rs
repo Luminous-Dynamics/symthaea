@@ -1,10 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Hierarchical Cantor Hypervectors (HCH)
+//! # Resonant Hypergraph Network (RHN)
 //!
-//! This module implements a hierarchical, fractal-inspired hyperdimensional representation.
-//! Instead of a flat vector, the space is partitioned into a tree-like hierarchy.
+//! This module implements the initial Hierarchical Cantor Hypervector (HCH) topology
+//! inside the broader Resonant Hypergraph Network research line. RHN treats topology
+//! as an engineering variable: Cantor hierarchy for multi-scale isolation, hypercube
+//! routing for proof-friendly coordinates, and small-world/prototype routing for
+//! semantic retrieval.
 //!
 //! ## Structure
 //!
@@ -444,6 +447,9 @@ pub struct CantorHdcConfig {
     pub bundle_mode: BundleMode,
 }
 
+/// Broader RHN alias for the current HCH configuration.
+pub type ResonantHypergraphConfig = CantorHdcConfig;
+
 impl Default for CantorHdcConfig {
     fn default() -> Self {
         Self {
@@ -495,6 +501,9 @@ pub struct PyramidCantorVector {
     /// Metadata for all nodes in the hierarchy.
     pub nodes: Vec<CantorNode>,
 }
+
+/// Broader RHN alias for the current Cantor-backed topology vector.
+pub type ResonantHypergraphVector = PyramidCantorVector;
 
 impl PyramidCantorVector {
     /// Create a new Pyramid Cantor Vector with the given configuration.

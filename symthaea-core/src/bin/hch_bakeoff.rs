@@ -48,6 +48,7 @@ mod app {
 
     #[derive(Debug, Clone, Serialize)]
     struct BakeoffReport {
+        architecture: &'static str,
         version: &'static str,
         objects: usize,
         seeds: usize,
@@ -214,7 +215,14 @@ mod app {
                 bundle_mode: config.bundle_mode,
             };
             trials.push(run_oracle_trial(
-                "OracleApprox".into(),
+                "OracleSameCapacity".into(),
+                config,
+                &test,
+                &codebook,
+                args.abstain_threshold,
+            ));
+            trials.push(run_oracle_trial(
+                "OracleHighCapacity".into(),
                 oracle_config,
                 &test,
                 &codebook,
@@ -225,7 +233,7 @@ mod app {
         let mut results = summarize_trials(&trials, args.seeds);
         let oracle = results
             .iter()
-            .find(|result| result.router == "OracleApprox")
+            .find(|result| result.router == "OracleHighCapacity")
             .cloned();
         if let Some(oracle) = oracle {
             for result in &mut results {
@@ -237,7 +245,8 @@ mod app {
         let diagnosis = diagnose(&results);
 
         BakeoffReport {
-            version: "hch-v0.6",
+            architecture: "RHN",
+            version: "rhn-v0.7",
             objects: args.objects,
             seeds: args.seeds,
             dim: args.dim,
@@ -533,32 +542,46 @@ mod app {
     }
 
     fn diagnose(results: &[RouterSummary]) -> String {
-        let Some(oracle) = results
+        let Some(high_capacity_oracle) = results
             .iter()
-            .find(|result| result.router == "OracleApprox")
+            .find(|result| result.router == "OracleHighCapacity")
         else {
-            return "missing oracle result; diagnosis unavailable".into();
+            return "missing high-capacity oracle result; diagnosis unavailable".into();
         };
+        let same_capacity_oracle = results
+            .iter()
+            .find(|result| result.router == "OracleSameCapacity");
         let best_non_oracle = results
             .iter()
-            .filter(|result| result.router != "OracleApprox")
+            .filter(|result| !result.router.starts_with("Oracle"))
             .max_by(|a, b| a.top1.partial_cmp(&b.top1).unwrap());
 
         let Some(best) = best_non_oracle else {
             return "missing non-oracle routers; diagnosis unavailable".into();
         };
 
-        let gap = oracle.top1 - best.top1;
-        if gap > 0.20 {
+        let high_capacity_gap = high_capacity_oracle.top1 - best.top1;
+        if let Some(same_capacity_oracle) = same_capacity_oracle {
+            let same_capacity_gap = same_capacity_oracle.top1 - best.top1;
+            if same_capacity_gap < 0.05 && high_capacity_gap > 0.20 {
+                return format!(
+                    "fixed-capacity bottleneck likely: same-capacity oracle is near best non-oracle ({}), but high-capacity oracle gap is {:.1} points",
+                    best.router,
+                    high_capacity_gap * 100.0
+                );
+            }
+        }
+
+        if high_capacity_gap > 0.20 {
             format!(
-                "routing bottleneck likely: oracle top1 exceeds best non-oracle ({}) by {:.1} points",
+                "routing bottleneck likely: high-capacity oracle top1 exceeds best non-oracle ({}) by {:.1} points",
                 best.router,
-                gap * 100.0
+                high_capacity_gap * 100.0
             )
-        } else if oracle.top1 < 0.30 {
+        } else if high_capacity_oracle.top1 < 0.30 {
             format!(
-                "bundling/retrieval bottleneck likely: oracle top1 is only {:.1}%",
-                oracle.top1 * 100.0
+                "bundling/retrieval bottleneck likely: high-capacity oracle top1 is only {:.1}%",
+                high_capacity_oracle.top1 * 100.0
             )
         } else {
             format!(
@@ -606,7 +629,7 @@ mod app {
     }
 
     fn print_summary(report: &BakeoffReport) {
-        println!("HCH bakeoff {}", report.version);
+        println!("{} bakeoff {}", report.architecture, report.version);
         println!(
             "objects={} seeds={} dim={} branching={} leaf_dim={} tau={:.3}",
             report.objects,
