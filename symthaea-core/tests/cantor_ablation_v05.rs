@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use symthaea_core::hdc::cantor_pyramid::{
     BundleMode, CantorHdcConfig, CantorRouter, HashRouter, HypercubeRouter, LoadBalancedHashRouter,
-    PrefixMaxRouter, PrototypeRouter, PyramidCantorVector, RandomRouter,
+    PrefixMaxRouter, PrototypeRouter, PyramidCantorVector, RandomRouter, SmallWorldRouter,
 };
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -167,6 +167,17 @@ fn test_hch_v05_comprehensive_router_comparison() {
                     .collect(),
             }),
         ),
+        (
+            "SmallWorld",
+            Box::new(SmallWorldRouter {
+                dimensions: 4,
+                seed,
+                leaf_keys: (0..16)
+                    .map(|i| ContinuousHV::random(1024, seed + 5000 + i as u64))
+                    .collect(),
+                shortcuts: 2,
+            }),
+        ),
     ];
 
     for (name, router) in routers {
@@ -240,6 +251,33 @@ fn test_hch_v05_hash_vs_hypercube_smoke() {
     assert!(hypercube.load_entropy > 0.0);
     assert!(hash.max_load <= n_objects);
     assert!(hypercube.max_load <= n_objects);
+}
+
+#[test]
+fn test_hch_v05_small_world_smoke() {
+    let seed = 11;
+    let n_objects = 16;
+    let config = CantorHdcConfig {
+        total_dim: 4096,
+        levels: 2,
+        branching: 8,
+        leaf_dim: 512,
+        bundle_mode: BundleMode::UnitNormalize,
+    };
+    let router = SmallWorldRouter {
+        dimensions: 3,
+        seed,
+        leaf_keys: (0..8)
+            .map(|i| ContinuousHV::random(512, seed + 5000 + i as u64))
+            .collect(),
+        shortcuts: 2,
+    };
+
+    let res = run_v05_trial(seed, config, n_objects, &router, 0.05);
+
+    assert!(res.top3 >= res.top1);
+    assert!(res.load_entropy > 0.0);
+    assert!(res.max_load <= n_objects);
 }
 
 #[test]

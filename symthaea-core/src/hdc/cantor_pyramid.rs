@@ -155,6 +155,14 @@ impl CantorRouter for HypercubeRouter {
     }
 }
 
+fn semantic_routing_query(role: &ContinuousHV, context: &ContinuousHV) -> ContinuousHV {
+    if context.as_slice().iter().any(|v| v.abs() > 1e-8) {
+        role.bind(context)
+    } else {
+        role.clone()
+    }
+}
+
 /// Lightweight semantic router for older ablations.
 ///
 /// This routes by deterministic signed projections from the role/context state. It is
@@ -199,7 +207,7 @@ pub struct PrototypeRouter {
 
 impl CantorRouter for PrototypeRouter {
     fn route(&self, role: &ContinuousHV, context: &ContinuousHV, branching: usize) -> usize {
-        let query = role.bind(context);
+        let query = semantic_routing_query(role, context);
         self.leaf_keys
             .iter()
             .take(branching)
@@ -212,6 +220,75 @@ impl CantorRouter for PrototypeRouter {
             })
             .map(|(idx, _)| idx)
             .unwrap_or(0)
+    }
+}
+
+/// Small-world semantic router.
+///
+/// Starts from a proof-friendly hypercube coordinate, then searches the local Hamming
+/// neighborhood plus a small deterministic shortcut set against semantic leaf prototypes.
+/// This is the first HCH router aimed at Broca-style associative retrieval rather than
+/// purely uniform load distribution.
+pub struct SmallWorldRouter {
+    pub dimensions: usize,
+    pub seed: u64,
+    pub leaf_keys: Vec<ContinuousHV>,
+    pub shortcuts: usize,
+}
+
+impl SmallWorldRouter {
+    fn push_candidate(candidates: &mut Vec<usize>, candidate: usize, branching: usize) {
+        if candidate < branching && !candidates.contains(&candidate) {
+            candidates.push(candidate);
+        }
+    }
+
+    fn shortcut(&self, base: usize, jump: usize, branching: usize) -> usize {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.seed.hash(&mut hasher);
+        base.hash(&mut hasher);
+        jump.hash(&mut hasher);
+        (hasher.finish() as usize) % branching
+    }
+}
+
+impl CantorRouter for SmallWorldRouter {
+    fn route(&self, role: &ContinuousHV, context: &ContinuousHV, branching: usize) -> usize {
+        if branching == 0 {
+            return 0;
+        }
+
+        let hypercube = HypercubeRouter {
+            dimensions: self.dimensions,
+            seed: self.seed,
+        };
+        let base = hypercube.route(role, context, branching);
+        if self.leaf_keys.is_empty() {
+            return base;
+        }
+
+        let mut candidates = Vec::new();
+        Self::push_candidate(&mut candidates, base, branching);
+        for neighbor in HypercubeRouter::hamming_neighbors(base, self.dimensions) {
+            Self::push_candidate(&mut candidates, neighbor, branching);
+        }
+        for jump in 0..self.shortcuts {
+            let shortcut = self.shortcut(base, jump, branching);
+            Self::push_candidate(&mut candidates, shortcut, branching);
+        }
+
+        let query = semantic_routing_query(role, context);
+        candidates
+            .into_iter()
+            .filter(|idx| *idx < self.leaf_keys.len())
+            .max_by(|a, b| {
+                query
+                    .similarity(&self.leaf_keys[*a])
+                    .partial_cmp(&query.similarity(&self.leaf_keys[*b]))
+                    .unwrap()
+            })
+            .unwrap_or(base)
     }
 }
 
