@@ -168,5 +168,6 @@ epistemic = []                               # Epistemic substrate profiles and 
 abstract_thought = []                        # Meta-HDC concept vectors, dynamic grammar generation, category theory discovery
 neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
+cantor-hdc = []                              # Hierarchical Cantor Hypervectors (experimental)
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)
