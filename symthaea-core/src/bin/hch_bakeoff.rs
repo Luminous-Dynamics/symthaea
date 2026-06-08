@@ -29,6 +29,8 @@ mod app {
         branching: usize,
         abstain_threshold: f32,
         shortcuts: usize,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
         out: PathBuf,
     }
 
@@ -41,6 +43,8 @@ mod app {
                 branching: 16,
                 abstain_threshold: 0.05,
                 shortcuts: 2,
+                redundancy_k: 1,
+                retrieval_fanout: 1,
                 out: PathBuf::from("reports/hch_v06.json"),
             }
         }
@@ -57,6 +61,8 @@ mod app {
         leaf_dim: usize,
         abstain_threshold: f32,
         shortcuts: usize,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
         diagnosis: String,
         results: Vec<RouterSummary>,
     }
@@ -73,6 +79,17 @@ mod app {
         max_leaf_load: usize,
         mean_leaf_load: f32,
         latency_ms: f32,
+        latency_per_query_ms: f32,
+        split_count: usize,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
+        searched_nodes_mean: f32,
+        searched_nodes_max: usize,
+        logical_storage_multiplier: f32,
+        physical_storage_multiplier: f32,
+        top1_per_logical_storage: f32,
+        top1_per_fanout: f32,
+        answered_accuracy_per_latency_ms: f32,
         oracle_gap_top1: f32,
         oracle_gap_margin: f32,
     }
@@ -89,6 +106,14 @@ mod app {
         max_leaf_load: usize,
         mean_leaf_load: f32,
         latency_ms: f32,
+        latency_per_query_ms: f32,
+        split_count: usize,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
+        searched_nodes_mean: f32,
+        searched_nodes_max: usize,
+        logical_storage_multiplier: f32,
+        physical_storage_multiplier: f32,
     }
 
     #[derive(Clone)]
@@ -115,7 +140,15 @@ mod app {
 
     fn parse_args() -> Result<Args, String> {
         let mut args = Args::default();
-        let mut iter = std::env::args().skip(1);
+        parse_args_from(std::env::args().skip(1), &mut args)?;
+        Ok(args)
+    }
+
+    fn parse_args_from<I>(args_iter: I, args: &mut Args) -> Result<(), String>
+    where
+        I: IntoIterator<Item = String>,
+    {
+        let mut iter = args_iter.into_iter();
         while let Some(arg) = iter.next() {
             match arg.as_str() {
                 "--objects" => args.objects = parse_next(&mut iter, "--objects")?,
@@ -124,6 +157,10 @@ mod app {
                 "--branching" => args.branching = parse_next(&mut iter, "--branching")?,
                 "--abstain" => args.abstain_threshold = parse_next(&mut iter, "--abstain")?,
                 "--shortcuts" => args.shortcuts = parse_next(&mut iter, "--shortcuts")?,
+                "--redundancy-k" => args.redundancy_k = parse_next(&mut iter, "--redundancy-k")?,
+                "--retrieval-fanout" => {
+                    args.retrieval_fanout = parse_next(&mut iter, "--retrieval-fanout")?
+                }
                 "--out" => args.out = PathBuf::from(next_value(&mut iter, "--out")?),
                 "--help" | "-h" => {
                     print_usage();
@@ -133,6 +170,10 @@ mod app {
             }
         }
 
+        validate_args(args)
+    }
+
+    fn validate_args(args: &Args) -> Result<(), String> {
         if args.objects == 0 {
             return Err("--objects must be > 0".into());
         }
@@ -145,8 +186,14 @@ mod app {
         if args.dim % args.branching != 0 {
             return Err("--dim must be divisible by --branching".into());
         }
+        if args.redundancy_k == 0 {
+            return Err("--redundancy-k must be > 0".into());
+        }
+        if args.retrieval_fanout == 0 {
+            return Err("--retrieval-fanout must be > 0".into());
+        }
 
-        Ok(args)
+        Ok(())
     }
 
     fn parse_next<T: std::str::FromStr>(
@@ -167,7 +214,7 @@ mod app {
     fn print_usage() {
         eprintln!(
             "usage: hch_bakeoff [--objects N] [--seeds N] [--dim N] [--branching N] \\
-             [--abstain F] [--shortcuts N] [--out PATH]"
+             [--abstain F] [--shortcuts N] [--redundancy-k N] [--retrieval-fanout N] [--out PATH]"
         );
     }
 
@@ -205,6 +252,8 @@ mod app {
                     &codebook,
                     router.as_ref(),
                     args.abstain_threshold,
+                    args.redundancy_k,
+                    args.retrieval_fanout,
                 ));
             }
             let oracle_config = CantorHdcConfig {
@@ -220,6 +269,8 @@ mod app {
                 &test,
                 &codebook,
                 args.abstain_threshold,
+                args.redundancy_k,
+                args.retrieval_fanout,
             ));
             trials.push(run_oracle_trial(
                 "OracleHighCapacity".into(),
@@ -227,6 +278,8 @@ mod app {
                 &test,
                 &codebook,
                 args.abstain_threshold,
+                args.redundancy_k,
+                args.retrieval_fanout,
             ));
         }
 
@@ -246,7 +299,7 @@ mod app {
 
         BakeoffReport {
             architecture: "RHN",
-            version: "rhn-v0.7",
+            version: "rhn-v0.10",
             objects: args.objects,
             seeds: args.seeds,
             dim: args.dim,
@@ -254,6 +307,8 @@ mod app {
             leaf_dim,
             abstain_threshold: args.abstain_threshold,
             shortcuts: args.shortcuts,
+            redundancy_k: args.redundancy_k,
+            retrieval_fanout: args.retrieval_fanout,
             diagnosis,
             results,
         }
@@ -354,6 +409,8 @@ mod app {
         codebook: &[ContinuousHV],
         router: &dyn CantorRouter,
         abstain_threshold: f32,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
     ) -> TrialResult {
         let start = Instant::now();
         let mut pyramid = PyramidCantorVector::new(config, None);
@@ -365,9 +422,12 @@ mod app {
             let value_idx = example.value_idx % codebook.len();
             let binding = example.role.bind(&codebook[value_idx]);
             let leaf_idx = router.route_and_record(&example.role, &zero, config.branching);
-            leaf_counts[leaf_idx] += 1;
-            let leaf = pyramid.find_node(1, leaf_idx).unwrap().clone();
-            pyramid.bundle_at_node(&leaf, &binding);
+            let target_leaves = leaf_candidates(leaf_idx, config.branching, redundancy_k);
+            for target_leaf in target_leaves {
+                leaf_counts[target_leaf] += 1;
+                let leaf = pyramid.find_node(1, target_leaf).unwrap().clone();
+                pyramid.bundle_at_node(&leaf, &binding);
+            }
             stored.push((example.role.clone(), value_idx, leaf_idx));
         }
 
@@ -379,6 +439,8 @@ mod app {
             codebook,
             &leaf_counts,
             abstain_threshold,
+            redundancy_k,
+            retrieval_fanout,
             start.elapsed().as_secs_f32() * 1000.0,
         )
     }
@@ -389,6 +451,8 @@ mod app {
         examples: &[Example],
         codebook: &[ContinuousHV],
         abstain_threshold: f32,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
     ) -> TrialResult {
         let start = Instant::now();
         let mut pyramid = PyramidCantorVector::new(config, None);
@@ -399,9 +463,12 @@ mod app {
             let value_idx = example.value_idx % codebook.len();
             let binding = example.role.bind(&codebook[value_idx]);
             let leaf_idx = idx % config.branching;
-            leaf_counts[leaf_idx] += 1;
-            let leaf = pyramid.find_node(1, leaf_idx).unwrap().clone();
-            pyramid.bundle_at_node(&leaf, &binding);
+            let target_leaves = leaf_candidates(leaf_idx, config.branching, redundancy_k);
+            for target_leaf in target_leaves {
+                leaf_counts[target_leaf] += 1;
+                let leaf = pyramid.find_node(1, target_leaf).unwrap().clone();
+                pyramid.bundle_at_node(&leaf, &binding);
+            }
             stored.push((example.role.clone(), value_idx, leaf_idx));
         }
 
@@ -413,6 +480,8 @@ mod app {
             codebook,
             &leaf_counts,
             abstain_threshold,
+            redundancy_k,
+            retrieval_fanout,
             start.elapsed().as_secs_f32() * 1000.0,
         )
     }
@@ -425,6 +494,8 @@ mod app {
         codebook: &[ContinuousHV],
         leaf_counts: &[usize],
         abstain_threshold: f32,
+        redundancy_k: usize,
+        retrieval_fanout: usize,
         latency_ms: f32,
     ) -> TrialResult {
         let mut hits1 = 0usize;
@@ -433,15 +504,26 @@ mod app {
         let mut abstained = 0usize;
         let mut answered = 0usize;
         let mut answered_hits = 0usize;
+        let mut searched_nodes_total = 0usize;
+        let mut searched_nodes_max = 0usize;
 
         for (role, correct_idx, leaf_idx) in stored {
-            let leaf = pyramid.find_node(1, *leaf_idx).unwrap();
-            let recovered = ContinuousHV::from_slice(pyramid.node_data(leaf)).bind(&role.inverse());
-            let mut sims: Vec<(usize, f32)> = codebook
-                .iter()
-                .enumerate()
-                .map(|(idx, candidate)| (idx, recovered.similarity(candidate)))
-                .collect();
+            let searched_leaves = leaf_candidates(*leaf_idx, config.branching, retrieval_fanout);
+            searched_nodes_total += searched_leaves.len();
+            searched_nodes_max = searched_nodes_max.max(searched_leaves.len());
+            let mut best_by_codebook = vec![f32::NEG_INFINITY; codebook.len()];
+
+            for searched_leaf in searched_leaves {
+                let leaf = pyramid.find_node(1, searched_leaf).unwrap();
+                let recovered =
+                    ContinuousHV::from_slice(pyramid.node_data(leaf)).bind(&role.inverse());
+                for (idx, candidate) in codebook.iter().enumerate() {
+                    best_by_codebook[idx] =
+                        best_by_codebook[idx].max(recovered.similarity(candidate));
+                }
+            }
+
+            let mut sims: Vec<(usize, f32)> = best_by_codebook.into_iter().enumerate().collect();
             sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
             let margin = sims[0].1 - sims[1].1;
@@ -465,6 +547,9 @@ mod app {
         }
 
         let n = stored.len().max(1);
+        let logical_storage_multiplier = logical_storage_multiplier(pyramid, config);
+        let searched_nodes_mean = searched_nodes_total as f32 / n as f32;
+        let latency_per_query_ms = latency_ms / n as f32;
         TrialResult {
             router: router_name,
             top1: hits1 as f32 / n as f32,
@@ -478,9 +563,62 @@ mod app {
             },
             load_entropy: calculate_entropy(leaf_counts),
             max_leaf_load: *leaf_counts.iter().max().unwrap_or(&0),
-            mean_leaf_load: n as f32 / config.branching as f32,
+            mean_leaf_load: leaf_counts.iter().sum::<usize>() as f32 / config.branching as f32,
             latency_ms,
+            latency_per_query_ms,
+            split_count: pyramid
+                .nodes
+                .iter()
+                .filter(|node| !node.children.is_empty())
+                .count()
+                - 1,
+            redundancy_k,
+            retrieval_fanout,
+            searched_nodes_mean,
+            searched_nodes_max,
+            logical_storage_multiplier,
+            physical_storage_multiplier: 1.0,
         }
+    }
+
+    fn leaf_candidates(primary_idx: usize, branching: usize, fanout: usize) -> Vec<usize> {
+        if branching == 0 || fanout == 0 {
+            return Vec::new();
+        }
+
+        let primary_idx = primary_idx % branching;
+        let mut candidates = vec![primary_idx];
+        let dimensions = branching.next_power_of_two().trailing_zeros() as usize;
+
+        for neighbor in HypercubeRouter::hamming_neighbors(primary_idx, dimensions) {
+            if neighbor < branching && !candidates.contains(&neighbor) {
+                candidates.push(neighbor);
+                if candidates.len() >= fanout {
+                    return candidates;
+                }
+            }
+        }
+
+        for offset in 1..branching {
+            let neighbor = (primary_idx + offset) % branching;
+            if !candidates.contains(&neighbor) {
+                candidates.push(neighbor);
+                if candidates.len() >= fanout {
+                    break;
+                }
+            }
+        }
+
+        candidates
+    }
+
+    fn logical_storage_multiplier(pyramid: &PyramidCantorVector, config: CantorHdcConfig) -> f32 {
+        if config.total_dim == 0 {
+            return 0.0;
+        }
+
+        let logical_dims: usize = pyramid.nodes.iter().map(|node| node.range.len()).sum();
+        logical_dims as f32 / config.total_dim as f32
     }
 
     fn calculate_entropy(counts: &[usize]) -> f32 {
@@ -530,6 +668,71 @@ mod app {
                         .unwrap_or(0),
                     mean_leaf_load: avg(&matching, |trial| trial.mean_leaf_load, denom),
                     latency_ms: avg(&matching, |trial| trial.latency_ms, denom),
+                    latency_per_query_ms: avg(&matching, |trial| trial.latency_per_query_ms, denom),
+                    split_count: matching
+                        .iter()
+                        .map(|trial| trial.split_count)
+                        .max()
+                        .unwrap_or(0),
+                    redundancy_k: matching
+                        .iter()
+                        .map(|trial| trial.redundancy_k)
+                        .max()
+                        .unwrap_or(1),
+                    retrieval_fanout: matching
+                        .iter()
+                        .map(|trial| trial.retrieval_fanout)
+                        .max()
+                        .unwrap_or(1),
+                    searched_nodes_mean: avg(&matching, |trial| trial.searched_nodes_mean, denom),
+                    searched_nodes_max: matching
+                        .iter()
+                        .map(|trial| trial.searched_nodes_max)
+                        .max()
+                        .unwrap_or(0),
+                    logical_storage_multiplier: avg(
+                        &matching,
+                        |trial| trial.logical_storage_multiplier,
+                        denom,
+                    ),
+                    physical_storage_multiplier: avg(
+                        &matching,
+                        |trial| trial.physical_storage_multiplier,
+                        denom,
+                    ),
+                    top1_per_logical_storage: avg(
+                        &matching,
+                        |trial| {
+                            if trial.logical_storage_multiplier > 0.0 {
+                                trial.top1 / trial.logical_storage_multiplier
+                            } else {
+                                0.0
+                            }
+                        },
+                        denom,
+                    ),
+                    top1_per_fanout: avg(
+                        &matching,
+                        |trial| {
+                            if trial.searched_nodes_mean > 0.0 {
+                                trial.top1 / trial.searched_nodes_mean
+                            } else {
+                                0.0
+                            }
+                        },
+                        denom,
+                    ),
+                    answered_accuracy_per_latency_ms: avg(
+                        &matching,
+                        |trial| {
+                            if trial.latency_per_query_ms > 0.0 {
+                                trial.answered_accuracy / trial.latency_per_query_ms
+                            } else {
+                                0.0
+                            }
+                        },
+                        denom,
+                    ),
                     oracle_gap_top1: 0.0,
                     oracle_gap_margin: 0.0,
                 }
@@ -606,11 +809,11 @@ mod app {
 
     fn to_csv(report: &BakeoffReport) -> String {
         let mut csv = String::from(
-            "router,top1,top3,mean_margin,abstention_rate,answered_accuracy,load_entropy,max_leaf_load,mean_leaf_load,latency_ms,oracle_gap_top1,oracle_gap_margin\n",
+            "router,top1,top3,mean_margin,abstention_rate,answered_accuracy,load_entropy,max_leaf_load,mean_leaf_load,latency_ms,latency_per_query_ms,split_count,redundancy_k,retrieval_fanout,searched_nodes_mean,searched_nodes_max,logical_storage_multiplier,physical_storage_multiplier,top1_per_logical_storage,top1_per_fanout,answered_accuracy_per_latency_ms,oracle_gap_top1,oracle_gap_margin\n",
         );
         for result in &report.results {
             csv.push_str(&format!(
-                "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{:.6},{:.6},{:.6},{:.6}\n",
+                "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{:.6},{:.6},{:.6},{},{},{},{:.6},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
                 result.router,
                 result.top1,
                 result.top3,
@@ -621,6 +824,17 @@ mod app {
                 result.max_leaf_load,
                 result.mean_leaf_load,
                 result.latency_ms,
+                result.latency_per_query_ms,
+                result.split_count,
+                result.redundancy_k,
+                result.retrieval_fanout,
+                result.searched_nodes_mean,
+                result.searched_nodes_max,
+                result.logical_storage_multiplier,
+                result.physical_storage_multiplier,
+                result.top1_per_logical_storage,
+                result.top1_per_fanout,
+                result.answered_accuracy_per_latency_ms,
                 result.oracle_gap_top1,
                 result.oracle_gap_margin
             ));
@@ -631,22 +845,34 @@ mod app {
     fn print_summary(report: &BakeoffReport) {
         println!("{} bakeoff {}", report.architecture, report.version);
         println!(
-            "objects={} seeds={} dim={} branching={} leaf_dim={} tau={:.3}",
+            "objects={} seeds={} dim={} branching={} leaf_dim={} tau={:.3} redundancy_k={} retrieval_fanout={}",
             report.objects,
             report.seeds,
             report.dim,
             report.branching,
             report.leaf_dim,
-            report.abstain_threshold
+            report.abstain_threshold,
+            report.redundancy_k,
+            report.retrieval_fanout
         );
         println!("{}", report.diagnosis);
         println!(
-            "{:20} {:>7} {:>7} {:>8} {:>8} {:>8} {:>8} {:>6} {:>9}",
-            "Router", "Top1", "Top3", "Margin", "Abstain", "AnsAcc", "Entropy", "MaxL", "Latency"
+            "{:20} {:>7} {:>7} {:>8} {:>8} {:>8} {:>8} {:>6} {:>7} {:>7} {:>9}",
+            "Router",
+            "Top1",
+            "Top3",
+            "Margin",
+            "Abstain",
+            "AnsAcc",
+            "Entropy",
+            "MaxL",
+            "Fanout",
+            "LogSt",
+            "Latency"
         );
         for result in &report.results {
             println!(
-                "{:20} {:>6.1}% {:>6.1}% {:>8.4} {:>7.1}% {:>7.1}% {:>8.2} {:>6} {:>8.1}ms",
+                "{:20} {:>6.1}% {:>6.1}% {:>8.4} {:>7.1}% {:>7.1}% {:>8.2} {:>6} {:>7.2} {:>7.2} {:>8.1}ms",
                 result.router,
                 result.top1 * 100.0,
                 result.top3 * 100.0,
@@ -655,8 +881,93 @@ mod app {
                 result.answered_accuracy * 100.0,
                 result.load_entropy,
                 result.max_leaf_load,
+                result.searched_nodes_mean,
+                result.logical_storage_multiplier,
                 result.latency_ms
             );
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn parse_cost_flags_are_serialized_into_report() {
+            let mut args = Args {
+                objects: 8,
+                seeds: 1,
+                dim: 256,
+                branching: 4,
+                out: PathBuf::from("/tmp/rhn_parse_test.json"),
+                ..Args::default()
+            };
+            parse_args_from(
+                [
+                    "--redundancy-k",
+                    "2",
+                    "--retrieval-fanout",
+                    "3",
+                    "--shortcuts",
+                    "4",
+                ]
+                .into_iter()
+                .map(String::from),
+                &mut args,
+            )
+            .unwrap();
+
+            let report = run_bakeoff(&args);
+
+            assert_eq!(report.version, "rhn-v0.10");
+            assert_eq!(report.redundancy_k, 2);
+            assert_eq!(report.retrieval_fanout, 3);
+            assert_eq!(report.shortcuts, 4);
+            assert!(report.results.iter().all(|result| result.redundancy_k == 2));
+            assert!(
+                report
+                    .results
+                    .iter()
+                    .all(|result| result.retrieval_fanout == 3)
+            );
+        }
+
+        #[test]
+        fn csv_shape_contains_cost_accounting_columns() {
+            let args = Args {
+                objects: 8,
+                seeds: 1,
+                dim: 256,
+                branching: 4,
+                redundancy_k: 2,
+                retrieval_fanout: 3,
+                ..Args::default()
+            };
+            let report = run_bakeoff(&args);
+            let csv = to_csv(&report);
+            let header = csv.lines().next().unwrap();
+
+            for column in [
+                "latency_per_query_ms",
+                "split_count",
+                "redundancy_k",
+                "retrieval_fanout",
+                "searched_nodes_mean",
+                "searched_nodes_max",
+                "logical_storage_multiplier",
+                "physical_storage_multiplier",
+                "top1_per_logical_storage",
+                "top1_per_fanout",
+                "answered_accuracy_per_latency_ms",
+            ] {
+                assert!(header.contains(column), "missing column {column}");
+            }
+
+            let first_result = report.results.first().unwrap();
+            assert_eq!(first_result.searched_nodes_mean, 3.0);
+            assert_eq!(first_result.searched_nodes_max, 3);
+            assert_eq!(first_result.logical_storage_multiplier, 2.0);
+            assert_eq!(first_result.physical_storage_multiplier, 1.0);
         }
     }
 }

@@ -13,6 +13,9 @@ Current status:
 - RHN v0.9 adds explicit split/retrieval semantics: stable `NodePath`
   identities, `SplitMigrationPolicy`, `RetrievalPolicy`, and split/retrieval
   reports for capacity/fanout accounting.
+- RHN v0.10 adds cost-aware bakeoff reporting: redundancy, retrieval fanout,
+  searched-node counts, storage multipliers, latency per query, and
+  cost-normalized accuracy metrics.
 - These APIs are ready for controlled Broca, Vision, and coding-router
   experiments behind feature flags, not default integration.
 
@@ -23,11 +26,11 @@ cargo run -p symthaea-core \
   --features cantor-hdc \
   --bin hch_bakeoff \
   --release \
-  -- --objects 128 --seeds 3 --out /tmp/rhn_v07.json
+  -- --objects 128 --seeds 3 --out /tmp/rhn_v010.json
 ```
 
 The runner writes both JSON and CSV reports. If `--out` is
-`/tmp/rhn_v07.json`, the CSV report is written to `/tmp/rhn_v07.csv`.
+`/tmp/rhn_v010.json`, the CSV report is written to `/tmp/rhn_v010.csv`.
 
 Primary metrics:
 
@@ -36,6 +39,16 @@ Primary metrics:
 - `abstention_rate`: fraction of queries below the configured margin threshold.
 - `answered_accuracy`: top-1 accuracy over non-abstained queries.
 - `load_entropy`, `max_leaf_load`, `mean_leaf_load`: routing balance.
+- `split_count`: adaptive split count observed in the trial.
+- `redundancy_k`: number of leaves written per item.
+- `retrieval_fanout`, `searched_nodes_mean`, `searched_nodes_max`: retrieval
+  breadth and effective search cost.
+- `logical_storage_multiplier`: logical topology cost from overlapping node
+  views; this is not physical memory expansion.
+- `physical_storage_multiplier`: actual backing-vector storage multiplier.
+- `latency_per_query_ms`: mean query/update cost.
+- `top1_per_logical_storage`, `top1_per_fanout`,
+  `answered_accuracy_per_latency_ms`: cost-normalized quality measures.
 - `oracle_gap_top1`, `oracle_gap_margin`: distance from the
   `OracleHighCapacity` control.
 
@@ -48,6 +61,8 @@ Interpretation:
 - Low high-capacity oracle result: bundling/retrieval is likely the bottleneck.
 - Strong answered accuracy with high abstention: topology may be useful as a
   confidence/calibration mechanism even before raw top-1 improves.
+- Higher top-1 with much higher fanout or redundancy is not a free gain; compare
+  cost-normalized metrics before promoting a router.
 
 Broca integration should wait until a router wins on top-3, margin,
 answered accuracy, or a Broca-specific semantic-role task.
