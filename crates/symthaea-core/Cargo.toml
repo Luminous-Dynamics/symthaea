@@ -191,4 +191,3 @@ synthesis-trait = []                         # Unified CodeSynthesisBackend trai
 cantor-hdc = []                              # Hierarchical Cantor Hypervectors (RHN)
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)
-
