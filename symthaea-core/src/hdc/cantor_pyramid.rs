@@ -163,6 +163,81 @@ fn semantic_routing_query(role: &ContinuousHV, context: &ContinuousHV) -> Contin
     }
 }
 
+/// Per-leaf semantic prototypes derived from assigned roles or intents.
+///
+/// This is intentionally simple and deterministic: callers decide the assignment policy
+/// (hash, hypercube, oracle, etc.), then this index bundles assigned semantic vectors into
+/// stable leaf keys for prototype and small-world routing.
+#[derive(Debug, Clone)]
+pub struct PrototypeIndex {
+    pub leaf_keys: Vec<ContinuousHV>,
+    pub counts: Vec<usize>,
+}
+
+impl PrototypeIndex {
+    pub fn from_assignments(
+        assignments: &[(usize, ContinuousHV)],
+        branching: usize,
+        leaf_dim: usize,
+        mode: BundleMode,
+    ) -> Self {
+        let mut leaf_keys = vec![ContinuousHV::zero(leaf_dim); branching];
+        let mut counts = vec![0usize; branching];
+
+        for (leaf_idx, vector) in assignments {
+            if *leaf_idx >= branching {
+                continue;
+            }
+
+            let target = leaf_keys[*leaf_idx].as_mut_slice();
+            let source = vector.as_slice();
+            for i in 0..leaf_dim.min(source.len()) {
+                target[i] += source[i];
+            }
+            counts[*leaf_idx] += 1;
+        }
+
+        for (idx, key) in leaf_keys.iter_mut().enumerate() {
+            match mode {
+                BundleMode::Sum => {}
+                BundleMode::Mean => {
+                    if counts[idx] > 0 {
+                        for v in key.as_mut_slice() {
+                            *v /= counts[idx] as f32;
+                        }
+                    }
+                }
+                BundleMode::UnitNormalize | BundleMode::Clipped { .. } => {
+                    normalize_hv(key);
+                }
+                BundleMode::MajoritySign => {
+                    for v in key.as_mut_slice() {
+                        *v = if *v > 0.0 {
+                            1.0
+                        } else if *v < 0.0 {
+                            -1.0
+                        } else {
+                            0.0
+                        };
+                    }
+                }
+            }
+        }
+
+        Self { leaf_keys, counts }
+    }
+}
+
+fn normalize_hv(hv: &mut ContinuousHV) {
+    let norm_sq: f32 = hv.as_slice().iter().map(|v| v * v).sum();
+    let norm = norm_sq.sqrt();
+    if norm > 1e-8 {
+        for v in hv.as_mut_slice() {
+            *v /= norm;
+        }
+    }
+}
+
 /// Lightweight semantic router for older ablations.
 ///
 /// This routes by deterministic signed projections from the role/context state. It is
