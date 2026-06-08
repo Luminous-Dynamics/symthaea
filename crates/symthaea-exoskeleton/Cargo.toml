@@ -16,10 +16,12 @@ proptest = "1"
 
 [dependencies.symtropy-physics]
 # [standalone-stripped] path = "../../../symtropy/crates/symtropy-physics"
+version = "0.2"
 optional = true
 
 [dependencies.symtropy-math]
 # [standalone-stripped] path = "../../../symtropy/crates/symtropy-math"
+version = "0.2"
 optional = true
 
 [dependencies.nalgebra]
