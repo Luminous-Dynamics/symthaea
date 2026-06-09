@@ -23,9 +23,10 @@ use super::unified_hv::ContinuousHV;
 use std::ops::Range;
 
 /// Aggregation strategy for bundling hypervectors.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BundleMode {
     /// Pure additive accumulation (no normalization).
+    #[default]
     Sum,
     /// Element-wise mean (Sum / Count).
     Mean,
@@ -35,12 +36,6 @@ pub enum BundleMode {
     Clipped { max_norm: f32 },
     /// Binarize via majority sign {-1, 0, 1}.
     MajoritySign,
-}
-
-impl Default for BundleMode {
-    fn default() -> Self {
-        Self::Sum
-    }
 }
 
 /// Trait for routing information to specific hierarchical nodes.
@@ -154,7 +149,11 @@ impl CantorRouter for HypercubeRouter {
             }
         }
 
-        if branching == 0 { 0 } else { coord % branching }
+        if branching == 0 {
+            0
+        } else {
+            coord % branching
+        }
     }
 }
 
@@ -696,7 +695,7 @@ impl PyramidCantorVector {
         let current_level = node.level;
 
         let child_level = current_level + 1;
-        let mut next_level_index = self
+        let next_level_index = self
             .nodes
             .iter()
             .filter(|existing| existing.level == child_level)
@@ -705,7 +704,7 @@ impl PyramidCantorVector {
             .map(|idx| idx + 1)
             .unwrap_or(0);
 
-        for i in 0..branching {
+        for (offset, i) in (0..branching).enumerate() {
             let child_start = range.start + i * child_dim;
             let child_end = if i == branching - 1 {
                 range.end
@@ -716,12 +715,11 @@ impl PyramidCantorVector {
             let child_idx = self.nodes.len();
             self.nodes.push(CantorNode {
                 level: child_level,
-                index: next_level_index,
+                index: next_level_index + offset,
                 range: child_start..child_end,
                 parent: Some(node_idx),
                 children: Vec::new(),
             });
-            next_level_index += 1;
             children.push(child_idx);
         }
 
@@ -920,22 +918,20 @@ impl PyramidCantorVector {
         load_threshold: usize,
         current_load: usize,
     ) -> usize {
-        if current_load >= load_threshold {
-            if self.split_at_node(node_idx) {
-                // Node was split, route to a child
-                // For simplicity, we'll use a local hash router here
-                use std::hash::{Hash, Hasher};
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                for &val in other.as_slice().iter().take(16) {
-                    val.to_bits().hash(&mut hasher);
-                }
-                let branching = self.config.branching;
-                let child_local_idx = (hasher.finish() as usize) % branching;
-                let child_node_idx = self.nodes[node_idx].children[child_local_idx];
-
-                // Recurse into child
-                return self.bundle_at_node_adaptive(child_node_idx, other, load_threshold, 0);
+        if current_load >= load_threshold && self.split_at_node(node_idx) {
+            // Node was split, route to a child.
+            // For simplicity, we'll use a local hash router here.
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            for &val in other.as_slice().iter().take(16) {
+                val.to_bits().hash(&mut hasher);
             }
+            let branching = self.config.branching;
+            let child_local_idx = (hasher.finish() as usize) % branching;
+            let child_node_idx = self.nodes[node_idx].children[child_local_idx];
+
+            // Recurse into child.
+            return self.bundle_at_node_adaptive(child_node_idx, other, load_threshold, 0);
         }
 
         let node = &self.nodes[node_idx].clone();
