@@ -924,12 +924,10 @@ mod app {
             assert_eq!(report.retrieval_fanout, 3);
             assert_eq!(report.shortcuts, 4);
             assert!(report.results.iter().all(|result| result.redundancy_k == 2));
-            assert!(
-                report
-                    .results
-                    .iter()
-                    .all(|result| result.retrieval_fanout == 3)
-            );
+            assert!(report
+                .results
+                .iter()
+                .all(|result| result.retrieval_fanout == 3));
         }
 
         #[test]
