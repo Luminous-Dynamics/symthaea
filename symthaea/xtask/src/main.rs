@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
-use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::path::PathBuf;
+
+mod rhn_sweep;
 
 #[derive(Parser)]
 struct Cli {
@@ -48,9 +47,33 @@ fn main() -> anyhow::Result<()> {
             policies,
             out,
         } => {
-            fs::create_dir_all(&out)?;
-            println!("Sweep initiated to {:?}", out);
+            let dims = parse_list(&dims)?;
+            let objects = parse_list(&objects)?;
+            let seeds = parse_list(&seeds)?;
+            let branching = parse_list(&branching)?;
+            let split_thresholds = parse_list(&split_thresholds)?;
+            let redundancy_ks = parse_list(&redundancy_ks)?;
+            let fanouts = parse_list(&fanouts)?;
+            let policies = policies.split(',').map(|s| s.to_string()).collect();
+
+            rhn_sweep::run_sweep(
+                dims,
+                objects,
+                seeds,
+                branching,
+                split_thresholds,
+                redundancy_ks,
+                fanouts,
+                policies,
+                out,
+            )?;
         }
     }
     Ok(())
+}
+
+fn parse_list(s: &str) -> anyhow::Result<Vec<usize>> {
+    s.split(',')
+        .map(|item| item.parse::<usize>().map_err(anyhow::Error::from))
+        .collect()
 }
