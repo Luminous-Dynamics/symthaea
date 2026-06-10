@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "xtask",
     "crates/symthaea-domotic",
     ".",
     "symthaea-core",
@@ -137,6 +138,7 @@ exclude = [
 ]
 # Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
 default-members = [
+    "xtask",
     "crates/symthaea-domotic",
     ".",
     "symthaea-core",
@@ -1210,9 +1212,6 @@ required-features = ["code_generation"]
 name = "hardware_stress"
 required-features = ["code_generation"]
 
-[[test]]
-name = "vision_manifold_closure"
-required-features = ["vision-manifold"]
 
 [[example]]
 name = "helicopter_phi_benchmark"
