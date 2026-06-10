@@ -158,15 +158,15 @@ pub fn run_sweep(
     ])?;
     for (r, dim, obj, seed, branching, threshold, k, fanout, policy) in &all_results {
         csv.write_record(&[
-            dim.to_string(),
-            obj.to_string(),
-            seed.to_string(),
-            branching.to_string(),
-            threshold.to_string(),
-            k.to_string(),
-            fanout.to_string(),
-            policy.clone(),
-            r.router.clone(),
+            dim,
+            obj,
+            seed,
+            branching,
+            threshold,
+            k,
+            fanout,
+            policy,
+            &r.router,
             r.top1.to_string(),
             r.top3.to_string(),
             r.mean_margin.to_string(),
@@ -179,6 +179,7 @@ pub fn run_sweep(
             r.oracle_gap_top1.to_string(),
         ])?;
     }
+
     csv.flush()?;
 
     // Generate Markdown summary
@@ -275,17 +276,17 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
                 raw_writer.write_all(b"\n")?;
                 for r in output.results {
                     let name = path.file_stem().unwrap().to_str().unwrap();
-                    let parts: Vec<&str> = name.split('_').collect();
+                    let parts: Vec<String> = name.split('_').map(|s| s.to_string()).collect();
                     all_results.push((
                         r,
-                        parts[0].trim_start_matches('d'),
-                        parts[1].trim_start_matches('o'),
-                        parts[2].trim_start_matches('s'),
-                        parts[3].trim_start_matches('b'),
-                        parts[4].trim_start_matches('t'),
-                        parts[5].trim_start_matches('k'),
-                        parts[6].trim_start_matches('f'),
-                        parts[7],
+                        parts[0].trim_start_matches('d').to_string(),
+                        parts[1].trim_start_matches('o').to_string(),
+                        parts[2].trim_start_matches('s').to_string(),
+                        parts[3].trim_start_matches('b').to_string(),
+                        parts[4].trim_start_matches('t').to_string(),
+                        parts[5].trim_start_matches('k').to_string(),
+                        parts[6].trim_start_matches('f').to_string(),
+                        parts[7].to_string(),
                     ));
                 }
             } else {
@@ -325,15 +326,15 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
     ])?;
     for (r, dim, obj, seed, branching, threshold, k, fanout, policy) in &all_results {
         csv.write_record(&[
-            dim.to_string(),
-            obj.to_string(),
-            seed.to_string(),
-            branching.to_string(),
-            threshold.to_string(),
-            k.to_string(),
-            fanout.to_string(),
-            policy.clone(),
-            r.router.clone(),
+            dim,
+            obj,
+            seed,
+            branching,
+            threshold,
+            k,
+            fanout,
+            policy,
+            &r.router,
             r.top1.to_string(),
             r.top3.to_string(),
             r.mean_margin.to_string(),
@@ -346,6 +347,7 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
             r.oracle_gap_top1.to_string(),
         ])?;
     }
+
     csv.flush()?;
 
     let mut summary = File::create(out.join("summary.md"))?;
