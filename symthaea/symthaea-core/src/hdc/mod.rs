@@ -742,6 +742,8 @@ pub mod relational_consciousness;
 // - CozoDB (Prefrontal Cortex): Recursive Datalog for causal reasoning
 // - LanceDB (Long-Term Memory): Multimodal embeddings storage
 // - DuckDB (Epistemic Auditor): Statistical analysis for self-reflection
+#[cfg(feature = "cantor-hdc")]
+pub mod cantor_pyramid;
 pub mod consciousness_metacognitive; // Metacognitive monitoring subsystem
 pub mod consciousness_perf; // SIMD batch ops + HV pool integration for consciousness hot paths
 pub mod consciousness_phi_optimization;
@@ -750,7 +752,7 @@ pub mod consciousness_subsystem; // Trait-based pluggable consciousness subsyste
 pub mod multi_database_integration;
 pub mod phi_feedback; // Φ feedback controller (closes the loop: Φ measurement → parameter modulation)
 pub mod phi_guided_math; // Φ-guided math domain selection (consciousness-driven computation paths)
-pub mod semantic_bridge; // Bidirectional text <-> HV <-> consciousness bridge // Phi optimization subsystem
+pub mod semantic_bridge; // Bidirectional text <-> HV <-> consciousness bridge // Phi optimization subsystem // Hierarchical Cantor Hypervectors (RHN)
 
 // Re-export multi-database integration types
 // Note: QdrantConfig is aliased to MdbQdrantConfig to avoid conflict with long_term_memory::QdrantConfig
