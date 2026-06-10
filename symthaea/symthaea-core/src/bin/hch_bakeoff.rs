@@ -17,7 +17,7 @@ mod app {
     use symthaea_core::hdc::cantor_pyramid::{
         BundleMode, CantorHdcConfig, CantorRouter, HashRouter, HypercubeRouter,
         LoadBalancedHashRouter, PrefixMaxRouter, PrototypeIndex, PrototypeRouter,
-        PyramidCantorVector, RandomRouter, RetrievalPolicy, RhnRetrievalReport, SmallWorldRouter,
+        PyramidCantorVector, RandomRouter, RetrievalPolicy, SmallWorldRouter,
     };
     use symthaea_core::hdc::unified_hv::ContinuousHV;
 
