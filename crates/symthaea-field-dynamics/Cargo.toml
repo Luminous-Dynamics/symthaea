@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-field-dynamics"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Consciousness field dynamics — wave equations, energy conservation, and resonant modes for consciousness evolution"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "field-theory", "wave-equation", "dynamics", "neuroscience"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }

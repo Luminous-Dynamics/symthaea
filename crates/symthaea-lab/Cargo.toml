@@ -1,0 +1,49 @@
+[package]
+name = "symthaea-lab"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Sovereign Engineering Laboratory: Autonomous design, simulation, and verification benchmarks."
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-humanoid = { path = "../symthaea-humanoid" }
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-runtime = { path = "../symthaea-runtime" }
+symthaea-engineering = { path = "../symthaea-engineering" }
+symthaea-broca = { path = "../symthaea-broca", default-features = false }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-openfoam-bridge = { path = "../symthaea-openfoam-bridge" }
+symthaea-mujoco-bridge = { path = "../symthaea-mujoco-bridge" }
+symthaea-manipulator = { path = "../symthaea-manipulator" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
+symthaea-silicon = { path = "../symthaea-silicon" }
+symthaea-proprioception = { path = "../symthaea-proprioception" }
+symthaea-workspace = { path = "../symthaea-workspace" }
+symthaea-fep = { path = "../symthaea-fep" }
+symthaea-phi-search = { path = "../symthaea-phi-search" }
+symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
+symthaea-infrastructure = { path = "../symthaea-infrastructure" }
+symthaea-materials = { path = "../symthaea-materials" }
+symthaea-causal-reasoning = { path = "../symthaea-causal-reasoning" }
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+symtropy-robotics-bridge-core = { path = "../symtropy-robotics-bridge-core" }
+symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
+iroh = "0.97"
+uuid = { workspace = true }
+serde = { workspace = true }
+nalgebra = "0.34"
+anyhow = "1.0"
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tokio = { workspace = true, features = ["full"] }
+
+# We need the School logic, but it's in the main crate.
+# To avoid circularity, I'll temporarily duplicate the necessary school logic 
+# or use a simplified lab orchestrator.
+
+[features]
+default = []
+school_learning = []

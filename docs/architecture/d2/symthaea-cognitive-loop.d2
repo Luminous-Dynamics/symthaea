@@ -1,0 +1,297 @@
+# Symthaea Cognitive Loop — 4-Phase Pipeline (50Hz)
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Symthaea Cognitive Loop — 50Hz Pipeline
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+input: Text / Sensory Input {
+  shape: parallelogram
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+}
+
+# ═══════════════════════════════════════════
+# PHASE 1: PERCEPTION (~5ms)
+# ═══════════════════════════════════════════
+perception: Phase 1 — PERCEPTION {
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  style.border-radius: 8
+
+  safety: "0.1 Safety Pre-check\n(Amygdala Veto)" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  thalamic: "0 Thalamic Routing\n(DeepThought/Cortical/Reflex)" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  moral_eval: "0.4 Moral Evaluation\n(EthicsEngine)" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  strategy: "0.5 Strategy Selection" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  hdc_encode: "1-1.2 HDC Encoding\n16,384-bit BinaryHV" {
+    style.fill: "#1e40af"
+    style.font-color: "#60a5fa"
+    style.stroke: "#60a5fa"
+  }
+  vision: "1.3 Vision Manifold\n(optional foveation)" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  surprise: "1.4 Surprise Exploration\n(FEP Module)" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  memo: "1.5 Input Memoization" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  ethics: "1.6 Ethics Check\n(Value Alignment)" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+  urgency: "1.7 Urgency\nComputation" {
+    style.fill: "#1e40af"
+    style.font-color: "#bfdbfe"
+  }
+
+  safety -> thalamic -> moral_eval -> strategy -> hdc_encode
+  hdc_encode -> vision -> surprise -> memo -> ethics -> urgency
+}
+
+perc_result: PerceptionPhaseResult {
+  shape: page
+  style.fill: "#1e3a5f"
+  style.font-color: "#93c5fd"
+  label: "PercEncoding | PercMoral\nPercStrategy | PercExploration\nPercUrgency"
+}
+
+# ═══════════════════════════════════════════
+# PHASE 2: DYNAMICS (~15ms, parallelized)
+# ═══════════════════════════════════════════
+dynamics: Phase 2 — DYNAMICS {
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  observe: "A: OBSERVE\nBuild CycleSnapshot" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+
+  managers: "B: COMPUTE — 5 Cognitive Managers" {
+    style.fill: "#581c87"
+    style.stroke: "#a855f7"
+    style.font-color: "#e9d5ff"
+    label: "DriveManager (7) | MemoryManager (11)\nLearningManager (13) | PerceptionManager (19)\nGovernanceManager (37)"
+  }
+
+  memory: "1a: Memory Recall\nEpisodic + Resonator + Goals" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+  emotion: "1b-1c: Emotion Processing\nContagion + Homeostasis + VAD" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+  cfc: "CfC Step\nO(1) Temporal Forward Pass\n+ Multi-Scale Prediction" {
+    style.fill: "#6b21a8"
+    style.font-color: "#c084fc"
+    style.stroke: "#c084fc"
+  }
+  fep: "FEP Decomposition\nAccuracy / Complexity / Pragmatic" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+  mcts: "MCTS Plan Evaluation\n(Reasoning Engine)" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+  training: "CfC Training\nGradient Update + Async" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+
+  parallel: "Parallel Post-Processing" {
+    style.fill: "#4c1d95"
+    style.font-color: "#e9d5ff"
+    label: "rayon::join(\n  stability_regime,\n  episodic_memory\n)"
+  }
+
+  observe -> managers -> memory -> emotion -> cfc
+  cfc -> fep -> mcts -> training -> parallel
+}
+
+dyn_result: DynamicsPhaseResult {
+  shape: page
+  style.fill: "#3a1e3a"
+  style.font-color: "#d8b4fe"
+  label: "DynCore | DynFep | DynReasoning\nDynAttention | DynResonator\nDynHomeostasis | DynNeuromod"
+}
+
+# ═══════════════════════════════════════════
+# PHASE 3: FEEDBACK (~5ms)
+# ═══════════════════════════════════════════
+feedback: Phase 3 — FEEDBACK {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  consciousness: "Consciousness Metrics" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    label: "Primitive Psi | Temporal Chains\nLattice Coherence | Compositionality"
+  }
+
+  monitors: "Consciousness Monitors\n(Normal/Critical urgency only)" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    label: "Resonance | Quantum Coherence\nTemporal | Thermodynamics\nEmbodied | Hierarchical FE\nPhenomenal Binding"
+  }
+
+  engine: "Consciousness Engine" {
+    style.fill: "#166534"
+    style.stroke: "#22c55e"
+    style.font-color: "#4ade80"
+    label: "SpectralMIPFinder (97) -> Phi\nConsciousnessEquationV2 (23)\nUnifiedPipeline (97)\nC(t) = sigma(...) x weights x S x rho x M x N x Soc"
+  }
+
+  quality: "Quality Gating\nAgreement + Coherence Velocity" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  homeostasis: "Homeostasis\nValence/Arousal Restoration" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  soul: "Soul Integration\nEight Harmonies Alignment" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  kosmic: "KosmicSong\nLife-Mind Coherence\n(every 50 cycles)" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+
+  consciousness -> monitors -> engine -> quality -> homeostasis -> soul -> kosmic
+}
+
+fb_result: FeedbackPhaseResult {
+  shape: page
+  style.fill: "#1e3a2e"
+  style.font-color: "#86efac"
+  label: "FbQuality | FbConsciousness\nFbReasoning | FbMemory\nFbEvolution | FbEthics"
+}
+
+# ═══════════════════════════════════════════
+# PHASE 4: OUTPUT (~2ms)
+# ═══════════════════════════════════════════
+output_phase: Phase 4 — OUTPUT {
+  style.fill: "#3a2e1e"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fcd34d"
+  style.border-radius: 8
+
+  assemble: "Assemble CycleResult" {
+    style.fill: "#78350f"
+    style.font-color: "#fcd34d"
+  }
+  metadata: "Build CycleMetadata\n(100+ telemetry fields)" {
+    style.fill: "#78350f"
+    style.font-color: "#fcd34d"
+  }
+  sign: "Identity Sign\n(optional)" {
+    style.fill: "#78350f"
+    style.font-color: "#fcd34d"
+  }
+
+  assemble -> metadata -> sign
+}
+
+cycle_result: CycleResult {
+  shape: parallelogram
+  style.fill: "#3a2e1e"
+  style.font-color: "#fcd34d"
+  label: "output (CfC vector) | prediction_error\nwisdom_hv (16,384D broadcast)\nthought_vector (32D viz)\nlanguage_output (Broca SSM)\nCycleMetadata (telemetry)"
+}
+
+# ═══════════════════════════════════════════
+# MAIN FLOW
+# ═══════════════════════════════════════════
+input -> perception
+perception -> perc_result
+perc_result -> dynamics
+dynamics -> dyn_result
+dyn_result -> feedback
+feedback -> fb_result
+fb_result -> output_phase
+output_phase -> cycle_result
+
+# Feedback loop
+cycle_result -> input: "next cycle\n(50Hz)" {
+  style.stroke: "#ef4444"
+  style.stroke-dash: 5
+  style.font-color: "#ef4444"
+}
+
+# ═══════════════════════════════════════════
+# SIDE SYSTEMS (connected to phases)
+# ═══════════════════════════════════════════
+urgency: Urgency Scheduling {
+  shape: hexagon
+  style.fill: "#7f1d1d"
+  style.font-color: "#fca5a5"
+  label: "Critical | Normal | Cruise\nControls subsystem frequency"
+}
+
+neuromod: Neuromodulator Bath {
+  shape: cylinder
+  style.fill: "#4a1942"
+  style.font-color: "#f0abfc"
+  label: "DA | NE | 5-HT | ACh | GABA\nGlutamate | Oxytocin\nAdenosine | Cortisol"
+}
+
+substrate: Substrate Manager {
+  shape: diamond
+  style.fill: "#1e1e3a"
+  style.font-color: "#a5b4fc"
+  label: "8 Substrates\nfeasibility x honest_confidence\ntau_factor | scale_pressure"
+}
+
+integrity: Integrity Framework {
+  shape: hexagon
+  style.fill: "#3a1e1e"
+  style.font-color: "#fca5a5"
+  label: "BLAKE3 Attestation\n6 canaries (co-prime)\nconfidence -> consciousness"
+}
+
+broca: Broca SSM {
+  shape: hexagon
+  style.fill: "#4a1942"
+  style.font-color: "#e9d5ff"
+  label: "Language Center\n(every 29 cycles)\nfeature: ssm_language"
+}
+
+perception.urgency -> urgency {style.stroke-dash: 3; style.stroke: "#fca5a5"}
+urgency -> dynamics.managers {style.stroke-dash: 3; style.stroke: "#fca5a5"}
+urgency -> feedback.monitors {style.stroke-dash: 3; style.stroke: "#fca5a5"}
+neuromod -> dynamics.emotion {style.stroke-dash: 3; style.stroke: "#f0abfc"}
+neuromod -> dynamics.training {style.stroke-dash: 3; style.stroke: "#f0abfc"}
+substrate -> feedback.engine {style.stroke-dash: 3; style.stroke: "#a5b4fc"}
+integrity -> feedback.engine: "integrity\nconfidence" {style.stroke-dash: 3; style.stroke: "#fca5a5"}
+broca -> dynamics.cfc: "language\nfeedback" {style.stroke-dash: 3; style.stroke: "#e9d5ff"}

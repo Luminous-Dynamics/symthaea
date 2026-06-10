@@ -1,0 +1,124 @@
+
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║         RAMANUJAN PROTOCOL — AUTOMATED PHYSICIST SHOWCASE        ║
+║                                                                  ║
+║  Tier 1A (Z3) + Tier 1B (Recognition) + Tier 1C (LaTeX) +        ║
+║  Tier 2A (Catalog) + Tier 2B (Reports) — end-to-end demo         ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Initializing physics catalog...
+Catalog loaded: 221 equations across all physics domains.
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Harmonic Oscillator                                              │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Discovering invariants ... 10 candidates
+  ⏵ Best:    ((x ^ 2) + (v ^ 2))
+  ⏵ Variance: 6.43e-23
+  ⏵ Status:   PROVEN ✓
+  ⏵ Match:    ↳ MATCHES 'Harmonic Oscillator Invariant' (100% similarity)
+    └ Harmonic Oscillator Invariant (ClassicalMechanics) score=1.000
+  ⏵ LaTeX:    $x^{2} + v^{2}$
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Lotka-Volterra Predator-Prey                                     │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Discovering invariants ... 10 candidates
+  ⏵ Best:    ((x - ln(x)) + (y - ln(y)))
+  ⏵ Variance: 6.51e-24
+  ⏵ Status:   PROVEN ✓
+  ⏵ Match:    ↳ MATCHES 'Lotka-Volterra Invariant' (100% similarity)
+    └ Lotka-Volterra Invariant (Biophysics) score=1.000
+  ⏵ LaTeX:    $x - \ln\left(x\right) + y - \ln\left(y\right)$
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Kepler Two-Body                                                  │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Discovering invariants ... 10 candidates
+  ⏵ Best:    ((x * vy) - (y * vx))
+  ⏵ Variance: 1.01e-28
+  ⏵ Status:   PROVEN ✓
+  ⏵ Match:    ↳ MATCHES 'Angular Momentum (2D Cartesian)' (100% similarity)
+    └ Angular Momentum (2D Cartesian) (ClassicalMechanics) score=1.000
+  ⏵ LaTeX:    $x vy - y vx$
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Hénon-Heiles Chaotic Hamiltonian                                 │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Discovering invariants ... 10 candidates
+  ⏵ Best:    ((((0.500000 * ((px ^ 2) + (py ^ 2))) + (0.500000 * ((x ^ 2) + (y ^ 2)))) + ((x ^ 2) * y)) + (-0.333333 * (y ^ 3)))
+  ⏵ Variance: 3.31e-26
+  ⏵ Status:   PROVEN ✓
+  ⏵ Match:    ↳ MATCHES 'Hénon-Heiles Hamiltonian' (100% similarity)
+    └ Hénon-Heiles Hamiltonian (ClassicalMechanics) score=1.000
+  ⏵ LaTeX:    $\frac{1}{2} \left(px^{2} + py^{2}\right) + \frac{1}{2} \left(x^{2} + y^{2}\right) + x^{2} y + -\frac{1}{3} y^{3}$
+
+╭──────────────────────────────────────────────────────────────────╮
+│ PCR3BP Jacobi Integral                                           │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Discovering invariants ... 1 candidates
+  ⏵ Best:    (cos((y / e)) ^ (x ^ 3))
+  ⏵ Variance: 2.75e-10
+  ⏵ Status:   Numerical
+  ⏵ Match:    ↳ MATCHES 'Boltzmann Distribution' (99% similarity)
+    └ Boltzmann Distribution (StatisticalMechanics) score=0.991
+  ⏵ LaTeX:    $\cos\left(\frac{y}{e}\right)^{x^{3}}$
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Coupled Anisotropic Oscillator (Mystery)                         │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Discovering invariants ... 10 candidates
+  ⏵ Best:    (((0.500000 * ((px ^ 2) + (py ^ 2))) + ((x ^ 2) + (y ^ 2))) + (x * y))
+  ⏵ Variance: 1.07e-22
+  ⏵ Status:   PROVEN ✓
+  ⏵ Match:    ↳ MATCHES 'Hénon-Heiles Hamiltonian' (100% similarity)
+    └ Hénon-Heiles Hamiltonian (ClassicalMechanics) score=0.998
+  ⏵ LaTeX:    $\frac{1}{2} \left(px^{2} + py^{2}\right) + x^{2} + y^{2} + x y$
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Triangular Numbers (sequence + Z3 formal verification)           │
+╰──────────────────────────────────────────────────────────────────╯
+  ⏵ Best:    ((n * (n + 1)) / 2)
+  ⏵ MSE:     0.00e0
+  ⏵ Status:  Z3 PROVEN (10 steps) ✓
+  ⏵ Match:   ↳ MATCHES 'Triangular Numbers' (100% similarity)
+  ⏵ LaTeX:   $\frac{n \left(n + 1\right)}{2}$
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║                  PAPER-READY LATEX TABLE                         ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+% ═════════════════════════════════════════════════════════════════════
+% AUTOMATED PHYSICIST — Ramanujan Protocol headline figure
+% Generated by symthaea-physics-bridge/examples/ramanujan_showcase.rs
+% Paste directly into papers/latex/ramanujan-protocol/main.tex
+% ═════════════════════════════════════════════════════════════════════
+\begin{table}[htbp]
+\centering
+\caption{Autonomous conservation-law discovery across canonical dynamical systems. Each row reports an invariant discovered with zero human guidance from the differential equations alone, the trajectory variance of the discovered quantity, the symbolic verification status (chain rule + Z3), and the closest match in the 221-equation physics catalog.}
+\label{tab:ramanujan_showcase}
+\begin{tabular}{lllll}
+\toprule
+System & Domain & Discovered Invariant & Verification & Catalog Match \\
+\midrule
+Harmonic Oscillator & Classical Mechanics & $x^{2} + v^{2}$ (var 6.4e-23) & \textbf{PROVEN} & ↳ MATCHES 'Harmonic Oscillator Invariant' (100\% similarity) \\
+Lotka-Volterra Predator-Prey & Ecology / Stat Mech & $x - \ln\left(x\right) + y - \ln\left(y\right)$ (var 6.5e-24) & \textbf{PROVEN} & ↳ MATCHES 'Lotka-Volterra Invariant' (100\% similarity) \\
+Kepler Two-Body & Orbital Mechanics & $x vy - y vx$ (var 1.0e-28) & \textbf{PROVEN} & ↳ MATCHES 'Angular Momentum (2D Cartesian)' (100\% similarity) \\
+Hénon-Heiles Chaotic Hamiltonian & Nonlinear Dynamics & $\frac{1}{2} \left(px^{2} + py^{2}\right) + \frac{1}{2} \left(x^{2} + y^{2}\right) + x^{2} y + -\frac{1}{3} y^{3}$ (var 3.3e-26) & \textbf{PROVEN} & ↳ MATCHES 'Hénon-Heiles Hamiltonian' (100\% similarity) \\
+PCR3BP Jacobi Integral & Celestial Mechanics (rotating frame) & $\cos\left(\frac{y}{e}\right)^{x^{3}}$ (var 2.7e-10) & Numeric & ↳ MATCHES 'Boltzmann Distribution' (99\% similarity) \\
+Coupled Anisotropic Oscillator (Mystery) & Designer-constructed stretch target & $\frac{1}{2} \left(px^{2} + py^{2}\right) + x^{2} + y^{2} + x y$ (var 1.1e-22) & \textbf{PROVEN} & ↳ MATCHES 'Hénon-Heiles Hamiltonian' (100\% similarity) \\
+Triangular Numbers & Combinatorics & $\frac{n \left(n + 1\right)}{2}$ — & — & ↳ MATCHES 'Triangular Numbers' (100\% similarity) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+──────────────────────────────────────────────────────────────────────
+ SHOWCASE COMPLETE: 7 problems, 7 catalog matches, all results above.
+──────────────────────────────────────────────────────────────────────

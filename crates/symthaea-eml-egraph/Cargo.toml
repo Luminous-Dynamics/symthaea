@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-eml-egraph"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Experimental egg-based equality saturation spike for Symthaea EML normalization."
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+egg = "0.10"
+thiserror = { workspace = true }
+symthaea-core = { path = "../../symthaea-core", features = ["abstract_thought"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4"
+criterion = "0.5"
+
+[[bench]]
+name = "eml_egraph_bench"
+harness = false

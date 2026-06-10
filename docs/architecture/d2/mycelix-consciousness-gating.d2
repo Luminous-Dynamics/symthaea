@@ -1,0 +1,236 @@
+# Mycelix Consciousness Gating — 4D Profile to 5-Tier Progression
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Mycelix Consciousness Gating Pipeline
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# 4D PROFILE INPUTS
+# ═══════════════════════════════════════════
+inputs: 4-Dimensional Consciousness Profile {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  identity: Identity (0.25 weight) {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    label: |md
+      MFA Assurance Level
+      Anonymous (0.0) → Basic (0.25)
+      Verified (0.5) → HighlyAssured (0.75)
+      Critical (1.0)
+    |
+  }
+
+  reputation: Reputation (0.25 weight) {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    label: |md
+      Cross-hApp History
+      30-day exponential decay
+      Multi-source weighted average
+    |
+  }
+
+  community: Community (0.30 weight) {
+    style.fill: "#312e81"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+    label: |md
+      Peer Trust Attestations
+      Weighted by attestor's own tier
+      (Higher-consciousness peers count more)
+    |
+  }
+
+  engagement: Engagement (0.20 weight) {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    label: |md
+      Domain-Specific Participation
+      Event/query counts, time-decayed
+    |
+  }
+}
+
+# ═══════════════════════════════════════════
+# COMBINED SCORE COMPUTATION
+# ═══════════════════════════════════════════
+formula: Combined Score {
+  shape: hexagon
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  label: |md
+    combined = identity x 0.25
+             + reputation x 0.25
+             + community x 0.30
+             + engagement x 0.20
+  |
+}
+
+inputs.identity -> formula
+inputs.reputation -> formula
+inputs.community -> formula
+inputs.engagement -> formula
+
+# ═══════════════════════════════════════════
+# 5-TIER PROGRESSION
+# ═══════════════════════════════════════════
+tiers: 5-Tier Consciousness Progression {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  observer: Observer {
+    style.fill: "#7f1d1d"
+    style.font-color: "#fca5a5"
+    label: |md
+      **Score < 0.3**
+      Read-only access
+      Vote weight: 0 bp
+    |
+  }
+
+  participant: Participant {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+    label: |md
+      **Score >= 0.3**
+      Basic proposals
+      Vote weight: 5,000 bp
+    |
+  }
+
+  citizen: Citizen {
+    style.fill: "#365314"
+    style.font-color: "#bef264"
+    label: |md
+      **Score >= 0.4**
+      Full voting rights
+      Vote weight: 7,500 bp
+    |
+  }
+
+  steward: Steward {
+    style.fill: "#164e63"
+    style.font-color: "#67e8f9"
+    label: |md
+      **Score >= 0.6**
+      Constitutional amendments
+      Vote weight: 10,000 bp
+    |
+  }
+
+  guardian: Guardian {
+    style.fill: "#312e81"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+    label: |md
+      **Score >= 0.8**
+      Emergency powers
+      Vote weight: 10,000 bp
+    |
+  }
+
+  observer -> participant: "grow" {style.stroke: "#f59e0b"}
+  participant -> citizen: "grow" {style.stroke: "#84cc16"}
+  citizen -> steward: "grow" {style.stroke: "#06b6d4"}
+  steward -> guardian: "grow" {style.stroke: "#818cf8"}
+}
+
+formula -> tiers
+
+# ═══════════════════════════════════════════
+# CONSCIOUSNESS CREDENTIAL
+# ═══════════════════════════════════════════
+credential: ConsciousnessCredential {
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+  label: |md
+    **Time-Limited Credential**
+    TTL: 24 hours
+    Grace period: 30 min (Participant-tier ops)
+    Refresh window: 2 hours before expiry
+    **Bootstrap**: first 5 agents, identity >= 0.25, 1h TTL
+  |
+}
+
+tiers -> credential: "issue" {style.stroke: "#22c55e"; style.stroke-width: 2}
+
+# ═══════════════════════════════════════════
+# GOVERNANCE GATES
+# ═══════════════════════════════════════════
+gates: Governance Action Gates {
+  style.fill: "#1e1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  basic: "Basic Gate (0.2)\nRead / Query" {
+    style.fill: "#3b0764"
+    style.font-color: "#e9d5ff"
+  }
+  proposal: "Proposal Gate (0.3)\nSubmit Actions" {
+    style.fill: "#3b0764"
+    style.font-color: "#e9d5ff"
+  }
+  voting: "Voting Gate (0.4)\nCast Votes" {
+    style.fill: "#3b0764"
+    style.font-color: "#e9d5ff"
+  }
+  constitutional: "Constitutional Gate (0.6)\nCharter Amendments" {
+    style.fill: "#3b0764"
+    style.font-color: "#e9d5ff"
+  }
+}
+
+credential -> gates: "validate" {style.stroke: "#a855f7"; style.stroke-width: 2}
+
+# ═══════════════════════════════════════════
+# COLLECTIVE PHI
+# ═══════════════════════════════════════════
+collective: Collective Phi (Group Consciousness) {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+  label: |md
+    **6D Agent Vector**: consciousness_level, meta_awareness,
+    coherence, care_activation, harmonic_alignment, epistemic_confidence
+    **Formula**: collective_phi = mean_individual_phi x inter_agent_coherence
+    **Fragile Consensus**: vote_ratio > 0.7 BUT collective_phi < 0.3
+  |
+}
+
+credential -> collective: "agent vectors" {style.stroke: "#22c55e"; style.stroke-dash: 3}
+collective -> gates: "fragile consensus\ndetection" {style.stroke: "#ef4444"; style.stroke-dash: 5}
+
+# ═══════════════════════════════════════════
+# FL (BYZANTINE) THRESHOLDS
+# ═══════════════════════════════════════════
+fl: Federated Learning Gates {
+  style.fill: "#3a1e1e"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+  style.border-radius: 8
+  label: |md
+    **fl_veto** (0.1): exclude gradient entirely
+    **fl_dampen** (0.3): weight x 0.3
+    **fl_boost** (0.6): weight x 1.5
+  |
+}
+
+credential -> fl: "FL gating" {style.stroke: "#f87171"; style.stroke-dash: 3}

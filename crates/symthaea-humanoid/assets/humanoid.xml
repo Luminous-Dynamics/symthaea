@@ -1,0 +1,164 @@
+<mujoco model="humanoid">
+  <compiler angle="degree" inertiafromgeom="true"/>
+  <option timestep="0.025" integrator="RK4">
+    <flag contact="enable"/>
+  </option>
+
+  <default>
+    <joint armature="1" damping="1" limited="true"/>
+    <geom conaffinity="0" condim="3" contype="1" margin="0.001" material="polished_white"/>
+    <position ctrllimited="true" ctrlrange="-3.14 3.14"/>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.1 0.12 0.16" rgb2="0.02 0.02 0.03" width="512" height="512"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.12 0.12 0.14" rgb2="0.18 0.18 0.20" width="512" height="512" mark="edge" markrgb="0.25 0.25 0.3"/>
+    
+    <material name="floor_mat" texture="grid" texrepeat="4 4" texuniform="true" reflectance="0.22" shininess="0.4"/>
+    <material name="polished_white" rgba="0.95 0.95 0.98 1" shininess="0.8" specular="0.7"/>
+    <material name="carbon_black" rgba="0.15 0.15 0.17 1" shininess="0.3" specular="0.3"/>
+    <material name="gold_chrome" rgba="0.88 0.68 0.22 1" shininess="0.95" specular="1.0"/>
+  </asset>
+
+  <worldbody>
+    <light mode="targetbodycom" target="torso" directional="false" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" pos="1 -4 4" dir="-0.2 0.8 -1" castshadow="true"/>
+    <light mode="targetbodycom" target="torso" directional="false" diffuse="0.4 0.4 0.4" pos="-2 4 3" dir="0.5 -0.7 -1" castshadow="false"/>
+    <light directional="true" diffuse="0.2 0.2 0.25" pos="0 0 5" dir="0 0 -1" castshadow="false"/>
+
+    <geom conaffinity="1" condim="3" name="floor" pos="0 0 0" type="plane" size="40 40 40" material="floor_mat" contype="0"/>
+
+    <geom name="stair_1" type="box" pos="1.5 0.0 0.02" size="0.25 1.5 0.02" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_2" type="box" pos="2.0 0.0 0.04" size="0.25 1.5 0.04" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_3" type="box" pos="2.5 0.0 0.06" size="0.25 1.5 0.06" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_4" type="box" pos="3.0 0.0 0.08" size="0.25 1.5 0.08" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_5" type="box" pos="3.5 0.0 0.10" size="0.25 1.5 0.10" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_6" type="box" pos="4.0 0.0 0.12" size="0.25 1.5 0.12" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_7" type="box" pos="4.5 0.0 0.14" size="0.25 1.5 0.14" material="carbon_black" conaffinity="1"/>
+    <geom name="stair_8" type="box" pos="5.0 0.0 0.16" size="0.25 1.5 0.16" material="carbon_black" conaffinity="1"/>
+
+    <body name="torso" pos="0 0 1.4">
+      <camera name="track" mode="trackcom" pos="0 -3.2 0.2" xyaxes="1 0 0 0 0.1 1"/>
+      <freejoint name="root"/>
+
+      <geom fromto="0 -0.07 0 0 0.07 0" name="torso1" size="0.07" type="capsule" material="polished_white"/>
+      <geom fromto="0 0 0.02 0 0 -0.24" name="spine_structural_column" size="0.045" type="capsule" material="carbon_black"/>
+      <geom fromto="-0.01 -0.06 -0.12 -0.01 0.06 -0.12" name="uwaist" size="0.06" type="capsule" material="polished_white"/>
+
+      <body name="head" pos="0 0 0.19">
+        <geom name="head" size="0.09" type="sphere" material="gold_chrome"/>
+      </body>
+
+      <body name="right_upper_arm" pos="0 -0.17 0.06">
+        <joint axis="2 1 1" name="right_shoulder1" pos="0 0 0" range="-85 60" stiffness="100" type="hinge"/>
+        <joint axis="0 -1 1" name="right_shoulder2" pos="0 0 0" range="-85 60" stiffness="100" type="hinge"/>
+        <geom type="sphere" size="0.042" material="gold_chrome"/>
+        <geom fromto="0 0 0 0.16 -0.16 -0.16" name="right_uarm1" size="0.04" type="capsule" material="polished_white"/>
+
+        <body name="right_lower_arm" pos="0.18 -0.18 -0.18">
+          <joint axis="0 -1 1" name="right_elbow" pos="0 0 0" range="-90 50" stiffness="80" type="hinge"/>
+          <geom type="sphere" size="0.033" material="gold_chrome"/>
+          <geom fromto="0.01 0.01 0.01 0.17 0.17 0.17" name="right_larm" size="0.031" type="capsule" material="carbon_black"/>
+
+          <body name="right_hand" pos="0.18 0.18 0.18">
+            <geom name="right_hand" size="0.04" type="sphere" material="gold_chrome"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="left_upper_arm" pos="0 0.17 0.06">
+        <joint axis="2 -1 1" name="left_shoulder1" pos="0 0 0" range="-60 85" stiffness="100" type="hinge"/>
+        <joint axis="0 1 1" name="left_shoulder2" pos="0 0 0" range="-60 85" stiffness="100" type="hinge"/>
+        <geom type="sphere" size="0.042" material="gold_chrome"/>
+        <geom fromto="0 0 0 0.16 0.16 -0.16" name="left_uarm1" size="0.04" type="capsule" material="polished_white"/>
+
+        <body name="left_lower_arm" pos="0.18 0.18 -0.18">
+          <joint axis="0 -1 -1" name="left_elbow" pos="0 0 0" range="-90 50" stiffness="80" type="hinge"/>
+          <geom type="sphere" size="0.033" material="gold_chrome"/>
+          <geom fromto="0.01 -0.01 0.01 0.17 -0.17 0.17" name="left_larm" size="0.031" type="capsule" material="carbon_black"/>
+
+          <body name="left_hand" pos="0.18 -0.18 0.18">
+            <geom name="left_hand" size="0.04" type="sphere" material="gold_chrome"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="lwaist" pos="-0.01 0 -0.26">
+        <geom fromto="0 -0.06 0 0 0.06 0" name="lwaist" size="0.06" type="capsule" material="carbon_black"/>
+        <joint axis="0 0 1" name="abdomen_z" pos="0 0 0.065" range="-45 45" stiffness="500" type="hinge"/>
+        <joint axis="0 1 0" name="abdomen_y" pos="0 0 0.065" range="-75 30" stiffness="500" type="hinge"/>
+
+        <body name="pelvis" pos="0 0 -0.165">
+          <joint axis="1 0 0" name="abdomen_x" pos="0 0 0.1" range="-35 35" stiffness="500" type="hinge"/>
+          <geom fromto="-0.02 -0.07 0 -0.02 0.07 0" name="butt" size="0.09" type="capsule" material="polished_white"/>
+
+          <body name="right_thigh" pos="0 -0.1 -0.04">
+            <joint axis="-1 0 0" name="right_hip_x" pos="0 0 0" range="-25 5" stiffness="250" type="hinge"/>
+            <joint axis="0 0 -1" name="right_hip_z" pos="0 0 0" range="-60 35" stiffness="250" type="hinge"/>
+            <joint axis="0 1 0" name="right_hip_y" pos="0 0 0" range="-110 20" stiffness="350" type="hinge"/>
+            <geom type="sphere" size="0.062" material="gold_chrome"/>
+            <geom fromto="0 0 0 0 0.01 -0.34" name="right_thigh1" size="0.06" type="capsule" material="polished_white"/>
+
+            <body name="right_shin" pos="0 0.01 -0.403">
+              <joint axis="0 -1 0" name="right_knee" pos="0 0 0.02" range="-160 2" stiffness="300" type="hinge"/>
+              <geom type="sphere" size="0.051" pos="0 0 0.02" material="gold_chrome"/>
+              <geom fromto="0 0 0 0 0 -0.3" name="right_shin1" size="0.049" type="capsule" material="carbon_black"/>
+
+              <body name="right_foot" pos="0 0 -0.35">
+                <joint axis="1 0 0.5" name="right_ankle_x" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
+                <joint axis="0 1 0" name="right_ankle_y" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
+                <geom type="sphere" size="0.03" pos="0 0 0.1" material="gold_chrome"/>
+                <geom name="right_foot" type="box" pos="0.04 -0.015 -0.01" size="0.10 0.05 0.015" material="polished_white"/>
+              </body>
+            </body>
+          </body>
+
+          <body name="left_thigh" pos="0 0.1 -0.04">
+            <joint axis="-1 0 0" name="left_hip_x" pos="0 0 0" range="-25 5" stiffness="250" type="hinge"/>
+            <joint axis="0 0 1" name="left_hip_z" pos="0 0 0" range="-60 35" stiffness="250" type="hinge"/>
+            <joint axis="0 1 0" name="left_hip_y" pos="0 0 0" range="-110 20" stiffness="350" type="hinge"/>
+            <geom type="sphere" size="0.062" material="gold_chrome"/>
+            <geom fromto="0 0 0 0 -0.01 -0.34" name="left_thigh1" size="0.06" type="capsule" material="polished_white"/>
+
+            <body name="left_shin" pos="0 -0.01 -0.403">
+              <joint axis="0 -1 0" name="left_knee" pos="0 0 0.02" range="-160 2" stiffness="300" type="hinge"/>
+              <geom type="sphere" size="0.051" pos="0 0 0.02" material="gold_chrome"/>
+              <geom fromto="0 0 0 0 0 -0.3" name="left_shin1" size="0.049" type="capsule" material="carbon_black"/>
+
+              <body name="left_foot" pos="0 0 -0.35">
+                <joint axis="1 0 0.5" name="left_ankle_x" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
+                <joint axis="0 1 0" name="left_ankle_y" pos="0 0 0.1" range="-50 50" stiffness="200" type="hinge"/>
+                <geom type="sphere" size="0.03" pos="0 0 0.1" material="gold_chrome"/>
+                <geom name="left_foot" type="box" pos="0.04 0.015 -0.01" size="0.10 0.05 0.015" material="polished_white"/>
+              </body>
+            </body>
+          </body>
+
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position joint="abdomen_y" name="abdomen_y" kp="200"/>
+    <position joint="abdomen_z" name="abdomen_z" kp="200"/>
+    <position joint="abdomen_x" name="abdomen_x" kp="200"/>
+    <position joint="right_hip_x" name="right_hip_x" kp="250"/>
+    <position joint="right_hip_z" name="right_hip_z" kp="250"/>
+    <position joint="right_hip_y" name="right_hip_y" kp="350"/>
+    <position joint="right_knee" name="right_knee" kp="300"/>
+    <position joint="right_ankle_x" name="right_ankle_x" kp="150"/>
+    <position joint="right_ankle_y" name="right_ankle_y" kp="150"/>
+    <position joint="left_hip_x" name="left_hip_x" kp="250"/>
+    <position joint="left_hip_z" name="left_hip_z" kp="250"/>
+    <position joint="left_hip_y" name="left_hip_y" kp="350"/>
+    <position joint="left_knee" name="left_knee" kp="300"/>
+    <position joint="left_ankle_x" name="left_ankle_x" kp="150"/>
+    <position joint="left_ankle_y" name="left_ankle_y" kp="150"/>
+    <position joint="right_shoulder1" name="right_shoulder1" kp="60"/>
+    <position joint="right_shoulder2" name="right_shoulder2" kp="60"/>
+    <position joint="right_elbow" name="right_elbow" kp="50"/>
+    <position joint="left_shoulder1" name="left_shoulder1" kp="60"/>
+    <position joint="left_shoulder2" name="left_shoulder2" kp="60"/>
+    <position joint="left_elbow" name="left_elbow" kp="50"/>
+  </actuator>
+</mujoco>

@@ -1,0 +1,16 @@
+{
+  "num_utterances": 100,
+  "total_audio_seconds": 652.53973,
+  "total_inference_seconds": 45.862045,
+  "rtf": 0.07028238,
+  "wer": 473.4394,
+  "per": 98.90585,
+  "word_correct": 0,
+  "word_substitutions": 1634,
+  "word_insertions": 6102,
+  "word_deletions": 0,
+  "phoneme_correct": 526,
+  "phoneme_substitutions": 6770,
+  "phoneme_insertions": 440,
+  "phoneme_deletions": 564
+}

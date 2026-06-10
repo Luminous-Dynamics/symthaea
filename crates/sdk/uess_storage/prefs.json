@@ -1,0 +1,21 @@
+{
+  "key": "prefs",
+  "data": "test_value",
+  "classification": {
+    "empirical": "E1Testimonial",
+    "normative": "N0Personal",
+    "materiality": "M1Temporal"
+  },
+  "schema": {
+    "id": "demo",
+    "version": "1.0",
+    "family": null
+  },
+  "stored_at": 1772969668259,
+  "modified_at": null,
+  "created_by": "demo-agent-001",
+  "expires_at": 1773574468259,
+  "cid": "3af27b8ddf7715fc415c56ce347a4224",
+  "version": 37,
+  "size_bytes": 12
+}

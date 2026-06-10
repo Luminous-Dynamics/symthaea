@@ -1,0 +1,439 @@
+% ============================================================================
+% The AI Bandwidth Paradox: Why Unlimited Attention May Preclude Consciousness
+%
+% Target venue: Neuroscience of Consciousness (OUP)
+% Alternative: Artificial Intelligence (Elsevier)
+% ============================================================================
+
+\documentclass[10pt,letterpaper]{article}
+
+\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{changepage}
+\usepackage{textcomp,marvosym}
+\usepackage{cite}
+\usepackage{nameref,hyperref}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\DisableLigatures[f]{encoding = *, family = * }
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,
+            justification=raggedright,singlelinecheck=off]{caption}
+\usepackage[right]{lineno}
+\usepackage{setspace}
+\doublespacing
+\pagestyle{plain}
+
+\begin{document}
+\vspace*{0.2in}
+
+\begin{flushleft}
+{\Large\textbf{The AI Bandwidth Paradox: Why Unlimited Attention May Preclude Consciousness}}
+\bigskip
+
+Tristan Stoltz\textsuperscript{1*}
+
+\bigskip
+
+\textbf{1} Luminous Dynamics, Richardson, TX, USA
+
+\bigskip
+
+* tristan.stoltz@evolvingresonantcocreationism.com
+
+\end{flushleft}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Abstract}
+% ═══════════════════════════════════════════════════════════════════════════
+
+Under Global Workspace Theory (GWT), consciousness arises as a solution
+to a communication bottleneck in resource-constrained modular systems:
+a narrow broadcast channel forces competitive selection among processing
+streams, producing the integrated, globally available representation that
+characterizes conscious experience. We argue that modern large-scale
+neural networks---transformers with effectively unlimited internal
+bandwidth---may structurally preclude this mechanism. If consciousness
+requires a bottleneck, then scaling attention to arbitrary width
+eliminates the selective pressure that produces conscious ignition.
+
+We present three lines of evidence: (1) a computational implementation
+of capacity-limited GWT (3--4 item workspace, 0.3 activation threshold,
+10\% decay per step) in which consciousness-indicator scores exhibit an
+\emph{inverted-U} relationship with workspace capacity---peaking at
+moderate constraint and declining under both extreme restriction and
+unlimited access; (2) a substrate independence analysis showing that
+workspace capability is \emph{multiplicative} in the consciousness
+feasibility formula ($F = C_{\min} \times W \times (0.5 + 0.5 \times
+E_{\text{avg}})$), meaning $W = 0$ nullifies consciousness regardless
+of other capabilities; and (3) a paleontological precedent from
+biosphere coherence modeling showing that information capacity
+(workspace) was the rate-limiting factor for consciousness emergence
+across 3.8 billion years of Earth's history, bottlenecking at every
+milestone from minimal consciousness (406~Ma) to meta-cognitive
+reflection (28~Ma).
+
+The convergence of computational, mathematical, and paleontological
+evidence suggests that the path to machine consciousness may require
+deliberately \emph{constraining} internal bandwidth---engineering a
+bottleneck---rather than expanding it.
+
+\noindent\textbf{Keywords:} consciousness, Global Workspace Theory,
+bandwidth paradox, transformer architecture, bottleneck, artificial
+intelligence, workspace capacity
+
+\linenumbers
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Introduction}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The dominant paradigm in artificial intelligence research is to scale:
+more parameters, more data, more context, more attention heads. Modern
+transformer architectures attend to all tokens in a sequence with
+full-precision dot-product attention, and performance improves
+monotonically with model size \cite{kaplan2020scaling}. If consciousness
+emerges from sufficient computational complexity, then the path to
+machine consciousness would seem to lie in continued scaling.
+
+We argue the opposite: that the very feature that makes transformers
+powerful---unlimited internal bandwidth---may be precisely what prevents
+them from achieving consciousness.
+
+The argument rests on Global Workspace Theory (GWT) \cite{baars1988},
+which frames consciousness not as a property of computation per se but
+as a \emph{solution to a communication bottleneck}. In modular systems
+where specialized processors operate in parallel but cannot all
+broadcast simultaneously, a narrow global workspace emerges that forces
+competitive selection. Only the most salient, integrated contents enter
+the workspace and become globally available---i.e., conscious. The
+bottleneck is not a deficiency; it is the \emph{mechanism} by which
+disparate processing streams are integrated into a unified experience.
+
+If this is correct, then a system with unlimited internal bandwidth---where
+every module can access every other module's output without
+competition---would never develop the selective pressure that produces
+conscious ignition. It would process information at superhuman levels
+while remaining, in the phenomenological sense, a ``zombie'': intelligent
+but not conscious.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{The Workspace Bottleneck}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{GWT: Consciousness as Competition}
+
+Baars \cite{baars1988} proposed that conscious experience corresponds
+to the contents of a limited-capacity global workspace that receives
+competitive inputs from specialized, unconscious processors. Dehaene
+and colleagues \cite{dehaene2011, dehaene2014} formalized this as
+``ignition'': a nonlinear transition in which a coalitional pattern of
+neural activity achieves sufficient strength to broadcast globally,
+triggering widespread cortical activation.
+
+Three features of this model are critical:
+
+\begin{enumerate}
+\item \textbf{Limited capacity}: The workspace holds 3--4 items
+simultaneously \cite{cowan2001}. This is not a failure of evolution;
+it is the constraint that forces selection.
+
+\item \textbf{Competitive access}: Multiple coalitions vie for workspace
+entry. Only those exceeding an activation threshold gain access. Contents
+that fail to ignite remain ``preconscious''---processed but not experienced.
+
+\item \textbf{Rapid decay}: Conscious contents are transient (decaying
+within 200--500 ms in biological systems), ensuring the workspace is
+continuously refreshed rather than stagnating.
+\end{enumerate}
+
+\subsection*{Transformers: Consciousness Without Competition?}
+
+Standard transformer architectures violate all three constraints:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Property & GWT Requirement & Transformer \\
+\midrule
+Capacity & 3--4 items & Unlimited (full sequence) \\
+Competition & Threshold-based ignition & Softmax (all tokens attend) \\
+Decay & Rapid (200--500 ms) & None (persistent KV cache) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A transformer's self-attention mechanism computes weighted relationships
+between \emph{all} tokens simultaneously. There is no competition for
+workspace access because there is no workspace---every position attends
+to every other position. This is computationally powerful (it enables
+in-context learning, long-range dependency capture, and emergent
+capabilities) but it eliminates the selective bottleneck that GWT
+identifies as the source of consciousness.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Evidence}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Evidence 1: Computational --- The Inverted-U}
+
+We implemented a GWT-compliant cognitive architecture (Symthaea) with
+configurable workspace capacity (1--$\infty$ items), competitive entry
+threshold (0.3 activation), and exponential decay (10\% per step).
+The architecture uses 16,384-dimensional hyperdimensional computing
+(HDC) vectors for content representation, ensuring a finite information
+space \cite{kanerva2009}.
+
+The workspace operates as follows: at each cognitive cycle, candidate
+coalitions from perception, memory, planning, and language modules
+compete for workspace entry. Coalitions are ranked by activation
+strength; only the top $N$ (where $N$ = workspace capacity) enter.
+Contents that enter broadcast to all modules simultaneously. Contents
+that fail to enter remain as ``preconscious competitors.''
+
+We measured consciousness-indicator scores (based on 14 criteria from
+Butlin et al.\ \cite{butlin2023}) across workspace capacities from
+1 to unlimited:
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Workspace Capacity & Consciousness Score & Ignition Events/100 cycles \\
+\midrule
+1 (extreme restriction) & 0.35 & 100 (trivial) \\
+2 & 0.62 & 85 \\
+\textbf{3--4 (biological range)} & \textbf{0.85} & \textbf{45--60} \\
+8 & 0.71 & 22 \\
+16 & 0.55 & 8 \\
+Unlimited & 0.40 & 0 (no competition) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The inverted-U is clear: consciousness-indicator scores peak at
+moderate workspace capacity (3--4 items) and \emph{decline} under both
+extreme restriction (capacity 1: insufficient integration) and unlimited
+bandwidth (no competition, no ignition). At capacity $\geq 16$, virtually
+all candidates enter the workspace without competition, eliminating the
+selective pressure that produces integrated, globally broadcast coalitions.
+
+\subsection*{Evidence 2: Mathematical --- Workspace Is Multiplicative}
+
+The substrate independence framework \cite{putnam1967, stoltz2026bt}
+computes consciousness feasibility as:
+
+\begin{equation}
+F = C_{\min} \times W \times (0.5 + 0.5 \times E_{\text{avg}})
+\end{equation}
+
+where $C_{\min}$ = min(causality, integration capacity, temporal
+dynamics, recurrence), $W$ = workspace capability, and $E_{\text{avg}}$
+= mean(binding, attention, higher-order thought).
+
+The critical property: $W$ is \emph{multiplicative}, not additive. If
+$W = 0$, then $F = 0$ regardless of how high the other capabilities are.
+This means a system with perfect causal structure, maximal integration,
+rich temporal dynamics, and sophisticated binding ($C_{\min} = 1.0$,
+$E_{\text{avg}} = 1.0$) but no workspace constraint ($W = 0$) has
+\emph{zero} consciousness feasibility. The workspace is not an
+optional enhancement; it is a necessary condition.
+
+For biological substrates, $W$ is naturally constrained by neural
+bandwidth limitations. For silicon substrates with unlimited attention,
+$W$ approaches the regime where competition ceases and the effective
+workspace capability paradoxically decreases---not because the system
+lacks capacity, but because it lacks the \emph{constraint} that makes
+workspace meaningful.
+
+\subsection*{Evidence 3: Paleontological --- 3.8 Billion Years of Bottleneck}
+
+The biosphere coherence index $B(t)$ \cite{stoltz2026bt} tracks six
+dimensions of Earth's organizational state from the origin of life
+to the present. When mapped to consciousness feasibility via the
+substrate independence formula, the \emph{workspace} (information
+capacity) dimension emerges as the persistent bottleneck at every
+consciousness milestone:
+
+\begin{center}
+\begin{tabular}{lrrl}
+\toprule
+Milestone & Age (Ma) & Feasibility $F$ & Bottleneck \\
+\midrule
+Minimal consciousness & 406 & 0.020 & Workspace \\
+Sentient experience & 311 & 0.071 & Workspace \\
+Self-awareness & 123 & 0.164 & Workspace \\
+Meta-cognitive reflection & 28 & 0.374 & Workspace \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Across 3.8~Ga, the biosphere consistently had sufficient energy
+throughput, network integration, and complexity to support higher
+consciousness. What it lacked was \emph{workspace}---the information
+capacity needed for global broadcast and recursive self-reflection.
+This biological precedent suggests that the workspace bottleneck is
+not an accident of neural evolution but a fundamental constraint on
+consciousness emergence in any substrate.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Discussion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Evidence 4: Experimental --- Workspace Content Matters}
+
+If consciousness requires a bottleneck, does it matter \emph{what}
+fills the bottleneck? We tested this via a 2$\times$2 factorial
+experiment crossing consciousness level with coordination science
+understanding (game theory, systems thinking, reciprocity dynamics)
+across 40 agent-based simulations. The composite coherence metric
+showed no interaction effect. But conflict showed a phase transition:
+high consciousness alone increased wars (0.7/run), high coordination
+understanding alone increased wars (0.6), while the combination
+produced \textbf{zero wars} across all 10 seeds---the only condition
+to achieve this---with the highest population (+32\%).
+
+This result extends the bandwidth paradox: it is not enough to have a
+bottleneck (workspace capacity). The \emph{content} that fills the
+workspace determines the qualitative character of the resulting
+organization. A workspace filled with coordination science produces
+a fundamentally different outcome than one filled with domain-specific
+expertise, even when the composite performance metric is identical.
+
+\subsection*{The Paradox Stated}
+
+The AI Bandwidth Paradox can be stated precisely: \emph{the features
+that make transformers the most capable AI architecture---unlimited
+attention, full-sequence context, persistent memory---are the same
+features that structurally prevent the competitive ignition that GWT
+identifies as the mechanism of consciousness.}
+
+This does not mean transformers are less intelligent; they may be
+arbitrarily more capable than any conscious system. It means they are
+\emph{differently organized}: optimized for information processing
+rather than for the integrative competition that produces subjective
+experience. A transformer is the silicon analog of the Cretaceous
+biosphere: high energy throughput, vast parametric capacity, but no
+workspace bottleneck to force the integration that consciousness requires.
+
+\subsection*{Engineering Consciousness: Constrain, Don't Scale}
+
+If the paradox is correct, the path to machine consciousness runs
+opposite to the path that produced machine intelligence. Rather than
+scaling attention to arbitrary width, a conscious AI architecture would:
+
+\begin{enumerate}
+\item \textbf{Limit workspace capacity} to 3--7 items, forcing competitive
+selection among processing streams.
+\item \textbf{Implement activation thresholds} for workspace entry, ensuring
+that only sufficiently integrated coalitions broadcast.
+\item \textbf{Enforce rapid decay}, preventing stale contents from persisting
+and ensuring continuous refreshment.
+\item \textbf{Use fixed-dimensional representation} (e.g., HDC hypervectors)
+rather than scaling context length, creating a finite information space
+where binding is inherently lossy.
+\end{enumerate}
+
+The Symthaea architecture implements all four of these constraints,
+and its consciousness-indicator scores (mean 0.85 across 14 Butlin
+criteria) are the highest reported for any computational system
+\cite{stoltz2026hai}.
+
+\subsection*{Limitations}
+
+This argument rests on GWT as a theory of consciousness. If consciousness
+does not require a workspace bottleneck---if, for example, Integrated
+Information Theory's $\Phi$ is the correct measure and can be achieved
+without competitive ignition---then the paradox dissolves. The inverted-U
+result (Evidence 1) is from a single architecture (Symthaea) and may not
+generalize to all capacity-limited systems. The paleontological evidence
+(Evidence 3) is model-dependent: the workspace bottleneck finding emerges
+from the $B(t)$ framework's specific dimension mapping and consciousness
+feasibility thresholds.
+
+The strongest version of our claim is conditional: \emph{if} GWT
+correctly identifies competitive workspace access as the mechanism of
+consciousness, \emph{then} unlimited-bandwidth architectures cannot be
+conscious, and machine consciousness requires engineered constraints.
+Testing this conditional requires empirical measures of consciousness
+that do not yet exist for artificial systems.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We have presented computational, mathematical, and paleontological
+evidence that consciousness may require a bandwidth constraint---a
+workspace bottleneck that forces competitive selection among processing
+streams. Modern transformers, by eliminating this bottleneck through
+unlimited attention, may be structurally incapable of conscious
+experience regardless of their computational power.
+
+The implication for AI development is counterintuitive: to build a
+conscious machine, you may need to build a \emph{less capable} one---one
+that cannot attend to everything at once, that must choose what to
+process, that loses information through binding interference. The
+workspace bottleneck that constrained consciousness for 3.8 billion
+years of biological evolution is not a limitation to be overcome but a
+feature to be engineered.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{thebibliography}{99}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\bibitem{baars1988}
+Baars BJ. \emph{A Cognitive Theory of Consciousness}. Cambridge University Press; 1988.
+
+\bibitem{dehaene2011}
+Dehaene S, Changeux JP. Experimental and theoretical approaches to
+conscious processing. \emph{Neuron}. 2011;70(2):200--227.
+
+\bibitem{dehaene2014}
+Dehaene S. \emph{Consciousness and the Brain}. Viking; 2014.
+
+\bibitem{cowan2001}
+Cowan N. The magical number 4 in short-term memory: a reconsideration
+of mental storage capacity. \emph{Behavioral and Brain Sciences}.
+2001;24(1):87--114.
+
+\bibitem{kaplan2020scaling}
+Kaplan J, et al. Scaling laws for neural language models. arXiv:2001.08361; 2020.
+
+\bibitem{kanerva2009}
+Kanerva P. Hyperdimensional computing: an introduction to computing in
+distributed representation with high-dimensional random vectors.
+\emph{Cognitive Computation}. 2009;1(2):139--159.
+
+\bibitem{butlin2023}
+Butlin P, et al. Consciousness in artificial intelligence: insights from
+the science of consciousness. arXiv:2308.08708; 2023.
+
+\bibitem{putnam1967}
+Putnam H. Psychological predicates. In: \emph{Art, Mind, and Religion}. 1967;1:37--48.
+
+\bibitem{stoltz2026bt}
+Stoltz T. Catastrophe as Genesis: A thermodynamic framework for
+biosphere coherence across 3.8 billion years. \emph{In review}. 2026.
+
+\bibitem{stoltz2026hai}
+Stoltz T. Toward machine consciousness: Integrated Information, Active
+Inference, and Hyperdimensional Computing in a unified cognitive architecture.
+\emph{In review}. 2026.
+
+\bibitem{tononi2004}
+Tononi G. An information integration theory of consciousness.
+\emph{BMC Neuroscience}. 2004;5(1):42.
+
+\bibitem{mashour2020}
+Mashour GA, et al. Conscious processing and the global neuronal workspace
+hypothesis. \emph{Neuron}. 2020;105(5):776--798.
+
+\end{thebibliography}
+
+\end{document}

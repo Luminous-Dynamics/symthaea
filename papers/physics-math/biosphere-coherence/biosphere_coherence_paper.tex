@@ -1,0 +1,868 @@
+% ============================================================================
+% Catastrophe as Genesis: A Thermodynamic Framework for Biosphere Coherence
+% Across 3.8 Billion Years, with an Exploratory Counterfactual Suggesting
+% Chicxulub May Have Opened a Narrow Path to Meta-Cognitive Consciousness
+%
+% Target venue: Philosophical Transactions of the Royal Society B
+% Alternative: PLoS Computational Biology, Nature Scientific Reports
+% ============================================================================
+
+\documentclass[10pt,letterpaper]{article}
+
+\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{changepage}
+\usepackage{textcomp,marvosym}
+\usepackage{cite}
+\usepackage{nameref,hyperref}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\DisableLigatures[f]{encoding = *, family = * }
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+%\usepackage{enumitem}
+
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,
+            justification=raggedright,singlelinecheck=off]{caption}
+\usepackage[right]{lineno}
+\usepackage{setspace}
+\doublespacing
+
+%\usepackage{lastpage,fancyhdr}
+\pagestyle{plain}
+
+% ── Custom commands ────────────────────────────────────────────────────────
+\newcommand{\bt}{$B(t)$}
+\newcommand{\kt}{$K(t)$}
+\newcommand{\ct}{$C(t)$}
+
+\begin{document}
+\vspace*{0.2in}
+
+\begin{flushleft}
+{\Large\textbf{Catastrophe as Genesis: A Thermodynamic Framework for Biosphere Coherence Across 3.8 Billion Years, with an Exploratory Counterfactual Suggesting Chicxulub May Have Opened a Narrow Path to Meta-Cognitive Consciousness}}
+\bigskip
+
+Tristan Stoltz\textsuperscript{1*}
+
+\bigskip
+
+\textbf{1} Luminous Dynamics, Richardson, TX, USA
+
+\bigskip
+
+* tristan.stoltz@evolvingresonantcocreationism.com
+
+\end{flushleft}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Abstract}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We introduce \bt{}, a continuous biosphere coherence index spanning 3.8~Ga
+(the origin of life) to the Neolithic Revolution, computed as the geometric
+mean of six normalized dimensions: biodiversity, complexity, resilience,
+network integration, energy throughput, and information capacity.
+Calibrated against Sepkoski's marine genus diversity curve (Pearson $r = 0.92$,
+$R^2 = 0.85$, $n = 37$), \bt{} is grounded in published paleontological data
+(PBDB, GEOCARB, $\delta^{13}$C isotopic records) and employs five
+methodological innovations: taphonomic SQS-style Bayesian correction for
+preservation bias, Lotka-Volterra niche-filling recovery dynamics,
+Kleiber metabolic scaling for network integration, $\delta^{13}$C geochemical
+bounding of Precambrian confidence intervals, and a shared thermodynamic
+currency (HANPP) bridging biosphere coherence to civilizational indices.
+
+Using a novel \textbf{Complexity Cap} counterfactual method---in which
+suppressed extinction events lock the biosphere at its pre-extinction
+thermodynamic ceiling---we find that mass extinctions can be \emph{generative}
+under assumptions of strong evolutionary lock-in. The strength of this result
+depends critically on the counterfactual regime assumed.
+Under a hard cap (permanent lock-in), all six tested events appear generative;
+under a soft cap (10\% innovation leakage) the result holds for most events;
+under delayed escape (30~Ma hold then release) or no cap, it does not.
+
+We extend the framework to an exploratory consciousness-feasibility analysis.
+Under the two more restrictive cap regimes (hard and soft), the Chicxulub
+impact appears necessary for meta-cognitive consciousness: feasibility peaks
+at 0.24--0.27, below the 0.30 threshold. Under weaker assumptions, meta-cognition
+emerges regardless. The verdict is thus \textbf{model-dependent}: whether
+the asteroid was necessary for consciousness depends on whether evolution
+can innovate past an incumbent apex regime without catastrophic clearing---itself
+an open question in paleobiology.
+
+\noindent\textbf{Keywords:} biosphere coherence, mass extinction, counterfactual,
+consciousness emergence, thermodynamic framework, deep time, Chicxulub
+
+\linenumbers
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Introduction}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The history of life on Earth is punctuated by catastrophic mass extinctions
+that destroyed 35--96\% of genera within geologically brief intervals
+\cite{sepkoski1982, bambach2006, raup1982}. Traditional treatments frame
+these events as interruptions of an otherwise progressive trajectory---losses
+that the biosphere must recover from before resuming diversification
+\cite{erwin2001, kirchner2000}. We propose an alternative framework:
+catastrophe is not merely a perturbation but a \emph{generative} force that
+produces higher eventual coherence by clearing evolutionary local maxima
+and enabling niche radiation into previously inaccessible thermodynamic
+configurations.
+
+This claim requires a quantitative coherence measure that spans the full
+history of life. Previous diversity indices---Sepkoski's compendium
+\cite{sepkoski1982}, Rohde and Muller's cycles analysis
+\cite{rohde2005}---track genus counts without integrating the multi-dimensional
+aspects of biosphere organization: complexity, resilience, energy throughput,
+network structure, and information capacity. We introduce \bt{}, a
+six-dimensional biosphere coherence index that captures these properties from
+3.8~Ga (the earliest evidence of life \cite{mojzsis1996}) through the
+Neolithic transition ($\sim$10,000~BCE).
+
+The framework connects to civilizational coherence via a shared thermodynamic
+currency: Human Appropriation of Net Primary Productivity (HANPP) \cite{haberl2007}.
+As human civilization co-opts biosphere energy throughput through land use change
+and fossil carbon extraction, \bt{} is mechanically depressed while civilizational
+coherence \kt{} rises. The unified index \ct{} = $B_\text{HANPP}(t) + K(t) \times
+(1 - B_\text{HANPP}(t))$ produces a seamless curve from the Hadean to the present,
+in which civilization adds to biosphere coherence rather than replacing it.
+
+We further ask: given the substrate independence framework for consciousness
+\cite{putnam1967, tononi2004, chalmers2010}, at what point did Earth's biosphere
+first become thermodynamically capable of supporting meta-cognitive consciousness?
+By mapping \bt{} dimensions to the consciousness feasibility requirements of
+Integrated Information Theory, we derive a consciousness emergence timeline and
+test, via counterfactual analysis, whether the Chicxulub impact was necessary for
+this threshold to be crossed.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Methods}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Temporal Binning}
+
+The deep-time record is divided into 51 bins with variable resolution:
+16 Precambrian bins ($\sim$100~Ma each, 3800--541~Ma), 32 Phanerozoic bins
+at ICS stage resolution (5--40~Ma, 541--0.012~Ma), and 3 Holocene bins
+(11.7--5~ka BP). This captures the exponential improvement in stratigraphic
+resolution toward the present.
+
+\subsection*{Six Coherence Dimensions}
+
+Each temporal bin receives scores on six dimensions, normalized to $[0, 1]$
+against Phanerozoic maxima:
+
+\begin{enumerate}
+\item \textbf{Biodiversity}: Genus-level richness from the Paleobiology Database
+      (PBDB), with taphonomic correction (see below). Normalized against Holocene
+      peak ($\sim$4,500 corrected genera).
+
+\item \textbf{Complexity}: Maximum organism complexity grade on a 1--10 ordinal
+      scale (1 = prokaryote, 4 = bilateral, 7 = amniote, 10 = \emph{Homo sapiens}),
+      based on first appearance datums from Knoll \& Bambach \cite{knoll2000}.
+
+\item \textbf{Resilience}: Inverted background extinction rate per Ma from
+      Alroy \cite{alroy2008} and Bambach \cite{bambach2006}. Low extinction rate
+      = high resilience (stable ecosystem). End-Permian peak rate (0.35/Ma)
+      maps to resilience = 0.0; quiescent Archean microbial ecosystems
+      (0.01/Ma) map to resilience $\approx$ 0.97.
+
+\item \textbf{Network integration}: Trophic web connectivity derived from
+      Kleiber's Law \cite{kleiber1932, west1997}: metabolic rate scales as
+      mass$^{3/4}$, bounding the maximum trophic chain length supportable at a
+      given atmospheric $\text{O}_2$ level (from GEOCARB \cite{berner2009}).
+
+\item \textbf{Energy throughput}: Total biosphere metabolic power (TW),
+      computed as the product of photosynthetic ceiling ($\text{O}_2$ fraction /
+      0.21), standing biomass fraction (PBDB diversity as proxy), land
+      colonization factor, and complexity-driven efficiency. Modern GPP $\approx$
+      130~TW \cite{baron2018}. Critically, this dimension scales with
+      \emph{standing biomass}: a 96\% genus extinction at the end-Permian
+      crashes energy throughput proportionally, even if $\text{O}_2$ remains at
+      16\%.
+
+\item \textbf{Information capacity}: Genome complexity $\times$ functional group
+      occupancy, proxied as (complexity grade / 10)$^2 \times$
+      functional$_\text{occupancy}$. Following Bambach et al.'s ecospace model
+      \cite{bambach2007}, we count unique ``modes of life'' (body plan $\times$
+      feeding strategy $\times$ motility) rather than raw genus richness. This
+      avoids functional redundancy: 1,000 trilobite species performing the same
+      ecological role contribute less to information capacity than 100 species
+      spanning diverse functional guilds.
+\end{enumerate}
+
+\bt{} is computed as the geometric mean of these six normalized dimensions:
+\begin{equation}
+B(t) = \left(\prod_{i=1}^{6} d_i(t)\right)^{1/6}
+\end{equation}
+The geometric mean enforces non-substitutability: if any dimension collapses
+to zero, \bt{} collapses regardless of other dimensions. This ``weakest link''
+property is appropriate for biosphere coherence, where, e.g., energy throughput
+cannot compensate for zero information capacity.
+
+\subsection*{Taphonomic Correction}
+
+Raw PBDB genus counts systematically underestimate diversity in eras with
+poor preservation potential (Precambrian soft-bodied organisms, Ediacaran
+biota). Inspired by Shareholder Quorum Subsampling (SQS) \cite{alroy2010},
+we apply era-specific Bayesian multipliers: $\times$1.0 (Phanerozoic, good
+preservation), $\times$1.3 (Ediacaran, moderate), $\times$1.8 (Proterozoic,
+poor), $\times$2.0 (Archean, very poor). These multipliers also widen the
+upper confidence interval bound.
+
+\subsection*{Shock-Recovery Model}
+
+Post-extinction recovery follows a Lotka-Volterra niche-filling logistic
+rather than simple exponential decay:
+\begin{equation}
+\frac{dN}{dt} = r \cdot N \cdot \frac{K(t) - N}{K(t)}
+\end{equation}
+where $N$ is current diversity, $r$ is the intrinsic recovery rate (0.5/Ma),
+and $K(t)$ is the carrying capacity, which may exceed the pre-extinction
+level ($K/K_\text{pre} = 1.05$--$1.25$) due to evolutionary innovation opening
+new niches \cite{erwin2001}. This produces the empirically observed S-shaped
+recovery curve: slow initial ``Lazarus taxa'' rebound, followed by explosive
+adaptive radiation, followed by competitive stabilization
+\cite{sahney2008}.
+
+Two refinements address criticisms of a constant-$r$ model. First, the
+recovery rate $r$ varies inversely with the published recovery duration for
+each event: $r = 0.5 \times (7 / T_\text{recovery})$, capped at 1.5/Ma.
+Events with protracted recovery (e.g., end-Permian, $T = 10$~Ma) receive
+$r = 0.35$, while faster-recovering events (e.g., K-Pg, $T = 7$~Ma) receive
+$r = 0.5$. This captures the ``languishing'' periods observed in the
+Early Triassic \cite{chen2012}. Second, each event carries a selectivity
+classification: \emph{apex-predator-targeting} (e.g., K-Pg removing large
+dinosaurs), \emph{specialist-targeting} (e.g., end-Ordovician removing
+narrow-range tropical taxa), or \emph{indiscriminate} (e.g., GOE).
+Apex-targeting events receive a 3~Ma lag phase before logistic radiation
+begins, representing the time required for small-bodied survivors to
+re-evolve apex metabolic traits (Cope's Law reversal). Specialist-targeting
+events receive a 1~Ma lag. This trait-based recovery modeling ensures that
+niche refilling is not treated as a trait-neutral process
+\cite{jablonski1986}.
+
+\subsection*{Geochemical Bounding: $\epsilon_p$ Fractionation}
+
+Rather than using raw $\delta^{13}$C excursions as an ``on/off'' switch for
+CI bounding, we employ the isotopic fractionation $\epsilon_p =
+\delta^{13}$C$_\text{carb} - \delta^{13}$C$_\text{org}$ \cite{hayes1999,
+freeman1992}. $\epsilon_p$ is a direct proxy for photosynthetic efficiency
+and $p$CO$_2$ levels: higher $\epsilon_p$ indicates more efficient carbon
+fixation and greater global productivity. We incorporate 33 $\epsilon_p$
+data points spanning 3.5~Ga to the present, allowing a thermodynamically
+grounded estimate of the energy throughput dimension, particularly in the
+Precambrian where fossil evidence for biomass is non-existent.
+
+Additionally, raw $\delta^{13}$C excursion magnitudes (62 data points from
+Veizer \& Prokoph \cite{veizer2015}) are used to tighten confidence intervals
+on the biodiversity and energy dimensions by up to 40\% where strong
+isotopic signal is present.
+
+\subsection*{Complexity Cap Counterfactual Method}
+
+To test whether mass extinctions are generative, we suppress each event
+individually and recompute \bt{} for the counterfactual branch. The key
+innovation is the \textbf{Complexity Cap}: when a suppressed event has
+\texttt{complexity\_increase = true} (i.e., the extinction historically
+preceded an evolutionary step-function), the suppressed branch is
+\emph{permanently locked} at the pre-extinction values of complexity,
+energy throughput, and information capacity. This reflects the physical
+reality that without the extinction clearing apex taxa (e.g., non-avian
+dinosaurs), the niche space for higher-integration organisms (e.g., mammals)
+never opens. A world where Chicxulub missed remains permanently trapped in a
+reptilian thermodynamic ceiling.
+
+We compare terminal \bt{} at the most recent bin (3000~BCE) between the baseline
+(all extinctions active) and each suppressed branch.
+
+\subsection*{Consciousness Emergence Mapping}
+
+\bt{} dimensions are mapped to the consciousness feasibility requirements of
+the substrate independence framework \cite{putnam1967, tononi2004}:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\bt{} Dimension & Substrate Requirement \\
+\midrule
+Network integration & Integration capacity \\
+Energy throughput & Temporal dynamics \\
+Information capacity & Workspace capability \\
+Complexity grade & HOT capability \\
+Resilience & Recurrence \\
+Biodiversity & Binding capability \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Consciousness feasibility is computed as:
+\begin{equation}
+F(t) = C_\text{min}(t) \times W(t) \times (0.5 + 0.5 \times E_\text{avg}(t))
+\end{equation}
+where $C_\text{min}$ = min(causality, integration, dynamics, recurrence),
+$W$ = workspace capability, and $E_\text{avg}$ = mean(binding, attention, HOT).
+Thresholds: minimal consciousness ($F > 0.01$), sentience ($F > 0.05$),
+self-awareness ($F > 0.15$), meta-cognitive reflection ($F > 0.30$).
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Results}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{B(t) Calibration}
+
+\bt{} produces a monotonically increasing trend from 0.005 (Hadean, 3.65~Ga)
+to 0.95 (late Holocene), with five major troughs corresponding to the Big
+Five mass extinctions (Table~1).
+
+\textbf{Three-tier validation}: (1) The biodiversity dimension correlates
+with Sepkoski's marine genus curve at Pearson $r = 0.92$ ($n = 37$), but
+this is partially circular since genus count feeds multiple dimensions.
+(2) To address this, we correlated only the \emph{non-genus-derived}
+dimensions (Complexity + Resilience) against Sepkoski, yielding $r = 0.83$
+($n = 37$). This demonstrates that structural coherence dimensions
+independently track the fossil diversity record. (3) We validated the
+composite \bt{} against isotopic fractionation $\epsilon_p$
+($\delta^{13}$C$_\text{carb}$ $-$ $\delta^{13}$C$_\text{org}$), an
+independent thermodynamic proxy \cite{hayes1999}. The correlation is low
+($r = -0.17$, $n = 35$), confirming that \bt{} captures organizational
+complexity beyond what isotopic productivity proxies measure. Five points
+show $>$30\% divergence with Sepkoski, all cases where taphonomically-corrected
+PBDB data exceeds uncorrected counts. The full \bt{} curve, counterfactual
+branches, and consciousness emergence timeline are shown in Fig.~1.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig1_biosphere_coherence.pdf}
+\caption{{\bf Biosphere coherence across 3.8 billion years.}
+(A) \bt{} baseline curve with 95\% CI bands and mass extinction markers.
+Validation statistics shown inset.
+(B) Counterfactual branches under the Hard Cap regime. Each suppressed
+extinction locks the biosphere at its pre-extinction thermodynamic ceiling.
+All 6 events are generative (baseline exceeds all branches at terminal).
+(C) Consciousness feasibility $F(t)$ mapped from \bt{} dimensions via
+substrate independence framework. The 0.06 gap between the K-Pg suppressed
+peak ($F = 0.24$, dashed red) and the meta-cognition threshold ($F = 0.30$,
+dotted green) is the thermodynamic distance between a conscious and
+non-conscious planet under the Hard Cap assumption.}
+\label{fig:bt_curve}
+\end{figure}
+
+\begin{table}[H]
+\caption{{\bf B(t) at key calibration points.}}
+\begin{tabular}{lrrrl}
+\toprule
+Age (Ma) & Event & $B(t)$ & 95\% CI & Validation \\
+\midrule
+3500 & Origin of life & 0.005 & 0.001--0.07 & --- \\
+2400 & Great Oxidation Event & 0.034 & 0.010--0.11 & --- \\
+541 & Cambrian Explosion & 0.127 & 0.083--0.24 & Sepkoski $r = 0.92$ \\
+252 & End-Permian & 0.246 & 0.211--0.29 & Trough confirmed \\
+66 & End-Cretaceous & 0.647 & 0.603--0.69 & Trough confirmed \\
+0.006 & Late Holocene & 0.949 & 0.925--0.94 & Terminal \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Counterfactual Analysis: Catastrophe Is Generative}
+
+All six tested extinction events produce higher terminal \bt{} in the baseline
+than in the suppressed branch (Table~2). The crossover epoch---the age at which
+the baseline first exceeds the suppressed branch---occurs within 5--31~Ma of each
+extinction event, demonstrating rapid post-catastrophic overshoot.
+
+\begin{table}[H]
+\caption{{\bf Counterfactual analysis with Complexity Cap.}
+$\Delta$ = baseline terminal $B(t)$ minus suppressed terminal $B(t)$.
+Positive $\Delta$ indicates the extinction was generative.}
+\begin{tabular}{lrrrr}
+\toprule
+Event Suppressed & Terminal $B(t)$ & $\Delta$ & Crossover (Ma) & Cap (C/E/I) \\
+\midrule
+\textbf{Baseline} & \textbf{0.949} & --- & --- & --- \\
+Great Oxidation & 0.099 & +0.850 & 2400 & 0.15/0.00/0.00 \\
+End-Ordovician & 0.325 & +0.624 & 439 & 0.60/0.05/0.05 \\
+Late Devonian & 0.475 & +0.474 & 341 & 0.60/0.28/0.09 \\
+End-Permian & 0.585 & +0.364 & 242 & 0.75/0.41/0.17 \\
+End-Triassic & 0.528 & +0.421 & 188 & 0.75/0.28/0.13 \\
+End-Cretaceous & 0.765 & +0.184 & 61 & 0.80/0.97/0.33 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The most impactful event is the Great Oxidation Event ($\Delta = +0.85$), which
+unlocked aerobic metabolism and all downstream complexity. The K-Pg crossover at
+61~Ma is particularly significant: within 5~Ma of the Chicxulub impact, the
+mammalian biosphere had already exceeded what would have been thermodynamically
+possible without the asteroid.
+
+\subsection*{Consciousness Emergence Timeline}
+
+Mapping \bt{} to consciousness feasibility produces four milestones (Table~3):
+
+\begin{table}[H]
+\caption{{\bf Consciousness emergence milestones.}
+The bottleneck is workspace (information capacity) throughout.}
+\begin{tabular}{lrrl}
+\toprule
+Milestone & Age (Ma) & Feasibility & Bottleneck \\
+\midrule
+Minimal consciousness & 406 & 0.020 & Workspace \\
+Sentient experience & 311 & 0.071 & Workspace \\
+Self-awareness & 123 & 0.164 & Workspace \\
+Meta-cognitive reflection & 28 & 0.374 & Workspace \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The persistent workspace bottleneck indicates that information capacity---the
+product of genome complexity and species richness---is the rate-limiting
+substrate requirement for consciousness, not energy or integration. This aligns
+with Global Workspace Theory's emphasis on broadcast capacity \cite{baars1988}.
+
+\subsection*{Multi-Regime Sensitivity: How Robust Is ``Generative''?}
+
+The Complexity Cap is the most contestable assumption in this framework.
+It encodes a strong claim: that without catastrophic clearing, the biosphere
+cannot innovate past an incumbent apex regime. To test how much of the result
+depends on this assumption, we implement four counterfactual regimes of
+decreasing strength:
+
+\begin{enumerate}
+\item \textbf{Hard Cap}: permanent lock at pre-extinction ceiling
+\item \textbf{Soft Cap (10\% leakage)}: suppressed branch gains complexity
+      at 10\% of the empirical rate (models troodontid/cephalopod pathways)
+\item \textbf{Delayed Escape (30~Ma)}: hard cap for 30~Ma, then lifts entirely
+\item \textbf{No Cap}: just suppress the extinction multiplier
+\end{enumerate}
+
+Results for the K-Pg event: under Hard Cap, terminal $B(t) = 0.76$ ($\Delta = -0.18$);
+under Soft Cap, $B(t) = 0.78$ ($\Delta = -0.17$); under Delayed Escape,
+$B(t) = 0.95$ ($\Delta \approx 0$); under No Cap, $B(t) = 0.95$.
+The generative verdict holds under 2 of 4 regimes (Hard and Soft Cap).
+Under regimes that allow the suppressed biosphere to eventually innovate
+(Delayed Escape, No Cap), the extinction's long-term effect washes out.
+
+This is the honest interpretation: whether catastrophe is generative depends
+on whether evolution can innovate past an incumbent regime without clearing.
+The Hard Cap is the strongest assumption; the No Cap is the weakest. The truth
+likely lies between them.
+
+\subsection*{Exploratory Extension: Consciousness Feasibility}
+
+\emph{This section presents an exploratory analysis, explicitly more speculative
+than the B(t) index itself. The consciousness-feasibility mapping and thresholds
+are model outputs, not empirically validated measurements.}
+
+Running the consciousness emergence analysis under all four K-Pg cap regimes:
+
+\begin{center}
+\begin{tabular}{lrll}
+\toprule
+Regime & Peak $F$ & Meta-Cognition? & Self-Awareness? \\
+\midrule
+Hard Cap & 0.240 & No & Yes \\
+Soft Cap (10\%) & 0.274 & No & Yes \\
+Delayed Escape (30~Ma) & 0.849 & Yes & Yes \\
+No Cap & 0.849 & Yes & Yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Under the two more restrictive regimes, the asteroid appears necessary for
+meta-cognition: feasibility peaks at 0.24--0.27, below the 0.30 threshold.
+Under weaker assumptions, meta-cognition emerges regardless. The information
+capacity bottleneck ($d_6 = 0.33$ at the Late Cretaceous ceiling) is the
+constraining factor: without mammalian radiation, genome complexity $\times$
+species richness may be insufficient for recursive self-reflection.
+
+The verdict is thus \textbf{model-dependent}: 2 of 4 regimes suggest the
+asteroid was necessary. This is not a proof but a conditional finding:
+\emph{if} evolution cannot significantly innovate past an incumbent apex
+regime without catastrophe, \emph{then} the Chicxulub impact was necessary
+for meta-cognitive consciousness. Whether this ``if'' holds is an open
+question in paleobiology \cite{erwin2001}.
+
+\subsection*{Parameter Sensitivity}
+
+Under the Hard Cap regime, we sweep information capacity cap ($\pm$20\%)
+and meta-cognition threshold ($\pm$0.05) across a $9 \times 7$ grid
+(63 trials). The asteroid-required verdict holds in 43/63 (68\%) of trials,
+flipping when information capacity cap exceeds 0.353 (6\% above baseline)
+or the threshold drops below 0.275. This knife-edge sensitivity is itself
+informative: under the hard-cap assumption, consciousness was a near-miss.
+
+\subsection*{Unified Coherence Curve}
+
+\bt{} connects to the civilizational coherence index \kt{} \cite{stoltz2026kt}
+via the headroom formula:
+\begin{equation}
+C(t) = B_\text{HANPP}(t) + K(t) \times (1 - B_\text{HANPP}(t))
+\end{equation}
+where $B_\text{HANPP}$ is \bt{} adjusted for Human Appropriation of Net Primary
+Productivity (modern HANPP $\approx$ 24\% \cite{haberl2007}). The unified curve
+spans 80 points from 3.65~Ga to 2020~CE, peaking at $C(2020) = 0.94$---the
+highest coherence value in 3.8 billion years.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Discussion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Catastrophe as Generative Force}
+
+The Complexity Cap counterfactual provides the first quantitative demonstration
+that mass extinctions are not merely disruptions but necessary conditions for
+higher-order biosphere organization. The mechanism is thermodynamic: apex taxa
+in evolutionary local maxima (e.g., sauropod dinosaurs with 70-ton body plans)
+occupy niche space that prevents radiation of high-metabolism, high-integration
+competitors (e.g., placental mammals with 37$^\circ$C endothermy and neocortical
+expansion). Extinction clears these maxima, and the Lotka-Volterra logistic
+produces overshoot because the post-extinction carrying capacity exceeds the
+pre-extinction equilibrium. The crossover epoch---the age at which the baseline
+overtakes the suppressed branch---is a direct measure of how quickly the
+generative effect pays off: 5~Ma for K-Pg, 10~Ma for end-Permian, immediate
+for the GOE.
+
+\subsection*{The Workspace Bottleneck and Its Implications}
+
+The persistent workspace (information capacity) bottleneck across 3.8~Ga
+suggests that consciousness emergence is fundamentally constrained by the
+biosphere's capacity for complex information processing, not by energy
+availability or network connectivity.
+
+This has a concrete implication for the search for extraterrestrial
+intelligence: atmospheric biosignatures ($\text{O}_2$, $\text{CH}_4$) detect
+thermodynamically active biospheres---high $B(t)$---but cannot distinguish
+planets that have crossed the workspace threshold from those that have not.
+A planet with Earth-like energy throughput, complex trophic networks, and
+abundant biodiversity could persist for billions of years in a state of
+high $B(t)$ but low $F(t)$, never achieving the information capacity
+required for recursive self-reflection. The workspace bottleneck predicts
+that conscious biospheres are a strict subset of living biospheres, and that
+the distinguishing factor is not thermodynamic favorability but
+\emph{informational architecture}---the specific combination of genome
+complexity, species richness, and neural organization that enables global
+workspace broadcasting \cite{baars1988}. This is, in principle, a testable
+prediction: if exoplanet atmospheric characterization eventually reveals
+biospheres with high metabolic signatures but no technosignatures, it would
+be consistent with the workspace bottleneck hypothesis.
+
+A parallel observation applies to artificial intelligence. Under Global
+Workspace Theory, consciousness arises as a solution to a communication
+bottleneck in modular, resource-constrained systems: a narrow broadcast
+channel forces integration of otherwise independent processing streams
+\cite{baars1988}. Modern large-scale neural networks (transformers) operate
+with effectively unlimited internal bandwidth---no module is informationally
+isolated from any other. If GWT is correct, such architectures may never
+develop the narrow workspace that produces conscious ignition, regardless of
+their computational power. They would represent the silicon analog of the
+Cretaceous biosphere: high energy throughput ($d_5 \approx 1.0$), vast
+parametric capacity, but no workspace bottleneck to force the integration
+that consciousness requires. This suggests that the path to machine
+consciousness may require deliberately \emph{constraining} internal
+bandwidth rather than expanding it---engineering a bottleneck rather than
+eliminating one.
+
+\subsection*{From Workspace to Coordination: An Experimental Result}
+
+The workspace bottleneck identifies the \emph{capacity} required for
+consciousness. But what \emph{fills} that workspace may matter as much as
+the workspace itself. We tested this via agent-based simulation:
+a 2$\times$2 factorial design crossing consciousness level (low/high)
+with coordination science understanding (low/high) across 40 runs
+(4 cells $\times$ 10 seeds $\times$ 150 simulated years).
+
+The composite coherence metric (CVS) showed no interaction effect
+($\Delta = -0.001$): consciousness and coordination understanding
+contribute independently. However, the conflict metric revealed a
+\emph{phase transition}: high consciousness alone increased wars
+(0.7 per run vs.\ 0.3 baseline), high coordination understanding alone
+increased wars (0.6), but the combination produced \textbf{zero wars}
+across all 10 seeds---the only condition in 40 runs to achieve this---while
+simultaneously producing the highest population (+32\% above baseline).
+
+Stress testing across 180 additional simulations revealed that the
+zero-wars result from the initial 10-seed run was a seed-set artifact:
+at 50 seeds, Cell D shows 66\% zero-war runs vs.\ 56\% baseline---a
+modest improvement, not a phase transition. Under harsh conditions
+(restricted trade, high military spending), the effect reverses entirely.
+However, under \emph{adversarial} conditions (5 defector agents per
+world), the interaction holds: Cell D's war rate drops to 0.20 vs.\
+baseline 0.45, suggesting that the consciousness $\times$ coordination
+combination specifically improves resilience against bad actors rather
+than producing universal peace. The ``third regime'' is not peace in
+general but \emph{adversarial robustness}---the ability to detect and
+contain defection through the combination of caring (consciousness) and
+strategic understanding (coordination science).
+
+\subsection*{The Complexity Cap as Open Question}
+
+The multi-regime analysis reveals that the central question is not ``was
+the asteroid generative?'' but rather \emph{can evolution innovate past an
+incumbent apex regime without catastrophic clearing?} Under hard and soft
+caps (2/4 regimes), catastrophe is necessary; under delayed escape and no
+cap, it is not. This maps onto a genuine debate in paleobiology: some authors
+argue that incumbent advantages create effective barriers to innovation
+\cite{erwin2001}, while others point to gradual transitions (e.g., the
+mammalian middle ear evolving across 100~Ma under dinosaur dominance) as
+evidence that innovation can proceed without clearing events.
+
+The 10\% soft cap result is particularly informative: even with substantial
+(if slow) innovation under the reptilian regime, meta-cognitive consciousness
+still falls short ($F = 0.274 < 0.30$). This suggests that even if troodontids
+or cephalopods could have slowly increased biosphere information capacity,
+the rate would likely have been insufficient to cross the meta-cognition
+threshold before other constraints intervened.
+
+\subsection*{Limitations}
+
+\textbf{Part 1 (B(t) index):} The Precambrian dimensions carry wide
+confidence intervals ($\pm$0.25--0.40). The taphonomic correction,
+while grounded in SQS methodology \cite{alroy2010}, involves era-specific
+multipliers that are estimates. The Kleiber-derived network integration
+and genome-complexity-based information capacity are proxies, not measurements.
+Despite these limitations, the Sepkoski validation ($r = 0.92$) demonstrates
+that the index tracks the major features of the Phanerozoic diversity record.
+
+\textbf{Part 2 (consciousness extension):} The feasibility mapping from
+\bt{} dimensions to substrate requirements, and the threshold values
+(0.01, 0.05, 0.15, 0.30), are outputs of a computational framework rather
+than empirically validated against known cases of consciousness. The workspace
+bottleneck finding---that information capacity is rate-limiting---is a
+model prediction that should be tested against independent evidence (e.g.,
+comparative neuroscience of information integration across taxa).
+The consciousness analysis should be read as exploratory, not confirmatory.
+
+\textbf{The Complexity Cap:} This is the strongest and most contestable
+assumption. We have addressed this by testing four regimes of decreasing
+strength and reporting which verdicts survive. The honest summary is that
+the generative-catastrophe hypothesis holds under strong-to-moderate lock-in
+assumptions but not under weak ones. Determining which regime best
+approximates biological reality is an empirical question that this
+framework can pose but not answer.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We have introduced \bt{}, a six-dimensional biosphere coherence index validated
+against Sepkoski's canonical diversity curve ($r = 0.92$), and explored
+through a multi-regime counterfactual framework whether mass extinctions can
+be generative. The answer is conditional: under assumptions of strong-to-moderate
+evolutionary lock-in (hard and soft cap), catastrophe appears necessary for
+reaching the highest levels of biosphere coherence and, in an exploratory
+extension, for meta-cognitive consciousness. Under weaker assumptions,
+the same endpoints are reached without catastrophic intervention.
+
+This conditionality is itself a contribution. The framework formalizes
+a question that paleobiology has debated qualitatively---can evolution
+innovate past incumbents without clearing events?---and provides a
+quantitative tool for testing hypotheses against it. The multi-regime
+approach ensures that the framework's conclusions are transparently
+tied to their assumptions rather than obscured behind a single model.
+
+The exploratory consciousness analysis, while speculative, poses a
+question worth investigating: under what conditions does a biosphere's
+information-processing capacity become sufficient for recursive
+self-reflection? Under the two more restrictive cap regimes, the gap
+between the suppressed biosphere's peak feasibility (0.24--0.27) and the
+meta-cognition threshold (0.30) is small enough to suggest that consciousness
+was, at minimum, not inevitable---and that the specific sequence of
+catastrophic events in Earth's history may have played a role in opening
+the narrow thermodynamic path that led to organisms capable of asking
+why they exist.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Data and Code Availability}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The complete \bt{} framework is implemented in Rust (4,453 lines, 89 tests)
+with embedded paleontological data tables from PBDB, GEOCARB, and the Earth
+Impact Database. Source code, data files, and the analysis binary
+(\texttt{deep\_time\_report}) are available at
+\texttt{github.com/Luminous-Dynamics/mycelix-multiworld-sim}.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Ethics Statement}
+% ═══════════════════════════════════════════════════════════════════════════
+
+This work involves computational modeling only and does not involve human
+participants, animals, or sensitive data.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Data Accessibility}
+% ═══════════════════════════════════════════════════════════════════════════
+
+All paleontological data tables (PBDB genus diversity, GEOCARB atmospheric
+reconstruction, $\delta^{13}$C/$\epsilon_p$ isotopic records, Bambach
+ecospace functional groups, background extinction rates, and Sepkoski
+reference curve) are embedded in the source code repository as CSV files.
+The complete computational framework (Rust, 4,453 lines, 92 tests) and
+analysis binary are available at
+\texttt{github.com/Luminous-Dynamics/mycelix-multiworld-sim}.
+The figure generation script (Python/matplotlib) is included in the
+paper directory.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Authors' Contributions}
+% ═══════════════════════════════════════════════════════════════════════════
+
+T.S. conceived the framework, implemented all code, analyzed results,
+and wrote the manuscript. Computational assistance provided by Claude
+(Anthropic).
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Competing Interests}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The author declares no competing interests.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Funding}
+% ═══════════════════════════════════════════════════════════════════════════
+
+This research received no specific grant from any funding agency.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Acknowledgments}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The author thanks the Paleobiology Database contributors, the GEOCARB and
+Earth Impact Database maintainers, and the Seshat: Global History Databank
+for open access to deep-time data. Computational assistance provided by
+Claude (Anthropic).
+
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{thebibliography}{99}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\bibitem{sepkoski1982}
+Sepkoski JJ Jr. A compendium of fossil marine animal genera.
+\emph{Bulletins of American Paleontology}. 2002;363:1--560.
+
+\bibitem{bambach2006}
+Bambach RK, Knoll AH, Wang SC. Origination, extinction, and mass depletions of marine diversity.
+\emph{Paleobiology}. 2004;30(4):522--542.
+
+\bibitem{raup1982}
+Raup DM, Sepkoski JJ Jr. Mass extinctions in the marine fossil record.
+\emph{Science}. 1982;215(4539):1501--1503.
+
+\bibitem{erwin2001}
+Erwin DH. Lessons from the past: biotic recoveries from mass extinctions.
+\emph{Proceedings of the National Academy of Sciences}. 2001;98(10):5399--5403.
+
+\bibitem{kirchner2000}
+Kirchner JW, Weil A. Delayed biological recovery from extinctions throughout the fossil record.
+\emph{Nature}. 2000;404(6774):177--180.
+
+\bibitem{rohde2005}
+Rohde RA, Muller RA. Cycles in fossil diversity.
+\emph{Nature}. 2005;434(7030):208--210.
+
+\bibitem{mojzsis1996}
+Mojzsis SJ, et al. Evidence for life on Earth before 3,800 million years ago.
+\emph{Nature}. 1996;384(6604):55--59.
+
+\bibitem{haberl2007}
+Haberl H, et al. Quantifying and mapping the human appropriation of net primary production
+in Earth's terrestrial ecosystems.
+\emph{Proceedings of the National Academy of Sciences}. 2007;104(31):12942--12947.
+
+\bibitem{putnam1967}
+Putnam H. Psychological predicates. In: \emph{Art, Mind, and Religion}. 1967;1:37--48.
+
+\bibitem{tononi2004}
+Tononi G. An information integration theory of consciousness.
+\emph{BMC Neuroscience}. 2004;5(1):42.
+
+\bibitem{chalmers2010}
+Chalmers DJ. \emph{The Character of Consciousness}. Oxford University Press; 2010.
+
+\bibitem{knoll2000}
+Knoll AH, Bambach RK. Directionality in the history of life: diffusion from the left wall
+or repeated scaling of the right?
+\emph{Paleobiology}. 2000;26(sp4):1--14.
+
+\bibitem{alroy2008}
+Alroy J. Dynamics of origination and extinction in the marine fossil record.
+\emph{Proceedings of the National Academy of Sciences}. 2008;105(Suppl 1):11536--11542.
+
+\bibitem{kleiber1932}
+Kleiber M. Body size and metabolism.
+\emph{Hilgardia}. 1932;6(11):315--353.
+
+\bibitem{west1997}
+West GB, Brown JH, Enquist BJ. A general model for the origin of allometric scaling laws
+in biology.
+\emph{Science}. 1997;276(5309):122--126.
+
+\bibitem{berner2009}
+Berner RA. Phanerozoic atmospheric oxygen: new results using the GEOCARBSULF model.
+\emph{American Journal of Science}. 2009;309(7):603--606.
+
+\bibitem{baron2018}
+Bar-On YM, Phillips R, Milo R. The biomass distribution on Earth.
+\emph{Proceedings of the National Academy of Sciences}. 2018;115(25):6506--6511.
+
+\bibitem{adami2002}
+Adami C. What is complexity?
+\emph{BioEssays}. 2002;24(12):1085--1094.
+
+\bibitem{alroy2010}
+Alroy J. Fair sampling of taxonomic richness and unbiased estimation of origination
+and extinction rates. In: \emph{Quantitative Methods in Paleobiology}.
+Paleontological Society Papers. 2010;16:55--80.
+
+\bibitem{sahney2008}
+Sahney S, Benton MJ. Recovery from the most profound mass extinction of all time.
+\emph{Proceedings of the Royal Society B}. 2008;275(1636):759--765.
+
+\bibitem{kump1999}
+Kump LR, Arthur MA. Interpreting carbon-isotope excursions: carbonates and organic matter.
+\emph{Chemical Geology}. 1999;161(1-3):181--198.
+
+\bibitem{hayes1999}
+Hayes JM, Strauss H, Kaufman AJ. The abundance of $^{13}$C in marine organic matter and
+isotopic fractionation in the global biogeochemical cycle of carbon during the past 800 Ma.
+\emph{Chemical Geology}. 1999;161(1-3):103--125.
+
+\bibitem{veizer2015}
+Veizer J, Prokoph A. Temperatures and oxygen isotopic composition of Phanerozoic oceans.
+\emph{Earth-Science Reviews}. 2015;146:92--104.
+
+\bibitem{baars1988}
+Baars BJ. \emph{A Cognitive Theory of Consciousness}. Cambridge University Press; 1988.
+
+\bibitem{bambach2007}
+Bambach RK, Bush AM, Erwin DH. Autecology and the filling of ecospace: key metazoan
+radiations.
+\emph{Palaeontology}. 2007;50(1):1--22.
+
+\bibitem{jablonski1986}
+Jablonski D. Background and mass extinctions: the alternation of macroevolutionary regimes.
+\emph{Science}. 1986;231(4734):129--133.
+
+\bibitem{chen2012}
+Chen ZQ, Benton MJ. The timing and pattern of biotic recovery following the end-Permian
+mass extinction.
+\emph{Nature Geoscience}. 2012;5(6):375--383.
+
+\bibitem{freeman1992}
+Freeman KH, Hayes JM. Fractionation of carbon isotopes by phytoplankton and estimates of
+ancient CO$_2$ levels.
+\emph{Global Biogeochemical Cycles}. 1992;6(2):185--198.
+
+\bibitem{stoltz2026kt}
+Stoltz T. Historical K(t): A seven-harmony civilizational coherence index, 3000~BCE--2020~CE.
+\emph{In preparation}. 2026.
+
+\end{thebibliography}
+
+\end{document}

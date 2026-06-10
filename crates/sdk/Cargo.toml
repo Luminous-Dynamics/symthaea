@@ -1,0 +1,107 @@
+[package]
+name = "mycelix-sdk"
+version = "0.1.0"
+edition = "2024"
+description = "Mycelix SDK - Trust infrastructure for the Mycelix Conscious Ecosystem"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/mycelix"
+
+[features]
+default = ["simulation"]
+holochain = []
+standalone = []
+ts-export = ["ts-rs"]
+wasm = ["wasm-bindgen", "js-sys"]
+parallel = ["rayon"]
+simulation = []
+# risc0 feature requires external risc0-zkvm installation - disabled by default
+risc0 = []
+# Full WebAuthn CBOR/COSE verification support
+webauthn-full = ["ciborium", "p256", "ecdsa"]
+# Stub WebAuthn for testing (accepts any signature) - DO NOT USE IN PRODUCTION
+stub-webauthn = []
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["sync", "time"], optional = true }
+
+# IMPORTANT: Do NOT add getrandom directly with features=["js"] here.
+# This SDK is compiled into Holochain WASM zomes (wasm32-unknown-unknown), where the
+# Holochain runtime does NOT have Web Crypto API. The "js" feature pulls in wasm-bindgen
+# which is incompatible with Holochain's WASM runtime (rejects wasm-bindgen imports).
+# The transitive getrandom dep (via rand 0.8 → rand_core 0.6 → getrandom 0.2) is handled
+# by the getrandom_backend="custom" rustflag in the zome's .cargo/config.toml, which
+# routes randomness to HDK's __getrandom_v03_custom symbol on wasm32-unknown-unknown.
+
+# Cryptography
+sha2 = "0.10"
+sha3 = "0.10"
+blake3 = "1.5"
+rand = "0.8"
+rand_distr = "0.4"
+subtle = "2.5"
+base64 = "0.21"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+zeroize = { version = "1.7", features = ["derive"] }
+hex = "0.4"
+bincode = "1.3"
+
+# Matrix operations (for Phi measurement, HyperFeel)
+ndarray = "0.15"
+
+# Timestamps
+# IMPORTANT: default-features = false to avoid pulling in wasm-bindgen via chrono's
+# "wasmbind" default feature, which breaks Holochain WASM zomes that depend on this SDK.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
+
+# WASM compatibility: getrandom 0.2 custom backend (avoids wasm-bindgen/js)
+# The "custom" feature removes the compile_error on wasm32-unknown-unknown.
+# In zome context, HDK provides the custom getrandom implementation.
+# In standalone SDK checks, cargo check (no link) is sufficient.
+getrandom = { version = "0.2", features = ["custom"] }
+
+# UUID generation
+# IMPORTANT: Do NOT use features=["js"] — it activates getrandom's js backend
+# (wasm-bindgen), which is incompatible with Holochain's WASM runtime.
+# "rng-rand" tells uuid to use rand for v4 randomness (rand uses getrandom custom backend on WASM).
+uuid = { version = "1.0", features = ["v4", "serde", "rng-rand"] }
+
+# Regex for sanitization
+regex = "1.10"
+once_cell = "1.19"
+
+# TypeScript bindings (optional)
+ts-rs = { version = "7.0", optional = true }
+
+# WASM bindings (optional)
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
+
+# Parallel processing (optional)
+rayon = { version = "1.8", optional = true }
+
+# Thiserror for error handling
+thiserror = "1.0"
+
+# Shared types with Holochain zomes
+mycelix_finance_types = { path = "../mycelix-finance-types" }
+
+# Unified FL core (shared with Symthaea)
+mycelix-fl-core = { path = "../mycelix-fl-core" }
+
+# WebAuthn CBOR/COSE support (optional)
+ciborium = { version = "0.2", optional = true }
+p256 = { version = "0.13", features = ["ecdsa"], optional = true }
+ecdsa = { version = "0.16", optional = true }
+
+[dev-dependencies]
+approx = "0.5"
+proptest = "1.4"
+
+[lib]
+name = "mycelix_sdk"
+path = "src/lib.rs"

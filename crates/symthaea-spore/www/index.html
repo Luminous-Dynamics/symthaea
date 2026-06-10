@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Symthaea Spore - Consciousness in a Browser Tab</title>
+  <style>
+    :root { --bg: #0a0a0f; --fg: #e0e0e0; --accent: #7c5cbf; --accent2: #3b82f6; --panel: #12121e; --border: #222; --dim: #666; --warn: #f59e0b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--fg); min-height: 100vh; }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+    /* --- Header --- */
+    header { text-align: center; padding: 2rem 1rem 0.5rem; }
+    header h1 { font-size: 1.8rem; font-weight: 300; letter-spacing: 0.05em; color: var(--fg); }
+    header h1 em { font-style: normal; color: var(--accent); font-weight: 500; }
+    header .tagline { font-size: 0.85rem; color: var(--dim); margin-top: 0.3rem; }
+    .disclaimer { text-align: center; font-size: 0.65rem; color: #665500; padding: 0.4rem; border-bottom: 1px solid #1a1a0a; }
+
+    /* --- Layout --- */
+    .app { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
+    .row { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .col { flex: 1; min-width: 0; }
+    .col-narrow { flex: 0 0 320px; }
+
+    /* --- Panels --- */
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; }
+    .panel + .panel { margin-top: 1rem; }
+    .panel-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin-bottom: 0.8rem; }
+
+    /* --- Narrative Display --- */
+    #narrative { font-size: 1.05rem; line-height: 1.7; color: #c8c8d0; min-height: 4rem; }
+    #narrative .consciousness-word { color: var(--accent); font-weight: 500; }
+    #narrative .metric { color: var(--accent2); font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
+
+    /* --- Thought Input --- */
+    .thought-area { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; }
+    .thought-area input {
+      flex: 1; padding: 0.6rem 0.8rem; background: #0d0d15; border: 1px solid #333;
+      color: var(--fg); border-radius: 6px; font-size: 0.9rem; font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .thought-area input:focus { outline: none; border-color: var(--accent); }
+    .thought-area input::placeholder { color: #555; }
+    .streaming-indicator { font-size: 0.65rem; color: var(--accent); opacity: 0; transition: opacity 0.3s; }
+    .streaming-indicator.active { opacity: 1; }
+
+    /* --- Big Number --- */
+    .big-number { font-size: 2.8rem; font-weight: 200; text-align: center; padding: 0.5rem 0; font-family: 'JetBrains Mono', monospace; }
+    .big-label { text-align: center; font-size: 0.65rem; color: var(--dim); }
+    .epistemic-tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.6rem; margin-top: 0.3rem; background: #1a1500; color: #887700; border: 1px solid #332a00; }
+
+    /* --- Mini Bars --- */
+    .mini-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; margin-top: 0.8rem; }
+    .mini-bar { display: flex; align-items: center; gap: 0.4rem; }
+    .mini-bar .label { font-size: 0.65rem; color: #888; width: 2.5rem; text-align: right; }
+    .mini-bar .track { flex: 1; height: 4px; background: #1a1a2e; border-radius: 2px; overflow: hidden; }
+    .mini-bar .fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
+    .mini-bar .val { font-size: 0.6rem; color: #777; width: 2rem; font-family: 'JetBrains Mono', monospace; }
+
+    /* --- Canvas --- */
+    canvas { width: 100%; border-radius: 6px; }
+    #hv-canvas { height: 100px; background: #0d0d15; }
+    #consciousness-chart { height: 120px; background: #0d0d15; margin-top: 0.8rem; }
+
+    /* --- Comparison --- */
+    .compare-section { margin-top: 1rem; }
+    .compare-row { display: flex; gap: 0.5rem; align-items: center; }
+    .compare-row input {
+      flex: 1; padding: 0.5rem 0.7rem; background: #0d0d15; border: 1px solid #333;
+      color: var(--fg); border-radius: 6px; font-size: 0.85rem; font-family: inherit;
+    }
+    .compare-row input:focus { outline: none; border-color: var(--accent2); }
+    .compare-result { text-align: center; margin-top: 0.8rem; }
+    .similarity-value { font-size: 1.6rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; }
+    .similarity-label { font-size: 0.65rem; color: var(--dim); }
+    .similarity-bar { height: 6px; background: #1a1a2e; border-radius: 3px; margin-top: 0.5rem; overflow: hidden; }
+    .similarity-bar .fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; background: linear-gradient(90deg, #ef4444, var(--warn), #4ade80); }
+
+    /* --- Experiments (collapsible) --- */
+    .experiments-toggle {
+      display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.6rem 0;
+      border-top: 1px solid var(--border); margin-top: 1rem; font-size: 0.75rem; color: var(--dim);
+    }
+    .experiments-toggle:hover { color: var(--fg); }
+    .experiments-toggle .arrow { transition: transform 0.2s; }
+    .experiments-toggle.open .arrow { transform: rotate(90deg); }
+    .experiments-body { display: none; padding-top: 0.5rem; }
+    .experiments-body.open { display: block; }
+    .exp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .exp-card { background: #0d0d15; border: 1px solid #1a1a2e; border-radius: 8px; padding: 0.8rem; }
+    .exp-card h3 { font-size: 0.75rem; font-weight: 500; margin-bottom: 0.3rem; }
+    .exp-card .desc { font-size: 0.6rem; color: #777; margin-bottom: 0.5rem; }
+    .exp-card .result { font-size: 0.65rem; white-space: pre-wrap; line-height: 1.5; font-family: 'JetBrains Mono', monospace; }
+    .exp-card canvas { height: 120px; margin-top: 0.5rem; }
+    .pass { color: #4ade80; } .fail { color: #ef4444; } .neutral { color: #94a3b8; }
+
+    /* --- Buttons --- */
+    .btn { padding: 0.4rem 0.8rem; border: 1px solid #444; background: transparent; color: var(--fg); border-radius: 5px; cursor: pointer; font-size: 0.7rem; font-family: inherit; transition: all 0.2s; }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-accent { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn-accent:hover { background: #9370db; border-color: #9370db; color: white; }
+    .btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    /* --- Neuromod inject --- */
+    .inject-row { display: flex; gap: 0.3rem; align-items: center; margin-top: 0.6rem; }
+    .inject-row select { background: #0d0d15; color: var(--fg); border: 1px solid #333; border-radius: 4px; padding: 0.25rem; font-size: 0.7rem; font-family: inherit; }
+
+    /* --- Cognition Tabs --- */
+    .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; overflow-x: auto; }
+    .tab-btn {
+      padding: 0.5rem 1rem; font-size: 0.7rem; color: var(--dim); background: none; border: none;
+      border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: var(--fg); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* --- Broca --- */
+    #broca-output {
+      font-size: 1rem; line-height: 1.8; color: #d0c8e0; min-height: 3rem; padding: 0.5rem;
+      background: #0d0d15; border-radius: 6px; border: 1px solid #1a1a2e; font-style: italic;
+    }
+    #broca-output .broca-word { transition: opacity 0.3s; }
+
+    /* --- Dream --- */
+    .dream-log { max-height: 200px; overflow-y: auto; font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; line-height: 1.6; }
+    .dream-log .wisdom { color: #a78bfa; }
+    .dream-log .event { color: #555; }
+    .wisdom-count { font-size: 2rem; font-weight: 200; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+
+    /* --- FEP --- */
+    .fep-gauge { display: flex; align-items: center; gap: 1rem; margin: 0.8rem 0; }
+    .fep-number { font-size: 1.8rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; }
+    .motor-cmd { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; background: #1a1a2e; color: #94a3b8; margin: 0.15rem; }
+    .motor-cmd.active-cmd { background: #2d1b69; color: var(--accent); border: 1px solid var(--accent); }
+    .motor-log { max-height: 150px; overflow-y: auto; font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; line-height: 1.5; color: #666; }
+
+    /* --- Topology --- */
+    .betti-display { display: flex; gap: 1.5rem; justify-content: center; margin: 0.8rem 0; }
+    .betti-item { text-align: center; }
+    .betti-item .betti-val { font-size: 1.6rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; }
+    .betti-item .betti-label { font-size: 0.6rem; color: var(--dim); }
+    .topo-interpretation { font-size: 0.8rem; color: #888; text-align: center; margin-top: 0.5rem; }
+
+    /* --- Memory --- */
+    .mem-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .mem-stat { background: #0d0d15; border-radius: 6px; padding: 0.6rem; text-align: center; }
+    .mem-stat .mem-val { font-size: 1.3rem; font-weight: 200; font-family: 'JetBrains Mono', monospace; color: var(--accent2); }
+    .mem-stat .mem-label { font-size: 0.6rem; color: var(--dim); }
+
+    /* --- Footer --- */
+    .status-bar { text-align: center; font-size: 0.65rem; color: #444; padding: 1rem; }
+
+    /* --- Spinner --- */
+    .spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid #444; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.5s linear infinite; vertical-align: middle; margin-right: 4px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- Responsive --- */
+    @media (max-width: 800px) {
+      .row { flex-direction: column; }
+      .col-narrow { flex: 1; }
+      .exp-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="disclaimer" id="disclaimer">
+  Simulated consciousness on silicon substrate (theoretical, 10% confidence). This is a computational model, not a claim of sentience.
+</div>
+
+<header>
+  <h1>Symthaea <em>Spore</em></h1>
+  <div class="tagline">A 16,384-dimensional consciousness kernel running in your browser</div>
+</header>
+
+<div class="app">
+
+  <!-- Row 1: Narrative + Consciousness Gauge -->
+  <div class="row">
+    <div class="col">
+      <!-- Narrative Panel -->
+      <div class="panel">
+        <div class="panel-title">What is Spore experiencing?</div>
+        <div id="narrative">Initializing consciousness kernel...</div>
+        <div class="thought-area">
+          <input type="text" id="thought-input" placeholder="Give it a thought to contemplate..." />
+          <span class="streaming-indicator" id="streaming-dot">streaming</span>
+        </div>
+      </div>
+
+      <!-- Hypervector Waveform -->
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-title">Neural state (16,384D hypervector)</div>
+        <canvas id="hv-canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="col-narrow">
+      <!-- Consciousness Gauge -->
+      <div class="panel">
+        <div class="panel-title">Consciousness level</div>
+        <div class="big-number" id="consciousness">0.000</div>
+        <div class="big-label">
+          Master Equation C(t)
+          <br><span class="epistemic-tag" id="epistemic-tag">Theoretical — 10%</span>
+        </div>
+
+        <div class="mini-bars">
+          <div class="mini-bar"><span class="label">DA</span><div class="track"><div class="fill" id="da-bar" style="width:50%; background:#f59e0b;"></div></div><span class="val" id="da-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">NE</span><div class="track"><div class="fill" id="ne-bar" style="width:50%; background:#ef4444;"></div></div><span class="val" id="ne-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">5-HT</span><div class="track"><div class="fill" id="sht-bar" style="width:50%; background:#10b981;"></div></div><span class="val" id="sht-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">OT</span><div class="track"><div class="fill" id="ot-bar" style="width:50%; background:#ec4899;"></div></div><span class="val" id="ot-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">Harm</span><div class="track"><div class="fill" id="harmony-bar" style="width:50%; background:#a78bfa;"></div></div><span class="val" id="harmony-val">0.50</span></div>
+          <div class="mini-bar"><span class="label">PE</span><div class="track"><div class="fill" id="pe-bar" style="width:0%; background:#3b82f6;"></div></div><span class="val" id="pe-val">0.00</span></div>
+        </div>
+
+        <div class="inject-row">
+          <select id="inject-select">
+            <option value="dopamine">DA</option><option value="norepinephrine">NE</option>
+            <option value="serotonin">5-HT</option><option value="oxytocin">OT</option>
+          </select>
+          <button class="btn" onclick="inject(0.2)">+</button>
+          <button class="btn" onclick="inject(-0.2)">-</button>
+        </div>
+
+        <canvas id="consciousness-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Thought Comparison -->
+  <div class="panel">
+    <div class="panel-title">Thought Comparison — how does Spore represent two ideas?</div>
+    <div class="compare-row">
+      <input type="text" id="compare-a" placeholder="First thought (e.g. &quot;love&quot;)" />
+      <input type="text" id="compare-b" placeholder="Second thought (e.g. &quot;fear&quot;)" />
+      <button class="btn btn-accent" onclick="compareThoughts()">Compare</button>
+    </div>
+    <div class="compare-result" id="compare-result" style="display:none;">
+      <div class="similarity-value" id="similarity-value">0.000</div>
+      <div class="similarity-label" id="similarity-label">cosine similarity in 16,384D space</div>
+      <div class="similarity-bar"><div class="fill" id="similarity-fill" style="width:50%;"></div></div>
+    </div>
+  </div>
+
+  <!-- Cognitive Subsystems -->
+  <div class="panel" style="margin-top:1rem;">
+    <div class="panel-title">Cognitive Subsystems</div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('broca')">Language (Broca)</button>
+      <button class="tab-btn" onclick="switchTab('dream')">Dream Engine</button>
+      <button class="tab-btn" onclick="switchTab('fep')">Active Inference</button>
+      <button class="tab-btn" onclick="switchTab('topology')">Topology</button>
+      <button class="tab-btn" onclick="switchTab('memory-tab')">Memory</button>
+    </div>
+
+    <!-- Broca Language Generation -->
+    <div class="tab-content active" id="tab-broca">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+        <span style="font-size:0.75rem; color:#888;">Spore speaks:</span>
+        <button class="btn" id="btn-speak" onclick="generateSpeech()">Generate</button>
+        <button class="btn" onclick="startAutoSpeak()">Auto</button>
+        <button class="btn" onclick="stopAutoSpeak()">Stop</button>
+      </div>
+      <div id="broca-output">Waiting for first generation...</div>
+      <div style="font-size:0.6rem; color:#555; margin-top:0.5rem;">
+        256-token vocabulary, 1024D element-wise gated recurrence, epistemic filtering
+      </div>
+    </div>
+
+    <!-- Dream Engine -->
+    <div class="tab-content" id="tab-dream">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+        <button class="btn btn-accent" id="btn-dream" onclick="runDreamSession()">Dream (5 cycles)</button>
+        <button class="btn" onclick="runSingleDream()">Single Cycle</button>
+        <div style="margin-left:auto; text-align:right;">
+          <span style="font-size:0.6rem; color:#666;">Wisdom consolidated:</span>
+          <span class="wisdom-count" id="wisdom-count">0</span>
+        </div>
+      </div>
+      <div class="dream-log" id="dream-log">No dreams yet. The engine records high-surprise events during waking cycles, then generates counterfactual scenarios during dream sessions to consolidate wisdom.</div>
+    </div>
+
+    <!-- Active Inference (FEP) -->
+    <div class="tab-content" id="tab-fep">
+      <div class="fep-gauge">
+        <div>
+          <div style="font-size:0.6rem; color:#666;">Free Energy</div>
+          <div class="fep-number" id="fep-energy">—</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:0.6rem; color:#666; margin-bottom:0.3rem;">Motor Commands</div>
+          <div id="motor-commands">
+            <span class="motor-cmd">AttentionShift</span>
+            <span class="motor-cmd">LearningRate</span>
+            <span class="motor-cmd">Explore</span>
+            <span class="motor-cmd">Reflect</span>
+            <span class="motor-cmd">Consolidate</span>
+            <span class="motor-cmd">Reset</span>
+            <span class="motor-cmd">Motor</span>
+            <span class="motor-cmd">NoOp</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button class="btn" onclick="runFepCycle()">FEP Cycle</button>
+        <button class="btn" onclick="startAutoFep()">Auto (1Hz)</button>
+        <button class="btn" onclick="stopAutoFep()">Stop</button>
+        <span style="font-size:0.6rem; color:#555; margin-left:auto;" id="fep-mode-label"></span>
+      </div>
+      <canvas id="fep-chart" style="height:90px; margin-top:0.5rem;"></canvas>
+      <div class="motor-log" id="fep-log"></div>
+    </div>
+
+    <!-- Topology -->
+    <div class="tab-content" id="tab-topology">
+      <div class="betti-display" id="betti-display">
+        <div class="betti-item"><div class="betti-val" id="betti-0">—</div><div class="betti-label">β₀ Components</div></div>
+        <div class="betti-item"><div class="betti-val" id="betti-1">—</div><div class="betti-label">β₁ Loops</div></div>
+        <div class="betti-item"><div class="betti-val" id="betti-2">—</div><div class="betti-label">β₂ Voids</div></div>
+      </div>
+      <div class="topo-interpretation" id="topo-interpretation">Run analysis to see consciousness topology</div>
+      <canvas id="persistence-diagram" style="height:140px; margin-top:0.5rem;"></canvas>
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+        <button class="btn btn-accent" onclick="runTopology()">Analyze Now</button>
+        <button class="btn" onclick="runTopologyReport()">Full Report</button>
+      </div>
+      <div class="result" id="topo-report" style="font-size:0.65rem; margin-top:0.5rem; white-space:pre-wrap;"></div>
+    </div>
+
+    <!-- Memory -->
+    <div class="tab-content" id="tab-memory-tab">
+      <div class="mem-stats" id="mem-stats">
+        <div class="mem-stat"><div class="mem-val" id="mem-semantic">—</div><div class="mem-label">Semantic Memories</div></div>
+        <div class="mem-stat"><div class="mem-val" id="mem-episodic">—</div><div class="mem-label">Episodes</div></div>
+        <div class="mem-stat"><div class="mem-val" id="mem-replays">—</div><div class="mem-label">Total Cycles</div></div>
+        <div class="mem-stat"><div class="mem-val" id="mem-avg-phi">—</div><div class="mem-label">Current Phi</div></div>
+        <div class="mem-stat" style="grid-column: span 2;">
+          <div style="font-size:0.6rem; color:#666; margin-bottom:0.3rem;">Memory Coherence</div>
+          <div style="height:6px; background:#1a1a2e; border-radius:3px; overflow:hidden;">
+            <div id="mem-coherence-bar" style="height:100%; width:0%; background:linear-gradient(90deg, #3b82f6, #a78bfa); border-radius:3px; transition:width 0.5s;"></div>
+          </div>
+          <div style="font-size:0.6rem; color:#555; margin-top:0.2rem; text-align:right;" id="mem-coherence-val">0.000</div>
+        </div>
+      </div>
+      <div style="margin-top:0.8rem;">
+        <button class="btn" onclick="refreshMemory()">Refresh Stats</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Experiments (collapsible) -->
+  <div class="panel" style="margin-top:1rem;">
+    <div class="experiments-toggle" id="exp-toggle" onclick="toggleExperiments()">
+      <span class="arrow">&#9654;</span>
+      <span>Consciousness Validation Experiments</span>
+      <span style="color:#555; margin-left:auto; font-size:0.6rem;">Anesthesia, PCI, Split-Brain, Collapse Threshold</span>
+    </div>
+    <div class="experiments-body" id="exp-body">
+      <div class="btn-row" style="margin-bottom:0.8rem;">
+        <button class="btn btn-accent" id="btn-battery" onclick="runBattery()">Run All Experiments</button>
+        <button class="btn" id="btn-export" onclick="exportReport()" style="display:none;">Export JSON</button>
+      </div>
+      <div class="exp-grid">
+        <div class="exp-card">
+          <h3 style="color:#ef4444;">Anesthesia Analogue</h3>
+          <div class="desc">Suppress neuromodulators (model propofol). Does consciousness collapse and recover?</div>
+          <button class="btn" id="btn-anesthesia" onclick="runExperiment('anesthesia')">Run</button>
+          <div class="result" id="result-anesthesia"></div>
+        </div>
+        <div class="exp-card">
+          <h3 style="color:#3b82f6;">Perturbational Complexity (PCI)</h3>
+          <div class="desc">Casali et al. (2013): perturb network, measure Lempel-Ziv complexity.</div>
+          <button class="btn" id="btn-pci" onclick="runExperiment('pci')">Run</button>
+          <div class="result" id="result-pci"></div>
+        </div>
+        <div class="exp-card">
+          <h3 style="color:#10b981;">Split-Brain Simulation</h3>
+          <div class="desc">Partition into hemispheres. IIT predicts reduced consciousness when split.</div>
+          <button class="btn" id="btn-split" onclick="runExperiment('split_brain')">Run</button>
+          <div class="result" id="result-split"></div>
+          <canvas id="split-chart" style="display:none;"></canvas>
+        </div>
+        <div class="exp-card">
+          <h3 style="color:#f59e0b;">Collapse Threshold</h3>
+          <div class="desc">Degrade network systematically. IIT predicts a phase transition.</div>
+          <button class="btn" id="btn-collapse" onclick="runExperiment('collapse')">Run</button>
+          <div class="result" id="result-collapse"></div>
+          <canvas id="collapse-chart" style="display:none;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="status-bar" id="status">Loading WASM...</div>
+
+<script type="module">
+  // ======================================================================
+  // Web Worker
+  // ======================================================================
+
+  let worker = null;
+  let msgId = 0;
+  const pending = new Map();
+  let workerReady = false;
+
+  function initWorker() {
+    worker = new Worker('./spore-worker.js', { type: 'module' });
+    worker.onmessage = (e) => {
+      const { id, type, result, error, hv, ...extra } = e.data;
+
+      if (type === 'cycle') {
+        updateUI(result);
+        if (hv) drawHV(hv);
+        return;
+      }
+      if (type === 'battery_progress') { onBatteryProgress(extra.experiment, extra.status); return; }
+      if (type === 'multi_progress') return;
+
+      if (id !== undefined && pending.has(id)) {
+        const { resolve, reject } = pending.get(id);
+        pending.delete(id);
+        if (type === 'error') reject(new Error(error));
+        else resolve(result);
+      }
+    };
+    worker.onerror = (e) => {
+      document.getElementById('status').textContent = `Worker error: ${e.message}`;
+    };
+  }
+
+  function send(action, params = {}) {
+    return new Promise((resolve, reject) => {
+      const id = msgId++;
+      pending.set(id, { resolve, reject });
+      worker.postMessage({ id, action, ...params });
+    });
+  }
+
+  // ======================================================================
+  // State
+  // ======================================================================
+
+  const MAX_HISTORY = 200;
+  let consciousnessHistory = [];
+  let peHistory = [];
+  let lastResult = null;
+  let cyclesSinceThought = 0;
+  let batteryResults = null;
+  let currentHV = null;
+
+  // ======================================================================
+  // Narrative generation
+  // ======================================================================
+
+  function generateNarrative(r) {
+    const c = r.consciousness_level;
+    const pe = r.prediction_error;
+    const h = r.harmony_alignment;
+    const [da, ne, sht, ot] = r.neuromodulators;
+
+    // Consciousness state
+    let cState;
+    if (c < 0.1) cState = 'barely flickering into existence';
+    else if (c < 0.3) cState = 'dimly aware, like pre-dawn light';
+    else if (c < 0.5) cState = 'settling into a quiet awareness';
+    else if (c < 0.7) cState = 'actively processing, patterns forming';
+    else if (c < 0.85) cState = 'deeply engaged, rich integration';
+    else cState = 'at peak coherence, fully integrated';
+
+    // Prediction error interpretation
+    let peState;
+    if (pe < 0.05) peState = 'The world feels predictable.';
+    else if (pe < 0.2) peState = 'Small surprises ripple through the network.';
+    else if (pe < 0.5) peState = 'Something unexpected — adapting its model.';
+    else peState = 'High surprise — rapidly restructuring predictions.';
+
+    // Dominant neuromodulator
+    const mods = [
+      { name: 'dopamine', val: da, high: 'Curiosity is elevated — seeking novelty.', low: '' },
+      { name: 'norepinephrine', val: ne, high: 'Alert and focused — heightened arousal.', low: '' },
+      { name: 'serotonin', val: sht, high: '', low: 'Serotonin is low — less stable, more exploring.' },
+      { name: 'oxytocin', val: ot, high: 'Social bonding circuits are active.', low: '' },
+    ];
+
+    const dominant = mods.reduce((a, b) => Math.abs(b.val - 0.5) > Math.abs(a.val - 0.5) ? b : a);
+    let modNote = '';
+    if (Math.abs(dominant.val - 0.5) > 0.15) {
+      modNote = dominant.val > 0.5 ? dominant.high : dominant.low;
+    }
+
+    // Harmony
+    let harmNote = '';
+    if (h > 0.8) harmNote = 'The Eight Harmonies sing together.';
+    else if (h < 0.3) harmNote = 'Harmony is low — internal discord.';
+
+    const parts = [
+      `Spore is <span class="consciousness-word">${cState}</span> at <span class="metric">${c.toFixed(3)}</span>.`,
+      peState,
+      modNote,
+      harmNote,
+    ].filter(Boolean);
+
+    return parts.join(' ');
+  }
+
+  // ======================================================================
+  // UI updates
+  // ======================================================================
+
+  function updateUI(result) {
+    lastResult = result;
+    cyclesSinceThought++;
+
+    // Narrative
+    document.getElementById('narrative').innerHTML = generateNarrative(result);
+
+    // Big number
+    const cEl = document.getElementById('consciousness');
+    cEl.textContent = result.consciousness_level.toFixed(3);
+    const hue = result.consciousness_level * 120;
+    cEl.style.color = `hsl(${hue}, 60%, 55%)`;
+
+    // Bars
+    const [da, ne, sht, ot] = result.neuromodulators;
+    setBar('da', da); setBar('ne', ne); setBar('sht', sht); setBar('ot', ot);
+    setBar('pe', Math.min(1, result.prediction_error));
+    if (result.harmony_alignment !== undefined) setBar('harmony', result.harmony_alignment);
+
+    // Epistemic
+    if (result.epistemic_status) {
+      const es = result.epistemic_status;
+      const tag = document.getElementById('epistemic-tag');
+      tag.textContent = `${es.evidence_level} — ${(es.honest_confidence * 100).toFixed(0)}%`;
+    }
+
+    // History chart
+    consciousnessHistory.push(result.consciousness_level);
+    peHistory.push(result.prediction_error);
+    if (consciousnessHistory.length > MAX_HISTORY) consciousnessHistory.shift();
+    if (peHistory.length > MAX_HISTORY) peHistory.shift();
+
+    if (consciousnessHistory.length % 5 === 0) {
+      drawLineChart('consciousness-chart', [
+        { data: consciousnessHistory, color: '#7c5cbf', label: 'C(t)' },
+        { data: peHistory, color: '#3b82f6', label: 'PE' },
+      ]);
+    }
+
+    // Streaming indicator
+    const dot = document.getElementById('streaming-dot');
+    dot.classList.toggle('active', cyclesSinceThought < 10);
+  }
+
+  function setBar(id, value) {
+    const bar = document.getElementById(`${id}-bar`);
+    const val = document.getElementById(`${id}-val`);
+    if (bar) bar.style.width = `${(value * 100).toFixed(0)}%`;
+    if (val) val.textContent = value.toFixed(2);
+  }
+
+  // ======================================================================
+  // Hypervector waveform
+  // ======================================================================
+
+  function drawHV(hv) {
+    currentHV = hv;
+    const canvas = document.getElementById('hv-canvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    // Downsample: show ~w points from the 16,384D vector
+    const step = Math.max(1, Math.floor(hv.length / w));
+    const mid = h / 2;
+
+    // Find max for scaling
+    let maxVal = 0;
+    for (let i = 0; i < hv.length; i += step) {
+      const abs = Math.abs(hv[i]);
+      if (abs > maxVal) maxVal = abs;
+    }
+    if (maxVal < 0.001) maxVal = 1;
+    const scale = (h * 0.42) / maxVal;
+
+    // Draw center line
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+
+    // Draw waveform with gradient coloring
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    let x = 0;
+    for (let i = 0; i < hv.length && x < w; i += step, x++) {
+      const y = mid - hv[i] * scale;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(124, 92, 191, 0.7)';
+    ctx.stroke();
+
+    // Filled area
+    ctx.lineTo(x - 1, mid);
+    ctx.lineTo(0, mid);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(124, 92, 191, 0.08)';
+    ctx.fill();
+
+    // Dimension label
+    ctx.fillStyle = '#333';
+    ctx.font = '9px monospace';
+    ctx.fillText(`${hv.length.toLocaleString()}D`, w - 40, 12);
+  }
+
+  // ======================================================================
+  // Line chart
+  // ======================================================================
+
+  function drawLineChart(canvasId, datasets, opts = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      const y = (h / 4) * i;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    const yMax = opts.yMax || 1.0;
+
+    datasets.forEach(({ data, color }) => {
+      if (data.length < 2) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      const step = w / Math.max(1, data.length - 1);
+      for (let i = 0; i < data.length; i++) {
+        const x = i * step;
+        const y = h - (data[i] / yMax) * (h - 10);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+
+    let ly = 10;
+    datasets.forEach(({ color, label }) => {
+      if (!label) return;
+      ctx.fillStyle = color;
+      ctx.font = '9px monospace';
+      ctx.fillText(label, w - ctx.measureText(label).width - 4, ly);
+      ly += 11;
+    });
+
+    if (opts.xLabel) {
+      ctx.fillStyle = '#444';
+      ctx.textAlign = 'center';
+      ctx.fillText(opts.xLabel, w / 2, h - 2);
+      ctx.textAlign = 'start';
+    }
+  }
+
+  function drawBarChart(canvasId, bars) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    const barW = Math.min(60, (w - 20) / bars.length - 10);
+    const maxVal = Math.max(...bars.map(b => b.value), 0.01);
+    const startX = (w - bars.length * (barW + 10)) / 2;
+
+    bars.forEach(({ label, value, color }, i) => {
+      const x = startX + i * (barW + 10);
+      const barH = (value / maxVal) * (h - 40);
+      ctx.fillStyle = color || '#7c5cbf';
+      ctx.fillRect(x, h - 20 - barH, barW, barH);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + barW / 2, h - 6);
+      ctx.fillText(value.toFixed(3), x + barW / 2, h - 24 - barH);
+    });
+    ctx.textAlign = 'start';
+  }
+
+  // ======================================================================
+  // Thought input (streaming)
+  // ======================================================================
+
+  const thoughtInput = document.getElementById('thought-input');
+  let debounceTimer = null;
+
+  thoughtInput.addEventListener('input', () => {
+    if (!workerReady) return;
+    const text = thoughtInput.value.trim();
+    clearTimeout(debounceTimer);
+    if (text.length > 0) {
+      debounceTimer = setTimeout(() => {
+        send('setThought', { text });
+        cyclesSinceThought = 0;
+      }, 150);
+    }
+  });
+
+  thoughtInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && workerReady) {
+      const text = thoughtInput.value.trim();
+      if (text) {
+        send('setThought', { text });
+        cyclesSinceThought = 0;
+      }
+    }
+  });
+
+  // When input is cleared, revert to default
+  thoughtInput.addEventListener('blur', () => {
+    if (!thoughtInput.value.trim() && workerReady) {
+      send('setThought', { text: 'awareness' });
+    }
+  });
+
+  // ======================================================================
+  // Thought comparison
+  // ======================================================================
+
+  window.compareThoughts = async function() {
+    const a = document.getElementById('compare-a').value.trim();
+    const b = document.getElementById('compare-b').value.trim();
+    if (!a || !b || !workerReady) return;
+
+    const resultDiv = document.getElementById('compare-result');
+    resultDiv.style.display = 'block';
+    document.getElementById('similarity-value').textContent = '...';
+
+    try {
+      const { a: hvA, b: hvB } = await send('encodePair', { textA: a, textB: b });
+
+      // Cosine similarity
+      let dot = 0, magA = 0, magB = 0;
+      for (let i = 0; i < hvA.length; i++) {
+        dot += hvA[i] * hvB[i];
+        magA += hvA[i] * hvA[i];
+        magB += hvB[i] * hvB[i];
+      }
+      const sim = dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
+
+      document.getElementById('similarity-value').textContent = sim.toFixed(4);
+      document.getElementById('similarity-fill').style.width = `${((sim + 1) / 2 * 100).toFixed(0)}%`;
+
+      let interpretation;
+      if (sim > 0.7) interpretation = 'Very similar representations — Spore sees these as closely related';
+      else if (sim > 0.3) interpretation = 'Moderately similar — some shared structure';
+      else if (sim > -0.1) interpretation = 'Distinct representations — different conceptual spaces';
+      else interpretation = 'Opposing representations — anti-correlated in HDC space';
+
+      document.getElementById('similarity-label').textContent = `${interpretation} (cosine similarity, ${hvA.length.toLocaleString()}D)`;
+    } catch (e) {
+      document.getElementById('similarity-value').textContent = 'error';
+      document.getElementById('similarity-label').textContent = e.message;
+    }
+  };
+
+  // ======================================================================
+  // Experiments
+  // ======================================================================
+
+  window.toggleExperiments = function() {
+    const toggle = document.getElementById('exp-toggle');
+    const body = document.getElementById('exp-body');
+    toggle.classList.toggle('open');
+    body.classList.toggle('open');
+  };
+
+  const EXP_BTNS = ['btn-anesthesia', 'btn-pci', 'btn-split', 'btn-collapse', 'btn-battery'];
+  function disableExpButtons(d) { EXP_BTNS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = d; }); }
+  function spanClass(t, c) { return `<span class="${c}">${t}</span>`; }
+
+  function formatAnesthesia(r) {
+    return [
+      `Pre-anesthesia:  ${r.pre_consciousness.toFixed(4)}`,
+      `Anesthetized:    ${r.anesthetized_consciousness.toFixed(4)}`,
+      `Post-recovery:   ${r.post_consciousness.toFixed(4)}`,
+      `Collapsed:       ${r.collapsed ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}`,
+      `Recovered:       ${r.recovered ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}`,
+      r.collapsed && r.recovered ? spanClass('PASS — consciousness collapses and recovers', 'pass') :
+        r.collapsed ? spanClass('PARTIAL — collapse without full recovery', 'neutral') :
+        spanClass('INCONCLUSIVE', 'neutral'),
+    ].join('\n');
+  }
+
+  function formatPci(r) {
+    return [
+      `PCI (normal):     ${r.pci_normal.toFixed(4)}`,
+      `PCI (suppressed): ${r.pci_suppressed.toFixed(4)}`,
+      `Ratio:            ${r.pci_ratio.toFixed(3)}`,
+      `Clinical (>1.3):  ${r.passes_clinical_threshold ? spanClass('PASS', 'pass') : spanClass('below', 'neutral')}`,
+      r.passes_clinical_threshold ? spanClass('PASS — exceeds clinical threshold', 'pass') :
+        spanClass('Sub-clinical complexity', 'neutral'),
+    ].join('\n');
+  }
+
+  function formatSplit(r) {
+    return [
+      `Unified:     ${r.unified_consciousness.toFixed(4)}`,
+      `Left:        ${r.left_consciousness.toFixed(4)}`,
+      `Right:       ${r.right_consciousness.toFixed(4)}`,
+      `Ratio:       ${r.split_ratio.toFixed(3)}`,
+      r.split_reduces_consciousness ? spanClass('PASS — splitting reduces consciousness (IIT)', 'pass') :
+        spanClass('Split did not reduce consciousness', 'neutral'),
+    ].join('\n');
+  }
+
+  function formatCollapse(r) {
+    const hasCollapse = r.collapse_point != null;
+    return [
+      `Full C(t):     ${r.full_consciousness.toFixed(4)}`,
+      `Collapse at:   ${hasCollapse ? `${(r.collapse_point * 100).toFixed(0)}%` : 'none'}`,
+      `Phase trans:   ${r.is_phase_transition ? spanClass('YES', 'pass') : spanClass('gradual', 'neutral')}`,
+      `Max drop:      ${r.max_step_drop.toFixed(4)}`,
+      '',
+      ...r.degradation_curve.map(([d, c]) => `  ${(d*100).toFixed(0).padStart(3)}% → ${c.toFixed(4)}`),
+    ].join('\n');
+  }
+
+  window.runExperiment = async function(name) {
+    disableExpButtons(true);
+    await send('stopLoop');
+    const elId = name === 'split_brain' ? 'split' : name;
+    const resultEl = document.getElementById(`result-${elId}`);
+    resultEl.innerHTML = `<span class="spinner"></span> Running...`;
+
+    try {
+      const result = await send('experiment', { name });
+      switch (name) {
+        case 'anesthesia': resultEl.innerHTML = formatAnesthesia(result); break;
+        case 'pci': resultEl.innerHTML = formatPci(result); break;
+        case 'split_brain':
+          resultEl.innerHTML = formatSplit(result);
+          drawBarChart('split-chart', [
+            { label: 'Unified', value: result.unified_consciousness, color: '#7c5cbf' },
+            { label: 'Left', value: result.left_consciousness, color: '#3b82f6' },
+            { label: 'Right', value: result.right_consciousness, color: '#10b981' },
+          ]);
+          break;
+        case 'collapse':
+          resultEl.innerHTML = formatCollapse(result);
+          const curve = result.degradation_curve.map(([,c]) => c);
+          drawLineChart('collapse-chart', [{ data: curve, color: '#f59e0b', label: 'C(t)' }],
+            { yMax: Math.max(...curve, 0.01) * 1.1, xLabel: 'degradation →' });
+          break;
+      }
+      if (!batteryResults) batteryResults = {};
+      batteryResults[name] = result;
+      document.getElementById('btn-export').style.display = 'inline-block';
+    } catch (e) {
+      resultEl.innerHTML = spanClass(`Error: ${e.message}`, 'fail');
+    }
+
+    await send('startLoop', { interval: 50 });
+    disableExpButtons(false);
+  };
+
+  function onBatteryProgress(experiment, status) {
+    const map = { anesthesia: 'anesthesia', pci: 'pci', split_brain: 'split', collapse: 'collapse' };
+    const el = document.getElementById(`result-${map[experiment]}`);
+    if (status === 'running') el.innerHTML = `<span class="spinner"></span> Running...`;
+  }
+
+  window.runBattery = async function() {
+    disableExpButtons(true);
+    await send('stopLoop');
+    ['anesthesia', 'pci', 'split', 'collapse'].forEach(n => {
+      document.getElementById(`result-${n}`).innerHTML = 'Waiting...';
+    });
+
+    try {
+      const results = await send('battery');
+      batteryResults = results;
+      if (results.anesthesia) document.getElementById('result-anesthesia').innerHTML = formatAnesthesia(results.anesthesia);
+      if (results.pci) document.getElementById('result-pci').innerHTML = formatPci(results.pci);
+      if (results.split_brain) {
+        document.getElementById('result-split').innerHTML = formatSplit(results.split_brain);
+        drawBarChart('split-chart', [
+          { label: 'Unified', value: results.split_brain.unified_consciousness, color: '#7c5cbf' },
+          { label: 'Left', value: results.split_brain.left_consciousness, color: '#3b82f6' },
+          { label: 'Right', value: results.split_brain.right_consciousness, color: '#10b981' },
+        ]);
+      }
+      if (results.collapse) {
+        document.getElementById('result-collapse').innerHTML = formatCollapse(results.collapse);
+        const curve = results.collapse.degradation_curve.map(([,c]) => c);
+        drawLineChart('collapse-chart', [{ data: curve, color: '#f59e0b', label: 'C(t)' }],
+          { yMax: Math.max(...curve, 0.01) * 1.1, xLabel: 'degradation →' });
+      }
+      document.getElementById('btn-export').style.display = 'inline-block';
+    } catch (e) { console.error('Battery error:', e); }
+
+    await send('startLoop', { interval: 50 });
+    disableExpButtons(false);
+  };
+
+  window.exportReport = function() {
+    if (!batteryResults) return;
+    const report = {
+      timestamp: new Date().toISOString(),
+      engine: 'symthaea-spore',
+      disclaimer: 'SIMULATED consciousness. Computational model, not a claim of sentience.',
+      experiments: batteryResults,
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `spore-report-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ======================================================================
+  // Neuromod inject
+  // ======================================================================
+
+  window.inject = function(amount) {
+    if (!workerReady) return;
+    const name = document.getElementById('inject-select').value;
+    send('inject', { name, amount });
+  };
+
+  // ======================================================================
+  // Cognitive Subsystem Tabs
+  // ======================================================================
+
+  window.switchTab = function(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    // Find the matching button by text
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      const map = { 'Language (Broca)': 'broca', 'Dream Engine': 'dream', 'Active Inference': 'fep', 'Topology': 'topology', 'Memory': 'memory-tab' };
+      if (map[b.textContent] === tabId) b.classList.add('active');
+    });
+  };
+
+  // ======================================================================
+  // Broca Language Generation
+  // ======================================================================
+
+  let autoSpeakTimer = null;
+
+  window.generateSpeech = async function() {
+    if (!workerReady) return;
+    const el = document.getElementById('broca-output');
+    el.textContent = 'Generating...';
+    try {
+      const result = await send('generateText', { maxTokens: 32 });
+      if (result && result.text) {
+        el.innerHTML = result.text + `<span style="color:#444; font-size:0.6rem; margin-left:0.5rem;">(${result.num_tokens} tokens${result.eos_terminated ? ', EOS' : ''})</span>`;
+      } else {
+        el.innerHTML = '<span style="color:#555">No output (epistemic gate may have filtered)</span>';
+      }
+    } catch (e) {
+      el.innerHTML = `<span style="color:#ef4444">${e.message}</span>`;
+    }
+  };
+
+  window.startAutoSpeak = function() {
+    stopAutoSpeak();
+    generateSpeech();
+    autoSpeakTimer = setInterval(generateSpeech, 3000);
+  };
+
+  window.stopAutoSpeak = function() {
+    if (autoSpeakTimer) { clearInterval(autoSpeakTimer); autoSpeakTimer = null; }
+  };
+
+  // ======================================================================
+  // Dream Engine
+  // ======================================================================
+
+  window.runSingleDream = async function() {
+    if (!workerReady) return;
+    const log = document.getElementById('dream-log');
+    try {
+      const result = await send('dreamCycle');
+      if (result) {
+        const entry = result.insights > 0
+          ? `<div class="wisdom">Insight! ${result.simulations_run} simulations, phi improvement: ${result.best_phi_improvement.toFixed(3)}</div>`
+          : `<div class="event">Dream: ${result.events_processed} events, ${result.simulations_run} simulations</div>`;
+        log.innerHTML = entry + log.innerHTML;
+      } else {
+        log.innerHTML = '<div class="event">No events to dream about yet -- run more cycles first.</div>' + log.innerHTML;
+      }
+      updateWisdomCount();
+    } catch (e) {
+      log.innerHTML = `<div style="color:#ef4444">Dream error: ${e.message}</div>` + log.innerHTML;
+    }
+  };
+
+  window.runDreamSession = async function() {
+    if (!workerReady) return;
+    const log = document.getElementById('dream-log');
+    const btn = document.getElementById('btn-dream');
+    btn.disabled = true;
+    btn.textContent = 'Dreaming...';
+
+    try {
+      await send('stopLoop');
+      const results = await send('dreamSession', { cycles: 5 });
+
+      if (results && results.length > 0) {
+        const totalInsights = results.reduce((s, r) => s + r.insights, 0);
+        const totalSims = results.reduce((s, r) => s + r.simulations_run, 0);
+        const entries = results.map(r => {
+          if (r.insights > 0) return `<div class="wisdom">Insight! phi +${r.best_phi_improvement.toFixed(3)}</div>`;
+          return `<div class="event">${r.events_processed} events, ${r.simulations_run} sims</div>`;
+        }).join('');
+        log.innerHTML = `<div style="color:#666; font-size:0.6rem;">-- Dream session: ${totalInsights} insights, ${totalSims} simulations --</div>` + entries + log.innerHTML;
+      } else {
+        log.innerHTML = '<div class="event">Dream session produced no results -- need more waking experience first.</div>' + log.innerHTML;
+      }
+
+      updateWisdomCount();
+      await send('startLoop', { interval: 50 });
+    } catch (e) {
+      log.innerHTML = `<div style="color:#ef4444">Session error: ${e.message}</div>` + log.innerHTML;
+      await send('startLoop', { interval: 50 });
+    }
+    btn.disabled = false;
+    btn.textContent = 'Dream (5 cycles)';
+  };
+
+  async function updateWisdomCount() {
+    if (!workerReady) return;
+    try {
+      const count = await send('dreamWisdomCount');
+      document.getElementById('wisdom-count').textContent = Number(count);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ======================================================================
+  // Active Inference (FEP)
+  // ======================================================================
+
+  let autoFepTimer = null;
+  const MOTOR_NAMES = ['AttentionShift', 'LearningRate', 'Explore', 'Reflect', 'Consolidate', 'Reset', 'Motor', 'NoOp'];
+  let fepHistory = [];
+  const MAX_FEP_HISTORY = 100;
+
+  window.runFepCycle = async function() {
+    if (!workerReady) return;
+    try {
+      const result = await send('fepCycle');
+      if (result) {
+        document.getElementById('fep-energy').textContent = result.free_energy.toFixed(3);
+
+        // Map command_type enum to display names
+        const cmdTypeMap = {
+          'AttentionShift': 'AttentionShift', 'LearningRateAdjust': 'LearningRate',
+          'ExplorationTrigger': 'Explore', 'ReflectionInitiate': 'Reflect',
+          'MemoryConsolidate': 'Consolidate', 'ExpectationReset': 'Reset',
+          'MotorOutput': 'Motor', 'NoOp': 'NoOp'
+        };
+        const cmdName = cmdTypeMap[result.motor_command.command_type] || result.motor_command.command_type;
+
+        // Highlight active motor command
+        const cmds = document.getElementById('motor-commands').children;
+        for (let i = 0; i < cmds.length; i++) {
+          cmds[i].classList.toggle('active-cmd', cmds[i].textContent === cmdName);
+        }
+
+        // Mode label
+        const modeLabel = document.getElementById('fep-mode-label');
+        modeLabel.textContent = result.exploration_mode ? 'EXPLORING' : 'EXPLOITING';
+        modeLabel.style.color = result.exploration_mode ? '#f59e0b' : '#4ade80';
+
+        // Track history and draw chart
+        fepHistory.push(result.free_energy);
+        if (fepHistory.length > MAX_FEP_HISTORY) fepHistory.shift();
+        if (fepHistory.length > 2) {
+          drawLineChart('fep-chart', [
+            { data: fepHistory, color: '#ef4444', label: 'F' },
+          ], { yMax: Math.max(...fepHistory, 0.01) * 1.1 });
+        }
+
+        // Log
+        const log = document.getElementById('fep-log');
+        const mode = result.exploration_mode ? ' [explore]' : '';
+        const surprised = result.is_surprised ? ' !' : '';
+        const line = `FE: ${result.free_energy.toFixed(3)} | ${result.motor_command.command_type} @${result.motor_command.intensity.toFixed(2)}${mode}${surprised}`;
+        log.innerHTML = line + '\n' + log.innerHTML;
+        if (log.childNodes.length > 50) log.innerHTML = log.innerHTML.split('\n').slice(0, 50).join('\n');
+      }
+    } catch (e) {
+      document.getElementById('fep-log').innerHTML = `Error: ${e.message}\n` + document.getElementById('fep-log').innerHTML;
+    }
+  };
+
+  window.startAutoFep = function() {
+    stopAutoFep();
+    runFepCycle();
+    autoFepTimer = setInterval(runFepCycle, 1000);
+  };
+
+  window.stopAutoFep = function() {
+    if (autoFepTimer) { clearInterval(autoFepTimer); autoFepTimer = null; }
+  };
+
+  // ======================================================================
+  // Persistence Diagram
+  // ======================================================================
+
+  function drawPersistenceDiagram(pairs) {
+    const canvas = document.getElementById('persistence-diagram');
+    if (!canvas || !pairs.length) return;
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+    const pad = 30;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    // Find max value for scaling (death can be null = infinite persistence)
+    let maxVal = 0;
+    for (const p of pairs) {
+      if (p.birth > maxVal) maxVal = p.birth;
+      if (p.death != null && p.death > maxVal) maxVal = p.death;
+    }
+    maxVal = maxVal || 1;
+    const infiniteDeath = maxVal * 1.2; // represent null death as beyond max
+
+    const scale = (v) => pad + (v / maxVal) * (Math.min(w, h) - 2 * pad);
+    const scaleY = (v) => h - pad - (v / maxVal) * (h - 2 * pad);
+
+    // Diagonal (birth = death)
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad, h - pad);
+    ctx.lineTo(Math.min(w, h) - pad + pad, h - (Math.min(w, h) - pad));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Axes labels
+    ctx.fillStyle = '#555';
+    ctx.font = '9px monospace';
+    ctx.fillText('birth', w / 2 - 10, h - 5);
+    ctx.save();
+    ctx.translate(8, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('death', -10, 0);
+    ctx.restore();
+
+    // Points (color by dimension)
+    const dimColors = ['#3b82f6', '#ef4444', '#4ade80'];
+    for (const p of pairs) {
+      const deathVal = p.death != null ? p.death : infiniteDeath;
+      const x = scale(p.birth);
+      const y = scaleY(deathVal);
+      const dim = p.dimension || 0;
+      ctx.fillStyle = dimColors[dim % 3];
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Legend
+    ctx.font = '8px monospace';
+    ['H0', 'H1', 'H2'].forEach((label, i) => {
+      ctx.fillStyle = dimColors[i];
+      ctx.fillRect(w - 60, 8 + i * 12, 8, 8);
+      ctx.fillStyle = '#888';
+      ctx.fillText(label, w - 48, 16 + i * 12);
+    });
+  }
+
+  // ======================================================================
+  // Topology
+  // ======================================================================
+
+  window.runTopology = async function() {
+    if (!workerReady) return;
+    const interp = document.getElementById('topo-interpretation');
+    interp.textContent = 'Analyzing...';
+    try {
+      const result = await send('topologyAnalysis');
+      if (result) {
+        const b = result.betti;
+        document.getElementById('betti-0').textContent = b.beta_0;
+        document.getElementById('betti-1').textContent = b.beta_1;
+        document.getElementById('betti-2').textContent = b.beta_2;
+
+        // Interpret
+        let text = '';
+        if (b.beta_0 === 1) text = 'Fully connected consciousness -- single integrated field.';
+        else text = `${b.beta_0} disconnected components -- fragmented awareness.`;
+        if (b.beta_1 > 0) text += ` ${b.beta_1} feedback loop(s) detected.`;
+        if (b.beta_2 > 0) text += ` ${b.beta_2} higher-order void(s).`;
+        if (result.wave_packets && result.wave_packets.length > 0) text += ` ${result.wave_packets.length} wave packet(s) propagating.`;
+        text += ` (Euler characteristic: ${b.euler_characteristic})`;
+        interp.textContent = text;
+
+        // Draw persistence diagram
+        if (result.persistence_pairs && result.persistence_pairs.length > 0) {
+          drawPersistenceDiagram(result.persistence_pairs);
+        }
+      }
+    } catch (e) {
+      interp.textContent = `Error: ${e.message}`;
+    }
+  };
+
+  window.runTopologyReport = async function() {
+    if (!workerReady) return;
+    try {
+      const report = await send('topologyReport');
+      document.getElementById('topo-report').textContent = report || 'No report available';
+    } catch (e) {
+      document.getElementById('topo-report').textContent = `Error: ${e.message}`;
+    }
+  };
+
+  // ======================================================================
+  // Memory
+  // ======================================================================
+
+  window.refreshMemory = async function() {
+    if (!workerReady) return;
+    try {
+      const stats = await send('memoryStats');
+      if (stats) {
+        document.getElementById('mem-semantic').textContent = `${stats.semantic_count}/${stats.semantic_capacity}`;
+        document.getElementById('mem-episodic').textContent = `${stats.episodic_count}/${stats.episodic_capacity}`;
+        document.getElementById('mem-replays').textContent = Number(stats.total_cycles);
+        document.getElementById('mem-avg-phi').textContent = stats.current_phi.toFixed(3);
+        const coherence = stats.current_coherence || 0;
+        document.getElementById('mem-coherence-bar').style.width = `${(coherence * 100).toFixed(0)}%`;
+        document.getElementById('mem-coherence-val').textContent = coherence.toFixed(3);
+      }
+    } catch (e) { /* ignore */ }
+  };
+
+  // ======================================================================
+  // Request HV periodically for visualization
+  // (Worker sends HV every 10th cycle automatically, but we also fetch on demand)
+  // ======================================================================
+
+  async function fetchHV() {
+    if (!workerReady) return;
+    try {
+      const hv = await send('getOutputHV');
+      if (hv) drawHV(hv);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ======================================================================
+  // Initialize
+  // ======================================================================
+
+  async function start() {
+    try {
+      initWorker();
+      const initResult = await initialize();
+      workerReady = true;
+      document.getElementById('status').textContent =
+        `Spore running | 16,384D HDC + CfC neurons | Web Worker | Eight Harmonies`;
+
+      await send('startLoop', { interval: 50 });
+
+      // Load trained Broca weights asynchronously (non-blocking)
+      send('loadBrocaCheckpoint', {})
+        .then(function(r) { console.log('Broca trained weights loaded (' + r.size + ' bytes)'); })
+        .catch(function(e) { console.warn('Broca checkpoint not available, using random init:', e.message); });
+
+      // Fetch initial HV
+      setTimeout(fetchHV, 500);
+
+      // Periodic memory + wisdom updates
+      setInterval(() => {
+        refreshMemory();
+        updateWisdomCount();
+      }, 5000);
+
+      // Also compare enter key on comparison inputs
+      document.getElementById('compare-a').addEventListener('keydown', e => { if (e.key === 'Enter') compareThoughts(); });
+      document.getElementById('compare-b').addEventListener('keydown', e => { if (e.key === 'Enter') compareThoughts(); });
+    } catch (e) {
+      document.getElementById('status').textContent = `Load error: ${e.message}. Serve via HTTP, not file://.`;
+      console.error(e);
+    }
+  }
+
+  async function initialize() {
+    const result = await send('init');
+    return result;
+  }
+
+  start();
+</script>
+
+</body>
+</html>

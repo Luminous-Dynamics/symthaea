@@ -1,0 +1,18 @@
+\begin{table}[htbp]
+\centering
+\caption{Autonomous conservation-law discovery across canonical dynamical systems. Each row reports an invariant discovered with zero human guidance from the differential equations alone, the trajectory variance of the discovered quantity, the symbolic verification status (chain rule + Z3), and the closest match in the 221-equation physics catalog.}
+\label{tab:ramanujan_showcase}
+\begin{tabular}{lllll}
+\toprule
+System & Domain & Discovered Invariant & Verification & Catalog Match \\
+\midrule
+Harmonic Oscillator & Classical Mechanics & $x^{2} + v^{2}$ (var 6.4e-23) & \textbf{PROVEN} & -- matches 'Harmonic Oscillator Invariant' (100\% similarity) \\
+Lotka-Volterra Predator-Prey & Ecology / Stat Mech & $x - \ln\left(x\right) + y - \ln\left(y\right)$ (var 6.5e-24) & \textbf{PROVEN} & -- matches 'Lotka-Volterra Invariant' (100\% similarity) \\
+Kepler Two-Body & Orbital Mechanics & $x vy - y vx$ (var 1.0e-28) & \textbf{PROVEN} & -- matches 'Angular Momentum (2D Cartesian)' (100\% similarity) \\
+Hénon-Heiles Chaotic Hamiltonian & Nonlinear Dynamics & $\frac{1}{2} \left(px^{2} + py^{2}\right) + \frac{1}{2} \left(x^{2} + y^{2}\right) + x^{2} y + -\frac{1}{3} y^{3}$ (var 3.3e-26) & \textbf{PROVEN} & -- matches 'Hénon-Heiles Hamiltonian' (100\% similarity) \\
+PCR3BP Jacobi Integral & Celestial Mechanics (rotating frame) & $\cos\left(\frac{y}{e}\right)^{x^{3}}$ (var 2.7e-10) & Numeric & -- matches 'Boltzmann Distribution' (99\% similarity) \\
+Coupled Anisotropic Oscillator (Mystery) & Designer-constructed stretch target & $\frac{1}{2} \left(px^{2} + py^{2}\right) + x^{2} + y^{2} + x y$ (var 1.1e-22) & \textbf{PROVEN} & -- matches 'Hénon-Heiles Hamiltonian' (100\% similarity) \\
+Triangular Numbers & Combinatorics & $\frac{n \left(n + 1\right)}{2}$ — & — & -- matches 'Triangular Numbers' (100\% similarity) \\
+\bottomrule
+\end{tabular}
+\end{table}

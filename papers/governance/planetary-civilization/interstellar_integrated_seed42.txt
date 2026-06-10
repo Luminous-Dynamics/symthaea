@@ -1,0 +1,22 @@
+EXIT: 0
+=== INTEGRATED INTERSTELLAR SIMULATION (seed: 42) ===
+1000-year civilization + generation ship to Proxima Centauri
+
+=== CIVILIZATION RESULTS ===
+Duration: 1000 years (12000 ticks)
+RESULT: SURVIVED (CVS: 0.753)
+Population: 69961
+Breakthroughs: 25280
+
+=== GENERATION SHIP RESULTS ===
+Destination: Proxima Centauri (4.24 ly)
+Phase: Arrived
+Hull integrity: 92.2%
+Fuel remaining: 19.1%
+Cultural speciation: YES
+Interstellar disasters: 11
+
+★ GENERATION SHIP ARRIVED at Proxima Centauri
+  Launched at year 500 with 500 colonists
+  Transit: 84.8 years
+  Humanity is now an interstellar civilization.

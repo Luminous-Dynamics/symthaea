@@ -1,0 +1,185 @@
+# Symthaea Reasoning Engine — 7-Step Conscious Reasoning
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Reasoning Engine — 7-Step Conscious Reasoning
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# INPUT (from Phase 2 Dynamics)
+# ═══════════════════════════════════════════
+input: ReasoningContext {
+  shape: parallelogram
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+  label: "theory_metrics [6] | phi (raw)\navailable_budget_us | available_actions\nrecent_utility | neuromod_exploration_mod"
+}
+
+# ═══════════════════════════════════════════
+# BUDGET TIER SELECTION
+# ═══════════════════════════════════════════
+budget: Budget Tier Selection {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  t0: "Tier 0 (2ms)\nDETECT + ASSESS + GATE\nNo planning" {
+    style.fill: "#7f1d1d"
+    style.font-color: "#fca5a5"
+  }
+  t1: "Tier 1 (8ms)\n+ Micro-MCTS (K=5, N=50, d=3)\n+ Epistemic rollouts" {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+  }
+  t2: "Tier 2 (20ms)\n+ Full MCTS (K=10, N=200, d=8)\n+ Counterfactual + Narrative" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+
+  selector: "budget < 2ms OR R < 0.2 -> T0\nbudget < 8ms OR R < 0.5 -> T1\nelse -> T2" {
+    shape: diamond
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  selector -> t0: "constrained" {style.stroke: "#ef4444"; style.stroke-dash: 3}
+  selector -> t1: "moderate" {style.stroke: "#f59e0b"; style.stroke-dash: 3}
+  selector -> t2: "full" {style.stroke: "#22c55e"; style.stroke-dash: 3}
+}
+
+# ═══════════════════════════════════════════
+# 7-STEP PIPELINE
+# ═══════════════════════════════════════════
+pipeline: 7-Step Reasoning Pipeline {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  s1: "Step 1: DETECT\n15 pairwise theory conflicts\n6 theories: IIT, GWT, AST, PP, RPT, 4E" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    style.stroke: "#818cf8"
+  }
+
+  s2: "Step 2: ASSESS\nR = softmin(consensus_scores)\nPhi_eff = Phi x R^gamma" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    style.stroke: "#818cf8"
+  }
+
+  s3: "Step 3: DECIDE (EVS)\nEVS = entropy x ln(actions) x utility x (1-R)\nIf EVS > 0.3 -> simulate" {
+    style.fill: "#1e3a5f"
+    style.font-color: "#93c5fd"
+  }
+
+  s4: "Step 4: PLAN (MCTS)\nMonte Carlo Tree Search\nBudget-bounded rollouts" {
+    style.fill: "#1e3a5f"
+    style.font-color: "#93c5fd"
+  }
+
+  s5: "Step 5: GATE\nRisk lattice: ReadOnly(0.1) to Critical(0.9)\nPhi_eff >= threshold AND confidence >= threshold" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    style.stroke: "#22c55e"
+  }
+
+  s6: "Step 6: ANALYZE (T2 only)\nCausal DAG + counterfactual query\nIdentified / Unidentified / Nonparametric" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+
+  s7: "Step 7: EMIT\nReasoningEvent telemetry\nRing buffer (cap 100)" {
+    style.fill: "#3a2e1e"
+    style.font-color: "#fde68a"
+  }
+
+  s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7
+}
+
+# ═══════════════════════════════════════════
+# 4 SUBSYSTEMS
+# ═══════════════════════════════════════════
+subsystems: 4 Subsystems {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  conflict: "Epistemic Conflict\nDetector\n6 theories, 15 pairs\nConflictMatrix + entropy" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  planning: "Temporal Planning\n(MCTS)\nEVS gating, budget enforcement\nbest_action + confidence" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  gate: "Tool Gate\n(Risk Classifier)\nReadOnly < Reversible < Elevated\n< High < Critical" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  causal: "Counterfactual\nReasoner\nCausal DAG queries\n(Tier 2 only, if >5ms)" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+}
+
+# ═══════════════════════════════════════════
+# PHI_EFF FORMULA
+# ═══════════════════════════════════════════
+phi_eff: Phi_eff Computation {
+  shape: hexagon
+  style.fill: "#4a1942"
+  style.stroke: "#c084fc"
+  style.font-color: "#e9d5ff"
+  label: "Phi_eff = Phi x R^gamma x (0.5 + 0.5 x epistemic_quality)\nINV-1: lower R cannot increase Phi_eff\ngamma in [1.0, 4.0]"
+}
+
+# ═══════════════════════════════════════════
+# OUTPUT
+# ═══════════════════════════════════════════
+output: ReasoningResult {
+  shape: parallelogram
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  label: "phi_eff | reliability | plan_confidence\ngate_decision (Allowed/Blocked)\nselected_action | narrative\ncounterfactual_outcome"
+}
+
+# ═══════════════════════════════════════════
+# FALLBACKS
+# ═══════════════════════════════════════════
+fallbacks: Fallback Strategies {
+  style.fill: "#3a1e1e"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+  style.border-radius: 8
+  label: "DowngradeToReadOnly\nDeferUntilHigherPhi\nRequestHumanConfirmation\nEpistemicAction\nNoFallback"
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+input -> budget.selector {style.stroke: "#818cf8"; style.stroke-width: 2}
+budget -> pipeline {style.stroke: "#6366f1"; style.stroke-width: 2}
+
+subsystems.conflict -> pipeline.s1 {style.stroke: "#818cf8"; style.stroke-dash: 3}
+subsystems.planning -> pipeline.s4 {style.stroke: "#818cf8"; style.stroke-dash: 3}
+subsystems.gate -> pipeline.s5 {style.stroke: "#818cf8"; style.stroke-dash: 3}
+subsystems.causal -> pipeline.s6 {style.stroke: "#818cf8"; style.stroke-dash: 3}
+
+pipeline.s2 -> phi_eff {style.stroke: "#c084fc"; style.stroke-width: 2}
+phi_eff -> pipeline.s5: "gate check" {style.stroke: "#c084fc"; style.stroke-dash: 3}
+
+pipeline.s7 -> output {style.stroke: "#22c55e"; style.stroke-width: 2}
+pipeline.s5 -> fallbacks: "Blocked" {style.stroke: "#ef4444"; style.stroke-dash: 5}

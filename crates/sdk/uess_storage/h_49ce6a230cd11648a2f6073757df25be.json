@@ -1,0 +1,21 @@
+{
+  "key": "proof:round-1:client-001",
+  "data": "{\"client_id\":\"client-001\",\"epochs\":5,\"gradient_hash\":\"0x1234...abcd\",\"learning_rate\":0.01,\"norm_valid\":true,\"round\":1}",
+  "classification": {
+    "empirical": "E3Cryptographic",
+    "normative": "N2Network",
+    "materiality": "M1Temporal"
+  },
+  "schema": {
+    "id": "zk-proof-result",
+    "version": "1.0",
+    "family": null
+  },
+  "stored_at": 1771138522520,
+  "modified_at": null,
+  "created_by": "fl-aggregator",
+  "expires_at": 1771743322520,
+  "cid": "5f3b17652544245af32c09b72d6085ae",
+  "version": 34,
+  "size_bytes": 136
+}

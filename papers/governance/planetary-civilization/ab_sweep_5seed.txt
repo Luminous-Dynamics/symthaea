@@ -1,0 +1,200 @@
+warning: unexpected `cfg` condition name: `kani`
+  --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:80:7
+   |
+80 | #[cfg(kani)]
+   |       ^^^^
+   |
+   = help: expected names are: `docsrs`, `feature`, and `test` and 31 more
+   = help: consider using a Cargo feature instead
+   = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+            [lints.rust]
+            unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+   = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: function `validate_dispatch_sizes` is never used
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/lib.rs:239:4
+    |
+239 | fn validate_dispatch_sizes(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: module `ExtensionKey` should have a snake case name
+   --> /srv/luminous-dynamics/crates/mycelix-bridge-common/src/consciousness_profile.rs:345:9
+    |
+345 | pub mod ExtensionKey {
+    |         ^^^^^^^^^^^^ help: convert the identifier to snake case: `extension_key`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: `mycelix-bridge-common` (lib) generated 3 warnings
+warning: unused import: `ConsciousnessTier`
+  --> src/interplanetary_consciousness.rs:25:28
+   |
+25 |     ConsciousnessEpidemic, ConsciousnessTier, EpidemicReport, Intervention, TransmissionModel,
+   |                            ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `CulturalProfile`
+  --> src/interworld.rs:15:20
+   |
+15 | use crate::world::{CulturalProfile, World, WorldResources};
+   |                    ^^^^^^^^^^^^^^^
+
+warning: unused variable: `current_tick`
+   --> src/interworld.rs:685:9
+    |
+685 |         current_tick: u32,
+    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_current_tick`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `current_tick` is never read
+   --> src/engine_v2.rs:378:33
+    |
+378 |     let mut current_tick: u32 = 0;
+    |                                 ^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `type_name`
+   --> src/engine_v2.rs:483:21
+    |
+483 |                 let type_name = format!("{:?}", event.event_type);
+    |                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_type_name`
+
+warning: unused variable: `max_population`
+   --> src/projects.rs:320:5
+    |
+320 |     max_population: usize,
+    |     ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_max_population`
+
+warning: unused variable: `year`
+   --> src/symtropy_bridge.rs:115:9
+    |
+115 |     let year = tick as f64 / 12.0;
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_year`
+
+warning: unused variable: `has_closed_eclss`
+   --> src/lib.rs:884:13
+    |
+884 |         let has_closed_eclss = self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS");
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_has_closed_eclss`
+
+warning: unused variable: `robot_maintenance_offset`
+    --> src/lib.rs:1408:17
+     |
+1408 |             let robot_maintenance_offset = robot_labor * 0.5; // Each robot-hour = 0.5 human maintenance hours
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_robot_maintenance_offset`
+
+warning: unused variable: `colony_age`
+    --> src/lib.rs:1554:21
+     |
+1554 |                 let colony_age = tick.saturating_sub(world.founded_tick) as f64 / 12.0;
+     |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_colony_age`
+
+warning: field `governance` is never read
+   --> src/lib.rs:107:5
+    |
+ 88 | pub struct MultiWorldSimulator {
+    |            ------------------- field in this struct
+...
+107 |     governance: Vec<governance::WorldGovernance>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `EUROPA_SOLAR_FLUX_FRACTION` is never used
+   --> src/disasters.rs:104:7
+    |
+104 | const EUROPA_SOLAR_FLUX_FRACTION: f64 = 0.037;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `TITAN_SOLAR_FLUX_FRACTION` is never used
+   --> src/disasters.rs:124:7
+    |
+124 | const TITAN_SOLAR_FLUX_FRACTION: f64 = 0.011;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `tick_emergence` is never used
+   --> src/factions.rs:150:8
+    |
+ 86 | impl FactionEngine {
+    | ------------------ method in this implementation
+...
+150 |     fn tick_emergence(
+    |        ^^^^^^^^^^^^^^
+
+warning: constant `MAX_EMERGENCY_SESSIONS` is never used
+  --> src/governance.rs:47:7
+   |
+47 | const MAX_EMERGENCY_SESSIONS: u32 = 3;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `EMERGENCY_DV_MULTIPLIER` is never used
+  --> src/interworld.rs:38:7
+   |
+38 | const EMERGENCY_DV_MULTIPLIER: f64 = 2.5;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `DEEP_SPACE_SOCIAL_DECAY_MULT` is never used
+   --> src/needs.rs:112:7
+    |
+112 | const DEEP_SPACE_SOCIAL_DECAY_MULT: f64 = 1.5;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `PAIR_BOND_PROBABILITY` is never used
+  --> src/population.rs:15:7
+   |
+15 | const PAIR_BOND_PROBABILITY: f64 = 0.02;
+   |       ^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `C_KM_S` is never used
+  --> src/generation_ship.rs:46:7
+   |
+46 | const C_KM_S: f64 = 299_792.458;
+   |       ^^^^^^
+
+warning: constant `LY_KM` is never used
+  --> src/generation_ship.rs:48:7
+   |
+48 | const LY_KM: f64 = 9.461e12;
+   |       ^^^^^
+
+warning: `mycelix-multiworld-sim` (lib) generated 20 warnings (run `cargo fix --lib -p mycelix-multiworld-sim` to apply 9 suggestions)
+   Compiling mycelix-multiworld-sim v0.1.0 (/srv/luminous-dynamics/mycelix-multiworld-sim)
+    Finished `release` profile [optimized] target(s) in 0.99s
+     Running `target/release/ab_sweep`
+=== 5-SEED A/B SWEEP (150 years) ===
+
+  --- Symthaea ---
+    Seed   42: CVS 0.719 | Pop  6738 | Phi 0.175 | Wars 0 | Turchin 9 | OK
+    Seed  123: CVS 0.711 | Pop  7857 | Phi 0.152 | Wars 0 | Turchin 9 | OK
+    Seed  789: CVS 0.726 | Pop 10616 | Phi 0.200 | Wars 0 | Turchin 9 | OK
+    Seed 1337: CVS 0.730 | Pop  9639 | Phi 0.191 | Wars 0 | Turchin 9 | OK
+    Seed 2718: CVS 0.736 | Pop 12054 | Phi 0.219 | Wars 0 | Turchin 9 | OK
+    MEAN:      CVS 0.724 | Pop  9380 | Phi 0.187 | Wars 0 | Survival 5/5
+
+  --- Legacy ---
+    Seed   42: CVS 0.689 | Pop  7182 | Phi 0.049 | Wars 0 | Turchin 9 | OK
+    Seed  123: CVS 0.679 | Pop  5158 | Phi 0.040 | Wars 0 | Turchin 9 | OK
+    Seed  789: CVS 0.710 | Pop 10250 | Phi 0.090 | Wars 1 | Turchin 9 | OK
+    Seed 1337: CVS 0.688 | Pop  8936 | Phi 0.071 | Wars 0 | Turchin 9 | OK
+    Seed 2718: CVS 0.692 | Pop  8295 | Phi 0.038 | Wars 1 | Turchin 9 | OK
+    MEAN:      CVS 0.691 | Pop  7964 | Phi 0.057 | Wars 2 | Survival 5/5
+
+  --- Utopia ---
+    Seed   42: CVS 0.716 | Pop  6185 | Phi 0.262 | Wars 0 | Turchin 0 | OK
+    Seed  123: CVS 0.709 | Pop  5546 | Phi 0.249 | Wars 0 | Turchin 0 | OK
+    Seed  789: CVS 0.719 | Pop  6102 | Phi 0.282 | Wars 0 | Turchin 0 | OK
+    Seed 1337: CVS 0.714 | Pop  7463 | Phi 0.262 | Wars 0 | Turchin 0 | OK
+    Seed 2718: CVS 0.713 | Pop  6738 | Phi 0.255 | Wars 0 | Turchin 0 | OK
+    MEAN:      CVS 0.714 | Pop  6406 | Phi 0.262 | Wars 0 | Survival 5/5
+
+=== INTERPRETATION ===
+Compare mean CVS, population, and Phi across conditions.
+If Symthaea consistently outperforms Legacy, the thesis holds.

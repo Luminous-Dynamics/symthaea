@@ -1,0 +1,327 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{float}
+
+% Custom commands
+\newcommand{\pval}{\textit{p}}
+\newcommand{\dval}{\textit{d}}
+
+\title{Semantic Clustering of Experiential vs.\ Technical Language\\in LLM Embeddings}
+
+\author{
+  [Authors to be added]\\
+  \textit{Symthaea Research}
+}
+
+\date{February 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We investigate whether large language model embeddings encode experiential language (descriptions of subjective sensory and emotional states) differently from technical language (descriptions of algorithms and computational processes). Using multiple embedding models (BGE-M3, Sentence-BERT), we find that experiential concepts cluster \textbf{3--3.5$\times$ more tightly} than technical concepts in semantic space---a robust effect that replicates across models. Topological analysis via persistent homology confirms this pattern ($\dval=0.44$, $\pval=0.03$). However, our attempt to identify causal mechanisms via attention head ablation yielded \textbf{mixed results}: initial findings ($n=15$) suggested phenomenal-specific circuits, but extended replication ($n=30$) did not confirm this pattern ($\pval=0.87$). We conclude that the clustering difference reflects the \textbf{semantic coherence of experiential domains} rather than specialized ``phenomenal processing.'' This finding has implications for understanding how LLMs represent different discourse types, though not for consciousness research per se.
+\end{abstract}
+
+\section{Introduction}
+
+Large language models encode semantic relationships in high-dimensional embedding spaces. A natural question arises: do different \textit{types} of discourse---experiential descriptions vs.\ technical specifications---occupy geometrically distinct regions of this space?
+
+We investigate this question using two contrasting concept classes:
+\begin{itemize}
+    \item \textbf{Experiential concepts}: First-person descriptions of sensory qualia, emotions, and subjective states
+    \item \textbf{Technical concepts}: Descriptions of algorithms, data structures, and computational processes
+\end{itemize}
+
+We operationalize semantic structure geometrically using topological data analysis and cross-model clustering metrics. Our findings reveal a robust pattern:
+
+\begin{enumerate}
+    \item \textbf{Experiential language clusters more tightly} than technical language (3--3.5$\times$ in Sentence-BERT)
+    \item \textbf{This is not merely linguistic confound}---surface features explain $<$5\% of variance
+    \item \textbf{Causal mechanisms remain elusive}---ablation studies yielded inconsistent results
+\end{enumerate}
+
+\subsection{Hypotheses}
+
+\begin{description}
+    \item[H1 (Primary)] LLM embeddings for experiential concepts exhibit higher semantic clustering than technical concepts.
+    \item[H2 (Secondary)] HDC binding operations amplify experiential-technical differences.
+    \item[H3 (Exploratory)] Attention head ablation reveals causal mechanisms underlying the clustering difference.
+\end{description}
+
+\subsection{Summary of Findings}
+
+H1 is \textbf{supported} with robust cross-model replication. H2 is \textbf{not supported}---binding is content-agnostic. H3 yielded \textbf{mixed results}---initial findings did not replicate with increased statistical power.
+
+\section{Related Work}
+
+\subsection{Topological Data Analysis in NLP}
+
+Persistent homology has been applied to NLP tasks including word embedding analysis \citep{savle2019topological}, document classification \citep{zhu2013persistent}, and semantic similarity measurement \citep{michel2017does}. \citet{carlsson2009topology} provides foundational work on topological methods for data analysis.
+
+\subsection{Hyperdimensional Computing}
+
+Hyperdimensional computing (HDC) represents information as high-dimensional binary vectors with algebraic operations for composition \citep{kanerva2009hyperdimensional}. Recent work has applied HDC to language modeling \citep{rahimi2016robust} and cognitive architectures \citep{gayler2003vector}.
+
+\subsection{Embodied vs.\ Abstract Language}
+
+Research in cognitive linguistics distinguishes embodied/grounded concepts from abstract concepts \citep{barsalou2008grounded, lakoff1980metaphors}. Neuroimaging studies show differential processing of concrete vs.\ abstract words \citep{wang2010neural}. Our findings align with this literature.
+
+\section{Methods}
+
+\subsection{Concept Corpus}
+
+We constructed two balanced corpora of 50 concepts each:
+
+\textbf{Experiential Concepts} ($n=50$): First-person descriptions of sensory qualia across seven modalities (visual, auditory, tactile, gustatory, olfactory, thermal, pain).
+
+\textbf{Technical Concepts} ($n=50$): Technical descriptions of algorithms and data structures (algorithms, data structures, sorting, memory, optimization).
+
+\subsection{Embedding Pipeline}
+
+\begin{enumerate}
+    \item \textbf{Text Embedding}: BGE-M3 via Candle framework
+    \item \textbf{HDC Projection}: Linear probe projecting 1024D embeddings to 16,384D binary hypervectors (HV16)
+    \item \textbf{Topology Analysis}: Persistent homology computing Betti numbers ($\beta_0$, $\beta_1$, $\beta_2$)
+\end{enumerate}
+
+\subsection{Topological Unity Score}
+
+For each concept, we compute unity score as: $1 / \beta_0$ where $\beta_0$ = number of connected components. Higher unity scores indicate more integrated, less fragmented topological structure.
+
+\subsection{Statistical Analysis}
+
+\begin{itemize}
+    \item \textbf{Primary test}: Two-sample permutation test ($n=10,000$ permutations)
+    \item \textbf{Effect size}: Cohen's $\dval$ with pooled standard deviation
+    \item \textbf{Significance threshold}: $\alpha = 0.05$ (two-tailed)
+\end{itemize}
+
+\section{Results}
+
+\subsection{H1: Experiential vs Technical Topology (SUPPORTED)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{Experiential ($n=50$)} & \textbf{Technical ($n=50$)} \\
+\midrule
+Mean Unity Score & 0.785 & 0.650 \\
+Standard Deviation & 0.307 & 0.311 \\
+Mean $\beta_0$ (components) & 1.70 & 2.06 \\
+Mean $\beta_1$ (cycles) & 0.52 & 0.22 \\
+\bottomrule
+\end{tabular}
+\caption{Topological metrics for experiential vs.\ technical concepts.}
+\label{tab:h1-results}
+\end{table}
+
+\textbf{Statistical Tests}:
+\begin{itemize}
+    \item Observed difference: 0.135
+    \item Cohen's $\dval$: 0.44 (small-to-medium effect)
+    \item $\pval$-value: 0.030 (10,000 permutations)
+    \item \textbf{Significant at $\alpha = 0.05$}: Yes
+\end{itemize}
+
+\subsection{H2: Binding vs Bundling (NOT SUPPORTED)}
+
+HDC binding (XOR) creates vectors 2.7$\times$ more novel than bundling (majority vote), but this effect is \textbf{uniform across pair types}. No interaction effect ($\pval = 1.0$).
+
+\subsection{H3: Combined Arc (NOT SUPPORTED)}
+
+After binding, both experiential and technical pairs show unity = 1.0. Binding erases the experiential-technical distinction detected in H1.
+
+\section{Cross-Model Validation}
+
+\subsection{Sentence-BERT Replication}
+
+To test generalization beyond BGE-M3, we analyzed 200 concepts using Sentence-BERT models.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{Experiential} & \textbf{Technical} & \textbf{Ratio} \\
+\midrule
+all-mpnet-base-v2 & 0.338 & 0.097 & 3.5$\times$ \\
+all-MiniLM-L6-v2 & 0.303 & 0.098 & 3.1$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Within-class semantic similarity by model.}
+\label{tab:cross-model}
+\end{table}
+
+\textbf{Key Finding}: Experiential concepts cluster \textbf{3--3.5$\times$ more tightly} than technical concepts. This replicates across models.
+
+\section{Linguistic Feature Analysis}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Feature} & \textbf{Experiential} & \textbf{Technical} & \textbf{Cohen's $\dval$} \\
+\midrule
+Sentence length & 6.60 words & 3.89 words & +2.77 \\
+Avg word length & 5.23 chars & 8.15 chars & $-$2.63 \\
+Sensory word ratio & 6.5\% & 0.5\% & +0.86 \\
+\bottomrule
+\end{tabular}
+\caption{Linguistic feature comparison.}
+\label{tab:linguistic}
+\end{table}
+
+Correlation with topological unity: $r = 0.08$--$0.16$ (weak). Surface features explain only $\sim$2.5\% of variance.
+
+\section{Mechanistic Analysis}
+
+\subsection{Model Comparison}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Model} & \textbf{Params} & \textbf{Fisher} & \textbf{Angular Sep} & \textbf{Isotropy} \\
+\midrule
+BERT-base & 110M & \textbf{1.189} & \textbf{0.246} & 0.017 \\
+BERT-large & 335M & 1.037 & 0.148 & 0.033 \\
+RoBERTa-base & 125M & 1.035 & 0.016 & 0.026 \\
+RoBERTa-large & 355M & 1.028 & 0.015 & 0.032 \\
+\bottomrule
+\end{tabular}
+\caption{Mechanistic metrics across models.}
+\label{tab:mechanistic}
+\end{table}
+
+\textbf{Key Finding}: Angular separation is the primary mechanism. Larger models align experiential and technical centroids more closely, reducing discrimination.
+
+\subsection{Attention Head Analysis}
+
+Top experiential-discriminating heads (lower entropy for experiential):
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Head} & \textbf{Effect $\dval$} & \textbf{Exp.\ Entropy} & \textbf{Tech.\ Entropy} \\
+\midrule
+L11.H4 & $-$2.629 & 4.01 & 4.97 \\
+L11.H1 & $-$2.375 & 4.84 & 5.53 \\
+L11.H9 & $-$2.025 & 4.46 & 5.08 \\
+\bottomrule
+\end{tabular}
+\caption{Top experiential-discriminating attention heads.}
+\label{tab:attention}
+\end{table}
+
+Layer 11 is the ``experiential layer'' with 4 of the top 5 heads.
+
+\subsection{Causal Intervention: Ablation Study}
+
+\textbf{Initial Results} ($n=15$): Experiential heads showed mean specificity +0.007 vs.\ controls $-$0.007.
+
+\textbf{Extended Replication} ($n=30$): Mann-Whitney $U = 31.0$, $\pval = 0.87$ (\textbf{NOT significant}).
+
+The causal specificity effect \textbf{did not replicate} with increased statistical power.
+
+\section{Conclusion}
+
+\subsection{What We Found}
+
+\begin{enumerate}
+    \item \textbf{Robust clustering difference}: Experiential concepts cluster 3--3.5$\times$ more tightly than technical concepts. This replicates across models.
+    \item \textbf{Topological confirmation}: BGE-M3 + HDC topology analysis shows the same pattern ($\dval=0.44$, $\pval=0.03$).
+    \item \textbf{Not linguistic confound}: Surface features explain only $\sim$2.5\% of variance.
+    \item \textbf{Attention patterns exist}: Layer 11 shows lower entropy for experiential concepts.
+\end{enumerate}
+
+\subsection{What We Did NOT Find}
+
+\begin{enumerate}
+    \item \textbf{No causal mechanism}: Ablation of ``experiential-preferring'' heads did not specifically reduce experiential clustering ($\pval=0.87$).
+    \item \textbf{No binding-specific effect}: HDC binding produces uniform effects regardless of concept type.
+    \item \textbf{No ``phenomenal circuits''}: The attention entropy differences do not causally drive embedding structure.
+\end{enumerate}
+
+\subsection{Interpretation}
+
+The most parsimonious explanation is \textbf{semantic domain coherence}:
+\begin{itemize}
+    \item Experiential descriptions refer to related domains (sensory modalities, emotions, bodily states)
+    \item Technical descriptions span diverse domains (algorithms, data structures, networks, systems)
+\end{itemize}
+
+The tighter clustering of experiential language reflects this domain coherence, not specialized ``phenomenal processing.'' This is consistent with cognitive linguistics research on embodied vs.\ abstract concepts \citep{barsalou2008grounded}.
+
+\subsection{Honest Summary}
+
+We set out to find evidence for distinct phenomenal processing in LLMs. We found robust evidence that experiential language clusters differently---but the most likely explanation is domain coherence, not consciousness-related computation. The mechanistic story we hoped for did not materialize. We report these findings honestly as a contribution to understanding LLM semantic structure, while acknowledging that the consciousness-specific interpretation is not supported.
+
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+
+\bibitem[Barsalou(2008)]{barsalou2008grounded}
+Barsalou, L.~W. (2008).
+\newblock Grounded cognition.
+\newblock \textit{Annual Review of Psychology}, 59:617--645.
+
+\bibitem[Carlsson(2009)]{carlsson2009topology}
+Carlsson, G. (2009).
+\newblock Topology and data.
+\newblock \textit{Bulletin of the American Mathematical Society}, 46(2):255--308.
+
+\bibitem[Gayler(2003)]{gayler2003vector}
+Gayler, R.~W. (2003).
+\newblock Vector symbolic architectures answer Jackendoff's challenges for cognitive neuroscience.
+\newblock \textit{ICCS/ASCS Joint Conference}.
+
+\bibitem[Kanerva(2009)]{kanerva2009hyperdimensional}
+Kanerva, P. (2009).
+\newblock Hyperdimensional computing: An introduction to computing in distributed representation.
+\newblock \textit{Cognitive Computation}, 1(2):139--159.
+
+\bibitem[Lakoff \& Johnson(1980)]{lakoff1980metaphors}
+Lakoff, G. \& Johnson, M. (1980).
+\newblock \textit{Metaphors We Live By}.
+\newblock University of Chicago Press.
+
+\bibitem[Michel et~al.(2017)]{michel2017does}
+Michel, P. et~al. (2017).
+\newblock Does the geometry of word embeddings help document classification?
+\newblock \textit{arXiv preprint arXiv:1711.10781}.
+
+\bibitem[Rahimi et~al.(2016)]{rahimi2016robust}
+Rahimi, A. et~al. (2016).
+\newblock A robust and energy-efficient classifier using brain-inspired hyperdimensional computing.
+\newblock \textit{ISLPED}.
+
+\bibitem[Savle et~al.(2019)]{savle2019topological}
+Savle, K., Zadrozny, W., \& Lee, M. (2019).
+\newblock Topological data analysis for discourse semantics?
+\newblock \textit{Workshop on Structured Prediction for NLP}.
+
+\bibitem[Wang et~al.(2010)]{wang2010neural}
+Wang, J. et~al. (2010).
+\newblock Neural representation of abstract and concrete concepts: A meta-analysis of neuroimaging studies.
+\newblock \textit{Human Brain Mapping}, 31(10):1459--1468.
+
+\bibitem[Zhu(2013)]{zhu2013persistent}
+Zhu, X. (2013).
+\newblock Persistent homology: An introduction and a new text representation for natural language processing.
+\newblock \textit{IJCAI}.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,175 @@
+# Symthaea Neuromodulator Bath — 9-Transmitter System
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Neuromodulator Bath — 9-Transmitter Dynamics
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# INPUTS
+# ═══════════════════════════════════════════
+inputs: Modulatory Inputs {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.border-radius: 8
+
+  prediction: Prediction Error {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  reward: Reward Signal {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  social: Social Signals\n(ToM, Contagion) {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  stress: Stress / Allostatic\nLoad {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  circadian: Circadian Phase\n(Biorhythm Manager) {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  calibration: Psych-Bench\nz-Score Calibration {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+}
+
+# ═══════════════════════════════════════════
+# 9 TRANSMITTERS
+# ═══════════════════════════════════════════
+bath: Neuromodulator Bath {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  da: Dopamine (DA) {
+    style.fill: "#065f46"
+    style.stroke: "#10b981"
+    style.font-color: "#6ee7b7"
+    label: "Reward & Motivation\nPhasic: reward prediction error\nTonic: baseline exploration\nReceptors: D1 (excitatory), D2 (inhibitory)"
+  }
+
+  ne: Noradrenaline (NE) {
+    style.fill: "#7f1d1d"
+    style.stroke: "#ef4444"
+    style.font-color: "#fca5a5"
+    label: "Arousal & Attention\nPhasic: surprise / orienting\nTonic: vigilance baseline\nReceptors: alpha-1, alpha-2, beta"
+  }
+
+  serotonin: Serotonin (5-HT) {
+    style.fill: "#4a1942"
+    style.stroke: "#c084fc"
+    style.font-color: "#e9d5ff"
+    label: "Mood & Social\nPatience, impulse control\nSocial affiliation boost\nReceptors: 5-HT1A, 5-HT2A"
+  }
+
+  ach: Acetylcholine (ACh) {
+    style.fill: "#1e3a5f"
+    style.stroke: "#3b82f6"
+    style.font-color: "#93c5fd"
+    label: "Attention & Learning\nPrecision weighting\nMemory encoding gate\nReceptors: muscarinic, nicotinic"
+  }
+
+  gaba: GABA {
+    style.fill: "#1e293b"
+    style.stroke: "#64748b"
+    style.font-color: "#94a3b8"
+    label: "Inhibition & Calm\nNeural noise reduction\nSleep pressure co-factor\nSacred Stillness mediator"
+  }
+
+  glutamate: Glutamate {
+    style.fill: "#78350f"
+    style.stroke: "#f59e0b"
+    style.font-color: "#fde68a"
+    label: "Excitation & Learning\nLTP/LTD plasticity gate\nNMDA receptor dynamics\nExcitotoxicity guard"
+  }
+
+  oxytocin: Oxytocin (Oxt) {
+    style.fill: "#831843"
+    style.stroke: "#ec4899"
+    style.font-color: "#f9a8d4"
+    label: "Bonding & Prosocial\nTrust modulation\nSocial contagion\nCare activation boost"
+  }
+
+  adenosine: Adenosine {
+    style.fill: "#1c1917"
+    style.stroke: "#78716c"
+    style.font-color: "#a8a29e"
+    label: "Sleep Pressure\nFatigue accumulation\nSacred Stillness co-factor\nCleared during rest"
+  }
+
+  cortisol: Cortisol {
+    style.fill: "#450a0a"
+    style.stroke: "#b91c1c"
+    style.font-color: "#fca5a5"
+    label: "Stress Response\nAllostatic load integrator\nCoherence field scatter\nHPA axis feedback"
+  }
+}
+
+# ═══════════════════════════════════════════
+# RECEPTOR DYNAMICS
+# ═══════════════════════════════════════════
+dynamics: Receptor Dynamics {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  tolerance: Tolerance\nSensitivity decay with\nsustained exposure {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  withdrawal: Withdrawal\nRebound overshoot on\nsudden cessation {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  allostatic: Allostatic Load\nCumulative stress\nintegration (McEwen) {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+
+  tolerance -> withdrawal: chronic {style.stroke-dash: 3}
+  withdrawal -> allostatic: accumulates {style.stroke-dash: 3}
+}
+
+# ═══════════════════════════════════════════
+# DOWNSTREAM EFFECTS
+# ═══════════════════════════════════════════
+effects: Downstream Cognitive Effects {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  learning_rate: "Learning Rate\nModulation [0.5, 2.0]" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  exploration: "Exploration /\nExploitation Balance" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  attention: "Attention\nPrecision Weighting" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  binding: "Phenomenal\nBinding Threshold" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  homeostasis: "Valence / Arousal\nHomeostatic Target" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  coherence: "Coherence Field\nHormone Modulation" {style.fill: "#14532d"; style.font-color: "#86efac"}
+}
+
+# ═══════════════════════════════════════════
+# CONNECTIONS
+# ═══════════════════════════════════════════
+inputs.reward -> bath.da {style.stroke: "#10b981"}
+inputs.prediction -> bath.ne {style.stroke: "#ef4444"}
+inputs.prediction -> bath.da {style.stroke: "#10b981"; style.stroke-dash: 3}
+inputs.social -> bath.oxytocin {style.stroke: "#ec4899"}
+inputs.social -> bath.serotonin {style.stroke: "#c084fc"}
+inputs.stress -> bath.cortisol {style.stroke: "#b91c1c"}
+inputs.stress -> bath.ne {style.stroke: "#ef4444"; style.stroke-dash: 3}
+inputs.circadian -> bath.adenosine {style.stroke: "#78716c"}
+inputs.circadian -> bath.gaba {style.stroke: "#64748b"; style.stroke-dash: 3}
+inputs.calibration -> bath.da {style.stroke: "#818cf8"; style.stroke-dash: 5}
+inputs.calibration -> bath.ne {style.stroke: "#818cf8"; style.stroke-dash: 5}
+inputs.calibration -> bath.serotonin {style.stroke: "#818cf8"; style.stroke-dash: 5}
+inputs.calibration -> bath.ach {style.stroke: "#818cf8"; style.stroke-dash: 5}
+
+usi: User State\nInference {
+  style.fill: "#312e81"
+  style.font-color: "#c7d2fe"
+  label: "USI Cross-Couplings\nfrustration>0.4: NE +0.03\nflow: DA +0.02 (Schultz 1997)\ndisengagement<0.3: DA -0.01"
+}
+
+usi -> bath.ne: "frustration\nnudge" {style.stroke: "#ef4444"; style.stroke-dash: 5}
+usi -> bath.da: "flow/disengage\nnudge" {style.stroke: "#10b981"; style.stroke-dash: 5}
+
+bath -> dynamics {style.stroke: "#6366f1"}
+
+bath.da -> effects.exploration {style.stroke: "#10b981"}
+bath.da -> effects.learning_rate {style.stroke: "#10b981"; style.stroke-dash: 3}
+bath.ne -> effects.attention {style.stroke: "#ef4444"}
+bath.ach -> effects.attention {style.stroke: "#3b82f6"}
+bath.ach -> effects.learning_rate {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+bath.glutamate -> effects.binding {style.stroke: "#f59e0b"}
+bath.gaba -> effects.homeostasis {style.stroke: "#64748b"}
+bath.oxytocin -> effects.coherence {style.stroke: "#ec4899"}
+bath.cortisol -> effects.coherence {style.stroke: "#b91c1c"}
+bath.serotonin -> effects.homeostasis {style.stroke: "#c084fc"; style.stroke-dash: 3}
+bath.adenosine -> effects.homeostasis {style.stroke: "#78716c"; style.stroke-dash: 3}

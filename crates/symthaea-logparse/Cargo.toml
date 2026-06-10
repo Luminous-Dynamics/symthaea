@@ -1,0 +1,35 @@
+[package]
+name = "symthaea-logparse"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Log ingestion and HDC semantic clustering for Symthaea IT-ops reasoning (Phase 1 spike). Parses Windows Event Log (evtx) + syslog (RFC5424) into structured events and encodes them as 16,384D hypervectors for clustering."
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Windows Event Log parsing. evtx is pure-Rust, parses the binary .evtx format
+# to structured JSON/XML. Works on Linux — we parse corpora offline, we are not
+# reading a live ETW session.
+evtx = "0.8"
+
+# Syslog RFC5424 / RFC3164 parser.
+syslog_loose = "0.21"
+
+# HDBSCAN over the 16,384D hypervectors. Pure Rust, takes Vec<Vec<f64>>
+# directly — no ndarray dance. We keep this as a normal dep so integration
+# tests and the example can share the cluster pipeline.
+hdbscan = "0.12"
+
+[dev-dependencies]
+
+[features]
+default = []
+# Enables wiring into symthaea-core HDC encoder. Off by default so this crate
+# builds standalone during the spike without pulling the whole workspace.
+hdc-encoder = []

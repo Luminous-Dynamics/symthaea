@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Symthaea — Consciousness-First Infrastructure</title>
+    <meta name="description" content="Consciousness-first cognitive architecture running in your browser. Pure Rust, no JavaScript runtime.">
+    <meta name="theme-color" content="#7ec8a0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:* wss://*; img-src 'self' data:; worker-src 'self';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <link rel="manifest" href="./assets/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
+    <link rel="apple-touch-icon" href="./assets/icon-192.png">
+    <link data-trunk rel="css" href="style/main.css">
+    <!-- Copy the SporeEngine WASM + worker to dist -->
+    <link data-trunk rel="copy-dir" href="assets">
+</head>
+<body></body>
+</html>

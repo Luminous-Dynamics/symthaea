@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-nurture"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bowlby attachment theory, co-regulation, developmental milestones, and nurturing AI via HDC + LTC"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["attachment", "bowlby", "developmental-psychology", "hdc", "nurture"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-fep = { path = "../symthaea-fep" }
+symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = "1.4"

@@ -1,0 +1,130 @@
+{
+  "version": "1.0.0",
+  "description": "Cross-language FL test vectors for Rust, TypeScript, and Python SDKs",
+  "precision_note": "All values rounded to 6 decimal places. Cross-language tolerance: 1e-4",
+  "inputs": {
+    "dimension": 5,
+    "updates": [
+      {
+        "participant_id": "honest_0",
+        "model_version": 1,
+        "gradients": [0.1, 0.2, 0.3, 0.4, 0.5],
+        "batch_size": 100,
+        "loss": 0.5
+      },
+      {
+        "participant_id": "honest_1",
+        "model_version": 1,
+        "gradients": [0.12, 0.22, 0.28, 0.42, 0.48],
+        "batch_size": 200,
+        "loss": 0.45
+      },
+      {
+        "participant_id": "honest_2",
+        "model_version": 1,
+        "gradients": [0.11, 0.19, 0.31, 0.39, 0.51],
+        "batch_size": 150,
+        "loss": 0.48
+      },
+      {
+        "participant_id": "honest_3",
+        "model_version": 1,
+        "gradients": [0.09, 0.21, 0.29, 0.41, 0.49],
+        "batch_size": 100,
+        "loss": 0.52
+      },
+      {
+        "participant_id": "honest_4",
+        "model_version": 1,
+        "gradients": [0.13, 0.18, 0.32, 0.38, 0.52],
+        "batch_size": 120,
+        "loss": 0.47
+      },
+      {
+        "participant_id": "byz_0",
+        "model_version": 1,
+        "gradients": [50.0, -30.0, 80.0, -60.0, 100.0],
+        "batch_size": 100,
+        "loss": 0.9
+      },
+      {
+        "participant_id": "byz_1",
+        "model_version": 1,
+        "gradients": [-40.0, 70.0, -50.0, 90.0, -80.0],
+        "batch_size": 100,
+        "loss": 0.85
+      },
+      {
+        "participant_id": "byz_2",
+        "model_version": 1,
+        "gradients": [30.0, 30.0, 30.0, 30.0, 30.0],
+        "batch_size": 100,
+        "loss": 0.88
+      },
+      {
+        "participant_id": "lowrep_0",
+        "model_version": 1,
+        "gradients": [0.5, 0.5, 0.5, 0.5, 0.5],
+        "batch_size": 80,
+        "loss": 0.6
+      },
+      {
+        "participant_id": "lowrep_1",
+        "model_version": 1,
+        "gradients": [0.4, 0.6, 0.4, 0.6, 0.4],
+        "batch_size": 80,
+        "loss": 0.55
+      }
+    ],
+    "reputations": {
+      "byz_0": 0.15,
+      "byz_1": 0.12,
+      "byz_2": 0.18,
+      "honest_0": 0.9,
+      "honest_1": 0.85,
+      "honest_2": 0.88,
+      "honest_3": 0.87,
+      "honest_4": 0.86,
+      "lowrep_0": 0.4,
+      "lowrep_1": 0.35
+    }
+  },
+  "expected_outputs": {
+    "fedavg": {
+      "gradients": [3.67, 6.392124, 5.550354, 5.625752, 4.783982]
+    },
+    "trimmed_mean_0_2": {
+      "trim_percentage": 0.2,
+      "gradients": [0.226667, 0.32, 0.353333, 0.453333, 0.5]
+    },
+    "coordinate_median": {
+      "gradients": [0.125, 0.215, 0.315, 0.415, 0.5]
+    },
+    "krum_3": {
+      "num_select": 3,
+      "gradients": [0.113784, 0.189459, 0.310541, 0.389459, 0.51054]
+    },
+    "trust_weighted_0_5": {
+      "trust_threshold": 0.5,
+      "gradients": [0.111931, 0.201522, 0.298478, 0.401522, 0.498478],
+      "participant_count": 5,
+      "excluded_count": 5
+    }
+  },
+  "byzantine_detection": {
+    "early_detector": {
+      "byzantine_indices": [],
+      "early_terminated": false
+    },
+    "multi_signal_detector": {
+      "byzantine_indices": [5, 6, 7],
+      "early_terminated": false,
+      "stats": {
+        "mean_norm": 37.928169,
+        "std_norm": 60.843864,
+        "mean_cosine_sim": 0.789641,
+        "participants_analyzed": 10
+      }
+    }
+  }
+}

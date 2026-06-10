@@ -1,0 +1,82 @@
+==============================================================================
+  Symthaea Muse: Paper Analysis
+  Ablation & Statistical Testing for Consciousness-Driven Music Synthesis
+==============================================================================
+
+=== ANALYSIS 1: Statistical Testing of Feature-State Correlations ===
+(12 states x 5 seeds = 60 data points per feature)
+Bonferroni threshold: p < 0.00227 (0.05/22)
+
+  [ 1/12] Excitement/Joy    done (5 seeds)
+  [ 2/12] Panic/Anger       done (5 seeds)
+  [ 3/12] Content/Peace     done (5 seeds)
+  [ 4/12] Sadness/Grief     done (5 seeds)
+  [ 5/12] Elation           done (5 seeds)
+  [ 6/12] Serenity          done (5 seeds)
+  [ 7/12] Delight           done (5 seeds)
+  [ 8/12] Melancholy        done (5 seeds)
+  [ 9/12] Tension           done (5 seeds)
+  [10/12] Tenderness        done (5 seeds)
+  [11/12] Agitation         done (5 seeds)
+  [12/12] Despair           done (5 seeds)
+
+Feature              | r(arousal) |   p-value | Sig? | r(valence) |   p-value | Sig? |     95% CI(A)
+---------------------------------------------------------------------------------------------------------
+onset_density        |     -0.113 |    1.00e0 |      |     -0.299 |   2.37e-2 |   *  | [-0.36,+0.14]
+rms_energy           |     +0.844 |  2.60e-17 |  *** |     +0.287 |   3.13e-2 |   *  | [+0.75,+0.90]
+tempo_proxy          |     -0.022 |    0.00e0 |  *** |     -0.387 |   2.45e-3 |   *  | [-0.27,+0.23]
+spectral_centroid    |     +0.150 |   5.16e-1 |      |     -0.032 |    0.00e0 |  *** | [-0.11,+0.39]
+spectral_flux        |     +0.839 |  5.59e-17 |  *** |     +0.270 |   4.54e-2 |   *  | [+0.74,+0.90]
+harmonic_tension     |     -0.091 |    0.00e0 |  *** |     -0.231 |   9.96e-2 |      | [-0.34,+0.17]
+zero_crossing_rate   |     +0.150 |   5.16e-1 |      |     -0.032 |    0.00e0 |  *** | [-0.11,+0.39]
+major_mode_weight    |     -0.366 |   4.44e-3 |   *  |     +0.319 |   1.51e-2 |   *  | [-0.57,-0.12]
+note_range           |     +0.139 |   6.92e-1 |      |     +0.351 |   6.65e-3 |   *  | [-0.12,+0.38]
+velocity_variance    |     +0.833 |  1.47e-16 |  *** |     +0.092 |    0.00e0 |  *** | [+0.73,+0.90]
+phrase_length        |     -0.113 |    1.00e0 |      |     -0.299 |   2.37e-2 |   *  | [-0.36,+0.14]
+
+  Bonferroni-significant features: 7/11
+
+=== ANALYSIS 2: Ablation Study ===
+
+  [1/7] Full system        ... done
+  [2/7] No FEP             ... done
+  [3/7] No feedback        ... done
+  [4/7] No Emot. Anchor    ... done
+  [5/7] No consciousness   ... done
+  [6/7] No reverb          ... done
+  [7/7] Null model         ... done
+
+Configuration      | State Discrim. | Feature Var. | R(arousal) | R(valence) | D from base
+-------------------------------------------------------------------------------------
+Full system        |         85.604 |    362.13370 |     +0.479 |     +0.612 |          --
+No FEP             |        148.326 |   1194.19153 |     +0.538 |     +0.668 |      +73.3%
+No feedback        |        214.451 |   2376.01758 |     +0.777 |     +0.380 |     +150.5%
+No Emot. Anchor    |        134.629 |    833.18378 |     +0.574 |     +0.543 |      +57.3%
+No consciousness   |        248.389 |   2712.41235 |     +0.787 |     +0.266 |     +190.2%
+No reverb          |        162.404 |   1294.89526 |     +0.767 |     +0.455 |      +89.7%
+Null model         |          0.000 |      0.00000 |     +0.000 |     +0.000 |     -100.0%
+
+=== ANALYSIS 3: Phi as Musical Identity ===
+(Partial correlations controlling for arousal and valence)
+
+Feature              | r(Phi|A,V) |   p-value | Interpretation                     
+----------------------------------------------------------------------------------
+onset_density        |     +0.113 |    1.00e0     | Note density scales with Phi       
+rms_energy           |     -0.118 |    1.00e0     | Energy output modulated by Phi     
+tempo_proxy          |     -0.060 |    0.00e0 *** | Rhythmic regularity via Phi        
+spectral_centroid    |     -0.389 |   2.77e-3 **  | Brightness tracks consciousness    
+spectral_flux        |     -0.022 |    0.00e0 *** | Timbral flux coupled to Phi        
+harmonic_tension     |     -0.049 |    0.00e0 *** | Tension inversely tracks Phi       
+zero_crossing_rate   |     -0.389 |   2.77e-3 **  | Noise floor modulated by Phi       
+major_mode_weight    |     +0.244 |   8.33e-2     | Mode clarity from Phi coherence    
+note_range           |     +0.120 |    1.00e0     | Pitch range expands with Phi       
+velocity_variance    |     -0.106 |    1.00e0     | Dynamic range from Phi             
+phrase_length        |     +0.113 |    1.00e0     | Phrase structure via Phi           
+
+  Features with significant Phi partial correlation (p<0.05): 5/11
+  This measures the unique musical signature of consciousness level,
+  independent of the emotional state being expressed.
+
+==============================================================================
+  Analysis complete. 144 total data points across 8 configurations.
+==============================================================================

@@ -1,0 +1,38 @@
+[
+  {
+    "task": "tiger",
+    "method": "HAI",
+    "inference_ms": 0.11848682786599832,
+    "action_ms": 1.225787691325636,
+    "free_energy": 7.62,
+    "success_rate": 0.98,
+    "episodes": 100
+  },
+  {
+    "task": "grid_10x10",
+    "method": "HAI",
+    "inference_ms": 0.13631468964740634,
+    "action_ms": 1.8082774224691094,
+    "free_energy": 0.4951731411982998,
+    "success_rate": 0.0,
+    "episodes": 50
+  },
+  {
+    "task": "grid_20x20",
+    "method": "HAI",
+    "inference_ms": 0.131129528551052,
+    "action_ms": 1.7530539724975824,
+    "free_energy": 0.4885982716675271,
+    "success_rate": 0.0,
+    "episodes": 30
+  },
+  {
+    "task": "multiagent_coord",
+    "method": "HAI",
+    "inference_ms": 0.11987894773483276,
+    "action_ms": 1.3607154768891632,
+    "free_energy": 0.483406873012558,
+    "success_rate": 0.0,
+    "episodes": 50
+  }
+]

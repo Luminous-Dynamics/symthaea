@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Sensors: high-rate accel/gyro for motion detection -->
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <!-- Audio: ambient dB level only (no recording content) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Vibration for haptic consciousness feedback -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Foreground service for background consciousness -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Network: local Ollama LLM for conversation fallback -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Symthaea Soma"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.SomaDemo">
+
+        <!-- LiteRT-LM GPU acceleration (Tensor G3 Mali) -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false"/>
+        <uses-native-library android:name="libOpenCL.so" android:required="false"/>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Foreground service: keeps consciousness running in background.
+             Dream consolidation runs overnight, sensors stay active. -->
+        <service
+            android:name="io.symthaea.soma.SomaEngineService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <!-- Notification listener for social pressure + media state bridges.
+             User must explicitly enable in Settings → Apps → Special access →
+             Notification access. No notification content is read. -->
+        <service
+            android:name="io.symthaea.soma.SomaNotificationBridge"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

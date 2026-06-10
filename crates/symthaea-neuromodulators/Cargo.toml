@@ -1,0 +1,34 @@
+[package]
+name = "symthaea-neuromodulators"
+version = "0.1.0"
+edition = "2024"
+description = "Neuromodulator Bath: DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine signaling"
+license = "AGPL-3.0-or-later"
+autoexamples = false
+
+[features]
+default = []
+showcase = []
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[[example]]
+name = "rehabilitation_pathway"
+path = "examples/rehabilitation_pathway.rs"
+required-features = ["showcase"]
+
+[[example]]
+name = "pharmacogenomic_therapy_demo"
+path = "examples/pharmacogenomic_therapy_demo.rs"
+
+[[example]]
+name = "pgx_sensitivity_analysis"
+path = "examples/pgx_sensitivity_analysis.rs"
+
+[[example]]
+name = "pgx_equity_analysis"
+path = "examples/pgx_equity_analysis.rs"

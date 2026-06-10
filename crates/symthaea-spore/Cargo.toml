@@ -1,0 +1,94 @@
+[package]
+name = "symthaea-spore"
+version = "0.1.0"
+edition = "2024"
+description = "Symthaea Spore: WASM consciousness kernel (~500KB) for browser, edge, and embedded"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core", default-features = false }
+symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" }
+symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
+symthaea-types = { path = "../symthaea-types" }
+symthaea-harmonies = { path = "../symthaea-harmonies" }
+# Full Broca pipeline (symthaea-broca crate) — real language generation
+# Uses HdcLtcUnifiedNetwork, 24-channel encoder, epistemic gating, semantic veto.
+# Must use default-features = false to exclude rayon/simd (not WASM-compatible).
+symthaea-broca = { path = "../symthaea-broca", optional = true, default-features = false }
+symthaea-neuroevolution = { path = "../symthaea-neuroevolution", optional = true }
+# NixOS config generation — WASM-safe subset (no tokio/tree-sitter/rusqlite)
+symthaea-nix = { path = "../symthaea-nix", optional = true, default-features = false }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+rmp-serde = { workspace = true }
+blake3 = { workspace = true }
+
+# WASM bindings (optional — rlib builds skip this)
+wasm-bindgen = { version = "=0.2.108", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# Server-side deps (eval-api, ssh-relay) — optional, never in WASM
+axum = { version = "0.7", optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+tokio-tungstenite = { version = "0.24", optional = true }
+tungstenite = { version = "0.24", optional = true }
+tokio-rustls = { version = "0.26", optional = true }
+rustls = { version = "0.23", optional = true }
+rustls-pemfile = { version = "2", optional = true }
+rcgen = { version = "0.13", optional = true }
+tower-http = { version = "0.5", features = ["cors"], optional = true }
+futures-util = { version = "0.3", optional = true }
+
+# WASM support — getrandom needs "js"/"wasm_js" and uuid needs "rng-getrandom" on wasm32
+# getrandom 0.2 (used by rand 0.8/symthaea-core) uses feature "js"
+# getrandom 0.3 (used by rand_core/quinn-proto/tokenizers) uses feature "wasm_js"
+# getrandom 0.4 (used by uuid via rand 0.10) uses feature "wasm_js"
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+uuid = { version = "1.6", features = ["rng-getrandom"] }
+
+[features]
+default = []
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook", "dep:symthaea-nix"]
+# Full Broca pipeline (Tier 2): 24-channel encoder, epistemic gating,
+# emotional modulation, coherence feedback with semantic veto.
+# No additional dependencies — uses symthaea-core HDC-CfC infrastructure.
+broca-full = []
+# Full Broca pipeline from symthaea-broca crate (Tier 3): production-grade
+# HdcLtcUnifiedNetwork backbone, BpeTokenizer, trained checkpoints.
+# Replaces broca-full's self-contained vocab with real trained weights.
+broca-pipeline = ["dep:symthaea-broca"]
+neuroevolution = ["dep:symthaea-neuroevolution"]
+# Server-side features (eval-api, ssh-relay) — NOT for WASM builds
+server = ["dep:axum", "dep:tokio", "dep:tokio-tungstenite", "dep:tungstenite", "dep:tower-http", "dep:futures-util", "dep:tokio-rustls", "dep:rustls", "dep:rustls-pemfile", "dep:rcgen"]
+__soma_integration_tests = []
+
+[[bin]]
+name = "train-broca-lite"
+path = "src/bin/train_broca_lite.rs"
+
+[[bin]]
+name = "gen-spore-training-data"
+path = "src/bin/gen_spore_training_data.rs"
+
+[[bin]]
+name = "eval-api"
+path = "src/bin/eval_api.rs"
+required-features = ["server"]
+
+[[bin]]
+name = "ssh-relay"
+path = "src/bin/ssh_relay.rs"
+required-features = ["server"]
+
+[[bin]]
+name = "spore-mesh-daemon"
+path = "src/bin/mesh_daemon.rs"
+required-features = []

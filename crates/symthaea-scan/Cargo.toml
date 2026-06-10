@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-scan"
+version = "0.1.0"
+edition = "2024"
+description = "System scanner for Sovereign Inoculation — detects installed apps, hardware, and system state"
+license = "AGPL-3.0-or-later"
+
+[lib]
+name = "symthaea_scan"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sovereign-scan"
+path = "src/main.rs"
+
+[workspace]
+
+[dependencies]
+symthaea-app-db = { path = "../symthaea-app-db" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"

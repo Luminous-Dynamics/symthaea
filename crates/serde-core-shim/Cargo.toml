@@ -1,0 +1,9 @@
+[package]
+name = "serde_core"
+version = "1.0.228"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Local shim — re-exports serde to bridge the serde_core split"
+
+[dependencies]
+serde = "1.0"

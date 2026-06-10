@@ -1,0 +1,32 @@
+[package]
+name = "mycelix-fl-core"
+version = "0.1.0"
+edition = "2024"
+description = "Core federated learning types, aggregation algorithms, Byzantine detection, and unified pipeline"
+license = "AGPL-3.0-or-later"
+
+# Minimal dependencies — no holochain, no burn, no conflicts
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
+rand = { version = "0.8", default-features = false, features = ["alloc", "small_rng", "std_rng"] }
+thiserror = "1"
+mycelix-bridge-common = { path = "../mycelix-bridge-common", default-features = false }
+sha2 = { version = "0.10", optional = true }
+
+[features]
+default = ["std"]
+std = ["rand/std"]
+holochain = ["serde_json"]
+replay = ["sha2"]
+shapley = []
+ensemble = []
+compression = []
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.0"
+
+[[bench]]
+name = "aggregation_bench"
+harness = false

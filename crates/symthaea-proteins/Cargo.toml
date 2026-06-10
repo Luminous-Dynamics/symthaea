@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-proteins"
+version = "0.1.0"
+edition = "2024"
+description = "Protein secondary structure prediction via physics baseline + ML correction"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

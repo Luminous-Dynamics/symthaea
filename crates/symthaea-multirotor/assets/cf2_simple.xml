@@ -1,0 +1,60 @@
+<!-- Crazyflie 2 — Primitive geometry, exact physics, zero mesh dependencies.
+     Mass: 0.027 kg, arm length: 46mm, rotor radius: 23mm.
+     Actuators: thrust [0, 0.6] N, roll/pitch moment [-0.005, 0.005] Nm, yaw [-0.002, 0.002] Nm.
+     QuadrotorCommand::to_ctrl() maps directly to mjData.ctrl with ZERO conversion (gear=1). -->
+<mujoco model="cf2_simple">
+  <option integrator="RK4" timestep="0.002" density="1.225" viscosity="1.8e-5"/>
+
+  <!-- Offscreen rendering buffer for MjRenderer video capture -->
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <geom type="plane" size="5 5 0.01" rgba="0.3 0.3 0.3 1"/>
+
+    <body name="cf2" pos="0 0 0.1">
+      <freejoint name="root"/>
+      <inertial pos="0 0 0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5"/>
+
+      <!-- Central frame -->
+      <geom type="box" size="0.03 0.03 0.005" rgba="0.1 0.1 0.1 1" name="frame"/>
+
+      <!-- 4 arms (diagonal, 45° rotated) -->
+      <geom type="box" pos="0.033 0.033 0" size="0.025 0.004 0.003" euler="0 0 45" name="arm_fr"/>
+      <geom type="box" pos="-0.033 0.033 0" size="0.025 0.004 0.003" euler="0 0 -45" name="arm_fl"/>
+      <geom type="box" pos="-0.033 -0.033 0" size="0.025 0.004 0.003" euler="0 0 45" name="arm_bl"/>
+      <geom type="box" pos="0.033 -0.033 0" size="0.025 0.004 0.003" euler="0 0 -45" name="arm_br"/>
+
+      <!-- 4 rotor discs (translucent cylinders at arm tips) -->
+      <geom type="cylinder" pos="0.046 0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5" name="rotor_fr"/>
+      <geom type="cylinder" pos="-0.046 0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5" name="rotor_fl"/>
+      <geom type="cylinder" pos="-0.046 -0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5" name="rotor_bl"/>
+      <geom type="cylinder" pos="0.046 -0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5" name="rotor_br"/>
+
+      <!-- Sensor and actuation sites -->
+      <site name="imu" pos="0 0 0"/>
+      <site name="actuation" pos="0 0 0"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- gear=1: ctrl values ARE physical forces/torques. Ranges match QuadrotorCommand. -->
+    <motor name="body_thrust"  site="actuation" gear="0 0 1 0 0 0" ctrlrange="0 0.6" ctrllimited="true"/>
+    <motor name="roll_moment"  site="actuation" gear="0 0 0 1 0 0" ctrlrange="-0.005 0.005" ctrllimited="true"/>
+    <motor name="pitch_moment" site="actuation" gear="0 0 0 0 1 0" ctrlrange="-0.005 0.005" ctrllimited="true"/>
+    <motor name="yaw_moment"   site="actuation" gear="0 0 0 0 0 1" ctrlrange="-0.002 0.002" ctrllimited="true"/>
+  </actuator>
+
+  <sensor>
+    <gyro name="body_gyro" site="imu"/>
+    <accelerometer name="body_linacc" site="imu"/>
+    <framequat name="body_quat" objtype="site" objname="imu"/>
+  </sensor>
+
+  <keyframe>
+    <key name="hover" qpos="0 0 0.1 1 0 0 0" ctrl="0.26487 0 0 0"/>
+  </keyframe>
+</mujoco>

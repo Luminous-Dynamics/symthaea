@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-crucible"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Extreme ethical stress-testing — thought experiments, adversarial scenarios, and property-based invariants for Symthaea's moral systems"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "ethics", "stress-test", "harmonies", "alignment"]
+categories = ["science"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-harmonies = { path = "../symthaea-harmonies" }
+symthaea-types = { path = "../symthaea-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

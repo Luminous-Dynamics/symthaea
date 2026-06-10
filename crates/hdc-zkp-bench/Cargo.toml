@@ -1,0 +1,34 @@
+[package]
+name = "hdc-zkp-bench"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Benchmark: HDC XOR binding proof across Binius, Winterfell, and RISC0 backends"
+authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
+
+[[bin]]
+name = "hdc-zkp-bench"
+path = "src/main.rs"
+
+[dependencies]
+# Binius64 (binary field STARKs — XOR is native field addition)
+binius-core = { path = "../core" }
+binius-frontend = { path = "../frontend" }
+binius-prover = { path = "../prover" }
+binius-verifier = { path = "../verifier" }
+binius-transcript = { path = "../transcript" }
+binius-hash = { path = "../hash" }
+
+# Winterfell (prime field STARKs — XOR requires bit decomposition)
+winterfell = "0.13.1"
+winter-math = "0.13.1"
+winter-crypto = "0.13.1"
+
+# Common
+rand = "0.9"
+sha2 = "0.10"
+serde_json = "1.0"
+
+[profile.release]
+lto = "thin"
+opt-level = 3

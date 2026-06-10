@@ -1,0 +1,30 @@
+[package]
+name = "symthaea-fep"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Free Energy Principle active inference — generative models, precision-weighted prediction errors, and motor control"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["active-inference", "fep", "neuroscience", "ai", "consciousness"]
+categories = ["science", "algorithms"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+argmin.workspace = true
+serde = { workspace = true }
+symthaea-core = { version = "0.5.0", path = "../../symthaea-core" }
+tracing.workspace = true
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "markov_blanket_bench"
+harness = false

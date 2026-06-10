@@ -1,0 +1,17 @@
+[package]
+name = "mycelix_finance_types"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+description = "Shared economic type definitions for Mycelix Finance — no HDK/HDI dependency"
+
+[lib]
+crate-type = ["rlib"]
+name = "mycelix_finance_types"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = "1"

@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-app-db"
+version = "0.1.0"
+edition = "2024"
+description = "Unified cross-platform app database for NixOS migration"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]

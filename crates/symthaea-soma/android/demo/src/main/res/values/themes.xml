@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Soma Consciousness Theme: bioluminescent solarpunk -->
+    <style name="Theme.SomaDemo" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Deep space background with organic warmth -->
+        <item name="colorPrimary">@color/soma_bioluminescent</item>
+        <item name="colorPrimaryVariant">@color/soma_deep_ocean</item>
+        <item name="colorOnPrimary">@color/soma_starlight</item>
+        <item name="colorSecondary">@color/soma_mycelium_glow</item>
+        <item name="colorOnSecondary">@color/soma_deep_earth</item>
+        <item name="android:colorBackground">@color/soma_void</item>
+        <item name="colorSurface">@color/soma_surface</item>
+        <item name="colorOnSurface">@color/soma_starlight</item>
+        <item name="android:statusBarColor">@color/soma_void</item>
+        <item name="android:navigationBarColor">@color/soma_void</item>
+        <item name="android:windowBackground">@color/soma_void</item>
+    </style>
+</resources>

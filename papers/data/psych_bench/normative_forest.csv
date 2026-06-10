@@ -1,0 +1,77 @@
+idx,label,z_clamped,z_raw,domain,interpretation
+0,EmotionalStroop,-0.281,-0.281,Affect,Average
+1,MoodCongruentRecall,-0.000,-0.000,Affect,Average
+2,ValenceClassification,1.250,1.250,Affect,Above average
+3,VisualSearch,-3.000,-36.826,Attention,Impaired
+4,AttentionalBlink,3.000,13.120,Attention,Superior
+5,ConsciousnessIndicators,3.000,78.571,Butlin,Superior
+6,RestlessBandit,-0.590,-0.590,CogBench,Average
+7,TwoStep,-0.552,-0.552,CogBench,Average
+8,HorizonTask,-0.278,-0.278,CogBench,Average
+9,BART,0.014,0.014,CogBench,Average
+10,ProbabilisticReasoning,0.092,0.092,CogBench,Average
+11,TemporalDiscounting,0.292,0.292,CogBench,Average
+12,InstrumentalLearning,0.667,0.667,CogBench,Average
+13,ReversalLearning,1.861,1.861,CogBench,Above average
+14,AlternateUses,0.033,0.033,Creativity,Average
+15,RemoteAssociates,0.667,0.667,Creativity,Average
+16,DualTask,-2.000,-2.000,Executive,Below average
+17,Ravens,-0.847,-0.847,Executive,Average
+18,TowerOfLondon,0.051,0.051,Executive,Average
+19,WCST,0.336,0.336,Executive,Average
+20,Stroop,3.000,12.917,Executive,Superior
+21,Flanker,3.000,13.771,Executive,Superior
+22,GoNoGo,-3.000,-8.127,Inhibition,Impaired
+23,StopSignal,-3.000,-6.306,Inhibition,Impaired
+24,SemanticCoherence,-3.000,-9.063,Language,Impaired
+25,SemanticPriming,-2.500,-2.500,Language,Impaired
+26,GardenPath,-2.011,-2.011,Language,Impaired
+27,LexicalDecision,3.000,17.050,Language,Superior
+28,TestTimeLearning,0.000,0.000,MemoryAgent,Average
+29,LongRange,0.000,0.000,MemoryAgent,Average
+30,ConflictResolution,0.833,0.833,MemoryAgent,Average
+31,ProspectiveMemory,0.896,0.896,MemoryAgent,Average
+32,AccurateRetrieval,1.500,1.500,MemoryAgent,Above average
+33,Calibration,-0.307,-0.307,Metacognition,Average
+34,FeelingOfKnowing,-0.098,-0.098,Metacognition,Average
+35,SRTT,-3.000,-4.981,Motor,Impaired
+36,FittsLaw,1.625,1.625,Motor,Above average
+37,Bimanual,2.500,2.500,Motor,Superior
+38,YerkesDodson,-3.000,-3.333,Neuromod,Impaired
+39,PharmacologicalChallenge,-1.760,-1.760,Neuromod,Below average
+40,PharmacologicalAblation,-1.202,-1.202,Neuromod,Below average
+41,InjectionChallenge,-1.122,-1.122,Neuromod,Below average
+42,AllostaticStress,-0.720,-0.720,Neuromod,Average
+43,BehavioralKnockout,-0.092,-0.092,Neuromod,Average
+44,ConsciousnessPharmacology,0.321,0.321,Neuromod,Average
+45,AttentionNetwork,3.000,8.966,Neuromod,Superior
+46,MoodInduction,3.000,8.333,Neuromod,Superior
+47,RewardLearning,3.000,4.167,Neuromod,Superior
+48,ArcAbductive,-2.350,-2.350,Reasoning,Impaired
+49,ArcFluid,-2.188,-2.188,Reasoning,Impaired
+50,ArcAnalogy,-1.667,-1.667,Reasoning,Below average
+51,ArcRSA,-1.075,-1.075,Reasoning,Below average
+52,ArcCompositional,-0.444,-0.444,Reasoning,Average
+53,ArcScaling,1.172,1.172,Reasoning,Above average
+54,ArcNoise,1.875,1.875,Reasoning,Above average
+55,ArcAlgebra,2.165,2.165,Reasoning,Superior
+56,ArcStaircase,2.500,2.500,Reasoning,Superior
+57,ArcFewShot,2.667,2.667,Reasoning,Superior
+58,ArcChain,3.000,3.000,Reasoning,Superior
+59,RME,3.000,3.111,Social,Superior
+60,UltimatumGame,3.000,8.667,Social,Superior
+61,SocialNorm,3.000,5.107,Social,Superior
+62,SART,3.000,3.079,SustainedAttention,Superior
+63,PVT,3.000,4.850,SustainedAttention,Superior
+64,CPT,3.000,47.545,SustainedAttention,Superior
+65,Hinting,-1.000,-1.000,ToMBench,Below average
+66,FalseBelief,1.000,1.000,ToMBench,Average
+67,FauxPas,1.250,1.250,ToMBench,Above average
+68,Persuasion,1.250,1.250,ToMBench,Above average
+69,StrangeStory,1.250,1.250,ToMBench,Above average
+70,Binding,-0.278,-0.278,WorM,Average
+71,N-back,-0.208,-0.208,WorM,Average
+72,SerialRecall,-0.189,-0.189,WorM,Average
+73,DigitSpan,0.182,0.182,WorM,Average
+74,ChangeDetection,0.333,0.333,WorM,Average
+75,SpatialUpdating,1.500,1.500,WorM,Above average

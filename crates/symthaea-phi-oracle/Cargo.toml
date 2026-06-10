@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-phi-oracle"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Integration Spectrometer — measure structural coherence of external systems via spectral MIP analysis and CfC temporal probes"
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+serde = { version = "1.0", features = ["derive"], optional = true }

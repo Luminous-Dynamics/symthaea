@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-silicon"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Autonomous Silicon Architect: RTL generation, PPA optimization, and EDA loop integration."
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-runtime = { path = "../symthaea-runtime" }
+symthaea-engineering = { path = "../symthaea-engineering" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }

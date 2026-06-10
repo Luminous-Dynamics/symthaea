@@ -1,0 +1,30 @@
+[package]
+name = "symthaea-installer"
+version = "0.1.0"
+edition = "2024"
+description = "Sovereign Inoculation — native NixOS installer with app detection"
+license = "AGPL-3.0-or-later"
+
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+symthaea-app-db = { path = "../../symthaea-app-db" }
+symthaea-scan = { path = "../../symthaea-scan" }
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["stream"] }
+sha2 = "0.10"
+futures-util = "0.3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

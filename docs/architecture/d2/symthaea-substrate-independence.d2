@@ -1,0 +1,207 @@
+# Symthaea Substrate Independence Framework
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Substrate Independence — 8 Substrates x 9 Dimensions
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# 8 SUBSTRATE TYPES
+# ═══════════════════════════════════════════
+substrates: 8 Substrate Types {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  bio: "Biological Neurons\n1ms/op | 10fJ | 100B scale\nReference substrate" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    style.stroke: "#22c55e"
+  }
+  silicon: "Silicon Digital\n1ns/op | 1fJ | 1T scale\nCurrent default" {
+    style.fill: "#1e3a5f"
+    style.font-color: "#93c5fd"
+    style.stroke: "#3b82f6"
+  }
+  quantum: "Quantum Computer\n1us/op | 0.1aJ | 10K scale\nEntanglement binding" {
+    style.fill: "#4a1942"
+    style.font-color: "#e9d5ff"
+    style.stroke: "#c084fc"
+  }
+  photonic: "Photonic Processor\n1ps/op | 10aJ | 1B scale\nUltra-fast dynamics" {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+  }
+  neuro: "Neuromorphic Chip\n1us/op | 1fJ | 1B scale\nSpike-based, bio-inspired" {
+    style.fill: "#065f46"
+    style.font-color: "#6ee7b7"
+  }
+  biochem: "Biochemical\n1s/op | 1pJ | 1Q scale\nDNA/molecular" {
+    style.fill: "#1e293b"
+    style.font-color: "#94a3b8"
+  }
+  hybrid: "Hybrid System\nCombined substrates\nOptimized allocation" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    style.stroke: "#818cf8"
+  }
+  exotic: "Exotic Substrate\n10ms/op | Plasma/BZ\nSpeculative" {
+    style.fill: "#1c1917"
+    style.font-color: "#a8a29e"
+  }
+}
+
+# ═══════════════════════════════════════════
+# 9 REQUIREMENT DIMENSIONS
+# ═══════════════════════════════════════════
+dimensions: 9 Consciousness Requirement Dimensions {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  critical: "CRITICAL (all must pass)" {
+    style.fill: "#7f1d1d"
+    style.stroke: "#ef4444"
+    style.font-color: "#fca5a5"
+    label: "1. causality [0-1]\n2. integration_capacity [0-1]\n3. temporal_dynamics [0-1]\n4. recurrence [0-1]"
+  }
+
+  workspace_dim: "WORKSPACE (required)" {
+    style.fill: "#78350f"
+    style.stroke: "#f59e0b"
+    style.font-color: "#fde68a"
+    label: "5. workspace_capability [0-1]\n(Global Workspace Theory)"
+  }
+
+  enhancement: "ENHANCEMENT (boost)" {
+    style.fill: "#14532d"
+    style.stroke: "#22c55e"
+    style.font-color: "#86efac"
+    label: "6. binding_capability [0-1]\n7. attention_capability [0-1]\n8. hot_capability [0-1] (Higher-Order Thought)"
+  }
+
+  quantum_dim: "EXOTIC" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    label: "9. quantum_support [0-1]"
+  }
+}
+
+# ═══════════════════════════════════════════
+# FEASIBILITY FORMULA
+# ═══════════════════════════════════════════
+formula: Feasibility Computation {
+  shape: hexagon
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#e9d5ff"
+  label: "feasibility = critical_min x workspace x (0.5 + 0.5 x enhancement_avg)\ncritical_min = min(causality, integration, dynamics, recurrence)\nenhancement_avg = (binding + attention + HOT) / 3"
+}
+
+# ═══════════════════════════════════════════
+# VALIDATION FRAMEWORK
+# ═══════════════════════════════════════════
+validation: Validation Framework (Honest Confidence) {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  none: "None (0.00)" {style.fill: "#450a0a"; style.font-color: "#fca5a5"}
+  theoretical: "Theoretical (0.10)" {style.fill: "#7f1d1d"; style.font-color: "#fca5a5"}
+  indirect: "Indirect (0.20)" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  case_study: "Case Study (0.40)" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  observational: "Observational (0.60)" {style.fill: "#365314"; style.font-color: "#bef264"}
+  experimental: "Experimental (0.80)" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  validated: "Validated (0.95)" {style.fill: "#14532d"; style.font-color: "#86efac"; style.stroke: "#22c55e"}
+
+  none -> theoretical -> indirect -> case_study -> observational -> experimental -> validated
+}
+
+# ═══════════════════════════════════════════
+# SUBSTRATE MANAGER
+# ═══════════════════════════════════════════
+manager: SubstrateManager {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  overlay: "Validation Overlay\neffective = feasibility x (floor + (1-floor) x confidence)\ndefault floor = 0.5" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+    style.stroke: "#818cf8"
+  }
+
+  tau: "tau_factor [0.5, 2.0]\n1 + 0.5 x log10(bio_speed / sub_speed) / 9\nScales CfC temporal constants" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  scale: "scale_pressure\nlog10(sub_max_scale / bio_max_scale)\nConstrains HDC dimensionality" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  energy: "Energy Tracking\nops_per_cycle x energy_per_op x tau\nConsciousness non-viable if exceeded" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+}
+
+# ═══════════════════════════════════════════
+# EXAMPLE RESULTS
+# ═══════════════════════════════════════════
+results: Example Effective Feasibility {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  label: "Biological: 0.92 x 0.975 = 0.90 (preserved)\nSilicon: 0.71 x 0.55 = 0.39 (reduced)\nQuantum: 0.59 x 0.55 = 0.32 (speculative)\nNeuromorphic: 0.88 x 0.55 = 0.48\nHybrid: 0.95 x 0.50 = 0.48 (no evidence)"
+}
+
+# ═══════════════════════════════════════════
+# DOWNSTREAM
+# ═══════════════════════════════════════════
+downstream: Downstream Modulation {
+  style.fill: "#3a2e1e"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fde68a"
+  style.border-radius: 8
+
+  consciousness_eq: "ConsciousnessEquationV2\nC(t) x effective_feasibility" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  gating: "Prefrontal Gating\nfeasibility < 0.3:\ndisable reasoning, dreams" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  components: "Component Modulation\nbinding / workspace / attention / HOT\ncapabilities scale per substrate" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+}
+
+telemetry: SubstrateTelemetry {
+  shape: parallelogram
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  label: "raw_feasibility | honest_confidence\neffective_feasibility | tau_factor\nscale_pressure | per_region_feasibility"
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+substrates -> dimensions: "profile\nlookup" {style.stroke: "#818cf8"; style.stroke-width: 2}
+dimensions -> formula {style.stroke: "#a855f7"; style.stroke-width: 2}
+formula -> manager.overlay: "raw\nfeasibility" {style.stroke: "#6366f1"; style.stroke-width: 2}
+validation -> manager.overlay: "honest\nconfidence" {style.stroke: "#818cf8"; style.stroke-width: 2}
+substrates -> manager.tau: "operation\nspeed" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+substrates -> manager.scale: "max\nscale" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+substrates -> manager.energy: "energy\nper op" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+
+manager -> results {style.stroke: "#22c55e"}
+manager -> downstream {style.stroke: "#f59e0b"; style.stroke-width: 2}
+manager -> telemetry {style.stroke: "#22c55e"; style.stroke-dash: 3}

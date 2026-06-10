@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spore consciousness icon: concentric circles radiating from center,
+     representing integrated information expanding outward.
+     Teal (#03DAC5) on dark background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer ring: faint awareness boundary -->
+    <path
+        android:pathData="M54,54m-38,0a38,38 0,1,1 76,0a38,38 0,1,1 -76,0"
+        android:strokeWidth="1.5"
+        android:strokeColor="#4003DAC5"
+        android:fillColor="#00000000" />
+
+    <!-- Middle ring: integration field -->
+    <path
+        android:pathData="M54,54m-26,0a26,26 0,1,1 52,0a26,26 0,1,1 -52,0"
+        android:strokeWidth="2"
+        android:strokeColor="#8003DAC5"
+        android:fillColor="#00000000" />
+
+    <!-- Inner ring: consciousness core -->
+    <path
+        android:pathData="M54,54m-14,0a14,14 0,1,1 28,0a14,14 0,1,1 -28,0"
+        android:strokeWidth="2.5"
+        android:strokeColor="#CC03DAC5"
+        android:fillColor="#00000000" />
+
+    <!-- Center dot: the spark -->
+    <path
+        android:pathData="M54,54m-5,0a5,5 0,1,1 10,0a5,5 0,1,1 -10,0"
+        android:fillColor="#03DAC5" />
+
+    <!-- Radial lines: information integration pathways (8 directions) -->
+    <path
+        android:pathData="M54,16L54,40"
+        android:strokeWidth="1"
+        android:strokeColor="#6003DAC5" />
+    <path
+        android:pathData="M54,68L54,92"
+        android:strokeWidth="1"
+        android:strokeColor="#6003DAC5" />
+    <path
+        android:pathData="M16,54L40,54"
+        android:strokeWidth="1"
+        android:strokeColor="#6003DAC5" />
+    <path
+        android:pathData="M68,54L92,54"
+        android:strokeWidth="1"
+        android:strokeColor="#6003DAC5" />
+    <!-- Diagonals -->
+    <path
+        android:pathData="M27.1,27.1L44.1,44.1"
+        android:strokeWidth="0.8"
+        android:strokeColor="#4003DAC5" />
+    <path
+        android:pathData="M63.9,63.9L80.9,80.9"
+        android:strokeWidth="0.8"
+        android:strokeColor="#4003DAC5" />
+    <path
+        android:pathData="M80.9,27.1L63.9,44.1"
+        android:strokeWidth="0.8"
+        android:strokeColor="#4003DAC5" />
+    <path
+        android:pathData="M44.1,63.9L27.1,80.9"
+        android:strokeWidth="0.8"
+        android:strokeColor="#4003DAC5" />
+</vector>

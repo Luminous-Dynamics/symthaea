@@ -1,0 +1,26 @@
+name,n_points,expected_shape,top_formula,train_mse,test_mse,test_rel_err,complexity,verdict,elapsed_ms
+hydrogen_energy_levels,30,"E(n) = -13.6 / n^2","(sin(0) ^ sin((0.666667 - (sin(n) + (2 / n)))))",8.3073e-2,inf,inf,12,missed,140
+quantum_harmonic_oscillator,31,"E(n) = n + 0.5","(n + sin(0.523599))",5.5594e-15,5.5594e-15,2.7331e-9,4,closed,60
+balmer_series,28,"1/λ = R*(1/4 - 1/n^2)","((4.048981 + 0.714339) ^ (1.696500 - -2.137423))",3.9669e3,9.4704e2,8.3976e-2,7,partial,67
+kepler_third_law,30,"T^2 = a^3 (i.e. T = a^1.5)","(1 * (n ^ 1.500000))",4.0606e-26,2.9326e-25,3.7150e-15,5,closed,86
+stefan_boltzmann,30,"P = σ * T^4","(n ^ 4)",0.0000e0,0.0000e0,0.0000e0,3,closed,76
+blackbody_peak,30,"λ_peak = b / T (Wien's law)","0",1.4710e-11,1.6295e-13,1.0000e0,1,missed,43
+partitions,30,"p(n) ~ exp(π√(2n/3)) / (4n√3)  (Hardy-Ramanujan)","((0.165000 * exp((2.500000 * sqrt(n)))) / (n - 2))",4.2097e2,4.6840e4,4.7675e-2,11,closed,102
+bell_numbers,16,"B(n) ~ (n/W(n))^n * e^((n/W(n))-n-1) / sqrt(…)","(sin((n + sin((4 ^ -0.550000)))) ^ (n / 4))",2.5633e6,4.8745e17,1.0000e0,11,missed,109
+catalan,21,"C(n) = (2n)! / ((n+1)! n!), ~ 4^n / n^1.5","((3.999827 ^ n) / (sqrt((3.169567 * n)) * (n + 1.056455)))",4.8419e5,2.7246e13,1.2668e-3,12,closed,97
+central_binomial_limit,29,"C(2n,n) * n^0.5 / 4^n → 1/√π (constant)","(0.373036 / 0.671140)",5.3943e-5,3.3631e-5,1.0326e-2,3,closed,44
+derangement_ratio,15,"!n / n! → 1/e ≈ 0.3679 (constant)","0.345859",1.2352e-2,4.8489e-4,5.9857e-2,1,partial,32
+fibonacci_ratios,29,"F(n+1)/F(n) → φ = (1+√5)/2 ≈ 1.618 (constant)","(1.626216 - (0.504955 ^ n))",1.7420e-2,6.6946e-5,5.0568e-3,5,closed,58
+prime_counting,100,"π(n) ~ n / ln(n)","(0.764165 * (n ^ 0.762465))",1.6314e-1,1.7887e-1,1.7802e-2,5,closed,197
+prime_gaps,1228,"g(p) ~ ln(p) (Cramér's conjecture); mean behavior","(3.168147 + (4.021366 + 0.704565))",3.2222e1,4.3155e1,1.1892e0,5,missed,1037
+maximal_prime_gap,20,"G(n) ~ (ln n)² (Shanks conjecture)","(4.291334 + (sin(1.543032) + (n ^ 0.381797)))",3.4645e1,1.4664e2,1.6818e-1,8,partial,58
+derangements,16,"!n = n! · Σ_{k=0..n} (-1)^k / k! ~ n!/e","((3.693307 ^ n) - sin(((2.623680 * sin(2.815096)) * ((sin(n) / 0.353376) ^ sin((n / 0.379510))))))",6.8539e7,inf,inf,19,missed,101
+bell_stirling_residual,16,"B(n) - Σ S(n,k) = 0 (identity residual — exactly zero)","0",0.0000e0,0.0000e0,0.0000e0,1,closed,26
+stirling_sum,16,"Σ_{k=0..n} S(n,k) = B(n) (Stirling → Bell)","(sin((n + sin((4 ^ -0.550000)))) ^ (n / 4))",2.5633e6,4.8745e17,1.0000e0,11,missed,102
+fubini,16,"a(n) = ordered Bell number ~ n!/2·(ln 2)^{-n-1}","exp(((3.443396 - n) ^ -1.180943))",1.7977e308,inf,inf,6,missed,94
+motzkin,21,"M(n) ~ 3^n / (n^{3/2} · √(3π/2)/2)","(sin(((3.044824 / 1.628779) / ((n ^ (n * -2.059570)) * n))) * (2.067383 ^ n))",2.8821e2,inf,inf,16,missed,84
+perm_det_ratio,6,"per(A)/det(A) ratio on random matrices (growth class TBD)","0.977534",2.5654e-4,1.8916e-2,1.3053e-1,1,partial,16
+inverse_square_law,30,"F(r) ~ 1 / r^2 (gravitation / Coulomb)","(n ^ -2)",0.0000e0,0.0000e0,0.0000e0,3,closed,55
+relativistic_kinetic_energy,20,"E_k(v) = (γ − 1) m c² with γ = 1/√(1 − v²/c²)","(n ^ 2.562331)",4.3022e-4,5.5842e-1,4.1389e-1,3,partial,54
+nuclear_binding_energy,99,"SEMF: ~ a_v·A − a_s·A^{2/3} − a_c·Z²/A^{1/3} − …","(4.116788 + (n ^ 0.388254))",7.4313e-1,1.3056e0,1.3096e-1,5,partial,125
+gr_correction,20,"Δφ per orbit ~ 6π GM / (c² a (1 − e²))","-0.021846",1.0370e-3,4.2486e-4,1.7313e1,1,missed,25

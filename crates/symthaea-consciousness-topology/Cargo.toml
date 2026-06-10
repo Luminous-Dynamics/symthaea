@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-consciousness-topology"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Algebraic topology for consciousness — Betti numbers, persistent homology, manifold analysis"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "topology", "homology", "betti", "manifold"]
+categories = ["science", "algorithms", "mathematics"]
+
+[dependencies]
+serde = { workspace = true }

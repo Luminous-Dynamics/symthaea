@@ -1,0 +1,49 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Memory subsystems for Symthaea.
+//!
+//! Extracted modules:
+//! - Phase A: semantic memory (HDC-based similarity lookup), coherence tracking
+//! - Phase B: hippocampus (episodic memory), conversation memory (SQLite)
+//! - Phase C: episodic replay (Phi-prioritized consolidation), memory coordinator
+
+pub mod coherence;
+pub mod conversation;
+pub mod coordinator;
+pub mod episodic_replay;
+pub mod hippocampus;
+pub mod semantic;
+
+pub use coherence::{CoherenceTrajectoryStats, ConversationCoherenceTracker};
+pub use conversation::{
+    CausalLearning, ConversationMemory, ConversationMemoryStats, ConversationSummary,
+    ConversationTurn,
+};
+pub use coordinator::{
+    CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
+    MemorySource, content_hash,
+};
+pub use episodic_replay::{
+    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
+    bath_cosine_similarity,
+};
+#[allow(deprecated)]
+pub use hippocampus::{
+    EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
+};
+pub use semantic::{SemanticEntry, SemanticMemory, SemanticMemoryStats};
+
+/// Trait abstraction for trainable temporal networks.
+///
+/// Allows episodic replay to train any compatible network without
+/// depending on the concrete CfCNetwork type from the main crate.
+pub trait TrainableNetwork {
+    fn train_step(
+        &mut self,
+        input: &ndarray::Array1<f32>,
+        target: &ndarray::Array1<f32>,
+        dt: f32,
+        learning_rate: f32,
+    ) -> anyhow::Result<f32>;
+}

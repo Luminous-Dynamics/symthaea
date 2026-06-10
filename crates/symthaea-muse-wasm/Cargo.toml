@@ -1,0 +1,39 @@
+[package]
+name = "symthaea-muse-wasm"
+version = "0.1.0"
+edition = "2024"
+description = "WASM bridge for consciousness-driven music synthesis"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+symthaea-muse = { path = "../symthaea-muse", default-features = false }
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { version = "1", features = ["js"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["console"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = ["console_error_panic_hook"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+
+[dependencies.console_error_panic_hook]
+version = "0.1"
+optional = true
+
+[workspace]
+
+[profile.release]
+opt-level = "s"
+lto = true

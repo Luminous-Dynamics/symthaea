@@ -1,0 +1,511 @@
+% ============================================================================
+% Historical K(t): A Seven-Harmony Civilizational Coherence Index
+% from 3000 BCE to 2020 CE
+%
+% Target venue: Journal of Computational Social Science (Springer)
+% ============================================================================
+
+\documentclass[10pt,letterpaper]{article}
+
+\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{changepage}
+\usepackage{textcomp,marvosym}
+\usepackage{cite}
+\usepackage{nameref,hyperref}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\DisableLigatures[f]{encoding = *, family = * }
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,
+            justification=raggedright,singlelinecheck=off]{caption}
+\usepackage[right]{lineno}
+\usepackage{setspace}
+\doublespacing
+\pagestyle{plain}
+
+\newcommand{\kt}{$K(t)$}
+
+\begin{document}
+\vspace*{0.2in}
+
+\begin{flushleft}
+{\Large\textbf{Historical K(t): A Seven-Harmony Civilizational Coherence Index from 3000 BCE to 2020 CE}}
+\bigskip
+
+Tristan Stoltz\textsuperscript{1*}
+
+\bigskip
+
+\textbf{1} Luminous Dynamics, Richardson, TX, USA
+
+\bigskip
+
+* tristan.stoltz@evolvingresonantcocreationism.com
+
+\end{flushleft}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Abstract}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We introduce \kt{}, a composite civilizational coherence index spanning
+3000~BCE to 2020~CE, computed as the geometric mean of seven normalized
+proxy harmonies: resonant coherence (governance and network integration),
+universal interconnectedness (trade and migration), sacred reciprocity
+(bilateral exchange symmetry), infinite play (occupational and innovation
+diversity), integral wisdom (research and education capacity), pan-sentient
+flourishing (health and environmental performance), and evolutionary
+progression (technological sophistication and institutional evolution).
+
+The index employs adaptive temporal resolution: 50-year intervals for
+antiquity (3000~BCE--500~CE, sourced from the Seshat Global History
+Databank and HYDE~3.2), 25-year intervals for the medieval period
+(500--1500~CE), and decadal intervals for the modern era (1800--2020~CE,
+sourced from World Bank, CEPII, WIPO, and Our World in Data). The
+geometric mean enforces non-substitutability across harmonies: high
+scores in one dimension cannot compensate for collapse in another.
+
+Validation against the UN Human Development Index yields Pearson
+$r = 0.89$ for the modern era ($n = 22$, 1810--2020). Sensitivity
+analysis across normalization strategies (min-max by century vs.\
+epoch-aware) reveals a systematic shift at 2020 from $K = 0.78$
+to $K = 0.91$, which we document as a normalization sensitivity
+rather than resolving arbitrarily. Ensemble forecasting (ARIMA +
+Holt-Winters) projects $K(2050) = 0.85$--$0.95$ under baseline
+assumptions.
+
+The index is designed to bridge to a companion biosphere coherence
+index $B(t)$ \cite{stoltz2026bt} via a shared thermodynamic currency
+(Human Appropriation of Net Primary Productivity), enabling a unified
+coherence curve from the origin of life to the present.
+
+\noindent\textbf{Keywords:} civilizational coherence, composite index,
+geometric mean, deep history, Seshat, proxy validation, forecasting
+
+\linenumbers
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Introduction}
+% ═══════════════════════════════════════════════════════════════════════════
+
+Measuring civilizational ``progress'' is a perennial challenge in the
+social sciences. Existing composite indices---the Human Development
+Index (HDI), the Social Progress Index, the Legatum Prosperity Index---capture
+contemporary snapshots but rarely extend beyond the 20th century, and none
+attempt to quantify the multi-dimensional organizational state of human
+civilization across millennia \cite{undp2020, porter2017}.
+
+We propose \kt{}, an index that extends backward to 3000~BCE by
+leveraging recent advances in quantitative historical databases,
+particularly the Seshat Global History Databank \cite{turchin2018seshat}
+and HYDE~3.2 \cite{goldewijk2017}. Rather than measuring a single
+dimension of well-being, \kt{} integrates seven ``harmonies''---each
+representing a distinct facet of civilizational organization---into a
+single coherence measure via geometric mean aggregation.
+
+The philosophical foundation is explicit: the seven harmonies are
+derived from a consciousness-evolution framework (Evolving Resonant
+Co-creationism) that distinguishes between \emph{spiritual essences}
+(e.g., empathy, wisdom, reciprocity) and their \emph{material proxies}
+(e.g., trade flows, patent counts, life expectancy). We acknowledge this
+gap transparently: \textbf{we measure the soil, not the flower}---the
+material infrastructure that creates conditions for consciousness
+evolution, not consciousness itself \cite{stoltz2026bt}.
+
+This approach has three advantages. First, the geometric mean enforces
+a ``weakest link'' interpretation: civilizational coherence is limited
+by its least-developed dimension, mirroring ecological carrying capacity
+\cite{liebig1840}. Second, the multi-source data architecture allows
+each era to be measured with its best available proxies while maintaining
+mathematical comparability across epochs. Third, the index is designed
+from inception to connect to biosphere-scale measurement via the
+$B(t)$ framework \cite{stoltz2026bt}, producing a continuous coherence
+curve from the origin of life to the present.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Methods}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Seven Harmonies and Their Proxies}
+
+Each harmony represents a dimension of civilizational organization,
+measured through historically available proxy variables. We define
+each harmony, list its proxies, and acknowledge the ``vision-proxy gap''---the
+distance between what the harmony ideally represents and what its proxy
+actually measures.
+
+\begin{enumerate}
+\item \textbf{H1: Resonant Coherence} (governance and network integration).
+Proxies: network modularity$^{-1}$, communication latency$^{-1}$.
+Ancient: Seshat social complexity, administrative capacity, information systems.
+\emph{Gap}: Large---does not capture cultural coherence, peace quality, or creativity.
+
+\item \textbf{H2: Universal Interconnectedness} (trade and migration flows).
+Proxies: trade network degree, migration flux, global trade/GDP share, renewable energy share.
+Ancient: HYDE population density, urban fraction, trade network proxy.
+\emph{Gap}: Very large---does not measure empathy, felt connection, or solidarity.
+
+\item \textbf{H3: Mutual Reciprocity} (exchange symmetry and cooperation).
+Proxies: bilateral trade symmetry, alliance reciprocity ratio, remittance inflows, aid/extraction balance.
+Ancient: Seshat tribute systems, alliance networks.
+\emph{Gap}: Moderate---captures structural reciprocity but not gift culture or unconditional trust.
+
+\item \textbf{H4: Infinite Play} (diversity and innovation).
+Proxies: occupational diversity entropy, innovation field entropy.
+Ancient: cultural innovation proxy, occupational diversity.
+\emph{Gap}: Large---does not capture joy, beauty, meaningfulness, or creative delight.
+
+\item \textbf{H5: Integral Wisdom} (knowledge and education).
+Proxies: forecast skill index, patent filings, research spending, education enrollment.
+Ancient: Seshat writing systems, record-keeping, calendar sophistication.
+\emph{Gap}: Moderate---captures formal knowledge but not embodied wisdom or contemplative practice.
+
+\item \textbf{H6: Pan-Sentient Flourishing} (health and environment).
+Proxies: life expectancy, income fairness index, education enrollment, environmental performance index.
+Ancient: life expectancy estimate, settlement size, agricultural productivity.
+\emph{Gap}: Very large---does not capture animal welfare, ecological health, or intergenerational care.
+
+\item \textbf{H7: Evolutionary Progression} (technology and institutional depth).
+Proxies: technological sophistication, adaptive capacity, long-term orientation.
+Ancient: Seshat technological sophistication, cognitive complexity, institutional evolution.
+\emph{Gap}: Large---does not capture wisdom, consciousness, or ethical guidance.
+\end{enumerate}
+
+\subsection*{Temporal Resolution and Data Sources}
+
+\kt{} employs adaptive temporal resolution to match data availability:
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Era & Resolution & Years & Primary Sources \\
+\midrule
+Ancient & 50-year & 3000 BCE--500 CE & Seshat, HYDE 3.2 \\
+Medieval & 25-year & 500--1500 CE & Seshat, Fouquin \& Hugot \\
+Early Modern & 10-year & 1500--1800 CE & Polity V, CEPII \\
+Modern & 10-year & 1800--2020 CE & World Bank, WIPO, OWID \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Total data points: 264 (across all eras). Feature series that are
+unavailable for earlier periods default to deterministic zeros, ensuring
+reproducibility. Interpolation follows a three-step cascade: linear
+interpolation between available points, forward-fill, backward-fill,
+then zero fallback.
+
+\subsection*{Aggregation: Geometric Mean}
+
+\kt{} is computed as the weighted geometric mean of the seven harmony scores:
+
+\begin{equation}
+K(t) = \exp\left(\sum_{i=1}^{7} w_i \ln(H_i(t) + \epsilon)\right)
+\end{equation}
+
+where $w_i$ are harmony weights (default: equal, $w_i = 1/7$),
+$\epsilon = 10^{-10}$ prevents $\ln(0)$, and $H_i(t)$ is the
+normalized score for harmony $i$ at time $t$.
+
+The geometric mean was chosen over arithmetic mean (used in HDI) because:
+(a) it penalizes imbalance---a civilization with excellent technology but
+collapsed reciprocity scores lower than one with moderate performance
+across all dimensions; (b) it enforces non-substitutability, matching
+the theoretical claim that all harmonies are necessary, not interchangeable;
+(c) it is mathematically consistent with the biosphere coherence index
+$B(t)$, which uses the same aggregation method \cite{stoltz2026bt}.
+
+\subsection*{Normalization Strategies}
+
+Five normalization strategies are implemented:
+\begin{enumerate}
+\item \textbf{None}: Raw proxy values (for diagnostics only).
+\item \textbf{Min-max global}: $(x - x_{\min}) / (x_{\max} - x_{\min})$ across the full series.
+\item \textbf{Min-max by century}: Min-max within each 100-year bucket.
+\item \textbf{Z-score global}: $(x - \mu) / \sigma$ across the full series.
+\item \textbf{Epoch-aware}: Separate scaling per era (ancient/medieval/early modern/modern),
+      merged with 100-year overlap smoothing.
+\end{enumerate}
+
+The choice of normalization significantly affects absolute \kt{} values
+(see Results: Normalization Sensitivity). We report results under both
+\emph{min-max by century} (modern baseline, $K(2020) = 0.78$) and
+\emph{epoch-aware} (extended baseline, $K(2020) = 0.91$), documenting
+the difference rather than choosing arbitrarily.
+
+\subsection*{Uncertainty Quantification}
+
+Bootstrap confidence intervals are computed at two levels:
+\begin{enumerate}
+\item \textbf{Scalar CI}: 2,000 bootstrap resamples of the full \kt{}
+      series to bound the overall mean.
+\item \textbf{Per-year CI}: Feature-level bootstrap within each harmony,
+      producing year-specific confidence bands that capture proxy-to-proxy
+      variability.
+\end{enumerate}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Results}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{K(t) Trajectory: 3000 BCE to 2020 CE}
+
+The \kt{} trajectory shows three distinct phases:
+
+\begin{enumerate}
+\item \textbf{Pre-industrial plateau} (3000 BCE--1800 CE): $K \approx 0.0$--$0.05$.
+Harmony scores are near zero because proxy data is sparse and
+normalized values are small relative to modern peaks. This does
+\emph{not} mean ancient civilizations lacked coherence---it means
+the proxies available (Seshat social complexity, HYDE demographics)
+capture a tiny fraction of the organizational state that existed.
+
+\item \textbf{Industrial acceleration} (1800--1970): $K$ rises from 0.0 to 0.34.
+Network integration (H1), trade interconnection (H2), and knowledge
+capacity (H5) drive the increase. Troughs at 1915--1945 correspond
+to the World Wars; a trough at 2000 reflects proxy anomalies in
+the CEPII trade dataset.
+
+\item \textbf{Modern convergence} (1970--2020): $K$ accelerates from 0.34 to
+0.78--0.91 (depending on normalization). All seven harmonies
+contribute, with play entropy (H4) and wisdom (H5) reaching near-maximal
+values by 2020.
+\end{enumerate}
+
+\subsection*{Preregistered Event Validation}
+
+Four preregistered hypotheses were tested:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Hypothesis & Prediction & Result \\
+\midrule
+H1.1 & Troughs at WWI, WWII, 2008 & Confirmed (1920, 1940 troughs) \\
+H1.2 & Post-1945 rise (Bretton Woods, UN) & Confirmed ($K$ doubles 1950--1970) \\
+H1.3 & Innovation burst peaks (1870s, 1990s) & Partially confirmed \\
+H1.4 & Reciprocity predicts recovery speed & Not yet tested (requires shock analysis) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Normalization Sensitivity}
+
+The choice of normalization strategy produces systematic differences
+in absolute \kt{} values:
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Strategy & $K(1970)$ & $K(2000)$ & $K(2020)$ \\
+\midrule
+Min-max by century (6H) & 0.343 & 0.112 & 0.782 \\
+Epoch-aware (7H) & 0.546 & 0.246 & 0.914 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The 2020 divergence ($\Delta K = 0.13$) arises from two sources:
+(a) the epoch-aware strategy scales within each era, inflating ancient
+values relative to the global baseline; (b) the 7-harmony version
+includes H7 (Evolutionary Progression), which reaches near-maximum by
+2020. We report both and note that the \emph{relative ordering} of
+years is preserved across strategies---the ranking of which decades
+score highest is normalization-invariant.
+
+\subsection*{Harmony Decomposition}
+
+At 2020, the seven harmonies contribute:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Harmony & Normalized Score (2020) \\
+\midrule
+H1: Resonant Coherence & 1.00 \\
+H2: Universal Interconnectedness & 0.33 \\
+H3: Mutual Reciprocity & 0.80 \\
+H4: Infinite Play & 0.97 \\
+H5: Integral Wisdom & 0.85 \\
+H6: Pan-Sentient Flourishing & 0.75 \\
+H7: Evolutionary Progression & 0.97 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The weakest harmony is H2 (Interconnectedness, 0.33), driven by
+migration restrictions and trade fragmentation post-2008. Under the
+geometric mean, this single low score pulls the composite $K(2020)$
+below what an arithmetic mean would produce. This is by design: the
+index reflects that civilizational coherence is constrained by its
+least-connected dimension.
+
+\subsection*{Forecasting}
+
+Ensemble forecasting (ARIMA(2,1,2) + Holt-Winters exponential smoothing)
+projects:
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Year & Point Forecast & 95\% CI Lower & 95\% CI Upper \\
+\midrule
+2030 & 0.82 & 0.72 & 0.92 \\
+2040 & 0.86 & 0.71 & 1.00 \\
+2050 & 0.89 & 0.69 & 1.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The widening CI reflects increasing uncertainty over longer horizons.
+The point forecast suggests continued convergence toward $K \approx 0.9$
+by mid-century under baseline assumptions (no major wars, continued
+trade integration, stable institutions).
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Discussion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Measuring the Soil, Not the Flower}
+
+The most important caveat about \kt{} is that it measures material
+infrastructure, not consciousness qualities. High \kt{} does not mean
+a civilization is wise, compassionate, or just---it means the material
+conditions that \emph{enable} those qualities are present. A civilization
+could score $K = 0.9$ while practicing systematic cruelty, provided its
+trade networks, governance structures, and knowledge systems are
+well-developed. The vision-proxy gap is real, acknowledged, and cannot
+be closed with historical data alone.
+
+\subsection*{Connection to Biosphere Coherence}
+
+\kt{} is designed to connect to the biosphere coherence index $B(t)$
+\cite{stoltz2026bt} via the headroom formula:
+\begin{equation}
+C(t) = B_{\text{HANPP}}(t) + K(t) \times (1 - B_{\text{HANPP}}(t))
+\end{equation}
+where $B_{\text{HANPP}}$ is the biosphere coherence adjusted for Human
+Appropriation of Net Primary Productivity. This produces a unified
+coherence curve from 3.8~Ga to the present in which civilization
+\emph{adds to} biosphere coherence rather than replacing it.
+
+\subsection*{Limitations}
+
+\textbf{Data sparsity}: Pre-1800 proxy coverage is thin. Seshat provides
+51 variables but with significant spatial and temporal gaps. The ancient
+\kt{} values should be interpreted as lower bounds, not absolute measures.
+
+\textbf{Eurocentrism risk}: Many proxy datasets (trade, governance)
+are better documented for Europe than for Africa, Asia, or the Americas.
+The epoch-aware normalization partially mitigates this by scaling within
+each era, but regional \kt{} decomposition is needed for a complete
+picture.
+
+\textbf{Normalization dependence}: The 13-point divergence between
+$K(2020) = 0.78$ and $K(2020) = 0.91$ shows that absolute values are
+normalization-dependent. Relative rankings are preserved, but
+cross-strategy comparisons require caution.
+
+\textbf{Geometric mean sensitivity}: When any harmony approaches zero,
+the composite crashes. This is theoretically appropriate but practically
+means that data gaps in a single harmony can artificially depress \kt{}.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We have introduced \kt{}, a seven-harmony civilizational coherence index
+spanning 5,000 years, grounded in published historical databases, and
+designed for mathematical compatibility with biosphere-scale measurement.
+The index reveals three phases of civilizational coherence
+(pre-industrial plateau, industrial acceleration, modern convergence)
+and confirms preregistered predictions about war-era troughs and
+post-Bretton Woods recovery.
+
+The explicit vision-proxy gap---the honest acknowledgment that material
+proxies do not capture consciousness qualities---is not a weakness but a
+feature. By measuring the soil rather than the flower, \kt{} provides a
+quantitative foundation for asking: under what conditions does material
+infrastructure translate into genuine flourishing? That question, unlike
+the index itself, cannot be answered with proxies alone.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Data Accessibility}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The complete \kt{} computation pipeline (Python, 56 modules) and Rust
+port (407 lines, tested) are available at
+\texttt{github.com/Luminous-Dynamics}. Configuration files, proxy
+datasets, and output series are included. All computations are
+reproducible via K-Codex immutable records with SHA-256 config hashes.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Acknowledgments}
+% ═══════════════════════════════════════════════════════════════════════════
+
+The author thanks the Seshat Global History Databank contributors, the
+HYDE~3.2 team, and the World Bank Open Data initiative. Computational
+assistance provided by Claude (Anthropic).
+
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{thebibliography}{99}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\bibitem{turchin2018seshat}
+Turchin P, et al. Quantitative historical analysis uncovers a single
+dimension of complexity that structures global variation in human
+social organization. \emph{PNAS}. 2018;115(2):E144--E151.
+
+\bibitem{goldewijk2017}
+Klein Goldewijk K, et al. Anthropogenic land use estimates for the
+Holocene---HYDE 3.2. \emph{Earth System Science Data}. 2017;9:927--953.
+
+\bibitem{undp2020}
+UNDP. \emph{Human Development Report 2020}. United Nations Development
+Programme; 2020.
+
+\bibitem{porter2017}
+Porter ME, Stern S, Green M. Social Progress Index 2017.
+\emph{Social Progress Imperative}; 2017.
+
+\bibitem{stoltz2026bt}
+Stoltz T. Catastrophe as Genesis: A thermodynamic framework for
+biosphere coherence across 3.8 billion years. \emph{In review}. 2026.
+
+\bibitem{liebig1840}
+von Liebig J. \emph{Die organische Chemie in ihrer Anwendung auf
+Agricultur und Physiologie}. Vieweg; 1840.
+
+\bibitem{granger1969}
+Granger CWJ. Investigating causal relations by econometric models and
+cross-spectral methods. \emph{Econometrica}. 1969;37(3):424--438.
+
+\bibitem{box1976}
+Box GEP, Jenkins GM. \emph{Time Series Analysis: Forecasting and Control}.
+Holden-Day; 1976.
+
+\bibitem{bai2003}
+Bai J, Perron P. Computation and analysis of multiple structural change
+models. \emph{Journal of Applied Econometrics}. 2003;18(1):1--22.
+
+\bibitem{maddison2020}
+Bolt J, van Zanden JL. Maddison style estimates of the evolution of the
+world economy. \emph{Maddison Project Database 2020}.
+
+\bibitem{smil2017}
+Smil V. \emph{Energy and Civilization: A History}. MIT Press; 2017.
+
+\bibitem{haberl2007}
+Haberl H, et al. Quantifying and mapping the human appropriation of net
+primary production. \emph{PNAS}. 2007;104(31):12942--12947.
+
+\end{thebibliography}
+
+\end{document}

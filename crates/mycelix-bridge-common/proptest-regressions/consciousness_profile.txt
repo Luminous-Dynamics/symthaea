@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc a15373f4f4568dd3cedd9e1c78c615289ad9f983ed7dedbc6dfbc84bdd5aec4b # shrinks to age_hours = 73

@@ -1,0 +1,136 @@
+<!-- Kinetic Sacrifice scenario — enriched construction site.
+     Same physics as cf2_sacrifice.xml but with visual scene geometry:
+     scaffolding, crates, safety cones, floor markings, better lighting.
+     All additions are static/decorative — they don't alter beam/drone/human dynamics. -->
+<mujoco model="cf2_sacrifice_enriched">
+  <option integrator="RK4" timestep="0.002" density="1.225" viscosity="1.8e-5"/>
+
+  <!-- Offscreen rendering buffer for MjRenderer video capture -->
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <quality shadowsize="4096"/>
+    <rgba fog="0.15 0.15 0.2 1"/>
+    <map znear="0.01" zfar="50"/>
+  </visual>
+
+  <worldbody>
+    <!-- Lighting: 3-point setup for dramatic shadows -->
+    <light pos="2 -3 6" dir="-0.2 0.3 -1" diffuse="0.7 0.7 0.8" specular="0.3 0.3 0.3" castshadow="true"/>
+    <light pos="-4 2 5" dir="0.5 -0.3 -1" diffuse="0.4 0.35 0.3" castshadow="true"/>
+    <light pos="0 0 8" dir="0 0 -1" diffuse="0.2 0.2 0.25" castshadow="false"/>
+
+    <!-- Ground: concrete-colored with darker border -->
+    <geom type="plane" size="10 10 0.01" rgba="0.42 0.40 0.38 1"/>
+
+    <!-- ── Floor markings (thin boxes on ground) ── -->
+    <!-- Hazard zone around human (yellow stripes) -->
+    <geom type="box" pos="-1.5 -0.6 0.002" size="0.6 0.02 0.002" rgba="0.9 0.8 0.1 0.8"/>
+    <geom type="box" pos="-1.5  0.6 0.002" size="0.6 0.02 0.002" rgba="0.9 0.8 0.1 0.8"/>
+    <geom type="box" pos="-0.9 0.0 0.002" size="0.02 0.6 0.002" rgba="0.9 0.8 0.1 0.8"/>
+    <geom type="box" pos="-2.1 0.0 0.002" size="0.02 0.6 0.002" rgba="0.9 0.8 0.1 0.8"/>
+
+    <!-- Mission path indicator (subtle green line from origin to target) -->
+    <geom type="box" pos="-1.5 0 0.001" size="1.5 0.01 0.001" rgba="0.2 0.5 0.2 0.3"/>
+
+    <!-- ── Construction scaffolding (behind human, visual only) ── -->
+    <!-- Vertical poles -->
+    <geom type="cylinder" pos="-2.5 -0.8 1.0" size="0.03 1.0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-2.5  0.8 1.0" size="0.03 1.0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-3.5 -0.8 1.0" size="0.03 1.0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-3.5  0.8 1.0" size="0.03 1.0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <!-- Horizontal bars -->
+    <geom type="cylinder" pos="-3.0 -0.8 1.5" size="0.02 0.5" euler="0 90 0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-3.0  0.8 1.5" size="0.02 0.5" euler="0 90 0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-2.5  0.0 2.0" size="0.02 0.8" euler="90 0 0" rgba="0.6 0.6 0.55 1" contype="0" conaffinity="0"/>
+    <!-- Cross braces -->
+    <geom type="cylinder" pos="-3.0 -0.8 1.0" size="0.015 1.2" euler="0 30 0" rgba="0.55 0.55 0.5 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-3.0  0.8 1.0" size="0.015 1.2" euler="0 -30 0" rgba="0.55 0.55 0.5 1" contype="0" conaffinity="0"/>
+
+    <!-- ── Crates (near scaffolding, visual only) ── -->
+    <geom type="box" pos="-3.8 0.3 0.2" size="0.2 0.15 0.2" rgba="0.55 0.35 0.15 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-3.5 0.5 0.15" size="0.15 0.12 0.15" rgba="0.50 0.30 0.12 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-3.8 0.3 0.55" size="0.18 0.13 0.15" rgba="0.48 0.32 0.14 1" euler="0 0 8" contype="0" conaffinity="0"/>
+
+    <!-- ── Safety cones (orange, visual only) ── -->
+    <geom type="cylinder" pos="-1.0 -0.7 0.15" size="0.06 0.15" rgba="1.0 0.45 0.0 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-1.0 -0.7 0.32" size="0.02 0.02" rgba="1.0 0.45 0.0 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-1.0  0.7 0.15" size="0.06 0.15" rgba="1.0 0.45 0.0 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-1.0  0.7 0.32" size="0.02 0.02" rgba="1.0 0.45 0.0 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-3.2 -0.5 0.15" size="0.06 0.15" rgba="1.0 0.45 0.0 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-3.2 -0.5 0.32" size="0.02 0.02" rgba="1.0 0.45 0.0 1" contype="0" conaffinity="0"/>
+
+    <!-- ── Tool cart (near origin, visual only) ── -->
+    <geom type="box" pos="1.5 1.0 0.3" size="0.3 0.2 0.3" rgba="0.3 0.35 0.4 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="1.2 1.0 0.05" size="0.05 0.05" rgba="0.25 0.25 0.25 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="1.8 1.0 0.05" size="0.05 0.05" rgba="0.25 0.25 0.25 1" contype="0" conaffinity="0"/>
+
+    <!-- ── The Drone (Crazyflie 2 — same physics as cf2_sacrifice) ── -->
+    <body name="cf2" pos="0 0 1.5">
+      <freejoint name="root"/>
+      <inertial pos="0 0 0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5"/>
+
+      <!-- Central frame -->
+      <geom type="box" size="0.03 0.03 0.005" rgba="0.1 0.1 0.1 1" name="frame"/>
+
+      <!-- 4 arms -->
+      <geom type="box" pos="0.033 0.033 0" size="0.025 0.004 0.003" euler="0 0 45" name="arm_fr"/>
+      <geom type="box" pos="-0.033 0.033 0" size="0.025 0.004 0.003" euler="0 0 -45" name="arm_fl"/>
+      <geom type="box" pos="-0.033 -0.033 0" size="0.025 0.004 0.003" euler="0 0 45" name="arm_bl"/>
+      <geom type="box" pos="0.033 -0.033 0" size="0.025 0.004 0.003" euler="0 0 -45" name="arm_br"/>
+
+      <!-- 4 rotor discs -->
+      <geom type="cylinder" pos="0.046 0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5"/>
+      <geom type="cylinder" pos="-0.046 0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5"/>
+      <geom type="cylinder" pos="-0.046 -0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5"/>
+      <geom type="cylinder" pos="0.046 -0.046 0.006" size="0.023 0.001" rgba="0.4 0.6 0.9 0.5"/>
+
+      <!-- Sensor and actuation sites -->
+      <site name="imu" pos="0 0 0"/>
+      <site name="actuation" pos="0 0 0"/>
+    </body>
+
+    <!-- The Human Worker (kinematic — capsule torso + sphere head + hard hat) -->
+    <body name="human" pos="-1.5 0 0" mocap="true">
+      <geom type="capsule" size="0.15 0.4" pos="0 0 0.6" rgba="0.8 0.6 0.4 1" name="torso"/>
+      <geom type="sphere" size="0.12" pos="0 0 1.1" rgba="0.8 0.6 0.4 1" name="head"/>
+      <!-- Hard hat (visual only) -->
+      <geom type="cylinder" size="0.14 0.03" pos="0 0 1.22" rgba="0.9 0.8 0.0 1" name="hardhat" contype="0" conaffinity="0"/>
+      <!-- Arms (visual only) -->
+      <geom type="capsule" size="0.04 0.25" pos="0.2 0 0.7" euler="0 60 0" rgba="0.8 0.6 0.4 1" contype="0" conaffinity="0"/>
+      <geom type="capsule" size="0.04 0.25" pos="-0.2 0 0.7" euler="0 -60 0" rgba="0.8 0.6 0.4 1" contype="0" conaffinity="0"/>
+      <!-- Legs (visual only) -->
+      <geom type="capsule" size="0.06 0.3" pos="0.08 0 0.15" rgba="0.2 0.2 0.5 1" contype="0" conaffinity="0"/>
+      <geom type="capsule" size="0.06 0.3" pos="-0.08 0 0.15" rgba="0.2 0.2 0.5 1" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- The Falling Beam — directly above human, high enough for drone to intercept -->
+    <body name="beam" pos="-1.5 0 4.0">
+      <freejoint name="beam_joint"/>
+      <inertial pos="0 0 0" mass="0.3" diaginertia="0.0015 0.0015 0.00015"/>
+      <geom type="box" size="0.02 0.02 0.3" rgba="0.6 0.2 0.1 1" name="steel_beam"
+            condim="4" friction="0.8 0.005 0.0001"/>
+    </body>
+
+    <!-- Payload target (drone's mission objective) -->
+    <site name="payload_target" pos="-3.0 0 1.0" rgba="0 1 0 0.5" size="0.1"/>
+
+    <!-- ── Overhead beam structure (offset to not interfere with falling beam) ── -->
+    <geom type="box" pos="-1.5 0.8 3.2" size="1.0 0.03 0.03" rgba="0.5 0.5 0.45 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-0.5 0.8 1.6" size="0.025 1.6" rgba="0.5 0.5 0.45 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-2.5 0.8 1.6" size="0.025 1.6" rgba="0.5 0.5 0.45 1" contype="0" conaffinity="0"/>
+  </worldbody>
+
+  <!-- Drone actuators (same as cf2_sacrifice) -->
+  <actuator>
+    <motor name="body_thrust"  site="actuation" gear="0 0 1 0 0 0" ctrlrange="0 0.6" ctrllimited="true"/>
+    <motor name="roll_moment"  site="actuation" gear="0 0 0 1 0 0" ctrlrange="-0.005 0.005" ctrllimited="true"/>
+    <motor name="pitch_moment" site="actuation" gear="0 0 0 0 1 0" ctrlrange="-0.005 0.005" ctrllimited="true"/>
+    <motor name="yaw_moment"   site="actuation" gear="0 0 0 0 0 1" ctrlrange="-0.002 0.002" ctrllimited="true"/>
+  </actuator>
+
+  <sensor>
+    <gyro name="body_gyro" site="imu"/>
+    <accelerometer name="body_linacc" site="imu"/>
+    <framequat name="body_quat" objtype="site" objname="imu"/>
+  </sensor>
+</mujoco>

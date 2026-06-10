@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-quicken-fb"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Mycelial colonization boot animation for NixOS installer — bare-metal DRM/KMS framebuffer"
+license = "AGPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "quicken-fb"
+path = "src/main.rs"
+
+[dependencies]
+drm = "0.12"
+drm-ffi = "0.8"
+nix = { version = "0.29", features = ["mman", "fs", "ioctl"] }
+blake3 = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-bandgap"
+version = "0.1.0"
+edition = "2024"
+description = "DFT bandgap correction via physics baseline + ML residual learning"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

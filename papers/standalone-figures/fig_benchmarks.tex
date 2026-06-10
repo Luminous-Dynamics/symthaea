@@ -1,0 +1,64 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+
+\definecolor{hdcblue}{RGB}{31,119,180}
+\definecolor{synthgray}{RGB}{174,199,232}
+
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=32pt,
+    width=12cm,
+    height=7cm,
+    ylabel={Accuracy (\%)},
+    ylabel style={font=\large},
+    symbolic x coords={LibriSpeech$^\dagger$, ISOLET, Ethics, MNIST, EEG$^\dagger$},
+    xtick=data,
+    xticklabel style={font=\normalsize},
+    ymin=75, ymax=105,
+    ytick={75,80,85,90,95,100},
+    ymajorgrids=true,
+    grid style={dashed, gray!40},
+    nodes near coords,
+    nodes near coords style={font=\small\bfseries, anchor=south},
+    clip=false,
+    enlarge x limits=0.15,
+]
+
+% Synthetic: LibriSpeech
+\addplot[fill=synthgray, fill opacity=0.85, draw=synthgray!60!black, forget plot]
+    coordinates {(LibriSpeech$^\dagger$, 94.5)};
+
+% Real: ISOLET
+\addplot[fill=hdcblue, fill opacity=0.85, draw=hdcblue!80!black, forget plot]
+    coordinates {(ISOLET, 91.7)};
+
+% Real: Ethics
+\addplot[fill=hdcblue, fill opacity=0.85, draw=hdcblue!80!black, forget plot]
+    coordinates {(Ethics, 92.9)};
+
+% Real: MNIST
+\addplot[fill=hdcblue, fill opacity=0.85, draw=hdcblue!80!black, forget plot]
+    coordinates {(MNIST, 88.5)};
+
+% Synthetic: EEG
+\addplot[fill=synthgray, fill opacity=0.85, draw=synthgray!60!black, forget plot]
+    coordinates {(EEG$^\dagger$, 100)};
+
+% 90% dashed line
+\draw[dashed, red!60!black, thick] (axis cs:LibriSpeech$^\dagger$, 90) -- (axis cs:EEG$^\dagger$, 90);
+\node[anchor=west, font=\small, red!60!black] at (axis cs:EEG$^\dagger$, 90) {\;90\%};
+
+% Manual legend
+\node[anchor=north east, fill=white, fill opacity=0.9, draw=gray!50, inner sep=5pt, font=\small]
+    at (rel axis cs:0.97,0.30) {
+    \tikz{\fill[hdcblue, fill opacity=0.85] (0,0) rectangle (0.3,0.2);}\;Real-world\quad
+    \tikz{\fill[synthgray, fill opacity=0.85] (0,0) rectangle (0.3,0.2);}\;Synthetic$^\dagger$
+};
+
+\end{axis}
+\end{tikzpicture}
+\end{document}

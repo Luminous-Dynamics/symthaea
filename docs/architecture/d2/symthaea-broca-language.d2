@@ -1,0 +1,187 @@
+# Symthaea Broca SSM — Language Center Pipeline
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Broca SSM — Consciousness-to-Language Pipeline
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# INPUT: THOUGHT CHANNELS
+# ═══════════════════════════════════════════
+input: ThoughtChannels (43D / 47D therapeutic) {
+  shape: parallelogram
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+  label: "43 scalar channels from CfC temporal state\n47 with therapeutic feature enabled\n(intent, emotion, consciousness, context, code, epistemic cube)"
+}
+
+# ═══════════════════════════════════════════
+# ENCODING
+# ═══════════════════════════════════════════
+encoding: ThoughtLanguageEncoder {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  normalize: "Normalize\nPer-channel range scaling" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  thermometer: "Level-Encode\nThermometer encoding" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  bind_bundle: "Bind + Bundle\nXOR with base HV -> majority\n-> 16,384D ContinuousHV" {
+    style.fill: "#312e81"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+  }
+
+  normalize -> thermometer -> bind_bundle
+}
+
+# ═══════════════════════════════════════════
+# PROJECTION (HDC -> SSM)
+# ═══════════════════════════════════════════
+projection: Temporal Projection {
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  chunk: "Chunk\n16,384D -> 64 x 256D chunks" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  upproject: "Up-Project\nEach 256D -> 768D\n(near-lossless per token)" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  context: "768D SSM Context\nReady for autoregressive" {
+    style.fill: "#6b21a8"
+    style.font-color: "#d8b4fe"
+    style.stroke: "#a855f7"
+  }
+
+  chunk -> upproject -> context
+}
+
+# ═══════════════════════════════════════════
+# MAMBA SSM
+# ═══════════════════════════════════════════
+mamba: MambaWrapper (SSM) {
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  style.border-radius: 8
+
+  forward: "forward_one_token()\nAutoregressive 768D latent\nState-space recurrence" {
+    style.fill: "#1e40af"
+    style.font-color: "#93c5fd"
+    style.stroke: "#3b82f6"
+  }
+}
+
+# ═══════════════════════════════════════════
+# LANGUAGE CONTROLLER
+# ═══════════════════════════════════════════
+controller: LanguageController {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  compose: "Compose\nthought_hv XOR token_emb XOR permute(pos)" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  evolve: "CfC Evolve\nnetwork.evolve_closed_form(dt, input)\ndt = 0.02s per token" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  logits: "Weight-Tied Logits\nlogit_i = cosine(output_hv, token_emb[i])\n256 tokens x 16,384D vocab" {
+    style.fill: "#312e81"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+  }
+
+  compose -> evolve -> logits
+}
+
+# ═══════════════════════════════════════════
+# GATING PIPELINE
+# ═══════════════════════════════════════════
+gating: Consciousness-Aware Gating {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  epistemic: "EpistemicGate\nSuppress factual tokens\nwhen uncertain\nBoost hedging words" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    style.stroke: "#22c55e"
+  }
+
+  emotional: "EmotionalModulator\narousal -> sentence length\nwarmth -> formality" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+
+  coherence: "CoherenceFeedback\nLow coherence -> boost\nthought_hv binding\nAuto-correct semantic drift" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+
+  epistemic -> emotional -> coherence
+}
+
+# ═══════════════════════════════════════════
+# OUTPUT
+# ═══════════════════════════════════════════
+generator: BrocaGenerator {
+  style.fill: "#3a2e1e"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fde68a"
+  style.border-radius: 8
+
+  sampling: "Sampling\nGreedy / Top-k / Top-p" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  tokenizer: "BPE Tokenizer\nToken IDs -> text" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+
+  sampling -> tokenizer
+}
+
+output: Language Output {
+  shape: parallelogram
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  label: "Generated text (feature: ssm_language)\nEpistemically honest, emotionally modulated\nCoherence-corrected"
+}
+
+# ═══════════════════════════════════════════
+# TRAINING (offline)
+# ═══════════════════════════════════════════
+training: Training Pipeline (Offline) {
+  style.fill: "#1e293b"
+  style.stroke: "#64748b"
+  style.font-color: "#94a3b8"
+  style.border-radius: 8
+
+  data: "JSONL Dataset\n{channels: [f32; 20], target_text}" {style.fill: "#374151"; style.font-color: "#9ca3af"}
+  teacher: "Teacher Forcing\nFull sequence forward pass" {style.fill: "#374151"; style.font-color: "#9ca3af"}
+  loss: "Cross-Entropy Loss\n+ Prefix weighting (0.3x)\n+ Contrastive loss" {style.fill: "#374151"; style.font-color: "#9ca3af"}
+  optim: "Adam + Cosine Annealing\nBPTT (window 16-32 tokens)" {style.fill: "#374151"; style.font-color: "#9ca3af"}
+
+  data -> teacher -> loss -> optim
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+input -> encoding {style.stroke: "#818cf8"; style.stroke-width: 2}
+encoding.bind_bundle -> projection.chunk: "16,384D\nthought_hv" {style.stroke: "#a855f7"; style.stroke-width: 2}
+projection.context -> mamba.forward {style.stroke: "#3b82f6"; style.stroke-width: 2}
+mamba.forward -> controller.compose: "768D\nlatent" {style.stroke: "#6366f1"; style.stroke-width: 2}
+controller.logits -> gating.epistemic {style.stroke: "#22c55e"; style.stroke-width: 2}
+gating.coherence -> generator.sampling {style.stroke: "#f59e0b"; style.stroke-width: 2}
+generator.tokenizer -> output {style.stroke: "#22c55e"; style.stroke-width: 2}
+
+training.optim -> controller: "weight\nupdates" {style.stroke: "#64748b"; style.stroke-dash: 5}

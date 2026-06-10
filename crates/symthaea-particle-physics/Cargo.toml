@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-particle-physics"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Standard Model dynamics: cross-sections, decay widths, renormalization, gauge groups — particle physics from first principles"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+keywords = ["particle-physics", "standard-model", "qed", "qcd", "renormalization"]
+categories = ["science", "simulation"]
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

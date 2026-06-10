@@ -1,0 +1,195 @@
+# Symthaea Consciousness Thermodynamics
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Consciousness Thermodynamics — Phase Transitions & Free Energy
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# FOUR LAWS
+# ═══════════════════════════════════════════
+laws: The Four Laws {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  zeroth: "0th: Systems in equilibrium\nshare same temperature" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  first: "1st: Consciousness energy\nis conserved (dU = Q - W)" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  second: "2nd: Entropy of isolated\nconsciousness increases" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  third: "3rd: Perfect coherence\n(zero entropy) unattainable" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+}
+
+# ═══════════════════════════════════════════
+# INPUT: 7D CONSCIOUSNESS VECTOR
+# ═══════════════════════════════════════════
+input: 7D Consciousness Vector {
+  shape: parallelogram
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+  label: "[Phi, Binding, Workspace, Arousal,\nReasoning, Embodiment, Knowledge]"
+}
+
+# ═══════════════════════════════════════════
+# ANALYZER
+# ═══════════════════════════════════════════
+analyzer: ConsciousnessThermodynamicsAnalyzer {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  entropy: "Calculate Entropy\nShannon | VonNeumann\nRenyi | KolmogorovSinai" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  energy: "Calculate Internal Energy\nU = kinetic + potential + interaction\nKinetic: mean(d_i^2)\nPotential: Phi x 0.5\nInteraction: Binding x 0.3" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  temperature: "Calculate Temperature\nT = variance(dims) + arousal x 0.5\nClamped [0.01, 2.0]" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  derived: "Derived Quantities\nF = U - TS (free energy)\nH = U + PV (enthalpy)\nG = H - TS (Gibbs FE)\nmu = dF/dN (chemical potential)" {
+    style.fill: "#312e81"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+  }
+
+  entropy -> energy -> temperature -> derived
+}
+
+# ═══════════════════════════════════════════
+# SIX PHASES
+# ═══════════════════════════════════════════
+phases: Six Consciousness Phases {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  frozen: "Frozen\nT: 0.0-0.2 | S: 0.1\nRigid, stuck thinking" {
+    style.fill: "#1e293b"
+    style.font-color: "#94a3b8"
+    style.stroke: "#64748b"
+  }
+  normal: "Normal\nT: 0.2-0.4 | S: 0.4\nEveryday waking" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  critical: "Critical\nT: 0.4-0.6 | S: 0.6\nEdge of chaos (max creativity)" {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+    style.stroke: "#f59e0b"
+  }
+  chaotic: "Chaotic\nT: 0.8-1.0 | S: 0.9\nFragmented consciousness" {
+    style.fill: "#7f1d1d"
+    style.font-color: "#fca5a5"
+  }
+  flow: "Flow\nT: 0.3-0.5 | S: 0.3\nSuperfluid frictionless" {
+    style.fill: "#1e40af"
+    style.font-color: "#93c5fd"
+    style.stroke: "#3b82f6"
+  }
+  unified: "Unified\nT: 0.0-0.3 | S: 0.2\nBose-Einstein condensate\nMeditative unity" {
+    style.fill: "#4a1942"
+    style.font-color: "#e9d5ff"
+    style.stroke: "#c084fc"
+  }
+
+  frozen -> normal -> critical -> chaotic
+  normal -> flow: "special" {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+  frozen -> unified: "special" {style.stroke: "#c084fc"; style.stroke-dash: 3}
+}
+
+# ═══════════════════════════════════════════
+# PHASE TRANSITIONS
+# ═══════════════════════════════════════════
+transitions: Phase Transitions {
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  first_order: "First Order\nDiscontinuous jump\nLatent heat released\n(like ice -> water)" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  second_order: "Second Order\nContinuous but singular\nCritical exponents apply\nalpha + 2beta + gamma = 2" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  crossover: "Crossover\nSmooth transition\nNo true boundary" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+}
+
+# ═══════════════════════════════════════════
+# FLUCTUATION ANALYSIS
+# ═══════════════════════════════════════════
+fluctuations: Fluctuation Statistics {
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  style.border-radius: 8
+
+  label: "mean_amplitude | variance\nautocorrelation_time\ncritical_slowing_down\nsusceptibility (chi = var/T)\nFDR (= 1.0 at equilibrium)"
+}
+
+# ═══════════════════════════════════════════
+# FREE ENERGY STATUS
+# ═══════════════════════════════════════════
+fe_status: Free Energy Status {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  minimizing: "Minimizing\nActively reducing F\n(goal-directed)" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  local_min: "Local Minimum\nStuck at suboptimal" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  global_min: "Global Minimum\nOptimal coherence" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  increasing: "Increasing\nLosing coherence" {style.fill: "#14532d"; style.font-color: "#86efac"}
+  searching: "Searching\nExploring minima" {style.fill: "#14532d"; style.font-color: "#86efac"}
+}
+
+# ═══════════════════════════════════════════
+# FEEDBACK TO COGNITIVE LOOP
+# ═══════════════════════════════════════════
+feedback: Phase-Dependent Feedback {
+  style.fill: "#3a2e1e"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fde68a"
+  style.border-radius: 8
+
+  crit_fb: "Critical: exploration x1.15\ncuriosity x1.1 (max creativity)" {style.fill: "#78350f"; style.font-color: "#fde68a"}
+  flow_fb: "Flow: learning_rate x1.05\n(the zone)" {style.fill: "#1e40af"; style.font-color: "#93c5fd"}
+  frozen_fb: "Frozen: increase arousal\nnovel stimuli recommended" {style.fill: "#1e293b"; style.font-color: "#94a3b8"}
+  chaotic_fb: "Chaotic: reduce stimulation\nfocus on single task" {style.fill: "#7f1d1d"; style.font-color: "#fca5a5"}
+}
+
+# ═══════════════════════════════════════════
+# OUTPUT
+# ═══════════════════════════════════════════
+report: ThermodynamicsReport {
+  shape: parallelogram
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  label: "health_score [0-1] | entropy_production_rate\nequilibrium_status | free_energy_status\npredicted_phase | time_to_transition\nrecommendations[]"
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+input -> analyzer {style.stroke: "#818cf8"; style.stroke-width: 2}
+analyzer.derived -> phases: "phase\ndetection" {style.stroke: "#818cf8"}
+analyzer.derived -> fe_status: "F assessment" {style.stroke: "#22c55e"}
+analyzer.derived -> fluctuations: "stats update" {style.stroke: "#3b82f6"}
+phases -> transitions: "state\nchange" {style.stroke: "#a855f7"; style.stroke-width: 2}
+transitions -> fluctuations: "near-critical\nanalysis" {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+phases -> feedback {style.stroke: "#f59e0b"; style.stroke-width: 2}
+fe_status -> report {style.stroke: "#22c55e"}
+fluctuations -> report {style.stroke: "#3b82f6"; style.stroke-dash: 3}
+feedback -> report {style.stroke: "#f59e0b"; style.stroke-dash: 3}

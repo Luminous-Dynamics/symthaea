@@ -1,0 +1,268 @@
+=== 150-YEAR CIVILIZATION REPORT ===
+Scenario: Earth (seed: 42)
+Duration: 1000.0 years (12000 ticks)
+
+RESULT: SURVIVED (CVS: 0.762)
+
+Population: 2339 across 5 worlds
+Checkpoints: 41/47 passed
+
+First birth: Year 0.0 | Constitution: Year 1.0 | First trade: Year 25.0
+
+HARMONY SCORES (Eight Harmonies):
+  1. Resonant Coherence                  0.283
+  2. Pan-Sentient Flourishing            0.678
+  3. Evolving Resonant Co-Creationism    0.643
+  4. Radical Translucency                0.542
+  5. Mutual Reciprocity                  0.800
+  6. Temporal Wholeness                  0.925
+  7. Emergent Ethical Wisdom             0.696
+  8. Sacred Stillness                    0.089
+Love Coherence: 0.341
+
+VIABILITY COMPONENTS:
+  Genetic diversity:  1.000
+  Economic sustain:   0.947
+  Harmony mean:       0.582
+  Oppression (inv):   1.000
+  Collective Phi:     0.283
+  CVS:                0.762
+
+PSYCHOLOGICAL NEEDS:
+  Allostatic load:    0.080
+  Engagement:         0.964
+  Thrill incidents:   12345
+  Biohack incidents:  0
+
+KEY EVENTS:
+  Constitutional crises: 10828
+  Epidemics: 98
+  Breakthroughs: 6673
+  Worlds founded: 5
+  Total migrants: 6950
+
+FACTION ANALYSIS:
+  Faction cycles:         5
+  Peak faction count:     5
+  Max elite persistence:  0.000
+  Max innovation stag:    1.000
+  Phi trend at end:       Oscillating
+  Max trauma:             0.000
+  Speciation events:      0
+  Calcification events:   0
+
+
+=== EPOCH SNAPSHOTS ===
+  Yr   5.0 | Pop   1180 | Phi 0.137 | CVS 0.640 | Fac 1 | Trauma 0.000
+  Yr  10.0 | Pop   1522 | Phi 0.138 | CVS 0.642 | Fac 1 | Trauma 0.000
+  Yr  14.0 | Pop   1668 | Phi 0.137 | CVS 0.642 | Fac 0 | Trauma 0.000
+  Yr  14.1 | Pop   1669 | Phi 0.138 | CVS 0.642 | Fac 0 | Trauma 0.000
+  Yr  14.2 | Pop   1672 | Phi 0.138 | CVS 0.642 | Fac 0 | Trauma 0.000
+  Yr  15.0 | Pop   1692 | Phi 0.138 | CVS 0.642 | Fac 0 | Trauma 0.000
+  Yr  20.0 | Pop   1911 | Phi 0.154 | CVS 0.648 | Fac 0 | Trauma 0.000
+  Yr  25.0 | Pop   2225 | Phi 0.177 | CVS 0.655 | Fac 0 | Trauma 0.000
+  Yr  30.0 | Pop   2270 | Phi 0.200 | CVS 0.663 | Fac 0 | Trauma 0.000
+  Yr  35.0 | Pop   2313 | Phi 0.209 | CVS 0.666 | Fac 1 | Trauma 0.000
+  Yr  40.0 | Pop   2288 | Phi 0.221 | CVS 0.670 | Fac 1 | Trauma 0.000
+  Yr  45.0 | Pop   2287 | Phi 0.246 | CVS 0.679 | Fac 0 | Trauma 0.000
+  Yr  50.0 | Pop   2250 | Phi 0.278 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr  55.0 | Pop   2245 | Phi 0.297 | CVS 0.698 | Fac 0 | Trauma 0.000
+  Yr  60.0 | Pop   2217 | Phi 0.316 | CVS 0.705 | Fac 0 | Trauma 0.000
+  Yr  65.0 | Pop   2234 | Phi 0.330 | CVS 0.710 | Fac 1 | Trauma 0.000
+  Yr  70.0 | Pop   2246 | Phi 0.314 | CVS 0.704 | Fac 0 | Trauma 0.000
+  Yr  75.0 | Pop   2243 | Phi 0.300 | CVS 0.699 | Fac 0 | Trauma 0.000
+  Yr  80.0 | Pop   2215 | Phi 0.290 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr  85.0 | Pop   2187 | Phi 0.288 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr  89.0 | Pop   2177 | Phi 0.287 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr  90.0 | Pop   2185 | Phi 0.287 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr  95.0 | Pop   2183 | Phi 0.281 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 100.0 | Pop   2172 | Phi 0.283 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 105.0 | Pop   2191 | Phi 0.289 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 110.0 | Pop   2188 | Phi 0.297 | CVS 0.698 | Fac 0 | Trauma 0.000
+  Yr 115.0 | Pop   2200 | Phi 0.292 | CVS 0.696 | Fac 0 | Trauma 0.000
+  Yr 119.0 | Pop   2186 | Phi 0.283 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 120.0 | Pop   2194 | Phi 0.280 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 125.0 | Pop   2176 | Phi 0.280 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 130.0 | Pop   2200 | Phi 0.275 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 135.0 | Pop   2195 | Phi 0.280 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 140.0 | Pop   2173 | Phi 0.283 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 145.0 | Pop   2160 | Phi 0.273 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 150.0 | Pop   2162 | Phi 0.280 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 150.0 | Pop   2162 | Phi 0.280 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 155.0 | Pop   2165 | Phi 0.286 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 160.0 | Pop   2158 | Phi 0.288 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 165.0 | Pop   2174 | Phi 0.282 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 170.0 | Pop   2173 | Phi 0.280 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 175.0 | Pop   2172 | Phi 0.278 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 180.0 | Pop   2165 | Phi 0.281 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 185.0 | Pop   2179 | Phi 0.273 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 190.0 | Pop   2167 | Phi 0.263 | CVS 0.686 | Fac 0 | Trauma 0.000
+  Yr 195.0 | Pop   2189 | Phi 0.267 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 200.0 | Pop   2197 | Phi 0.237 | CVS 0.675 | Fac 0 | Trauma 0.000
+  Yr 200.0 | Pop   2197 | Phi 0.237 | CVS 0.675 | Fac 0 | Trauma 0.000
+  Yr 205.0 | Pop   2247 | Phi 0.255 | CVS 0.682 | Fac 0 | Trauma 0.000
+  Yr 210.0 | Pop   2248 | Phi 0.273 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 215.0 | Pop   2250 | Phi 0.279 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 220.0 | Pop   2261 | Phi 0.288 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 225.0 | Pop   2283 | Phi 0.301 | CVS 0.698 | Fac 0 | Trauma 0.000
+  Yr 230.0 | Pop   2294 | Phi 0.305 | CVS 0.700 | Fac 0 | Trauma 0.000
+  Yr 235.0 | Pop   2288 | Phi 0.310 | CVS 0.701 | Fac 0 | Trauma 0.000
+  Yr 240.0 | Pop   2274 | Phi 0.306 | CVS 0.700 | Fac 0 | Trauma 0.000
+  Yr 245.0 | Pop   2273 | Phi 0.305 | CVS 0.699 | Fac 0 | Trauma 0.000
+  Yr 250.0 | Pop   2247 | Phi 0.305 | CVS 0.700 | Fac 0 | Trauma 0.000
+  Yr 250.0 | Pop   2247 | Phi 0.305 | CVS 0.700 | Fac 0 | Trauma 0.000
+  Yr 255.0 | Pop   2256 | Phi 0.299 | CVS 0.697 | Fac 0 | Trauma 0.000
+  Yr 260.0 | Pop   2247 | Phi 0.292 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 265.0 | Pop   2237 | Phi 0.287 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 270.0 | Pop   2247 | Phi 0.271 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 275.0 | Pop   2235 | Phi 0.249 | CVS 0.680 | Fac 0 | Trauma 0.000
+  Yr 280.0 | Pop   2232 | Phi 0.250 | CVS 0.680 | Fac 0 | Trauma 0.000
+  Yr 285.0 | Pop   2230 | Phi 0.268 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 290.0 | Pop   2243 | Phi 0.288 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 295.0 | Pop   2259 | Phi 0.289 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 300.0 | Pop   2271 | Phi 0.262 | CVS 0.684 | Fac 0 | Trauma 0.000
+  Yr 300.0 | Pop   2271 | Phi 0.262 | CVS 0.684 | Fac 0 | Trauma 0.000
+  Yr 305.0 | Pop   2302 | Phi 0.285 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 310.0 | Pop   2344 | Phi 0.295 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 315.0 | Pop   2337 | Phi 0.293 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 320.0 | Pop   2369 | Phi 0.300 | CVS 0.697 | Fac 1 | Trauma 0.000
+  Yr 325.0 | Pop   2363 | Phi 0.303 | CVS 0.698 | Fac 0 | Trauma 0.000
+  Yr 330.0 | Pop   2373 | Phi 0.303 | CVS 0.698 | Fac 0 | Trauma 0.000
+  Yr 335.0 | Pop   2349 | Phi 0.302 | CVS 0.698 | Fac 0 | Trauma 0.000
+  Yr 340.0 | Pop   2348 | Phi 0.291 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 345.0 | Pop   2354 | Phi 0.276 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 350.0 | Pop   2322 | Phi 0.269 | CVS 0.686 | Fac 0 | Trauma 0.000
+  Yr 355.0 | Pop   2335 | Phi 0.262 | CVS 0.683 | Fac 0 | Trauma 0.000
+  Yr 360.0 | Pop   2357 | Phi 0.260 | CVS 0.683 | Fac 0 | Trauma 0.000
+  Yr 365.0 | Pop   2362 | Phi 0.269 | CVS 0.686 | Fac 0 | Trauma 0.000
+  Yr 370.0 | Pop   2378 | Phi 0.271 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 375.0 | Pop   2365 | Phi 0.279 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 380.0 | Pop   2382 | Phi 0.279 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 385.0 | Pop   2389 | Phi 0.285 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 390.0 | Pop   2371 | Phi 0.290 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 395.0 | Pop   2389 | Phi 0.292 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 400.0 | Pop   2364 | Phi 0.290 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 405.0 | Pop   2349 | Phi 0.280 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 410.0 | Pop   2362 | Phi 0.274 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 415.0 | Pop   2349 | Phi 0.262 | CVS 0.683 | Fac 0 | Trauma 0.000
+  Yr 420.0 | Pop   2358 | Phi 0.272 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 425.0 | Pop   2382 | Phi 0.284 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 430.0 | Pop   2430 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 435.0 | Pop   2444 | Phi 0.288 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 440.0 | Pop   2416 | Phi 0.290 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 445.0 | Pop   2399 | Phi 0.297 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 450.0 | Pop   2387 | Phi 0.294 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 455.0 | Pop   2384 | Phi 0.297 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 460.0 | Pop   2392 | Phi 0.299 | CVS 0.696 | Fac 0 | Trauma 0.000
+  Yr 465.0 | Pop   2403 | Phi 0.301 | CVS 0.697 | Fac 0 | Trauma 0.000
+  Yr 470.0 | Pop   2398 | Phi 0.309 | CVS 0.699 | Fac 0 | Trauma 0.000
+  Yr 475.0 | Pop   2384 | Phi 0.313 | CVS 0.701 | Fac 0 | Trauma 0.000
+  Yr 480.0 | Pop   2403 | Phi 0.309 | CVS 0.699 | Fac 0 | Trauma 0.000
+  Yr 485.0 | Pop   2405 | Phi 0.301 | CVS 0.696 | Fac 0 | Trauma 0.000
+  Yr 490.0 | Pop   2435 | Phi 0.295 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 495.0 | Pop   2402 | Phi 0.290 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 500.0 | Pop   2389 | Phi 0.292 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 505.0 | Pop   2396 | Phi 0.291 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 510.0 | Pop   2373 | Phi 0.288 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 515.0 | Pop   2355 | Phi 0.287 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 520.0 | Pop   2347 | Phi 0.288 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 525.0 | Pop   2334 | Phi 0.292 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 530.0 | Pop   2347 | Phi 0.292 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 535.0 | Pop   2367 | Phi 0.287 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 540.0 | Pop   2358 | Phi 0.283 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 545.0 | Pop   2352 | Phi 0.279 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 550.0 | Pop   2379 | Phi 0.273 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 555.0 | Pop   2374 | Phi 0.278 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 560.0 | Pop   2362 | Phi 0.278 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 565.0 | Pop   2376 | Phi 0.277 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 570.0 | Pop   2367 | Phi 0.271 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 575.0 | Pop   2351 | Phi 0.270 | CVS 0.686 | Fac 0 | Trauma 0.000
+  Yr 580.0 | Pop   2346 | Phi 0.275 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 585.0 | Pop   2354 | Phi 0.278 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 590.0 | Pop   2354 | Phi 0.280 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 595.0 | Pop   2361 | Phi 0.284 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 600.0 | Pop   2355 | Phi 0.285 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 605.0 | Pop   2354 | Phi 0.284 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 610.0 | Pop   2357 | Phi 0.285 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 615.0 | Pop   2361 | Phi 0.284 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 620.0 | Pop   2366 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 625.0 | Pop   2367 | Phi 0.284 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 630.0 | Pop   2367 | Phi 0.287 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 635.0 | Pop   2387 | Phi 0.283 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 640.0 | Pop   2385 | Phi 0.281 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 645.0 | Pop   2360 | Phi 0.276 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 650.0 | Pop   2346 | Phi 0.265 | CVS 0.685 | Fac 0 | Trauma 0.000
+  Yr 655.0 | Pop   2361 | Phi 0.253 | CVS 0.680 | Fac 0 | Trauma 0.000
+  Yr 660.0 | Pop   2355 | Phi 0.267 | CVS 0.686 | Fac 0 | Trauma 0.000
+  Yr 665.0 | Pop   2363 | Phi 0.280 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 670.0 | Pop   2374 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 675.0 | Pop   2389 | Phi 0.290 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 680.0 | Pop   2378 | Phi 0.288 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 685.0 | Pop   2379 | Phi 0.284 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 690.0 | Pop   2376 | Phi 0.275 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 695.0 | Pop   2371 | Phi 0.276 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 700.0 | Pop   2375 | Phi 0.267 | CVS 0.686 | Fac 0 | Trauma 0.000
+  Yr 705.0 | Pop   2378 | Phi 0.265 | CVS 0.685 | Fac 0 | Trauma 0.000
+  Yr 710.0 | Pop   2370 | Phi 0.271 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 715.0 | Pop   2360 | Phi 0.273 | CVS 0.688 | Fac 0 | Trauma 0.000
+  Yr 720.0 | Pop   2352 | Phi 0.267 | CVS 0.685 | Fac 0 | Trauma 0.000
+  Yr 725.0 | Pop   2342 | Phi 0.260 | CVS 0.683 | Fac 0 | Trauma 0.000
+  Yr 730.0 | Pop   2340 | Phi 0.247 | CVS 0.678 | Fac 0 | Trauma 0.000
+  Yr 735.0 | Pop   2351 | Phi 0.237 | CVS 0.674 | Fac 0 | Trauma 0.000
+  Yr 740.0 | Pop   2327 | Phi 0.220 | CVS 0.668 | Fac 0 | Trauma 0.000
+  Yr 745.0 | Pop   2331 | Phi 0.211 | CVS 0.665 | Fac 0 | Trauma 0.000
+  Yr 750.0 | Pop   2325 | Phi 0.214 | CVS 0.666 | Fac 0 | Trauma 0.000
+  Yr 755.0 | Pop   2349 | Phi 0.241 | CVS 0.676 | Fac 0 | Trauma 0.000
+  Yr 760.0 | Pop   2376 | Phi 0.261 | CVS 0.683 | Fac 0 | Trauma 0.000
+  Yr 765.0 | Pop   2384 | Phi 0.282 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 770.0 | Pop   2394 | Phi 0.288 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 775.0 | Pop   2378 | Phi 0.293 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 780.0 | Pop   2395 | Phi 0.290 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 785.0 | Pop   2410 | Phi 0.288 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 790.0 | Pop   2373 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 795.0 | Pop   2354 | Phi 0.264 | CVS 0.684 | Fac 0 | Trauma 0.000
+  Yr 800.0 | Pop   2332 | Phi 0.235 | CVS 0.674 | Fac 0 | Trauma 0.000
+  Yr 805.0 | Pop   2321 | Phi 0.219 | CVS 0.668 | Fac 0 | Trauma 0.000
+  Yr 810.0 | Pop   2315 | Phi 0.212 | CVS 0.666 | Fac 0 | Trauma 0.000
+  Yr 815.0 | Pop   2335 | Phi 0.234 | CVS 0.674 | Fac 0 | Trauma 0.000
+  Yr 820.0 | Pop   2329 | Phi 0.251 | CVS 0.680 | Fac 0 | Trauma 0.000
+  Yr 825.0 | Pop   2326 | Phi 0.272 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 830.0 | Pop   2355 | Phi 0.281 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 835.0 | Pop   2363 | Phi 0.288 | CVS 0.693 | Fac 0 | Trauma 0.000
+  Yr 840.0 | Pop   2372 | Phi 0.289 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 845.0 | Pop   2370 | Phi 0.292 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 850.0 | Pop   2381 | Phi 0.292 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 855.0 | Pop   2379 | Phi 0.291 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 860.0 | Pop   2351 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 865.0 | Pop   2352 | Phi 0.280 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 870.0 | Pop   2366 | Phi 0.272 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 875.0 | Pop   2355 | Phi 0.272 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 880.0 | Pop   2348 | Phi 0.277 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 885.0 | Pop   2363 | Phi 0.281 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 890.0 | Pop   2382 | Phi 0.282 | CVS 0.691 | Fac 0 | Trauma 0.000
+  Yr 895.0 | Pop   2363 | Phi 0.281 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 900.0 | Pop   2362 | Phi 0.281 | CVS 0.690 | Fac 0 | Trauma 0.000
+  Yr 905.0 | Pop   2359 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 910.0 | Pop   2373 | Phi 0.284 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 915.0 | Pop   2347 | Phi 0.286 | CVS 0.692 | Fac 0 | Trauma 0.000
+  Yr 920.0 | Pop   2342 | Phi 0.291 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 925.0 | Pop   2348 | Phi 0.293 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 930.0 | Pop   2349 | Phi 0.295 | CVS 0.696 | Fac 0 | Trauma 0.000
+  Yr 935.0 | Pop   2376 | Phi 0.294 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 940.0 | Pop   2377 | Phi 0.293 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 945.0 | Pop   2374 | Phi 0.291 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 950.0 | Pop   2367 | Phi 0.292 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 955.0 | Pop   2364 | Phi 0.291 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 960.0 | Pop   2375 | Phi 0.294 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 965.0 | Pop   2359 | Phi 0.293 | CVS 0.695 | Fac 0 | Trauma 0.000
+  Yr 970.0 | Pop   2351 | Phi 0.290 | CVS 0.694 | Fac 0 | Trauma 0.000
+  Yr 975.0 | Pop   2382 | Phi 0.277 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 980.0 | Pop   2369 | Phi 0.263 | CVS 0.684 | Fac 0 | Trauma 0.000
+  Yr 985.0 | Pop   2369 | Phi 0.259 | CVS 0.683 | Fac 0 | Trauma 0.000
+  Yr 990.0 | Pop   2341 | Phi 0.270 | CVS 0.687 | Fac 0 | Trauma 0.000
+  Yr 995.0 | Pop   2368 | Phi 0.277 | CVS 0.689 | Fac 0 | Trauma 0.000
+  Yr 1000.0 | Pop   2339 | Phi 0.283 | CVS 0.691 | Fac 0 | Trauma 0.000
+
+============================================================
+  CIVILIZATION SURVIVED 1000 YEARS (CVS: 0.7624)
+============================================================
