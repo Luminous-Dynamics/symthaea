@@ -9,12 +9,12 @@ pub fn run_sweep(
     policies: Vec<String>,
     out: std::path::PathBuf,
 ) -> anyhow::Result<()> {
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
     use std::fs::{self, File};
     use std::io::{BufWriter, Write};
     use std::process::Command;
 
-    #[derive(Deserialize, serde::Serialize)]
+    #[derive(Deserialize, Serialize)]
     struct BakeoffResult {
         router: String,
         top1: f32,
@@ -29,10 +29,8 @@ pub fn run_sweep(
         oracle_gap_top1: f32,
     }
 
-    #[derive(Deserialize, serde::Serialize)]
+    #[derive(Deserialize, Serialize)]
     struct BakeoffOutput {
-        architecture: String,
-        version: String,
         results: Vec<BakeoffResult>,
     }
 
@@ -40,8 +38,13 @@ pub fn run_sweep(
     fs::create_dir_all(&runs_dir)?;
     let raw_runs = File::create(out.join("raw_runs.jsonl"))?;
     let mut raw_writer = BufWriter::new(raw_runs);
+    let failed_runs = File::create(out.join("failed_runs.jsonl"))?;
+    let mut failed_writer = BufWriter::new(failed_runs);
 
     let mut all_results = Vec::new();
+    let mut inv_count = 0;
+    let mut success_count = 0;
+    let mut fail_count = 0;
 
     for &dim in &dims {
         for &obj in &objects {
@@ -51,6 +54,7 @@ pub fn run_sweep(
                         for &k in &redundancy_ks {
                             for &fanout in &fanouts {
                                 for policy in &policies {
+                                    inv_count += 1;
                                     let run_id = format!(
                                         "d{}_o{}_s{}_b{}_t{}_k{}_f{}_{}",
                                         dim, obj, seed, branching, threshold, k, fanout, policy
@@ -88,16 +92,17 @@ pub fn run_sweep(
                                         .status()?;
 
                                     if status.success() {
+                                        success_count += 1;
                                         let content = fs::read_to_string(&output_path)?;
                                         let output: BakeoffOutput = serde_json::from_str(&content)?;
 
-                                        // Write JSONL entry
                                         raw_writer
                                             .write_all(content.replace('\n', "").as_bytes())?;
                                         raw_writer.write_all(b"\n")?;
 
                                         for r in output.results {
                                             all_results.push((
+                                                r,
                                                 dim,
                                                 obj,
                                                 seed,
@@ -106,9 +111,15 @@ pub fn run_sweep(
                                                 k,
                                                 fanout,
                                                 policy.clone(),
-                                                r,
                                             ));
                                         }
+                                    } else {
+                                        fail_count += 1;
+                                        writeln!(
+                                            failed_writer,
+                                            "{{\"run_id\": \"{}\", \"status\": \"failed\"}}",
+                                            run_id
+                                        )?;
                                     }
                                 }
                             }
@@ -119,8 +130,8 @@ pub fn run_sweep(
         }
     }
     raw_writer.flush()?;
+    failed_writer.flush()?;
 
-    // Generate CSV
     let mut csv = csv::Writer::from_path(out.join("aggregate.csv"))?;
     csv.write_record(&[
         "dim",
@@ -143,7 +154,7 @@ pub fn run_sweep(
         "top1_per_fanout",
         "oracle_gap_top1",
     ])?;
-    for (dim, obj, seed, branching, threshold, k, fanout, policy, r) in &all_results {
+    for (r, dim, obj, seed, branching, threshold, k, fanout, policy) in &all_results {
         csv.write_record(&[
             dim.to_string(),
             obj.to_string(),
@@ -168,17 +179,47 @@ pub fn run_sweep(
     }
     csv.flush()?;
 
-    // Generate Markdown summary
     let mut summary = File::create(out.join("summary.md"))?;
     writeln!(summary, "# RHN Sweep Summary\n")?;
-    writeln!(summary, "Total runs: {}", all_results.len())?;
-    writeln!(summary, "\n| Router | Top1/Fanout | Missing Leaves |")?;
-    writeln!(summary, "| --- | --- | --- |")?;
-    for (dim, obj, seed, branching, threshold, k, fanout, policy, r) in &all_results {
+    writeln!(summary, "Benchmark Invocations: {}", inv_count)?;
+    writeln!(summary, "Successful Invocations: {}", success_count)?;
+    writeln!(summary, "Failed Invocations: {}", fail_count)?;
+    writeln!(summary, "Result Rows: {}", all_results.len())?;
+    writeln!(
+        summary,
+        "Missing Leaf Count Sum: {}",
+        all_results
+            .iter()
+            .map(|(r, _, _, _, _, _, _, _, _)| r.missing_leaf_count)
+            .sum::<usize>()
+    )?;
+
+    let best_overall = all_results.iter().max_by(|a, b| {
+        a.0.top1_per_fanout
+            .partial_cmp(&b.0.top1_per_fanout)
+            .unwrap()
+    });
+    let best_non_oracle = all_results
+        .iter()
+        .filter(|(r, _, _, _, _, _, _, _, _)| !r.router.starts_with("Oracle"))
+        .max_by(|a, b| {
+            a.0.top1_per_fanout
+                .partial_cmp(&b.0.top1_per_fanout)
+                .unwrap()
+        });
+
+    if let Some((r, _, _, _, _, _, _, _, _)) = best_overall {
         writeln!(
             summary,
-            "| {} | {:.4} | {} |",
-            r.router, r.top1_per_fanout, r.missing_leaf_count
+            "\n### Best Overall Router (by top1_per_fanout)\n- Router: {}\n- Score: {:.4}",
+            r.router, r.top1_per_fanout
+        )?;
+    }
+    if let Some((r, _, _, _, _, _, _, _, _)) = best_non_oracle {
+        writeln!(
+            summary,
+            "\n### Best Non-Oracle Router (by top1_per_fanout)\n- Router: {}\n- Score: {:.4}",
+            r.router, r.top1_per_fanout
         )?;
     }
 
