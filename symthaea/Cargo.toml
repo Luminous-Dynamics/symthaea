@@ -48,7 +48,6 @@ members = [
     "crates/symthaea-vocal-tract",
     "crates/symthaea-voice",
     "crates/symthaea-vehicle",
-    "crates/symthaea-morphogenesis",
     # New platforms (uncomment after creating crates):
     "crates/symthaea-exoskeleton",
     "crates/symthaea-surgical",
