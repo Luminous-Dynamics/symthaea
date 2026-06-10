@@ -100,17 +100,16 @@ pub fn run_sweep(
                                         raw_writer
                                             .write_all(content.replace('\n', "").as_bytes())?;
                                         raw_writer.write_all(b"\n")?;
-
                                         for r in output.results {
                                             all_results.push((
                                                 r,
-                                                dim,
-                                                obj,
-                                                seed,
-                                                branching,
-                                                threshold,
-                                                k,
-                                                fanout,
+                                                dim.to_string(),
+                                                obj.to_string(),
+                                                seed.to_string(),
+                                                branching.to_string(),
+                                                threshold.to_string(),
+                                                k.to_string(),
+                                                fanout.to_string(),
                                                 policy.clone(),
                                             ));
                                         }
@@ -133,7 +132,6 @@ pub fn run_sweep(
     raw_writer.flush()?;
     failed_writer.flush()?;
 
-    // Generate CSV
     let mut csv = csv::Writer::from_path(out.join("aggregate.csv"))?;
     csv.write_record(&[
         "dim",
@@ -179,10 +177,8 @@ pub fn run_sweep(
             r.oracle_gap_top1.to_string(),
         ])?;
     }
-
     csv.flush()?;
 
-    // Generate Markdown summary
     let mut summary = File::create(out.join("summary.md"))?;
     writeln!(summary, "# RHN Sweep Summary\n")?;
     writeln!(summary, "Benchmark Invocations: {}", inv_count)?;
@@ -334,7 +330,7 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
             k,
             fanout,
             policy,
-            &r.router,
+            r.router.clone(),
             r.top1.to_string(),
             r.top3.to_string(),
             r.mean_margin.to_string(),
@@ -347,7 +343,6 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
             r.oracle_gap_top1.to_string(),
         ])?;
     }
-
     csv.flush()?;
 
     let mut summary = File::create(out.join("summary.md"))?;
