@@ -500,19 +500,21 @@ pub struct PolicyDiscoveryRecord {
 }
 
 impl PolicyDiscoveryRecord {
-    pub fn new(
-        policy: CellPolicy,
-        training_summary: PolicyEvaluationSummary,
-        validation_summary: Option<PolicyEvaluationSummary>,
-        metadata: PolicyMetadata,
-    ) -> Self {
-        Self {
-            policy,
-            training_summary,
-            validation_summary,
-            metadata,
-            notes: String::new(),
-        }
+    pub fn save_to_disk(&self, directory: &str) -> std::io::Result<()> {
+        std::fs::create_dir_all(directory)?;
+        let filename = format!(
+            "{}/{}_{}.json",
+            directory, self.metadata.run_id, self.metadata.timestamp
+        );
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(filename, content)
+    }
+
+    pub fn load_from_disk(path: &str) -> std::io::Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
 
@@ -677,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    fn test_policy_discovery_record_creation() {
+    fn test_policy_discovery_record_persistence() {
         let parent = ParameterizedPolicy::default();
         let scenario = vec![vec![3.0, 2.0, 1.0]];
         let summary = DiscoveryHarness::evaluate_policy_on_scenarios(
@@ -691,7 +693,7 @@ mod tests {
             mutation_magnitude: 0.1,
             generation: 1,
             timestamp: 1600000000,
-            run_id: "test-run-001".to_string(),
+            run_id: "persistence-test".to_string(),
         };
 
         let record = PolicyDiscoveryRecord::new(
@@ -701,8 +703,15 @@ mod tests {
             metadata,
         );
 
-        assert_eq!(record.metadata.run_id, "test-run-001");
-        assert!(record.validation_summary.is_some());
+        let dir = "target/test_ledger";
+        record.save_to_disk(dir).unwrap();
+
+        let loaded = PolicyDiscoveryRecord::load_from_disk(&format!(
+            "{}/persistence-test_1600000000.json",
+            dir
+        ))
+        .unwrap();
+        assert_eq!(loaded.metadata.run_id, record.metadata.run_id);
     }
 
     #[test]
