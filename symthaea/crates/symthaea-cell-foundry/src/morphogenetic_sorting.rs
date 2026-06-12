@@ -348,6 +348,18 @@ pub struct PolicyEvaluation {
     pub fitness: f32,
 }
 
+#[derive(Debug, Clone)]
+pub struct PolicyEvaluationSummary {
+    pub policy: CellPolicy,
+    pub evaluations: Vec<PolicyEvaluation>,
+    pub mean_fitness: f32,
+    pub min_fitness: f32,
+    pub mean_sortedness: f32,
+    pub mean_steps: f32,
+    pub mean_swaps: f32,
+    pub failure_count: usize,
+}
+
 pub struct DiscoveryHarness;
 
 impl DiscoveryHarness {
@@ -382,6 +394,85 @@ impl DiscoveryHarness {
             b.fitness
                 .partial_cmp(&a.fitness)
                 .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        results
+    }
+
+    pub fn evaluate_policy_on_scenarios(
+        scenarios: &[Vec<f32>],
+        policy: &CellPolicy,
+        max_steps: usize,
+    ) -> PolicyEvaluationSummary {
+        let mut evaluations = Vec::new();
+        let mut total_fitness = 0.0;
+        let mut min_fitness = f32::MAX;
+        let mut total_sortedness = 0.0;
+        let mut total_steps = 0.0;
+        let mut total_swaps = 0.0;
+        let mut failure_count = 0;
+
+        for scenario in scenarios {
+            let mut sandbox = MorphogeneticSortingSandbox::from_values(
+                SortingMode::SymthaeaMorpho,
+                scenario.to_vec(),
+            );
+            for cell in &mut sandbox.cells {
+                cell.policy = policy.clone();
+            }
+
+            let metrics = sandbox.run_until_converged(max_steps);
+            let fitness = metrics.fitness();
+
+            if metrics.sortedness < 1.0 {
+                failure_count += 1;
+            }
+
+            total_fitness += fitness;
+            min_fitness = min_fitness.min(fitness);
+            total_sortedness += metrics.sortedness;
+            total_steps += metrics.convergence_steps as f32;
+            total_swaps += metrics.swap_count as f32;
+
+            evaluations.push(PolicyEvaluation {
+                policy: policy.clone(),
+                metrics,
+                fitness,
+            });
+        }
+
+        let count = scenarios.len() as f32;
+        PolicyEvaluationSummary {
+            policy: policy.clone(),
+            evaluations,
+            mean_fitness: total_fitness / count,
+            min_fitness,
+            mean_sortedness: total_sortedness / count,
+            mean_steps: total_steps / count,
+            mean_swaps: total_swaps / count,
+            failure_count,
+        }
+    }
+
+    pub fn rank_policies_across_scenarios(
+        scenarios: &[Vec<f32>],
+        policies: &[CellPolicy],
+        max_steps: usize,
+    ) -> Vec<PolicyEvaluationSummary> {
+        let mut results: Vec<PolicyEvaluationSummary> = policies
+            .iter()
+            .map(|p| Self::evaluate_policy_on_scenarios(scenarios, p, max_steps))
+            .collect();
+
+        results.sort_by(|a, b| {
+            b.mean_fitness
+                .partial_cmp(&a.mean_fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(
+                    b.min_fitness
+                        .partial_cmp(&a.min_fitness)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
         });
 
         results
@@ -525,16 +616,40 @@ mod tests {
     }
 
     #[test]
-    fn test_discovery_harness_ranks_policies() {
-        let scenario = vec![3.0, 2.0, 1.0];
+    fn test_evaluate_policy_on_multiple_scenarios() {
+        let scenarios = vec![vec![3.0, 2.0, 1.0], vec![1.0, 2.0, 3.0]];
+        let policy = CellPolicy::Parameterized(ParameterizedPolicy::default());
+
+        let summary = DiscoveryHarness::evaluate_policy_on_scenarios(&scenarios, &policy, 20);
+
+        assert_eq!(summary.evaluations.len(), 2);
+        assert!(summary.mean_fitness > 0.0);
+    }
+
+    #[test]
+    fn test_multi_scenario_ranking_is_deterministic() {
+        let scenarios = vec![vec![3.0, 2.0, 1.0], vec![2.0, 1.0]];
         let policies = vec![
             CellPolicy::Greedy,
             CellPolicy::Parameterized(ParameterizedPolicy::default()),
         ];
 
-        let results = DiscoveryHarness::evaluate_policies(&scenario, &policies, 20);
+        let results1 = DiscoveryHarness::rank_policies_across_scenarios(&scenarios, &policies, 20);
+        let results2 = DiscoveryHarness::rank_policies_across_scenarios(&scenarios, &policies, 20);
 
-        assert_eq!(results.len(), 2);
-        assert!(results[0].fitness >= results[1].fitness);
+        assert_eq!(results1.len(), results2.len());
+        for (r1, r2) in results1.iter().zip(results2.iter()) {
+            assert_eq!(r1.mean_fitness, r2.mean_fitness);
+        }
+    }
+
+    #[test]
+    fn test_failure_count_increases_for_bad_policy() {
+        let scenarios = vec![vec![3.0, 2.0, 1.0], vec![2.0, 1.0]];
+        let policies = vec![CellPolicy::HdcPredictive]; // HdcPredictive returns false, so it won't sort.
+
+        let summary = DiscoveryHarness::evaluate_policy_on_scenarios(&scenarios, &policies[0], 5);
+
+        assert!(summary.failure_count > 0);
     }
 }
