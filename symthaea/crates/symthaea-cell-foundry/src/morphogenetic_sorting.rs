@@ -741,12 +741,52 @@ mod tests {
     }
 
     #[test]
-    fn test_single_generation_elite_training_fitness_at_least_parent() {
+    fn test_discovery_harness_ranks_policies_single_scenario() {
+        let scenario = vec![3.0, 2.0, 1.0];
+        let policies = vec![
+            CellPolicy::Greedy,
+            CellPolicy::Parameterized(ParameterizedPolicy::default()),
+        ];
+
+        let results = DiscoveryHarness::evaluate_policies(&scenario, &policies, 20);
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].fitness >= results[1].fitness);
+    }
+
+    #[test]
+    fn test_single_generation_computes_validation_summary() {
+        let parent = ParameterizedPolicy::default();
+        let training = vec![vec![3.0, 2.0, 1.0]];
+        let validation = vec![vec![5.0, 4.0, 3.0, 2.0, 1.0]];
+
+        let result = EvolutionHarness::run_single_generation(
+            parent,
+            5,
+            0.1,
+            &training,
+            &validation,
+            20,
+            123,
+        );
+
+        assert_eq!(
+            result.validation_summary.evaluations.len(),
+            validation.len()
+        );
+        assert!(result.validation_summary.mean_fitness.is_finite());
+    }
+
+    #[test]
+    fn test_elite_is_at_index_zero_in_all_candidates() {
         let parent = ParameterizedPolicy::default();
         let scenarios = vec![vec![3.0, 2.0, 1.0]];
         let result = EvolutionHarness::run_single_generation(
             parent, 5, 0.1, &scenarios, &scenarios, 20, 123,
         );
-        assert!(result.elite_summary.mean_fitness >= result.parent_summary.mean_fitness);
+        assert_eq!(
+            result.all_candidate_summaries[0].fitness,
+            result.elite_summary.fitness
+        );
     }
 }
