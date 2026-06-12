@@ -481,6 +481,62 @@ impl DiscoveryHarness {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SingleGenerationEvolutionResult {
+    pub parent_summary: PolicyEvaluationSummary,
+    pub candidate_summaries: Vec<PolicyEvaluationSummary>,
+    pub elite_summary: PolicyEvaluationSummary,
+    pub validation_summary: PolicyEvaluationSummary,
+}
+
+pub struct EvolutionHarness;
+
+impl EvolutionHarness {
+    pub fn run_single_generation(
+        parent: ParameterizedPolicy,
+        population_size: usize,
+        mutation_magnitude: f32,
+        training_scenarios: &[Vec<f32>],
+        validation_scenarios: &[Vec<f32>],
+        max_steps: usize,
+        seed: u64,
+    ) -> SingleGenerationEvolutionResult {
+        let mut candidates = vec![CellPolicy::Parameterized(parent.clone())];
+        for i in 0..population_size {
+            let mut mutant = parent.clone();
+            mutant.mutate(seed + i as u64, mutation_magnitude);
+            candidates.push(CellPolicy::Parameterized(mutant));
+        }
+
+        let mut ranked = DiscoveryHarness::rank_policies_across_scenarios(
+            training_scenarios,
+            &candidates,
+            max_steps,
+        );
+
+        let elite = ranked.remove(0);
+
+        let parent_summary = DiscoveryHarness::evaluate_policy_on_scenarios(
+            training_scenarios,
+            &CellPolicy::Parameterized(parent),
+            max_steps,
+        );
+
+        let validation_summary = DiscoveryHarness::evaluate_policy_on_scenarios(
+            validation_scenarios,
+            &elite.policy,
+            max_steps,
+        );
+
+        SingleGenerationEvolutionResult {
+            parent_summary,
+            candidate_summaries: ranked,
+            elite_summary: elite,
+            validation_summary,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
