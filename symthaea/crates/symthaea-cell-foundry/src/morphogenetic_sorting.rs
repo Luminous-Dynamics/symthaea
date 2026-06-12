@@ -404,6 +404,7 @@ impl DiscoveryHarness {
         policy: &CellPolicy,
         max_steps: usize,
     ) -> PolicyEvaluationSummary {
+        assert!(!scenarios.is_empty(), "scenarios must not be empty");
         let mut evaluations = Vec::new();
         let mut total_fitness = 0.0;
         let mut min_fitness = f32::MAX;
@@ -459,6 +460,7 @@ impl DiscoveryHarness {
         policies: &[CellPolicy],
         max_steps: usize,
     ) -> Vec<PolicyEvaluationSummary> {
+        assert!(!scenarios.is_empty(), "scenarios must not be empty");
         let mut results: Vec<PolicyEvaluationSummary> = policies
             .iter()
             .map(|p| Self::evaluate_policy_on_scenarios(scenarios, p, max_steps))
@@ -644,12 +646,16 @@ mod tests {
     }
 
     #[test]
-    fn test_failure_count_increases_for_bad_policy() {
-        let scenarios = vec![vec![3.0, 2.0, 1.0], vec![2.0, 1.0]];
-        let policies = vec![CellPolicy::HdcPredictive]; // HdcPredictive returns false, so it won't sort.
+    fn test_discovery_harness_ranks_policies_single_scenario() {
+        let scenario = vec![3.0, 2.0, 1.0];
+        let policies = vec![
+            CellPolicy::Greedy,
+            CellPolicy::Parameterized(ParameterizedPolicy::default()),
+        ];
 
-        let summary = DiscoveryHarness::evaluate_policy_on_scenarios(&scenarios, &policies[0], 5);
+        let results = DiscoveryHarness::evaluate_policies(&scenario, &policies, 20);
 
-        assert!(summary.failure_count > 0);
+        assert_eq!(results.len(), 2);
+        assert!(results[0].fitness >= results[1].fitness);
     }
 }
