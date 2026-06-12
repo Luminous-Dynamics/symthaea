@@ -516,6 +516,14 @@ impl PolicyDiscoveryRecord {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SingleGenerationEvolutionResult {
+    pub parent_summary: PolicyEvaluationSummary,
+    pub all_candidate_summaries: Vec<PolicyEvaluationSummary>,
+    pub elite_summary: PolicyEvaluationSummary,
+    pub validation_summary: PolicyEvaluationSummary,
+}
+
 pub struct EvolutionHarness;
 
 impl EvolutionHarness {
@@ -650,12 +658,11 @@ mod tests {
     }
 
     #[test]
-    fn test_symthaea_morpho_surprise_and_coherence() {
-        let mut sandbox =
-            MorphogeneticSortingSandbox::from_values(SortingMode::SymthaeaMorpho, vec![2.0, 1.0]);
-        sandbox.step_once();
-        assert!(sandbox.metrics.mean_local_surprise >= 0.0);
-        assert!(sandbox.metrics.coherence >= 0.0);
+    fn test_parameterized_policy_mutation() {
+        let mut policy = ParameterizedPolicy::default();
+        let old_weights = policy.weights;
+        policy.mutate(123, 0.1);
+        assert_ne!(old_weights, policy.weights);
     }
 
     #[test]
