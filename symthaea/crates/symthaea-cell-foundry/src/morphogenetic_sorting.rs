@@ -484,7 +484,7 @@ impl DiscoveryHarness {
 #[derive(Debug, Clone)]
 pub struct SingleGenerationEvolutionResult {
     pub parent_summary: PolicyEvaluationSummary,
-    pub candidate_summaries: Vec<PolicyEvaluationSummary>,
+    pub all_candidate_summaries: Vec<PolicyEvaluationSummary>,
     pub elite_summary: PolicyEvaluationSummary,
     pub validation_summary: PolicyEvaluationSummary,
 }
@@ -508,13 +508,13 @@ impl EvolutionHarness {
             candidates.push(CellPolicy::Parameterized(mutant));
         }
 
-        let mut ranked = DiscoveryHarness::rank_policies_across_scenarios(
+        let ranked = DiscoveryHarness::rank_policies_across_scenarios(
             training_scenarios,
             &candidates,
             max_steps,
         );
 
-        let elite = ranked.remove(0);
+        let elite = ranked[0].clone();
 
         let parent_summary = DiscoveryHarness::evaluate_policy_on_scenarios(
             training_scenarios,
@@ -530,7 +530,7 @@ impl EvolutionHarness {
 
         SingleGenerationEvolutionResult {
             parent_summary,
-            candidate_summaries: ranked,
+            all_candidate_summaries: ranked,
             elite_summary: elite,
             validation_summary,
         }
@@ -702,16 +702,51 @@ mod tests {
     }
 
     #[test]
-    fn test_discovery_harness_ranks_policies_single_scenario() {
-        let scenario = vec![3.0, 2.0, 1.0];
-        let policies = vec![
-            CellPolicy::Greedy,
-            CellPolicy::Parameterized(ParameterizedPolicy::default()),
-        ];
+    fn test_single_generation_returns_expected_candidate_count() {
+        let parent = ParameterizedPolicy::default();
+        let scenarios = vec![vec![3.0, 2.0, 1.0]];
+        let population_size = 5;
+        let result = EvolutionHarness::run_single_generation(
+            parent,
+            population_size,
+            0.1,
+            &scenarios,
+            &scenarios,
+            20,
+            123,
+        );
+        assert_eq!(result.all_candidate_summaries.len(), population_size + 1);
+    }
 
-        let results = DiscoveryHarness::evaluate_policies(&scenario, &policies, 20);
+    #[test]
+    fn test_single_generation_is_deterministic_for_same_seed() {
+        let parent = ParameterizedPolicy::default();
+        let scenarios = vec![vec![3.0, 2.0, 1.0]];
+        let result1 = EvolutionHarness::run_single_generation(
+            parent.clone(),
+            5,
+            0.1,
+            &scenarios,
+            &scenarios,
+            20,
+            123,
+        );
+        let result2 = EvolutionHarness::run_single_generation(
+            parent, 5, 0.1, &scenarios, &scenarios, 20, 123,
+        );
+        assert_eq!(
+            result1.elite_summary.mean_fitness,
+            result2.elite_summary.mean_fitness
+        );
+    }
 
-        assert_eq!(results.len(), 2);
-        assert!(results[0].fitness >= results[1].fitness);
+    #[test]
+    fn test_single_generation_elite_training_fitness_at_least_parent() {
+        let parent = ParameterizedPolicy::default();
+        let scenarios = vec![vec![3.0, 2.0, 1.0]];
+        let result = EvolutionHarness::run_single_generation(
+            parent, 5, 0.1, &scenarios, &scenarios, 20, 123,
+        );
+        assert!(result.elite_summary.mean_fitness >= result.parent_summary.mean_fitness);
     }
 }
