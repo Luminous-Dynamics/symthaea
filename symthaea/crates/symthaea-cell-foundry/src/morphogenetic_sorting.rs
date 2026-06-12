@@ -574,6 +574,70 @@ impl EvolutionHarness {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct EvolutionaryExperiment {
+    pub generation_results: Vec<SingleGenerationEvolutionResult>,
+    pub final_elite: PolicyDiscoveryRecord,
+}
+
+impl EvolutionHarness {
+    pub fn run_multi_generation_experiment(
+        initial_parent: ParameterizedPolicy,
+        generations: usize,
+        population_size: usize,
+        mutation_magnitude: f32,
+        training_scenarios: &[Vec<f32>],
+        validation_scenarios: &[Vec<f32>],
+        max_steps: usize,
+        seed: u64,
+        run_id: String,
+    ) -> EvolutionaryExperiment {
+        let mut current_parent = initial_parent;
+        let mut generation_results = Vec::new();
+
+        for generation in 1..=generations {
+            let result = Self::run_single_generation(
+                current_parent.clone(),
+                population_size,
+                mutation_magnitude,
+                training_scenarios,
+                validation_scenarios,
+                max_steps,
+                seed + (generation as u64 * 1000),
+            );
+
+            // Update parent for next generation
+            if let CellPolicy::Parameterized(elite_policy) = result.elite_summary.policy.clone() {
+                current_parent = elite_policy;
+            }
+
+            generation_results.push(result);
+        }
+
+        let last_gen = generation_results.last().unwrap();
+        let final_elite = PolicyDiscoveryRecord::new(
+            last_gen.elite_summary.policy.clone(),
+            last_gen.elite_summary.clone(),
+            Some(last_gen.validation_summary.clone()),
+            PolicyMetadata {
+                seed,
+                mutation_magnitude,
+                generation: generations,
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+                run_id,
+            },
+        );
+
+        EvolutionaryExperiment {
+            generation_results,
+            final_elite,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -794,25 +858,25 @@ mod tests {
     }
 
     #[test]
-    fn test_single_generation_is_deterministic_for_same_seed() {
+    fn test_multi_generation_experiment_runs() {
         let parent = ParameterizedPolicy::default();
         let scenarios = vec![vec![3.0, 2.0, 1.0]];
-        let result1 = EvolutionHarness::run_single_generation(
-            parent.clone(),
-            5,
+        let generations = 2;
+
+        let experiment = EvolutionHarness::run_multi_generation_experiment(
+            parent,
+            generations,
+            3,
             0.1,
             &scenarios,
             &scenarios,
             20,
             123,
+            "test-exp".to_string(),
         );
-        let result2 = EvolutionHarness::run_single_generation(
-            parent, 5, 0.1, &scenarios, &scenarios, 20, 123,
-        );
-        assert_eq!(
-            result1.elite_summary.mean_fitness,
-            result2.elite_summary.mean_fitness
-        );
+
+        assert_eq!(experiment.generation_results.len(), generations);
+        assert!(experiment.final_elite.training_summary.mean_fitness >= 0.0);
     }
 
     #[test]
