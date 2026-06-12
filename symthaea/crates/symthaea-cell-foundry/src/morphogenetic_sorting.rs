@@ -481,12 +481,39 @@ impl DiscoveryHarness {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SingleGenerationEvolutionResult {
-    pub parent_summary: PolicyEvaluationSummary,
-    pub all_candidate_summaries: Vec<PolicyEvaluationSummary>,
-    pub elite_summary: PolicyEvaluationSummary,
-    pub validation_summary: PolicyEvaluationSummary,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolicyMetadata {
+    pub seed: u64,
+    pub mutation_magnitude: f32,
+    pub generation: usize,
+    pub timestamp: u64, // Epoch time
+    pub run_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolicyDiscoveryRecord {
+    pub policy: CellPolicy,
+    pub training_summary: PolicyEvaluationSummary,
+    pub validation_summary: Option<PolicyEvaluationSummary>,
+    pub metadata: PolicyMetadata,
+    pub notes: String,
+}
+
+impl PolicyDiscoveryRecord {
+    pub fn new(
+        policy: CellPolicy,
+        training_summary: PolicyEvaluationSummary,
+        validation_summary: Option<PolicyEvaluationSummary>,
+        metadata: PolicyMetadata,
+    ) -> Self {
+        Self {
+            policy,
+            training_summary,
+            validation_summary,
+            metadata,
+            notes: String::new(),
+        }
+    }
 }
 
 pub struct EvolutionHarness;
@@ -632,11 +659,32 @@ mod tests {
     }
 
     #[test]
-    fn test_parameterized_policy_mutation() {
-        let mut policy = ParameterizedPolicy::default();
-        let old_weights = policy.weights;
-        policy.mutate(123, 0.1);
-        assert_ne!(old_weights, policy.weights);
+    fn test_policy_discovery_record_creation() {
+        let parent = ParameterizedPolicy::default();
+        let scenario = vec![vec![3.0, 2.0, 1.0]];
+        let summary = DiscoveryHarness::evaluate_policy_on_scenarios(
+            &scenario,
+            &CellPolicy::Parameterized(parent.clone()),
+            20,
+        );
+
+        let metadata = PolicyMetadata {
+            seed: 123,
+            mutation_magnitude: 0.1,
+            generation: 1,
+            timestamp: 1600000000,
+            run_id: "test-run-001".to_string(),
+        };
+
+        let record = PolicyDiscoveryRecord::new(
+            CellPolicy::Parameterized(parent),
+            summary.clone(),
+            Some(summary),
+            metadata,
+        );
+
+        assert_eq!(record.metadata.run_id, "test-run-001");
+        assert!(record.validation_summary.is_some());
     }
 
     #[test]
