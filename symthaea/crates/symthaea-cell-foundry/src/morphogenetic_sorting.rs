@@ -341,14 +341,14 @@ impl MorphogeneticSortingSandbox {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyEvaluation {
     pub policy: CellPolicy,
     pub metrics: SortingCompetencyMetrics,
     pub fitness: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyEvaluationSummary {
     pub policy: CellPolicy,
     pub evaluations: Vec<PolicyEvaluation>,
@@ -658,11 +658,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parameterized_policy_mutation() {
-        let mut policy = ParameterizedPolicy::default();
-        let old_weights = policy.weights;
-        policy.mutate(123, 0.1);
-        assert_ne!(old_weights, policy.weights);
+    fn test_symthaea_morpho_surprise_and_coherence() {
+        let mut sandbox =
+            MorphogeneticSortingSandbox::from_values(SortingMode::SymthaeaMorpho, vec![2.0, 1.0]);
+        sandbox.step_once();
+        assert!(sandbox.metrics.mean_local_surprise >= 0.0);
+        assert!(sandbox.metrics.mean_global_surprise >= 0.0);
+        assert!(sandbox.metrics.coherence >= 0.0);
+        assert!(sandbox.metrics.coherence.is_finite());
     }
 
     #[test]
