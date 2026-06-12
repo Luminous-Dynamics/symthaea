@@ -658,6 +658,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parameterized_policy_mutation() {
+        let mut policy = ParameterizedPolicy::default();
+        let old_weights = policy.weights;
+        policy.mutate(123, 0.1);
+        assert_ne!(old_weights, policy.weights);
+    }
+
+    #[test]
     fn test_symthaea_morpho_surprise_and_coherence() {
         let mut sandbox =
             MorphogeneticSortingSandbox::from_values(SortingMode::SymthaeaMorpho, vec![2.0, 1.0]);
