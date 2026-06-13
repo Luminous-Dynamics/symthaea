@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! OLD WATERWORKS MICRO-SLICE — Ticket 1 & 2
+//! OLD WATERWORKS MICRO-SLICE — Ticket 1, 2, 5
 //!
 //! This is the first concrete playable foundation for Symtropy.
 //! - Floor, walls, and greybox machinery (pump, tank, console).
@@ -9,6 +9,7 @@
 //! - Field Deck: Amber interface frame (Press F to toggle).
 //! - Dead authority lock inspection state (inside Field Deck).
 //! - Panic Drop: Esc/Shift exits instantly.
+//! - Procedural Lighting: Oscillating room intensity.
 //!
 //! Hard Scope:
 //! - No Device Bus yet
@@ -23,7 +24,7 @@
 //! - just the first playable room
 
 use bevy::prelude::*;
-use symtropy_bevy_scene::{SymtropyScenePlugin, fixed_camera};
+use symtropy_bevy_scene::{fixed_camera, SymtropyScenePlugin};
 
 #[derive(Component)]
 struct Player;
@@ -38,6 +39,9 @@ enum InterfaceState {
     FieldDeck,
     Console,
 }
+
+#[derive(Component)]
+struct OscillatingLight;
 
 fn main() {
     App::new()
@@ -54,9 +58,22 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (player_move_system, interaction_system, ui_visibility_system),
+            (
+                player_move_system,
+                interaction_system,
+                ui_visibility_system,
+                oscillating_light_system,
+            ),
         )
         .run();
+}
+
+fn oscillating_light_system(time: Res<Time>, mut query: Query<&mut PointLight, With<OscillatingLight>>) {
+    let elapsed = time.elapsed_secs();
+    for mut light in query.iter_mut() {
+        // Oscillation between 80k and 120k intensity
+        light.intensity = 100_000.0 + (elapsed * 2.0).sin() * 20_000.0;
+    }
 }
 
 fn setup(
@@ -182,6 +199,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 3.5, 0.0),
+        OscillatingLight,
     ));
 
     // UI Root for interaction hint
