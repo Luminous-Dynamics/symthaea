@@ -1228,3 +1228,25 @@ impl DiscoveryReport {
         }
     }
 }
+
+impl MotifDiscoveryPipeline {
+    pub fn execute_discovery_run(&self, run_id: &str) -> DiscoveryReport {
+        let parent = ParameterizedPolicy::default();
+        let training_scenarios = vec![
+            vec![3.0, 2.0, 1.0],
+            vec![5.0, 4.0, 3.0, 2.0, 1.0],
+            vec![1.0, 3.0, 2.0],
+        ];
+        let validation_scenarios = vec![vec![4.0, 1.0, 3.0, 2.0], vec![1.0, 2.0, 3.0, 4.0]];
+
+        self.run_discovery(
+            parent,
+            5,    // Generations
+            10,   // Population size
+            0.05, // Mutation magnitude
+            &training_scenarios,
+            &validation_scenarios,
+            run_id.to_string(),
+        )
+    }
+}
