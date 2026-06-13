@@ -874,6 +874,31 @@ mod tests {
     }
 
     #[test]
+    fn test_single_generation_is_deterministic_for_same_seed() {
+        let parent = ParameterizedPolicy::default();
+        let scenarios = vec![vec![3.0, 2.0, 1.0]];
+
+        let result1 = EvolutionHarness::run_single_generation(
+            parent.clone(),
+            5,
+            0.1,
+            &scenarios,
+            &scenarios,
+            20,
+            123,
+        );
+
+        let result2 = EvolutionHarness::run_single_generation(
+            parent, 5, 0.1, &scenarios, &scenarios, 20, 123,
+        );
+
+        assert_eq!(
+            result1.elite_summary.mean_fitness,
+            result2.elite_summary.mean_fitness
+        );
+    }
+
+    #[test]
     fn test_multi_generation_experiment_runs() {
         let parent = ParameterizedPolicy::default();
         let scenarios = vec![vec![3.0, 2.0, 1.0]];
