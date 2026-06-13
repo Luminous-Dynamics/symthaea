@@ -1250,3 +1250,32 @@ impl MotifDiscoveryPipeline {
         )
     }
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+
+    #[test]
+    fn test_end_to_end_discovery_pipeline() {
+        let ledger_path = "target/integration_test_ledger".to_string();
+        let pipeline = MotifDiscoveryPipeline::new(ledger_path, 20);
+        let parent = ParameterizedPolicy::default();
+
+        let training = vec![vec![3.0, 2.0, 1.0]];
+        let validation = vec![vec![2.0, 1.0]];
+
+        let report = pipeline.run_discovery(
+            parent,
+            2,   // Generations
+            3,   // Population
+            0.1, // Mutation
+            &training,
+            &validation,
+            "int-test-001".to_string(),
+        );
+
+        assert!(report.total_discovered >= 1);
+        assert!(report.algorithmic_motif.iter().any(|&w| w != 0.0));
+        report.print_summary();
+    }
+}
