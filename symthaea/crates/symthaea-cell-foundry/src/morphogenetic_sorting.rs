@@ -1269,23 +1269,33 @@ impl DiscoveryExperimentManager {
         self.pipeline.ledger.list_policies()
     }
 
-    pub fn get_best_algorithmic_motif(&self) -> Option<[f32; 8]> {
-        let ledger = &self.pipeline.ledger;
-        let top_policies = ledger.get_top_policies(10);
-        if top_policies.is_empty() {
-            return None;
-        }
+    pub fn generate_discovery_summary(&self) -> String {
+        let all_records = self.list_all_discoveries();
+        let total = all_records.len();
+        let best_motif = self.get_best_algorithmic_motif();
 
-        let mut motif = [0.0; 8];
-        let count = top_policies.len() as f32;
-        for record in &top_policies {
-            if let CellPolicy::Parameterized(p) = &record.policy {
-                for (i, w) in p.weights.iter().enumerate() {
-                    motif[i] += w / count;
-                }
+        let mut summary = format!("--- Research Discovery Summary ---\n");
+        summary.push_str(&format!("Total Experiments: {}\n", total));
+
+        if let Some(motif) = best_motif {
+            summary.push_str("Top Algorithmic Motif (Mean Weights):\n");
+            let labels = [
+                "Inversion Bias",
+                "Surprise Sensitivity",
+                "Energy Conservation",
+                "Damage Aversion",
+                "Weight4",
+                "Weight5",
+                "Weight6",
+                "Weight7",
+            ];
+            for (i, w) in motif.iter().enumerate() {
+                summary.push_str(&format!(" - {}: {:.3}\n", labels[i], w));
             }
+        } else {
+            summary.push_str("No policies discovered yet.\n");
         }
-        Some(motif)
+        summary
     }
 }
 
