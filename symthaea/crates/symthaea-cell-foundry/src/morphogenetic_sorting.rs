@@ -558,6 +558,7 @@ impl EvolutionHarness {
         assert!(generations > 0, "generations must be greater than zero");
         let mut current_parent = initial_parent;
         let mut generation_results = Vec::new();
+        let mut population_history = Vec::new();
 
         for generation in 1..=generations {
             let result = Self::run_single_generation(
@@ -569,6 +570,11 @@ impl EvolutionHarness {
                 max_steps,
                 seed + (generation as u64 * 1000),
             );
+
+            population_history.push(PopulationMetrics::from_generation(
+                generation,
+                &result.all_candidate_summaries,
+            ));
 
             // Update parent for next generation
             if let CellPolicy::Parameterized(elite_policy) = result.elite_summary.policy.clone() {
@@ -597,7 +603,39 @@ impl EvolutionHarness {
 
         EvolutionaryExperiment {
             generation_results,
+            population_history,
             final_elite,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PopulationMetrics {
+    pub generation: usize,
+    pub mean_fitness: f32,
+    pub elite_fitness: f32,
+    pub diversity: f32,
+}
+
+impl PopulationMetrics {
+    pub fn from_generation(generation: usize, candidates: &[PolicyEvaluationSummary]) -> Self {
+        let fitnesses: Vec<f32> = candidates.iter().map(|c| c.mean_fitness).collect();
+        let sum: f32 = fitnesses.iter().sum();
+        let mean = sum / fitnesses.len() as f32;
+        let elite = *fitnesses
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        // Simple diversity: variance of mean fitnesses
+        let variance =
+            fitnesses.iter().map(|f| (f - mean).powi(2)).sum::<f32>() / fitnesses.len() as f32;
+
+        Self {
+            generation,
+            mean_fitness: mean,
+            elite_fitness: elite,
+            diversity: variance.sqrt(),
         }
     }
 }
@@ -605,6 +643,7 @@ impl EvolutionHarness {
 #[derive(Debug, Clone)]
 pub struct EvolutionaryExperiment {
     pub generation_results: Vec<SingleGenerationEvolutionResult>,
+    pub population_history: Vec<PopulationMetrics>,
     pub final_elite: PolicyDiscoveryRecord,
 }
 
@@ -623,6 +662,7 @@ impl EvolutionHarness {
         assert!(generations > 0, "generations must be greater than zero");
         let mut current_parent = initial_parent;
         let mut generation_results = Vec::new();
+        let mut population_history = Vec::new();
 
         for generation in 1..=generations {
             let result = Self::run_single_generation(
@@ -634,6 +674,11 @@ impl EvolutionHarness {
                 max_steps,
                 seed + (generation as u64 * 1000),
             );
+
+            population_history.push(PopulationMetrics::from_generation(
+                generation,
+                &result.all_candidate_summaries,
+            ));
 
             // Update parent for next generation
             if let CellPolicy::Parameterized(elite_policy) = result.elite_summary.policy.clone() {
@@ -662,6 +707,7 @@ impl EvolutionHarness {
 
         EvolutionaryExperiment {
             generation_results,
+            population_history,
             final_elite,
         }
     }
