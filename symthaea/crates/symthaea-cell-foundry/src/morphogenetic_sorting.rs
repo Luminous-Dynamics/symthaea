@@ -1327,3 +1327,35 @@ mod integration_tests {
         report.print_summary();
     }
 }
+
+pub struct PolicyVisualizer;
+
+impl PolicyVisualizer {
+    pub fn render_fitness_trend(trend: &[f32]) -> String {
+        let mut output = String::from("Fitness Trend:\n");
+        let max = trend.iter().cloned().fold(f32::MIN, f32::max).max(0.1);
+        for (generation, &val) in trend.iter().enumerate() {
+            let bars = ((val / max) * 20.0) as usize;
+            output.push_str(&format!(
+                "Gen {:2}: [{:-<20}] {:.3}\n",
+                generation,
+                "=".repeat(bars),
+                val
+            ));
+        }
+        output
+    }
+
+    pub fn render_weight_heatmap(weights: [f32; 8]) -> String {
+        let mut output = String::from("Weight Heatmap:\n");
+        let labels = [
+            "InvB", "Surp", "Engy", "Damg", "W4  ", "W5  ", "W6  ", "W7  ",
+        ];
+        for (i, &w) in weights.iter().enumerate() {
+            let bar_len = ((w.abs().min(1.0)) * 10.0) as usize;
+            let dir = if w >= 0.0 { "+" } else { "-" };
+            output.push_str(&format!("{}: {}{}\n", labels[i], dir.repeat(bar_len), w));
+        }
+        output
+    }
+}
