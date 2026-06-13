@@ -1154,3 +1154,55 @@ mod tests {
         );
     }
 }
+
+pub struct MotifDiscoveryPipeline {
+    pub ledger: PolicyLedger,
+    pub max_steps: usize,
+}
+
+impl MotifDiscoveryPipeline {
+    pub fn new(ledger_path: String, max_steps: usize) -> Self {
+        Self {
+            ledger: PolicyLedger::new(ledger_path),
+            max_steps,
+        }
+    }
+
+    pub fn run_discovery(
+        &self,
+        parent: ParameterizedPolicy,
+        generations: usize,
+        population_size: usize,
+        mutation_magnitude: f32,
+        training: &[Vec<f32>],
+        validation: &[Vec<f32>],
+        run_id: String,
+    ) -> DiscoveryReport {
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let experiment = EvolutionHarness::run_multi_generation_experiment(
+            parent,
+            generations,
+            population_size,
+            mutation_magnitude,
+            training,
+            validation,
+            self.max_steps,
+            seed,
+            run_id,
+        );
+
+        // Archive the results
+        experiment
+            .final_elite
+            .save_to_disk(&self.ledger.base_directory)
+            .ok();
+
+        // Synthesize report
+        DiscoveryReporter::generate_report(&self.ledger)
+            .expect("Ledger should contain at least the freshly discovered policy")
+    }
+}
