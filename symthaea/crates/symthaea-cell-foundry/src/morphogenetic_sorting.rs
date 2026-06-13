@@ -500,6 +500,21 @@ pub struct PolicyDiscoveryRecord {
 }
 
 impl PolicyDiscoveryRecord {
+    pub fn new(
+        policy: CellPolicy,
+        training_summary: PolicyEvaluationSummary,
+        validation_summary: Option<PolicyEvaluationSummary>,
+        metadata: PolicyMetadata,
+    ) -> Self {
+        Self {
+            policy,
+            training_summary,
+            validation_summary,
+            metadata,
+            notes: String::new(),
+        }
+    }
+
     pub fn save_to_disk(&self, directory: &str) -> std::io::Result<()> {
         std::fs::create_dir_all(directory)?;
         let filename = format!(
@@ -592,6 +607,7 @@ impl EvolutionHarness {
         seed: u64,
         run_id: String,
     ) -> EvolutionaryExperiment {
+        assert!(generations > 0, "generations must be greater than zero");
         let mut current_parent = initial_parent;
         let mut generation_results = Vec::new();
 
@@ -858,25 +874,25 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_generation_experiment_runs() {
+    fn test_single_generation_is_deterministic_for_same_seed() {
         let parent = ParameterizedPolicy::default();
         let scenarios = vec![vec![3.0, 2.0, 1.0]];
-        let generations = 2;
-
-        let experiment = EvolutionHarness::run_multi_generation_experiment(
-            parent,
-            generations,
-            3,
+        let result1 = EvolutionHarness::run_single_generation(
+            parent.clone(),
+            5,
             0.1,
             &scenarios,
             &scenarios,
             20,
             123,
-            "test-exp".to_string(),
         );
-
-        assert_eq!(experiment.generation_results.len(), generations);
-        assert!(experiment.final_elite.training_summary.mean_fitness >= 0.0);
+        let result2 = EvolutionHarness::run_single_generation(
+            parent, 5, 0.1, &scenarios, &scenarios, 20, 123,
+        );
+        assert_eq!(
+            result1.elite_summary.mean_fitness,
+            result2.elite_summary.mean_fitness
+        );
     }
 
     #[test]
