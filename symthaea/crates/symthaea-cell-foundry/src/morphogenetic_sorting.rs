@@ -1209,3 +1209,22 @@ impl MotifDiscoveryPipeline {
             .expect("Ledger should contain at least the freshly discovered policy")
     }
 }
+
+impl DiscoveryReport {
+    pub fn print_summary(&self) {
+        println!("--- Discovery Report ---");
+        println!("Policies Analyzed: {}", self.total_discovered);
+        println!(
+            "Best Fitness: {:.4}",
+            self.top_policy.training_summary.mean_fitness
+        );
+        println!("Motif Rules:");
+        let rules = PolicyRuleExtractor::extract_rules(self.algorithmic_motif);
+        for rule in rules {
+            println!(
+                " - {} -> {} (mag: {:.2})",
+                rule.condition, rule.action, rule.weight_magnitude
+            );
+        }
+    }
+}
