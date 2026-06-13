@@ -1,13 +1,17 @@
 [package]
 name = "symtropy-bevy-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 description = "Permissively-licensed Bevy plugin for symtropy-physics N-dimensional physics. Generic over PhysicsCallback."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["bevy", "game-engine", "symtropy", "physics", "distribution"]
+categories = ["game-engines"]
+readme = "README.md"
 
 [dependencies]
-symtropy-physics = { path = "../symtropy-physics" }
-symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { version = "0.2.1", path = "../symtropy-physics" }
+symtropy-math = { version = "0.2.1", path = "../symtropy-math" }
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
