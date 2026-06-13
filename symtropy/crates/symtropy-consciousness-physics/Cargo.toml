@@ -21,7 +21,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
 symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
-symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+symthaea-consciousness-equation = { version = "0.1.0", path = "../../../crates/domains/symthaea-consciousness-equation" }
 nalgebra = "0.34"
 
 # WASM / browser demo — activated by the `wasm` feature

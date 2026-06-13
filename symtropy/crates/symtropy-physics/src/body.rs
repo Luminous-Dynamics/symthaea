@@ -207,7 +207,7 @@ impl<const D: usize> RigidBody<D> {
                 new_c
             } else {
                 let mut new_c = CompoundShape::<D>::new();
-                new_c.add_child(Transform::identity(), self.collider.clone_box());
+                new_c.add_child(Transform::identity(), self.collider.as_ref().clone_box());
                 new_c
             };
 

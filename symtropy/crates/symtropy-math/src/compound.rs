@@ -37,7 +37,7 @@ use crate::transform::Transform;
 /// shapes first-class `Shape<D>` objects compatible with GJK.
 pub struct CompoundShape<const D: usize> {
     /// Children: (local-frame transform, shape).
-    children: Vec<(Transform<D>, Box<dyn Shape<D>>)>,
+    parts: Vec<(Transform<D>, Box<dyn Shape<D>>)>,
     /// Cached bounding sphere: (center-in-local-frame, radius).
     cached_center: Point<D>,
     cached_radius: f64,
@@ -45,13 +45,13 @@ pub struct CompoundShape<const D: usize> {
 
 impl<const D: usize> Clone for CompoundShape<D> {
     fn clone(&self) -> Self {
-        let children = self
-            .children
+        let parts = self
+            .parts
             .iter()
             .map(|(tf, child)| (tf.clone(), child.clone_box()))
             .collect();
         Self {
-            children,
+            parts,
             cached_center: self.cached_center,
             cached_radius: self.cached_radius,
         }
@@ -62,7 +62,7 @@ impl<const D: usize> CompoundShape<D> {
     /// Create an empty compound shape.
     pub fn new() -> Self {
         Self {
-            children: Vec::new(),
+            parts: Vec::new(),
             cached_center: Point::origin(),
             cached_radius: 0.0,
         }
@@ -79,18 +79,18 @@ impl<const D: usize> CompoundShape<D> {
     ///
     /// Recomputes the cached bounding sphere after each addition.
     pub fn add_child(&mut self, transform: Transform<D>, shape: Box<dyn Shape<D>>) {
-        self.children.push((transform, shape));
+        self.parts.push((transform, shape));
         self.recompute_bounding();
     }
 
     /// Access the child shapes and their local transforms.
     pub fn children(&self) -> &[(Transform<D>, Box<dyn Shape<D>>)] {
-        &self.children
+        &self.parts
     }
 
     /// Number of child shapes.
     pub fn child_count(&self) -> usize {
-        self.children.len()
+        self.parts.len()
     }
 
     /// Recompute the enclosing bounding sphere over all children.
@@ -99,7 +99,7 @@ impl<const D: usize> CompoundShape<D> {
     /// 1. Centroid = mean of all child bounding-sphere centers in local frame.
     /// 2. Radius = max(dist(centroid, child_center_world) + child_radius).
     fn recompute_bounding(&mut self) {
-        if self.children.is_empty() {
+        if self.parts.is_empty() {
             self.cached_center = Point::origin();
             self.cached_radius = 0.0;
             return;
@@ -107,16 +107,16 @@ impl<const D: usize> CompoundShape<D> {
 
         // Step 1: centroid of all child sphere centers (in compound local frame)
         let mut center = SVector::<f64, D>::zeros();
-        for (tf, child) in &self.children {
+        for (tf, child) in &self.parts {
             let (local_c, _) = child.bounding_sphere();
             let world_c = tf.transform_point(&local_c).0;
             center += world_c;
         }
-        center /= self.children.len() as f64;
+        center /= self.parts.len() as f64;
 
         // Step 2: tightest enclosing sphere around centroid
         let mut radius = 0.0f64;
-        for (tf, child) in &self.children {
+        for (tf, child) in &self.parts {
             let (local_c, child_r) = child.bounding_sphere();
             let world_c = tf.transform_point(&local_c).0;
             let d = (world_c - center).norm() + child_r;
@@ -145,7 +145,7 @@ impl<const D: usize> Shape<D> for CompoundShape<D> {
     ///   3. Transform the result back to compound-local frame.
     ///   4. Return the child whose result has the maximum dot with `direction`.
     fn support(&self, direction: &SVector<f64, D>) -> SVector<f64, D> {
-        self.children
+        self.parts
             .iter()
             .map(|(tf, child)| {
                 // Rotate direction into child's local frame

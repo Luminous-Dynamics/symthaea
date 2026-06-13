@@ -1,21 +1,20 @@
 [package]
 name = "symtropy-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 description = "The permissive Symtropy distribution: core Bevy physics bundle without AGPL dependencies."
 repository = "https://github.com/luminous-dynamics/symtropy"
 keywords = ["bevy", "game-engine", "symtropy", "physics", "distribution"]
 categories = ["game-engines"]
-readme = "README.md"
 
 [dependencies]
 bevy = { version = "0.18", default-features = false }
-symtropy-bevy-core = { version = "0.1.0", path = "../symtropy-bevy-core" }
-symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
-symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole" }
-symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
-symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
+symtropy-bevy-core = { version = "0.1.1", path = "../symtropy-bevy-core" }
+symtropy-bevy-scene = { version = "0.1.1", path = "../symtropy-bevy-scene" }
+symtropy-devconsole = { version = "0.1.1", path = "../symtropy-devconsole" }
+symtropy-physics = { version = "0.2.1", path = "../symtropy-physics" }
+symtropy-math = { version = "0.2.1", path = "../symtropy-math" }
 
 [features]
 default = []

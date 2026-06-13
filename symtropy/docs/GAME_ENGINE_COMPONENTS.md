@@ -124,6 +124,161 @@
 | **Profiler integration (Tracy)** | **`Community` — GAP** | Recommend `tracy-client` + Bevy tracing |
 | **Observability (Prometheus)** | `Symthaea` | **Differentiator** — `symthaea/api/metrics` registry pattern |
 
+## Art, assets, and production pipeline
+
+Symtropy should treat art assets as a first-class production system, not as an afterthought.
+
+The goal is not to replace human art direction. The goal is to automate the repetitive steps between concept art, free/public assets, Blender cleanup, Bevy import, and playable scenes.
+
+### Recommended production rule
+
+Use **CC0/public-domain assets** aggressively for prototypes and greybox replacement.
+
+Do not use random “free” assets without license verification.
+
+Every external asset must have provenance metadata even when attribution is not legally required.
+
+### Asset pipeline ownership
+
+| Component                    | Status              | Notes                                                                  |
+| ---------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| Asset loading                | `Bevy`              | `AssetServer`, glTF/glb, image/audio loading                           |
+| Hot reload                   | `Bevy`              | Use during local iteration                                             |
+| glTF scene import            | `Bevy`              | Preferred runtime format for 3D assets                                 |
+| Blender cleanup/export       | `Community/Tooling` | Use Blender Python scripts for batch conversion and cleanup            |
+| Asset license manifest       | `Missing` — GAP     | Add `LICENSES.assets.toml` or `assets_manifest.toml`                   |
+| Asset provenance checker     | `Missing` — GAP     | CI script should fail on unlicensed external assets                    |
+| Concept-art-to-asset brief   | `Missing` — GAP     | Generate short asset briefs from concept art folders                   |
+| Greybox replacement workflow | `Planned/P2`        | Replace primitive cubes with tagged prefabs                            |
+| Material library             | `Planned/P2`        | CC0 PBR concrete, metal, glass, water, warning paint                   |
+| Prop library                 | `Planned/P2`        | Pipes, valves, tanks, consoles, cables, crates, drones                 |
+| Texture optimization         | `Community/Tooling` | Batch resize/compress textures for target quality tiers                |
+| Thumbnail generation         | `Community/Tooling` | Generate previews for imported assets                                  |
+| Bevy prefab metadata         | `Planned/P2`        | `.ron`/`.toml` metadata for tags, scale, collider hints, gameplay role |
+
+### Recommended public asset sources
+
+Prefer CC0/public-domain sources:
+
+| Source     | Best use                                                             |
+| ---------- | -------------------------------------------------------------------- |
+| Kenney     | placeholder props, icons, UI, simple game assets, development kits   |
+| Quaternius | low-poly 3D props, characters, buildings, vehicles, environment kits |
+| ambientCG  | PBR materials, concrete, metal, ground, corrosion, HDRIs             |
+| Poly Haven | HDRIs, high-quality PBR materials, selected models                   |
+
+### Import policy
+
+External assets should enter the repository through an explicit import folder:
+
+```text
+assets/external/cc0/<source>/<pack_or_asset_name>/
+```
+
+Symtropy-authored assets should live separately:
+
+```text
+assets/symtropy/<area_or_feature>/
+```
+
+Example:
+
+```text
+assets/symtropy/old_waterworks/
+  greybox/
+  imported_cc0/
+  materials/
+  prefabs/
+  manifests/
+```
+
+### Required manifest fields
+
+Every external asset should have a manifest entry:
+
+```toml
+[[asset]]
+id = "ambientcg_wet_concrete_01"
+source = "ambientCG"
+license = "CC0"
+original_url = "https://..."
+imported_at = "2026-06-13"
+imported_by = "agent"
+local_path = "assets/external/cc0/ambientcg/wet_concrete_01/"
+used_for = "Old Waterworks floor material"
+notes = "Prototype material; may be replaced by Symtropy-authored final art."
+```
+
+### Automation targets
+
+The art pipeline should automate:
+
+* downloading from approved source lists
+* verifying license metadata
+* generating thumbnails
+* normalizing file names
+* converting models to `.glb`
+* resizing textures
+* generating material variants
+* creating collider hints
+* creating Bevy prefab metadata
+* reporting triangle counts
+* reporting missing textures
+* reporting missing license fields
+
+### Do not automate
+
+Do not automate away art direction.
+
+The following require human review:
+
+* faction visual grammar
+* Field Deck silhouette
+* Null Ecology corruption language
+* Archive Witness iconography
+* Old Waterworks hero composition
+* final key art
+* any asset that becomes strongly associated with Symtropy’s identity
+
+### Old Waterworks first asset target
+
+The first asset automation target should be the Old Waterworks room.
+
+Minimum useful asset list:
+
+```text
+wet concrete material
+rusted metal material
+pipe segment
+valve wheel
+industrial console
+warning stripe decal
+water tank
+cable bundle
+broken duct
+amber glass/emissive screen material
+```
+
+Acceptance criteria:
+
+* assets live under a clear folder
+* every external asset has license metadata
+* all runtime assets are loadable by Bevy
+* greybox cubes can be replaced one at a time
+* no unlicensed asset enters the repo
+* no large asset dump is committed without curation
+
+### Strategic principle
+
+Free assets are scaffolding.
+
+Symtropy’s identity must remain authored.
+
+Use public assets to make the room exist sooner.
+
+Use art direction to make the room unmistakably Symtropy.
+
+
 ### VFX
 
 | Component | Status | Notes |

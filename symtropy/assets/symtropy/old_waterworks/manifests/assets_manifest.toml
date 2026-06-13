@@ -4,6 +4,5 @@
 # Place assets in the sibling directories and reference them here.
 
 [assets]
-# Example entry:
-# pump_greybox = { path = "props/pump_01.glb", type = "mesh" }
-# wall_material = { path = "materials/concrete_dark.png", type = "texture" }
+# Assets
+pump_texture = { path = "../materials/pump_rust.jpg", type = "texture" }

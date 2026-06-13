@@ -1,6 +1,6 @@
 [package]
 name = "symtropy-physics"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 description = "N-dimensional rigid body physics with GJK+EPA collision, CCD, joints, raycasting, and warm-starting. Pluggable PhysicsCallback trait for coupling custom metrics to forces and friction."
@@ -20,7 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 deterministic-net = []
 
 [dependencies]
-symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
+symtropy-math = { version = "0.2.1", path = "../symtropy-math" }
 nalgebra = { version = "0.34", features = ["serde-serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 arrayvec = "0.7"

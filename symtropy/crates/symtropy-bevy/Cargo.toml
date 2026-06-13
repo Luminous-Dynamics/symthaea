@@ -13,7 +13,7 @@ symtropy-rapier3d-bridge = { path = "../symtropy-rapier3d-bridge", optional = tr
 symtropy-math = { path = "../symtropy-math" }
 symtropy-robotics-bridge-core = { path = "../symtropy-robotics-bridge-core" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
-symthaea-muse = { path = "../../../symthaea/crates/symthaea-muse" }
+symthaea-muse = { path = "../../../crates/domains/symthaea-muse" }
 symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole", features = ["phi-panel"] }
 bevy = { version = "0.18", default-features = false, features = [
     "png",

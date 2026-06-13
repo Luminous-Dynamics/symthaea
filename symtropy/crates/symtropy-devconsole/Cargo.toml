@@ -1,6 +1,6 @@
 [package]
 name = "symtropy-devconsole"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 description = "Drop-in Bevy dev console: bevy-inspector-egui's world inspector + a Symtropy-specific Phi/scene-control panel. Toggle with F1."
@@ -20,7 +20,7 @@ bevy_egui = { version = "0.39", default-features = false, features = [
     "render",
     "default_fonts", 
 ] }
-symtropy-bevy-core = { path = "../symtropy-bevy-core" }
+symtropy-bevy-core = { version = "0.1.1", path = "../symtropy-bevy-core" }
 
 [features]
 default = []

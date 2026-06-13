@@ -12,8 +12,8 @@ name = "exoskeleton-demo"
 path = "src/main.rs"
 
 [dependencies]
-symthaea-exoskeleton = { path = "../../../symthaea/crates/symthaea-exoskeleton" }
-symthaea-core = { path = "../../../symthaea/symthaea-core" }
+symthaea-exoskeleton = { path = "../../../crates/domains/symthaea-exoskeleton" }
+symthaea-core = { path = "../../../symthaea-core" }
 
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }

@@ -12,8 +12,8 @@ name = "surgical-demo"
 path = "src/main.rs"
 
 [dependencies]
-symthaea-surgical = { path = "../../../symthaea/crates/symthaea-surgical" }
-symthaea-core = { path = "../../../symthaea/symthaea-core" }
+symthaea-surgical = { path = "../../../crates/domains/symthaea-surgical" }
+symthaea-core = { path = "../../../symthaea-core" }
 
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }

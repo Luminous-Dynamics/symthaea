@@ -12,8 +12,8 @@ name = "quadruped-demo"
 path = "src/main.rs"
 
 [dependencies]
-symthaea-quadruped = { path = "../../../symthaea/crates/symthaea-quadruped" }
-symthaea-core = { path = "../../../symthaea/symthaea-core" }
+symthaea-quadruped = { path = "../../../crates/domains/symthaea-quadruped" }
+symthaea-core = { path = "../../../symthaea-core" }
 
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }

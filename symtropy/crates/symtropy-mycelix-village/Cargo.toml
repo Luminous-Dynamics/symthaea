@@ -41,4 +41,4 @@ path = "src/headless.rs"
 
 [[bin]]
 name = "city-scale"
-path = "src/city_scale.rs"
+path = "src/headless.rs"

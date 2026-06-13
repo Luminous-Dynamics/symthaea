@@ -61,6 +61,7 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -139,7 +140,12 @@ fn setup(
         )),
     ));
 
-    // Large Pump
+    // Pump
+    let pump_texture = asset_server.load("symtropy/old_waterworks/materials/pump_rust.jpg");
+    let pump_mat = materials.add(StandardMaterial {
+        base_color_texture: Some(pump_texture),
+        ..default()
+    });
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(pump_mat),

@@ -14,8 +14,8 @@ path = "src/main.rs"
 
 [dependencies]
 # Symthaea robotics
-symthaea-auv = { path = "../../../symthaea/crates/symthaea-auv" }
-symthaea-core = { path = "../../../symthaea/symthaea-core" }
+symthaea-auv = { path = "../../../crates/domains/symthaea-auv" }
+symthaea-core = { path = "../../../symthaea-core" }
 
 # Symtropy engine (consciousness side-channel)
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }

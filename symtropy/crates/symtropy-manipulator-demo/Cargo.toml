@@ -16,10 +16,10 @@ path = "src/main.rs"
 
 [dependencies]
 # Symthaea robotics
-symthaea-manipulator = { path = "../../../symthaea/crates/symthaea-manipulator" }
-symthaea-core = { path = "../../../symthaea/symthaea-core" }
-symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
-symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+symthaea-manipulator = { path = "../../../crates/domains/symthaea-manipulator" }
+symthaea-core = { path = "../../../symthaea-core" }
+symthaea-fep = { path = "../../../crates/core/symthaea-fep" }
+symthaea-consciousness-equation = { path = "../../../crates/domains/symthaea-consciousness-equation" }
 
 # Symtropy engine
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }

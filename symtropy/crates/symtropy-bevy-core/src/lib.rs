@@ -91,7 +91,8 @@ impl<const D: usize> PhysicsCallback<D> for NoCouplingResource {
     }
     fn on_collision(&mut self, _: &CollisionEvent<D>) {}
     fn record_dissipation(&mut self, _: f64) {}
-    fn apply_trauma(&mut self, _: &symtropy_physics::CollisionEvent<D>) {}
+    fn record_work(&mut self, _: BodyHandle, _: f64) {}
+    fn apply_trauma(&mut self, _: &CollisionEvent<D>) {}
 }
 
 // --- Systems ---

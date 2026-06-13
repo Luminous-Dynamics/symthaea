@@ -2,6 +2,18 @@
 
 N-dimensional rigid body physics with GJK+EPA collision detection. Zero heap allocation in the hot path.
 
+## Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+symtropy-physics = "0.2.1"
+symtropy-math = "0.2.1"
+```
+
+## Usage
+
 ```rust
 use symtropy_physics::PhysicsWorld;
 use symtropy_math::{Point, Sphere};
