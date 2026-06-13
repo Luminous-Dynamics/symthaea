@@ -27,6 +27,9 @@ pub mod consolidation;
 pub mod evaporator;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
+pub mod metabolism;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
 pub use simulator::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
@@ -46,3 +49,6 @@ pub use consolidation::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use evaporator::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use metabolism::*;
