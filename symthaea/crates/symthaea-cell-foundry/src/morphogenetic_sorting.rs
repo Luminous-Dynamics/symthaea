@@ -1034,17 +1034,28 @@ mod tests {
     }
 
     #[test]
-    fn test_discovery_harness_ranks_policies_single_scenario() {
-        let scenario = vec![3.0, 2.0, 1.0];
-        let policies = vec![
-            CellPolicy::Greedy,
-            CellPolicy::Parameterized(ParameterizedPolicy::default()),
-        ];
+    fn test_evolutionary_analysis_computes_trends() {
+        let parent = ParameterizedPolicy::default();
+        let scenarios = vec![vec![3.0, 2.0, 1.0]];
+        let generations = 3;
 
-        let results = DiscoveryHarness::evaluate_policies(&scenario, &policies, 20);
+        let experiment = EvolutionHarness::run_multi_generation_experiment(
+            parent,
+            generations,
+            3,
+            0.1,
+            &scenarios,
+            &scenarios,
+            20,
+            123,
+            "analysis-test".to_string(),
+        );
 
-        assert_eq!(results.len(), 2);
-        assert!(results[0].fitness >= results[1].fitness);
+        let analysis = experiment.analyze();
+        assert_eq!(analysis.total_generations, generations);
+        assert_eq!(analysis.fitness_trend.len(), generations);
+        assert!(analysis.fitness_trend[0] >= 0.0);
+        assert!(analysis.dominant_weights.iter().any(|&w| w != 0.0));
     }
 
     #[test]
