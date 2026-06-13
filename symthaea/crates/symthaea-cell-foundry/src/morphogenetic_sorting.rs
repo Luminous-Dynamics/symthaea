@@ -1229,25 +1229,63 @@ impl DiscoveryReport {
     }
 }
 
-impl MotifDiscoveryPipeline {
-    pub fn execute_discovery_run(&self, run_id: &str) -> DiscoveryReport {
-        let parent = ParameterizedPolicy::default();
-        let training_scenarios = vec![
+pub struct DiscoveryExperimentManager {
+    pub pipeline: MotifDiscoveryPipeline,
+}
+
+impl DiscoveryExperimentManager {
+    pub fn new(ledger_path: String, max_steps: usize) -> Self {
+        Self {
+            pipeline: MotifDiscoveryPipeline::new(ledger_path, max_steps),
+        }
+    }
+
+    pub fn run_experiment(
+        &self,
+        generations: usize,
+        population_size: usize,
+        mutation_magnitude: f32,
+        run_id: &str,
+    ) -> DiscoveryReport {
+        let training = vec![
             vec![3.0, 2.0, 1.0],
             vec![5.0, 4.0, 3.0, 2.0, 1.0],
             vec![1.0, 3.0, 2.0],
         ];
-        let validation_scenarios = vec![vec![4.0, 1.0, 3.0, 2.0], vec![1.0, 2.0, 3.0, 4.0]];
+        let validation = vec![vec![4.0, 1.0, 3.0, 2.0], vec![1.0, 2.0, 3.0, 4.0]];
 
-        self.run_discovery(
-            parent,
-            5,    // Generations
-            10,   // Population size
-            0.05, // Mutation magnitude
-            &training_scenarios,
-            &validation_scenarios,
+        self.pipeline.run_discovery(
+            ParameterizedPolicy::default(),
+            generations,
+            population_size,
+            mutation_magnitude,
+            &training,
+            &validation,
             run_id.to_string(),
         )
+    }
+
+    pub fn list_all_discoveries(&self) -> Vec<PolicyDiscoveryRecord> {
+        self.pipeline.ledger.list_policies()
+    }
+
+    pub fn get_best_algorithmic_motif(&self) -> Option<[f32; 8]> {
+        let ledger = &self.pipeline.ledger;
+        let top_policies = ledger.get_top_policies(10);
+        if top_policies.is_empty() {
+            return None;
+        }
+
+        let mut motif = [0.0; 8];
+        let count = top_policies.len() as f32;
+        for record in &top_policies {
+            if let CellPolicy::Parameterized(p) = &record.policy {
+                for (i, w) in p.weights.iter().enumerate() {
+                    motif[i] += w / count;
+                }
+            }
+        }
+        Some(motif)
     }
 }
 
