@@ -541,7 +541,41 @@ pub struct SingleGenerationEvolutionResult {
     pub validation_summary: PolicyEvaluationSummary,
 }
 
-pub struct EvolutionHarness;
+pub struct PolicyLedger {
+    pub base_directory: String,
+}
+
+impl PolicyLedger {
+    pub fn new(base_directory: String) -> Self {
+        std::fs::create_dir_all(&base_directory).unwrap_or(());
+        Self { base_directory }
+    }
+
+    pub fn list_policies(&self) -> Vec<PolicyDiscoveryRecord> {
+        let mut records = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&self.base_directory) {
+            for entry in entries.flatten() {
+                if let Ok(record) =
+                    PolicyDiscoveryRecord::load_from_disk(entry.path().to_str().unwrap_or_default())
+                {
+                    records.push(record);
+                }
+            }
+        }
+        records
+    }
+
+    pub fn get_top_policies(&self, limit: usize) -> Vec<PolicyDiscoveryRecord> {
+        let mut records = self.list_policies();
+        records.sort_by(|a, b| {
+            b.training_summary
+                .mean_fitness
+                .partial_cmp(&a.training_summary.mean_fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        records.into_iter().take(limit).collect()
+    }
+}
 
 impl EvolutionHarness {
     pub fn run_multi_generation_experiment(
@@ -607,6 +641,61 @@ impl EvolutionHarness {
             final_elite,
         }
     }
+
+    pub fn run_single_generation(
+        parent: ParameterizedPolicy,
+        population_size: usize,
+        mutation_magnitude: f32,
+        training_scenarios: &[Vec<f32>],
+        validation_scenarios: &[Vec<f32>],
+        max_steps: usize,
+        seed: u64,
+    ) -> SingleGenerationEvolutionResult {
+        let mut candidates = Vec::new();
+        candidates.push(CellPolicy::Parameterized(parent.clone()));
+
+        for i in 0..population_size {
+            let mut child = parent.clone();
+            child.mutate(seed + i as u64, mutation_magnitude);
+            candidates.push(CellPolicy::Parameterized(child));
+        }
+
+        let mut all_summaries = Vec::new();
+        for policy in &candidates {
+            all_summaries.push(DiscoveryHarness::evaluate_policy_on_scenarios(
+                training_scenarios,
+                policy,
+                max_steps,
+            ));
+        }
+
+        let mut sorted_summaries = all_summaries.clone();
+        sorted_summaries.sort_by(|a, b| b.mean_fitness.partial_cmp(&a.mean_fitness).unwrap());
+
+        let elite_summary = sorted_summaries[0].clone();
+        let validation_summary = DiscoveryHarness::evaluate_policy_on_scenarios(
+            validation_scenarios,
+            &elite_summary.policy,
+            max_steps,
+        );
+
+        SingleGenerationEvolutionResult {
+            parent_summary: DiscoveryHarness::evaluate_policy_on_scenarios(
+                training_scenarios,
+                &CellPolicy::Parameterized(parent),
+                max_steps,
+            ),
+            all_candidate_summaries: all_summaries,
+            elite_summary,
+            validation_summary,
+        }
+    }
+}
+
+pub struct EvolutionaryExperiment {
+    pub generation_results: Vec<SingleGenerationEvolutionResult>,
+    pub population_history: Vec<PopulationMetrics>,
+    pub final_elite: PolicyDiscoveryRecord,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -627,7 +716,6 @@ impl PopulationMetrics {
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap();
 
-        // Simple diversity: variance of mean fitnesses
         let variance =
             fitnesses.iter().map(|f| (f - mean).powi(2)).sum::<f32>() / fitnesses.len() as f32;
 
@@ -661,7 +749,6 @@ impl EvolutionaryExperiment {
             .map(|p| p.diversity)
             .collect();
 
-        // Calculate average weights of the elite
         let mut avg_weights = [0.0; 8];
         let count = self.generation_results.len() as f32;
 
@@ -678,72 +765,6 @@ impl EvolutionaryExperiment {
             fitness_trend,
             diversity_trend,
             dominant_weights: avg_weights,
-        }
-    }
-}
-
-impl EvolutionHarness {
-    pub fn run_multi_generation_experiment(
-        initial_parent: ParameterizedPolicy,
-        generations: usize,
-        population_size: usize,
-        mutation_magnitude: f32,
-        training_scenarios: &[Vec<f32>],
-        validation_scenarios: &[Vec<f32>],
-        max_steps: usize,
-        seed: u64,
-        run_id: String,
-    ) -> EvolutionaryExperiment {
-        assert!(generations > 0, "generations must be greater than zero");
-        let mut current_parent = initial_parent;
-        let mut generation_results = Vec::new();
-        let mut population_history = Vec::new();
-
-        for generation in 1..=generations {
-            let result = Self::run_single_generation(
-                current_parent.clone(),
-                population_size,
-                mutation_magnitude,
-                training_scenarios,
-                validation_scenarios,
-                max_steps,
-                seed + (generation as u64 * 1000),
-            );
-
-            population_history.push(PopulationMetrics::from_generation(
-                generation,
-                &result.all_candidate_summaries,
-            ));
-
-            // Update parent for next generation
-            if let CellPolicy::Parameterized(elite_policy) = result.elite_summary.policy.clone() {
-                current_parent = elite_policy;
-            }
-
-            generation_results.push(result);
-        }
-
-        let last_gen = generation_results.last().unwrap();
-        let final_elite = PolicyDiscoveryRecord::new(
-            last_gen.elite_summary.policy.clone(),
-            last_gen.elite_summary.clone(),
-            Some(last_gen.validation_summary.clone()),
-            PolicyMetadata {
-                seed,
-                mutation_magnitude,
-                generation: generations,
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs(),
-                run_id,
-            },
-        );
-
-        EvolutionaryExperiment {
-            generation_results,
-            population_history,
-            final_elite,
         }
     }
 }
@@ -853,7 +874,7 @@ mod tests {
     }
 
     #[test]
-    fn test_policy_discovery_record_persistence() {
+    fn test_policy_ledger_persistence() {
         let parent = ParameterizedPolicy::default();
         let scenario = vec![vec![3.0, 2.0, 1.0]];
         let summary = DiscoveryHarness::evaluate_policy_on_scenarios(
@@ -867,7 +888,7 @@ mod tests {
             mutation_magnitude: 0.1,
             generation: 1,
             timestamp: 1600000000,
-            run_id: "persistence-test".to_string(),
+            run_id: "ledger-test".to_string(),
         };
 
         let record = PolicyDiscoveryRecord::new(
@@ -877,15 +898,14 @@ mod tests {
             metadata,
         );
 
-        let dir = "target/test_ledger";
-        record.save_to_disk(dir).unwrap();
+        let ledger_dir = "target/test_ledger_service";
+        record.save_to_disk(ledger_dir).unwrap();
 
-        let loaded = PolicyDiscoveryRecord::load_from_disk(&format!(
-            "{}/persistence-test_1600000000.json",
-            dir
-        ))
-        .unwrap();
-        assert_eq!(loaded.metadata.run_id, record.metadata.run_id);
+        let ledger = PolicyLedger::new(ledger_dir.to_string());
+        let policies = ledger.list_policies();
+
+        assert_eq!(policies.len(), 1);
+        assert_eq!(policies[0].metadata.run_id, "ledger-test");
     }
 
     #[test]
@@ -1048,7 +1068,6 @@ mod tests {
             &scenarios,
             20,
             123,
-            "analysis-test".to_string(),
         );
 
         let analysis = experiment.analyze();
