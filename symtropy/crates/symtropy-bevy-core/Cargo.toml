@@ -18,10 +18,17 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_color",
     "bevy_state",
     "bevy_log",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_ui_render",
+    "bevy_pbr",
     "multi_threaded",
     "x11",
 ] }
 nalgebra = "0.34"
+
+[dev-dependencies]
+symtropy-bevy-scene = { path = "../symtropy-bevy-scene" }
 
 [features]
 default = []
