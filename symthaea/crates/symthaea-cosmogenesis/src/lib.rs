@@ -1,0 +1,18 @@
+// Copyright (C) 2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! # symthaea-cosmogenesis
+//!
+//! Algorithmic semantic manifold organization via ΛCDM-inspired cosmological dynamics.
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub mod simulator;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub mod types;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use simulator::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use types::*;

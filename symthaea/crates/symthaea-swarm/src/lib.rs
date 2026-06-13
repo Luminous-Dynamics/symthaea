@@ -77,6 +77,25 @@ pub struct MutualAidMsg {
     /// High-dimensional proof of the deficit being addressed.
     pub support_hv: ContinuousHV,
 }
+/// Message for broadcasting structural failure residuals (geometric curvature).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurvatureGossipMsg {
+    pub node_id: Uuid,
+    /// Vector of structural failure residuals (Einstein condition violation)
+    pub residuals: Vec<f64>,
+    /// Metadata for the local geometric basis
+    pub dim: usize,
+    pub timestamp: u64,
+}
+
+/// Message for broadcasting collective Social Phi metrics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialPhiGossipMsg {
+    pub node_id: Uuid,
+    pub collective_phi: f64,
+    pub integration_ratio: f64,
+    pub timestamp: u64,
+}
 
 /// Unified swarm wire protocol envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +104,9 @@ pub enum SwarmMessage {
     HapticPulse(HapticPulseMsg),
     ProofGossip(SwarmProofMsg),
     LawGossip(LawGossipMsg),
+    MacroGossip(MacroGossipMsg),
+    CurvatureGossip(CurvatureGossipMsg),
+    SocialPhiGossip(SocialPhiGossipMsg),
     MutualAid(MutualAidMsg),
 
     /// Message containing a metamorphic weight update kernel and its ZKP proof.
@@ -108,6 +130,7 @@ pub struct SwarmAggregator {
     pub collective_laws: std::collections::HashMap<String, (String, f64)>,
     /// Collective haptic map: position -> surprise magnitude
     pub haptic_map: std::collections::HashMap<[i32; 3], f64>,
+    pub swarm_curvature: Vec<f64>,
 }
 
 impl SwarmAggregator {
@@ -135,6 +158,19 @@ impl SwarmAggregator {
     }
 
     /// Record a peer-distributed mathematical lemma into local memory.
+    /// Ingest geometric residuals from peers.
+    pub fn ingest_curvature_gossip(&mut self, msg: CurvatureGossipMsg) {
+        if self.swarm_curvature.is_empty() {
+            self.swarm_curvature = msg.residuals;
+        } else {
+            for (i, &r) in msg.residuals.iter().enumerate() {
+                if i < self.swarm_curvature.len() {
+                    self.swarm_curvature[i] = self.swarm_curvature[i].max(r);
+                }
+            }
+        }
+    }
+
     pub fn ingest_peer_proof(&mut self, msg: SwarmProofMsg) {
         if !self
             .swarm_proofs

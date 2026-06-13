@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-cosmogenesis"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Algorithmic semantic manifold organization via ΛCDM-inspired cosmological dynamics."
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+
+[features]
+default = []
+cognitive-cosmogenesis = []
+
+[dev-dependencies]
+symthaea-core = { path = "../../symthaea-core" }

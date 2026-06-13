@@ -147,6 +147,23 @@ impl CognitiveLoopService {
         self.fep.episodic_memory.recall(query, top_k, 0.2)
     }
 
+    /// Retrieve the current binding of proprioceptive state to semantic HDC space.
+    pub fn get_proprioceptive_binding(&self) -> Option<Vec<f32>> {
+        self.sensorimotor
+            .embodiment_bridge
+            .as_ref()
+            .and_then(|b| b.last_perception_hv().map(|hv| hv.to_vec()))
+    }
+
+    /// Retrieve the current epistemic quality (sensorimotor accuracy) of the embodiment.
+    pub fn get_epistemic_quality(&self) -> f64 {
+        self.sensorimotor
+            .embodiment_bridge
+            .as_ref()
+            .map(|b| b.sensorimotor_accuracy() as f64)
+            .unwrap_or(0.5)
+    }
+
     /// Add a goal to the system
     pub fn add_goal(&mut self, id: &str, description: &str, priority: f32) {
         self.fep

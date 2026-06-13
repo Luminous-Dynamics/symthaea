@@ -41,8 +41,8 @@ fn main() {
 
     println!("Attraction,Lambda,InitSeparation,FinalSeparation,DeltaSep,Finite");
 
-    let attraction_values = [0.5, 1.0, 2.0, 4.0];
-    let lambda_values = [0.0, 0.01, 0.1, 0.5];
+    let attraction_values = [0.005, 0.01, 0.02, 0.05];
+    let lambda_values = [0.005, 0.01, 0.02, 0.05];
 
     for &attraction in &attraction_values {
         for &lambda in &lambda_values {

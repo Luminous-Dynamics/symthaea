@@ -7,6 +7,7 @@
 //! - Bivariate causal discovery (71.3% accuracy on Tübingen benchmark)
 //! - Causal consciousness integration (HSIC, attention, LTC bridge)
 
+pub mod athena;
 pub mod causal_consciousness;
 pub mod causal_discovery;
 pub mod nixos_causal;

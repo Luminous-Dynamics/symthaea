@@ -717,6 +717,7 @@ impl CognitiveLoopService {
                     enable_td_learning: true,
                     ..Default::default()
                 }),
+                haptic_semantic_binder: symthaea_fep::HapticSemanticBinder::new(8, 64),
                 enhanced_bridge: EnhancedFEPBridge::new(
                     ActiveInferenceAgentConfig {
                         state_dim: 8,
@@ -727,6 +728,7 @@ impl CognitiveLoopService {
                     },
                     4,
                 ),
+
                 learning_signal: 0.0,
                 last_action_idx: 0,
                 lr_boost: 1.0,

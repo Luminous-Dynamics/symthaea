@@ -11,12 +11,16 @@ homepage = "https://luminousdynamics.org"
 keywords = ["cell-culture", "ipsc", "hdc", "ivg", "stem-cells"]
 categories = ["science", "algorithms"]
 
+[features]
+default = []
+morphogenetic-sorting = []
+
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 rand = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
 proptest = "1.4"

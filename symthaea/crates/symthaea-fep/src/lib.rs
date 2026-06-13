@@ -141,6 +141,7 @@ mod agent;
 mod bridge;
 pub mod free_energy;
 pub mod generative_model;
+pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
@@ -164,6 +165,8 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use haptic_semantic_binder::HapticSemanticBinder;
 
 pub use free_energy::{ExpectedFreeEnergyComputer, FreeEnergyCalculator, PrecisionEstimator};
 

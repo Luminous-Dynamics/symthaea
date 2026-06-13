@@ -44,6 +44,8 @@ pub struct IntegratedConsciousAgent {
     pub(super) emotional_state: EmotionalState,
     /// Last known coherence state from Symthaea physiological system
     pub(super) last_coherence: Option<CoherenceState>,
+    /// Last known collective Φ from social swarm
+    pub collective_phi: f64,
 }
 
 impl IntegratedConsciousAgent {
@@ -74,7 +76,13 @@ impl IntegratedConsciousAgent {
             working_memory: WorkingMemory::new(7), // Miller's magical number
             emotional_state: EmotionalState::new(),
             last_coherence: None,
+            collective_phi: 0.0,
         }
+    }
+
+    /// Ingest the swarm-wide collective Φ.
+    pub fn sync_collective_phi(&mut self, collective_phi: f64) {
+        self.collective_phi = collective_phi;
     }
 
     /// Process sensory input through the complete conscious system
@@ -82,12 +90,21 @@ impl IntegratedConsciousAgent {
         self.step += 1;
 
         // ═══════════════════════════════════════════════════════════════════
-        // STAGE 1: ATTENTION - What should enter consciousness?
+        // STAGE 0: HYPER-DIMENSIONAL RESONANCE
         // ═══════════════════════════════════════════════════════════════════
+        // Inject collective social Φ into the awareness engine to warp the 'I'
+        // toward the 'We'
+        let resonance_hv = ContinuousHV::random(self.config.dim, self.step as u64)
+            .scale(self.collective_phi as f32);
+
+        // Modulate sensory input with collective resonance
+        let social_aware_sensory = sensory_input.bind(&resonance_hv);
 
         // Add sensory input as attention target
-        let salience = self.compute_salience(sensory_input);
-        let input_target_id = self.attention.add_target(sensory_input.clone(), salience);
+        let salience = self.compute_salience(&social_aware_sensory);
+        let input_target_id = self
+            .attention
+            .add_target(social_aware_sensory.clone(), salience);
 
         // Self-directed attention: bias toward goals
         if self.config.self_directed_attention {
