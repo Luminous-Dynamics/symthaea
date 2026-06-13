@@ -577,6 +577,47 @@ impl PolicyLedger {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiscoveryReport {
+    pub total_discovered: usize,
+    pub top_policy: PolicyDiscoveryRecord,
+    pub algorithmic_motif: [f32; 8],
+}
+
+pub struct DiscoveryReporter;
+
+impl DiscoveryReporter {
+    pub fn generate_report(ledger: &PolicyLedger) -> Option<DiscoveryReport> {
+        let all_policies = ledger.list_policies();
+        if all_policies.is_empty() {
+            return None;
+        }
+
+        let total_discovered = all_policies.len();
+        let top_policies = ledger.get_top_policies(1);
+        let top_policy = top_policies.first()?.clone();
+
+        // Calculate motif: average of top 10 policies
+        let top_ten = ledger.get_top_policies(10);
+        let mut motif = [0.0; 8];
+        let count = top_ten.len() as f32;
+
+        for record in &top_ten {
+            if let CellPolicy::Parameterized(p) = &record.policy {
+                for (i, w) in p.weights.iter().enumerate() {
+                    motif[i] += w / count;
+                }
+            }
+        }
+
+        Some(DiscoveryReport {
+            total_discovered,
+            top_policy,
+            algorithmic_motif: motif,
+        })
+    }
+}
+
 impl EvolutionHarness {
     pub fn run_multi_generation_experiment(
         initial_parent: ParameterizedPolicy,
