@@ -1,0 +1,9 @@
+# Old Waterworks Asset Manifest
+#
+# This manifest tracks CC0/licensed assets for the Old Waterworks micro-slice.
+# Place assets in the sibling directories and reference them here.
+
+[assets]
+# Example entry:
+# pump_greybox = { path = "props/pump_01.glb", type = "mesh" }
+# wall_material = { path = "materials/concrete_dark.png", type = "texture" }
