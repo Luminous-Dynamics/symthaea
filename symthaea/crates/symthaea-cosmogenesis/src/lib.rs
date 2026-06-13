@@ -21,6 +21,9 @@ pub mod complexity;
 pub mod phase_detector;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
+pub mod consolidation;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
 pub use simulator::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
@@ -34,3 +37,6 @@ pub use complexity::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use phase_detector::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use consolidation::*;
