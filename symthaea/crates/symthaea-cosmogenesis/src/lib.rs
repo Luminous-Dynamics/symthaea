@@ -12,7 +12,13 @@ pub mod simulator;
 pub mod types;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
+pub mod analyzer;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
 pub use simulator::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use types::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use analyzer::*;
