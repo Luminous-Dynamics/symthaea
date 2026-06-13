@@ -49,4 +49,5 @@ pub struct SemanticParticle {
     pub mass: f32,
     pub latent_mass: f32,
     pub energy: f32,
+    pub frequency: f32,
 }

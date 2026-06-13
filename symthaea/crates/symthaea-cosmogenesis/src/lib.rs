@@ -30,6 +30,9 @@ pub mod evaporator;
 pub mod metabolism;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
+pub mod resonance;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
 pub use simulator::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
@@ -52,3 +55,6 @@ pub use evaporator::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use metabolism::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use resonance::*;
