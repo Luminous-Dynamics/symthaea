@@ -15,6 +15,9 @@ pub mod types;
 pub mod analyzer;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
+pub mod complexity;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
 pub mod phase_detector;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
@@ -25,6 +28,9 @@ pub use types::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use analyzer::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use complexity::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use phase_detector::*;
