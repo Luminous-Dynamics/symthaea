@@ -24,6 +24,9 @@ pub mod phase_detector;
 pub mod consolidation;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
+pub mod evaporator;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
 pub use simulator::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
@@ -40,3 +43,6 @@ pub use phase_detector::*;
 
 #[cfg(feature = "cognitive-cosmogenesis")]
 pub use consolidation::*;
+
+#[cfg(feature = "cognitive-cosmogenesis")]
+pub use evaporator::*;
