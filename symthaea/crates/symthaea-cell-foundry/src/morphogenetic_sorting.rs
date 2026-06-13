@@ -640,11 +640,46 @@ impl PopulationMetrics {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct EvolutionaryExperiment {
-    pub generation_results: Vec<SingleGenerationEvolutionResult>,
-    pub population_history: Vec<PopulationMetrics>,
-    pub final_elite: PolicyDiscoveryRecord,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvolutionaryAnalysis {
+    pub total_generations: usize,
+    pub fitness_trend: Vec<f32>,
+    pub diversity_trend: Vec<f32>,
+    pub dominant_weights: [f32; 8],
+}
+
+impl EvolutionaryExperiment {
+    pub fn analyze(&self) -> EvolutionaryAnalysis {
+        let fitness_trend = self
+            .population_history
+            .iter()
+            .map(|p| p.mean_fitness)
+            .collect();
+        let diversity_trend = self
+            .population_history
+            .iter()
+            .map(|p| p.diversity)
+            .collect();
+
+        // Calculate average weights of the elite
+        let mut avg_weights = [0.0; 8];
+        let count = self.generation_results.len() as f32;
+
+        for res in &self.generation_results {
+            if let CellPolicy::Parameterized(p) = &res.elite_summary.policy {
+                for (i, w) in p.weights.iter().enumerate() {
+                    avg_weights[i] += w / count;
+                }
+            }
+        }
+
+        EvolutionaryAnalysis {
+            total_generations: self.generation_results.len(),
+            fitness_trend,
+            diversity_trend,
+            dominant_weights: avg_weights,
+        }
+    }
 }
 
 impl EvolutionHarness {
