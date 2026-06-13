@@ -1124,3 +1124,29 @@ impl DiscoveryExperimentManager {
         batch_reports
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResearchSweepRecord {
+    pub base_run_id: String,
+    pub timestamp: u64,
+    pub experiment_configs: Vec<(usize, usize, f32)>,
+    pub report_summaries: Vec<DiscoveryReport>,
+}
+
+pub struct ResearchSweepLogger {
+    pub base_directory: String,
+}
+
+impl ResearchSweepLogger {
+    pub fn new(base_directory: String) -> Self {
+        std::fs::create_dir_all(&base_directory).unwrap_or(());
+        Self { base_directory }
+    }
+
+    pub fn log_sweep(&self, record: &ResearchSweepRecord) -> std::io::Result<()> {
+        let path = format!("{}/{}_sweep.json", self.base_directory, record.base_run_id);
+        let content = serde_json::to_string_pretty(record)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(path, content)
+    }
+}
