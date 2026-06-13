@@ -1,12 +1,14 @@
 // Copyright (C) 2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! OLD WATERWORKS MICRO-SLICE — Ticket 1
+//! OLD WATERWORKS MICRO-SLICE — Ticket 1 & 2
 //!
 //! This is the first concrete playable foundation for Symtropy.
 //! - Floor, walls, and greybox machinery (pump, tank, console).
 //! - Basic first-person movement (WASD + Arrows).
 //! - Proximity-based interaction with the console (Press E).
-//! - Dead authority lock inspection state.
+//! - Field Deck: Amber interface frame (Press F to toggle).
+//! - Dead authority lock inspection state (inside Field Deck).
+//! - Panic Drop: Esc/Shift exits instantly.
 //!
 //! Hard Scope:
 //! - No Device Bus yet
@@ -15,7 +17,7 @@
 //! - No Mycelix yet
 //! - No Holochain yet
 //! - No SymLogic yet
-//! - No Field Deck UI yet
+//! - No full Field Deck UI yet
 //! - No faction evolution yet
 //! - No Chronicle yet
 //! - just the first playable room
@@ -30,10 +32,11 @@ struct Player;
 struct Console;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
-enum InspectionState {
+enum InterfaceState {
     #[default]
     None,
-    PumpConsole,
+    FieldDeck,
+    Console,
 }
 
 fn main() {
@@ -47,15 +50,11 @@ fn main() {
             ..default()
         }))
         .add_plugins(SymtropyScenePlugin::default())
-        .init_state::<InspectionState>()
+        .init_state::<InterfaceState>()
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (
-                player_move_system.run_if(in_state(InspectionState::None)),
-                interaction_system,
-                inspection_ui_system,
-            ),
+            (player_move_system, interaction_system, ui_visibility_system),
         )
         .run();
 }
@@ -200,47 +199,113 @@ fn setup(
             ));
         });
 
-    // UI Root for Inspection
-    commands.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            display: Display::None,
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.85)),
-        InspectionUI,
-    )).with_children(|parent| {
-        parent.spawn((
-            Text::new("OLD WATERWORKS CONSOLE\nPUMP_1: LOCKED\nTANK_0: 12%\nAUTHORITY: DEAD_AUTHORITY_LOCK\n\nPress Esc/Shift to drop interface"),
-            TextFont {
-                font_size: 40.0,
+    // UI Root for Field Deck (Amber Frame)
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                border: UiRect::all(Val::Px(20.0)),
+                display: Display::None,
                 ..default()
             },
-            TextColor(Color::srgb(1.0, 0.8, 0.2)), // Amber
-        ));
-    });
+            BorderColor(Color::srgb(1.0, 0.8, 0.2)), // Amber
+            FieldDeckUI,
+        ))
+        .with_children(|parent| {
+            // Label for the Field Deck itself
+            parent
+                .spawn((Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(25.0),
+                    left: Val::Px(25.0),
+                    ..default()
+                },))
+                .with_children(|inner| {
+                    inner.spawn((
+                        Text::new("FIELD DECK MK0 - OFFLINE LINK"),
+                        TextFont {
+                            font_size: 20.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(1.0, 0.8, 0.2)),
+                    ));
+                });
+
+            // Container for inner content (Console info)
+            parent
+                .spawn((Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },))
+                .with_children(|inner| {
+                    inner.spawn((
+                        Text::new(""),
+                        TextFont {
+                            font_size: 40.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(1.0, 0.8, 0.2)),
+                        InspectionText,
+                    ));
+                });
+
+            // Panic Drop hint
+            parent
+                .spawn((Node {
+                    position_type: PositionType::Absolute,
+                    bottom: Val::Px(25.0),
+                    right: Val::Px(25.0),
+                    ..default()
+                },))
+                .with_children(|inner| {
+                    inner.spawn((
+                        Text::new("Press Esc/Shift to Panic Drop"),
+                        TextFont {
+                            font_size: 20.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(1.0, 0.5, 0.0)), // More orange/warning
+                    ));
+                });
+        });
 }
 
 #[derive(Component)]
 struct InteractionHint;
 
 #[derive(Component)]
-struct InspectionUI;
+struct FieldDeckUI;
+
+#[derive(Component)]
+struct InspectionText;
 
 fn player_move_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    state: Res<State<InterfaceState>>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     let Ok(mut transform) = query.single_mut() else {
         return;
     };
-    let mut direction = Vec3::ZERO;
 
+    // Movement speed depends on state
+    let speed = match *state.get() {
+        InterfaceState::None => 5.0,
+        InterfaceState::FieldDeck => 1.0, // Slowed movement while Deck is up
+        InterfaceState::Console => 0.0,   // No movement while inspecting console
+    };
+
+    if speed == 0.0 {
+        return;
+    }
+
+    let mut direction = Vec3::ZERO;
     if keyboard.pressed(KeyCode::KeyW) {
         let forward = transform.forward();
         direction += *forward;
@@ -261,7 +326,7 @@ fn player_move_system(
     direction.y = 0.0;
     if direction.length_squared() > 0.0 {
         direction = direction.normalize();
-        transform.translation += direction * 5.0 * time.delta_secs();
+        transform.translation += direction * speed * time.delta_secs();
     }
 
     // Simple rotation with Arrows
@@ -280,8 +345,9 @@ fn interaction_system(
     player_query: Query<&Transform, With<Player>>,
     console_query: Query<&Transform, With<Console>>,
     mut interaction_hint_query: Query<(&mut Text, &mut Visibility), With<InteractionHint>>,
-    state: Res<State<InspectionState>>,
-    mut next_state: ResMut<NextState<InspectionState>>,
+    mut inspection_text_query: Query<&mut Text, (With<InspectionText>, Without<InteractionHint>)>,
+    state: Res<State<InterfaceState>>,
+    mut next_state: ResMut<NextState<InterfaceState>>,
 ) {
     let Ok(player_tf) = player_query.single() else {
         return;
@@ -289,46 +355,63 @@ fn interaction_system(
     let Ok(console_tf) = console_query.single() else {
         return;
     };
-    let Ok((mut text, mut visibility)) = interaction_hint_query.single_mut() else {
+    let Ok((mut hint_text, mut hint_visibility)) = interaction_hint_query.single_mut() else {
+        return;
+    };
+    let Ok(mut inspect_text) = inspection_text_query.single_mut() else {
         return;
     };
 
     let dist = player_tf.translation.distance(console_tf.translation);
     let near_console = dist < 2.5;
+    let current_state = *state.get();
 
-    if *state.get() == InspectionState::None {
-        if near_console {
-            **text = "Press E to inspect pump console".to_string();
-            *visibility = Visibility::Visible;
-
-            if keyboard.just_pressed(KeyCode::KeyE) {
-                next_state.set(InspectionState::PumpConsole);
-            }
-        } else {
-            *visibility = Visibility::Hidden;
-        }
+    // Interaction Hint
+    if current_state != InterfaceState::Console && near_console {
+        **hint_text = "Press E to inspect pump console".to_string();
+        *hint_visibility = Visibility::Visible;
     } else {
-        *visibility = Visibility::Hidden;
+        *hint_visibility = Visibility::Hidden;
+    }
 
-        if keyboard.just_pressed(KeyCode::Escape)
-            || keyboard.just_pressed(KeyCode::ShiftLeft)
-            || keyboard.just_pressed(KeyCode::ShiftRight)
-        {
-            next_state.set(InspectionState::None);
+    // Input Handling
+    if keyboard.just_pressed(KeyCode::Escape)
+        || keyboard.just_pressed(KeyCode::ShiftLeft)
+        || keyboard.just_pressed(KeyCode::ShiftRight)
+    {
+        // Panic Drop
+        next_state.set(InterfaceState::None);
+    } else if keyboard.just_pressed(KeyCode::KeyF) {
+        // Toggle Field Deck
+        match current_state {
+            InterfaceState::None => next_state.set(InterfaceState::FieldDeck),
+            InterfaceState::FieldDeck => next_state.set(InterfaceState::None),
+            InterfaceState::Console => next_state.set(InterfaceState::None), // Panic drop also works here
         }
+    } else if keyboard.just_pressed(KeyCode::KeyE) && near_console {
+        // Inspect Console
+        next_state.set(InterfaceState::Console);
+    }
+
+    // Update Inspection Text
+    if current_state == InterfaceState::Console {
+        **inspect_text =
+            "OLD WATERWORKS CONSOLE\nPUMP_1: LOCKED\nTANK_0: 12%\nAUTHORITY: DEAD_AUTHORITY_LOCK"
+                .to_string();
+    } else {
+        **inspect_text = "".to_string();
     }
 }
 
-fn inspection_ui_system(
-    state: Res<State<InspectionState>>,
-    mut query: Query<&mut Node, With<InspectionUI>>,
+fn ui_visibility_system(
+    state: Res<State<InterfaceState>>,
+    mut query: Query<&mut Node, With<FieldDeckUI>>,
 ) {
     let Ok(mut node) = query.single_mut() else {
         return;
     };
-    if *state.get() != InspectionState::None {
-        node.display = Display::Flex;
-    } else {
-        node.display = Display::None;
+    match *state.get() {
+        InterfaceState::None => node.display = Display::None,
+        InterfaceState::FieldDeck | InterfaceState::Console => node.display = Display::Flex,
     }
 }
