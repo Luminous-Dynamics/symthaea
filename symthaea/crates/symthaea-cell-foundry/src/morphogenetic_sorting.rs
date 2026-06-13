@@ -584,37 +584,40 @@ pub struct DiscoveryReport {
     pub algorithmic_motif: [f32; 8],
 }
 
-pub struct DiscoveryReporter;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AlgorithmicRule {
+    pub condition: String,
+    pub action: String,
+    pub weight_magnitude: f32,
+}
 
-impl DiscoveryReporter {
-    pub fn generate_report(ledger: &PolicyLedger) -> Option<DiscoveryReport> {
-        let all_policies = ledger.list_policies();
-        if all_policies.is_empty() {
-            return None;
-        }
+pub struct PolicyRuleExtractor;
 
-        let total_discovered = all_policies.len();
-        let top_policies = ledger.get_top_policies(1);
-        let top_policy = top_policies.first()?.clone();
+impl PolicyRuleExtractor {
+    pub fn extract_rules(weights: [f32; 8]) -> Vec<AlgorithmicRule> {
+        let mut rules = Vec::new();
+        let labels = [
+            "Inversion Bias",
+            "Surprise Sensitivity",
+            "Energy Conservation",
+            "Damage Aversion",
+            "Weight4",
+            "Weight5",
+            "Weight6",
+            "Weight7",
+        ];
 
-        // Calculate motif: average of top 10 policies
-        let top_ten = ledger.get_top_policies(10);
-        let mut motif = [0.0; 8];
-        let count = top_ten.len() as f32;
-
-        for record in &top_ten {
-            if let CellPolicy::Parameterized(p) = &record.policy {
-                for (i, w) in p.weights.iter().enumerate() {
-                    motif[i] += w / count;
-                }
+        for (i, &weight) in weights.iter().enumerate() {
+            if weight.abs() > 0.1 {
+                let direction = if weight > 0.0 { "Promote" } else { "Inhibit" };
+                rules.push(AlgorithmicRule {
+                    condition: format!("Based on {}", labels[i]),
+                    action: format!("{} swap decision", direction),
+                    weight_magnitude: weight,
+                });
             }
         }
-
-        Some(DiscoveryReport {
-            total_discovered,
-            top_policy,
-            algorithmic_motif: motif,
-        })
+        rules
     }
 }
 
