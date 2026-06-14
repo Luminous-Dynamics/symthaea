@@ -4,7 +4,7 @@ members = [
     "xtask",
     "crates/symthaea-domotic",
     ".",
-    "symthaea-core",
+    "crates/core/symthaea-core",
     "crates/symthaea-nix",
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
@@ -75,7 +75,7 @@ members = [
     "crates/symthaea-broca",
     "crates/symthaea-coding-feedback",
     "crates/symthaea-geodesic",
-    "crates/symthaea-consciousness-equation",
+    "crates/domains/symthaea-consciousness-equation",
     "crates/symthaea-neuromodulators",
     "crates/symthaea-cell-foundry",
     "crates/symthaea-ectogenesis",
@@ -118,14 +118,8 @@ members = [
     "crates/symthaea-hdc-store",
     "crates/symthaea-mycelix-conductor",
     "crates/symthaea-epistemic-types",
-    "crates/symthaea-cosmogenesis",
-    # Phase 1 spike for MSP / IT-ops wedge. See memory/project_msp_wedge.md.
-    "crates/symthaea-logparse",
-    "crates/symthaea-eml-egraph",
-    # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
-    "crates/symthaea-quicken-fb",
-    # Leptos CSR web frontend — WASM target, not in default-members.
-    "crates/symthaea-web",
+    "crates/symthaea-fractal-time-lab",
+    "crates/symthaea-prime-gap-lab",
 ]
 exclude = [
     # RISC Zero guest/host crates need the rzup toolchain (RISC-V cross-compiler);
@@ -142,10 +136,11 @@ default-members = [
     "xtask",
     "crates/symthaea-domotic",
     ".",
-    "symthaea-core",
+    "crates/core/symthaea-core",
 ]
 
 [workspace.package]
+version = "2.0.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 
@@ -183,7 +178,7 @@ nonsensical_open_options = "deny"
 unused_io_amount = "deny"
 
 [workspace.dependencies]
-mycelix-zkp-core = { path = "../crates/mycelix-zkp-core", features = ["dilithium"] }
+mycelix-zkp-core = { path = "../mycelix-workspace/crates/mycelix-zkp-core", features = ["dilithium"] }
 no-panic = "0.1"
 parry3d = "0.17"
 uom = { version = "0.36", features = ["f64", "si"] }
@@ -270,12 +265,12 @@ tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
-symthaea-core = { path = "symthaea-core" }
+symthaea-core = { path = "crates/core/symthaea-core" }
 # Shared epistemic types (E/N/M, Prismatic context, provenance)
 symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
 
 # Symthaea Consciousness Equation - Master Consciousness Equation C(t)
-symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equation" }
+symthaea-consciousness-equation = { path = "crates/domains/symthaea-consciousness-equation" }
 
 # Symthaea Neuromodulators - DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine bath
 symthaea-neuromodulators = { path = "crates/symthaea-neuromodulators" }
@@ -288,7 +283,7 @@ symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default
 symthaea-fep = { path = "crates/symthaea-fep" }
 
 # Shared positioning and peer-fusion primitives
-positioning = { path = "../mycelix-position/lib/positioning" }
+positioning = { path = "../mycelix-workspace/mycelix-position/lib/positioning" }
 
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/symthaea-dream" }
@@ -334,7 +329,7 @@ mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", option
 symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor", optional = true }
 
 # Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
-mycelix-crypto = { path = "../mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
+mycelix-crypto = { path = "../mycelix-workspace/mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
@@ -365,6 +360,7 @@ symthaea-auv = { path = "crates/symthaea-auv", optional = true }
 
 # Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
 symthaea-manipulator = { path = "crates/symthaea-manipulator", optional = true }
+symthaea-fractal-time-lab = { path = "crates/symthaea-fractal-time-lab", optional = true }
 # New platforms (uncomment after creating crates with scripts/new-platform.sh):
 symthaea-exoskeleton = { path = "crates/symthaea-exoskeleton", optional = true }
 symthaea-surgical = { path = "crates/symthaea-surgical", optional = true }
@@ -504,8 +500,8 @@ mycelix-sdk = { path = "../mycelix-workspace/sdk-ts/../sdk", optional = true, de
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Prism epistemic search (local, offline, 16,384-bit BinaryHV)
-prism-common = { path = "../prism/prism-common", optional = true }
-prism-search = { path = "../prism/prism-search", optional = true }
+prism-common = { path = "../mycelix-workspace/mycelix-prism/prism-common", optional = true }
+prism-search = { path = "../mycelix-workspace/mycelix-prism/prism-search", optional = true }
 
 # Web Research & Epistemic Verification (Track 6)
 reqwest = { version = "0.13", features = ["json", "multipart", "rustls", "blocking"], default-features = false }
@@ -649,6 +645,7 @@ wait-timeout = "0.2"
 [features]
 default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
+fractal-time-lab = ["dep:symthaea-fractal-time-lab"]
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
 
@@ -1137,6 +1134,10 @@ path = "examples/engineering_school_benchmarks.rs"
 [[example]]
 name = "sovereign_design_loop"
 path = "examples/sovereign_design_loop.rs"
+
+[[example]]
+name = "phi_accuracy_comparison"
+path = "examples/phi_accuracy_comparison.rs"
 
 [[example]]
 name = "demo_proof_caching"
