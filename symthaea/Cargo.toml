@@ -2,145 +2,25 @@
 resolver = "2"
 members = [
     "xtask",
-    "crates/symthaea-domotic",
     ".",
-    "crates/core/symthaea-core",
-    "crates/symthaea-nix",
-    "crates/symthaea-stt",
-    "crates/symthaea-sentinel",
-    "crates/symthaea-perception",
-    "crates/symthaea-causal-reasoning",
-    "crates/symthaea-fep",
-    "crates/symthaea-dream",
-    "crates/symthaea-phi-search",
-    "crates/symthaea-narrative-self",
-    "crates/symthaea-field-dynamics",
-    "crates/symthaea-hodge",
-    "crates/symthaea-factor-graph",
-    "crates/symthaea-enactive",
-    "crates/symthaea-sensorimotor",
-    "crates/symthaea-consciousness-topology",
-    "crates/symthaea-exploration",
-    "crates/symthaea-wisdom",
-    "crates/symthaea-types",
-    "crates/symthaea-harmonies",
-    "crates/symthaea-consciousness-resonance",
-    "crates/symthaea-embeddings",
-    "crates/symthaea-observability",
-    "crates/symthaea-support",
-    "crates/symthaea-psych-bench",
-    "crates/symthaea-lean-bridge",
-    "crates/symthaea-multirotor",
-    "crates/symthaea-helicopter",
-    "crates/symthaea-auv",
-    "crates/symthaea-manipulator",
-    "crates/symthaea-humanoid",
-    "crates/symthaea-physics",
-    "crates/symthaea-physics-bridge",
-    "crates/symthaea-sim-bridge",
-    "crates/symthaea-digital-twin",
-    "crates/symthaea-formal-safety",
-    "crates/symthaea-engineering",
-    "crates/symthaea-mujoco-bridge",
-    "crates/symthaea-opensees-bridge",
-    "crates/symthaea-ngspice-bridge",
-    "crates/symthaea-openfoam-bridge",
-    "crates/symthaea-ros-bridge",
-    "crates/symthaea-vocal-tract",
-    "crates/symthaea-voice",
-    "crates/symthaea-vehicle",
-    # New platforms (uncomment after creating crates):
-    "crates/symthaea-exoskeleton",
-    "crates/symthaea-surgical",
-    "crates/symthaea-swarm",
-    "crates/symthaea-orbital",
-    "crates/symthaea-quadruped",
-    "crates/symthaea-subterranean",
-    "crates/symthaea-infrastructure",
-    "crates/symthaea-silicon",
-    "crates/symthaea-proprioception",
-    "crates/symthaea-workspace",
-    "crates/symthaea-scavenger",
-    "crates/symthaea-agribot",
-    "crates/symthaea-biota",
-    "crates/symthaea-clime",
-    "crates/symthaea-sensors",
-    "crates/symthaea-browser",
-    "crates/symthaea-hal",
-    "crates/symthaea-ssm",
-    "crates/symthaea-runtime",
-    "crates/symthaea-lab",
-    "crates/symthaea-zkproof",
-    "crates/symthaea-zkproof/core",
-    "crates/symthaea-broca",
-    "crates/symthaea-coding-feedback",
-    "crates/symthaea-geodesic",
-    "crates/domains/symthaea-consciousness-equation",
-    "crates/symthaea-neuromodulators",
-    "crates/symthaea-cell-foundry",
-    "crates/symthaea-ectogenesis",
-    "crates/symthaea-genomics",
-    "crates/symthaea-nurture",
-    "crates/symthaea-population",
-    "crates/symthaea-neuroevolution",
-    "crates/symthaea-jepa",
-    "crates/symthaea-materials",
-    "crates/symthaea-gravcraft",
-    "crates/symthaea-nuclear",
-    "crates/symthaea-quantum-chemistry",
-    "crates/symthaea-particle-physics",
-    "crates/symthaea-continuum-physics",
-    "crates/symthaea-frontier-physics",
-    "crates/symthaea-proteins",
-    "crates/symthaea-bandgap",
-    "crates/symthaea-physics-catalog",
-    "crates/symthaea-nuclear-forensics",
-    "crates/symthaea-memory",
-    "crates/symthaea-fabrication-kernel",
-    "crates/symthaea-vision-manifold",
-    "crates/symthaea-phone-embodiment",
-    "crates/symthaea-foveation",
-    "crates/symthaea-phi-oracle",
-    "crates/symthaea-pulse",
-    "crates/symthaea-spore",
-    "crates/symthaea-soma",
-    "crates/symthaea-crucible",
-    "crates/symthaea-canvas",
-    "crates/symthaea-aesthetic",
-    "crates/symthaea-atelier",
-    "crates/symthaea-muse",
-    "crates/symthaea-bevy-dash",
-    "crates/symthaea-biometrics",
-    "crates/symthaea-gallery",
-    "crates/symthaea-circular",
-    "crates/symthaea-clinical",
-    "crates/symthaea-therapeutic",
-    "crates/symthaea-hdc-store",
-    "crates/symthaea-mycelix-conductor",
-    "crates/symthaea-epistemic-types",
-    "crates/symthaea-fractal-time-lab",
-    "crates/symthaea-prime-gap-lab",
+    "crates/core/*",
+    "crates/domains/*",
+    "crates/bridges/*",
 ]
 exclude = [
-    # RISC Zero guest/host crates need the rzup toolchain (RISC-V cross-compiler);
-    # kept out of the workspace so normal `cargo build` isn't affected.
+    "crates/bridges/symthaea-mycelix-holochain",
     "crates/symthaea-zkproof/methods",
     "crates/symthaea-zkproof/host",
-    # WASM crate targets wasm32-unknown-unknown; excluded so `cargo build` works normally.
     "crates/symthaea-muse-wasm",
-    # Fuzz crates use libfuzzer-sys and require nightly + sanitizer flags.
     "crates/symthaea-spore/fuzz",
 ]
-# Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
 default-members = [
     "xtask",
-    "crates/symthaea-domotic",
     ".",
-    "crates/core/symthaea-core",
+    "crates/core/*",
 ]
 
 [workspace.package]
-version = "2.0.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 
@@ -178,6 +58,8 @@ nonsensical_open_options = "deny"
 unused_io_amount = "deny"
 
 [workspace.dependencies]
+bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
+getrandom = "0.2"
 mycelix-zkp-core = { path = "../mycelix-workspace/crates/mycelix-zkp-core", features = ["dilithium"] }
 no-panic = "0.1"
 parry3d = "0.17"
@@ -227,7 +109,7 @@ tree-sitter-nix = "0.3"
 hex = "0.4"
 ed25519-dalek = "=2.1.0"
 syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 dashmap = "5.5"
 lru = "0.16"
 serial_test = "3.2"
@@ -236,8 +118,8 @@ proptest = "1.4"
 num-complex = "0.4"
 libc = "0.2"
 csv = "1.3"
-axum = "0.8"
-symtropy-robotics-bridge-core = { path = "../symtropy/crates/symtropy-robotics-bridge-core" }
+axum = { version = "0.8", features = ["ws"] }
+symtropy-robotics-bridge-core = { path = "../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
 
 [package]
 name = "symthaea"
@@ -267,188 +149,187 @@ mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "crates/core/symthaea-core" }
 # Shared epistemic types (E/N/M, Prismatic context, provenance)
-symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
+symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
 
 # Symthaea Consciousness Equation - Master Consciousness Equation C(t)
 symthaea-consciousness-equation = { path = "crates/domains/symthaea-consciousness-equation" }
 
 # Symthaea Neuromodulators - DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine bath
-symthaea-neuromodulators = { path = "crates/symthaea-neuromodulators" }
-symthaea-memory = { path = "crates/symthaea-memory" }
+symthaea-neuromodulators = { path = "crates/domains/symthaea-neuromodulators" }
+symthaea-memory = { path = "crates/domains/symthaea-memory" }
 
 # Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
-symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default-features = false }
+symthaea-causal-reasoning = { path = "crates/core/symthaea-causal-reasoning", default-features = false }
 
 # Symthaea FEP - Free Energy Principle active inference (always enabled)
-symthaea-fep = { path = "crates/symthaea-fep" }
+symthaea-fep = { path = "crates/core/symthaea-fep" }
 
 # Shared positioning and peer-fusion primitives
-positioning = { path = "../mycelix-workspace/mycelix-position/lib/positioning" }
+positioning = { path = "/srv/luminous-dynamics/mycelix-workspace/mycelix-position/lib/positioning" }
 
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
-symthaea-dream = { path = "crates/symthaea-dream" }
+symthaea-dream = { path = "crates/domains/symthaea-dream" }
 
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
-symthaea-phi-search = { path = "crates/symthaea-phi-search" }
+symthaea-phi-search = { path = "crates/domains/symthaea-phi-search" }
 sha2 = { version = "0.10", optional = true }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)
-symthaea-narrative-self = { path = "crates/symthaea-narrative-self" }
+symthaea-narrative-self = { path = "crates/domains/symthaea-narrative-self" }
 
 # Symthaea Field Dynamics - Consciousness field wave equations (optional)
-symthaea-field-dynamics = { path = "crates/symthaea-field-dynamics", optional = true }
+symthaea-field-dynamics = { path = "crates/domains/symthaea-field-dynamics", optional = true }
 
 # Symthaea Hodge - Hodge Laplacian for simplicial complexes (always enabled)
-symthaea-hodge = { path = "crates/symthaea-hodge" }
+symthaea-hodge = { path = "crates/domains/symthaea-hodge" }
 
 # Symthaea Factor Graph - Belief propagation inference (always enabled)
-symthaea-factor-graph = { path = "crates/symthaea-factor-graph" }
+symthaea-factor-graph = { path = "crates/domains/symthaea-factor-graph" }
 
 # Symthaea Enactive - Enactive cognition paradigm (always enabled)
-symthaea-enactive = { path = "crates/symthaea-enactive" }
+symthaea-enactive = { path = "crates/domains/symthaea-enactive" }
 
 # Symthaea Sensorimotor - Sensorimotor contingency theory (optional)
-symthaea-sensorimotor = { path = "crates/symthaea-sensorimotor", optional = true }
-symthaea-consciousness-topology = { path = "crates/symthaea-consciousness-topology" }
-symthaea-exploration = { path = "crates/symthaea-exploration" }
-symthaea-wisdom = { path = "crates/symthaea-wisdom" }
-symthaea-types = { path = "crates/symthaea-types" }
-symthaea-harmonies = { path = "crates/symthaea-harmonies" }
-symthaea-consciousness-resonance = { path = "crates/symthaea-consciousness-resonance" }
-symthaea-embeddings = { path = "crates/symthaea-embeddings" }
-symthaea-ssm = { path = "crates/symthaea-ssm", optional = true }
+symthaea-sensorimotor = { path = "crates/domains/symthaea-sensorimotor", optional = true }
+symthaea-consciousness-topology = { path = "crates/domains/symthaea-consciousness-topology" }
+symthaea-exploration = { path = "crates/domains/symthaea-exploration" }
+symthaea-wisdom = { path = "crates/domains/symthaea-wisdom" }
+symthaea-types = { path = "crates/core/symthaea-types" }
+symthaea-harmonies = { path = "crates/domains/symthaea-harmonies" }
+symthaea-consciousness-resonance = { path = "crates/domains/symthaea-consciousness-resonance" }
+symthaea-embeddings = { path = "crates/domains/symthaea-embeddings" }
+symthaea-ssm = { path = "crates/domains/symthaea-ssm", optional = true }
 
 linux-embedded-hal = { version = "0.4", optional = true, default-features = false, features = ["i2c"] }
-symthaea-observability = { path = "crates/symthaea-observability", optional = true }
-symthaea-support = { path = "crates/symthaea-support", optional = true }
+symthaea-observability = { path = "crates/domains/symthaea-observability", optional = true }
+symthaea-support = { path = "crates/domains/symthaea-support", optional = true }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
-mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
+mycelix-fl-core = { path = "/srv/luminous-dynamics/mycelix-workspace/crates/mycelix-fl-core", optional = true }
 
 # Mycelix Conductor bridge - governance dispatch to Holochain conductor
-symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor", optional = true }
+symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor", optional = true }
 
 # Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
-mycelix-crypto = { path = "../mycelix-workspace/mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
+mycelix-crypto = { path = "/srv/luminous-dynamics/mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
-symthaea-stt = { path = "crates/symthaea-stt", optional = true }
+symthaea-stt = { path = "crates/core/symthaea-stt", optional = true }
 # Symthaea Swarm - P2P collective consciousness
-symthaea_swarm = { path = "crates/symthaea-swarm", optional = true, package = "symthaea-swarm" }
+symthaea_swarm = { path = "crates/domains/symthaea-swarm", optional = true, package = "symthaea-swarm" }
 symtropy-robotics-bridge-core = { workspace = true, optional = true }
 
 # Symthaea Sentinel - Zero-shot temporal audio pattern recognition
-symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
+symthaea-sentinel = { path = "crates/core/symthaea-sentinel", optional = true }
 
 # Symthaea Multirotor - HDC-LTC + FEP Active Inference multirotor flight control
-symthaea-multirotor = { path = "crates/symthaea-multirotor", optional = true }
+symthaea-multirotor = { path = "crates/domains/symthaea-multirotor", optional = true }
 
 # Symthaea Helicopter - HDC-LTC + FEP Active Inference SAR helicopter control
-symthaea-helicopter = { path = "crates/symthaea-helicopter", optional = true }
+symthaea-helicopter = { path = "crates/domains/symthaea-helicopter", optional = true }
 
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
-symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
+symthaea-humanoid = { path = "crates/domains/symthaea-humanoid", optional = true }
 
 # Symthaea Vehicle - HDC-LTC + FEP Active Inference autonomous vehicle control
-symthaea-vehicle = { path = "crates/symthaea-vehicle", optional = true }
+symthaea-vehicle = { path = "crates/domains/symthaea-vehicle", optional = true }
 
 # Symthaea Browser - Consciousness-driven browser agent via CDP
-symthaea-browser = { path = "crates/symthaea-browser", optional = true }
+symthaea-browser = { path = "crates/domains/symthaea-browser", optional = true }
 
 # Symthaea AUV - HDC-LTC + FEP Active Inference autonomous underwater vehicle control
-symthaea-auv = { path = "crates/symthaea-auv", optional = true }
+symthaea-auv = { path = "crates/domains/symthaea-auv", optional = true }
 
 # Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
-symthaea-manipulator = { path = "crates/symthaea-manipulator", optional = true }
-symthaea-fractal-time-lab = { path = "crates/symthaea-fractal-time-lab", optional = true }
+symthaea-manipulator = { path = "crates/domains/symthaea-manipulator", optional = true }
 # New platforms (uncomment after creating crates with scripts/new-platform.sh):
-symthaea-exoskeleton = { path = "crates/symthaea-exoskeleton", optional = true }
-symthaea-surgical = { path = "crates/symthaea-surgical", optional = true }
-symthaea-orbital = { path = "crates/symthaea-orbital", optional = true }
-symthaea-quadruped = { path = "crates/symthaea-quadruped", optional = true }
-symthaea-subterranean = { path = "crates/symthaea-subterranean", optional = true }
-symthaea-infrastructure = { path = "crates/symthaea-infrastructure", optional = true }
-symthaea-scavenger = { path = "crates/symthaea-scavenger", optional = true }
-symthaea-agribot = { path = "crates/symthaea-agribot", optional = true }
-symthaea-biota = { path = "crates/symthaea-biota", optional = true }
-symthaea-clime = { path = "crates/symthaea-clime", optional = true }
+symthaea-exoskeleton = { path = "crates/domains/symthaea-exoskeleton", optional = true }
+symthaea-surgical = { path = "crates/domains/symthaea-surgical", optional = true }
+symthaea-orbital = { path = "crates/domains/symthaea-orbital", optional = true }
+symthaea-quadruped = { path = "crates/domains/symthaea-quadruped", optional = true }
+symthaea-subterranean = { path = "crates/domains/symthaea-subterranean", optional = true }
+symthaea-infrastructure = { path = "crates/core/symthaea-infrastructure", optional = true }
+symthaea-scavenger = { path = "crates/domains/symthaea-scavenger", optional = true }
+symthaea-agribot = { path = "crates/domains/symthaea-agribot", optional = true }
+symthaea-biota = { path = "crates/domains/symthaea-biota", optional = true }
+symthaea-clime = { path = "crates/domains/symthaea-clime", optional = true }
 
 # Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
-symthaea-hal = { path = "crates/symthaea-hal", optional = true }
+symthaea-hal = { path = "crates/domains/symthaea-hal", optional = true }
 
 # Symthaea Vocal Tract - LTC-driven articulatory synthesis (encoder, controller, FEP, pipeline, metrics)
-symthaea-vocal-tract = { path = "crates/symthaea-vocal-tract", default-features = false }
+symthaea-vocal-tract = { path = "crates/domains/symthaea-vocal-tract", default-features = false }
 
 # Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
-symthaea-physics = { path = "crates/symthaea-physics", optional = true }
+symthaea-physics = { path = "crates/domains/symthaea-physics", optional = true }
 
 # Symthaea Physics Bridge - HDC semantic search for mathematical physics analogies
-symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = true }
+symthaea-physics-bridge = { path = "crates/bridges/symthaea-physics-bridge", optional = true }
 
 # Symthaea Engineering - simulation dispatch, digital twins, and safety cases
-symthaea-sim-bridge = { path = "crates/symthaea-sim-bridge", optional = true }
-symthaea-digital-twin = { path = "crates/symthaea-digital-twin", optional = true }
-symthaea-formal-safety = { path = "crates/symthaea-formal-safety", optional = true }
-symthaea-engineering = { path = "crates/symthaea-engineering", optional = true }
-symthaea-mujoco-bridge = { path = "crates/symthaea-mujoco-bridge", optional = true }
-symthaea-opensees-bridge = { path = "crates/symthaea-opensees-bridge", optional = true }
-symthaea-ngspice-bridge = { path = "crates/symthaea-ngspice-bridge", optional = true }
-symthaea-openfoam-bridge = { path = "crates/symthaea-openfoam-bridge", optional = true }
+symthaea-sim-bridge = { path = "crates/bridges/symthaea-sim-bridge", optional = true }
+symthaea-digital-twin = { path = "crates/domains/symthaea-digital-twin", optional = true }
+symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety", optional = true }
+symthaea-engineering = { path = "crates/domains/symthaea-engineering", optional = true }
+symthaea-mujoco-bridge = { path = "crates/bridges/symthaea-mujoco-bridge", optional = true }
+symthaea-opensees-bridge = { path = "crates/bridges/symthaea-opensees-bridge", optional = true }
+symthaea-ngspice-bridge = { path = "crates/bridges/symthaea-ngspice-bridge", optional = true }
+symthaea-openfoam-bridge = { path = "crates/bridges/symthaea-openfoam-bridge", optional = true }
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
-symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+symthaea-broca = { path = "crates/domains/symthaea-broca", optional = true }
 
 # Symthaea Coding Feedback - lightweight semantic failure taxonomy and repair hints
-symthaea-coding-feedback = { path = "crates/symthaea-coding-feedback" }
+symthaea-coding-feedback = { path = "crates/domains/symthaea-coding-feedback" }
 
 # Symthaea Spore - WASM consciousness kernel (BrocaLite fallback for always-on language)
-symthaea-spore = { path = "crates/symthaea-spore", optional = true, default-features = false }
+symthaea-spore = { path = "crates/domains/symthaea-spore", optional = true, default-features = false }
 
 # Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
-symthaea-muse = { path = "crates/symthaea-muse", optional = true }
+symthaea-muse = { path = "crates/domains/symthaea-muse", optional = true }
 
 # Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
-symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
+symthaea-geodesic = { path = "crates/domains/symthaea-geodesic", optional = true }
 
 # Symthaea Canvas - Living topology UI: cognitive geometry → SVG
-symthaea-canvas = { path = "crates/symthaea-canvas", optional = true }
+symthaea-canvas = { path = "crates/domains/symthaea-canvas", optional = true }
 
 # Symthaea Aesthetic - Aesthetic evaluation and feedback
-symthaea-aesthetic = { path = "crates/symthaea-aesthetic", optional = true }
+symthaea-aesthetic = { path = "crates/domains/symthaea-aesthetic", optional = true }
 
 # Symthaea Atelier - Generative art studio
-symthaea-atelier = { path = "crates/symthaea-atelier", optional = true }
+symthaea-atelier = { path = "crates/domains/symthaea-atelier", optional = true }
 
 # Symthaea Clinical - Clinical assessment and therapeutic reasoning
-symthaea-clinical = { path = "crates/symthaea-clinical", optional = true }
-symthaea-therapeutic = { path = "crates/symthaea-therapeutic", optional = true }
+symthaea-clinical = { path = "crates/domains/symthaea-clinical", optional = true }
+symthaea-therapeutic = { path = "crates/domains/symthaea-therapeutic", optional = true }
 
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
-symthaea-nix = { path = "crates/symthaea-nix", optional = true }
+symthaea-nix = { path = "crates/core/symthaea-nix", optional = true }
 
 # Genesis Pipeline - DNA-to-Human species stewardship
-symthaea-genomics = { path = "crates/symthaea-genomics", optional = true }
-symthaea-cell-foundry = { path = "crates/symthaea-cell-foundry", optional = true }
-symthaea-ectogenesis = { path = "crates/symthaea-ectogenesis", optional = true }
-symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
-symthaea-population = { path = "crates/symthaea-population", optional = true }
-symthaea-neuroevolution = { path = "crates/symthaea-neuroevolution", optional = true }
-symthaea-jepa = { path = "crates/symthaea-jepa", optional = true }
-symthaea-materials = { path = "crates/symthaea-materials", optional = true }
-symthaea-nuclear = { path = "crates/symthaea-nuclear", optional = true }
-symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
-symthaea-quantum-chemistry = { path = "crates/symthaea-quantum-chemistry", optional = true }
-symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
+symthaea-genomics = { path = "crates/domains/symthaea-genomics", optional = true }
+symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry", optional = true }
+symthaea-ectogenesis = { path = "crates/domains/symthaea-ectogenesis", optional = true }
+symthaea-nurture = { path = "crates/domains/symthaea-nurture", optional = true }
+symthaea-population = { path = "crates/domains/symthaea-population", optional = true }
+symthaea-neuroevolution = { path = "crates/domains/symthaea-neuroevolution", optional = true }
+symthaea-jepa = { path = "crates/domains/symthaea-jepa", optional = true }
+symthaea-materials = { path = "crates/domains/symthaea-materials", optional = true }
+symthaea-nuclear = { path = "crates/domains/symthaea-nuclear", optional = true }
+symthaea-nuclear-forensics = { path = "crates/domains/symthaea-nuclear-forensics", optional = true }
+symthaea-quantum-chemistry = { path = "crates/domains/symthaea-quantum-chemistry", optional = true }
+symthaea-fabrication-kernel = { path = "crates/domains/symthaea-fabrication-kernel", optional = true }
 
 # Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
-symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional = true }
-symthaea-phone-embodiment = { path = "crates/symthaea-phone-embodiment", optional = true }
+symthaea-vision-manifold = { path = "crates/domains/symthaea-vision-manifold", optional = true }
+symthaea-phone-embodiment = { path = "crates/domains/symthaea-phone-embodiment", optional = true }
 
 # Symthaea Foveation Bridge - Dorsal surprise → ventral recognition dispatch
-symthaea-foveation = { path = "crates/symthaea-foveation", optional = true }
+symthaea-foveation = { path = "crates/domains/symthaea-foveation", optional = true }
 
 # Symthaea HDC Store - Zero-copy mmap'd BinaryHV storage with persistent LSH
-symthaea-hdc-store = { path = "crates/symthaea-hdc-store", optional = true }
+symthaea-hdc-store = { path = "crates/domains/symthaea-hdc-store", optional = true }
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -496,7 +377,7 @@ arrow-schema = { workspace = true, optional = true }
 futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
-mycelix-sdk = { path = "../mycelix-workspace/sdk-ts/../sdk", optional = true, default-features = false, features = ["standalone"] }
+mycelix-sdk = { path = "/srv/luminous-dynamics/mycelix-workspace/sdk", optional = true, default-features = false, features = ["standalone"] }
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Prism epistemic search (local, offline, 16,384-bit BinaryHV)
@@ -645,7 +526,6 @@ wait-timeout = "0.2"
 [features]
 default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
-fractal-time-lab = ["dep:symthaea-fractal-time-lab"]
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
 
@@ -994,23 +874,23 @@ default-mind = [
 
 
 [dev-dependencies]
-symthaea-formal-safety = { path = "crates/symthaea-formal-safety" }
+symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety" }
 
 criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"
-symthaea-broca = { path = "crates/symthaea-broca", default-features = false }
-symthaea-engineering = { path = "crates/symthaea-engineering" }
-symthaea-sim-bridge = { path = "crates/symthaea-sim-bridge" }
-symthaea-mujoco-bridge = { path = "crates/symthaea-mujoco-bridge" }
-symthaea-openfoam-bridge = { path = "crates/symthaea-openfoam-bridge" }
-symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel" }
-symthaea-materials = { path = "crates/symthaea-materials" }
-symthaea-crucible = { path = "crates/symthaea-crucible" }
-symthaea-psych-bench = { path = "crates/symthaea-psych-bench" }
-symthaea-humanoid = { path = "crates/symthaea-humanoid" }
-symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
-symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
+symthaea-broca = { path = "crates/domains/symthaea-broca", default-features = false }
+symthaea-engineering = { path = "crates/domains/symthaea-engineering" }
+symthaea-sim-bridge = { path = "crates/bridges/symthaea-sim-bridge" }
+symthaea-mujoco-bridge = { path = "crates/bridges/symthaea-mujoco-bridge" }
+symthaea-openfoam-bridge = { path = "crates/bridges/symthaea-openfoam-bridge" }
+symthaea-fabrication-kernel = { path = "crates/domains/symthaea-fabrication-kernel" }
+symthaea-materials = { path = "crates/domains/symthaea-materials" }
+symthaea-crucible = { path = "crates/domains/symthaea-crucible" }
+symthaea-psych-bench = { path = "crates/domains/symthaea-psych-bench" }
+symthaea-humanoid = { path = "crates/domains/symthaea-humanoid" }
+symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor" }
+symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
 tempfile = "3.8"  # For perception tests
 tower = { version = "0.5", features = ["util"] }  # Router oneshot helpers in integration tests
 
@@ -1129,19 +1009,15 @@ required-features = ["multirotor-mujoco"]
 
 [[example]]
 name = "engineering_school_benchmarks"
-path = "examples/engineering_school_benchmarks.rs"
+path = "/srv/luminous-dynamics/symthaea/examples/engineering_school_benchmarks.rs"
 
 [[example]]
 name = "sovereign_design_loop"
-path = "examples/sovereign_design_loop.rs"
-
-[[example]]
-name = "phi_accuracy_comparison"
-path = "examples/phi_accuracy_comparison.rs"
+path = "/srv/luminous-dynamics/symthaea/examples/sovereign_design_loop.rs"
 
 [[example]]
 name = "demo_proof_caching"
-path = "examples/demo_proof_caching.rs"
+path = "/srv/luminous-dynamics/symthaea/examples/demo_proof_caching.rs"
 required-features = ["code_generation"]
 
 [[example]]
@@ -1989,16 +1865,16 @@ codegen-units = 1
 strip = true
 
 [patch.crates-io]
-curve25519-dalek-derive = { path = "patches/ed25519-dalek/curve25519-dalek-derive" }
-curve25519-dalek = { path = "patches/ed25519-dalek/curve25519-dalek" }
-ed25519-dalek = { path = "patches/ed25519-dalek/ed25519-dalek" }
-x25519-dalek = { path = "patches/ed25519-dalek/x25519-dalek" }
-iroh = { path = "patches/iroh/iroh" }
-iroh-base = { path = "patches/iroh/iroh-base" }
-iroh-relay = { path = "patches/iroh/iroh-relay" }
+curve25519-dalek-derive = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/curve25519-dalek-derive" }
+curve25519-dalek = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/curve25519-dalek" }
+ed25519-dalek = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/ed25519-dalek" }
+x25519-dalek = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/x25519-dalek" }
+iroh = { path = "/srv/luminous-dynamics/symthaea/patches/iroh/iroh" }
+iroh-base = { path = "/srv/luminous-dynamics/symthaea/patches/iroh/iroh-base" }
+iroh-relay = { path = "/srv/luminous-dynamics/symthaea/patches/iroh/iroh-relay" }
 # cudarc 0.13.9 does not ship CUDA 12.9 bindings. The vendored copy
 # aliases CUDA 12.9 to its CUDA 12.8 bindings for local Broca GPU builds.
-cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }
+cudarc = { path = "/srv/luminous-dynamics/symthaea/vendor/cudarc-0.13.9-cuda129" }
 
 [profile.release.package.symthaea-physics-catalog]
 opt-level = "z"
