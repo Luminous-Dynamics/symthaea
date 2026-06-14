@@ -1,0 +1,29 @@
+[forbidden]
+root_crates_dir = "/srv/luminous-dynamics/crates"
+
+[symtropy]
+root = "/srv/luminous-dynamics/symtropy"
+members = [
+  "crates/symtropy-math",
+  "crates/symtropy-physics",
+  "crates/symtropy-bevy-core",
+]
+
+[mycelix]
+root = "/srv/luminous-dynamics/mycelix-workspace"
+members = [
+  "crates/mycelix-crypto",
+  "crates/mycelix-zkp-core",
+  "crates/mycelix-bridge-common",
+  "crates/sovereign-profile",
+  "mycelix-core/libs/proofs-config",
+  "mycelix-core/libs/proofs-commitment",
+]
+
+[symthaea]
+root = "/srv/luminous-dynamics/symthaea"
+members = [
+  "symthaea-core",
+  "crates/symthaea-types",
+  "crates/symthaea-wisdom",
+]
