@@ -20,6 +20,7 @@ pub mod null_models;
 pub mod report;
 pub mod runner;
 pub mod semantic_stream_diagnostics;
+pub mod stability_profiler;
 pub mod topological_analysis;
 
 pub use metrics::{
