@@ -1,0 +1,29 @@
+name: Atomic CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  symtropy-tier1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Symtropy Tier 1
+        run: |
+          cd releases/symtropy-release
+          cargo check --workspace
+          cargo test --workspace
+          cargo test --workspace --examples
+  
+  symtropy-workshop-atomic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Atomic Crate Checks
+        run: |
+          cargo check --manifest-path symtropy/crates/symtropy-math/Cargo.toml
+          cargo check --manifest-path symtropy/crates/symtropy-physics/Cargo.toml
+          cargo check --manifest-path symtropy/crates/symtropy-bevy-core/Cargo.toml
+EOF
