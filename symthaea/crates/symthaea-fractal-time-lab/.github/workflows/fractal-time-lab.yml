@@ -1,0 +1,34 @@
+name: Fractal Time Lab
+
+on:
+  push:
+    paths:
+      - "crates/symthaea-fractal-time-lab/**"
+      - ".github/workflows/fractal-time-lab.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "crates/symthaea-fractal-time-lab/**"
+      - ".github/workflows/fractal-time-lab.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  test-fractal-time-lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test crate
+        run: cargo test -p symthaea-fractal-time-lab --lib
+      - name: Test benchmark sanity
+        run: cargo test -p symthaea-fractal-time-lab --test benchmark_sanity
+      - name: Run benchmark example
+        run: cargo run -p symthaea-fractal-time-lab --example run_experiments -- --seed 42 --trials 4
+      - name: Run JSON run output
+        run: cargo run -p symthaea-fractal-time-lab --example run_experiments -- --json-run --seed 42 --trials 4
+      - name: Run CSV output
+        run: cargo run -p symthaea-fractal-time-lab --example run_experiments -- --csv --seed 42 --trials 4
+      - name: Run Markdown output
+        run: cargo run -p symthaea-fractal-time-lab --example run_experiments -- --markdown --seed 42 --trials 4

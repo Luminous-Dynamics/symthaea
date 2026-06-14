@@ -1,0 +1,67 @@
+[
+  {
+    "experiment": "Hofstadter-HDC cross-scale similarity",
+    "hypothesis": "Related Harper slices preserve HDC similarity better than random/jittered/smooth spectra.",
+    "primary_score": 0.5096435546875,
+    "null_mean": 0.5337441762288412,
+    "null_std": 0.02354740611255271,
+    "effect_size": -1.0234936886952302,
+    "n_trials": 32,
+    "seed": 42,
+    "threshold": 2.0,
+    "passed": false,
+    "caveat": "Exploratory: uses Harper slices and HDC quantization, not full experimental Hofstadter data."
+  },
+  {
+    "experiment": "Persistent 2T response",
+    "hypothesis": "A DTC-like toy model shows persistent subharmonic response compared with damped and random controls.",
+    "primary_score": 0.9967169955457682,
+    "null_mean": 0.0040014320955835195,
+    "null_std": 0.00920564072487834,
+    "effect_size": 107.83774786771338,
+    "n_trials": 32,
+    "seed": 42,
+    "threshold": 2.0,
+    "passed": true,
+    "caveat": "Exploratory: classical Floquet surrogate, not a quantum many-body simulation."
+  },
+  {
+    "experiment": "Multi-scale integration survival",
+    "hypothesis": "Hierarchical modular graphs preserve an EI/Phi proxy across spectral coarse-graining better than random controls.",
+    "primary_score": 0.44549975625638494,
+    "null_mean": 0.42670264517220047,
+    "null_std": 0.03733270176044128,
+    "effect_size": 0.5035025647166631,
+    "n_trials": 32,
+    "seed": 42,
+    "threshold": 1.0,
+    "passed": false,
+    "caveat": "Exploratory: EI/Phi proxy and spectral coarse-graining, not full IIT Phi."
+  },
+  {
+    "experiment": "Box-covering integration survival",
+    "hypothesis": "A path/tree-like graph preserves EI/Phi proxy across greedy box covering differently than random graph controls.",
+    "primary_score": 0.7393012224494159,
+    "null_mean": 0.4038183422450978,
+    "null_std": 0.08546080760915443,
+    "effect_size": 3.925575823465324,
+    "n_trials": 32,
+    "seed": 42,
+    "threshold": 0.5,
+    "passed": true,
+    "caveat": "Exploratory: greedy graph-radius boxes, not optimized minimum box covering."
+  },
+  {
+    "experiment": "Greedy box-dimension diagnostic",
+    "hypothesis": "Tree-like graph has a stable greedy box-count scaling signal compared with random graph controls.",
+    "primary_score": 0.6021520553103833,
+    "null_mean": 1.328110708346793,
+    "null_std": 0.24174393394452195,
+    "effect_size": -3.003006698827903,
+    "n_trials": 32,
+    "seed": 42,
+    "threshold": 0.5,
+    "passed": false,
+    "caveat": "Exploratory: greedy cover dimension is heuristic and sensitive to graph family and radius range."
+  }
+]
