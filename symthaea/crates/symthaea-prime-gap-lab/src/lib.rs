@@ -5,4 +5,5 @@ pub mod hardy_littlewood;
 pub mod lean_bridge;
 pub mod parity_diagnostics;
 pub mod reports;
+pub mod search_engine;
 pub mod tuples;
