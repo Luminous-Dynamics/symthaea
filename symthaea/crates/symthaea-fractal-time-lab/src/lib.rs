@@ -22,6 +22,7 @@ pub mod runner;
 pub mod semantic_stream_diagnostics;
 pub mod stability_audit;
 pub mod stability_profiler;
+pub mod structural_fidelity;
 pub mod topological_analysis;
 
 pub use metrics::{
