@@ -4,6 +4,7 @@ pub mod data;
 pub mod hardy_littlewood;
 pub mod lean_bridge;
 pub mod parity_diagnostics;
+pub mod pipeline;
 pub mod ranking_feedback;
 pub mod repair_engine;
 pub mod reports;
