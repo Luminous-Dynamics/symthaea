@@ -21,6 +21,7 @@ pub mod metrics;
 pub mod multiscale_phi;
 pub mod null_models;
 pub mod report;
+pub mod resilience_audit;
 pub mod runner;
 pub mod semantic_stream_diagnostics;
 pub mod stability_audit;
