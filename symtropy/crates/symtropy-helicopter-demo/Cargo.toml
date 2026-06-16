@@ -13,7 +13,7 @@ name = "helicopter-demo"
 path = "src/main.rs"
 
 [dependencies]
-symthaea-helicopter = { path = "../../../crates/domains/symthaea-helicopter" }
+symthaea-helicopter = { path = "../../../symthaea/crates/domains/symthaea-helicopter" }
 symthaea-core = { path = "../../../symthaea-core" }
 
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }

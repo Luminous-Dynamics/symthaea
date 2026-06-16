@@ -13,7 +13,7 @@ mycelix = []
 [dependencies]
 # Mycelix pure-Rust crates (no Holochain dependency)
 mycelix-multiworld-sim = { path = "../../../mycelix-multiworld-sim" }
-mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common", default-features = false }
+mycelix-bridge-common = { path = "../../../symthaea/crates/mycelix-bridge-common", default-features = false }
 mycelix-core-types = { path = "../../../mycelix-core/libs/mycelix-core-types", default-features = false }
 mycelix-fl = { path = "../../../mycelix-core/libs/mycelix-fl", default-features = false }
 rb-bft-consensus = { path = "../../../mycelix-core/libs/rb-bft-consensus", default-features = false, features = ["std"] }

@@ -12,7 +12,7 @@ name = "humanoid-demo"
 path = "src/main.rs"
 
 [dependencies]
-symthaea-humanoid = { path = "../../../crates/domains/symthaea-humanoid" }
+symthaea-humanoid = { path = "../../../symthaea/crates/domains/symthaea-humanoid" }
 symthaea-core = { path = "../../../symthaea-core" }
 
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }

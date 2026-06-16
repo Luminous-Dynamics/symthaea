@@ -1,0 +1,9 @@
+[package]
+name = "symtropy-bevy-validation-scene"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.18"
+symtropy-bevy-scene = { path = "../symtropy-bevy-scene" }
+symtropy-core = { path = "../symtropy-core" }
