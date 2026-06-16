@@ -122,5 +122,24 @@ mod tests {
             caveats: vec![],
         };
         assert!(ledger.add_claim(claim).is_err());
+
+        let claim_proven = Claim {
+            name: "Proven".to_string(),
+            status: ClaimStatus::Proven,
+            evidence: EvidenceKind::FormalProof,
+            kind: ClaimKind::Theorem,
+            scope: ClaimScope::Global,
+            assumptions: vec![],
+            dependencies: vec![],
+            caveats: vec![],
+        };
+        assert!(ledger.add_claim(claim_proven).is_ok());
+    }
+
+    #[test]
+    fn test_hardy_littlewood_is_heuristic() {
+        let hl = ClaimLedger::heuristic_claim("HL", vec!["test".to_string()]);
+        assert_eq!(hl.status, ClaimStatus::Heuristic);
+        assert_ne!(hl.status, ClaimStatus::Proven);
     }
 }

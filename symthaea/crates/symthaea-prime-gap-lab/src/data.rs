@@ -3,6 +3,7 @@ pub fn is_prime(n: u64) -> bool {
         return false;
     }
     for i in 2..=((n as f64).sqrt() as u64) {
+        #[allow(clippy::manual_is_multiple_of)]
         if n % i == 0 {
             return false;
         }
