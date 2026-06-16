@@ -12,6 +12,7 @@
 //! - Not physical proof of fractal time, quantum consciousness, or cosmological recurrence.
 //! - Intended to compare hypotheses against explicit null models.
 
+pub mod cognitive_coherence;
 pub mod correlation_auditor;
 pub mod floquet_time_crystal;
 pub mod hofstadter;
