@@ -1,4 +1,5 @@
 pub mod claim_ledger;
+pub mod conjecture_generator;
 pub mod counterexample;
 pub mod data;
 pub mod hardy_littlewood;
