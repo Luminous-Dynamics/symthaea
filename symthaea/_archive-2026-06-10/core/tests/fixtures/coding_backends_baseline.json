@@ -1,0 +1,29 @@
+{
+  "benchmark": "coding_backends_smoke",
+  "require_feature_geodesic": true,
+  "min_task_count": 31,
+  "min_pass_rate": 0.95,
+  "min_quality_pass_rate": 0.95,
+  "max_mean_attempts_per_task": 1.2,
+  "max_certificates_sheaf_incoherent": 0,
+  "min_certificates_with_sheaf": 31,
+  "require_broca_eval_gate_passed": true,
+  "min_broca_selection_score": 0.95,
+  "min_repair_success_rate": 0.0,
+  "max_repair_attempts": 0,
+  "max_geodesic_rejection_shadow_false_positives": 0,
+  "max_hard_geodesic_rejections": 0,
+  "min_category_pass_rates": {
+    "async": 0.9,
+    "branch": 0.9,
+    "collection": 0.9,
+    "conversion": 0.9,
+    "generic": 0.9,
+    "linear": 0.9,
+    "map": 0.9,
+    "option": 0.9,
+    "result": 0.9,
+    "string": 0.9
+  },
+  "notes": "Expanded coding backend baseline: 31 tasks with option/result/generic/map coverage, repair lessons, and Broca eval gate."
+}

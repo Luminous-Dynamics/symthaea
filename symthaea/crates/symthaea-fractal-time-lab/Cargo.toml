@@ -6,7 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Experimental benchmark lab for scale-recursive spectra, temporal symmetry breaking, and multi-scale integration."
 
 [dependencies]
-symthaea-core = { path = "../symthaea-core" }
+symthaea-core = { path = "../core/symthaea-core" }
 clap = { version = "4", features = ["derive"] }
 nalgebra = "0.33"
 petgraph = "0.6"

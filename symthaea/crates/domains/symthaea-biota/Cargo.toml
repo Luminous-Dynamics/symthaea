@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-biota"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "HDC-LTC + FEP Active Inference interspecies sanctuary platform"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
+
+[features]
+default = []

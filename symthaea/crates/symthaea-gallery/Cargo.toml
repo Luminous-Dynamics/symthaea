@@ -6,7 +6,7 @@ description = "Self-curating art gallery for Symthaea — persistence, evolution
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+symthaea-aesthetic = { path = "../domains/symthaea-aesthetic" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }

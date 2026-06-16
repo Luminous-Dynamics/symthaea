@@ -17,27 +17,18 @@
 mod config;
 mod embodiment;
 mod engine;
-mod geodesic_interop;
-mod geodesic_interop;
-mod manifold_repair;
 mod narrative;
 mod social;
-mod stability_auditor;
-mod stability_auditor;
-mod stability_profiler;
+mod types;
 
 pub use config::{ComponentWeights, MasterEquationConfig};
 pub use embodiment::{EmbodimentDiagnostics, EmbodimentFactor, InteroceptiveState};
 pub use engine::MasterConsciousnessEquation;
-pub use geodesic_interop::GeodesicInteropBridge;
-pub use manifold_repair::ManifoldRepairEngine;
 pub use narrative::{
     FutureScenario, NarrativeCoherence, NarrativeCoherenceDiagnostics, NarrativeEpisode,
     SimulationBranch,
 };
 pub use social::{AgentModel, SelfModel, SocialEmbedding};
-pub use stability_auditor::StabilityAuditor;
-pub use stability_profiler::StabilityProfiler;
 pub use types::{ConsciousnessInputs, ConsciousnessResult};
 
 #[cfg(test)]

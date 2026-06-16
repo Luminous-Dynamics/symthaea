@@ -11,8 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 symthaea = { path = "../.." }
-symthaea-psych-bench = { path = "../symthaea-psych-bench" }
-symthaea-types = { path = "../symthaea-types" }
+symthaea-psych-bench = { path = "../domains/symthaea-psych-bench" }
+symthaea-types = { path = "../core/symthaea-types" }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }

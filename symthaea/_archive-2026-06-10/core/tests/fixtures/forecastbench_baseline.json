@@ -1,0 +1,12 @@
+{
+  "benchmark": "forecastbench_epistemic_calibration",
+  "source": "local_coding_forecastbench",
+  "min_task_count": 20,
+  "min_resolved_count": 20,
+  "max_brier_score": 0.12,
+  "max_expected_calibration_error": 0.18,
+  "min_accuracy_at_50": 0.95,
+  "min_router_trust_multiplier": 1.0,
+  "require_quality_gate_passed": true,
+  "notes": "Conservative local epistemic calibration baseline. Tighten after this lane runs stably in CI."
+}

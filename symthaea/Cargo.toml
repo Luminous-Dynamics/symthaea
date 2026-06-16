@@ -119,7 +119,7 @@ num-complex = "0.4"
 libc = "0.2"
 csv = "1.3"
 axum = { version = "0.8", features = ["ws"] }
-symtropy-robotics-bridge-core = { path = "../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
+symtropy-robotics-bridge-core = { path = "../symtropy/crates/symtropy-robotics-bridge-core" }
 
 [package]
 name = "symthaea"

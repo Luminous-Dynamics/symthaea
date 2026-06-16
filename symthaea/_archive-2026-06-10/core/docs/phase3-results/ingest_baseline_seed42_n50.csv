@@ -1,0 +1,51 @@
+name,stage,error_category,error_message,lake_check
+mathd_algebra_114,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 165",not_run
+mathd_algebra_11,translated,,,accepted
+mathd_algebra_141,translated,,,accepted
+mathd_algebra_304,translated,,,accepted
+mathd_algebra_24,translated,,,accepted
+mathd_algebra_392,not_parsed,parse,"expected relation operator (= ≠ < ≤ > ≥ ∣), found ""n"" at offset 138",not_run
+mathd_algebra_440,translated,,,accepted
+mathd_algebra_119,translated,,,accepted
+mathd_algebra_568,translated,,,accepted
+mathd_algebra_338,translated,,,lake_error
+mathd_algebra_69,translated,,,rejected
+mathd_algebra_421,translated,,,lake_error
+mathd_algebra_142,translated,,,accepted
+mathd_algebra_427,translated,,,accepted
+mathd_algebra_451,not_parsed,parse,"unknown character 'σ' at offset 112",not_run
+mathd_numbertheory_5,not_parsed,parse,"unknown character '∃' at offset 156",not_run
+mathd_algebra_59,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 131",not_run
+mathd_algebra_126,translated,,,accepted
+mathd_numbertheory_296,not_parsed,parse,"unknown character '∃' at offset 157",not_run
+mathd_algebra_756,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 137",not_run
+mathd_algebra_437,not_parsed,parse,"unknown character '↑' at offset 201",not_run
+mathd_numbertheory_541,translated,,,lake_error
+mathd_algebra_410,translated,,,lake_error
+mathd_algebra_101,translated,,,accepted
+mathd_algebra_33,translated,,,lake_error
+mathd_numbertheory_629,not_parsed,parse,"unknown character '{' at offset 126",not_run
+mathd_algebra_55,translated,,,accepted
+mathd_algebra_362,translated,,,rejected
+mathd_algebra_107,translated,,,accepted
+mathd_numbertheory_43,not_parsed,parse,"unknown character '{' at offset 128",not_run
+mathd_algebra_441,translated,,,accepted
+mathd_algebra_267,translated,,,rejected
+mathd_numbertheory_234,translated,,,rejected
+mathd_algebra_123,translated,,,accepted
+mathd_algebra_251,translated,,,accepted
+mathd_algebra_137,not_parsed,parse,"unknown character '↑' at offset 133",not_run
+mathd_algebra_400,translated,,,accepted
+mathd_numbertheory_326,translated,,,accepted
+mathd_numbertheory_1124,translated,,,accepted
+mathd_numbertheory_690,not_parsed,parse,"unknown character '{' at offset 130",not_run
+mathd_algebra_354,translated,,,accepted
+mathd_algebra_181,translated,,,accepted
+mathd_algebra_276,not_parsed,parse,"expected term (identifier, integer, or `(`), found ""∀"" at offset 135",not_run
+mathd_algebra_176,translated,,,accepted
+mathd_algebra_80,translated,,,rejected
+mathd_algebra_478,translated,,,lake_error
+mathd_algebra_234,translated,,,accepted
+mathd_numbertheory_227,not_parsed,parse,"unknown character '↑' at offset 143",not_run
+mathd_algebra_13,not_parsed,parse,"expected term (identifier, integer, or `(`), found ""∀"" at offset 132",not_run
+mathd_algebra_432,translated,,,accepted

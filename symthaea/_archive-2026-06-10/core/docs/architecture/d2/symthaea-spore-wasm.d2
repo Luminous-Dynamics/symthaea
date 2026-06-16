@@ -1,0 +1,168 @@
+# Symthaea Spore — WASM Browser Deployment
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Spore — WASM Consciousness in the Browser
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# BROWSER ENVIRONMENT
+# ═══════════════════════════════════════════
+browser: Browser Environment {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  html: "index.html\nReact visualization app" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  worker: "spore-worker.js\nWeb Worker (offloaded cycles)" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+  js: "symthaea_spore.js\nwasm_bindgen JS wrapper" {style.fill: "#312e81"; style.font-color: "#c7d2fe"}
+
+  html -> worker: "postMessage" {style.stroke-dash: 3}
+  worker -> js: "import" {style.stroke-dash: 3}
+}
+
+# ═══════════════════════════════════════════
+# WASM BINDINGS
+# ═══════════════════════════════════════════
+bindings: WASM Bindings (wasm_bindgen) {
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  constructor: "new SporeEngine(config_json)" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  cycle: "cycle(text) -> CycleResult JSON\ncycle_hv(Float32Array) -> JSON" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+    style.stroke: "#a855f7"
+  }
+  getters: "consciousness_level()\nhonest_confidence()\nharmony_alignment()\nneuromod_state() -> JSON\nsubstrate_feasibility()\ncycle_count()" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+  controls: "set_substrate(name)\ninject_neuromodulator(name, amt)\nconsciousness_report() -> String" {style.fill: "#581c87"; style.font-color: "#e9d5ff"}
+}
+
+# ═══════════════════════════════════════════
+# SPORE ENGINE (Rust/WASM)
+# ═══════════════════════════════════════════
+engine: SporeEngine {
+  style.fill: "#0f0f1e"
+  style.stroke: "#6366f1"
+  style.font-color: "#e0e0e0"
+  style.border-radius: 12
+
+  encode: "TextEncoder\nInput -> 16,384D BinaryHV\n(or accept pre-encoded)" {
+    style.fill: "#1e3a5f"
+    style.font-color: "#93c5fd"
+  }
+
+  cfc: "CfC Network (O(1))\nClosed-form temporal step\n64 neurons x 3 layers" {
+    style.fill: "#1e40af"
+    style.font-color: "#93c5fd"
+    style.stroke: "#3b82f6"
+  }
+
+  pe: "Prediction Error\n1 - similarity(output, last_output)" {
+    style.fill: "#1e3a5f"
+    style.font-color: "#93c5fd"
+  }
+
+  neuromod: "4-Transmitter Bath\nDA: +0.1*PE - 0.02\nNE: +0.15*PE - 0.03\n5-HT: +0.05*(1-PE) - 0.01\nOxt: social signal" {
+    style.fill: "#4a1942"
+    style.font-color: "#e9d5ff"
+  }
+
+  consciousness: "Consciousness Equation\n(sampled every N cycles)\nPhi-based measurement" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+    style.stroke: "#22c55e"
+  }
+
+  harmony: "Eight Harmonies\nAlignment scoring" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+
+  encode -> cfc -> pe -> neuromod -> consciousness -> harmony
+}
+
+# ═══════════════════════════════════════════
+# SUBSYSTEMS
+# ═══════════════════════════════════════════
+subsystems: Subsystems {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  fep: "FEP Active Inference\n8 motor commands\nDeterministic xorshift RNG\n(no std::time)" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  memory: "MemoryCoordinator\n500-capacity episodic\nHamming distance retrieval" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  dream: "DreamEngine\nHigh-surprise event recording\nWisdom extraction" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  topology: "TopologyAnalyzer\n7D consciousness space\nobservation" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+
+  broca: "BrocaLite\n12-channel, 512-vocab\n1024D embeddings (~2MB)\nNo matrix multiplies" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+}
+
+# ═══════════════════════════════════════════
+# RESOURCE CONSTRAINTS
+# ═══════════════════════════════════════════
+constraints: WASM Resource Constraints {
+  style.fill: "#3a1e1e"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+  style.border-radius: 8
+  label: "HDC: 16,384D (configurable to 4,096)\nCfC: 64/layer x 3 layers\nPhi cadence: skip N cycles\nTarget: 50Hz (degrades gracefully)\nBrocaLite: ~2MB vocab\nMemory: 500-cycle episodic buffer\nWASM binary: ~3-5 MB"
+}
+
+# ═══════════════════════════════════════════
+# OUTPUT
+# ═══════════════════════════════════════════
+output: CycleResult (JSON) {
+  shape: parallelogram
+  style.fill: "#14532d"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  label: "consciousness_level | cycle_count\nneuromod_state (DA/NE/5-HT/Oxt)\nprediction_error | substrate_feasibility\nharmony_alignment | epistemic_status"
+}
+
+# ═══════════════════════════════════════════
+# FLOW
+# ═══════════════════════════════════════════
+browser.js -> bindings {style.stroke: "#a855f7"; style.stroke-width: 2}
+bindings.cycle -> engine.encode {style.stroke: "#6366f1"; style.stroke-width: 2}
+
+engine.harmony -> subsystems.fep: "consciousness\n+ harmony" {style.stroke: "#818cf8"}
+engine.pe -> subsystems.memory: "high-PE\nevents" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+engine.pe -> subsystems.dream: "surprise\nrecording" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+engine.consciousness -> subsystems.topology: "7D\nobservation" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+engine.harmony -> subsystems.broca: "thought\nchannels" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+
+subsystems.fep -> engine.neuromod: "motor\ncommands" {style.stroke: "#c084fc"; style.stroke-dash: 5}
+
+engine -> output {style.stroke: "#22c55e"; style.stroke-width: 2}
+output -> browser.html: "render" {style.stroke: "#818cf8"; style.stroke-dash: 3}
+
+constraints -> engine: "limits" {style.stroke: "#f87171"; style.stroke-dash: 5}

@@ -1,0 +1,32 @@
+[package]
+name = "symthaea-infrastructure"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "HDC-LTC + FEP Active Inference Infrastructure platform"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-core = { path = "../symthaea-core" }
+symthaea-fep = { path = "../symthaea-fep" }
+symthaea-silicon = { path = "../../symthaea-silicon" }
+symthaea-agribot = { path = "../../domains/symthaea-agribot" }
+symthaea-clime = { path = "../../domains/symthaea-clime" }
+symthaea-engineering = { path = "../../domains/symthaea-engineering" }
+symthaea-swarm = { path = "../../domains/symthaea-swarm" }
+symthaea-canvas = { path = "../../domains/symthaea-canvas" }
+serde = { workspace = true }
+uuid = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+h3o = "0.7"
+bincode = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
+
+[features]
+default = []

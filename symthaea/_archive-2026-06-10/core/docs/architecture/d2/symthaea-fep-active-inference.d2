@@ -1,0 +1,187 @@
+# Symthaea FEP Active Inference Loop
+# Professional Tier 1 Diagram
+
+direction: down
+
+title: {
+  label: Free Energy Principle — Active Inference Loop
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# ENVIRONMENT / PERCEPTION
+# ═══════════════════════════════════════════
+environment: Environment {
+  shape: cloud
+  style.fill: "#374151"
+  style.font-color: "#e5e7eb"
+  label: External world + internal states
+}
+
+observation: Observation (o_t) {
+  shape: parallelogram
+  style.fill: "#1e3a5f"
+  style.font-color: "#93c5fd"
+}
+
+# ═══════════════════════════════════════════
+# GENERATIVE MODEL
+# ═══════════════════════════════════════════
+generative: Generative Model P(o, s) {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  prior: "Prior Beliefs\nP(s_t | s_{t-1}, a_{t-1})" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+  likelihood: "Likelihood Model\nP(o_t | s_t)" {
+    style.fill: "#312e81"
+    style.font-color: "#c7d2fe"
+  }
+  posterior: "Approximate Posterior\nQ(s_t | o_{1:t})" {
+    style.fill: "#312e81"
+    style.font-color: "#a5b4fc"
+    style.stroke: "#818cf8"
+  }
+
+  prior -> posterior: predict
+  likelihood -> posterior: update
+}
+
+# ═══════════════════════════════════════════
+# FREE ENERGY DECOMPOSITION
+# ═══════════════════════════════════════════
+decomposition: Free Energy Decomposition {
+  style.fill: "#3a1e3a"
+  style.stroke: "#a855f7"
+  style.font-color: "#d8b4fe"
+  style.border-radius: 8
+
+  variational: "Variational Free Energy\nF = E_Q[log Q(s) - log P(o,s)]" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+    style.stroke: "#a855f7"
+  }
+
+  accuracy: "Accuracy Term\n-E_Q[log P(o|s)]\n(prediction quality)" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+  complexity: "Complexity Term\nKL[Q(s) || P(s)]\n(belief deviation from prior)" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+  pragmatic: "Pragmatic Value\nExpected utility of actions\n(goal-directed)" {
+    style.fill: "#581c87"
+    style.font-color: "#e9d5ff"
+  }
+
+  variational -> accuracy
+  variational -> complexity
+  variational -> pragmatic
+}
+
+# ═══════════════════════════════════════════
+# FEP MODULE (10 Subfields)
+# ═══════════════════════════════════════════
+fep_module: FEP Module (Consolidated) {
+  style.fill: "#1e3a2e"
+  style.stroke: "#22c55e"
+  style.font-color: "#86efac"
+  style.border-radius: 8
+
+  active_inference: "ActiveInferenceBridge\nPrecision-weighted prediction" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  closed_loop: "ClosedLearningLoop\nStrategy-based adaptation" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  agent: "ActiveInferenceAgent\nPerception-action loop" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  world_model: "WorldModelBridge\nHierarchical grounded prediction" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  goal_system: "GoalSystemBridge\nGoal-directed attention" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  surprise_bridge: "SurpriseExplorationBridge\nFEP-driven exploration" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+  enhanced: "EnhancedFEPBridge\nMotor system integration" {
+    style.fill: "#14532d"
+    style.font-color: "#86efac"
+  }
+}
+
+# ═══════════════════════════════════════════
+# ACTION SELECTION
+# ═══════════════════════════════════════════
+action: Action Selection {
+  style.fill: "#3a2e1e"
+  style.stroke: "#f59e0b"
+  style.font-color: "#fde68a"
+  style.border-radius: 8
+
+  expected_fe: "Expected Free Energy\nG(pi) = ambiguity + risk" {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+    style.stroke: "#f59e0b"
+  }
+  policy: "Policy Selection\nargmin G(pi)\n(softmax temperature)" {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+  }
+  precision: "Precision Dynamics\nGamma = confidence in policy" {
+    style.fill: "#78350f"
+    style.font-color: "#fde68a"
+  }
+
+  expected_fe -> policy -> precision
+}
+
+# ═══════════════════════════════════════════
+# LEARNING
+# ═══════════════════════════════════════════
+learning: Learning & Adaptation {
+  style.fill: "#7f1d1d"
+  style.stroke: "#ef4444"
+  style.font-color: "#fca5a5"
+  style.border-radius: 8
+
+  td: "TD Error\nTemporal difference learning" {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+  plasticity: "Plasticity Modulation\nQ-learning rate [0.5, 2.0]" {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+  surprise: "Surprise Signal\nTriggers exploration" {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+
+  td -> plasticity -> surprise
+}
+
+# ═══════════════════════════════════════════
+# FLOW (The Active Inference Loop)
+# ═══════════════════════════════════════════
+environment -> observation: sense {style.stroke: "#93c5fd"}
+observation -> generative.likelihood: "encode" {style.stroke: "#818cf8"; style.stroke-width: 2}
+generative.posterior -> decomposition.variational: "minimize F" {style.stroke: "#a855f7"; style.stroke-width: 2}
+decomposition -> fep_module: "decomposed\nsignals" {style.stroke: "#22c55e"}
+fep_module -> action.expected_fe: "policy\ncandidates" {style.stroke: "#f59e0b"; style.stroke-width: 2}
+action.precision -> environment: "act (a_t)" {
+  style.stroke: "#ef4444"
+  style.stroke-width: 3
+}
+
+# Learning feedback
+action -> learning: "outcome" {style.stroke: "#ef4444"}
+learning.surprise -> fep_module.surprise_bridge: "exploration\nboost" {style.stroke: "#ef4444"; style.stroke-dash: 3}
+learning.td -> generative.prior: "update\nbeliefs" {style.stroke: "#ef4444"; style.stroke-dash: 5}

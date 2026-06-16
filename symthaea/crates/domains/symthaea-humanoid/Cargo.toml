@@ -1,0 +1,32 @@
+[package]
+name = "symthaea-humanoid"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "HDC-LTC + FEP Active Inference bipedal humanoid control on DMC Humanoid benchmark"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["humanoid", "active-inference", "hdc", "bipedal", "mujoco"]
+categories = ["science", "algorithms", "simulation"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+anyhow = { workspace = true }
+
+# MuJoCo bindings (optional — required for full contact dynamics)
+mujoco-rs = { version = "2.3", optional = true, default-features = false }
+symthaea-vision-manifold = { version = "0.1.0", path = "../symthaea-vision-manifold" }
+
+[dev-dependencies]
+approx = "0.5"
+
+[features]
+default = []
+mujoco = ["dep:mujoco-rs"]
+viewer = ["mujoco", "mujoco-rs/viewer"]

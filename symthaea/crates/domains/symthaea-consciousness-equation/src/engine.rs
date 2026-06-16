@@ -33,22 +33,22 @@ pub struct MasterConsciousnessEquation {
     last_computation: Option<Instant>,
 
     /// Current gating factors (γᵢ)
-    pub gating_factors: GatingFactors,
+    gating_factors: GatingFactors,
 }
 
 /// Gating factors for each component
 #[derive(Debug, Clone)]
-pub struct GatingFactors {
-    pub phi: f64,
-    pub broadcast: f64,
-    pub working_memory: f64,
-    pub attention: f64,
-    pub recurrence: f64,
-    pub embodiment: f64,
-    pub knowledge: f64,
-    pub embodiment_factor: f64,
-    pub narrative: f64,
-    pub social: f64,
+struct GatingFactors {
+    phi: f64,
+    broadcast: f64,
+    working_memory: f64,
+    attention: f64,
+    recurrence: f64,
+    embodiment: f64,
+    knowledge: f64,
+    embodiment_factor: f64,
+    narrative: f64,
+    social: f64,
 }
 
 impl Default for GatingFactors {

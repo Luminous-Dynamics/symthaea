@@ -1,0 +1,35 @@
+{
+  "claims": [
+    {
+      "name": "Twin Prime Conjecture",
+      "status": "Open",
+      "evidence": "Literature",
+      "kind": "Conjecture",
+      "scope": "Global",
+      "assumptions": [],
+      "dependencies": [],
+      "caveats": [
+        "Requires analytic number theory beyond current scope."
+      ]
+    },
+    {
+      "name": "Hardy-Littlewood k-tuple conjecture",
+      "status": "Heuristic",
+      "evidence": "HeuristicModel",
+      "kind": "Heuristic",
+      "scope": "Global",
+      "assumptions": [],
+      "dependencies": [],
+      "caveats": [
+        "Heuristic model only."
+      ]
+    }
+  ],
+  "non_claims": [
+    "Does not prove twin primes.",
+    "Does not solve the parity problem.",
+    "Does not reproduce Zhang/Maynard-Tao.",
+    "Does not formalize analytic number theory.",
+    "Does not integrate into symthaea-core."
+  ]
+}

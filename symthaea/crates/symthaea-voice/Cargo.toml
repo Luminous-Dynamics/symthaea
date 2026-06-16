@@ -6,8 +6,8 @@ description = "Consciousness-driven voice synthesis for Symthaea — dual engine
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
-symthaea-vocal-tract = { path = "../symthaea-vocal-tract" }
+symthaea-core = { path = "../core/symthaea-core" }
+symthaea-vocal-tract = { path = "../domains/symthaea-vocal-tract" }
 serde = { workspace = true }
 
 # Kokoro TTS (optional — requires ONNX Runtime + HuggingFace model download)

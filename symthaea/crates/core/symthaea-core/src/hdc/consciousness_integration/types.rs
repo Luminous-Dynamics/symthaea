@@ -358,8 +358,6 @@ pub struct ConsciousnessState {
     pub self_model_accuracy: f64,
     pub cognitive_mode: CognitiveMode,
     pub mode_appropriateness: f64,
-    /// Fractal-time structural stability signature
-    pub stability_signature: Option<f64>,
     pub emotional_valence: f64,
     pub emotional_arousal: Option<f64>,
     pub uncertainty: f64,
@@ -491,7 +489,6 @@ impl Default for ConsciousnessState {
             emotional_arousal: Some(0.5),
             uncertainty: 0.5,
             integration_score: 0.5,
-            stability_signature: None,
         }
     }
 }

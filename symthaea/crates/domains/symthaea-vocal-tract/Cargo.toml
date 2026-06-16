@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-vocal-tract"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "LTC-driven articulatory synthesis: HDC encoder, controller, FEP agent, metrics"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["vocal-tract", "articulatory-synthesis", "hdc", "ltc", "formant"]
+categories = ["science", "algorithms", "multimedia::audio"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+serde = { workspace = true }
+hound = { workspace = true, optional = true }
+rustfft = { workspace = true, optional = true }
+
+[features]
+default = []
+hound = ["dep:hound"]
+mel-conversion = ["dep:rustfft"]

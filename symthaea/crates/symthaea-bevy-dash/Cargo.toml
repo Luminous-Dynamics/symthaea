@@ -8,9 +8,9 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 bevy = { version = "0.15", default-features = false, features = ["bevy_winit", "bevy_render", "bevy_pbr", "bevy_gltf", "x11", "bevy_ui", "bevy_sprite"] }
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../core/symthaea-core" }
 symthaea-phi-oracle = { path = "../symthaea-phi-oracle" }
-symthaea-digital-twin = { path = "../symthaea-digital-twin" }
+symthaea-digital-twin = { path = "../domains/symthaea-digital-twin" }
 bevy_egui = "0.31"
 serde = { workspace = true }
 tracing = { workspace = true }

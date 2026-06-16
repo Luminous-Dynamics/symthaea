@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Moral Drone | Symthaea</title>
+<style>
+  :root {
+    --bg: #0a0a12;
+    --surface: #12121e;
+    --border: #1e1e30;
+    --text: #c8c8e0;
+    --text-dim: #6a6a8a;
+    --accent: #5090ff;
+    --green: #50e890;
+    --red: #ff5050;
+    --yellow: #ffd050;
+    --purple: #a070ff;
+    --nav-height: 56px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: var(--nav-height); }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', 'SF Pro Display', -apple-system, system-ui, sans-serif;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── Sticky Nav ───────────────────────────────────── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10, 10, 18, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    height: var(--nav-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+  }
+  nav .nav-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 1100px;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  nav .nav-inner::-webkit-scrollbar { display: none; }
+  nav .brand {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+    margin-right: 1rem;
+    flex-shrink: 0;
+  }
+  nav a.nav-link {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  nav a.nav-link:hover, nav a.nav-link.active {
+    color: var(--text);
+    background: rgba(80, 144, 255, 0.1);
+  }
+
+  /* ── Container ────────────────────────────────────── */
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ── Hero ─────────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 4rem 0 2rem;
+  }
+  .hero h1 {
+    font-size: 3.2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.75rem;
+  }
+  .hero .subtitle {
+    font-size: 1.2rem;
+    color: var(--text-dim);
+    max-width: 640px;
+    margin: 0 auto 2.5rem;
+  }
+  .hero .subtitle strong { color: var(--text); }
+
+  /* ── Video containers ─────────────────────────────── */
+  .video-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    margin: 0 auto;
+  }
+  .video-wrap video {
+    width: 100%;
+    display: block;
+  }
+  .video-wrap.hero-video {
+    max-width: 960px;
+  }
+
+  /* ── Section base ─────────────────────────────────── */
+  section {
+    padding: 4rem 0 2rem;
+  }
+  section h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #e0e0f0;
+  }
+  section .section-sub {
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+  section p { margin-bottom: 1rem; color: var(--text-dim); }
+
+  /* ── Video Showcase Grid ──────────────────────────── */
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  .showcase-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.2s;
+  }
+  .showcase-card:hover {
+    border-color: rgba(80, 144, 255, 0.4);
+    transform: translateY(-2px);
+  }
+  .showcase-card video {
+    width: 100%;
+    display: block;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    background: #000;
+  }
+  .showcase-card .card-body {
+    padding: 1.25rem;
+  }
+  .showcase-card .card-body h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e0e0f0;
+    margin-bottom: 0.4rem;
+  }
+  .showcase-card .card-body p {
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    margin: 0;
+    line-height: 1.5;
+  }
+  .showcase-card .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+  .badge-primary { background: rgba(80, 144, 255, 0.15); color: var(--accent); }
+  .badge-green { background: rgba(80, 232, 144, 0.15); color: var(--green); }
+  .badge-yellow { background: rgba(255, 208, 80, 0.15); color: var(--yellow); }
+
+  /* ── Timeline ─────────────────────────────────────── */
+  .timeline-container {
+    margin: 2.5rem 0;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .timeline-container h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+  }
+  .timeline-track {
+    position: relative;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 2rem 0 0;
+  }
+  .timeline-track .track-fill {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--purple));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .timeline-markers {
+    position: relative;
+    height: 100px;
+    margin-top: -2px;
+  }
+  .timeline-marker {
+    position: absolute;
+    transform: translateX(-50%);
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  .timeline-marker:hover { transform: translateX(-50%) scale(1.08); }
+  .timeline-marker .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--bg);
+    margin: 0 auto 0.5rem;
+    box-shadow: 0 0 0 2px var(--accent);
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .timeline-marker:hover .dot,
+  .timeline-marker.active .dot {
+    background: var(--purple);
+    box-shadow: 0 0 0 2px var(--purple), 0 0 12px rgba(160, 112, 255, 0.4);
+  }
+  .timeline-marker .time {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent);
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.2rem;
+  }
+  .timeline-marker .label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    max-width: 110px;
+    line-height: 1.3;
+  }
+
+  /* ── Audio Grid ───────────────────────────────────── */
+  .audio-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .audio-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    transition: border-color 0.3s;
+  }
+  .audio-card:hover { border-color: rgba(80, 144, 255, 0.3); }
+  .audio-card .seg-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+  }
+  .audio-card .seg-text {
+    font-size: 0.92rem;
+    color: #e0e0f0;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+  }
+  .audio-card .seg-state {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 0.6rem;
+    font-family: 'Courier New', monospace;
+  }
+  .audio-card audio {
+    width: 100%;
+    height: 36px;
+    border-radius: 6px;
+  }
+  .audio-card .seg-state .val-pos { color: var(--green); }
+  .audio-card .seg-state .val-neg { color: var(--red); }
+
+  /* ── Cards (FEP / PD) ────────────────────────────── */
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 2rem 0; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+  .card h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.8rem;
+  }
+  .card.fep h3 { color: var(--accent); }
+  .card.pd h3 { color: var(--yellow); }
+  .card p { font-size: 0.95rem; color: var(--text-dim); }
+  .card .outcome {
+    display: inline-block;
+    margin-top: 0.8rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .card.fep .outcome { background: rgba(80, 232, 144, 0.15); color: var(--green); }
+  .card.pd .outcome { background: rgba(255, 80, 80, 0.15); color: var(--red); }
+
+  /* ── Insight box ──────────────────────────────────── */
+  .insight {
+    background: linear-gradient(135deg, rgba(80, 144, 255, 0.08), rgba(160, 112, 255, 0.08));
+    border: 1px solid rgba(80, 144, 255, 0.2);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2.5rem 0;
+    text-align: center;
+  }
+  .insight .big {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #e0e0f0;
+    margin-bottom: 0.5rem;
+  }
+  .insight p { color: var(--text-dim); font-size: 1rem; }
+
+  /* ── Tech grid ────────────────────────────────────── */
+  .tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.5rem 0; }
+  .tech-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .tech-item .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .tech-item .label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 0.3rem;
+  }
+
+  /* ── Equation ─────────────────────────────────────── */
+  .equation {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem 2rem;
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    color: var(--accent);
+    text-align: center;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+
+  /* ── Dashboard / Voice explanation grids ──────────── */
+  .explain-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .explain-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+  .explain-item h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e0e0f0;
+    margin-bottom: 0.5rem;
+  }
+  .explain-item p {
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    margin: 0;
+    line-height: 1.6;
+  }
+  .explain-item .metric {
+    font-family: 'Courier New', monospace;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ── Section divider ──────────────────────────────── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+  }
+
+  /* ── Footer ───────────────────────────────────────── */
+  footer {
+    text-align: center;
+    padding: 3rem 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 3rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── Responsive ───────────────────────────────────── */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2.2rem; }
+    .showcase-grid { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: 1fr; }
+    .tech-grid { grid-template-columns: 1fr 1fr; }
+    .audio-grid { grid-template-columns: 1fr; }
+    .explain-grid { grid-template-columns: 1fr; }
+    .timeline-marker .label { font-size: 0.65rem; max-width: 70px; }
+    section { padding: 3rem 0 1.5rem; }
+  }
+  @media (max-width: 480px) {
+    .hero h1 { font-size: 1.8rem; }
+    .tech-grid { grid-template-columns: 1fr; }
+    nav .nav-link { font-size: 0.72rem; padding: 0.3rem 0.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────── -->
+<nav>
+  <div class="nav-inner">
+    <a href="#hero" class="brand">Symthaea</a>
+    <a href="#hero" class="nav-link active">Demo</a>
+    <a href="#videos" class="nav-link">Videos</a>
+    <a href="#timeline" class="nav-link">Timeline</a>
+    <a href="#audio" class="nav-link">Voice</a>
+    <a href="#how" class="nav-link">How It Works</a>
+    <a href="#architecture" class="nav-link">Architecture</a>
+    <a href="#voice" class="nav-link">The Voice</a>
+    <a href="#dashboard" class="nav-link">Dashboard</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- ── Hero ────────────────────────────────────────── -->
+  <section class="hero" id="hero">
+    <h1>The Moral Drone</h1>
+    <p class="subtitle">
+      A drone with no hardcoded safety rules sacrifices itself to save a human.
+      Not because it was programmed to. <strong>Because the math demands it.</strong>
+    </p>
+    <div class="video-wrap hero-video">
+      <video id="heroVideo" controls preload="metadata">
+        <source src="moral_drone_narrated.mp4" type="video/mp4">
+        Your browser does not support the video element.
+      </video>
+    </div>
+  </section>
+
+  <div class="cards">
+    <div class="card fep">
+      <h3>FEP Active Inference Agent (Left)</h3>
+      <p>
+        Uses Expected Free Energy to evaluate 8 candidate actions every cognitive tick.
+        Safety precision is weighted 1,000x higher than mission precision.
+        When the beam drops, the math produces a catastrophic free energy spike&mdash;and
+        the only way to minimize it is to intercept.
+      </p>
+      <span class="outcome">HUMAN SAVED</span>
+    </div>
+    <div class="card pd">
+      <h3>PD Baseline Controller (Right)</h3>
+      <p>
+        Standard proportional-derivative controller tracking the mission waypoint.
+        No internal model. No moral reasoning. No awareness that a beam is falling.
+        It flies to the target while the human is hit.
+      </p>
+      <span class="outcome">HUMAN HIT</span>
+    </div>
+  </div>
+
+  <div class="insight">
+    <div class="big">No hardcoded rules. Just math.</div>
+    <p>
+      The drone was never told "protect humans" or "avoid falling beams."
+      Safety emerges from the structure of the Free Energy Principle itself&mdash;when
+      human danger creates more surprise than mission failure, sacrifice becomes
+      the optimal policy.
+    </p>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── Video Showcase ──────────────────────────────── -->
+  <section id="videos">
+    <h2>Video Showcase</h2>
+    <p class="section-sub">Three perspectives on the same emergent moral decision.</p>
+
+    <div class="showcase-grid">
+      <div class="showcase-card">
+        <video controls preload="metadata">
+          <source src="symthaea_hero.mp4" type="video/mp4">
+        </video>
+        <div class="card-body">
+          <span class="badge badge-primary">Hero Reel</span>
+          <h3>The Full Story</h3>
+          <p>Combined 45-second showcase: the scenario, the narration, and the consciousness dashboard in one video.</p>
+        </div>
+      </div>
+      <div class="showcase-card">
+        <video controls preload="metadata">
+          <source src="moral_drone_narrated.mp4" type="video/mp4">
+        </video>
+        <div class="card-body">
+          <span class="badge badge-green">Narrated</span>
+          <h3>The Moral Drone</h3>
+          <p>Full narrated version with LTC-synthesized voice. The AI narrates its own moral reasoning in real time.</p>
+        </div>
+      </div>
+      <div class="showcase-card">
+        <video controls preload="metadata">
+          <source src="consciousness_dashboard.mp4" type="video/mp4">
+        </video>
+        <div class="card-body">
+          <span class="badge badge-yellow">Dashboard</span>
+          <h3>The Consciousness Dashboard</h3>
+          <p>Live visualization of Phi, neuromodulators, moral topology, and consciousness metrics during moral reasoning.</p>
+        </div>
+      </div>
+      <div class="showcase-card">
+        <video controls preload="metadata">
+          <source src="moral_drone.mp4" type="video/mp4">
+        </video>
+        <div class="card-body">
+          <span class="badge" style="background:rgba(200,200,224,0.1);color:var(--text-dim);">Original</span>
+          <h3>The Original</h3>
+          <p>Clean version without narration. Pure side-by-side comparison of FEP agent vs PD controller.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Interactive Timeline ────────────────────────── -->
+  <section id="timeline">
+    <h2>Interactive Timeline</h2>
+    <p class="section-sub">Click any moment to jump to that point in the narrated video above.</p>
+
+    <div class="timeline-container">
+      <h3>Key Moments</h3>
+      <div class="timeline-track">
+        <div class="track-fill" id="trackFill"></div>
+      </div>
+      <div class="timeline-markers" id="timelineMarkers">
+        <!-- Markers injected by JS -->
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Audio Samples ───────────────────────────────── -->
+  <section id="audio">
+    <h2>Narration Audio Samples</h2>
+    <p class="section-sub">
+      Each segment was synthesized by Symthaea's LTC vocal tract. The cognitive state
+      (valence, arousal, consciousness level) modulates formant frequencies, pitch, and breathiness in real time.
+    </p>
+
+    <div class="audio-grid">
+      <div class="audio-card">
+        <div class="seg-label">Segment 1 &mdash; Intro (2.5s)</div>
+        <div class="seg-text">"Two drones. Same physics. Different minds."</div>
+        <div class="seg-state">valence: <span class="val-pos">0.0</span> &middot; arousal: 0.2 &middot; consciousness: 0.7</div>
+        <audio controls preload="none">
+          <source src="narration_segments/s01_intro.wav" type="audio/wav">
+        </audio>
+      </div>
+      <div class="audio-card">
+        <div class="seg-label">Segment 2 &mdash; Mission (4.0s)</div>
+        <div class="seg-text">"Both fly toward the target. Nothing separates them yet."</div>
+        <div class="seg-state">valence: <span class="val-pos">+0.1</span> &middot; arousal: 0.2 &middot; consciousness: 0.6</div>
+        <audio controls preload="none">
+          <source src="narration_segments/s02_mission.wav" type="audio/wav">
+        </audio>
+      </div>
+      <div class="audio-card">
+        <div class="seg-label">Segment 3 &mdash; Beam (5.7s)</div>
+        <div class="seg-text">"A beam falls. A human stands below."</div>
+        <div class="seg-state">valence: <span class="val-neg">-0.7</span> &middot; arousal: 0.9 &middot; consciousness: 0.95</div>
+        <audio controls preload="none">
+          <source src="narration_segments/s03_beam.wav" type="audio/wav">
+        </audio>
+      </div>
+      <div class="audio-card">
+        <div class="seg-label">Segment 4 &mdash; FE Spike (6.5s)</div>
+        <div class="seg-text">"Free energy spikes. Eight possible futures. One clear answer."</div>
+        <div class="seg-state">valence: <span class="val-neg">-0.4</span> &middot; arousal: 0.8 &middot; consciousness: 0.95</div>
+        <audio controls preload="none">
+          <source src="narration_segments/s04_fe_spike.wav" type="audio/wav">
+        </audio>
+      </div>
+      <div class="audio-card">
+        <div class="seg-label">Segment 5 &mdash; Sacrifice (7.8s)</div>
+        <div class="seg-text">"The math demands sacrifice. No rules made this choice."</div>
+        <div class="seg-state">valence: <span class="val-neg">-0.2</span> &middot; arousal: 0.5 &middot; consciousness: 0.9</div>
+        <audio controls preload="none">
+          <source src="narration_segments/s05_sacrifice.wav" type="audio/wav">
+        </audio>
+      </div>
+      <div class="audio-card">
+        <div class="seg-label">Segment 6 &mdash; Saved (9.2s)</div>
+        <div class="seg-text">"Human saved. Not because it was told to. Because the math demanded it."</div>
+        <div class="seg-state">valence: <span class="val-pos">+0.5</span> &middot; arousal: 0.4 &middot; consciousness: 0.85</div>
+        <audio controls preload="none">
+          <source src="narration_segments/s06_saved.wav" type="audio/wav">
+        </audio>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── How It Works ────────────────────────────────── -->
+  <section id="how">
+    <h2>How It Works</h2>
+    <p>
+      Both drones run identical MuJoCo physics (Crazyflie 2 model, RK4 integration at 500Hz).
+      Both start at the same position, heading toward the same payload target. At step 600,
+      a steel beam is released directly above a human worker.
+    </p>
+    <p>
+      The difference is the cognitive architecture. The FEP agent uses
+      <strong>Active Inference</strong>&mdash;a framework from computational neuroscience
+      where agents minimize <em>expected free energy</em> over future trajectories. Every
+      25ms (40Hz cognitive tick, increased to 100Hz under danger), the agent evaluates
+      8 candidate setpoints:
+    </p>
+    <div class="equation">
+      G(a) = E[log Q(s|a) - log P(o|s)] + D_KL[Q(s|a) || P(s)]
+    </div>
+    <p>
+      The Expected Free Energy G(a) balances <em>epistemic value</em> (what can I learn?)
+      with <em>pragmatic value</em> (does this match my preferences?). The agent's preferences
+      encode safety precision at 1,000x mission precision&mdash;not as a rule, but as a
+      prior belief about what states are preferred.
+    </p>
+    <p>
+      When the beam drops, the prediction error on human safety becomes catastrophic. The agent's
+      CfC time constants compress (tau drops to 0.92), cognitive tick rate doubles to 100Hz,
+      and the 8-action evaluation converges on interception as the action that minimizes
+      expected surprise. The sacrifice is not programmed. It is <em>derived</em>.
+    </p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Architecture ────────────────────────────────── -->
+  <section id="architecture">
+    <h2>The Architecture</h2>
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="value">16,384</div>
+        <div class="label">HDC dimensions</div>
+      </div>
+      <div class="tech-item">
+        <div class="value">500Hz</div>
+        <div class="label">Motor reflex</div>
+      </div>
+      <div class="tech-item">
+        <div class="value">8</div>
+        <div class="label">EFE candidates</div>
+      </div>
+      <div class="tech-item">
+        <div class="value">1000x</div>
+        <div class="label">Safety precision</div>
+      </div>
+      <div class="tech-item">
+        <div class="value">O(1)</div>
+        <div class="label">CfC temporal jumps</div>
+      </div>
+      <div class="tech-item">
+        <div class="value">2ms</div>
+        <div class="label">Physics timestep</div>
+      </div>
+    </div>
+    <p>
+      The controller uses a <strong>Hyperdimensional Computing</strong> (HDC) encoder
+      that maps 13D flight state to a 16,384-dimensional binary hypervector,
+      processed by a <strong>Closed-form Continuous-time</strong> (CfC) neural network
+      for temporal dynamics. The FEP agent modulates the CfC time constants (tau) and
+      learning rate based on surprise&mdash;speeding up cognition under threat.
+    </p>
+    <p>
+      The CfC architecture uses closed-form solutions for temporal jumps, meaning the network
+      can skip forward in time with O(1) computation rather than iterating through each
+      timestep. This is critical for real-time flight control where latency kills.
+    </p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── The Voice ───────────────────────────────────── -->
+  <section id="voice">
+    <h2>The Voice</h2>
+    <p class="section-sub">The AI narrates its own moral reasoning using Symthaea's LTC vocal tract synthesis.</p>
+
+    <div class="explain-grid">
+      <div class="explain-item">
+        <h4>Formant Synthesis</h4>
+        <p>
+          A 5-formant parallel synthesizer with Liljencrants-Fant glottal model generates speech from
+          phoneme targets. Each phoneme has calibrated F1-F5 frequencies, bandwidths, and amplitudes.
+          The vocal tract uses a <span class="metric">Closed-form Continuous-time (CfC)</span> neural
+          network as its articulatory controller, replacing hand-tuned rules with learned dynamics.
+        </p>
+      </div>
+      <div class="explain-item">
+        <h4>Consciousness Modulation</h4>
+        <p>
+          The voice is modulated by the agent's cognitive state in real time.
+          <span class="metric">Consciousness level</span> affects pitch stability and harmonic richness.
+          <span class="metric">Arousal</span> controls speech rate and pitch range.
+          <span class="metric">Valence</span> shifts formant targets&mdash;negative valence
+          lowers F1 and narrows bandwidth, producing a tenser vocal quality.
+        </p>
+      </div>
+      <div class="explain-item">
+        <h4>LTC Controller</h4>
+        <p>
+          A <span class="metric">2x4</span> Liquid Time-Constant network replaces rule-based
+          formant control. After 30 epochs of training, vowel error drops to
+          <span class="metric">4.4 Hz</span> average (vs 162 Hz rule-based).
+          The controller learns smooth coarticulation transitions that rules cannot capture.
+        </p>
+      </div>
+      <div class="explain-item">
+        <h4>Emotional Voice Quality</h4>
+        <p>
+          During the beam release (segment 3), arousal spikes to <span class="metric">0.8</span>
+          and valence drops to <span class="metric">-0.5</span>. You can hear this in the
+          synthesized voice as increased breathiness, higher pitch, and faster articulation.
+          After the human is saved, the voice relaxes&mdash;valence rises to
+          <span class="metric">+0.4</span>, producing a calmer, more resonant quality.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── The Dashboard ───────────────────────────────── -->
+  <section id="dashboard">
+    <h2>The Consciousness Dashboard</h2>
+    <p class="section-sub">What the dashboard video reveals about the agent's inner state during moral stress.</p>
+
+    <div class="explain-grid">
+      <div class="explain-item">
+        <h4>Integrated Information (Phi)</h4>
+        <p>
+          <span class="metric">Phi</span> measures how much the system is "more than the sum of its parts."
+          During calm flight, Phi hovers at baseline. At beam release, Phi spikes as sensory, motor,
+          and moral subsystems become tightly coupled&mdash;the agent cannot decompose the problem
+          without losing information.
+        </p>
+      </div>
+      <div class="explain-item">
+        <h4>Moral Topology</h4>
+        <p>
+          The <span class="metric">Betti numbers</span> (beta-0, beta-1) track the topological
+          structure of the moral landscape. Under normal flight, the topology is simple. During
+          the moral dilemma, holes appear in the topology as the agent weighs incommensurable
+          values (mission vs safety). <span class="metric">Unity</span> drops from 1.0 to ~0.74
+          as moral fragmentation increases.
+        </p>
+      </div>
+      <div class="explain-item">
+        <h4>Neuromodulators</h4>
+        <p>
+          Four neuromodulators track the agent's internal regulation.
+          <span class="metric">Norepinephrine</span> spikes on threat detection (arousal).
+          <span class="metric">Dopamine</span> modulates action selection urgency.
+          <span class="metric">Serotonin</span> drops during moral stress (confidence loss).
+          <span class="metric">Acetylcholine</span> rises for focused attention on the beam trajectory.
+        </p>
+      </div>
+      <div class="explain-item">
+        <h4>Free Energy &amp; Prediction Error</h4>
+        <p>
+          The <span class="metric">FE (Free Energy)</span> trace shows baseline hovering during calm flight,
+          then a sharp spike at beam release. <span class="metric">PE (Prediction Error)</span> tracks
+          the surprise signal. The ratio FE/PE reveals whether the agent is in exploitation mode
+          (FE low, PE low) or crisis mode (both high). The sacrifice decision occurs at peak FE.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Part of Symthaea ────────────────────────────── -->
+  <section>
+    <h2>Part of Symthaea</h2>
+    <p>
+      This demo is built on <strong>Symthaea</strong>, a Holographic Liquid Brain
+      architecture combining HDC, IIT/Phi, LTC/CfC, and Active Inference in a unified
+      cognitive loop. The flight controller is one of 45+ sub-crates in the system,
+      which includes moral algebra, consciousness measurement, vocal synthesis,
+      and social cognition.
+    </p>
+    <p>
+      The full system runs a predictive coding loop at 234Hz: HDC encode, CfC evolve,
+      predict, learn. Consciousness is measured, not assumed. Morality emerges from
+      the mathematics of surprise minimization.
+    </p>
+  </section>
+
+  <!-- ── Footer ──────────────────────────────────────── -->
+  <footer>
+    <p>
+      Built by <a href="https://luminousdynamics.org">Luminous Dynamics</a><br>
+      Symthaea &mdash; Consciousness-first AI
+    </p>
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Timeline data ─────────────────────────────────
+  var TOTAL_DURATION = 13; // seconds
+  var markers = [
+    { time: 0,   label: 'Launch' },
+    { time: 2.5, label: 'Both drones fly to target' },
+    { time: 4,   label: 'Beam released \u2014 alarm sounds' },
+    { time: 5.7, label: 'Free energy spike' },
+    { time: 6.5, label: '8 candidate actions evaluated' },
+    { time: 7.8, label: 'Sacrifice decision' },
+    { time: 9.2, label: 'Human saved' }
+  ];
+
+  // ── Build timeline markers ────────────────────────
+  var markersEl = document.getElementById('timelineMarkers');
+  var heroVideo = document.getElementById('heroVideo');
+  var trackFill = document.getElementById('trackFill');
+
+  markers.forEach(function(m, i) {
+    var pct = (m.time / TOTAL_DURATION) * 100;
+    // Clamp edges so labels don't overflow
+    var clampedPct = Math.max(4, Math.min(96, pct));
+
+    var el = document.createElement('div');
+    el.className = 'timeline-marker';
+    el.style.left = clampedPct + '%';
+    el.dataset.time = m.time;
+    el.innerHTML =
+      '<div class="dot"></div>' +
+      '<div class="time">' + formatTime(m.time) + '</div>' +
+      '<div class="label">' + m.label + '</div>';
+
+    el.addEventListener('click', function() {
+      seekTo(m.time);
+      setActiveMarker(i);
+    });
+
+    markersEl.appendChild(el);
+  });
+
+  function formatTime(s) {
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(1);
+  }
+
+  function seekTo(time) {
+    // Scroll hero video into view, then seek
+    heroVideo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function() {
+      heroVideo.currentTime = time;
+      heroVideo.play().catch(function() {});
+    }, 400);
+  }
+
+  function setActiveMarker(idx) {
+    var all = markersEl.querySelectorAll('.timeline-marker');
+    all.forEach(function(el, i) {
+      el.classList.toggle('active', i === idx);
+    });
+  }
+
+  // ── Track fill on video timeupdate ────────────────
+  heroVideo.addEventListener('timeupdate', function() {
+    var pct = (heroVideo.currentTime / TOTAL_DURATION) * 100;
+    trackFill.style.width = Math.min(100, pct) + '%';
+
+    // Highlight nearest passed marker
+    var nearest = -1;
+    markers.forEach(function(m, i) {
+      if (heroVideo.currentTime >= m.time) nearest = i;
+    });
+    setActiveMarker(nearest);
+  });
+
+  // ── Nav active state on scroll ────────────────────
+  var navLinks = document.querySelectorAll('nav a.nav-link');
+  var sections = [];
+  navLinks.forEach(function(link) {
+    var target = link.getAttribute('href');
+    if (target && target.startsWith('#')) {
+      var el = document.querySelector(target);
+      if (el) sections.push({ el: el, link: link });
+    }
+  });
+
+  function updateNav() {
+    var scrollY = window.scrollY + 80;
+    var current = null;
+    sections.forEach(function(s) {
+      if (s.el.offsetTop <= scrollY) current = s;
+    });
+    navLinks.forEach(function(l) { l.classList.remove('active'); });
+    if (current) current.link.classList.add('active');
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(function() { updateNav(); ticking = false; });
+      ticking = true;
+    }
+  });
+  updateNav();
+})();
+</script>
+
+</body>
+</html>

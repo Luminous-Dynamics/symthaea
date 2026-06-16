@@ -1,0 +1,240 @@
+[package]
+name = "symthaea-broca"
+version = "0.1.0"
+edition = "2024"
+description = "SSM Language Center: CfC-HDC autoregressive thought-to-text generation"
+license = "AGPL-3.0-or-later"
+autobins = false
+
+[dependencies]
+futures-util = { version = "0.3", features = ["sink"] }
+chumsky.workspace = true
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-geodesic = { path = "../symthaea-geodesic", optional = true }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-hodge = { path = "../symthaea-hodge" }
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+symthaea-hdc-store = { path = "../symthaea-hdc-store" }
+mycelix-zkp-core = { workspace = true }
+symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
+symthaea-sim-bridge = { path = "../../bridges/symthaea-sim-bridge" }
+symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+syn = { version = "2.0", features = ["full", "visit"], optional = true }
+bincode = { workspace = true }
+
+rmp-serde = { workspace = true }
+blake3 = { workspace = true }
+walkdir = "2.5"
+anyhow = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand = { workspace = true }
+rayon = { workspace = true, optional = true }
+symthaea-stt = { path = "../../core/symthaea-stt", optional = true }
+tree-sitter = "0.24"
+regex = "1.10"
+tempfile = "3.10"
+sled = "0.34"
+rnix = "0.11"
+rowan = "0.15"
+chrono = "0.4"
+md5 = "0.7"
+hex = "0.4"
+sha2 = "0.10"
+sysinfo = "0.32"
+pqcrypto-dilithium = "0.5"
+pqcrypto-traits = "0.3"
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-go = "0.23"
+symthaea-lean-bridge = { path = "../../symthaea-lean-bridge" }
+symthaea-runtime = { path = "../../symthaea-runtime" }
+symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/symtropy-robotics-bridge-core" }
+systemstat = "0.2"
+tokio-websockets = { version = "0.12", features = ["server"] }
+
+# Distillation collection
+ureq = { version = "2.9" }
+
+# Candle ML framework (GPU-accelerated training + inference)
+candle-core = { workspace = true }
+candle-nn = { workspace = true, optional = true }
+hf-hub = { version = "0.4", optional = true }
+urlencoding = "2.1"
+tokenizers = { version = "0.21", optional = true }
+wasmtime = { version = "29.0", optional = true }
+rustyline = "14.0"
+bytemuck = "1.25.0"
+lru.workspace = true
+uuid = "1"
+tokio = { workspace = true, features = ["sync"] }
+
+# WASM support — getrandom + uuid need explicit features on wasm32
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+uuid = { version = "1", features = ["rng-getrandom"] }
+
+[[bin]]
+name = "broca-train"
+path = "src/bin/broca_train.rs"
+
+[[bin]]
+name = "broca-eval"
+path = "src/bin/broca_eval.rs"
+
+[[bin]]
+name = "broca-collect"
+path = "src/bin/broca_collect.rs"
+required-features = ["collect"]
+
+[[bin]]
+name = "broca-mamba-verify"
+path = "src/bin/broca_mamba_verify.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-projection-train"
+path = "src/bin/broca_projection_train.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-compare"
+path = "src/bin/broca_compare.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-liquid-eval"
+path = "src/bin/broca_liquid_eval.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-attractor-calibrate"
+path = "src/bin/broca_attractor_calibrate.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-decoder-ab"
+path = "src/bin/broca_decoder_ab.rs"
+
+[[bin]]
+name = "broca-embedding-stats"
+path = "src/bin/broca_embedding_stats.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "distill-for-spore"
+path = "src/bin/distill_for_spore.rs"
+
+[[bin]]
+name = "gen-epistemic-training"
+path = "src/bin/gen_epistemic_training.rs"
+
+[[bin]]
+name = "gen-code-training"
+path = "src/bin/gen_code_training.rs"
+
+[[bin]]
+name = "gen-nsm-training-data"
+path = "src/bin/gen_nsm_training_data.rs"
+
+[[bin]]
+name = "gen-creativity-training"
+path = "src/bin/gen_creativity_training.rs"
+
+[[bin]]
+name = "gen-moral-training"
+path = "src/bin/gen_moral_training.rs"
+
+[[bin]]
+name = "gen-speech-training"
+path = "src/bin/gen_speech_training.rs"
+required-features = ["speech-data"]
+
+[[bin]]
+name = "cognitive-repl"
+path = "src/bin/cognitive_repl.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "demo-ecological-closure"
+path = "src/bin/demo_ecological_closure.rs"
+
+[[bin]]
+name = "broca-dreamer"
+path = "src/bin/broca_dreamer.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-benchmark-suite"
+path = "src/bin/broca_benchmark_suite.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-validator"
+path = "src/bin/broca_validator.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-self-architect"
+path = "src/bin/broca_self_architect.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval"]
+
+[[bin]]
+name = "broca-sovereign-node"
+path = "src/bin/broca_sovereign_node.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
+
+[[bin]]
+name = "broca-exercism-bench"
+path = "src/bin/broca_exercism_bench.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval"]
+
+[[bin]]
+name = "broca-vs-gemma"
+path = "src/bin/broca_vs_gemma.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "broca-external-baseline"
+path = "src/bin/broca_external_baseline.rs"
+
+[[bin]]
+name = "broca-checkpoint-compare"
+path = "src/bin/broca_checkpoint_compare.rs"
+
+[features]
+default = ["simd", "parallel"]
+# GPU tensor acceleration via candle CUDA (auto-detects at runtime)
+gpu = ["candle-core/cuda", "dep:candle-nn", "candle-nn/cuda"]
+parallel = ["dep:rayon", "symthaea-core/parallel"]
+# P2P Swarm networking
+networking = ["symthaea-swarm/networking"]
+# WASM sandboxing support via wasmtime
+wasm-sandbox = ["dep:wasmtime"]
+# Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
+mamba-cpu = ["dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
+# Mamba with CUDA GPU acceleration (default for local dev)
+mamba = ["mamba-cpu", "candle-core/cuda"]
+# GPU-accelerated logit computation and training (candle-core matmul)
+gpu-logits = []
+# Legacy alias
+cuda = ["mamba"]
+hf-tokenizer = ["dep:tokenizers"]
+collect = []
+simd = ["symthaea-core/simd"]
+test-helpers = ["mamba-cpu"]
+therapeutic = []
+speech-data = ["dep:symthaea-stt"]
+code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
+
+[[bin]]
+name = "fused_cognitive_node"
+path = "src/bin/fused_cognitive_node.rs"
+
+[[example]]
+name = "hierarchical_reasoning"
+required-features = ["mamba-cpu"]

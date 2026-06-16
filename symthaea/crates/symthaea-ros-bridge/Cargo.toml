@@ -12,8 +12,8 @@ keywords = ["ros2", "robotics", "consciousness", "telemetry"]
 categories = ["science", "simulation"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
-symthaea-humanoid = { path = "../symthaea-humanoid" }
+symthaea-core = { path = "../core/symthaea-core" }
+symthaea-humanoid = { path = "../domains/symthaea-humanoid" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

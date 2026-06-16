@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-clinical"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Clinical Knowledge Ontology — DSM-5/ICD-11/RDoC taxonomies as HDC hypervectors"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "clinical", "psychology", "hdc", "therapeutic"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+serde = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

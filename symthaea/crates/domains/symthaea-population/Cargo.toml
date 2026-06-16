@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-population"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Population genetics with HDC encoding, breeding strategy, and Mycelix-compatible governance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["population-genetics", "hdc", "breeding", "governance", "conservation"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-types = { path = "../../core/symthaea-types" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = "1.4"

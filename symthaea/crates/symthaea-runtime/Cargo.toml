@@ -7,7 +7,7 @@ description = "Unified high-performance runtime for Symthaea: HDC math, simulati
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../core/symthaea-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

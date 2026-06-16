@@ -1,0 +1,48 @@
+[package]
+name = "spark-engine"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics Research Team"]
+description = "Lattice Confinement Fusion (LCF) physics simulation and analysis"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/spark-engine"
+keywords = ["fusion", "physics", "lcf", "neutron", "simulation"]
+categories = ["science", "simulation"]
+
+[features]
+default = ["full"]
+full = ["visualization", "uncertainty"]
+visualization = []
+uncertainty = []
+experimental = []  # For anomaly investigation (Path C)
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8"
+rand_chacha = "0.3"
+thiserror = "1.0"
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.0"
+
+# [[bench]]
+# name = "gamow_integration"
+# harness = false
+
+[[bin]]
+name = "spark"
+path = "src/bin/spark.rs"
+
+[[example]]
+name = "analysis_runner"
+path = "examples/analysis_runner.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.bench]
+opt-level = 3
+debug = false

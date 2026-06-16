@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-therapeutic"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Therapeutic Psychology — client model, alliance, safety, affect regulation, narrative"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "therapeutic", "psychology", "safety", "alliance"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-clinical = { path = "../symthaea-clinical" }
+symthaea-dream = { path = "../symthaea-dream" }
+serde = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = "1.4"
+
+[lints]
+workspace = true

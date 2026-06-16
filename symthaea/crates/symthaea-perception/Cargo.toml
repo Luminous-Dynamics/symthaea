@@ -9,7 +9,7 @@ parry3d.workspace = true
 wgpu.workspace = true
 
 
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../core/symthaea-core" }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

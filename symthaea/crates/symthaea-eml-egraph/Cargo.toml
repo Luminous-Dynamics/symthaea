@@ -10,7 +10,7 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 egg = "0.10"
 thiserror = { workspace = true }
-symthaea-core = { path = "../../symthaea-core", features = ["abstract_thought"] }
+symthaea-core = { path = "../core/symthaea-core", features = ["abstract_thought"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

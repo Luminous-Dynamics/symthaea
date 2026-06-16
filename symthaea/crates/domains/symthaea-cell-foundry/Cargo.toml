@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-cell-foundry"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Cell culture control, iPSC reprogramming, IVG, and SCNT with HDC + LTC multi-scale prediction"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["cell-culture", "ipsc", "hdc", "ivg", "stem-cells"]
+categories = ["science", "algorithms"]
+
+[features]
+default = []
+morphogenetic-sorting = []
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+serde = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.4"

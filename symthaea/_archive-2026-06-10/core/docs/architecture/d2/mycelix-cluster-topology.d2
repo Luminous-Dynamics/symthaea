@@ -1,0 +1,198 @@
+# Mycelix Fractal CivOS — Unified hApp Cluster Topology
+# Professional Tier 1 Diagram
+
+direction: right
+
+title: {
+  label: Mycelix Unified hApp — 10-Role Cluster Topology
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# ═══════════════════════════════════════════
+# SOVEREIGN LAYER (Agent's Own Data)
+# ═══════════════════════════════════════════
+sovereign: Sovereign Layer {
+  style.fill: "#1a1a2e"
+  style.stroke: "#818cf8"
+  style.font-color: "#c7d2fe"
+  style.border-radius: 8
+
+  personal: Personal DNA {
+    style.fill: "#312e81"
+    style.stroke: "#818cf8"
+    style.font-color: "#e0e7ff"
+    identity_vault: Identity Vault {style.fill: "#3730a3"; style.font-color: "#c7d2fe"}
+    health_vault: Health Vault {style.fill: "#3730a3"; style.font-color: "#c7d2fe"}
+    credential_wallet: Credential Wallet {style.fill: "#3730a3"; style.font-color: "#c7d2fe"}
+    bridge: Personal Bridge {style.fill: "#4338ca"; style.font-color: "#a5b4fc"}
+  }
+}
+
+# ═══════════════════════════════════════════
+# AUTHORITY LAYER (Identity + Governance)
+# ═══════════════════════════════════════════
+authority: Authority Layer {
+  style.fill: "#1a2e1a"
+  style.stroke: "#4ade80"
+  style.font-color: "#bbf7d0"
+  style.border-radius: 8
+
+  identity: Identity DNA (9 zomes) {
+    style.fill: "#14532d"
+    style.stroke: "#22c55e"
+    style.font-color: "#bbf7d0"
+    did: DID Registry\ndid:mycelix format {style.fill: "#166534"; style.font-color: "#86efac"}
+    mfa: MFA Assurance\n5 Levels {style.fill: "#166534"; style.font-color: "#86efac"}
+    trust: Trust Credentials\nPeer Attestations {style.fill: "#166534"; style.font-color: "#86efac"}
+    recovery: Social Recovery\n3-7 Trustees, 60% {style.fill: "#166534"; style.font-color: "#86efac"}
+    creds: Credential Schema\nW3C Verifiable {style.fill: "#166534"; style.font-color: "#86efac"}
+    revocation: Revocation\n& Suspension {style.fill: "#166534"; style.font-color: "#86efac"}
+  }
+
+  governance: Governance DNA (7 zomes) {
+    style.fill: "#14532d"
+    style.stroke: "#22c55e"
+    style.font-color: "#bbf7d0"
+    proposals: Proposals\nMIP Submission {style.fill: "#166534"; style.font-color: "#86efac"}
+    voting: Voting\nWeighted + Delegation {style.fill: "#166534"; style.font-color: "#86efac"}
+    execution: Execution\nTimelock Protected {style.fill: "#166534"; style.font-color: "#86efac"}
+    constitution: Constitution\nCharter + Amendments {style.fill: "#166534"; style.font-color: "#86efac"}
+    dkg: DKG\nThreshold Signing {style.fill: "#166534"; style.font-color: "#86efac"}
+    treasury: Treasury\nCommons Pool {style.fill: "#166534"; style.font-color: "#86efac"}
+    councils: Councils\nQuorum Bodies {style.fill: "#166534"; style.font-color: "#86efac"}
+  }
+}
+
+# ═══════════════════════════════════════════
+# COMMUNITY LAYER (Commons + Civic + Hearth)
+# ═══════════════════════════════════════════
+community: Community Layer {
+  style.fill: "#2e1a1a"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+  style.border-radius: 8
+
+  commons_land: Commons Land DNA (19 zomes) {
+    style.fill: "#7f1d1d"
+    style.stroke: "#ef4444"
+    style.font-color: "#fca5a5"
+    property: Property (4)\nRegistry, Transfer,\nDisputes, Commons {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+    housing: Housing (6)\nUnits, CLT, Finance,\nMaint, Governance {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+    water: Water (5)\nFlow, Purity, Capture,\nSteward, Wisdom {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+    food: Food (4)\nProduction, Distribution,\nPreservation, Knowledge {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+  }
+
+  commons_care: Commons Care DNA (16 zomes) {
+    style.fill: "#7f1d1d"
+    style.stroke: "#ef4444"
+    style.font-color: "#fca5a5"
+    care: Care (5)\nTimebank, Circles,\nMatching, Plans, Creds {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+    mutualaid: Mutual Aid (7)\nNeeds, Pools, Resources,\nRequests, Governance {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+    transport: Transport (3)\nRoutes, Sharing, Impact {style.fill: "#991b1b"; style.font-color: "#fecaca"}
+  }
+
+  civic: Civic DNA (16 zomes) {
+    style.fill: "#78350f"
+    style.stroke: "#f59e0b"
+    style.font-color: "#fde68a"
+    justice: Justice (5)\nCases, Evidence,\nArbitration, Restorative {style.fill: "#92400e"; style.font-color: "#fde68a"}
+    emergency: Emergency (6)\nIncidents, Triage,\nResources, Shelters {style.fill: "#92400e"; style.font-color: "#fde68a"}
+    media: Media (4)\nPublication, Attribution,\nFactcheck, Curation {style.fill: "#92400e"; style.font-color: "#fde68a"}
+  }
+
+  hearth: Hearth DNA (12 zomes) {
+    style.fill: "#4a1942"
+    style.stroke: "#c084fc"
+    style.font-color: "#e9d5ff"
+    kinship: Kinship\nBonds, Invitations {style.fill: "#581c87"; style.font-color: "#d8b4fe"}
+    decisions: Decisions\nVoting, Quorum {style.fill: "#581c87"; style.font-color: "#d8b4fe"}
+    stories: Stories\nFamily Histories {style.fill: "#581c87"; style.font-color: "#d8b4fe"}
+    rhythms: Rhythms\nPresence, Daily {style.fill: "#581c87"; style.font-color: "#d8b4fe"}
+    autonomy: Autonomy\nGraduated Roles {style.fill: "#581c87"; style.font-color: "#d8b4fe"}
+    milestones: Milestones\nLife Transitions {style.fill: "#581c87"; style.font-color: "#d8b4fe"}
+  }
+}
+
+# ═══════════════════════════════════════════
+# ECONOMIC LAYER (Finance + Attribution)
+# ═══════════════════════════════════════════
+economic: Economic Layer {
+  style.fill: "#1a2e2e"
+  style.stroke: "#2dd4bf"
+  style.font-color: "#99f6e4"
+  style.border-radius: 8
+
+  finance: Finance DNA (7 zomes) {
+    style.fill: "#134e4a"
+    style.stroke: "#14b8a6"
+    style.font-color: "#99f6e4"
+    mycel: MYCEL\nSoulbound Reputation\n(0.0-1.0) {style.fill: "#115e59"; style.font-color: "#5eead4"}
+    sap: SAP\nTransferable\n2% Demurrage {style.fill: "#115e59"; style.font-color: "#5eead4"}
+    tend: TEND\nMutual Credit\n1 TEND = 1 Hour {style.fill: "#115e59"; style.font-color: "#5eead4"}
+    treasury: Treasury\n25% Inalienable Reserve {style.fill: "#115e59"; style.font-color: "#5eead4"}
+    staking: Staking\nSAP Collateral {style.fill: "#115e59"; style.font-color: "#5eead4"}
+  }
+
+  attribution: Attribution DNA (3 zomes) {
+    style.fill: "#134e4a"
+    style.stroke: "#14b8a6"
+    style.font-color: "#99f6e4"
+    registry: Dependency\nRegistry (8 ecosystems) {style.fill: "#115e59"; style.font-color: "#5eead4"}
+    usage: Usage Receipts\nZK-STARK Attestations {style.fill: "#115e59"; style.font-color: "#5eead4"}
+    reciprocity: Reciprocity\nStewardship Scoring {style.fill: "#115e59"; style.font-color: "#5eead4"}
+  }
+}
+
+# ═══════════════════════════════════════════
+# HEALTH (Standalone)
+# ═══════════════════════════════════════════
+health: Health DNA {
+  shape: hexagon
+  style.fill: "#1e3a5f"
+  style.stroke: "#3b82f6"
+  style.font-color: "#93c5fd"
+  label: Health Records\n(Standalone DNA)
+}
+
+# ═══════════════════════════════════════════
+# CROSS-CLUSTER BRIDGES
+# ═══════════════════════════════════════════
+
+# Within-DNA calls (CallTargetCell::Local)
+community.commons_land.property -> community.commons_land.housing: Local call {
+  style.stroke: "#4b5563"
+  style.stroke-dash: 2
+}
+
+# Cross-cluster bridges (CallTargetCell::OtherRole)
+community.commons_land -> community.civic: OtherRole\n"civic" {
+  style.stroke: "#f59e0b"
+  style.stroke-width: 2
+}
+community.civic -> community.commons_land: OtherRole\n"commons" {
+  style.stroke: "#ef4444"
+  style.stroke-width: 2
+}
+authority.identity -> authority.governance: ConsciousnessCredential\n(24h TTL) {
+  style.stroke: "#22c55e"
+  style.stroke-width: 3
+}
+authority.governance -> economic.finance: Treasury\nOperations {
+  style.stroke: "#14b8a6"
+  style.stroke-width: 2
+}
+sovereign.personal -> authority.identity: DID\nManagement {
+  style.stroke: "#818cf8"
+  style.stroke-width: 2
+}
+community.hearth -> authority.identity: OtherRole\n"identity" {
+  style.stroke: "#c084fc"
+  style.stroke-width: 2
+}
+economic.attribution -> economic.finance: MYCEL\nFeed {
+  style.stroke: "#2dd4bf"
+  style.stroke-dash: 3
+}

@@ -1,0 +1,63 @@
+[package]
+name = "symthaea-atelier"
+version = "0.1.0"
+edition = "2024"
+description = "Generative visual art engine for Symthaea — consciousness-driven SVG composition"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-canvas = { path = "../symthaea-canvas" }
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+serde = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+symthaea-muse = { path = "../symthaea-muse" }
+symthaea-gallery = { path = "../../symthaea-gallery" }
+
+[features]
+default = []
+showcase = []
+
+[[example]]
+name = "autopoietic_practice"
+required-features = ["showcase"]
+
+[[example]]
+name = "creative_demo"
+required-features = ["showcase"]
+
+[[example]]
+name = "creative_evolution"
+required-features = ["showcase"]
+
+[[example]]
+name = "living_art_demo"
+required-features = ["showcase"]
+
+[[example]]
+name = "neural_vs_procedural"
+required-features = ["showcase"]
+
+[[example]]
+name = "overnight_practice"
+required-features = ["showcase"]
+
+[[example]]
+name = "synesthetic_practice"
+required-features = ["showcase"]
+
+[[example]]
+name = "train_neural_canvas"
+required-features = ["showcase"]
+
+[[test]]
+name = "creative_loop_integration"
+required-features = ["showcase"]
+
+[lints]
+workspace = true

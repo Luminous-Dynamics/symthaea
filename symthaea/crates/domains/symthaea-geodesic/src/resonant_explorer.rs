@@ -150,57 +150,60 @@ impl ResonantExplorer {
         self
     }
 
-    /// Run the full resonant search toward an expected output encoding, optionally biased by epistemic mesh insights.
-    pub fn explore(
-        &mut self,
-        expected_output: &BinaryHV,
-        epistemic_context: Option<&crate::mycelix::epistemic_mesh::EpistemicSummary>,
-    ) -> ExplorationResult {
+    /// Run the full resonant search toward an expected output encoding.
+    ///
+    /// Returns the best ProgramNode found, its score, and optionally emitted
+    /// Rust source code.
+    pub fn explore(&mut self, expected_output: &BinaryHV) -> ExplorationResult {
         // Score the initial candidate
         let initial_encoding = self.best_encoding;
         self.best_score = self.score(&initial_encoding, expected_output);
 
         while self.evaluations < self.max_evaluations {
-            let converged = self.step(expected_output, epistemic_context);
+            let converged = self.step(expected_output);
             if converged {
                 break;
             }
         }
-        
-        // ... (rest of the result construction)
+
+        let source_code = Some(program_emitter::emit_rust(
+            &self.best_node,
+            "generated",
+            None,
+        ));
+
         ExplorationResult {
             best_node: self.best_node.clone(),
             best_score: self.best_score,
             evaluations_used: self.evaluations,
             sigma_final: self.sigma,
             converged: self.best_score >= self.convergence_threshold,
-            source_code: Some(program_emitter::emit_rust(&self.best_node, "generated", None)),
+            source_code,
             history: self.history.clone(),
         }
     }
 
-    /// Execute one search step with optional epistemic bias.
-    fn step(&mut self, expected_output: &BinaryHV, epistemic_context: Option<&crate::mycelix::epistemic_mesh::EpistemicSummary>) -> bool {
+    /// Execute one search step. Returns `true` if converged.
+    fn step(&mut self, expected_output: &BinaryHV) -> bool {
+        // 1. Perturb the best encoding
         self.seed_counter = xorshift64(self.seed_counter);
 
         let mut base_hv = self.best_encoding;
 
-        // Apply Epistemic Bias: narrow the exploration sigma if we have strong
-        // guidance for the current domain.
-        let mut active_sigma = self.sigma;
-        if let Some(ctx) = epistemic_context {
-            if ctx.blind_spots.iter().any(|b| self.best_node.domain() == *b) {
-                active_sigma *= 0.5; // Narrow search in high-ambiguity zones
-            }
+        // Semantic Repulsion: If we have a failure geometry, we "push" the base
+        // encoding away from it before adding exploration noise.
+        if let Some(ref rhv) = self.repulsion_hv {
+            // XOR with a noisy version of the repulsion vector effectively
+            // pushes the search into a different region of the 16k-D manifold.
+            let push_noise = perturb(rhv, 1.0 - self.repulsion_weight, self.seed_counter);
+            base_hv = base_hv.bind(&push_noise);
         }
-        
-        let perturbed = perturb(&base_hv, active_sigma, self.seed_counter);
-        
-        // ... (rest of step logic)
+
+        let perturbed = perturb(&base_hv, self.sigma, self.seed_counter);
+
+        // 2. Decode to nearest known ProgramNode
         let candidate_node = self.decode_nearest(&perturbed);
-        // ...
-        true
-    }
+        let candidate_encoding = candidate_node.encode();
 
         // 3. Score against expected output
         let candidate_score = self.score(&candidate_encoding, expected_output);

@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-memory"
+version = "0.1.0"
+edition = "2024"
+description = "Memory subsystems: semantic memory, coherence tracking, hippocampus, conversation"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+anyhow = { workspace = true }
+bincode = { workspace = true }
+chrono = { workspace = true }
+ndarray = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+symthaea-core = { path = "../../core/symthaea-core" }
+tokio = { workspace = true, features = ["sync"] }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio = { workspace = true, features = ["sync", "rt", "macros"] }
