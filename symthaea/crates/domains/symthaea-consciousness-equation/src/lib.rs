@@ -18,6 +18,8 @@ mod config;
 mod embodiment;
 mod engine;
 mod geodesic_interop;
+mod geodesic_interop;
+mod manifold_repair;
 mod narrative;
 mod social;
 mod stability_auditor;
@@ -28,6 +30,7 @@ pub use config::{ComponentWeights, MasterEquationConfig};
 pub use embodiment::{EmbodimentDiagnostics, EmbodimentFactor, InteroceptiveState};
 pub use engine::MasterConsciousnessEquation;
 pub use geodesic_interop::GeodesicInteropBridge;
+pub use manifold_repair::ManifoldRepairEngine;
 pub use narrative::{
     FutureScenario, NarrativeCoherence, NarrativeCoherenceDiagnostics, NarrativeEpisode,
     SimulationBranch,
