@@ -20,7 +20,8 @@ mod engine;
 mod narrative;
 mod social;
 mod stability_auditor;
-mod types;
+mod stability_auditor;
+mod stability_profiler;
 
 pub use config::{ComponentWeights, MasterEquationConfig};
 pub use embodiment::{EmbodimentDiagnostics, EmbodimentFactor, InteroceptiveState};
@@ -31,6 +32,7 @@ pub use narrative::{
 };
 pub use social::{AgentModel, SelfModel, SocialEmbedding};
 pub use stability_auditor::StabilityAuditor;
+pub use stability_profiler::StabilityProfiler;
 pub use types::{ConsciousnessInputs, ConsciousnessResult};
 
 #[cfg(test)]
