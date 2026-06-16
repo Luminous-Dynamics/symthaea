@@ -15,6 +15,7 @@
 pub mod correlation_auditor;
 pub mod floquet_time_crystal;
 pub mod hofstadter;
+pub mod live_audit;
 pub mod metrics;
 pub mod multiscale_phi;
 pub mod null_models;
