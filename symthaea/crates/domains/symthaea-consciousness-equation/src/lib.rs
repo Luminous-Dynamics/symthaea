@@ -17,6 +17,7 @@
 mod config;
 mod embodiment;
 mod engine;
+mod geodesic_interop;
 mod narrative;
 mod social;
 mod stability_auditor;
@@ -26,6 +27,7 @@ mod stability_profiler;
 pub use config::{ComponentWeights, MasterEquationConfig};
 pub use embodiment::{EmbodimentDiagnostics, EmbodimentFactor, InteroceptiveState};
 pub use engine::MasterConsciousnessEquation;
+pub use geodesic_interop::GeodesicInteropBridge;
 pub use narrative::{
     FutureScenario, NarrativeCoherence, NarrativeCoherenceDiagnostics, NarrativeEpisode,
     SimulationBranch,
