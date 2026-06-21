@@ -326,3 +326,83 @@ pub fn dialogue_system(
         }
     }
 }
+
+/// Bark situational dialogue when NPCs perform actions.
+pub fn dialogue_action_bark_system(
+    mut commands: Commands,
+    mut action_events: MessageReader<crate::components::NpcActionEvent>,
+    existing_bubbles: Query<Entity, With<SpeechBubble>>,
+) {
+    for event in action_events.read() {
+        for entity in &existing_bubbles {
+            commands.entity(entity).despawn();
+        }
+
+        let bark_text = match event.action_kind {
+            crate::components::NpcActionKind::RepairJunction => {
+                if event.success_delta >= 1.0 {
+                    format!(
+                        "{}: \"Junction grid fully stabilized. Re-routing output!\"",
+                        event.actor_name
+                    )
+                } else {
+                    format!(
+                        "{}: \"Junction restored to 80%! Need PR-4 to fully lock it in!\"",
+                        event.actor_name
+                    )
+                }
+            }
+            crate::components::NpcActionKind::RepairPump => {
+                if event.success_delta >= 1.0 {
+                    format!(
+                        "{}: \"Water pump efficiency recovered to 100%!\"",
+                        event.actor_name
+                    )
+                } else {
+                    format!(
+                        "{}: \"Pump is online, but warning: water lines are contaminated!\"",
+                        event.actor_name
+                    )
+                }
+            }
+            crate::components::NpcActionKind::HealStress => {
+                if event.success_delta > 0.0 {
+                    format!(
+                        "{}: \"Heart rate spikes detected. Stabilizing your allostatic load...\"",
+                        event.actor_name
+                    )
+                } else {
+                    format!(
+                        "{}: \"Warning: Patient is relapsing! Kael, get closer!\"",
+                        event.actor_name
+                    )
+                }
+            }
+            crate::components::NpcActionKind::CombatDrone => {
+                format!(
+                    "{}: \"Engaging hostile drone! Telemetry noise is spiking!\"",
+                    event.actor_name
+                )
+            }
+        };
+
+        commands.spawn((
+            Text::new(bark_text),
+            TextFont {
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(Color::srgba(0.5, 0.9, 1.0, 0.95)),
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(680.0),
+                left: Val::Px(12.0),
+                ..default()
+            },
+            SpeechBubble {
+                npc_entity: event.actor,
+                timer: 0.0,
+            },
+        ));
+    }
+}

@@ -625,3 +625,236 @@ pub fn camera_follow_system(
     // No rotation — camera always looks straight down (sprites stay visible)
     cam_tf.rotation = Quat::IDENTITY;
 }
+
+/// Helper to draw a 2D arrow using gizmos
+fn draw_arrow_2d(gizmos: &mut Gizmos, start: Vec2, end: Vec2, color: Color) {
+    gizmos.line_2d(start, end, color);
+    let dir = (start - end).normalize_or_zero();
+    if dir == Vec2::ZERO {
+        return;
+    }
+    let length = 8.0;
+    let angle = 0.52_f32; // ~30 degrees
+    let left = Vec2::new(
+        dir.x * angle.cos() - dir.y * angle.sin(),
+        dir.x * angle.sin() + dir.y * angle.cos(),
+    ) * length;
+    let right = Vec2::new(
+        dir.x * angle.cos() + dir.y * angle.sin(),
+        -dir.x * angle.sin() + dir.y * angle.cos(),
+    ) * length;
+    gizmos.line_2d(end, end + left, color);
+    gizmos.line_2d(end, end + right, color);
+}
+
+/// Helper to draw a 3D arrow using gizmos
+fn draw_arrow_3d(gizmos: &mut Gizmos, start: Vec3, end: Vec3, color: Color) {
+    gizmos.line(start, end, color);
+    let dir = (start - end).normalize_or_zero();
+    if dir == Vec3::ZERO {
+        return;
+    }
+    let length = 8.0;
+    let up = Vec3::Y;
+    let right_vec = dir.cross(up).normalize_or_zero();
+    let up_vec = if right_vec == Vec3::ZERO {
+        Vec3::X
+    } else {
+        right_vec.cross(dir).normalize_or_zero()
+    };
+
+    let left = (dir * 0.866 + right_vec * 0.5) * length;
+    let right = (dir * 0.866 - right_vec * 0.5) * length;
+    let up_p = (dir * 0.866 + up_vec * 0.5) * length;
+    let down_p = (dir * 0.866 - up_vec * 0.5) * length;
+
+    gizmos.line(end, end + left, color);
+    gizmos.line(end, end + right, color);
+    gizmos.line(end, end + up_p, color);
+    gizmos.line(end, end + down_p, color);
+}
+
+/// Configuration for the Field Deck diagnostic overlay
+#[derive(Resource)]
+pub struct FieldDeckConfig {
+    pub overlay_enabled: bool,
+}
+
+impl Default for FieldDeckConfig {
+    fn default() -> Self {
+        Self {
+            overlay_enabled: true,
+        }
+    }
+}
+
+/// Toggles Field Deck Diagnostic Overlay via F3 or KeyF
+pub fn field_deck_toggle_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut config: ResMut<FieldDeckConfig>,
+) {
+    if keyboard.just_pressed(KeyCode::F3) || keyboard.just_pressed(KeyCode::KeyF) {
+        config.overlay_enabled = !config.overlay_enabled;
+    }
+}
+
+/// Spawns floating world-space completion barks when WorldFeedbackEvents are emitted
+pub fn world_feedback_listener_system(
+    mut commands: Commands,
+    mut events: MessageReader<crate::components::WorldFeedbackEvent>,
+) {
+    for event in events.read() {
+        commands.spawn((
+            Text2d::new(event.message.clone()),
+            TextFont {
+                font_size: 10.0,
+                ..default()
+            },
+            TextColor(event.color),
+            Transform::from_xyz(event.position.x, event.position.y + 15.0, 15.0),
+            crate::components::WorldFeedbackLabel {
+                timer: Timer::from_seconds(2.0, TimerMode::Once),
+            },
+        ));
+    }
+}
+
+/// Floats world feedback text upwards and fades it out
+pub fn update_feedback_labels_system(
+    mut commands: Commands,
+    mut query: Query<(
+        Entity,
+        &mut Transform,
+        &mut TextColor,
+        &mut crate::components::WorldFeedbackLabel,
+    )>,
+    time: Res<Time>,
+) {
+    let dt = time.delta_secs();
+    for (entity, mut tf, mut color, mut label) in &mut query {
+        label.timer.tick(time.delta());
+        if label.timer.is_finished() {
+            commands.entity(entity).despawn();
+        } else {
+            tf.translation.y += 20.0 * dt;
+            let progress = label.timer.fraction_remaining();
+            color.0.set_alpha(progress);
+        }
+    }
+}
+
+/// Field Deck Diagnostic Visualizer drawing active inference indicators in world space
+pub fn gizmo_telemetry_debug_system(
+    mut gizmos: Gizmos,
+    npcs: Query<(
+        &CrewNpc,
+        &Transform,
+        &MoveTarget,
+        &symtropy_render_bridge::PhysicsBody,
+    )>,
+    player_query: Query<&Transform, With<Player>>,
+    physics: Res<PhysicsWorldRes>,
+    phase_state: Res<State<crate::resources::GamePhase>>,
+    field_deck: Res<FieldDeckConfig>,
+    power_junctions: Query<(&Transform, &PowerJunction)>,
+    water_pumps: Query<(&Transform, &WaterPump)>,
+) {
+    if !field_deck.overlay_enabled {
+        return;
+    }
+
+    let is_3d = *phase_state.get() == crate::resources::GamePhase::Playing3D;
+
+    let Some(player_tf) = player_query.iter().next() else {
+        return;
+    };
+    let player_pos = player_tf.translation;
+
+    // Draw crew diagnostic overlays
+    for (_npc, npc_tf, move_target, body) in &npcs {
+        let npc_pos = npc_tf.translation;
+
+        let (prediction_error, npc_phi) = physics
+            .consciousness
+            .entities
+            .get(&body.handle)
+            .map(|e| (e.prediction_error, e.phi()))
+            .unwrap_or((0.0, 0.5));
+
+        // 1. Surprise Gradient (Red, pointing upwards)
+        let height = (prediction_error as f32 * 50.0).clamp(5.0, 150.0);
+        let ray_color = Color::srgb(1.0, 0.1, 0.1);
+        if is_3d {
+            gizmos.line(npc_pos, npc_pos + Vec3::new(0.0, 0.0, height), ray_color);
+        } else {
+            gizmos.line_2d(
+                npc_pos.truncate(),
+                npc_pos.truncate() + Vec2::new(0.0, height),
+                ray_color,
+            );
+        }
+
+        // 2. Phi Cohesion Thread (Thin ice-blue lines connecting player to crew, fading as phi drops)
+        let phi_color = Color::linear_rgba(0.4, 0.8, 1.0, npc_phi as f32);
+        if is_3d {
+            gizmos.line(
+                player_pos + Vec3::new(0.0, 0.0, 2.0),
+                npc_pos + Vec3::new(0.0, 0.0, 2.0),
+                phi_color,
+            );
+        } else {
+            gizmos.line_2d(player_pos.truncate(), npc_pos.truncate(), phi_color);
+        }
+
+        // 3. Action Intention Vector (Green arrows pointing to move target)
+        if let Some(target) = move_target.target {
+            let target_pos = if is_3d {
+                Vec3::new(target.x, target.y, npc_pos.z)
+            } else {
+                Vec3::new(target.x, target.y, 0.0)
+            };
+            let dir_color = Color::srgb(0.2, 0.9, 0.3);
+            if is_3d {
+                draw_arrow_3d(&mut gizmos, npc_pos, target_pos, dir_color);
+            } else {
+                draw_arrow_2d(
+                    &mut gizmos,
+                    npc_pos.truncate(),
+                    target_pos.truncate(),
+                    dir_color,
+                );
+            }
+        }
+    }
+
+    // 4. Infrastructure Distress Ray (Amber/Orange vertical lines from damaged/sabotaged machines)
+    let distress_color = Color::srgb(0.9, 0.5, 0.1);
+    for (j_tf, junction) in &power_junctions {
+        if junction.is_damaged {
+            let j_pos = j_tf.translation;
+            if is_3d {
+                gizmos.line(j_pos, j_pos + Vec3::new(0.0, 0.0, 40.0), distress_color);
+            } else {
+                gizmos.line_2d(
+                    j_pos.truncate(),
+                    j_pos.truncate() + Vec2::new(0.0, 40.0),
+                    distress_color,
+                );
+            }
+        }
+    }
+    for (p_tf, pump) in &water_pumps {
+        if pump.is_sabotaged {
+            let p_pos = p_tf.translation;
+            if is_3d {
+                gizmos.line(p_pos, p_pos + Vec3::new(0.0, 0.0, 40.0), distress_color);
+            } else {
+                gizmos.line_2d(
+                    p_pos.truncate(),
+                    p_pos.truncate() + Vec2::new(0.0, 40.0),
+                    distress_color,
+                );
+            }
+        }
+    }
+}

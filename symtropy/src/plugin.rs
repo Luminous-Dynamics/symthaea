@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Symtropy game plugin: wires all systems together.
 
+use crate::components;
 use crate::resources::{
     BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes, PlayerInput,
 };
@@ -22,6 +23,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<GovernanceLog>()
             .init_resource::<systems::consciousness::PlayerConsciousness>()
             .init_resource::<systems::rendering::TelemetryTimer>()
+            .init_resource::<systems::rendering::FieldDeckConfig>()
             .init_resource::<systems::postprocess::ConsciousnessVisuals>()
             .init_resource::<systems::postprocess::CameraTrauma>()
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
@@ -49,6 +51,8 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<systems::dimensional_leakage::LeakageTimer>()
             .init_resource::<symtropy_render_bridge::TelemetryBufferResource>()
             .add_plugins(symtropy_render_bridge::TelemetryMaterialPlugin)
+            .add_message::<components::NpcActionEvent>()
+            .add_message::<components::WorldFeedbackEvent>()
             // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
             .add_systems(FixedUpdate, (
                 systems::engine_physics::physics_apply_inputs,
@@ -89,7 +93,13 @@ impl Plugin for SymtropyPlugin {
             .add_systems(Update, (
                 systems::input::input_system,
                 systems::player::flashlight_system, systems::player::extraction_system,
-                systems::fep_behavior::fep_behavior_system, systems::fep_behavior::npc_movement_system,
+                systems::fep_behavior::fep_behavior_system,
+                systems::fep_behavior::npc_action_system,
+                systems::fep_behavior::npc_movement_system,
+                systems::rendering::gizmo_telemetry_debug_system,
+                systems::rendering::update_feedback_labels_system,
+                systems::rendering::field_deck_toggle_system,
+                systems::rendering::world_feedback_listener_system,
             ).chain().run_if(in_playing_or_3d))
             .add_systems(Update, (
                 systems::rendering::camera_follow_system,
@@ -119,6 +129,7 @@ impl Plugin for SymtropyPlugin {
                 systems::rendering::hud_system, systems::minimap::update_minimap,
                 systems::room_memory::room_memory_update_system,
                 systems::dialogue::dialogue_system,
+                systems::dialogue::dialogue_action_bark_system,
                 systems::living_dungeon::living_dungeon_system,
                 systems::settlement::settlement_metric_update_system,
                 systems::settlement::settlement_interaction_system,
@@ -389,6 +400,7 @@ mod tests {
         app.add_plugins(bevy::input::InputPlugin);
         // Add AssetPlugin so Assets<Mesh>/Assets<StandardMaterial> exist
         app.add_plugins(bevy::asset::AssetPlugin::default());
+        app.add_plugins(bevy::gizmos::GizmoPlugin);
         app.init_asset::<Mesh>();
         app.init_asset::<StandardMaterial>();
 

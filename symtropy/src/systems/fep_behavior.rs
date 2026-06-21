@@ -5,7 +5,10 @@
 use bevy::prelude::*;
 use symthaea_fep::Observation;
 
-use crate::components::{CrewNpc, MoveTarget, NoiseEmitter, Player};
+use crate::components::{
+    CrewNpc, MoveTarget, NoiseEmitter, NpcActionEvent, NpcActionKind, NullDrone, Player,
+    PowerJunction, WaterPump, WorldFeedbackEvent,
+};
 use crate::resources::{
     BiometricsCtx, EnergyWell, LeviathanState, PhysicsWorldRes, SettlementMetrics, SleepPhase,
 };
@@ -15,12 +18,13 @@ use symtropy_render_bridge::PhysicsBody;
 pub fn fep_behavior_system(
     mut npcs: Query<
         (
+            Entity,
             &mut CrewNpc,
             &Transform,
             &mut MoveTarget,
             &mut NoiseEmitter,
             &PhysicsBody,
-            Option<&crate::systems::psychology::PsychologicalNeeds>,
+            Option<&mut crate::systems::psychology::PsychologicalNeeds>,
         ),
         Without<Player>,
     >,
@@ -39,6 +43,10 @@ pub fn fep_behavior_system(
             Without<CrewNpc>,
         ),
     >,
+    power_junctions: Query<(&Transform, &PowerJunction)>,
+    water_pumps: Query<(&Transform, &WaterPump)>,
+    drones: Query<(&Transform, &NullDrone)>,
+    time: Res<Time>,
 ) {
     let Some((player_tf, player_body)) = player_query.iter().next() else {
         return;
@@ -89,7 +97,24 @@ pub fn fep_behavior_system(
         }
     }
 
-    for (mut npc, npc_tf, mut target, mut noise, body, psych) in &mut npcs {
+    // Pre-gather all NPC basic info to avoid query/borrow conflicts
+    struct NpcInfo {
+        entity: Entity,
+        name: String,
+        pos: Vec2,
+        allostatic_load: f32,
+    }
+    let npc_infos: Vec<NpcInfo> = npcs
+        .iter()
+        .map(|(entity, npc, tf, _, _, _, psych)| NpcInfo {
+            entity,
+            name: npc.name.clone(),
+            pos: tf.translation.truncate(),
+            allostatic_load: psych.as_ref().map_or(0.0, |p| p.allostatic_load),
+        })
+        .collect();
+
+    for (entity, mut npc, npc_tf, mut target, mut noise, body, mut psych) in &mut npcs {
         let npc_pos = npc_tf.translation.truncate();
         let pos = nalgebra::SVector::from([npc_pos.x as f64, npc_pos.y as f64]);
 
@@ -153,9 +178,114 @@ pub fn fep_behavior_system(
             }
         }
 
+        // ARCHETYPE-SPECIFIC ACTIVE INFERENCE ACTIONS & GOALS
+
+        // 1. Kael (Engineer) & Leo (Young Tech)
+        if npc.name.contains("Kael") || npc.name.contains("Leo") {
+            let mut closest_junction: Option<(Vec2, f32)> = None;
+            for (junction_tf, junction) in &power_junctions {
+                if junction.is_damaged {
+                    let j_pos = junction_tf.translation.truncate();
+                    let dist = npc_pos.distance(j_pos);
+                    if closest_junction.map_or(true, |(_, d)| dist < d) {
+                        closest_junction = Some((j_pos, dist));
+                    }
+                }
+            }
+            if let Some((j_pos, _)) = closest_junction {
+                let to_junction = nalgebra::SVector::from([
+                    (j_pos.x - npc_pos.x) as f64,
+                    (j_pos.y - npc_pos.y) as f64,
+                ])
+                .normalize();
+                direction = direction * 0.4 + to_junction * 0.6;
+            }
+
+            // If Leo is close to Kael, scale down Leo's anxiety/stress over time
+            if npc.name.contains("Leo") {
+                let kael_pos = npc_infos
+                    .iter()
+                    .find(|info| info.name.contains("Kael"))
+                    .map(|info| info.pos);
+                if let Some(kael_p) = kael_pos {
+                    if npc_pos.distance(kael_p) < 100.0 {
+                        if let Some(ref mut p) = psych {
+                            p.allostatic_load =
+                                (p.allostatic_load - 0.05 * time.delta_secs()).max(0.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Mira (Medic)
+        if npc.name.contains("Mira") {
+            let mut closest_stressed: Option<(Vec2, f32)> = None;
+            for info in &npc_infos {
+                if info.entity != entity && info.allostatic_load > 0.4 {
+                    let dist = npc_pos.distance(info.pos);
+                    if closest_stressed.map_or(true, |(_, d)| dist < d) {
+                        closest_stressed = Some((info.pos, dist));
+                    }
+                }
+            }
+            if let Some((c_pos, _)) = closest_stressed {
+                let to_crew = nalgebra::SVector::from([
+                    (c_pos.x - npc_pos.x) as f64,
+                    (c_pos.y - npc_pos.y) as f64,
+                ])
+                .normalize();
+                direction = direction * 0.3 + to_crew * 0.7;
+            }
+        }
+
+        // 3. Jack (Convoy Lead)
+        if npc.name.contains("Jack") {
+            let mut closest_drone: Option<(Vec2, f32)> = None;
+            for (drone_tf, _) in &drones {
+                let d_pos = drone_tf.translation.truncate();
+                let dist = npc_pos.distance(d_pos);
+                if dist <= 250.0 {
+                    if closest_drone.map_or(true, |(_, d)| dist < d) {
+                        closest_drone = Some((d_pos, dist));
+                    }
+                }
+            }
+            if let Some((d_pos, _)) = closest_drone {
+                let to_drone = nalgebra::SVector::from([
+                    (d_pos.x - npc_pos.x) as f64,
+                    (d_pos.y - npc_pos.y) as f64,
+                ])
+                .normalize();
+                direction = direction * 0.2 + to_drone * 0.8;
+            }
+        }
+
+        // 4. PR-4 (Robot)
+        if npc.name.contains("PR-4") {
+            let mut closest_pump: Option<(Vec2, f32)> = None;
+            for (pump_tf, pump) in &water_pumps {
+                if pump.is_sabotaged {
+                    let p_pos = pump_tf.translation.truncate();
+                    let dist = npc_pos.distance(p_pos);
+                    if closest_pump.map_or(true, |(_, d)| dist < d) {
+                        closest_pump = Some((p_pos, dist));
+                    }
+                }
+            }
+            if let Some((p_pos, _)) = closest_pump {
+                let to_pump = nalgebra::SVector::from([
+                    (p_pos.x - npc_pos.x) as f64,
+                    (p_pos.y - npc_pos.y) as f64,
+                ])
+                .normalize();
+                direction = direction * 0.4 + to_pump * 0.6;
+            }
+        }
+
         let dir_vec = Vec2::new(direction[0] as f32, direction[1] as f32);
-        let load = psych.map(|p| p.allostatic_load).unwrap_or(0.0);
-        let engagement = psych.map(|p| p.engagement).unwrap_or(1.0);
+        let load = psych.as_ref().map(|p| p.allostatic_load).unwrap_or(0.0);
+        let engagement = psych.as_ref().map(|p| p.engagement).unwrap_or(1.0);
 
         let effective_engagement = if danger > 0.5 {
             engagement.max(0.5)
@@ -187,6 +317,256 @@ pub fn fep_behavior_system(
             npc.caution = (npc.caution + 0.05 + load_caution_boost).min(1.0);
         } else {
             npc.caution = (npc.caution - 0.02).max(0.0);
+        }
+    }
+}
+
+/// System applying repairs, healing, and drone neutralization when adjacent to targets.
+/// System applying repairs, healing, and drone neutralization when adjacent to targets.
+pub fn npc_action_system(
+    actors: Query<(Entity, &CrewNpc, &Transform)>,
+    mut needs_query: Query<&mut crate::systems::psychology::PsychologicalNeeds>,
+    mut power_junctions: Query<(&Transform, &mut PowerJunction)>,
+    mut water_pumps: Query<(&Transform, &mut WaterPump)>,
+    mut drones: Query<(Entity, &Transform, &mut NullDrone)>,
+    mut commands: Commands,
+    time: Res<Time>,
+    mut action_writer: MessageWriter<NpcActionEvent>,
+    mut feedback_writer: MessageWriter<WorldFeedbackEvent>,
+) {
+    let dt = time.delta_secs();
+
+    for (actor_entity, npc, tf) in &actors {
+        let npc_pos = tf.translation.truncate();
+
+        // 1. Kael (Engineer) repairs PowerJunction
+        if npc.name.contains("Kael") {
+            for (j_tf, mut junction) in &mut power_junctions {
+                if junction.is_damaged {
+                    let j_pos = j_tf.translation.truncate();
+                    if npc_pos.distance(j_pos) < 30.0 {
+                        let is_pr4_adjacent = actors.iter().any(|(_, other_npc, other_tf)| {
+                            other_npc.name.contains("PR-4")
+                                && other_tf.translation.truncate().distance(j_pos) < 30.0
+                        });
+
+                        if is_pr4_adjacent {
+                            junction.is_damaged = false;
+                            junction.output = 1.0;
+                            action_writer.write(NpcActionEvent {
+                                actor: actor_entity,
+                                actor_name: npc.name.clone(),
+                                target: None,
+                                target_name: "Power Junction".to_string(),
+                                action_kind: NpcActionKind::RepairJunction,
+                                intensity: 1.0,
+                                success_delta: 1.0,
+                                settlement_metric_delta: 0.2,
+                            });
+                            feedback_writer.write(WorldFeedbackEvent {
+                                position: j_pos,
+                                message: "JUNCTION STABILIZED (100%)".to_string(),
+                                color: Color::srgb(0.2, 0.9, 0.4),
+                            });
+                        } else if junction.output < 0.8 {
+                            let old_out = junction.output;
+                            junction.output = (junction.output + 0.3 * dt).min(0.8);
+                            if old_out < 0.8 && junction.output >= 0.8 {
+                                action_writer.write(NpcActionEvent {
+                                    actor: actor_entity,
+                                    actor_name: npc.name.clone(),
+                                    target: None,
+                                    target_name: "Power Junction".to_string(),
+                                    action_kind: NpcActionKind::RepairJunction,
+                                    intensity: 0.5,
+                                    success_delta: 0.8,
+                                    settlement_metric_delta: 0.1,
+                                });
+                                feedback_writer.write(WorldFeedbackEvent {
+                                    position: j_pos,
+                                    message: "JUNCTION RESTORED TO 80% (NEEDS PR-4)".to_string(),
+                                    color: Color::srgb(0.9, 0.6, 0.2),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. PR-4 (Robot) repairs WaterPump
+        if npc.name.contains("PR-4") {
+            for (p_tf, mut pump) in &mut water_pumps {
+                if pump.is_sabotaged {
+                    let p_pos = p_tf.translation.truncate();
+                    if npc_pos.distance(p_pos) < 30.0 {
+                        let is_assistant_adjacent =
+                            actors.iter().any(|(_, other_npc, other_tf)| {
+                                (other_npc.name.contains("Nadia")
+                                    || other_npc.name.contains("Soren"))
+                                    && other_tf.translation.truncate().distance(p_pos) < 30.0
+                            });
+
+                        if is_assistant_adjacent {
+                            pump.is_sabotaged = false;
+                            pump.efficiency = 1.0;
+                            pump.is_running = true;
+                            action_writer.write(NpcActionEvent {
+                                actor: actor_entity,
+                                actor_name: npc.name.clone(),
+                                target: None,
+                                target_name: "Water Pump".to_string(),
+                                action_kind: NpcActionKind::RepairPump,
+                                intensity: 1.0,
+                                success_delta: 1.0,
+                                settlement_metric_delta: 0.2,
+                            });
+                            feedback_writer.write(WorldFeedbackEvent {
+                                position: p_pos,
+                                message: "WATER PUMP PURIFIED (100%)".to_string(),
+                                color: Color::srgb(0.2, 0.9, 0.4),
+                            });
+                        } else if pump.efficiency < 0.7 {
+                            let old_eff = pump.efficiency;
+                            pump.efficiency = (pump.efficiency + 0.3 * dt).min(0.7);
+                            pump.is_running = true;
+                            if old_eff < 0.7 && pump.efficiency >= 0.7 {
+                                pump.is_sabotaged = false; // Online but partial
+                                action_writer.write(NpcActionEvent {
+                                    actor: actor_entity,
+                                    actor_name: npc.name.clone(),
+                                    target: None,
+                                    target_name: "Water Pump".to_string(),
+                                    action_kind: NpcActionKind::RepairPump,
+                                    intensity: 0.5,
+                                    success_delta: 0.7,
+                                    settlement_metric_delta: 0.1,
+                                });
+                                feedback_writer.write(WorldFeedbackEvent {
+                                    position: p_pos,
+                                    message: "WATER PUMP ONLINE (CONTAMINATED)".to_string(),
+                                    color: Color::srgb(0.9, 0.6, 0.2),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Mira (Medic) heals stressed crew member
+        if npc.name.contains("Mira") {
+            for (other_entity, other_npc, other_tf) in &actors {
+                if other_entity != actor_entity {
+                    let other_pos = other_tf.translation.truncate();
+                    if npc_pos.distance(other_pos) < 30.0 {
+                        if let Ok(mut other_psych) = needs_query.get_mut(other_entity) {
+                            if other_psych.allostatic_load > 0.4 {
+                                let kael_pos = actors
+                                    .iter()
+                                    .find(|(_, o_npc, _)| o_npc.name.contains("Kael"))
+                                    .map(|(_, _, o_tf)| o_tf.translation.truncate());
+                                let kael_far =
+                                    kael_pos.map_or(true, |kp| other_pos.distance(kp) > 120.0);
+
+                                if kael_far && other_npc.name.contains("Leo") {
+                                    // Relapse state
+                                    other_psych.allostatic_load =
+                                        (other_psych.allostatic_load + 0.05 * dt).min(1.0);
+
+                                    // Trigger relapse warning event and label slowly
+                                    if rand::random::<f32>() < 0.01 {
+                                        action_writer.write(NpcActionEvent {
+                                            actor: actor_entity,
+                                            actor_name: npc.name.clone(),
+                                            target: Some(other_entity),
+                                            target_name: other_npc.name.clone(),
+                                            action_kind: NpcActionKind::HealStress,
+                                            intensity: 0.0,
+                                            success_delta: -0.1,
+                                            settlement_metric_delta: -0.05,
+                                        });
+                                        feedback_writer.write(WorldFeedbackEvent {
+                                            position: other_pos,
+                                            message: "LEO RELAPSING (KAEL FAR)".to_string(),
+                                            color: Color::srgb(0.9, 0.2, 0.2),
+                                        });
+                                    }
+                                } else {
+                                    // Successful healing
+                                    let old_load = other_psych.allostatic_load;
+                                    other_psych.allostatic_load =
+                                        (other_psych.allostatic_load - 0.15 * dt).max(0.0);
+                                    other_psych.social_satiation =
+                                        (other_psych.social_satiation + 0.1 * dt).min(1.0);
+
+                                    // Emit healer success event
+                                    if old_load > 0.4 && other_psych.allostatic_load <= 0.4 {
+                                        action_writer.write(NpcActionEvent {
+                                            actor: actor_entity,
+                                            actor_name: npc.name.clone(),
+                                            target: Some(other_entity),
+                                            target_name: other_npc.name.clone(),
+                                            action_kind: NpcActionKind::HealStress,
+                                            intensity: 1.0,
+                                            success_delta: 0.15,
+                                            settlement_metric_delta: 0.1,
+                                        });
+                                        feedback_writer.write(WorldFeedbackEvent {
+                                            position: other_pos,
+                                            message: "CREW STRESS STABILIZED (-15%)".to_string(),
+                                            color: Color::srgb(0.2, 0.8, 0.9),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Jack (Convoy Lead) deals damage to / destroys NullDrone
+        if npc.name.contains("Jack") {
+            for (drone_entity, d_tf, mut drone) in &mut drones {
+                let d_pos = d_tf.translation.truncate();
+                if npc_pos.distance(d_pos) < 30.0 {
+                    drone.integrity -= 0.5 * dt;
+
+                    // Gunfire stress: increase stress of nearby crew members
+                    for (other_ent, other_npc, other_tf) in &actors {
+                        if other_ent != actor_entity {
+                            let dist = other_tf.translation.truncate().distance(npc_pos);
+                            if dist < 150.0 {
+                                if let Ok(mut other_psych) = needs_query.get_mut(other_ent) {
+                                    other_psych.allostatic_load =
+                                        (other_psych.allostatic_load + 0.02 * dt).min(1.0);
+                                }
+                            }
+                        }
+                    }
+
+                    if drone.integrity <= 0.0 {
+                        commands.entity(drone_entity).despawn();
+
+                        action_writer.write(NpcActionEvent {
+                            actor: actor_entity,
+                            actor_name: npc.name.clone(),
+                            target: None,
+                            target_name: "NullDrone".to_string(),
+                            action_kind: NpcActionKind::CombatDrone,
+                            intensity: 1.0,
+                            success_delta: 1.0,
+                            settlement_metric_delta: 0.15,
+                        });
+                        feedback_writer.write(WorldFeedbackEvent {
+                            position: d_pos,
+                            message: "NULL DRONE DISABLED".to_string(),
+                            color: Color::srgb(0.9, 0.2, 0.2),
+                        });
+                    }
+                }
+            }
         }
     }
 }

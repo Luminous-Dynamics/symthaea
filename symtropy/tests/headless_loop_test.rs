@@ -14,6 +14,7 @@ fn test_headless_game_loop() {
     app.add_plugins(bevy::state::app::StatesPlugin);
     app.add_plugins(bevy::input::InputPlugin);
     app.add_plugins(bevy::asset::AssetPlugin::default());
+    app.add_plugins(bevy::gizmos::GizmoPlugin);
     app.init_asset::<Mesh>();
     app.init_asset::<StandardMaterial>();
 
@@ -48,10 +49,21 @@ fn test_headless_game_loop() {
     // Step 3: Transition to Playing3D / Playing. Run OnEnter systems for the active gameplay phase.
     app.update();
 
+    // Measure duration using std::time::Instant
+    let start_time = std::time::Instant::now();
+
     // Run for 100+ frames to simulate gameplay ticks
     for _ in 0..120 {
         app.update();
     }
+
+    let elapsed = start_time.elapsed();
+    println!("120-frame simulation took: {:?}", elapsed);
+    assert!(
+        elapsed < std::time::Duration::from_secs_f32(3.0),
+        "Headless execution budget exceeded: 120 frames took {:?} (budget: 3.0s)",
+        elapsed
+    );
 
     // --- Assertions ---
 
@@ -190,5 +202,385 @@ fn test_headless_game_loop() {
     println!(
         "Headless simulation completed successfully with drone sabotage validation. Settlement metrics: {:?}",
         settlement_metrics
+    );
+}
+
+#[test]
+fn test_dungeon_pcg_properties() {
+    use rand::Rng;
+    use rand::SeedableRng;
+
+    let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+
+    for i in 0..50 {
+        let seed = rng.r#gen::<u64>();
+        // Randomize dimensions
+        let width = rng.gen_range(20..50);
+        let height = rng.gen_range(20..50);
+        let dungeon = symtropy_launcher::systems::procgen::generate_dungeon(width, height, seed);
+
+        // Verify dimensions
+        assert_eq!(dungeon.width, width);
+        assert_eq!(dungeon.height, height);
+
+        // Find player start (3) and core start (2)
+        let mut player_start = None;
+        let mut core_start = None;
+
+        for y in 0..height {
+            for x in 0..width {
+                if dungeon.tiles[y][x] == 3 {
+                    player_start = Some((x, y));
+                } else if dungeon.tiles[y][x] == 2 {
+                    core_start = Some((x, y));
+                }
+            }
+        }
+
+        assert!(
+            player_start.is_some(),
+            "Dungeon layout #{} (seed: {}) failed to generate a player start",
+            i,
+            seed
+        );
+        assert!(
+            core_start.is_some(),
+            "Dungeon layout #{} (seed: {}) failed to generate a core start",
+            i,
+            seed
+        );
+
+        let start_pos = player_start.unwrap();
+        let end_pos = core_start.unwrap();
+
+        // Perform BFS to assert that a path exists between them
+        let mut queue = std::collections::VecDeque::new();
+        let mut visited = vec![vec![false; width]; height];
+
+        queue.push_back(start_pos);
+        visited[start_pos.1][start_pos.0] = true;
+
+        let mut path_found = false;
+        while let Some((cx, cy)) = queue.pop_front() {
+            if (cx, cy) == end_pos {
+                path_found = true;
+                break;
+            }
+
+            for (dx, dy) in &[(0, 1), (0, -1), (1, 0), (-1, 0)] {
+                let nx = cx as isize + dx;
+                let ny = cy as isize + dy;
+                if nx >= 0 && nx < width as isize && ny >= 0 && ny < height as isize {
+                    let ux = nx as usize;
+                    let uy = ny as usize;
+                    // Walkable tiles are > 0 (1=floor, 2=core_room, 3=player_start)
+                    if !visited[uy][ux] && dungeon.tiles[uy][ux] > 0 {
+                        visited[uy][ux] = true;
+                        queue.push_back((ux, uy));
+                    }
+                }
+            }
+        }
+
+        assert!(
+            path_found,
+            "Dungeon layout #{} (seed: {}) failed path verification: no walkable path exists between player start {:?} and core start {:?}",
+            i, seed, start_pos, end_pos
+        );
+    }
+}
+
+#[test]
+fn test_narrative_system_causality() {
+    let mut app = App::new();
+
+    // Set up standard Bevy plugins headlessly
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins(bevy::state::app::StatesPlugin);
+    app.add_plugins(bevy::input::InputPlugin);
+    app.add_plugins(bevy::asset::AssetPlugin::default());
+    app.add_plugins(bevy::gizmos::GizmoPlugin);
+    app.init_asset::<Mesh>();
+    app.init_asset::<StandardMaterial>();
+
+    // Register our plugin (which handles systems, state, physics, settlement loop)
+    app.add_plugins(SymtropyPlugin);
+
+    // Mock virtual time advancement by 0.5s per frame deterministically
+    app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+        std::time::Duration::from_secs_f32(0.5),
+    ));
+
+    // Selection experience setup: select "waterworks-3d"
+    {
+        let mut registry = app
+            .world_mut()
+            .resource_mut::<symtropy_launcher::experience::ExperienceRegistry>();
+        if let Some(idx) = registry
+            .experiences
+            .iter()
+            .position(|e| e.id == "waterworks-3d")
+        {
+            registry.selected = idx;
+        }
+    }
+
+    // Transition from MainMenu to Loading manually
+    app.world_mut()
+        .resource_mut::<NextState<GamePhase>>()
+        .set(GamePhase::Loading);
+
+    // Run setup to playing transition
+    app.update();
+    app.update();
+    app.update();
+
+    // Now, let's create a test event collector resource and add the collector system
+    #[derive(Resource, Default, Clone)]
+    struct TestEventCollector {
+        actions: Vec<symtropy_launcher::components::NpcActionEvent>,
+        feedback: Vec<symtropy_launcher::components::WorldFeedbackEvent>,
+    }
+
+    app.insert_resource(TestEventCollector::default());
+
+    fn collect_test_events_system(
+        mut reader_actions: MessageReader<symtropy_launcher::components::NpcActionEvent>,
+        mut reader_feedback: MessageReader<symtropy_launcher::components::WorldFeedbackEvent>,
+        mut collector: ResMut<TestEventCollector>,
+    ) {
+        for event in reader_actions.read() {
+            collector.actions.push(event.clone());
+        }
+        for event in reader_feedback.read() {
+            collector.feedback.push(event.clone());
+        }
+    }
+
+    app.add_systems(Update, collect_test_events_system);
+
+    // Helper to teleport both the Bevy Transform and Rapier physics body of an NPC
+    let teleport_npc = |app: &mut App, entity: Entity, pos: Vec3| {
+        if let Some(mut tf) = app.world_mut().get_mut::<Transform>(entity) {
+            tf.translation = pos;
+        }
+        let handle = app
+            .world()
+            .get::<symtropy_render_bridge::PhysicsBody>(entity)
+            .map(|pb| pb.handle);
+        if let Some(handle) = handle {
+            let mut physics = app
+                .world_mut()
+                .resource_mut::<symtropy_launcher::resources::PhysicsWorldRes>();
+            if let Some(body) = physics.world.body_mut(handle) {
+                body.transform.translation =
+                    symtropy_math::Point::new([pos.x as f64, pos.y as f64]);
+            }
+        }
+    };
+
+    // Let's retrieve entities we want to manipulate
+    let mut kael_entity = None;
+    let mut pr4_entity = None;
+    let mut soren_entity = None;
+    let mut mira_entity = None;
+    let mut leo_entity = None;
+    let mut jack_entity = None;
+
+    {
+        let mut query = app
+            .world_mut()
+            .query::<(Entity, &symtropy_launcher::components::CrewNpc)>();
+        for (entity, npc) in query.iter(app.world()) {
+            if npc.name.contains("Kael") {
+                kael_entity = Some(entity);
+            } else if npc.name.contains("PR-4") {
+                pr4_entity = Some(entity);
+            } else if npc.name.contains("Soren") {
+                soren_entity = Some(entity);
+            } else if npc.name.contains("Mira") {
+                mira_entity = Some(entity);
+            } else if npc.name.contains("Leo") {
+                leo_entity = Some(entity);
+            } else if npc.name.contains("Jack") {
+                jack_entity = Some(entity);
+            }
+        }
+    }
+
+    let kael = kael_entity.unwrap();
+    let pr4 = pr4_entity.unwrap();
+    let soren = soren_entity.unwrap();
+    let mira = mira_entity.unwrap();
+    let leo = leo_entity.unwrap();
+    let jack = jack_entity.unwrap();
+
+    // 1. Verify "when PR-4 reaches sabotaged pump -> pump damage decreases" and partial success
+    // Let's spawn a sabotaged WaterPump
+    let pump_pos = Vec3::new(100.0, 100.0, 0.0);
+    let pump_entity = app
+        .world_mut()
+        .spawn((
+            symtropy_launcher::components::WaterPump {
+                efficiency: 0.0,
+                is_running: false,
+                is_sabotaged: true,
+            },
+            Transform::from_translation(pump_pos),
+        ))
+        .id();
+
+    // Teleport PR-4 next to the pump, soren far away
+    teleport_npc(&mut app, pr4, pump_pos);
+    teleport_npc(&mut app, soren, Vec3::new(500.0, 500.0, 0.0));
+
+    // Update app for a few frames (with dt simulation)
+    for _ in 0..10 {
+        app.update();
+    }
+
+    // Verify pump efficiency improved, is_running is true, is_sabotaged is false, but capped at 0.7
+    let pump = app
+        .world()
+        .get::<symtropy_launcher::components::WaterPump>(pump_entity)
+        .unwrap();
+    assert!(pump.efficiency > 0.0);
+    assert!(pump.efficiency <= 0.7);
+    assert!(pump.is_running);
+    assert!(!pump.is_sabotaged);
+
+    // Run one more frame to ensure messages written in the 10th frame are collected in Update
+    app.update();
+
+    // Verify online but contaminated event was fired
+    let collector = app.world().resource::<TestEventCollector>();
+    assert!(
+        collector
+            .feedback
+            .iter()
+            .any(|f| f.message.contains("CONTAMINATED"))
+    );
+
+    // Teleport Soren near the pump too, sabotage it again, and run update
+    app.world_mut()
+        .get_mut::<symtropy_launcher::components::WaterPump>(pump_entity)
+        .unwrap()
+        .is_sabotaged = true;
+    teleport_npc(&mut app, soren, pump_pos);
+
+    // Clear collector for next step
+    app.world_mut()
+        .resource_mut::<TestEventCollector>()
+        .feedback
+        .clear();
+
+    for _ in 0..10 {
+        app.update();
+    }
+
+    // Verify full purification to 1.0 (cooperative success with Soren)
+    let pump = app
+        .world()
+        .get::<symtropy_launcher::components::WaterPump>(pump_entity)
+        .unwrap();
+    assert_eq!(pump.efficiency, 1.0);
+    assert!(!pump.is_sabotaged);
+
+    let collector = app.world().resource::<TestEventCollector>();
+    assert!(
+        collector
+            .feedback
+            .iter()
+            .any(|f| f.message.contains("100%"))
+    );
+
+    // 2. Verify "when pump damage decreases -> settlement water metric improves"
+    let settlement_metrics = app
+        .world()
+        .resource::<symtropy_launcher::resources::SettlementMetrics>();
+    assert!(settlement_metrics.water > 0.0);
+
+    // 3. Verify "when Leo is near Mira and Kael is far away -> Leo relapses"
+    // Set Leo's stress high (> 0.4)
+    app.world_mut()
+        .get_mut::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load = 0.5;
+
+    // Teleport Mira next to Leo
+    let leo_pos = Vec3::new(200.0, 200.0, 0.0);
+    teleport_npc(&mut app, leo, leo_pos);
+    teleport_npc(&mut app, mira, leo_pos);
+
+    // Teleport Kael far away (>120 units)
+    teleport_npc(&mut app, kael, Vec3::new(400.0, 400.0, 0.0));
+
+    // Run updates
+    app.world_mut()
+        .resource_mut::<TestEventCollector>()
+        .feedback
+        .clear();
+    for _ in 0..100 {
+        app.update();
+    }
+
+    // Verify Leo relapses (stress increases instead of decays)
+    let leo_needs = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap();
+    assert!(leo_needs.allostatic_load > 0.5);
+
+    // 4. Verify "when Kael is near Leo -> Leo stress decays under Mira's care"
+    teleport_npc(&mut app, kael, leo_pos);
+    let stress_before = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load;
+
+    for _ in 0..50 {
+        app.update();
+    }
+
+    let stress_after = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load;
+    assert!(
+        stress_after < stress_before,
+        "Stress should decay when Kael is near"
+    );
+
+    // 5. Verify Jack drone destruction event emitting
+    let drone_pos = Vec3::new(300.0, 300.0, 0.0);
+    let drone_entity = app
+        .world_mut()
+        .spawn((
+            symtropy_launcher::components::NullDrone::default(),
+            Transform::from_translation(drone_pos),
+        ))
+        .id();
+
+    // Teleport Jack next to the drone
+    teleport_npc(&mut app, jack, drone_pos);
+
+    app.world_mut()
+        .resource_mut::<TestEventCollector>()
+        .actions
+        .clear();
+
+    // Update to trigger combat and verify drone health decreases or despawns, and action event fires
+    for _ in 0..10 {
+        app.update();
+    }
+
+    let collector = app.world().resource::<TestEventCollector>();
+    assert!(
+        collector
+            .actions
+            .iter()
+            .any(|a| a.action_kind == symtropy_launcher::components::NpcActionKind::CombatDrone)
     );
 }

@@ -377,3 +377,39 @@ impl EpistemicTag {
         }
     }
 }
+
+/// Dynamic event fired when an NPC initiates/completes an action.
+#[derive(Message, Debug, Clone)]
+pub struct NpcActionEvent {
+    pub actor: Entity,
+    pub actor_name: String,
+    pub target: Option<Entity>,
+    pub target_name: String,
+    pub action_kind: NpcActionKind,
+    pub intensity: f32,
+    pub success_delta: f32,
+    pub settlement_metric_delta: f32,
+}
+
+/// Action kinds for NPCs
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NpcActionKind {
+    RepairJunction,
+    RepairPump,
+    HealStress,
+    CombatDrone,
+}
+
+/// Event fired to trigger diegetic world-space completion labels
+#[derive(Message, Debug, Clone)]
+pub struct WorldFeedbackEvent {
+    pub position: Vec2,
+    pub message: String,
+    pub color: Color,
+}
+
+/// Component for floating world-space feedback text
+#[derive(Component)]
+pub struct WorldFeedbackLabel {
+    pub timer: Timer,
+}
