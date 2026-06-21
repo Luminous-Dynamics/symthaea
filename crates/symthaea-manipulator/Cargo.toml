@@ -9,7 +9,7 @@ license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-swarm = { path = "../symthaea-swarm" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hal = { path = "../symthaea-hal", default-features = false }

@@ -12,7 +12,7 @@ keywords = ["digital-twin", "engineering", "telemetry", "fep"]
 categories = ["science", "simulation"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 chrono = { workspace = true }

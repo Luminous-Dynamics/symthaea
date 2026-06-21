@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 uom.workspace = true
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 serde_json = { workspace = true }

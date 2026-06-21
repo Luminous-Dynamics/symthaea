@@ -12,7 +12,7 @@ keywords = ["browser-agent", "consciousness", "hdc", "cdp", "active-inference"]
 categories = ["science", "algorithms", "web-programming"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 chromiumoxide = { version = "0.7", features = ["tokio-runtime"], default-features = false }
 tokio = { version = "1", features = ["sync", "rt"] }
 serde = { workspace = true }

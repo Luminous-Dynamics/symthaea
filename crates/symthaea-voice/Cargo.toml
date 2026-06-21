@@ -6,7 +6,7 @@ description = "Consciousness-driven voice synthesis for Symthaea — dual engine
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-vocal-tract = { path = "../symthaea-vocal-tract" }
 serde = { workspace = true }
 

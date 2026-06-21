@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-humanoid = { path = "../symthaea-humanoid" }
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-runtime = { path = "../symthaea-runtime" }
 symthaea-engineering = { path = "../symthaea-engineering" }
 symthaea-broca = { path = "../symthaea-broca", default-features = false }

@@ -17,7 +17,7 @@ av1-research = ["dep:rav1d"]
 h264-fallback = ["dep:openh264"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde = { version = "1", features = ["derive"] }

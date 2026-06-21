@@ -12,7 +12,7 @@ keywords = ["consciousness", "ethics", "stress-test", "harmonies", "alignment"]
 categories = ["science"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-harmonies = { path = "../symthaea-harmonies" }
 symthaea-types = { path = "../symthaea-types" }
 serde = { workspace = true }

@@ -6,7 +6,7 @@ description = "JEPA: Joint Embedding Predictive Architecture for thermodynamical
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 rand = { workspace = true }
 

@@ -21,7 +21,7 @@ materials-benchmarks = ["dep:symthaea-materials"]        # Materials design scie
 science-benchmarks = ["nuclear-benchmarks", "materials-benchmarks"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-ssm = { path = "../symthaea-ssm" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }

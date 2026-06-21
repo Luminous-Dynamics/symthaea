@@ -15,6 +15,6 @@ categories = ["science", "mathematics"]
 default = []
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 
 [dev-dependencies]

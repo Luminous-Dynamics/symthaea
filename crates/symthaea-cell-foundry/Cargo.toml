@@ -12,7 +12,7 @@ keywords = ["cell-culture", "ipsc", "hdc", "ivg", "stem-cells"]
 categories = ["science", "algorithms"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 rand = { workspace = true }

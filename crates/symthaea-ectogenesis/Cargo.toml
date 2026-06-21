@@ -12,7 +12,7 @@ keywords = ["ectogenesis", "artificial-womb", "hdc", "developmental", "ethics"]
 categories = ["science", "algorithms"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 rand = { workspace = true }
 

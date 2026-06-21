@@ -96,7 +96,7 @@ path = "src/bin/train_ltc_supervised.rs"
 
 [dependencies]
 # Symthaea core — HdcLtcUnifiedNeuron, ContinuousHV, GenesisSeed
-symthaea-core = { path = "../../symthaea-core", default-features = false }
+symthaea-core = { path = "../symthaea-core", default-features = false }
 
 # Core hashing
 blake3 = { workspace = true }

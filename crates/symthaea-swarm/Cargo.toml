@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 yrs.workspace = true
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-runtime = { path = "../symthaea-runtime" }
 symtropy-robotics-bridge-core = { path = "../symtropy-robotics-bridge-core" }
 serde = { workspace = true }

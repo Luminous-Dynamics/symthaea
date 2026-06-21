@@ -7,7 +7,7 @@ description = "Autonomous Silicon Architect: RTL generation, PPA optimization, a
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-runtime = { path = "../symthaea-runtime" }
 symthaea-engineering = { path = "../symthaea-engineering" }
 symthaea-formal-safety = { path = "../symthaea-formal-safety" }

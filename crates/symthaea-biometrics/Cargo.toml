@@ -6,7 +6,7 @@ description = "Behavioral biometrics: encode mouse/keyboard telemetry into HDC s
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-muse = { path = "../symthaea-muse", optional = true }
 
 [dev-dependencies]

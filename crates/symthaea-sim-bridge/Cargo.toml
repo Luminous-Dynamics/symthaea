@@ -14,7 +14,7 @@ categories = ["science", "simulation"]
 [dependencies]
 iceoryx2.workspace = true
 
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

@@ -15,7 +15,7 @@ categories = ["embedded", "hardware-support"]
 no-panic.workspace = true
 fixed.workspace = true
 statig.workspace = true
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-humanoid = { path = "../symthaea-humanoid" }
 serde = { workspace = true }
 serde_json = { workspace = true }

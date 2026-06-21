@@ -26,7 +26,7 @@ path = "src/bin/nix_mind_daemon.rs"
 required-features = ["daemon"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 # Native-only (C FFI, async)
 tree-sitter = { workspace = true, optional = true }
 tree-sitter-nix = { workspace = true, optional = true }

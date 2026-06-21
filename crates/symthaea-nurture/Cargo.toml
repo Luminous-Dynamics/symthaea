@@ -12,7 +12,7 @@ keywords = ["attachment", "bowlby", "developmental-psychology", "hdc", "nurture"
 categories = ["science", "algorithms"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 serde = { workspace = true }
