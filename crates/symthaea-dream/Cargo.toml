@@ -12,7 +12,7 @@ keywords = ["consciousness", "counterfactual", "dreaming", "ai", "simulation"]
 categories = ["science", "algorithms"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 anyhow = { workspace = true }
 blake3 = { workspace = true }

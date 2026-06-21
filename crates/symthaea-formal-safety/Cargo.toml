@@ -14,7 +14,7 @@ categories = ["science", "development-tools"]
 [dependencies]
 no-panic.workspace = true
 chumsky.workspace = true
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 uuid = { workspace = true }
 

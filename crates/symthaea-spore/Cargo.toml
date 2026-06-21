@@ -9,7 +9,7 @@ license = "AGPL-3.0-or-later"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core", default-features = false }
+symthaea-core = { path = "../symthaea-core", default-features = false }
 symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea-types = { path = "../symthaea-types" }

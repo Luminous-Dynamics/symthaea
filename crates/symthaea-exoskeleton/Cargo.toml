@@ -8,7 +8,7 @@ description = "HDC-LTC + FEP Active Inference exoskeleton — consciousness-coup
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 rand = { workspace = true }

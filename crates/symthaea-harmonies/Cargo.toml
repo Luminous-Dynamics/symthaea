@@ -14,4 +14,4 @@ categories = ["science"]
 [dependencies]
 serde = { workspace = true }
 symthaea-types = { path = "../symthaea-types" }
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }

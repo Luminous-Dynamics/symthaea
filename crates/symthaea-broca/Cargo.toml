@@ -9,7 +9,7 @@ autobins = false
 [dependencies]
 futures-util = { version = "0.3", features = ["sink"] }
 chumsky.workspace = true
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-geodesic = { path = "../symthaea-geodesic", optional = true }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hodge = { path = "../symthaea-hodge" }

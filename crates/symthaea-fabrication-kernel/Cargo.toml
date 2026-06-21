@@ -10,7 +10,7 @@ default = ["analytical"]
 analytical = []
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-atelier = { path = "../symthaea-atelier" }
 symthaea-canvas = { path = "../symthaea-canvas" }
 serde = { workspace = true }

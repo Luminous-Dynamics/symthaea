@@ -11,7 +11,7 @@ keywords = ["quantum-chemistry", "hartree-fock", "dft", "molecular-integrals", "
 categories = ["science", "simulation"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core", optional = true }
+symthaea-core = { path = "../symthaea-core", optional = true }
 serde = { workspace = true }
 
 [features]

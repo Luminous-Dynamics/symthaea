@@ -12,7 +12,7 @@ keywords = ["population-genetics", "hdc", "breeding", "governance", "conservatio
 categories = ["science", "algorithms"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-types = { path = "../symthaea-types" }
 serde = { workspace = true }
 rand = { workspace = true }

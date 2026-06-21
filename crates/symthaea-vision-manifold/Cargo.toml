@@ -12,7 +12,7 @@ keywords = ["vision", "hdc", "cfc", "temporal-manifold", "video"]
 categories = ["science", "algorithms", "multimedia::video"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 uuid = { workspace = true, features = ["v4"] }
 serde = { workspace = true }

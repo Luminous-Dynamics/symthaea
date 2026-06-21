@@ -16,7 +16,7 @@ name = "symthaea_multirotor"
 
 [dependencies]
 positioning = { path = "../positioning" }
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 symthaea-hal = { path = "../symthaea-hal", default-features = false }
 serde = { workspace = true }

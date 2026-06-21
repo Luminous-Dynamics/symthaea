@@ -7,7 +7,7 @@ description = "Substrate Proprioception: Sense and protect physical hardware (CP
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 tracing = { workspace = true }
 systemstat = "0.2"

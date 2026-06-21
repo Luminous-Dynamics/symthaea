@@ -6,7 +6,7 @@ authors = ["Tristan Stoltz / Luminous Dynamics"]
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tokio = { version = "1.0", features = ["full"] }

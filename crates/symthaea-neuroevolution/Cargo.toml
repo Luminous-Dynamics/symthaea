@@ -18,7 +18,7 @@ default = []
 parallel = ["dep:rayon"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core", default-features = false }
+symthaea-core = { path = "../symthaea-core", default-features = false }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 serde_json = { workspace = true }

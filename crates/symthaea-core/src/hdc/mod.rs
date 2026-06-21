@@ -263,6 +263,8 @@ impl From<usize> for LtcNeuronCount {
     }
 }
 
+#[cfg(feature = "cantor-hdc")]
+pub mod cantor_pyramid;
 pub mod cantor_recursive_hv; // Cantor Recursive Hypervectors
 pub mod cantor_resonator_cleanup; // Layer-preserving CRHV cleanup
 pub mod multidimensional_cantor; // Radial 3D 4D Spherical Cantor
@@ -751,9 +753,6 @@ pub mod multi_database_integration;
 pub mod phi_feedback; // Φ feedback controller (closes the loop: Φ measurement → parameter modulation)
 pub mod phi_guided_math; // Φ-guided math domain selection (consciousness-driven computation paths)
 pub mod semantic_bridge; // Bidirectional text <-> HV <-> consciousness bridge // Phi optimization subsystem
-#[cfg(feature = "cantor-hdc")]
-pub mod cantor_pyramid; // Hierarchical Cantor Hypervectors (RHN)
-
 
 // Re-export multi-database integration types
 // Note: QdrantConfig is aliased to MdbQdrantConfig to avoid conflict with long_term_memory::QdrantConfig

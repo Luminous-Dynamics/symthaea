@@ -9,7 +9,7 @@ license = "AGPL-3.0-or-later"
 wgpu.workspace = true
 
 
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }

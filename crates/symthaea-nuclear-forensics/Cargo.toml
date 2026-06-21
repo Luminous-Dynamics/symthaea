@@ -11,7 +11,7 @@ keywords = ["nuclear", "forensics", "hdc", "attribution", "isotope"]
 categories = ["science", "simulation"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 serde = { workspace = true }
 
 [dev-dependencies]

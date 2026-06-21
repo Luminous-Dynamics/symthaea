@@ -799,6 +799,12 @@ impl ContinuousHV {
         &self.values
     }
 
+    /// Get a mutable slice view of the internal values
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [f32] {
+        &mut self.values
+    }
+
     /// Create a ContinuousHV from a slice
     pub fn from_slice(slice: &[f32]) -> Self {
         Self {

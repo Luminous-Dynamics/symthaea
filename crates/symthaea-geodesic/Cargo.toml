@@ -12,7 +12,7 @@ keywords = ["topology", "code-synthesis", "geodesic", "sheaf", "manifold"]
 categories = ["science", "algorithms", "development-tools"]
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-hodge = { path = "../symthaea-hodge" }
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "visit"] }

@@ -6,7 +6,7 @@ description = "Generative visual art engine for Symthaea — consciousness-drive
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-symthaea-core = { path = "../../symthaea-core" }
+symthaea-core = { path = "../symthaea-core" }
 symthaea-canvas = { path = "../symthaea-canvas" }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 serde = { workspace = true }
