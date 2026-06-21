@@ -3,6 +3,7 @@
 
 //! Triangle mesh collider and BVH-based narrowphase.
 
+pub mod meshlet_physics;
 pub mod narrowphase;
 
 use nalgebra::SVector;
@@ -11,6 +12,7 @@ use symtropy_math::{Point, Shape};
 use symtropy_physics::broadphase::Aabb;
 
 pub use narrowphase::generate_mesh_contacts;
+pub use narrowphase::generate_meshlet_contacts;
 
 /// A single triangle in 3D.
 #[derive(Clone, Debug)]

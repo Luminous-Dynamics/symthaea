@@ -4,6 +4,8 @@
 
 pub mod ai_player;
 pub mod audio;
+pub mod chronicle;
+pub mod chronicle_recorder;
 pub mod consciousness;
 pub mod consciousness_aura;
 pub mod dialogue;
@@ -17,16 +19,21 @@ pub mod input;
 pub mod leviathan;
 pub mod living_dungeon;
 pub mod menu;
-pub mod muse;
 pub mod minimap;
+pub mod muse;
+pub mod null_ecology;
 pub mod phi_pcg;
 pub mod player;
 pub mod postprocess;
 pub mod procgen;
 pub mod psychology;
 pub mod rendering;
+pub mod rendering_3d;
 pub mod room_memory;
 pub mod scavenge;
+pub mod settlement;
+pub mod settlement_spawn;
+pub mod telemetry;
 pub mod thermodynamic;
 
 // Sol Atlas globe view — planetary coordination layer.

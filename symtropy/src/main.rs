@@ -12,16 +12,10 @@
 //! RUST_LOG=warn,symtropy=info ./target/release/symtropy
 //! ```
 
-mod components;
-pub mod experience;
-mod plugin;
-mod resources;
-mod systems;
-
 use bevy::prelude::*;
-use bevy::render::settings::{RenderCreation, WgpuSettings};
 use bevy::render::RenderPlugin;
-use plugin::SymtropyPlugin;
+use bevy::render::settings::{RenderCreation, WgpuSettings};
+use symtropy_launcher::plugin::SymtropyPlugin;
 
 fn main() {
     // Crash handler — writes to both stderr and a crash log file
@@ -32,7 +26,8 @@ fn main() {
         );
         eprintln!("{msg}");
         // Also write to file so we can inspect after window closes
-        let _ = std::fs::write("/tmp/symtropy_panic.log", &msg);
+        let log_path = std::env::temp_dir().join("symtropy_panic.log");
+        let _ = std::fs::write(&log_path, &msg);
     }));
 
     eprintln!("[symtropy] Starting...");
@@ -89,8 +84,10 @@ fn main() {
         eprintln!("[symtropy] --autostart: skipping menu, starting game immediately");
         app.add_systems(
             Startup,
-            |mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
-                next.set(crate::resources::GamePhase::Loading);
+            |mut next: ResMut<
+                bevy::prelude::NextState<symtropy_launcher::resources::GamePhase>,
+            >| {
+                next.set(symtropy_launcher::resources::GamePhase::Loading);
             },
         );
     }
@@ -101,11 +98,13 @@ fn main() {
         eprintln!("[symtropy] --globe: entering Sol Atlas globe view from MainMenu");
         app.add_systems(
             Update,
-            (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
-                next.set(crate::resources::GamePhase::GlobeView);
+            (|mut next: ResMut<
+                bevy::prelude::NextState<symtropy_launcher::resources::GamePhase>,
+            >| {
+                next.set(symtropy_launcher::resources::GamePhase::GlobeView);
             })
             .run_if(bevy::prelude::in_state(
-                crate::resources::GamePhase::MainMenu,
+                symtropy_launcher::resources::GamePhase::MainMenu,
             )),
         );
     }
@@ -116,14 +115,14 @@ fn main() {
         eprintln!("[symtropy] --demo: cinematic demo director enabled");
         app.add_systems(
             Update,
-            (|mut director: ResMut<crate::systems::demo_director::DemoDirector>| {
+            (|mut director: ResMut<symtropy_launcher::systems::demo_director::DemoDirector>| {
                 if !director.enabled {
                     director.enabled = true;
                     info!("[demo] Director started — 30s cinematic sequence");
                 }
             })
             .run_if(bevy::prelude::in_state(
-                crate::resources::GamePhase::GlobeView,
+                symtropy_launcher::resources::GamePhase::GlobeView,
             )),
         );
     }
@@ -141,7 +140,7 @@ fn main() {
                 }
             })
             .run_if(bevy::prelude::in_state(
-                crate::resources::GamePhase::GlobeView,
+                symtropy_launcher::resources::GamePhase::GlobeView,
             )),
         );
     }
@@ -151,13 +150,19 @@ fn main() {
     if cinematic_mode {
         eprintln!("[symtropy] --cinematic: full-spectrum cinematic (90s, 18 phases)");
         // Insert cinematic resources
-        app.insert_resource(crate::systems::cinematic_director::CinematicDirector {
-            enabled: true,
-            ..Default::default()
-        });
-        app.insert_resource(crate::systems::cinematic_director::ScreenFade::default());
-        app.insert_resource(crate::systems::cinematic_director::NarrationState::default());
-        app.insert_resource(crate::systems::cinematic_director::VoiceNarration::default());
+        app.insert_resource(
+            symtropy_launcher::systems::cinematic_director::CinematicDirector {
+                enabled: true,
+                ..Default::default()
+            },
+        );
+        app.insert_resource(symtropy_launcher::systems::cinematic_director::ScreenFade::default());
+        app.insert_resource(
+            symtropy_launcher::systems::cinematic_director::NarrationState::default(),
+        );
+        app.insert_resource(
+            symtropy_launcher::systems::cinematic_director::VoiceNarration::default(),
+        );
         // Frame capture with cinematic output dir
         app.insert_resource(sol_atlas_bevy::frame_capture::FrameCaptureConfig {
             output_dir: "/tmp/symtropy-cinematic-frames".into(),
@@ -166,33 +171,35 @@ fn main() {
             ..Default::default()
         });
         // AI player (starts disabled, cinematic enables it during dungeon phases)
-        let ai = crate::systems::ai_player::AiPlayer::new();
+        let ai = symtropy_launcher::systems::ai_player::AiPlayer::new();
         app.insert_resource(ai);
         // Auto-start Loading phase
         app.add_systems(
             Update,
-            (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
-                next.set(crate::resources::GamePhase::Loading);
+            (|mut next: ResMut<
+                bevy::prelude::NextState<symtropy_launcher::resources::GamePhase>,
+            >| {
+                next.set(symtropy_launcher::resources::GamePhase::Loading);
             })
             .run_if(bevy::prelude::in_state(
-                crate::resources::GamePhase::MainMenu,
+                symtropy_launcher::resources::GamePhase::MainMenu,
             )),
         );
     }
 
     if ai_player {
         eprintln!("[symtropy] --ai-player: Symthaea is playing the game");
-        let mut ai = crate::systems::ai_player::AiPlayer::new();
+        let mut ai = symtropy_launcher::systems::ai_player::AiPlayer::new();
         ai.enabled = true;
         app.insert_resource(ai);
         app.add_systems(
             Update,
-            crate::systems::ai_player::ai_player_system.run_if(bevy::prelude::in_state(
-                crate::resources::GamePhase::Playing,
-            )),
+            symtropy_launcher::systems::ai_player::ai_player_system.run_if(
+                bevy::prelude::in_state(symtropy_launcher::resources::GamePhase::Playing),
+            ),
         );
     } else {
-        app.insert_resource(crate::systems::ai_player::AiPlayer::new());
+        app.insert_resource(symtropy_launcher::systems::ai_player::AiPlayer::new());
     }
 
     app.run();

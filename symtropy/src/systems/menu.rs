@@ -221,6 +221,7 @@ pub fn menu_input_system(
     mut seed: ResMut<DungeonSeed>,
     mut registry: ResMut<ExperienceRegistry>,
     mut indicators: Query<(&SelectionIndicator, &mut TextColor)>,
+    mut app_exit: MessageWriter<bevy::app::AppExit>,
 ) {
     let count = registry.experiences.len();
 
@@ -278,7 +279,7 @@ pub fn menu_input_system(
     }
 
     if keyboard.just_pressed(KeyCode::Escape) {
-        std::process::exit(0);
+        app_exit.write(bevy::app::AppExit::Success);
     }
 }
 

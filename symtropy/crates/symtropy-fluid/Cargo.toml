@@ -9,7 +9,7 @@ keywords = ["physics", "fluid", "sph", "simulation", "n-dimensional"]
 categories = ["simulation", "science"]
 
 [dependencies]
-symtropy-math = { version = "0.2.1", path = "../symtropy-math" }
-symtropy-physics = { version = "0.2.1", path = "../symtropy-physics" }
+symtropy-math = { version = "0.2.1", path = "../core/symtropy-math" }
+symtropy-physics = { version = "0.2.1", path = "../core/symtropy-physics" }
 nalgebra = { version = "0.34", features = ["serde-serialize"] }
 serde = { version = "1.0", features = ["derive"] }

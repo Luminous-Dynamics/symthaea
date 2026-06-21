@@ -55,9 +55,17 @@ pub fn player_movement_system(
 /// Update flashlight flicker based on player stress.
 pub fn flashlight_system(
     biometrics: Res<BiometricsCtx>,
-    mut query: Query<(&mut Flashlight, &mut Sprite), With<Player>>,
+    mut query: Query<
+        (
+            &mut Flashlight,
+            Option<&mut Sprite>,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+        ),
+        With<Player>,
+    >,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let Ok((mut flashlight, mut sprite)) = query.single_mut() else {
+    let Ok((mut flashlight, opt_sprite, opt_mat)) = query.single_mut() else {
         return;
     };
     flashlight.flicker =
@@ -65,7 +73,16 @@ pub fn flashlight_system(
 
     // Player sprite dims/brightens with stress (visual feedback)
     let stress_dim = 1.0 - biometrics.model.allostatic_load * 0.3;
-    sprite.color = Color::srgba(0.2 * stress_dim, 0.9 * stress_dim, 1.0 * stress_dim, 1.0);
+    let color = Color::srgba(0.2 * stress_dim, 0.9 * stress_dim, 1.0 * stress_dim, 1.0);
+
+    if let Some(mut sprite) = opt_sprite {
+        sprite.color = color;
+    }
+    if let Some(mat_handle) = opt_mat {
+        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+            mat.base_color = color;
+        }
+    }
 }
 
 /// Fusion core extraction: hold E near the core. Mouse steadiness matters.
@@ -73,7 +90,16 @@ pub fn flashlight_system(
 pub fn extraction_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     player_query: Query<&Transform, With<Player>>,
-    mut core_query: Query<(&Transform, &mut FusionCore, &mut Sprite), Without<Player>>,
+    mut core_query: Query<
+        (
+            &Transform,
+            &mut FusionCore,
+            Option<&mut Sprite>,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+        ),
+        Without<Player>,
+    >,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     biometrics: Res<BiometricsCtx>,
     mut noise_query: Query<&mut NoiseEmitter, With<Player>>,
     collected: Res<super::scavenge::CollectedPrimitives>,
@@ -83,7 +109,7 @@ pub fn extraction_system(
         return;
     };
 
-    for (core_tf, mut core, mut core_sprite) in &mut core_query {
+    for (core_tf, mut core, opt_sprite, opt_mat) in &mut core_query {
         let dist = player_tf
             .translation
             .truncate()
@@ -111,13 +137,29 @@ pub fn extraction_system(
             // Core pulses faster as extraction progresses
             let pulse = (time.elapsed_secs() * (4.0 + core.extraction_progress * 12.0)).sin();
             let brightness = 0.7 + pulse * 0.3;
-            core_sprite.color = Color::srgb(brightness, brightness * 0.9, 0.1);
+            let color = Color::srgb(brightness, brightness * 0.9, 0.1);
+            if let Some(mut sprite) = opt_sprite {
+                sprite.color = color;
+            }
+            if let Some(mat_handle) = opt_mat {
+                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                    mat.base_color = color;
+                }
+            }
         } else {
             core.being_extracted = false;
             // Core gentle pulse when not being extracted
             if dist < 120.0 {
                 let pulse = (time.elapsed_secs() * 1.5).sin();
-                core_sprite.color = Color::srgb(0.9 + pulse * 0.1, 0.8 + pulse * 0.1, 0.1);
+                let color = Color::srgb(0.9 + pulse * 0.1, 0.8 + pulse * 0.1, 0.1);
+                if let Some(mut sprite) = opt_sprite {
+                    sprite.color = color;
+                }
+                if let Some(mat_handle) = opt_mat {
+                    if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                        mat.base_color = color;
+                    }
+                }
             }
         }
     }

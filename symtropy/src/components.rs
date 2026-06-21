@@ -22,10 +22,20 @@ pub struct CrewNpc {
 
 impl CrewNpc {
     pub fn new(name: &str, seed: u64) -> Self {
+        // Seed unique parameters for the FEP active inference agent based on the seed
+        let belief_learning_rate = 0.05 + (seed % 5) as f64 * 0.05;
+        let action_temperature = 0.3 + (seed % 8) as f64 * 0.15;
+        let planning_horizon = 2 + (seed % 4) as usize;
+        let inference_iterations = 4 + (seed % 6) as usize;
+
         let config = ActiveInferenceAgentConfig {
             state_dim: 8,
-            obs_dim: 4,
+            obs_dim: 6,
             num_actions: 8,
+            belief_learning_rate,
+            action_temperature,
+            planning_horizon,
+            inference_iterations,
             ..ActiveInferenceAgentConfig::default()
         };
         Self {
@@ -96,7 +106,90 @@ pub struct FusionCore {
 }
 
 // ============================================================================
-// Governance / Economy / Faction components
+// Infrastructure Components (Firstlight Basin Vertical Slice)
+// ============================================================================
+
+/// A power junction that distributes energy to the settlement.
+#[derive(Component)]
+pub struct PowerJunction {
+    /// Current power output [0, 1].
+    pub output: f32,
+    /// Whether it is damaged and needs repair.
+    pub is_damaged: bool,
+    /// Time since last failure (for entropy calculations).
+    pub uptime_secs: f32,
+}
+
+/// A water pump that provides water to the settlement.
+#[derive(Component)]
+pub struct WaterPump {
+    /// Pumping efficiency [0, 1].
+    pub efficiency: f32,
+    /// Operational status.
+    pub is_running: bool,
+    /// Whether the 'Null Drones' have sabotaged it.
+    pub is_sabotaged: bool,
+}
+
+/// A settlement fabricator for making parts.
+#[derive(Component)]
+pub struct Fabricator {
+    /// Available material storage [0, 1].
+    pub material_reserve: f32,
+    /// Power requirement to operate.
+    pub power_draw: f32,
+    /// Whether a part is currently being fabricated.
+    pub is_active: bool,
+}
+
+/// Settlement state UI marker.
+#[derive(Component)]
+pub struct SettlementUi;
+
+/// Repair tool marker.
+#[derive(Component)]
+pub struct RepairTool;
+
+/// Interaction target for infrastructure.
+#[derive(Component)]
+pub struct InteractionTarget {
+    pub radius: f32,
+    pub label: String,
+}
+
+impl Default for InteractionTarget {
+    fn default() -> Self {
+        Self {
+            radius: 50.0,
+            label: "Interact".to_string(),
+        }
+    }
+}
+
+// ============================================================================
+// Null Ecology (Enemies)
+// ============================================================================
+
+/// Rogue machine drone from the Null Ecology.
+#[derive(Component)]
+pub struct NullDrone {
+    /// Drone health [0, 1].
+    pub integrity: f32,
+    /// Target infrastructure entity (if any).
+    pub target_machine: Option<Entity>,
+    /// Damage per second to infrastructure.
+    pub sabotage_rate: f32,
+}
+
+impl Default for NullDrone {
+    fn default() -> Self {
+        Self {
+            integrity: 1.0,
+            target_machine: None,
+            sabotage_rate: 0.05,
+        }
+    }
+}
 //
 // When `mycelix` feature is enabled: uses REAL Mycelix types from bridge-common.
 // When disabled: uses compatible fallback types with same API.
@@ -106,8 +199,8 @@ pub struct FusionCore {
 // --- With real Mycelix types (feature = "mycelix") ---
 #[cfg(feature = "mycelix")]
 pub use mycelix_bridge_common::{
-    consciousness_thresholds::ConsciousnessThresholds, CivicTier as MycelixTier,
-    ConsciousnessProfile as MycelixConsciousnessProfile,
+    CivicTier as MycelixTier, ConsciousnessProfile as MycelixConsciousnessProfile,
+    consciousness_thresholds::ConsciousnessThresholds,
 };
 #[cfg(feature = "mycelix")]
 pub use mycelix_core_types::epistemic::EmpiricalLevel;

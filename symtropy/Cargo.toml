@@ -21,54 +21,71 @@ bevy = { version = "0.18", default-features = false, features = [
     "multi_threaded", "x11", # Explicitly include X11, exclude Wayland
     "default_font", "png",
 ] }
-symthaea = { path = "../symthaea", default-features = false, features = ["vision-manifold", "muse", "reasoning_engine"] }
-symthaea-muse = { path = "../symthaea/crates/symthaea-muse", features = ["muse-live"] }
-symtropy-bevy = { path = "crates/symtropy-bevy" }
-symtropy-bevy-core = { path = "crates/symtropy-bevy-core" }
-symtropy-bevy-scene = { path = "crates/symtropy-bevy-scene" }
-symtropy-physics = { path = "crates/symtropy-physics" }
-symtropy-rapier3d-bridge = { path = "crates/symtropy-rapier3d-bridge" }
-symtropy-physics-gpu = { path = "crates/symtropy-physics-gpu" }
-symtropy-core = { path = "crates/symtropy-core" }
-symtropy-math = { path = "crates/symtropy-math" }
-symtropy-mycelix-village = { path = "crates/symtropy-mycelix-village" }
-symtropy-terrain = { path = "crates/symtropy-terrain" }
-symtropy-consciousness-physics = { path = "crates/symtropy-consciousness-physics" }
-symtropy-render-bridge = { path = "crates/symtropy-render-bridge" }
-symthaea-fep = { path = "../symthaea/crates/symthaea-fep" }
-symthaea-biometrics = { path = "../symthaea/crates/symthaea-biometrics" }
-symthaea-consciousness-equation = { path = "../symthaea/crates/symthaea-consciousness-equation" }
+symthaea = { path = "../symthaea", default-features = false, features = ["vision-manifold", "muse", "reasoning_engine", "humanoid", "vehicle"] }
+symthaea-muse = { path = "../symthaea/crates/domains/symthaea-muse", features = ["muse-live"] }
+symtropy-bevy = { path = "crates/bridges/symtropy-bevy" }
+symtropy-bevy-core = { path = "crates/core/symtropy-bevy-core" }
+symtropy-bevy-scene = { path = "crates/core/symtropy-bevy-scene" }
+symtropy-physics = { path = "crates/core/symtropy-physics" }
+symtropy-rapier3d-bridge = { path = "crates/bridges/symtropy-rapier3d-bridge" }
+symtropy-physics-gpu = { path = "crates/domains/symtropy-physics-gpu" }
+symtropy-core = { path = "crates/core/symtropy-core" }
+symtropy-math = { path = "crates/core/symtropy-math" }
+symtropy-mycelix-village = { path = "crates/apps/symtropy-mycelix-village" }
+symtropy-terrain = { path = "crates/domains/symtropy-terrain" }
+symtropy-consciousness-physics = { path = "crates/domains/symtropy-consciousness-physics" }
+symtropy-render-bridge = { path = "crates/bridges/symtropy-render-bridge" }
+symthaea-fep = { path = "../symthaea/crates/core/symthaea-fep" }
+symthaea-biometrics = { path = "../symthaea/crates/domains/symthaea-biometrics" }
+symthaea-consciousness-equation = { path = "../symthaea/crates/domains/symthaea-consciousness-equation" }
 nalgebra = "0.34"
 rand = "0.8"
 hound = "3.5"
 image = { version = "0.24", features = ["png"] }
 cpal = "0.17"
-symthaea-core = { path = "../symthaea/symthaea-core" }
+bevy_egui = "0.39"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+symthaea-core = { path = "../symthaea/crates/core/symthaea-core" }
+bytemuck = { version = "1.18", features = ["derive"] }
 
 [workspace]
 resolver = "2"
+exclude = [
+    "crates/bridges/symtropy-robotics-bridge",
+    "crates/symtropy-robotics-bridge",
+    "crates/bridges/symtropy-symthaea-adapter",
+]
 members = [
     ".",
-    "crates/symtropy-bevy",
-    "crates/symtropy-bevy-core",
-    "crates/symtropy-bevy-scene",
-    "crates/symthaea-bevy-brain",
-    "crates/symtropy-mycelix-village",
-    "crates/symtropy-oceanic",
-    "crates/symtropy-net",
+    "crates/bridges/symtropy-bevy",
+    "crates/core/symtropy-bevy-core",
+    "crates/core/symtropy-bevy-scene",
+    "crates/bridges/symthaea-bevy-brain",
+    "crates/apps/symtropy-mycelix-village",
+    "crates/domains/symtropy-net",
 
-    "crates/symtropy-robotics-bridge-core",
-    "crates/symtropy-rapier3d-bridge",
-    "crates/symtropy-physics-gpu",
-    "crates/symtropy-core",
-    "crates/symtropy-devconsole",
-    "crates/symtropy-math",
-    "crates/symtropy-physics",
-    "crates/symtropy-render-bridge",
-    "crates/symtropy-terrain",
-    "crates/symtropy-lightyear",
-    "crates/symtropy-multiplayer-demo",
+    "crates/bridges/symtropy-robotics-bridge-core",
+    "crates/bridges/symtropy-rapier3d-bridge",
+    "crates/domains/symtropy-physics-gpu",
+    "crates/core/symtropy-core",
+    "crates/domains/symtropy-devconsole",
+    "crates/core/symtropy-math",
+    "crates/core/symtropy-physics",
+    "crates/bridges/symtropy-render-bridge",
+    "crates/bridges/symtropy-mycelix-bridge",
+    "crates/bridges/symtropy-foundry",
+    "crates/domains/symtropy-terrain",
+    "crates/domains/symtropy-lightyear",
+    "crates/apps/symtropy-multiplayer-demo",
+    "crates/symtropy-mesh",
 ]
 
 [lints.clippy]
 all = "warn"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

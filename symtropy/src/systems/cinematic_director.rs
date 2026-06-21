@@ -631,7 +631,10 @@ pub fn cinematic_director_system(
                 old, director.phase, director.total_time
             );
         } else {
-            info!("[cinematic] Complete! {:.1}s total. Stitch: ffmpeg -framerate 8 -i /tmp/symtropy-cinematic-frames/frame_%05d.png -c:v libx264 cinematic.mp4", director.total_time);
+            info!(
+                "[cinematic] Complete! {:.1}s total. Stitch: ffmpeg -framerate 8 -i /tmp/symtropy-cinematic-frames/frame_%05d.png -c:v libx264 cinematic.mp4",
+                director.total_time
+            );
         }
     }
 }

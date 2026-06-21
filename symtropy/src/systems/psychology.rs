@@ -324,14 +324,32 @@ pub fn npc_collapse_recovery_system(
 
 /// Update NPC sprite appearance based on psychological state.
 pub fn npc_visual_state_system(
-    mut npcs: Query<(&PsychologicalNeeds, &mut Sprite, Option<&NpcCollapsed>), With<CrewNpc>>,
+    mut npcs: Query<
+        (
+            &PsychologicalNeeds,
+            Option<&mut Sprite>,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+            Option<&NpcCollapsed>,
+            &mut Transform,
+        ),
+        With<CrewNpc>,
+    >,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     time: Res<Time>,
 ) {
-    for (needs, mut sprite, collapsed) in &mut npcs {
+    for (needs, opt_sprite, opt_mat, collapsed, mut transform) in &mut npcs {
         if collapsed.is_some() {
             // Collapsed: gray, small.
-            sprite.color = Color::srgb(0.3, 0.3, 0.3);
-            sprite.custom_size = Some(Vec2::splat(12.0));
+            if let Some(mut sprite) = opt_sprite {
+                sprite.color = Color::srgb(0.3, 0.3, 0.3);
+                sprite.custom_size = Some(Vec2::splat(12.0));
+            }
+            if let Some(mat_handle) = opt_mat {
+                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                    mat.base_color = Color::srgb(0.3, 0.3, 0.3);
+                }
+            }
+            transform.scale = Vec3::splat(12.0 / 16.0);
             continue;
         }
 
@@ -356,17 +374,33 @@ pub fn npc_visual_state_system(
             1.0
         };
 
-        // Apply visual state (preserve base green-ish color from spawn, just modulate brightness).
-        let Srgba {
-            red, green, blue, ..
-        } = sprite.color.to_srgba();
         let factor = load_dim * social_pulse;
-        sprite.color = Color::srgb(
-            (red * factor).clamp(0.0, 1.0),
-            (green * factor).clamp(0.0, 1.0),
-            (blue * factor).clamp(0.0, 1.0),
-        );
-        sprite.custom_size = Some(Vec2::splat(engagement_scale));
+
+        if let Some(mut sprite) = opt_sprite {
+            let Srgba {
+                red, green, blue, ..
+            } = sprite.color.to_srgba();
+            sprite.color = Color::srgb(
+                (red * factor).clamp(0.0, 1.0),
+                (green * factor).clamp(0.0, 1.0),
+                (blue * factor).clamp(0.0, 1.0),
+            );
+            sprite.custom_size = Some(Vec2::splat(engagement_scale));
+        }
+
+        if let Some(mat_handle) = opt_mat {
+            if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                let Srgba {
+                    red, green, blue, ..
+                } = mat.base_color.to_srgba();
+                mat.base_color = Color::srgb(
+                    (red * factor).clamp(0.0, 1.0),
+                    (green * factor).clamp(0.0, 1.0),
+                    (blue * factor).clamp(0.0, 1.0),
+                );
+            }
+            transform.scale = Vec3::splat(engagement_scale / 16.0);
+        }
     }
 }
 

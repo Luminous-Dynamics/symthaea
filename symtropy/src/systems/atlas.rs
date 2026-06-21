@@ -630,7 +630,7 @@ pub fn setup_globe_view(
         }
 
         let clusters = sol_atlas_core::lod::cluster_markers(&all_markers, 4, 8); // coarser = fewer blobs
-                                                                                 // Heat blobs disabled — city indicators + event markers provide better data.
+        // Heat blobs disabled — city indicators + event markers provide better data.
         let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
         let _spawn_blobs = false;
         for cell in &clusters {
@@ -960,7 +960,7 @@ pub fn setup_globe_view(
         // Strict filter — only major events to avoid visual noise
         match event.event_type {
             sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 5.5 => {
-                continue
+                continue;
             }
             sol_atlas_core::types::NaturalEventType::Fire => continue, // fires disabled — too many, too noisy
             sol_atlas_core::types::NaturalEventType::Storm if event.magnitude < 30.0 => continue, // only major storms
@@ -1285,8 +1285,12 @@ pub fn setup_globe_view(
     // Store data for arc rendering (gizmos are immediate-mode)
     commands.insert_resource(AtlasData { data });
 
-    info!("[atlas] Globe view: {marker_count} markers + {} stress + {} bodies + {} governance — Esc to return",
-        stress_data.len(), bodies.len(), gov_pulses.len());
+    info!(
+        "[atlas] Globe view: {marker_count} markers + {} stress + {} bodies + {} governance — Esc to return",
+        stress_data.len(),
+        bodies.len(),
+        gov_pulses.len()
+    );
 }
 
 /// Draw maglev corridor arcs using gizmos (immediate-mode, redrawn each frame).
@@ -1952,7 +1956,7 @@ pub fn holographic_pulse_system(
 
     for mut tf in atmospheres.iter_mut() {
         let base = tf.scale.x.max(0.5); // avoid zero scale
-                                        // Apply breathing to atmosphere shells (they started at ~1.03-1.05 scale)
+        // Apply breathing to atmosphere shells (they started at ~1.03-1.05 scale)
         tf.scale = Vec3::splat(base.signum() * breath * 1.04);
     }
 }
@@ -1987,9 +1991,9 @@ pub fn consciousness_shader_system(
     for (_, mat) in materials.iter_mut() {
         // Higher phi = tighter fresnel (more integrated, coherent light)
         mat.extension.fresnel_power = 2.0 + phi * 3.0; // 2.0 → 5.0
-                                                       // Higher phi = slower scanlines (serene vs anxious)
+        // Higher phi = slower scanlines (serene vs anxious)
         mat.extension.scanline_speed = 1.3 - phi * 1.0; // 1.3 → 0.3
-                                                        // Higher phi = more opaque (clearer perception)
+        // Higher phi = more opaque (clearer perception)
         mat.extension.hologram_alpha = 0.40 + phi * 0.40; // 0.40 → 0.80
     }
 }

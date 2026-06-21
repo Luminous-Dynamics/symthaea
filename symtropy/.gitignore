@@ -1,2 +1,18 @@
 # mdBook rendered output
 book/book/
+
+# Python
+__pycache__/
+*.pyc
+pyphi.log
+temp_deps.txt
+
+# LaTeX
+*.aux
+*.log
+*.out
+texput.log
+
+# Nix
+result
+.direnv/

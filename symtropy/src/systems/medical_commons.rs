@@ -124,7 +124,9 @@ pub fn medical_commons_system(
             ),
             SharingModel::Voluntary => format!(
                 "Medical Commons: VOLUNTARY — {:.0}% healing! {}/{} crew consent. FL quality={:.0}%",
-                medical.healing_rate * 100.0, consenting, total,
+                medical.healing_rate * 100.0,
+                consenting,
+                total,
                 fl_pool.aggregation_quality * 100.0,
             ),
             SharingModel::Coerced => format!(

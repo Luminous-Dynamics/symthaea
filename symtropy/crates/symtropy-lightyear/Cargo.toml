@@ -15,8 +15,8 @@ bevy_ecs = "0.18"
 bevy_log = "0.18"
 
 # Symtropy crates
-symtropy-net = { path = "../symtropy-net" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-net = { path = "/srv/luminous-dynamics/symtropy/crates/domains/symtropy-net" }
+symtropy-physics = { path = "../core/symtropy-physics" }
 
 # nalgebra
 nalgebra = "0.34"

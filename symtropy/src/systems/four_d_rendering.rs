@@ -11,9 +11,24 @@
 //! just wires it into Bevy's ECS.
 
 use bevy::prelude::*;
-use symtropy_render_bridge::Projector4D;
+use symtropy_render_bridge::{NdSlicingMaterial, Projector4D};
 
+use crate::resources::SettlementMetrics;
 use crate::systems::dimension_transition::{DimensionMode, DimensionTransition};
+
+/// Sync global settlement metrics and 4D slice position to PBR materials.
+pub fn four_d_material_sync_system(
+    dim: Res<DimensionTransition>,
+    settlement: Res<SettlementMetrics>,
+    mut materials: ResMut<Assets<NdSlicingMaterial>>,
+) {
+    for (_, material) in materials.iter_mut() {
+        let settings = &mut material.extension.settings;
+        settings.w_slice = dim.w_position;
+        settings.phi_global = settlement.trust; // Link trust to global Phi visual
+        settings.energy_level = settlement.power; // Power drives brightness
+    }
+}
 
 /// Component that gives an entity a position in the 4th dimension (W axis).
 ///

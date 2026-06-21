@@ -1,5 +1,5 @@
 [package]
-name = "symtropy-render-bridge"
+name = "symtropy-render-bridge-backup"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
@@ -14,8 +14,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
-symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
+symtropy-math = { version = "0.2.0", path = "../core/symtropy-math" }
+symtropy-physics = { version = "0.2.0", path = "../core/symtropy-physics" }
 nalgebra = "0.34"
 bevy = { version = "0.15", default-features = false, features = [
     "bevy_render", "bevy_core_pipeline", "bevy_sprite",

@@ -29,8 +29,8 @@ symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole" }
 # adding extra dependencies. The `low-level` feature surfaces them as
 # `symtropy::physics::*` / `symtropy::math::*` modules in addition to the
 # prelude items.
-symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
-symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
+symtropy-physics = { version = "0.2.0", path = "../core/symtropy-physics" }
+symtropy-math = { version = "0.2.0", path = "../core/symtropy-math" }
 
 [features]
 default = ["devconsole-phi"]

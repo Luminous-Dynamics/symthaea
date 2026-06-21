@@ -59,6 +59,16 @@ impl Default for ExperienceRegistry {
             available: true,
         });
 
+        // Embodied 3D Layout (H1.5)
+        experiences.push(ExperienceDescriptor {
+            id: "waterworks-3d",
+            name: "Old Waterworks 3D",
+            subtitle: "Embodied 3D survival & repair test",
+            icon_color: [0.9, 0.6, 0.1], // Amber/Orange
+            phase: GamePhase::Loading,
+            available: true,
+        });
+
         // Muse: Thermodynamic Visualizer
         experiences.push(ExperienceDescriptor {
             id: "muse",

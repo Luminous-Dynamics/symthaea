@@ -135,7 +135,7 @@ pub fn governance_voting_system(
         // Vote decision: NPCs with high care_activation approve pro-social proposals
         let care = consciousness.sim_dimensions[3]; // care_activation
         let coherence = consciousness.sim_dimensions[2]; // coherence
-                                                         // High-care NPCs approve; low-coherence NPCs abstain (don't vote)
+        // High-care NPCs approve; low-coherence NPCs abstain (don't vote)
         if coherence < 0.3 {
             continue; // Too confused to vote
         }

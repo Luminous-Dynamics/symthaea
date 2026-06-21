@@ -9,8 +9,8 @@ publish = false
 bevy = { version = "0.18", default-features = false, features = ["bevy_winit", "bevy_core_pipeline", "bevy_render", "bevy_pbr", "bevy_asset", "multi_threaded", "x11", "bevy_log", "bevy_state", "bevy_color"] }
 lightyear = "0.26"
 symtropy-lightyear = { path = "../symtropy-lightyear" }
-symtropy-physics = { path = "../symtropy-physics" }
-symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../core/symtropy-physics" }
+symtropy-math = { path = "../core/symtropy-math" }
 nalgebra = "0.34"
 serde = { version = "1", features = ["derive"] }
 rand = "0.8"

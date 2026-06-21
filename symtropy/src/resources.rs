@@ -96,6 +96,8 @@ pub enum GamePhase {
     Loading,
     /// Active gameplay.
     Playing,
+    /// Active 3D gameplay (Milestone H1.5).
+    Playing3D,
     /// Governance council session — gameplay paused for voting.
     Council,
     /// Leviathan caught the player.
@@ -119,7 +121,7 @@ pub enum GamePhase {
 #[derive(Resource, Default)]
 pub struct GovernanceLog {
     /// Recent governance event messages (ring buffer, max 20).
-    pub messages: Vec<GovernanceMessage>,
+    pub messages: std::collections::VecDeque<GovernanceMessage>,
 }
 
 /// A timestamped governance message.
@@ -135,13 +137,13 @@ pub struct GovernanceMessage {
 impl GovernanceLog {
     /// Push a message, keeping max 20 entries.
     pub fn push(&mut self, time_secs: f32, text: String, severity: u8) {
-        self.messages.push(GovernanceMessage {
+        self.messages.push_back(GovernanceMessage {
             time_secs,
             text,
             severity,
         });
         if self.messages.len() > 20 {
-            self.messages.remove(0);
+            self.messages.pop_front();
         }
     }
 }
@@ -209,6 +211,100 @@ pub struct PlayerInput {
 }
 
 // ============================================================================
+// Settlement Metrics (Firstlight Basin Vertical Slice)
+// ============================================================================
+
+/// Global metrics for the Firstlight Basin settlement.
+/// These metrics drive NPC behavior and the First Public Vote.
+#[derive(Resource, Debug, Clone)]
+pub struct SettlementMetrics {
+    /// Power stability [0, 1].
+    pub power: f32,
+    /// Water availability [0, 1].
+    pub water: f32,
+    /// Food reserves [0, 1].
+    pub food: f32,
+    /// Infrastructure repair quality [0, 1].
+    pub repair: f32,
+    /// Collective trust in leadership/player [0, 1].
+    pub trust: f32,
+    /// Institutional legitimacy [0, 1].
+    pub legitimacy: f32,
+    /// Physical safety [0, 1].
+    pub safety: f32,
+    /// Systemic entropy [0, 1].
+    pub entropy: f32,
+}
+
+impl Default for SettlementMetrics {
+    fn default() -> Self {
+        Self {
+            power: 0.2,      // unstable
+            water: 0.1,      // critical
+            food: 0.3,       // low
+            repair: 0.2,     // poor
+            trust: 0.4,      // fragile
+            legitimacy: 0.3, // provisional
+            safety: 0.3,     // weak
+            entropy: 0.6,    // rising
+        }
+    }
+}
+
+// ============================================================================
+// Governance Vote (Firstlight Basin Vertical Slice)
+// ============================================================================
+
+/// A strategic decision for the settlement.
+#[derive(Debug, Clone)]
+pub struct VoteOption {
+    pub label: String,
+    pub description: String,
+    pub effect_text: String,
+}
+
+/// Active governance vote state.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct GovernanceVote {
+    pub is_active: bool,
+    pub question: String,
+    pub options: Vec<VoteOption>,
+    pub selected_index: usize,
+}
+
+impl GovernanceVote {
+    pub fn new_water_crisis_vote() -> Self {
+        Self {
+            is_active: true,
+            question: "What should Seedworks become after surviving the water crisis?".to_string(),
+            options: vec![
+                VoteOption {
+                    label: "Public Repair".to_string(),
+                    description: "Reinforce shared infrastructure and housing.".to_string(),
+                    effect_text: "Trust rises, repair costs decrease.".to_string(),
+                },
+                VoteOption {
+                    label: "Factory Overdrive".to_string(),
+                    description: "Prioritize fabrication and machine expansion.".to_string(),
+                    effect_text: "Production rises, pollution risk begins.".to_string(),
+                },
+                VoteOption {
+                    label: "Perimeter Defense".to_string(),
+                    description: "Build walls and floodlights.".to_string(),
+                    effect_text: "Safety improves, trust may split.".to_string(),
+                },
+                VoteOption {
+                    label: "Archive Recovery".to_string(),
+                    description: "Investigate the Ghost Civic Center.".to_string(),
+                    effect_text: "Knowledge increases, old systems awaken.".to_string(),
+                },
+            ],
+            selected_index: 0,
+        }
+    }
+}
+
+// ============================================================================
 // Energy Wells (thermodynamic life sources)
 // ============================================================================
 
@@ -255,3 +351,22 @@ impl EnergyWell {
 // ============================================================================
 
 // AudioOutput moved to systems/audio.rs as AudioState
+
+// ============================================================================
+// Shared Presentation / Simulation Site Layout
+// ============================================================================
+
+/// Global site layout describing dungeon room centers and tiles.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct SiteLayout {
+    pub site_id: String,
+    pub width: usize,
+    pub height: usize,
+    /// 0=wall, 1=floor, 2=core_room, 3=player_start
+    pub tiles: Vec<Vec<u8>>,
+    /// Center of rooms
+    pub room_centers: Vec<(usize, usize)>,
+    /// Coordinates of special points (player spawn, core, etc.) in world space
+    pub player_start: Vec2,
+    pub core_pos: Vec2,
+}

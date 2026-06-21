@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 bevy = { version = "0.18", default-features = false, features = ["bevy_core_pipeline", "bevy_render", "bevy_pbr", "bevy_asset", "bevy_winit", "x11", "bevy_log", "bevy_color", "bevy_state"] }
 symtropy-bevy-core = { path = "../symtropy-bevy-core" }
 symthaea-bevy-brain = { path = "../symthaea-bevy-brain" }
-symtropy-math = { path = "../symtropy-math" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-math = { path = "../core/symtropy-math" }
+symtropy-physics = { path = "../core/symtropy-physics" }
 serde = { version = "1.0", features = ["derive"] }
 nalgebra = "0.34"

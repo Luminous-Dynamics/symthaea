@@ -142,7 +142,7 @@ pub fn demo_director_system(
             // Hold camera, scrub timeline from 50 to 200
             camera.distance += (2.8 - camera.distance) * 0.02;
             timeline.year = 50 + (ease * 150.0) as u32; // 50 → 200
-                                                        // Slow rotation during scrub
+            // Slow rotation during scrub
             camera.theta += 0.0003;
         }
 

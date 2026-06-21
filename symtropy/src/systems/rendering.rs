@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rendering setup: camera, level design, sprites, HUD, visual stress effects.
 
+use crate::resources::SettlementMetrics;
 use bevy::prelude::*;
 
 use crate::components::*;
-use crate::resources::{
-    BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes,
-    SleepPhase, TileGrid,
-};
-use crate::systems::consciousness::PlayerConsciousness;
+use crate::resources::{BiometricsCtx, GovernanceLog, LeviathanState, PhysicsWorldRes, SleepPhase};
 // TODO: re-enable when Mycelix integration stabilizes
 // use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
 
@@ -28,108 +25,65 @@ pub struct HudText;
 #[derive(Component)]
 pub struct LeviathanSprite;
 
-/// Generate full dungeon from seed, optionally modulated by consciousness.
-fn level_dungeon(seed: u64, phi: Option<f64>) -> super::procgen::Dungeon {
-    let dungeon = if let Some(phi) = phi {
-        let config = super::phi_pcg::PhiDungeonConfig::from_phi(&super::phi_pcg::PhiPcgParams {
-            phi,
-            ..Default::default()
-        });
-        eprintln!(
-            "[symtropy] Phi-PCG: phi={phi:.2}, depth={}, rooms_min={}, connections={}",
-            config.bsp_depth, config.min_room_size, config.extra_connections
-        );
-        super::procgen::generate_dungeon_phi(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed, &config)
-    } else {
-        super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed)
-    };
-    eprintln!(
-        "[symtropy] Generated dungeon with seed {seed} ({} rooms)",
-        dungeon.room_centers.len()
-    );
-    dungeon
-}
-
 /// Spawn the camera, level, player, NPCs, fusion core, and Leviathan.
 pub fn setup_world(
     mut commands: Commands,
-    seed: Res<crate::resources::DungeonSeed>,
+    layout: Res<crate::resources::SiteLayout>,
     mut physics_world: ResMut<crate::resources::PhysicsWorldRes>,
-    player_c: Res<crate::systems::consciousness::PlayerConsciousness>,
+    registry: Res<crate::experience::ExperienceRegistry>,
 ) {
-    // Camera with consciousness-driven post-processing
-    commands.spawn((
-        Camera2d,
-        Transform::from_xyz(0.0, 0.0, 999.0),
-        bevy::post_process::bloom::Bloom {
-            intensity: 0.15,
-            ..default()
-        },
-    ));
+    let exp = &registry.experiences[registry.selected];
+    let is_3d = exp.id == "waterworks-3d";
 
-    // Phi-PCG: consciousness shapes the dungeon topology
-    // First run Phi≈0.5 (default); restarts use the player's actual consciousness level
-    let phi = player_c.level;
-    let dungeon = level_dungeon(seed.0, Some(phi));
-    let map = &dungeon.tiles;
-    let rows = map.len() as i32;
-    let cols = if map.is_empty() {
-        0
-    } else {
-        map[0].len() as i32
-    };
+    if !is_3d {
+        // Camera with consciousness-driven post-processing
+        commands.spawn((
+            Camera2d,
+            Transform::from_xyz(0.0, 0.0, 999.0),
+            bevy::post_process::bloom::Bloom {
+                intensity: 0.15,
+                ..default()
+            },
+        ));
+    }
 
-    let mut player_pos = Vec2::new(0.0, 0.0);
-    let mut core_pos = Vec2::new(0.0, 0.0);
+    let map = &layout.tiles;
+    let rows = layout.height as f32;
+    let cols = layout.width as f32;
 
-    // Build tile grid for O(1) collision lookups
-    let mut tile_grid = TileGrid {
-        tile_size: TILE_SIZE,
-        origin_col: cols / 2,
-        origin_row: rows / 2,
-        cols,
-        rows,
-        ..default()
-    };
+    let player_pos = layout.player_start;
+    let core_pos = layout.core_pos;
 
     // Spawn tiles
     for (row_idx, row) in map.iter().enumerate() {
         for (col_idx, &cell) in row.iter().enumerate() {
-            let x = (col_idx as f32 - cols as f32 / 2.0) * TILE_SIZE;
-            let y = (rows as f32 / 2.0 - row_idx as f32) * TILE_SIZE;
+            let x = (col_idx as f32 - cols / 2.0) * TILE_SIZE;
+            let y = (rows / 2.0 - row_idx as f32) * TILE_SIZE;
 
-            let (color, walkable) = match cell {
-                1 => (Color::srgb(0.45, 0.35, 0.25), false), // wall — brown
-                2 => {
-                    core_pos = Vec2::new(x, y);
-                    (Color::srgb(0.2, 0.25, 0.35), true) // core room — darker blue
-                }
-                3 => {
-                    player_pos = Vec2::new(x, y);
-                    (Color::srgb(0.25, 0.25, 0.32), true) // player start
-                }
-                _ => (Color::srgb(0.22, 0.22, 0.30), true), // floor — dark blue-gray
+            let color = match cell {
+                1 => Color::srgb(0.45, 0.35, 0.25), // wall — brown
+                2 => Color::srgb(0.2, 0.25, 0.35),  // core room — darker blue
+                3 => Color::srgb(0.25, 0.25, 0.32), // player start
+                _ => Color::srgb(0.22, 0.22, 0.30), // floor — dark blue-gray
             };
 
-            // Register in spatial lookup grid
-            tile_grid
-                .cells
-                .insert((col_idx as i32, row_idx as i32), walkable);
-
-            commands.spawn((
-                Sprite::from_color(color, Vec2::splat(TILE_SIZE - 1.0)),
-                Transform::from_xyz(x, y, 0.0),
-                Tile {
-                    grid_x: col_idx as i32,
-                    grid_y: row_idx as i32,
-                    walkable,
-                },
-            ));
+            if !is_3d {
+                commands.spawn((
+                    Sprite::from_color(color, Vec2::splat(TILE_SIZE - 1.0)),
+                    Transform::from_xyz(x, y, 0.0),
+                    Tile {
+                        grid_x: col_idx as i32,
+                        grid_y: row_idx as i32,
+                        walkable: cell != 1,
+                    },
+                ));
+            }
         }
     }
 
-    // Insert tile grid as resource for collision checks
-    commands.insert_resource(tile_grid);
+    if is_3d {
+        return;
+    }
 
     // Player — bright cyan, with physics body
     let player_physics_handle = physics_world.world.add_sphere(
@@ -157,34 +111,69 @@ pub fn setup_world(
         symtropy_render_bridge::PhysicsBody::new(player_physics_handle, 10.0),
     ));
 
-    // Crew NPCs — each a different green shade, spread near player
+    // Crew NPCs — each archetype has a different color and caution/governance settings
     let npc_configs = [
         (
-            "Kael",
+            "Engineer (Kael)",
             player_pos.x - 32.0,
             player_pos.y,
-            Color::srgb(0.3, 0.9, 0.3),
+            Color::srgb(0.9, 0.5, 0.1),
+            0.4, // caution
         ),
         (
-            "Mira",
+            "Medic (Mira)",
             player_pos.x + 32.0,
             player_pos.y,
-            Color::srgb(0.4, 0.85, 0.5),
+            Color::srgb(0.2, 0.8, 0.6),
+            0.6, // caution
         ),
         (
-            "Soren",
+            "Archivist (Soren)",
             player_pos.x,
             player_pos.y + 32.0,
-            Color::srgb(0.25, 0.8, 0.4),
+            Color::srgb(0.3, 0.3, 0.8),
+            0.7, // caution
+        ),
+        (
+            "Convoy Lead (Jack)",
+            player_pos.x - 32.0,
+            player_pos.y - 32.0,
+            Color::srgb(0.8, 0.3, 0.3),
+            0.3, // caution
+        ),
+        (
+            "Friendly Robot (PR-4)",
+            player_pos.x + 32.0,
+            player_pos.y - 32.0,
+            Color::srgb(0.5, 0.8, 0.8),
+            0.1, // caution
+        ),
+        (
+            "Industrial Liaison (Nadia)",
+            player_pos.x - 64.0,
+            player_pos.y,
+            Color::srgb(0.8, 0.8, 0.2),
+            0.5, // caution
+        ),
+        (
+            "Young Tech (Leo)",
+            player_pos.x + 64.0,
+            player_pos.y,
+            Color::srgb(0.6, 0.9, 0.2),
+            0.3, // caution
         ),
     ];
     // NPC consciousness varies — creates natural tier distribution for governance
     let npc_consciousness = [
-        [0.6, 0.5, 0.5, 0.7, 0.6, 0.5], // Kael: high care, Steward-tier
-        [0.4, 0.3, 0.6, 0.5, 0.4, 0.4], // Mira: moderate, Contributor-tier
-        [0.8, 0.7, 0.7, 0.4, 0.8, 0.6], // Soren: high level, near-Guardian
+        [0.6, 0.5, 0.5, 0.7, 0.6, 0.5], // Engineer: high care
+        [0.4, 0.3, 0.6, 0.5, 0.4, 0.4], // Medic: community/social
+        [0.8, 0.7, 0.7, 0.4, 0.8, 0.6], // Archivist: deep knowledge
+        [0.5, 0.6, 0.4, 0.7, 0.5, 0.5], // Convoy Lead: tactical
+        [0.2, 0.1, 0.8, 0.9, 0.2, 0.1], // Friendly Robot: low self-identity, high engagement
+        [0.7, 0.8, 0.5, 0.5, 0.7, 0.6], // Industrial Liaison: negotiation
+        [0.3, 0.4, 0.4, 0.6, 0.3, 0.3], // Young Tech: junior
     ];
-    for (i, (name, x, y, color)) in npc_configs.iter().enumerate() {
+    for (i, (name, x, y, color, caution)) in npc_configs.iter().enumerate() {
         let cp = ConsciousnessComp {
             sim_dimensions: npc_consciousness[i],
             ..Default::default()
@@ -204,10 +193,13 @@ pub fn setup_world(
             .consciousness
             .register(npc_physics_handle, 80.0, 30.0);
 
+        let mut crew_npc = CrewNpc::new(name, i as u64 + 100);
+        crew_npc.caution = *caution;
+
         commands.spawn((
             Sprite::from_color(*color, Vec2::splat(16.0)),
             Transform::from_xyz(*x, *y, 2.0),
-            CrewNpc::new(name, i as u64 + 100),
+            crew_npc,
             MoveTarget {
                 target: None,
                 speed: 60.0,
@@ -215,7 +207,36 @@ pub fn setup_world(
             NoiseEmitter::default(),
             cp,
             super::consciousness::NpcConsciousness::default(),
-            super::psychology::PsychologicalNeeds::default(),
+            super::psychology::PsychologicalNeeds {
+                allostatic_load: match i {
+                    0 => 0.20, // Kael
+                    1 => 0.40, // Mira
+                    2 => 0.10, // Soren
+                    3 => 0.30, // Jack
+                    4 => 0.05, // PR-4
+                    5 => 0.25, // Nadia
+                    _ => 0.50, // Leo
+                },
+                social_satiation: match i {
+                    0 => 0.40,
+                    1 => 0.80,
+                    2 => 0.30,
+                    3 => 0.50,
+                    4 => 0.90,
+                    5 => 0.60,
+                    _ => 0.50,
+                },
+                engagement: match i {
+                    0 => 0.90,
+                    1 => 0.70,
+                    2 => 0.80,
+                    3 => 0.60,
+                    4 => 0.95,
+                    5 => 0.75,
+                    _ => 0.80,
+                },
+                burnout_ticks: 0,
+            },
             TendBalance::new(40),
             FactionAffiliation {
                 faction_id: None,
@@ -263,7 +284,7 @@ pub fn setup_world(
     ));
     well_count += 1;
 
-    for (i, &(cx, cy)) in dungeon.room_centers.iter().enumerate() {
+    for (i, &(cx, cy)) in layout.room_centers.iter().enumerate() {
         // Place wells at every other room, skip core room
         if i % 2 != 0 {
             continue;
@@ -339,6 +360,7 @@ pub fn hud_system(
     physics: Res<PhysicsWorldRes>,
     thermo_hud: Res<crate::systems::thermodynamic::ThermodynamicHudState>,
     dim_state: Res<crate::systems::dimension_transition::DimensionTransition>,
+    settlement: Res<SettlementMetrics>,
 ) {
     timer.0 += time.delta_secs();
     if timer.0 < 0.25 {
@@ -455,6 +477,7 @@ pub fn hud_system(
          Stress: {:.0}%  Load: {:.0}%  Leviathan: {phase}{sanctuary}\n\
          {consciousness}  Harmony: {harm}  Fragments: {frags}/48\n\
          {energy}\n\
+         SETTLEMENT: Power={pow:.0}% Water={wat:.0}% Trust={trust:.0}% Entropy={ent:.0}%\n\
          Dim: {dim}  Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%\n\
          {hint}",
         stress.arousal * 100.0,
@@ -465,6 +488,10 @@ pub fn hud_system(
         harm = harmony_str,
         frags = collected.total(),
         energy = energy_str,
+        pow = settlement.power * 100.0,
+        wat = settlement.water * 100.0,
+        trust = settlement.trust * 100.0,
+        ent = settlement.entropy * 100.0,
         dim = dim_str,
         noise = leviathan.noise_accumulator,
         thresh = leviathan.threshold,

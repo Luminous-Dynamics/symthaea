@@ -9,8 +9,10 @@ keywords = ["physics", "mesh", "collision", "simulation"]
 categories = ["science", "simulation", "game-engines"]
 
 [dependencies]
-symtropy-math = { path = "../symtropy-math" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-math = { path = "../core/symtropy-math" }
+symtropy-physics = { path = "../core/symtropy-physics" }
 nalgebra = "0.34"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 arrayvec = "0.7"
+bincode = "1.3"

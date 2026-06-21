@@ -1,27 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! FEP-driven NPC behavior: free energy gradient minimization.
-//!
-//! NPCs move to minimize variational free energy:
-//! - Low energy → seek energy wells (survival)
-//! - Moderate energy → seek resonant agents (epistemic offloading)
-//! - High energy → explore (information seeking)
-//! - Danger → flee (entropy avoidance)
-//!
-//! This replaced the stub action selector. The cooperation experiment
-//! proved this produces 80% tighter clustering than random movement.
 
 use bevy::prelude::*;
 use symthaea_fep::Observation;
 
 use crate::components::{CrewNpc, MoveTarget, NoiseEmitter, Player};
-use crate::resources::{BiometricsCtx, EnergyWell, LeviathanState, PhysicsWorldRes, SleepPhase};
+use crate::resources::{
+    BiometricsCtx, EnergyWell, LeviathanState, PhysicsWorldRes, SettlementMetrics, SleepPhase,
+};
 use symtropy_render_bridge::PhysicsBody;
 
 /// Run the FEP perception-action cycle for each crew NPC.
-///
-/// Uses free_energy_gradient() to compute the optimal movement direction
-/// based on energy state, nearby agents, energy wells, and danger.
 pub fn fep_behavior_system(
     mut npcs: Query<
         (
@@ -40,6 +30,7 @@ pub fn fep_behavior_system(
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
     physics: Res<PhysicsWorldRes>,
+    settlement: Res<SettlementMetrics>,
     core_query: Query<
         &Transform,
         (
@@ -49,7 +40,7 @@ pub fn fep_behavior_system(
         ),
     >,
 ) {
-    let Ok((player_tf, player_body)) = player_query.single() else {
+    let Some((player_tf, player_body)) = player_query.iter().next() else {
         return;
     };
     let player_pos = player_tf.translation.truncate();
@@ -61,7 +52,6 @@ pub fn fep_behavior_system(
         SleepPhase::Hunting => 1.0,
     };
 
-    // Leviathan danger source (near the fusion core)
     let danger_source: Option<nalgebra::SVector<f64, 2>> = if danger > 0.1 {
         core_query
             .iter()
@@ -71,7 +61,6 @@ pub fn fep_behavior_system(
         None
     };
 
-    // Collect energy well data
     let well_data: Vec<(nalgebra::SVector<f64, 2>, f64)> = wells
         .iter()
         .filter(|(_, w)| w.is_active())
@@ -83,17 +72,14 @@ pub fn fep_behavior_system(
         })
         .collect();
 
-    // Collect all agent positions+harmonies (player + other NPCs) for gradient
     let mut all_agents: Vec<(nalgebra::SVector<f64, 2>, [f64; 9])> = Vec::new();
 
-    // Add player
     if let Some(entity) = physics.consciousness.entities.get(&player_body.handle) {
         all_agents.push((
             nalgebra::SVector::from([player_pos.x as f64, player_pos.y as f64]),
             entity.harmony_activations,
         ));
     }
-    // Add other NPCs
     for (tf, body) in &other_npcs {
         if let Some(entity) = physics.consciousness.entities.get(&body.handle) {
             all_agents.push((
@@ -107,8 +93,7 @@ pub fn fep_behavior_system(
         let npc_pos = npc_tf.translation.truncate();
         let pos = nalgebra::SVector::from([npc_pos.x as f64, npc_pos.y as f64]);
 
-        // Get this NPC's consciousness state
-        let (energy_frac, harmony, prediction_error, npc_phi) = physics
+        let (energy_frac, harmony, _prediction_error, npc_phi) = physics
             .consciousness
             .entities
             .get(&body.handle)
@@ -122,35 +107,34 @@ pub fn fep_behavior_system(
             })
             .unwrap_or((1.0, [0.5; 9], 0.0, 0.5));
 
-        // FEP perception (still feeds the internal model)
+        // FEP perception with Settlement Metrics
         let obs = Observation::new(
             vec![
                 energy_frac,
                 biometrics.encoder.compute_stress_vector().arousal as f64,
                 danger,
                 npc.caution as f64,
+                settlement.water as f64,
+                settlement.power as f64,
             ],
             0.8,
             "game",
         );
         let _perception = npc.fep.perceive(&obs);
 
-        // Build nearby agents list (exclude self)
         let nearby: Vec<_> = all_agents
             .iter()
             .filter(|(agent_pos, _)| {
                 let d = (agent_pos - pos).norm();
-                d > 2.0 // exclude self (distance ~0)
+                d > 2.0
             })
             .cloned()
             .collect();
 
-        // FREE ENERGY GRADIENT — Φ-coupled: consciousness modulates social drive,
-        // resonance gating, and danger sensitivity
-        let direction = symtropy_consciousness_physics::fep_gradient::free_energy_gradient_phi(
+        let mut direction = symtropy_consciousness_physics::fep_gradient::free_energy_gradient_phi(
             &pos,
             energy_frac,
-            Some(npc_phi), // consciousness-aware behavior
+            Some(npc_phi),
             &harmony,
             &nearby,
             &well_data,
@@ -158,14 +142,21 @@ pub fn fep_behavior_system(
             danger,
         );
 
-        // Convert gradient direction to movement target
-        let dir_vec = Vec2::new(direction[0] as f32, direction[1] as f32);
+        // EMERGENT CRISIS MODIFIERS:
+        if npc_phi > 0.6 {
+            if settlement.water < 0.3 {
+                // Seek the Water Pump (assumed to be at the last room center, near the end)
+                if let Some((wx, wy)) = well_data.last().map(|(p, _)| (p[0], p[1])) {
+                    let to_pump = nalgebra::SVector::from([wx - pos[0], wy - pos[1]]).normalize();
+                    direction = direction * 0.5 + to_pump * 0.5;
+                }
+            }
+        }
 
-        // Psychology modifiers
+        let dir_vec = Vec2::new(direction[0] as f32, direction[1] as f32);
         let load = psych.map(|p| p.allostatic_load).unwrap_or(0.0);
         let engagement = psych.map(|p| p.engagement).unwrap_or(1.0);
 
-        // Danger overrides disengagement — survival instinct
         let effective_engagement = if danger > 0.5 {
             engagement.max(0.5)
         } else {
@@ -173,28 +164,24 @@ pub fn fep_behavior_system(
         };
 
         if dir_vec.length_squared() > 0.01 && effective_engagement > 0.15 {
-            // Move in gradient direction
             let speed = if energy_frac < 0.2 {
-                90.0 // Urgent — move faster toward safety
+                90.0
             } else if danger > 0.5 {
-                100.0 // Fleeing
+                100.0
             } else {
-                50.0 // Normal navigation
+                50.0
             };
 
-            // Burnout slows movement; low engagement reduces willingness to move
             let psych_factor = (1.0 - load * 0.4) * effective_engagement;
             target.target = Some(npc_pos + dir_vec * 100.0);
             target.speed = speed * (1.0 - npc.caution * 0.3) * psych_factor;
             noise.level = if speed > 80.0 { 0.1 } else { 0.03 };
         } else {
-            // No gradient or disengaged — rest
             target.target = None;
             target.speed = 0.0;
             noise.level = 0.0;
         }
 
-        // Update caution from danger + allostatic load
         let load_caution_boost = if load > 0.6 { 0.02 } else { 0.0 };
         if danger > 0.5 {
             npc.caution = (npc.caution + 0.05 + load_caution_boost).min(1.0);
@@ -205,9 +192,6 @@ pub fn fep_behavior_system(
 }
 
 /// Apply NPC movement intent to physics bodies.
-///
-/// Reads MoveTarget (set by FEP behavior) and sets velocity on the NPC's
-/// physics body. Wall collision handled by the physics system via TileGrid.
 pub fn npc_movement_system(
     mut query: Query<
         (
@@ -217,7 +201,7 @@ pub fn npc_movement_system(
         ),
         With<CrewNpc>,
     >,
-    mut physics: ResMut<crate::resources::PhysicsWorldRes>,
+    mut physics: ResMut<PhysicsWorldRes>,
     tile_grid: Option<Res<crate::resources::TileGrid>>,
 ) {
     for (tf, target, body_comp) in &query {
@@ -231,7 +215,6 @@ pub fn npc_movement_system(
                     let mut vx = norm.x as f64 * target.speed as f64;
                     let mut vy = norm.y as f64 * target.speed as f64;
 
-                    // TileGrid wall collision filter
                     if let Some(ref grid) = tile_grid {
                         let dt = 1.0 / 64.0_f32;
                         let new_x = tf.translation.x + vx as f32 * dt;

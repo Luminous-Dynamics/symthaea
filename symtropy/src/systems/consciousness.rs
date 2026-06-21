@@ -84,7 +84,13 @@ pub fn player_consciousness_system(
         attention: (stress.arousal as f64 * 0.3f64 + 0.5f64).min(1.0f64), // some arousal helps
         recurrence: (harmony.total_energy as f64 / 8.0f64).min(1.0f64),
         embodiment: (1.0_f64 - danger as f64 * 0.3f64).max(0.2f64),
-        knowledge: (harmony.activations.iter().filter(|&&a| a as f64 > 0.3f64).count() as f64 / 8.0f64).min(1.0f64),
+        knowledge: (harmony
+            .activations
+            .iter()
+            .filter(|&&a| a as f64 > 0.3f64)
+            .count() as f64
+            / 8.0f64)
+            .min(1.0f64),
         synchrony: if harmony.is_sanctuary {
             0.9f64
         } else {

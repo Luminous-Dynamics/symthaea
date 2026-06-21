@@ -17,15 +17,15 @@ path = "src/main.rs"
 [dependencies]
 # Symthaea robotics
 symthaea-manipulator = { path = "../../../symthaea/crates/domains/symthaea-manipulator" }
-symthaea-core = { path = "../../../symthaea-core" }
+symthaea-core = { path = "../../../symthaea/crates/core/symthaea-core" }
 symthaea-fep = { path = "../../../symthaea/crates/core/symthaea-fep" }
 symthaea-consciousness-equation = { path = "../../../symthaea/crates/domains/symthaea-consciousness-equation" }
 
 # Symtropy engine
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
-symtropy-physics = { path = "../symtropy-physics" }
-symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../core/symtropy-physics" }
+symtropy-math = { path = "../core/symtropy-math" }
 symtropy-demo-capture = { path = "../symtropy-demo-capture" }
 
 # Bevy — 3D PBR + UI + windowing (x11 for NixOS)

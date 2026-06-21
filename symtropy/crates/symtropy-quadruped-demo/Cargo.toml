@@ -13,11 +13,11 @@ path = "src/main.rs"
 
 [dependencies]
 symthaea-quadruped = { path = "../../../symthaea/crates/domains/symthaea-quadruped" }
-symthaea-core = { path = "../../../symthaea-core" }
+symthaea-core = { path = "../../../symthaea/crates/core/symthaea-core" }
 
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-physics = { path = "../core/symtropy-physics" }
 symtropy-demo-capture = { path = "../symtropy-demo-capture" }
 
 bevy = { version = "0.18", default-features = false, features = [

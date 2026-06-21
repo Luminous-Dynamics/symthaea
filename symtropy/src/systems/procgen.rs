@@ -133,7 +133,7 @@ impl BspNode {
                 }
             }
         }
-        if let (Some(ref left), Some(ref right)) = (&self.left, &self.right) {
+        if let (Some(left), Some(right)) = (&self.left, &self.right) {
             left.carve(tiles);
             right.carve(tiles);
             // Connect siblings with a corridor
@@ -316,20 +316,28 @@ fn generate_dungeon_with_config(
         // Player at first room, core at last (maximum BSP distance)
         let player = rooms[0];
         let core = rooms[rooms.len() - 1];
-        tiles[player.1][player.0] = 3; // player start
-        tiles[core.1][core.0] = 2; // core room
-                                   // Mark core room area
+
+        let py = player.1.clamp(1, height - 2);
+        let px = player.0.clamp(1, width - 2);
+        let cy = core.1.clamp(1, height - 2);
+        let cx = core.0.clamp(1, width - 2);
+
+        tiles[py][px] = 3; // player start
+        tiles[cy][cx] = 2; // core room
+        // Mark core room area
         for dy in -1i32..=1 {
             for dx in -1i32..=1 {
-                let cy = (core.1 as i32 + dy) as usize;
-                let cx = (core.0 as i32 + dx) as usize;
-                if cy < height && cx < width && tiles[cy][cx] == 1 {
-                    tiles[cy][cx] = 2;
+                let cy_near = (cy as i32 + dy) as usize;
+                let cx_near = (cx as i32 + dx) as usize;
+                if cy_near < height && cx_near < width && tiles[cy_near][cx_near] == 1 {
+                    tiles[cy_near][cx_near] = 2;
                 }
             }
         }
     } else if !rooms.is_empty() {
-        tiles[rooms[0].1][rooms[0].0] = 3;
+        let py = rooms[0].1.clamp(1, height - 2);
+        let px = rooms[0].0.clamp(1, width - 2);
+        tiles[py][px] = 3;
         // Place core somewhere walkable
         for y in 1..height - 1 {
             for x in 1..width - 1 {
@@ -347,6 +355,90 @@ fn generate_dungeon_with_config(
         tiles,
         room_centers: rooms,
     }
+}
+
+/// Generate and insert SiteLayout and TileGrid resources.
+pub fn generate_site_layout_system(
+    mut commands: bevy::prelude::Commands,
+    seed: bevy::prelude::Res<crate::resources::DungeonSeed>,
+    player_c: bevy::prelude::Res<crate::systems::consciousness::PlayerConsciousness>,
+) {
+    use crate::resources::{SiteLayout, TileGrid};
+    use crate::systems::rendering::{MAP_HEIGHT, MAP_WIDTH, TILE_SIZE};
+    use bevy::prelude::*;
+
+    let phi = player_c.level;
+
+    // level_dungeon inline:
+    let dungeon = {
+        let config = crate::systems::phi_pcg::PhiDungeonConfig::from_phi(
+            &crate::systems::phi_pcg::PhiPcgParams {
+                phi,
+                ..Default::default()
+            },
+        );
+        info!(
+            "[symtropy] Phi-PCG: phi={:.2}, depth={}, rooms_min={}, connections={}",
+            phi, config.bsp_depth, config.min_room_size, config.extra_connections
+        );
+        generate_dungeon_phi(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed.0, &config)
+    };
+
+    info!(
+        "[symtropy] Generated dungeon with seed {} ({} rooms)",
+        seed.0,
+        dungeon.room_centers.len()
+    );
+
+    let map = &dungeon.tiles;
+    let rows = map.len() as i32;
+    let cols = if map.is_empty() {
+        0
+    } else {
+        map[0].len() as i32
+    };
+
+    // Build tile grid for O(1) collision lookups
+    let mut tile_grid = TileGrid {
+        tile_size: TILE_SIZE,
+        origin_col: cols / 2,
+        origin_row: rows / 2,
+        cols,
+        rows,
+        ..default()
+    };
+
+    let mut site_layout = SiteLayout {
+        site_id: "seedworks_firstlight".to_string(),
+        width: cols as usize,
+        height: rows as usize,
+        tiles: dungeon.tiles.clone(),
+        room_centers: dungeon.room_centers.clone(),
+        player_start: Vec2::ZERO,
+        core_pos: Vec2::ZERO,
+    };
+
+    // Calculate positions and populate TileGrid
+    for (row_idx, row) in map.iter().enumerate() {
+        for (col_idx, &cell) in row.iter().enumerate() {
+            let x = (col_idx as f32 - cols as f32 / 2.0) * TILE_SIZE;
+            let y = (rows as f32 / 2.0 - row_idx as f32) * TILE_SIZE;
+
+            let walkable = cell != 1;
+            if cell == 2 {
+                site_layout.core_pos = Vec2::new(x, y);
+            } else if cell == 3 {
+                site_layout.player_start = Vec2::new(x, y);
+            }
+
+            tile_grid
+                .cells
+                .insert((col_idx as i32, row_idx as i32), walkable);
+        }
+    }
+
+    commands.insert_resource(tile_grid);
+    commands.insert_resource(site_layout);
 }
 
 use rand::SeedableRng;

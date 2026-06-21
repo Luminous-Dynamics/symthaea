@@ -98,7 +98,7 @@ pub fn living_dungeon_system(
         let wall_candidates: Vec<(i32, i32)> = grid
             .cells
             .iter()
-            .filter(|(_, &walkable)| !walkable)
+            .filter(|&(_, &walkable)| !walkable)
             .map(|(&pos, _)| pos)
             .filter(|&(c, r)| {
                 // Must be adjacent to at least one walkable tile
@@ -136,7 +136,7 @@ pub fn living_dungeon_system(
         let floor_candidates: Vec<(i32, i32)> = grid
             .cells
             .iter()
-            .filter(|(_, &walkable)| walkable)
+            .filter(|&(_, &walkable)| walkable)
             .map(|(&pos, _)| pos)
             .filter(|&(c, r)| {
                 let neighbors = [(c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)];

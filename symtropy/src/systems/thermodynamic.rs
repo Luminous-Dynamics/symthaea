@@ -208,9 +208,16 @@ pub fn thermodynamic_enforcement_system(
 pub fn collapse_visual_system(
     physics: Res<PhysicsWorldRes>,
     mut commands: Commands,
-    mut query: Query<(Entity, &PhysicsBody, &mut Sprite, Option<&EnergyCollapsed>)>,
+    mut query: Query<(
+        Entity,
+        &PhysicsBody,
+        Option<&mut Sprite>,
+        Option<&MeshMaterial3d<StandardMaterial>>,
+        Option<&EnergyCollapsed>,
+    )>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (entity, body_comp, mut sprite, collapsed_marker) in &mut query {
+    for (entity, body_comp, opt_sprite, opt_mat, collapsed_marker) in &mut query {
         let is_collapsed = physics
             .consciousness
             .entities
@@ -219,10 +226,24 @@ pub fn collapse_visual_system(
             .unwrap_or(false);
 
         if is_collapsed && collapsed_marker.is_none() {
-            sprite.color = Color::srgba(0.3, 0.3, 0.3, 0.7);
+            if let Some(mut sprite) = opt_sprite {
+                sprite.color = Color::srgba(0.3, 0.3, 0.3, 0.7);
+            }
+            if let Some(mat_handle) = opt_mat {
+                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                    mat.base_color = Color::srgba(0.3, 0.3, 0.3, 0.7);
+                }
+            }
             commands.entity(entity).insert(EnergyCollapsed);
         } else if !is_collapsed && collapsed_marker.is_some() {
-            sprite.color = Color::srgba(1.0, 1.0, 1.0, 1.0);
+            if let Some(mut sprite) = opt_sprite {
+                sprite.color = Color::srgba(1.0, 1.0, 1.0, 1.0);
+            }
+            if let Some(mat_handle) = opt_mat {
+                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                    mat.base_color = Color::srgba(1.0, 1.0, 1.0, 1.0);
+                }
+            }
             commands.entity(entity).remove::<EnergyCollapsed>();
         }
     }

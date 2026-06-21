@@ -6,7 +6,7 @@ license = "Apache-2.0 OR MIT"
 description = "Soft-body and cloth dynamics for Symtropy using XPBD."
 
 [dependencies]
-symtropy-math = { path = "../symtropy-math" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-math = { path = "../core/symtropy-math" }
+symtropy-physics = { path = "../core/symtropy-physics" }
 nalgebra = { version = "0.34", features = ["serde-serialize"] }
 serde = { version = "1.0", features = ["derive"] }

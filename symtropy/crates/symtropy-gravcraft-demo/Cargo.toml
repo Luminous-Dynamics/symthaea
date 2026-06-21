@@ -15,7 +15,7 @@ path = "src/main.rs"
 [dependencies]
 # Symthaea gravcraft
 symthaea-gravcraft = { path = "../../../symthaea/crates/domains/symthaea-gravcraft" }
-symthaea-core = { path = "../../../symthaea-core" }
+symthaea-core = { path = "../../../symthaea/crates/core/symthaea-core" }
 
 # Bevy engine
 bevy = { version = "0.18", default-features = false, features = [

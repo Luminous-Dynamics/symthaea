@@ -155,8 +155,10 @@ pub fn fl_aggregation_system(
 
                 let msg = format!(
                     "FL DEFENSE OVERWHELMED — {:.0}% Byzantine (>{:.0}% threshold). {} nodes, {} excluded.",
-                    poison_fraction * 100.0, BFT_THRESHOLD * 100.0,
-                    pool.total_submitted, pool.excluded_count,
+                    poison_fraction * 100.0,
+                    BFT_THRESHOLD * 100.0,
+                    pool.total_submitted,
+                    pool.excluded_count,
                 );
                 eprintln!("[fl] {}", msg);
                 log.push(time.elapsed_secs(), msg, 2);
@@ -166,8 +168,10 @@ pub fn fl_aggregation_system(
 
                 let msg = format!(
                     "FL defense held (TrimmedMean): {}/{} nodes included, {} poisoned filtered (quality={:.0}%)",
-                    agg.included_nodes.len(), pool.total_submitted,
-                    num_poison, pool.aggregation_quality * 100.0,
+                    agg.included_nodes.len(),
+                    pool.total_submitted,
+                    num_poison,
+                    pool.aggregation_quality * 100.0,
                 );
                 eprintln!("[fl] {}", msg);
                 log.push(time.elapsed_secs(), msg, 0);

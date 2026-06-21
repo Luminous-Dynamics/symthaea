@@ -34,7 +34,182 @@ fn bottleneck_to_dialogue(
     name: &str,
     needs: Option<&crate::systems::psychology::PsychologicalNeeds>,
 ) -> String {
-    // Psychological needs override consciousness dialogue when extreme
+    // 1. Role-specific overrides for high stress / allostatic burnout
+    if name.contains("Kael") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"The junction grids... they're completely fried. I can't keep them stable alone!\""
+                );
+            }
+            if n.social_satiation < 0.15 {
+                return format!(
+                    "{name}: \"Does anyone even care about the life support status? I'm talking to empty rooms.\""
+                );
+            }
+        }
+        return match bottleneck {
+            "phi" => format!(
+                "{name}: \"If we don't fix the power loops, the consciousness coupling will collapse.\""
+            ),
+            "working_memory" => {
+                format!("{name}: \"What was the sequence for the water pump purge again?\"")
+            }
+            "attention" => format!(
+                "{name}: \"The voltage is fluctuating too fast. I can't focus on the schematics.\""
+            ),
+            _ => format!(
+                "{name}: \"Checking the junction status. We need more voltage to keep the system online.\""
+            ),
+        };
+    } else if name.contains("Mira") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"So many wounded... the trauma feed is off the charts. I need a break.\""
+                );
+            }
+            if n.social_satiation < 0.15 {
+                return format!(
+                    "{name}: \"I'm supposed to heal people, but everyone is shutting me out.\""
+                );
+            }
+        }
+        return match bottleneck {
+            "phi" => format!(
+                "{name}: \"Biometric stress is peaking. Please, everyone stay calm and breathe.\""
+            ),
+            "embodiment" => format!(
+                "{name}: \"My hands are shaking... is this real feedback or phantom trauma?\""
+            ),
+            "knowledge" => format!(
+                "{name}: \"I need clean water. If the pump is sabotaged, infection rates will spike.\""
+            ),
+            _ => format!(
+                "{name}: \"Check your biometrics. Don't let your stress compromise the coupling.\""
+            ),
+        };
+    } else if name.contains("Soren") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"The logs... they're being erased. Everything we built... gone.\""
+                );
+            }
+            if n.social_satiation < 0.15 {
+                return format!(
+                    "{name}: \"Isolated in the archive stacks. Only dead voices for company.\""
+                );
+            }
+        }
+        return match bottleneck {
+            "phi" => format!(
+                "{name}: \"This division of consciousness is documented in the ancient worldline files.\""
+            ),
+            "knowledge" => {
+                format!("{name}: \"The Chronicle knows our choices. Nothing is forgotten.\"")
+            }
+            "broadcast" => format!(
+                "{name}: \"I need to transmit this signal before the null ecology intercepts it.\""
+            ),
+            _ => format!(
+                "{name}: \"I am scanning the historical anchors for precedents in the database.\""
+            ),
+        };
+    } else if name.contains("Jack") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"Drones everywhere! We're cornered! Get that door open!\""
+                );
+            }
+            if n.social_satiation < 0.15 {
+                return format!("{name}: \"Where is the backup team? We're on our own out here.\"");
+            }
+        }
+        return match bottleneck {
+            "attention" => {
+                format!("{name}: \"Keep your eyes open. The null ecology is scanning this room.\"")
+            }
+            "working_memory" => {
+                format!("{name}: \"I'm losing track of the patrol routes. Need to double back.\"")
+            }
+            _ => format!(
+                "{name}: \"Secure the perimeter. I'll cover the pump area while you repair.\""
+            ),
+        };
+    } else if name.contains("PR-4") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"WARNING: Actuator thermal overload. Self-preservation protocol active.\""
+                );
+            }
+        }
+        return match bottleneck {
+            "phi" => format!(
+                "{name}: \"Error: Phi levels deviating from target parameters. Re-calibrating.\""
+            ),
+            "embodiment" => format!(
+                "{name}: \"Chassis integrity at 98%. Ready for hardware maintenance task.\""
+            ),
+            "working_memory" => format!(
+                "{name}: \"Buffer overflow: memory allocation failed. Repeating task list.\""
+            ),
+            _ => format!(
+                "{name}: \"Beep. Ready to assist with power grid configuration and maintenance.\""
+            ),
+        };
+    } else if name.contains("Nadia") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"The trade-offs are too steep. We are sacrificing too much for this colony!\""
+                );
+            }
+            if n.social_satiation < 0.15 {
+                return format!(
+                    "{name}: \"Nobody trusts my negotiations anymore. I'm talking to walls.\""
+                );
+            }
+        }
+        return match bottleneck {
+            "phi" => format!(
+                "{name}: \"We must balance resources. If we overdrive the factory, the entropy will kill us.\""
+            ),
+            "knowledge" => format!(
+                "{name}: \"The factions are watching how we handle the water crisis. We need a vote.\""
+            ),
+            _ => format!(
+                "{name}: \"We can secure a deal if we keep the power grid stable. Let's act logically.\""
+            ),
+        };
+    } else if name.contains("Leo") {
+        if let Some(n) = needs {
+            if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+                return format!(
+                    "{name}: \"I don't know what to do! It's all falling apart and I'm scared!\""
+                );
+            }
+            if n.social_satiation < 0.15 {
+                return format!("{name}: \"Why is everyone ignoring me? I just want to help.\"");
+            }
+        }
+        return match bottleneck {
+            "phi" => format!(
+                "{name}: \"Is my consciousness level high enough? I don't want to get caught by the Leviathan.\""
+            ),
+            "knowledge" => {
+                format!("{name}: \"How do I use the repair tool? I'm trying my best...\"")
+            }
+            "working_memory" => {
+                format!("{name}: \"Wait, what was Kael's instruction? I forgot...\"")
+            }
+            _ => format!("{name}: \"I'll watch the monitors. Tell me what needs doing, please.\""),
+        };
+    }
+
+    // Fallback generic dialog for unknown NPCs
     if let Some(n) = needs {
         if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
             return format!("{name}: \"I can't keep this up... everything hurts.\"");
@@ -43,17 +218,7 @@ fn bottleneck_to_dialogue(
             return format!("{name}: \"Does anyone even know I'm here?\"");
         }
         if n.engagement < 0.2 {
-            return format!("{name}: \"...\""); // disengaged — goes silent
-        }
-        // Moderate stress flavors
-        if n.allostatic_load > 0.6 {
-            return match bottleneck {
-                "phi" => format!("{name}: \"Too much stress to think straight.\""),
-                _ => format!("{name}: \"I need a moment. Just... a moment.\""),
-            };
-        }
-        if n.social_satiation < 0.3 {
-            return format!("{name}: \"Stay close. Please.\"");
+            return format!("{name}: \"...\"");
         }
     }
 

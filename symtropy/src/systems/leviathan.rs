@@ -93,9 +93,19 @@ pub fn leviathan_system(
 pub fn victory_check_system(
     cores: Query<&crate::components::FusionCore>,
     mut next_state: ResMut<NextState<GamePhase>>,
+    mut triggered: Local<bool>,
 ) {
     for core in &cores {
         if core.extraction_progress >= 1.0 {
+            if !*triggered {
+                crate::systems::chronicle_recorder::record_chronicle_event(
+                    "FusionCoreExtractionSuccess",
+                    serde_json::json!({
+                        "progress": core.extraction_progress,
+                    }),
+                );
+                *triggered = true;
+            }
             next_state.set(GamePhase::Victory);
         }
     }

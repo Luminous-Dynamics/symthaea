@@ -1,7 +1,7 @@
 // src/systems/engine_physics.rs
+use crate::resources::PhysicsWorldRes;
 use bevy::prelude::*;
 use symtropy_bevy_core::PhysicsBody;
-use crate::resources::PhysicsWorldRes;
 
 pub fn update_physics_consciousness(
     mut physics: ResMut<PhysicsWorldRes>,
