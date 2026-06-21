@@ -16,6 +16,8 @@ Current status:
 - RHN v0.10 adds cost-aware bakeoff reporting: redundancy, retrieval fanout,
   searched-node counts, storage multipliers, latency per query, and
   cost-normalized accuracy metrics.
+- RHN v0.11 adds a Broca semantic-role preservation bakeoff for domain-transfer
+  evidence without wiring RHN into Broca generation by default.
 - These APIs are ready for controlled Broca, Vision, and coding-router
   experiments behind feature flags, not default integration.
 
@@ -84,3 +86,21 @@ Split semantics:
 
 Before default Broca/Vision integration, RHN still needs domain-transfer
 evidence and storage/fanout accounting from the bakeoff runner.
+
+Run the Broca role-preservation bakeoff:
+
+```bash
+cargo run -p symthaea-core \
+  --features cantor-hdc \
+  --bin rhn_broca_role_bakeoff \
+  --release \
+  -- --frames 96 --seeds 3 --branching 64 \
+     --retrieval-fanout 3 --out /tmp/rhn_broca_role_v011.json
+```
+
+This runner measures whether RHN routing preserves directional semantic frames
+such as `Alice helps Bob` versus `Bob helps Alice`. It reports top-1/top-3
+retrieval, subject/relation/object preservation, exact frame preservation,
+role-reversal rate, abstention, answered accuracy, fanout, redundancy, load
+balance, and latency. Treat it as a controlled Broca planner experiment, not as
+a claim that RHN improves open-ended language generation.
