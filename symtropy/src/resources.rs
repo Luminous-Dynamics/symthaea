@@ -370,3 +370,25 @@ pub struct SiteLayout {
     pub player_start: Vec2,
     pub core_pos: Vec2,
 }
+
+// ============================================================================
+// Playable Tutorial Scenario (Causality Engine)
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Reflect)]
+pub enum TutorialStep {
+    #[default]
+    Inactive,
+    PumpSabotaged,
+    PR4Repairing,
+    CoopRepairing,
+    LeoStressRising,
+    LeoStabilizing,
+    Completed,
+}
+
+#[derive(Resource, Default, Debug, Clone, Reflect)]
+pub struct TutorialScenarioRes {
+    pub step: TutorialStep,
+    pub pump_entity: Option<Entity>,
+}

@@ -35,6 +35,7 @@ pub mod settlement;
 pub mod settlement_spawn;
 pub mod telemetry;
 pub mod thermodynamic;
+pub mod tutorial_scenario;
 
 // Sol Atlas globe view — planetary coordination layer.
 // Enabled via `cargo build --features atlas`.

@@ -11,6 +11,7 @@ use crate::components::{
 };
 use crate::resources::{
     BiometricsCtx, EnergyWell, LeviathanState, PhysicsWorldRes, SettlementMetrics, SleepPhase,
+    TutorialScenarioRes, TutorialStep,
 };
 use symtropy_render_bridge::PhysicsBody;
 
@@ -47,6 +48,7 @@ pub fn fep_behavior_system(
     water_pumps: Query<(&Transform, &WaterPump)>,
     drones: Query<(&Transform, &NullDrone)>,
     time: Res<Time>,
+    tutorial_res: Option<Res<TutorialScenarioRes>>,
 ) {
     let Some((player_tf, player_body)) = player_query.iter().next() else {
         return;
@@ -218,6 +220,30 @@ pub fn fep_behavior_system(
             }
         }
 
+        // Soren (Archivist) - Attracted to WaterPump during CoopRepairing step of the tutorial
+        if npc.name.contains("Soren") {
+            if let Some(ref tutorial) = tutorial_res {
+                if tutorial.step == TutorialStep::CoopRepairing {
+                    let mut closest_pump: Option<(Vec2, f32)> = None;
+                    for (pump_tf, _) in &water_pumps {
+                        let p_pos = pump_tf.translation.truncate();
+                        let dist = npc_pos.distance(p_pos);
+                        if closest_pump.map_or(true, |(_, d)| dist < d) {
+                            closest_pump = Some((p_pos, dist));
+                        }
+                    }
+                    if let Some((p_pos, _)) = closest_pump {
+                        let to_pump = nalgebra::SVector::from([
+                            (p_pos.x - npc_pos.x) as f64,
+                            (p_pos.y - npc_pos.y) as f64,
+                        ])
+                        .normalize();
+                        direction = direction * 0.2 + to_pump * 0.8;
+                    }
+                }
+            }
+        }
+
         // 2. Mira (Medic)
         if npc.name.contains("Mira") {
             let mut closest_stressed: Option<(Vec2, f32)> = None;
@@ -265,7 +291,12 @@ pub fn fep_behavior_system(
         if npc.name.contains("PR-4") {
             let mut closest_pump: Option<(Vec2, f32)> = None;
             for (pump_tf, pump) in &water_pumps {
-                if pump.is_sabotaged {
+                let is_under_coop_tutorial = if let Some(ref tutorial) = tutorial_res {
+                    tutorial.step == TutorialStep::CoopRepairing && pump.efficiency < 1.0
+                } else {
+                    false
+                };
+                if pump.is_sabotaged || is_under_coop_tutorial {
                     let p_pos = pump_tf.translation.truncate();
                     let dist = npc_pos.distance(p_pos);
                     if closest_pump.map_or(true, |(_, d)| dist < d) {
@@ -333,6 +364,7 @@ pub fn npc_action_system(
     time: Res<Time>,
     mut action_writer: MessageWriter<NpcActionEvent>,
     mut feedback_writer: MessageWriter<WorldFeedbackEvent>,
+    tutorial_res: Option<Res<TutorialScenarioRes>>,
 ) {
     let dt = time.delta_secs();
 
@@ -397,7 +429,13 @@ pub fn npc_action_system(
         // 2. PR-4 (Robot) repairs WaterPump
         if npc.name.contains("PR-4") {
             for (p_tf, mut pump) in &mut water_pumps {
-                if pump.is_sabotaged {
+                let is_under_coop_tutorial = if let Some(ref tutorial) = tutorial_res {
+                    tutorial.step == TutorialStep::CoopRepairing && pump.efficiency < 1.0
+                } else {
+                    false
+                };
+
+                if pump.is_sabotaged || is_under_coop_tutorial {
                     let p_pos = p_tf.translation.truncate();
                     if npc_pos.distance(p_pos) < 30.0 {
                         let is_assistant_adjacent =

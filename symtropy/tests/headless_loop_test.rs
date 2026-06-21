@@ -584,3 +584,305 @@ fn test_narrative_system_causality() {
             .any(|a| a.action_kind == symtropy_launcher::components::NpcActionKind::CombatDrone)
     );
 }
+
+#[test]
+fn test_old_waterworks_tutorial_causal_chain() {
+    let mut app = App::new();
+
+    // Set up standard Bevy plugins headlessly
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins(bevy::state::app::StatesPlugin);
+    app.add_plugins(bevy::input::InputPlugin);
+    app.add_plugins(bevy::asset::AssetPlugin::default());
+    app.add_plugins(bevy::gizmos::GizmoPlugin);
+    app.init_asset::<Mesh>();
+    app.init_asset::<StandardMaterial>();
+
+    // Register our plugin (which handles systems, state, physics, settlement loop)
+    app.add_plugins(SymtropyPlugin);
+
+    // Mock virtual time advancement by 0.5s per frame deterministically
+    app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+        std::time::Duration::from_secs_f32(0.5),
+    ));
+
+    // Selection experience setup: select "waterworks-3d"
+    {
+        let mut registry = app
+            .world_mut()
+            .resource_mut::<symtropy_launcher::experience::ExperienceRegistry>();
+        if let Some(idx) = registry
+            .experiences
+            .iter()
+            .position(|e| e.id == "waterworks-3d")
+        {
+            registry.selected = idx;
+        }
+    }
+
+    // Transition from MainMenu to Loading manually
+    app.world_mut()
+        .resource_mut::<NextState<symtropy_launcher::resources::GamePhase>>()
+        .set(symtropy_launcher::resources::GamePhase::Loading);
+
+    // Run setup to playing transition
+    app.update();
+    app.update();
+    app.update();
+
+    // Now, let's create a test event collector resource and add the collector system
+    #[derive(Resource, Default, Clone)]
+    struct TestEventCollector {
+        feedback: Vec<symtropy_launcher::components::WorldFeedbackEvent>,
+    }
+
+    app.insert_resource(TestEventCollector::default());
+
+    fn collect_test_events_system(
+        mut reader_feedback: MessageReader<symtropy_launcher::components::WorldFeedbackEvent>,
+        mut collector: ResMut<TestEventCollector>,
+    ) {
+        for event in reader_feedback.read() {
+            collector.feedback.push(event.clone());
+        }
+    }
+
+    app.add_systems(Update, collect_test_events_system);
+
+    // Helper to teleport both the Bevy Transform and Rapier physics body of an NPC
+    let teleport_npc = |app: &mut App, entity: Entity, pos: Vec3| {
+        if let Some(mut tf) = app.world_mut().get_mut::<Transform>(entity) {
+            tf.translation = pos;
+        }
+        let handle = app
+            .world()
+            .get::<symtropy_render_bridge::PhysicsBody>(entity)
+            .map(|pb| pb.handle);
+        if let Some(handle) = handle {
+            let mut physics = app
+                .world_mut()
+                .resource_mut::<symtropy_launcher::resources::PhysicsWorldRes>();
+            if let Some(body) = physics.world.body_mut(handle) {
+                body.transform.translation =
+                    symtropy_math::Point::new([pos.x as f64, pos.y as f64]);
+            }
+        }
+    };
+
+    // Retrieve entities we want to manipulate
+    let mut pr4_entity = None;
+    let mut soren_entity = None;
+    let mut kael_entity = None;
+    let mut mira_entity = None;
+    let mut leo_entity = None;
+
+    {
+        let mut query = app
+            .world_mut()
+            .query::<(Entity, &symtropy_launcher::components::CrewNpc)>();
+        for (entity, npc) in query.iter(app.world()) {
+            if npc.name.contains("PR-4") {
+                pr4_entity = Some(entity);
+            } else if npc.name.contains("Soren") {
+                soren_entity = Some(entity);
+            } else if npc.name.contains("Kael") {
+                kael_entity = Some(entity);
+            } else if npc.name.contains("Mira") {
+                mira_entity = Some(entity);
+            } else if npc.name.contains("Leo") {
+                leo_entity = Some(entity);
+            }
+        }
+    }
+
+    let pr4 = pr4_entity.unwrap();
+    let soren = soren_entity.unwrap();
+    let kael = kael_entity.unwrap();
+    let mira = mira_entity.unwrap();
+    let leo = leo_entity.unwrap();
+
+    // 1. Initial pump sabotaged.
+    let pump_pos = Vec3::new(100.0, 100.0, 0.0);
+    let pump_entity = app
+        .world_mut()
+        .spawn((
+            symtropy_launcher::components::WaterPump {
+                efficiency: 0.0,
+                is_running: false,
+                is_sabotaged: true,
+            },
+            Transform::from_translation(pump_pos),
+        ))
+        .id();
+
+    // Initialize the tutorial scenario resource at step PumpSabotaged
+    app.insert_resource(symtropy_launcher::resources::TutorialScenarioRes {
+        step: symtropy_launcher::resources::TutorialStep::PumpSabotaged,
+        pump_entity: Some(pump_entity),
+    });
+
+    // Teleport PR-4 next to the pump, Soren far away
+    teleport_npc(&mut app, pr4, pump_pos);
+    teleport_npc(&mut app, soren, Vec3::new(500.0, 500.0, 0.0));
+
+    // Teleport Kael far away from Leo
+    teleport_npc(&mut app, kael, Vec3::new(600.0, 600.0, 0.0));
+    teleport_npc(&mut app, leo, Vec3::new(200.0, 200.0, 0.0));
+    teleport_npc(&mut app, mira, Vec3::new(200.0, 200.0, 0.0));
+
+    // Update app for a few frames. PR-4 should start repair, transitioning step to PR4Repairing
+    app.update();
+    app.update();
+
+    let tutorial = app
+        .world()
+        .resource::<symtropy_launcher::resources::TutorialScenarioRes>();
+    assert_eq!(
+        tutorial.step,
+        symtropy_launcher::resources::TutorialStep::PR4Repairing
+    );
+
+    // 2. PR-4 alone reaches 70% efficiency online (contaminated)
+    // Run update frames until efficiency reaches 0.7.
+    // At that point, the tutorial system will transition to CoopRepairing.
+    for _ in 0..10 {
+        app.update();
+    }
+
+    let pump = app
+        .world()
+        .get::<symtropy_launcher::components::WaterPump>(pump_entity)
+        .unwrap();
+    assert!(pump.efficiency >= 0.7);
+    assert!(!pump.is_sabotaged); // partial online
+
+    let tutorial = app
+        .world()
+        .resource::<symtropy_launcher::resources::TutorialScenarioRes>();
+    assert_eq!(
+        tutorial.step,
+        symtropy_launcher::resources::TutorialStep::CoopRepairing
+    );
+
+    // 3. Verify contamination warning message generated
+    app.update(); // propagate messages to reader
+    let collector = app.world().resource::<TestEventCollector>();
+    assert!(
+        collector
+            .feedback
+            .iter()
+            .any(|f| f.message.contains("CONTAMINATION"))
+    );
+
+    // 4. Soren joins PR-4 to cooperative repair
+    // Teleport Soren next to the pump
+    teleport_npc(&mut app, soren, pump_pos);
+
+    // Run updates to let Soren and PR-4 cooperatively repair pump to 100% (1.0)
+    let mut reached_rising = false;
+    for _ in 0..25 {
+        app.update();
+        let tutorial = app
+            .world()
+            .resource::<symtropy_launcher::resources::TutorialScenarioRes>();
+        if tutorial.step == symtropy_launcher::resources::TutorialStep::LeoStressRising {
+            reached_rising = true;
+            break;
+        }
+    }
+    assert!(reached_rising, "Must transition to LeoStressRising step");
+
+    let pump = app
+        .world()
+        .get::<symtropy_launcher::components::WaterPump>(pump_entity)
+        .unwrap();
+    assert_eq!(pump.efficiency, 1.0);
+    assert!(!pump.is_sabotaged);
+
+    // 5. Verify Coop success feedback fired
+    app.update(); // propagate messages to reader
+    let collector = app.world().resource::<TestEventCollector>();
+    assert!(
+        collector
+            .feedback
+            .iter()
+            .any(|f| f.message.contains("COOPERATIVE REPAIR"))
+    );
+
+    // 6. Leo stress rises when Kael is distant
+    // Now Leo's stress has just been set to 0.55.
+    let stress_before = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load;
+    assert!(
+        stress_before >= 0.55 && stress_before < 0.8,
+        "stress_before was {}",
+        stress_before
+    );
+
+    for _ in 0..5 {
+        app.update();
+    }
+    let stress_after = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load;
+    assert!(
+        stress_after > stress_before,
+        "Leo's stress must rise when Kael is distant"
+    );
+
+    // 7. Mira stabilizes Leo when Kael returns
+    // Teleport Kael next to Leo
+    teleport_npc(&mut app, kael, Vec3::new(200.0, 200.0, 0.0));
+
+    // Run updates. Leo's stress should start decaying
+    let stress_high = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load;
+    for _ in 0..15 {
+        app.update();
+    }
+    let stress_low = app
+        .world()
+        .get::<symtropy_launcher::systems::psychology::PsychologicalNeeds>(leo)
+        .unwrap()
+        .allostatic_load;
+    assert!(
+        stress_low < stress_high,
+        "Leo's stress must decrease when Kael is near under Mira's care"
+    );
+
+    // 8. WorldFeedbackEvent confirms settlement recovery and step is Completed
+    for _ in 0..30 {
+        app.update();
+        let tutorial = app
+            .world()
+            .resource::<symtropy_launcher::resources::TutorialScenarioRes>();
+        if tutorial.step == symtropy_launcher::resources::TutorialStep::Completed {
+            break;
+        }
+    }
+
+    let tutorial = app
+        .world()
+        .resource::<symtropy_launcher::resources::TutorialScenarioRes>();
+    assert_eq!(
+        tutorial.step,
+        symtropy_launcher::resources::TutorialStep::Completed
+    );
+
+    app.update(); // propagate completion feedback event
+    let collector = app.world().resource::<TestEventCollector>();
+    assert!(
+        collector
+            .feedback
+            .iter()
+            .any(|f| f.message.contains("SETTLEMENT STABILIZED"))
+    );
+}

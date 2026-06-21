@@ -41,6 +41,7 @@ impl Plugin for SymtropyPlugin {
             // Physics engine
             .init_resource::<PhysicsWorldRes>()
             .init_resource::<PlayerInput>()
+            .init_resource::<crate::resources::TutorialScenarioRes>()
             .init_resource::<systems::thermodynamic::ThermodynamicHudState>()
             .init_resource::<systems::dimension_transition::DimensionTransition>()
             .init_resource::<systems::four_d_rendering::FourDProjector>()
@@ -100,6 +101,7 @@ impl Plugin for SymtropyPlugin {
                 systems::rendering::update_feedback_labels_system,
                 systems::rendering::field_deck_toggle_system,
                 systems::rendering::world_feedback_listener_system,
+                systems::tutorial_scenario::tutorial_scenario_system,
             ).chain().run_if(in_playing_or_3d))
             .add_systems(Update, (
                 systems::rendering::camera_follow_system,
