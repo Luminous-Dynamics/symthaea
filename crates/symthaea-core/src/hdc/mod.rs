@@ -267,7 +267,7 @@ impl From<usize> for LtcNeuronCount {
 pub mod cantor_pyramid;
 pub mod cantor_recursive_hv; // Cantor Recursive Hypervectors
 pub mod cantor_resonator_cleanup; // Layer-preserving CRHV cleanup
-pub mod multidimensional_cantor; // Radial 3D 4D Spherical Cantor // Hierarchical Cantor Hypervectors (HCH)
+pub mod multidimensional_cantor; // Radial 3D 4D Spherical Cantor
 
 pub mod cincinnati_advanced; // Advanced Cincinnati-LTC: chaos detection, adaptive weights, memory horizon
 pub mod cincinnati_enhanced; // Enhanced Cincinnati-LTC: multi-scale, amplitude encoding, attention modulation
