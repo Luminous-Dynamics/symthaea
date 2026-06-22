@@ -1,0 +1,9 @@
+[package]
+name = "symtropy-colony"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "CPU reference model for Symtropy stigmergic ant-colony intelligence."
+
+[dependencies]
+symtropy-lifesim-core = { path = "../symtropy-lifesim-core" }

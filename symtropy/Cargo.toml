@@ -35,7 +35,12 @@ symtropy-mycelix-village = { path = "crates/apps/symtropy-mycelix-village" }
 symtropy-terrain = { path = "crates/domains/symtropy-terrain" }
 symtropy-consciousness-physics = { path = "crates/domains/symtropy-consciousness-physics" }
 symtropy-render-bridge = { path = "crates/bridges/symtropy-render-bridge" }
+symthaea-bevy-brain = { path = "crates/bridges/symthaea-bevy-brain", optional = true }
+symtropy-symthaea-adapter = { path = "crates/bridges/symtropy-symthaea-adapter", optional = true }
+symtropy-mycelix-bridge = { path = "crates/bridges/symtropy-mycelix-bridge", optional = true }
+
 symthaea-fep = { path = "../symthaea/crates/core/symthaea-fep" }
+
 symthaea-biometrics = { path = "../symthaea/crates/domains/symthaea-biometrics" }
 symthaea-consciousness-equation = { path = "../symthaea/crates/domains/symthaea-consciousness-equation" }
 nalgebra = "0.34"
@@ -58,12 +63,15 @@ exclude = [
 ]
 members = [
     ".",
+    "crates/apps/symtropy-cli",
     "crates/bridges/symtropy-bevy",
     "crates/core/symtropy-bevy-core",
     "crates/core/symtropy-bevy-scene",
     "crates/bridges/symthaea-bevy-brain",
     "crates/apps/symtropy-mycelix-village",
     "crates/domains/symtropy-net",
+    "crates/domains/symtropy-lifesim-core",
+    "crates/domains/symtropy-colony",
 
     "crates/bridges/symtropy-robotics-bridge-core",
     "crates/bridges/symtropy-rapier3d-bridge",
@@ -75,6 +83,7 @@ members = [
     "crates/bridges/symtropy-render-bridge",
     "crates/bridges/symtropy-mycelix-bridge",
     "crates/bridges/symtropy-foundry",
+    "crates/bridges/symtropy-sim-bridge",
     "crates/domains/symtropy-terrain",
     "crates/domains/symtropy-lightyear",
     "crates/apps/symtropy-multiplayer-demo",

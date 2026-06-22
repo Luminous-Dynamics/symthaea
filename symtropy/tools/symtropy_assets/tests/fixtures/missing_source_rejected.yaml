@@ -1,0 +1,6 @@
+ai:
+  provenance_state: not_ai
+id: test.no_src
+license:
+  id: CC0-1.0
+source: {}

@@ -1,0 +1,7 @@
+ai:
+  provenance_state: not_ai
+id: test.ccby_no_c
+license:
+  id: CC-BY-4.0
+source:
+  source_url: http://test.com

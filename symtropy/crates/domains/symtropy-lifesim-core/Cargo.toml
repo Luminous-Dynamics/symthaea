@@ -1,0 +1,9 @@
+[package]
+name = "symtropy-lifesim-core"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "Shared CPU field primitives and telemetry exports for Symtropy living-system simulations."
+
+[dependencies]
+arrow-array = "59.0.0"

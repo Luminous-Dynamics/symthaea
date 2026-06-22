@@ -49,16 +49,23 @@ verify-core:
     # 1. License check
     ./scripts/check-licenses.sh
     # 2. Formatting (check only)
-    cargo fmt --all -- --check
+    ./scripts/check-format.sh check
     # 3. Compilation & Clippy (deny warnings on core crates)
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo clippy -p symtropy-math -p symtropy-physics -p symtropy-render-bridge -p symtropy-bevy-core -p symtropy-consciousness-physics -- -D warnings
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo check -p symtropy-cli
     # 4. Core Tests
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-lifesim-core -p symtropy-colony
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-math -p symtropy-physics -p symtropy-consciousness-physics --lib
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-physics --test replay_harness --test callback_contract
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-consciousness-physics --test accounting_verification
-    # 5. Governance Scenarios
+    # 5. Asset Foundry tests
+    nix develop -c pytest tools/symtropy_assets/tests
+    # 6. Governance Scenarios
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo run -p symtropy-sim-bridge --bin headless_test -- --ticks 100
+
+# Verify the Asset Foundry Python pipeline only.
+verify-asset-foundry:
+    nix develop -c pytest tools/symtropy_assets/tests
 
 # Generate workspace documentation
 doc:

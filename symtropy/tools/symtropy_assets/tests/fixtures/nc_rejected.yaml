@@ -1,0 +1,7 @@
+ai:
+  provenance_state: not_ai
+id: test.nc
+license:
+  id: CC-BY-NC-4.0
+source:
+  source_url: http://test.com

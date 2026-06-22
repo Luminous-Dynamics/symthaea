@@ -1,38 +1,60 @@
 #!/usr/bin/env bash
-# Check that all .rs files in symtropy/crates/ have SPDX headers matching their Cargo.toml license.
+# Check that workspace Rust files have SPDX headers matching their package license.
 
-set -e
+set -euo pipefail
 
-FAILED=0
+python3 - <<'PY'
+import json
+import pathlib
+import subprocess
+import sys
+import tomllib
 
-for d in symtropy/crates/*; do
-  if [ -f "$d/Cargo.toml" ]; then
-    pkg_license=$(grep '^license =' "$d/Cargo.toml" | cut -d'"' -f2)
-    if [ -z "$pkg_license" ]; then
-      echo "No license found in $d/Cargo.toml"
-      continue
-    fi
+metadata = json.loads(
+    subprocess.check_output(
+        ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+        text=True,
+    )
+)
 
-    # Check all .rs files in src, tests, examples, benches
-    while read -r f; do
-      if ! grep -q "SPDX-License-Identifier:" "$f"; then
-        echo "Missing SPDX header: $f"
-        FAILED=1
+failed = False
+root = pathlib.Path(metadata["workspace_root"])
+
+for package in metadata["packages"]:
+    manifest_path = pathlib.Path(package["manifest_path"])
+    package_root = manifest_path.parent
+    manifest = tomllib.loads(manifest_path.read_text())
+    license_id = manifest.get("package", {}).get("license")
+
+    if not license_id:
+        print(f"No license found in {manifest_path.relative_to(root)}")
+        failed = True
         continue
-      fi
 
-      spdx_header=$(grep "SPDX-License-Identifier:" "$f" | head -n 1 | cut -d':' -f2- | xargs)
-      if [ "$pkg_license" != "$spdx_header" ]; then
-        echo "License mismatch: $f (Cargo: $pkg_license, Header: $spdx_header)"
-        FAILED=1
-      fi
-    done < <(find "$d" \( -path "$d/src" -o -path "$d/tests" -o -path "$d/examples" -o -path "$d/benches" \) -name "*.rs")
-  fi
-done
+    for source_root in ("src", "tests", "examples", "benches"):
+        tree = package_root / source_root
+        if not tree.exists():
+            continue
+        for rust_file in sorted(tree.rglob("*.rs")):
+            text = rust_file.read_text(errors="replace")
+            spdx = None
+            for line in text.splitlines()[:10]:
+                marker = "SPDX-License-Identifier:"
+                if marker in line:
+                    spdx = line.split(marker, 1)[1].strip()
+                    break
 
-if [ $FAILED -ne 0 ]; then
-  echo "License check failed."
-  exit 1
-fi
+            rel = rust_file.relative_to(root)
+            if spdx is None:
+                print(f"Missing SPDX header: {rel}")
+                failed = True
+            elif spdx != license_id:
+                print(f"License mismatch: {rel} (Cargo: {license_id}, Header: {spdx})")
+                failed = True
 
-echo "License check passed."
+if failed:
+    print("License check failed.")
+    sys.exit(1)
+
+print("License check passed.")
+PY

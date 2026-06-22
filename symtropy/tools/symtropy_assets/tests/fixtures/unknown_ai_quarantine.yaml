@@ -1,0 +1,7 @@
+ai:
+  provenance_state: unknown_ai_provenance
+id: test.ai
+license:
+  id: CC0-1.0
+source:
+  source_url: http://test.com
