@@ -11554,6 +11554,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "symtropy-basin"
+version = "0.1.0"
+dependencies = [
+ "symtropy-lifesim-core",
+]
+
+[[package]]
 name = "symtropy-bevy"
 version = "0.2.0"
 dependencies = [
