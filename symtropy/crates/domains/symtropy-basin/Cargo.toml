@@ -6,4 +6,7 @@ license = "Apache-2.0 OR MIT"
 description = "Living Basin OS primitives for coupled ecology, infrastructure, agency, and civic claims."
 
 [dependencies]
+arrow-array = "59.0.0"
+symtropy-colony = { path = "../symtropy-colony" }
 symtropy-lifesim-core = { path = "../symtropy-lifesim-core" }
+symtropy-mycelium = { path = "../symtropy-mycelium" }

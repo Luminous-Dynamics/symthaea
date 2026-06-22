@@ -11557,7 +11557,10 @@ dependencies = [
 name = "symtropy-basin"
 version = "0.1.0"
 dependencies = [
+ "arrow-array",
+ "symtropy-colony",
  "symtropy-lifesim-core",
+ "symtropy-mycelium",
 ]
 
 [[package]]

@@ -8,7 +8,10 @@
 //! model so higher layers can attach Bevy, Device Bus, Chronicle, and GPU paths
 //! without weakening the ecological contract.
 
+use arrow_array::{Float32Array, UInt64Array};
+use symtropy_colony::{ColonyDebugMetrics, ColonyWorld};
 use symtropy_lifesim_core::{DiffusionParams, FieldGrid, FieldLayer};
+use symtropy_mycelium::{MyceliumMetrics, MyceliumWorld};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WaterState {
@@ -455,6 +458,171 @@ pub struct BasinExchangeReport {
     pub biomass_input: f32,
     pub toxin_buffered: f32,
     pub civic_evidence_added: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OldWaterworksTickRecord {
+    pub tick: u64,
+    pub basin: BasinMetrics,
+    pub colony: ColonyDebugMetrics,
+    pub mycelium: MyceliumMetrics,
+    pub colony_exchange: BasinExchangeReport,
+    pub mycelium_exchange: BasinExchangeReport,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OldWaterworksDebugFrame {
+    pub tick: u64,
+    pub basin_ppm: String,
+    pub colony_ppm: String,
+    pub mycelium_ppm: String,
+}
+
+pub struct OldWaterworksSnapshotArrays {
+    pub tick: UInt64Array,
+    pub basin_viability: Float32Array,
+    pub basin_toxin_load: Float32Array,
+    pub basin_signal_corruption: Float32Array,
+    pub colony_food_reserve: Float32Array,
+    pub colony_stress: Float32Array,
+    pub mycelium_total_biomass: Float32Array,
+    pub mycelium_total_toxin: Float32Array,
+    pub colony_signal_input: Float32Array,
+    pub mycelium_toxin_buffered: Float32Array,
+}
+
+impl OldWaterworksSnapshotArrays {
+    pub const SCHEMA_SIGNATURE: &'static str = "tick:u64,basin_viability:f32,basin_toxin_load:f32,basin_signal_corruption:f32,colony_food_reserve:f32,colony_stress:f32,mycelium_total_biomass:f32,mycelium_total_toxin:f32,colony_signal_input:f32,mycelium_toxin_buffered:f32";
+
+    pub const fn schema_signature(&self) -> &'static str {
+        Self::SCHEMA_SIGNATURE
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OldWaterworksScenario {
+    pub basin: BasinWorld,
+    pub colony: ColonyWorld,
+    pub mycelium: MyceliumWorld,
+    records: Vec<OldWaterworksTickRecord>,
+}
+
+impl OldWaterworksScenario {
+    pub fn new(width: usize, height: usize) -> Self {
+        assert!(width >= 8, "scenario width must be at least 8");
+        assert!(height >= 5, "scenario height must be at least 5");
+
+        let center_y = height / 2;
+        let mut colony = ColonyWorld::new(width, height, (1, center_y), 48);
+        colony.add_food_source(width - 2, center_y, 4_000);
+
+        let mut mycelium = MyceliumWorld::new(width, height, (2, center_y));
+        mycelium.add_dead_biomass(width - 3, center_y, 600.0);
+
+        Self {
+            basin: BasinWorld::old_waterworks(width, height),
+            colony,
+            mycelium,
+            records: Vec::new(),
+        }
+    }
+
+    pub fn apply(&mut self, intervention: BasinIntervention) {
+        self.basin.apply(intervention);
+    }
+
+    pub fn step(&mut self) -> OldWaterworksTickRecord {
+        self.basin.step();
+
+        self.colony.absorb_basin_fields(&self.basin.fields);
+        self.colony.step();
+
+        self.mycelium.absorb_basin_fields(&self.basin.fields);
+        self.mycelium.step();
+        self.mycelium.buffer_basin_fields(&mut self.basin.fields);
+
+        let colony_exchange = self
+            .basin
+            .ingest_organism_fields(BasinOrganismKind::Colony, &self.colony.fields);
+        let mycelium_exchange = self
+            .basin
+            .ingest_organism_fields(BasinOrganismKind::Mycelium, &self.mycelium.fields);
+
+        let record = OldWaterworksTickRecord {
+            tick: self.basin.tick(),
+            basin: self.basin.metrics(),
+            colony: self.colony.debug_metrics(),
+            mycelium: self.mycelium.metrics(),
+            colony_exchange,
+            mycelium_exchange,
+        };
+        self.records.push(record.clone());
+        record
+    }
+
+    pub fn run_steps(&mut self, steps: usize) {
+        for _ in 0..steps {
+            self.step();
+        }
+    }
+
+    pub fn records(&self) -> &[OldWaterworksTickRecord] {
+        &self.records
+    }
+
+    pub fn debug_frame(&self) -> OldWaterworksDebugFrame {
+        OldWaterworksDebugFrame {
+            tick: self.basin.tick(),
+            basin_ppm: self.basin.to_ppm_heatmap(),
+            colony_ppm: self.colony.to_ppm_heatmap(),
+            mycelium_ppm: self.mycelium.to_ppm_heatmap(),
+        }
+    }
+
+    pub fn snapshot_arrays(&self) -> OldWaterworksSnapshotArrays {
+        OldWaterworksSnapshotArrays {
+            tick: UInt64Array::from_iter_values(self.records.iter().map(|record| record.tick)),
+            basin_viability: Float32Array::from_iter_values(
+                self.records.iter().map(|record| record.basin.viability),
+            ),
+            basin_toxin_load: Float32Array::from_iter_values(
+                self.records.iter().map(|record| record.basin.toxin_load),
+            ),
+            basin_signal_corruption: Float32Array::from_iter_values(
+                self.records
+                    .iter()
+                    .map(|record| record.basin.signal_corruption),
+            ),
+            colony_food_reserve: Float32Array::from_iter_values(
+                self.records
+                    .iter()
+                    .map(|record| record.colony.food_reserve as f32),
+            ),
+            colony_stress: Float32Array::from_iter_values(
+                self.records.iter().map(|record| record.colony.stress),
+            ),
+            mycelium_total_biomass: Float32Array::from_iter_values(
+                self.records
+                    .iter()
+                    .map(|record| record.mycelium.total_biomass),
+            ),
+            mycelium_total_toxin: Float32Array::from_iter_values(
+                self.records
+                    .iter()
+                    .map(|record| record.mycelium.total_toxin),
+            ),
+            colony_signal_input: Float32Array::from_iter_values(
+                self.records
+                    .iter()
+                    .map(|record| record.colony_exchange.signal_input),
+            ),
+            mycelium_toxin_buffered: Float32Array::from_iter_values(
+                self.records
+                    .iter()
+                    .map(|record| record.mycelium_exchange.toxin_buffered),
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1182,6 +1350,124 @@ mod tests {
                 .civic_claims
                 .iter()
                 .any(|claim| claim.justification == ClaimJustification::ToxinCapture)
+        );
+    }
+
+    #[test]
+    fn old_waterworks_scenario_couples_basin_colony_and_mycelium() {
+        let mut scenario = OldWaterworksScenario::new(16, 9);
+        scenario.apply(BasinIntervention::PipeLeak);
+
+        scenario.run_steps(24);
+
+        let latest = scenario
+            .records()
+            .last()
+            .expect("scenario should record ticks");
+        assert_eq!(latest.tick, 24);
+        assert!(latest.colony.stress > 0.0);
+        assert!(latest.mycelium.total_biomass > 0.0);
+        assert!(
+            scenario
+                .records()
+                .iter()
+                .any(|record| record.colony_exchange.signal_input > 0.0)
+        );
+        assert!(
+            scenario
+                .records()
+                .iter()
+                .any(|record| record.mycelium_exchange.toxin_buffered > 0.0)
+        );
+    }
+
+    #[test]
+    fn old_waterworks_scenario_exports_debug_frames() {
+        let mut scenario = OldWaterworksScenario::new(10, 6);
+        scenario.run_steps(3);
+
+        let frame = scenario.debug_frame();
+
+        assert_eq!(frame.tick, 3);
+        assert!(frame.basin_ppm.starts_with("P3\n# symtropy-basin tick 3\n"));
+        assert!(
+            frame
+                .colony_ppm
+                .starts_with("P3\n# symtropy-colony tick 3\n")
+        );
+        assert!(
+            frame
+                .mycelium_ppm
+                .starts_with("P3\n# symtropy-mycelium tick 3\n")
+        );
+    }
+
+    #[test]
+    fn old_waterworks_scenario_exports_arrow_snapshot_arrays() {
+        let mut scenario = OldWaterworksScenario::new(12, 7);
+        scenario.run_steps(5);
+
+        let arrays = scenario.snapshot_arrays();
+
+        assert_eq!(
+            arrays.schema_signature(),
+            OldWaterworksSnapshotArrays::SCHEMA_SIGNATURE
+        );
+        assert_eq!(arrays.tick.len(), 5);
+        assert_eq!(arrays.basin_viability.len(), 5);
+        assert_eq!(arrays.colony_signal_input.len(), 5);
+        assert_eq!(arrays.mycelium_toxin_buffered.len(), 5);
+    }
+
+    #[test]
+    fn old_waterworks_null_greenwash_is_visible_in_scenario_metrics() {
+        let mut baseline = OldWaterworksScenario::new(12, 7);
+        baseline.run_steps(6);
+        let baseline_latest = baseline
+            .records()
+            .last()
+            .expect("baseline should record ticks");
+
+        let mut scenario = OldWaterworksScenario::new(12, 7);
+        let before = scenario.basin.metrics().toxin_load;
+
+        scenario.apply(BasinIntervention::NullGreenwash);
+        scenario.run_steps(6);
+
+        let latest = scenario
+            .records()
+            .last()
+            .expect("scenario should record ticks");
+        assert!(latest.basin.signal_corruption > baseline_latest.basin.signal_corruption);
+        assert!(latest.basin.toxin_load >= before * 0.90);
+    }
+
+    #[test]
+    fn old_waterworks_ecological_repair_outperforms_fast_repair_recovery() {
+        let mut fast = OldWaterworksScenario::new(12, 7);
+        fast.apply(BasinIntervention::PipeLeak);
+        fast.apply(BasinIntervention::FastMechanicalRepair);
+        fast.run_steps(20);
+
+        let mut reroute = OldWaterworksScenario::new(12, 7);
+        reroute.apply(BasinIntervention::PipeLeak);
+        reroute.apply(BasinIntervention::EcologicalReroute);
+        reroute.apply(BasinIntervention::DecomposerAid);
+        reroute.run_steps(20);
+
+        assert!(
+            reroute
+                .records()
+                .last()
+                .expect("reroute should record ticks")
+                .basin
+                .recovery_momentum
+                > fast
+                    .records()
+                    .last()
+                    .expect("fast should record ticks")
+                    .basin
+                    .recovery_momentum
         );
     }
 }
