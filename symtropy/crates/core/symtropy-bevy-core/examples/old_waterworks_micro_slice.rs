@@ -4,11 +4,11 @@
 //!
 //! This is the first concrete playable foundation for Symtropy.
 //! - Floor, walls, and greybox machinery (pump, tank, console).
-//! - Basic first-person movement (WASD + Arrows).
+//! - Intent-based first-person movement (WASD + mouse look).
 //! - Proximity-based interaction with the console (Press E).
-//! - Field Deck: Amber interface frame (Press F to toggle).
+//! - Field Deck: Amber interface frame (Press Tab to toggle).
 //! - Dead authority lock inspection state (inside Field Deck).
-//! - Panic Drop: Esc/Shift exits instantly.
+//! - Panic Drop: Esc releases the mouse and exits tools instantly.
 //! - Procedural Lighting: Oscillating room intensity.
 //!
 //! Hard Scope:
@@ -23,12 +23,24 @@
 //! - No Chronicle yet
 //! - just the first playable room
 
-use bevy::prelude::*;
+use bevy::{
+    input::mouse::AccumulatedMouseMotion,
+    prelude::*,
+    window::{CursorGrabMode, CursorOptions},
+};
 use symtropy_basin::{BasinIntervention, OldWaterworksScenario};
 use symtropy_bevy_scene::{SymtropyScenePlugin, fixed_camera};
 
+const MOUSE_SENSITIVITY: Vec2 = Vec2::new(0.0022, 0.0018);
+const INTERACTION_DISTANCE: f32 = 2.5;
+
 #[derive(Component)]
 struct Player;
+
+#[derive(Component)]
+struct PlayerLook {
+    sensitivity: Vec2,
+}
 
 #[derive(Component)]
 struct Console;
@@ -48,6 +60,193 @@ struct OscillatingLight;
 struct ScenarioRuntime {
     scenario: OldWaterworksScenario,
     timer: Timer,
+    paused: bool,
+    step_once: bool,
+}
+
+#[derive(Resource, Debug, Clone)]
+struct InputBindings {
+    move_forward: KeyCode,
+    move_back: KeyCode,
+    move_left: KeyCode,
+    move_right: KeyCode,
+    sprint: KeyCode,
+    crouch: KeyCode,
+    jump: KeyCode,
+    interact: KeyCode,
+    focus_inspect: KeyCode,
+    toggle_field_deck: KeyCode,
+    quick_tool: KeyCode,
+    repair_tool: KeyCode,
+    build_mode: KeyCode,
+    chronicle_panel: KeyCode,
+    basin_map: KeyCode,
+    scan_visualization: KeyCode,
+    previous_scan_mode: KeyCode,
+    next_scan_mode: KeyCode,
+    pause_or_release: KeyCode,
+    controls_overlay: KeyCode,
+    command_palette: KeyCode,
+    dev_scenario_panel: KeyCode,
+}
+
+impl Default for InputBindings {
+    fn default() -> Self {
+        Self {
+            move_forward: KeyCode::KeyW,
+            move_back: KeyCode::KeyS,
+            move_left: KeyCode::KeyA,
+            move_right: KeyCode::KeyD,
+            sprint: KeyCode::ShiftLeft,
+            crouch: KeyCode::ControlLeft,
+            jump: KeyCode::Space,
+            interact: KeyCode::KeyE,
+            focus_inspect: KeyCode::KeyF,
+            toggle_field_deck: KeyCode::Tab,
+            quick_tool: KeyCode::KeyQ,
+            repair_tool: KeyCode::KeyR,
+            build_mode: KeyCode::KeyB,
+            chronicle_panel: KeyCode::KeyC,
+            basin_map: KeyCode::KeyM,
+            scan_visualization: KeyCode::KeyV,
+            previous_scan_mode: KeyCode::BracketLeft,
+            next_scan_mode: KeyCode::BracketRight,
+            pause_or_release: KeyCode::Escape,
+            controls_overlay: KeyCode::F1,
+            command_palette: KeyCode::KeyK,
+            dev_scenario_panel: KeyCode::F10,
+        }
+    }
+}
+
+#[derive(Resource, Default, Debug, Clone)]
+struct IntentFrame {
+    movement: Vec2,
+    look_delta: Vec2,
+    pressed: Vec<InputIntent>,
+    just_pressed: Vec<InputIntent>,
+}
+
+impl IntentFrame {
+    fn clear(&mut self) {
+        self.movement = Vec2::ZERO;
+        self.look_delta = Vec2::ZERO;
+        self.pressed.clear();
+        self.just_pressed.clear();
+    }
+
+    fn pressed(&self, intent: InputIntent) -> bool {
+        self.pressed.contains(&intent)
+    }
+
+    fn just_pressed(&self, intent: InputIntent) -> bool {
+        self.just_pressed.contains(&intent)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputIntent {
+    MoveForward,
+    MoveBack,
+    MoveLeft,
+    MoveRight,
+    Sprint,
+    Crouch,
+    Jump,
+    Interact,
+    FocusInspect,
+    OpenFieldDeck,
+    CycleFieldDeckModePrev,
+    CycleFieldDeckModeNext,
+    EquipToolSlot(u8),
+    QuickTool,
+    RepairTool,
+    BuildMode,
+    OpenChroniclePanel,
+    OpenBasinMap,
+    ToggleScanVisualization,
+    PauseOrRelease,
+    OpenControlsOverlay,
+    OpenCommandPalette,
+    OpenDevScenarioPanel,
+    TriggerScenarioIntervention(BasinIntervention),
+    PauseSimulation,
+    StepSimulation,
+    ResetScenario,
+    CaptureReplay,
+}
+
+#[derive(Resource, Debug, Clone)]
+struct ControlsState {
+    mode: ControlMode,
+    selected_tool_slot: u8,
+    scan_mode: ScanMode,
+    show_controls: bool,
+    show_dev_panel: bool,
+    mouse_captured: bool,
+}
+
+impl Default for ControlsState {
+    fn default() -> Self {
+        Self {
+            mode: ControlMode::FirstPerson,
+            selected_tool_slot: 1,
+            scan_mode: ScanMode::Ecology,
+            show_controls: false,
+            show_dev_panel: false,
+            mouse_captured: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ControlMode {
+    FirstPerson,
+    FieldDeck,
+    Console,
+    DevScenario,
+    Pause,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ScanMode {
+    Infrastructure,
+    Ecology,
+    MachineDiagnostics,
+    CivicClaims,
+    NullSignalCorruption,
+    RepairPreview,
+    ChronicleEvidence,
+}
+
+impl ScanMode {
+    const ALL: [ScanMode; 7] = [
+        ScanMode::Infrastructure,
+        ScanMode::Ecology,
+        ScanMode::MachineDiagnostics,
+        ScanMode::CivicClaims,
+        ScanMode::NullSignalCorruption,
+        ScanMode::RepairPreview,
+        ScanMode::ChronicleEvidence,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            ScanMode::Infrastructure => "Infrastructure",
+            ScanMode::Ecology => "Ecology",
+            ScanMode::MachineDiagnostics => "Machine Diagnostics",
+            ScanMode::CivicClaims => "Civic Claims",
+            ScanMode::NullSignalCorruption => "Null / Signal Corruption",
+            ScanMode::RepairPreview => "Repair Preview",
+            ScanMode::ChronicleEvidence => "Chronicle Evidence",
+        }
+    }
+
+    fn offset(self, delta: isize) -> Self {
+        let current = Self::ALL.iter().position(|mode| *mode == self).unwrap_or(0) as isize;
+        let len = Self::ALL.len() as isize;
+        Self::ALL[((current + delta).rem_euclid(len)) as usize]
+    }
 }
 
 #[derive(Component)]
@@ -80,26 +279,247 @@ fn main() {
         .insert_resource(ScenarioRuntime {
             scenario,
             timer: Timer::from_seconds(0.20, TimerMode::Repeating),
+            paused: false,
+            step_once: false,
         })
+        .insert_resource(InputBindings::default())
+        .insert_resource(IntentFrame::default())
+        .insert_resource(ControlsState::default())
         .init_state::<InterfaceState>()
         .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
+                input_intent_system,
+                control_mode_system,
+                cursor_capture_system,
                 scenario_step_system,
                 player_move_system,
+                mouse_look_system,
                 interaction_system,
                 ecological_meter_system,
                 ui_visibility_system,
+                controls_overlay_system,
+                dev_panel_overlay_system,
                 oscillating_light_system,
-            ),
+            )
+                .chain(),
         )
         .run();
 }
 
 fn scenario_step_system(time: Res<Time>, mut runtime: ResMut<ScenarioRuntime>) {
-    if runtime.timer.tick(time.delta()).just_finished() {
+    let auto_step = !runtime.paused && runtime.timer.tick(time.delta()).just_finished();
+    if auto_step || runtime.step_once {
         runtime.scenario.step();
+        runtime.step_once = false;
+    }
+}
+
+fn input_intent_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    mouse_motion: Res<AccumulatedMouseMotion>,
+    bindings: Res<InputBindings>,
+    mut intents: ResMut<IntentFrame>,
+) {
+    intents.clear();
+    intents.look_delta = mouse_motion.delta;
+
+    if keyboard.pressed(bindings.move_forward) {
+        intents.movement.y += 1.0;
+        intents.pressed.push(InputIntent::MoveForward);
+    }
+    if keyboard.pressed(bindings.move_back) {
+        intents.movement.y -= 1.0;
+        intents.pressed.push(InputIntent::MoveBack);
+    }
+    if keyboard.pressed(bindings.move_left) {
+        intents.movement.x -= 1.0;
+        intents.pressed.push(InputIntent::MoveLeft);
+    }
+    if keyboard.pressed(bindings.move_right) {
+        intents.movement.x += 1.0;
+        intents.pressed.push(InputIntent::MoveRight);
+    }
+    if keyboard.pressed(bindings.sprint) || keyboard.pressed(KeyCode::ShiftRight) {
+        intents.pressed.push(InputIntent::Sprint);
+    }
+    if keyboard.pressed(bindings.crouch) || keyboard.pressed(KeyCode::ControlRight) {
+        intents.pressed.push(InputIntent::Crouch);
+    }
+
+    macro_rules! add_just {
+        ($key:expr, $intent:expr) => {
+            if keyboard.just_pressed($key) {
+                intents.just_pressed.push($intent);
+            }
+        };
+    }
+    macro_rules! add_just_ctrl {
+        ($key:expr, $intent:expr) => {
+            if (keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight))
+                && keyboard.just_pressed($key)
+            {
+                intents.just_pressed.push($intent);
+            }
+        };
+    }
+
+    add_just!(bindings.jump, InputIntent::Jump);
+    add_just!(bindings.interact, InputIntent::Interact);
+    add_just!(bindings.focus_inspect, InputIntent::FocusInspect);
+    add_just!(bindings.toggle_field_deck, InputIntent::OpenFieldDeck);
+    add_just!(bindings.quick_tool, InputIntent::QuickTool);
+    add_just!(bindings.repair_tool, InputIntent::RepairTool);
+    add_just!(bindings.build_mode, InputIntent::BuildMode);
+    add_just!(bindings.chronicle_panel, InputIntent::OpenChroniclePanel);
+    add_just!(bindings.basin_map, InputIntent::OpenBasinMap);
+    add_just!(
+        bindings.scan_visualization,
+        InputIntent::ToggleScanVisualization
+    );
+    add_just!(
+        bindings.previous_scan_mode,
+        InputIntent::CycleFieldDeckModePrev
+    );
+    add_just!(bindings.next_scan_mode, InputIntent::CycleFieldDeckModeNext);
+    add_just!(bindings.pause_or_release, InputIntent::PauseOrRelease);
+    add_just!(bindings.controls_overlay, InputIntent::OpenControlsOverlay);
+    add_just_ctrl!(bindings.command_palette, InputIntent::OpenCommandPalette);
+    add_just!(
+        bindings.dev_scenario_panel,
+        InputIntent::OpenDevScenarioPanel
+    );
+
+    for (key, slot) in [
+        (KeyCode::Digit1, 1),
+        (KeyCode::Digit2, 2),
+        (KeyCode::Digit3, 3),
+        (KeyCode::Digit4, 4),
+        (KeyCode::Digit5, 5),
+        (KeyCode::Digit6, 6),
+    ] {
+        if keyboard.just_pressed(key) {
+            intents.just_pressed.push(InputIntent::EquipToolSlot(slot));
+        }
+    }
+
+    for (key, intervention) in [
+        (KeyCode::F2, BasinIntervention::PipeLeak),
+        (KeyCode::F3, BasinIntervention::FastMechanicalRepair),
+        (KeyCode::F4, BasinIntervention::EcologicalReroute),
+        (KeyCode::F5, BasinIntervention::WillowPlanting),
+        (KeyCode::F6, BasinIntervention::NullGreenwash),
+        (KeyCode::F7, BasinIntervention::DecomposerAid),
+    ] {
+        if keyboard.just_pressed(key) {
+            intents
+                .just_pressed
+                .push(InputIntent::TriggerScenarioIntervention(intervention));
+        }
+    }
+    add_just!(KeyCode::KeyP, InputIntent::PauseSimulation);
+    add_just!(KeyCode::Period, InputIntent::StepSimulation);
+    add_just!(KeyCode::F8, InputIntent::ResetScenario);
+    add_just!(KeyCode::F9, InputIntent::CaptureReplay);
+
+    if mouse.just_pressed(MouseButton::Left) {
+        intents.just_pressed.push(InputIntent::FocusInspect);
+    }
+}
+
+fn control_mode_system(
+    intents: Res<IntentFrame>,
+    mut controls: ResMut<ControlsState>,
+    mut runtime: ResMut<ScenarioRuntime>,
+    mut next_state: ResMut<NextState<InterfaceState>>,
+) {
+    if intents.just_pressed(InputIntent::PauseOrRelease) {
+        controls.mode = ControlMode::Pause;
+        controls.mouse_captured = false;
+        controls.show_dev_panel = false;
+        next_state.set(InterfaceState::None);
+    }
+
+    if intents.just_pressed(InputIntent::OpenControlsOverlay) {
+        controls.show_controls = !controls.show_controls;
+    }
+
+    if intents.just_pressed(InputIntent::OpenDevScenarioPanel) {
+        controls.show_dev_panel = !controls.show_dev_panel;
+        controls.mode = if controls.show_dev_panel {
+            controls.mouse_captured = false;
+            ControlMode::DevScenario
+        } else {
+            controls.mouse_captured = true;
+            ControlMode::FirstPerson
+        };
+        next_state.set(InterfaceState::None);
+    }
+
+    if intents.just_pressed(InputIntent::OpenFieldDeck) {
+        controls.show_dev_panel = false;
+        match controls.mode {
+            ControlMode::FieldDeck => {
+                controls.mode = ControlMode::FirstPerson;
+                controls.mouse_captured = true;
+                next_state.set(InterfaceState::None);
+            }
+            _ => {
+                controls.mode = ControlMode::FieldDeck;
+                controls.mouse_captured = false;
+                next_state.set(InterfaceState::FieldDeck);
+            }
+        }
+    }
+
+    if intents.just_pressed(InputIntent::CycleFieldDeckModePrev) {
+        controls.scan_mode = controls.scan_mode.offset(-1);
+    }
+    if intents.just_pressed(InputIntent::CycleFieldDeckModeNext) {
+        controls.scan_mode = controls.scan_mode.offset(1);
+    }
+
+    for intent in &intents.just_pressed {
+        match *intent {
+            InputIntent::EquipToolSlot(slot) => controls.selected_tool_slot = slot,
+            InputIntent::TriggerScenarioIntervention(intervention) if controls.show_dev_panel => {
+                runtime.scenario.apply(intervention);
+            }
+            InputIntent::PauseSimulation if controls.show_dev_panel => {
+                runtime.paused = !runtime.paused;
+            }
+            InputIntent::StepSimulation if controls.show_dev_panel => {
+                runtime.step_once = true;
+            }
+            InputIntent::ResetScenario if controls.show_dev_panel => {
+                runtime.scenario = OldWaterworksScenario::new(16, 9);
+                runtime.scenario.apply(BasinIntervention::PipeLeak);
+                runtime.scenario.apply(BasinIntervention::NullGreenwash);
+                runtime.paused = false;
+                runtime.step_once = false;
+            }
+            InputIntent::FocusInspect if controls.mode == ControlMode::Pause => {
+                controls.mode = ControlMode::FirstPerson;
+                controls.mouse_captured = true;
+            }
+            _ => {}
+        }
+    }
+}
+
+fn cursor_capture_system(
+    controls: Res<ControlsState>,
+    mut cursor_options: Single<&mut CursorOptions>,
+) {
+    if controls.is_changed() {
+        cursor_options.visible = !controls.mouse_captured;
+        cursor_options.grab_mode = if controls.mouse_captured {
+            CursorGrabMode::Locked
+        } else {
+            CursorGrabMode::None
+        };
     }
 }
 
@@ -254,6 +674,9 @@ fn setup(
     // Player/Camera
     commands.spawn((
         Player,
+        PlayerLook {
+            sensitivity: MOUSE_SENSITIVITY,
+        },
         fixed_camera(Vec3::new(0.0, 1.7, 5.0), Vec3::new(0.0, 1.7, 0.0)),
     ));
 
@@ -364,6 +787,46 @@ fn setup(
                     ));
                 });
         });
+
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(20.0),
+            top: Val::Px(20.0),
+            width: Val::Px(520.0),
+            padding: UiRect::all(Val::Px(16.0)),
+            display: Display::None,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.02, 0.025, 0.035, 0.88)),
+        ControlsOverlay,
+        Text::new(""),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::srgb(0.86, 0.9, 1.0)),
+    ));
+
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            right: Val::Px(20.0),
+            top: Val::Px(20.0),
+            width: Val::Px(520.0),
+            padding: UiRect::all(Val::Px(16.0)),
+            display: Display::None,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.04, 0.025, 0.015, 0.9)),
+        DevPanelOverlay,
+        Text::new(""),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::srgb(1.0, 0.76, 0.46)),
+    ));
 }
 
 #[derive(Component)]
@@ -375,71 +838,87 @@ struct FieldDeckUI;
 #[derive(Component)]
 struct InspectionText;
 
+#[derive(Component)]
+struct ControlsOverlay;
+
+#[derive(Component)]
+struct DevPanelOverlay;
+
 fn player_move_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
+    intents: Res<IntentFrame>,
     time: Res<Time>,
-    state: Res<State<InterfaceState>>,
+    controls: Res<ControlsState>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     let Ok(mut transform) = query.single_mut() else {
         return;
     };
 
-    // Movement speed depends on state
-    let speed = match *state.get() {
-        InterfaceState::None => 5.0,
-        InterfaceState::FieldDeck => 1.0, // Slowed movement while Deck is up
-        InterfaceState::Console => 0.0,   // No movement while inspecting console
+    let base_speed = match controls.mode {
+        ControlMode::FirstPerson => 5.0,
+        ControlMode::FieldDeck => 1.0,
+        ControlMode::Console | ControlMode::DevScenario | ControlMode::Pause => 0.0,
     };
 
-    if speed == 0.0 {
+    if base_speed == 0.0 {
         return;
     }
 
-    let mut direction = Vec3::ZERO;
-    if keyboard.pressed(KeyCode::KeyW) {
-        let forward = transform.forward();
-        direction += *forward;
+    let mut speed = base_speed;
+    if intents.pressed(InputIntent::Sprint) && controls.mode == ControlMode::FirstPerson {
+        speed *= 1.65;
     }
-    if keyboard.pressed(KeyCode::KeyS) {
-        let back = transform.back();
-        direction += *back;
-    }
-    if keyboard.pressed(KeyCode::KeyA) {
-        let left = transform.left();
-        direction += *left;
-    }
-    if keyboard.pressed(KeyCode::KeyD) {
-        let right = transform.right();
-        direction += *right;
+    if intents.pressed(InputIntent::Crouch) {
+        speed *= 0.45;
     }
 
+    let mut direction =
+        *transform.forward() * intents.movement.y + *transform.right() * intents.movement.x;
     direction.y = 0.0;
     if direction.length_squared() > 0.0 {
         direction = direction.normalize();
         transform.translation += direction * speed * time.delta_secs();
     }
+}
 
-    // Simple rotation with Arrows
-    let mut rotation = 0.0;
-    if keyboard.pressed(KeyCode::ArrowLeft) {
-        rotation += 1.0;
+fn mouse_look_system(
+    intents: Res<IntentFrame>,
+    controls: Res<ControlsState>,
+    mut query: Query<(&mut Transform, &PlayerLook), With<Player>>,
+) {
+    if !controls.mouse_captured || controls.mode != ControlMode::FirstPerson {
+        return;
     }
-    if keyboard.pressed(KeyCode::ArrowRight) {
-        rotation -= 1.0;
+
+    let Ok((mut transform, look)) = query.single_mut() else {
+        return;
+    };
+    let delta = intents.look_delta;
+    if delta == Vec2::ZERO {
+        return;
     }
-    transform.rotate_y(rotation * 2.0 * time.delta_secs());
+
+    let delta_yaw = -delta.x * look.sensitivity.x;
+    let delta_pitch = -delta.y * look.sensitivity.y;
+    let (yaw, pitch, roll) = transform.rotation.to_euler(EulerRot::YXZ);
+    let pitch_limit = std::f32::consts::FRAC_PI_2 - 0.01;
+    transform.rotation = Quat::from_euler(
+        EulerRot::YXZ,
+        yaw + delta_yaw,
+        (pitch + delta_pitch).clamp(-pitch_limit, pitch_limit),
+        roll,
+    );
 }
 
 fn interaction_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
+    intents: Res<IntentFrame>,
     runtime: Res<ScenarioRuntime>,
     player_query: Query<&Transform, With<Player>>,
     console_query: Query<&Transform, With<Console>>,
     mut interaction_hint_query: Query<(&mut Text, &mut Visibility), With<InteractionHint>>,
     mut inspection_text_query: Query<&mut Text, (With<InspectionText>, Without<InteractionHint>)>,
-    state: Res<State<InterfaceState>>,
     mut next_state: ResMut<NextState<InterfaceState>>,
+    mut controls_state: ResMut<ControlsState>,
 ) {
     let Ok(player_tf) = player_query.single() else {
         return;
@@ -455,54 +934,52 @@ fn interaction_system(
     };
 
     let dist = player_tf.translation.distance(console_tf.translation);
-    let near_console = dist < 2.5;
-    let current_state = *state.get();
+    let near_console = dist < INTERACTION_DISTANCE;
+    let current_mode = controls_state.mode;
 
     // Interaction Hint
-    if current_state != InterfaceState::Console && near_console {
-        **hint_text = "Press E to inspect pump console".to_string();
+    if current_mode != ControlMode::Console && near_console {
+        **hint_text = "E: inspect pump console | Tab: Field Deck | F1: controls".to_string();
         *hint_visibility = Visibility::Visible;
     } else {
         *hint_visibility = Visibility::Hidden;
     }
 
-    // Input Handling
-    if keyboard.just_pressed(KeyCode::Escape)
-        || keyboard.just_pressed(KeyCode::ShiftLeft)
-        || keyboard.just_pressed(KeyCode::ShiftRight)
-    {
-        // Panic Drop
-        next_state.set(InterfaceState::None);
-    } else if keyboard.just_pressed(KeyCode::KeyF) {
-        // Toggle Field Deck
-        match current_state {
-            InterfaceState::None => next_state.set(InterfaceState::FieldDeck),
-            InterfaceState::FieldDeck => next_state.set(InterfaceState::None),
-            InterfaceState::Console => next_state.set(InterfaceState::None), // Panic drop also works here
-        }
-    } else if keyboard.just_pressed(KeyCode::KeyE) && near_console {
-        // Inspect Console
+    if intents.just_pressed(InputIntent::Interact) && near_console {
+        controls_state.mode = ControlMode::Console;
+        controls_state.mouse_captured = false;
         next_state.set(InterfaceState::Console);
     }
 
     // Update Inspection Text
-    if current_state == InterfaceState::Console {
-        **inspect_text =
-            "OLD WATERWORKS CONSOLE\nPUMP_1: LOCKED\nTANK_0: 12%\nAUTHORITY: DEAD_AUTHORITY_LOCK"
-                .to_string();
-    } else if current_state == InterfaceState::FieldDeck {
+    if current_mode == ControlMode::Console {
+        **inspect_text = format!(
+            "OLD WATERWORKS CONSOLE\n\
+             PUMP_1: LOCKED\n\
+             TANK_0: 12%\n\
+             AUTHORITY: DEAD_AUTHORITY_LOCK\n\
+             Active tool slot: {}\n\
+             Esc: release | Tab: Field Deck",
+            controls_state.selected_tool_slot
+        );
+    } else if current_mode == ControlMode::FieldDeck {
         let Some(record) = runtime.scenario.records().last() else {
             **inspect_text = "FIELD DECK ECOLOGY LINK\nAwaiting basin signal...".to_string();
             return;
         };
         **inspect_text = format!(
             "FIELD DECK ECOLOGY LINK\n\
+             Mode: {} ([ / ] to cycle)\n\
+             Tool slot: {}\n\
              Basin viability: {:.2}\n\
              Toxin load: {:.2}\n\
              Signal corruption: {:.2}\n\
              Colony stress: {:.2}\n\
              Mycelium toxin buffered: {:.3}\n\
-             Machine status: GREEN / BIOLOGICAL STATUS: CONFLICT",
+             Machine status: GREEN / BIOLOGICAL STATUS: CONFLICT\n\
+             C: Chronicle evidence | V: scan overlay | F: focus reading",
+            controls_state.scan_mode.label(),
+            controls_state.selected_tool_slot,
             record.basin.viability,
             record.basin.toxin_load,
             record.basin.signal_corruption,
@@ -564,4 +1041,97 @@ fn ui_visibility_system(
         InterfaceState::None => node.display = Display::None,
         InterfaceState::FieldDeck | InterfaceState::Console => node.display = Display::Flex,
     }
+}
+
+fn controls_overlay_system(
+    controls: Res<ControlsState>,
+    runtime: Res<ScenarioRuntime>,
+    mut query: Query<(&mut Node, &mut Text), With<ControlsOverlay>>,
+) {
+    let Ok((mut node, mut text)) = query.single_mut() else {
+        return;
+    };
+    node.display = if controls.show_controls {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    if !controls.show_controls {
+        return;
+    }
+
+    **text = format!(
+        "FIRST-PERSON CONTROL SPINE\n\
+         WASD move | Mouse look | Shift sprint | Ctrl crouch | Space jump later\n\
+         E interact/use focused object | F focus inspect\n\
+         Tab Field Deck | [ / ] scan mode | V scan visualization\n\
+         1-6 toolbelt slots | Q quick tool | R repair tool | B build mode\n\
+         C Chronicle/evidence | M basin map | Ctrl+K command palette\n\
+         F10 dev scenario panel | Esc release mouse / pause\n\n\
+         Mode: {:?}\n\
+         Mouse captured: {}\n\
+         Tool slot: {}\n\
+         Field Deck mode: {}\n\
+         Scenario paused: {}\n\
+         Tick records: {}",
+        controls.mode,
+        controls.mouse_captured,
+        controls.selected_tool_slot,
+        controls.scan_mode.label(),
+        runtime.paused,
+        runtime.scenario.records().len()
+    );
+}
+
+fn dev_panel_overlay_system(
+    controls: Res<ControlsState>,
+    runtime: Res<ScenarioRuntime>,
+    mut query: Query<(&mut Node, &mut Text), With<DevPanelOverlay>>,
+) {
+    let Ok((mut node, mut text)) = query.single_mut() else {
+        return;
+    };
+    node.display = if controls.show_dev_panel {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    if !controls.show_dev_panel {
+        return;
+    }
+
+    let latest = runtime.scenario.records().last();
+    let metrics = latest
+        .map(|record| {
+            format!(
+                "Latest basin: viability {:.2}, toxin {:.2}, corruption {:.2}\n\
+                 Colony stress {:.2} | Mycelium biomass {:.2}",
+                record.basin.viability,
+                record.basin.toxin_load,
+                record.basin.signal_corruption,
+                record.colony.stress,
+                record.mycelium.total_biomass
+            )
+        })
+        .unwrap_or_else(|| "Latest basin: awaiting first tick".to_string());
+
+    **text = format!(
+        "DEV SCENARIO PANEL (F10)\n\
+         F2 pipe leak\n\
+         F3 fast mechanical repair\n\
+         F4 ecological reroute\n\
+         F5 willow planting\n\
+         F6 Null greenwash\n\
+         F7 decomposer aid\n\
+         F8 reset scenario\n\
+         F9 capture replay marker (intent only)\n\
+         P pause/resume simulation\n\
+         . step one tick\n\n\
+         Simulation paused: {}\n\
+         Tick records: {}\n\
+         {}",
+        runtime.paused,
+        runtime.scenario.records().len(),
+        metrics
+    );
 }
