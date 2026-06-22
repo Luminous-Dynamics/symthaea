@@ -573,10 +573,12 @@ mod tests {
         assert!(!report.energy_window_open);
         assert_eq!(report.completed_work_orders, 0);
         assert_eq!(report.handoff_receipts, 0);
-        assert!(report
-            .events
-            .iter()
-            .any(|event| event.record_kind == Mk0RecordKind::MaintenanceFlag));
+        assert!(
+            report
+                .events
+                .iter()
+                .any(|event| event.record_kind == Mk0RecordKind::MaintenanceFlag)
+        );
     }
 
     #[test]
