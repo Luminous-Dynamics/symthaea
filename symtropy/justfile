@@ -102,6 +102,10 @@ run-pendulum-swarm-3d:
 run-pendulum-swarm-4d:
     cargo run -p symtropy-bevy --example pendulum_swarm_4d --release
 
+# Run the Old Waterworks living-basin Bevy micro-slice
+run-old-waterworks:
+    cargo run -p symtropy-bevy-core --example old_waterworks_micro_slice
+
 # Run biometrics tests
 test-biometrics:
     cd ../symthaea && cargo test -p symthaea-biometrics --features muse-bridge
