@@ -9,6 +9,9 @@
 use arrow_array::{Float32Array, UInt32Array};
 use std::fmt;
 
+#[cfg(feature = "wgpu")]
+pub mod wgpu_backend;
+
 /// Canonical field channels shared by ant colonies, mycelium, wetlands, and biofilms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FieldLayer {
@@ -273,12 +276,14 @@ pub struct DiffusionParams {
     pub max_value: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FieldStepError {
     NonFiniteParam(&'static str),
     NegativeParam(&'static str),
     NonPositiveMaxValue,
     ExplicitDiffusionUnstable { courant: f32, max_courant: f32 },
+    GpuUnavailable(String),
+    GpuDispatchFailed(String),
 }
 
 impl fmt::Display for FieldStepError {
@@ -294,6 +299,8 @@ impl fmt::Display for FieldStepError {
                 f,
                 "explicit 2D diffusion is unstable: diffusion * dt = {courant}, max {max_courant}"
             ),
+            Self::GpuUnavailable(message) => write!(f, "GPU field stepper unavailable: {message}"),
+            Self::GpuDispatchFailed(message) => write!(f, "GPU field dispatch failed: {message}"),
         }
     }
 }

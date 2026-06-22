@@ -67,6 +67,11 @@ verify-core:
 verify-asset-foundry:
     nix develop -c pytest tools/symtropy_assets/tests
 
+# Verify the optional WGPU field stepper. The test compiles the WGSL backend
+# everywhere and executes parity when a compatible adapter is available.
+verify-lifesim-wgpu:
+    nix develop -c cargo test -p symtropy-lifesim-core --features wgpu -- --nocapture
+
 # Generate workspace documentation
 doc:
     cargo doc --workspace --no-deps --open

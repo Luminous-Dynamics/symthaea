@@ -9,7 +9,7 @@
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
-      
+
       # Standard Bevy dependencies for Linux/NixOS
       bevyDeps = with pkgs; [
         pkg-config
@@ -22,6 +22,14 @@
         xorg.libXcursor
         xorg.libXi
         xorg.libXrandr
+      ];
+
+      # Extra userspace pieces for WGPU compute tests and diagnostics.
+      wgpuDeps = with pkgs; [
+        libGL
+        mesa
+        vulkan-tools
+        vulkan-validation-layers
       ];
 
       mycelix-asset-bake = pkgs.rustPlatform.buildRustPackage {
@@ -62,24 +70,25 @@
 
       devShells.${system}.default = pkgs.mkShell {
         name = "symtropy-dev";
-        
+
         buildInputs = with pkgs; [
           # Rust/Build tools
           just
-          
+
           # Assets
           blender
           python3
           python3Packages.pyyaml
           python3Packages.jsonschema
-        ] ++ bevyDeps;
+        ] ++ bevyDeps ++ wgpuDeps;
 
         # Ensure dynamic libraries are found at runtime (standard for Bevy on NixOS)
-        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath bevyDeps;
+        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (bevyDeps ++ wgpuDeps);
+        VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
 
         shellHook = ''
           echo "💠 Symtropy Development Shell"
-          echo "Run 'just check' or 'cargo check' to verify workspace."
+          echo "Run 'just check', 'cargo check', or 'just verify-lifesim-wgpu'."
         '';
       };
     };
