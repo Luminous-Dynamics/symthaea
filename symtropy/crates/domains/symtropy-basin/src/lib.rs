@@ -442,6 +442,21 @@ pub struct BasinMetrics {
     pub signal_corruption: f32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BasinOrganismKind {
+    Colony,
+    Mycelium,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BasinExchangeReport {
+    pub organism: BasinOrganismKind,
+    pub signal_input: f32,
+    pub biomass_input: f32,
+    pub toxin_buffered: f32,
+    pub civic_evidence_added: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct BasinWorld {
     width: usize,
@@ -517,6 +532,29 @@ impl BasinWorld {
 
     pub fn cell(&self, x: usize, y: usize) -> BasinCell {
         self.cells[idx(self.width, x, y)]
+    }
+
+    /// Ingest a living system's field traces into basin metabolism and agency.
+    ///
+    /// This is the first shared contract between basin, colony, and mycelium:
+    /// organism crates only need to exchange `FieldGrid`, while the basin turns
+    /// those traces into flux, signals, viability pressure, and civic evidence.
+    pub fn ingest_organism_fields(
+        &mut self,
+        organism: BasinOrganismKind,
+        organism_fields: &FieldGrid,
+    ) -> BasinExchangeReport {
+        assert_eq!(self.width, organism_fields.width(), "field widths differ");
+        assert_eq!(
+            self.height,
+            organism_fields.height(),
+            "field heights differ"
+        );
+
+        match organism {
+            BasinOrganismKind::Colony => self.ingest_colony_fields(organism_fields),
+            BasinOrganismKind::Mycelium => self.ingest_mycelium_fields(organism_fields),
+        }
     }
 
     pub fn apply(&mut self, intervention: BasinIntervention) {
@@ -706,6 +744,112 @@ impl BasinWorld {
 
     fn add_civic_claim(&mut self, claim: EcoCivicClaim) {
         self.civic_claims.push(claim);
+    }
+
+    fn ingest_colony_fields(&mut self, fields: &FieldGrid) -> BasinExchangeReport {
+        let pheromone = fields.channel_sum(FieldLayer::FoodPheromone)
+            + fields.channel_sum(FieldLayer::HomePheromone);
+        let danger = fields.channel_sum(FieldLayer::DangerPheromone);
+        let cells = (self.width * self.height) as f32;
+        let signal_input = (pheromone / cells / 100.0).min(1.0);
+        let danger_pressure = (danger / cells / 40.0).min(1.0);
+
+        if signal_input > 0.01 {
+            self.add_signal(
+                SignalKind::Pheromone,
+                SignalSource::Colony,
+                signal_input,
+                0.05,
+                0.08,
+                0.0,
+            );
+        }
+        self.flux.signal += signal_input;
+        self.flux.biomass += (pheromone / cells / 500.0).min(0.5);
+        self.viability.harm_perception =
+            clamp01(self.viability.harm_perception + danger_pressure * 0.05);
+
+        let mut civic_evidence_added = false;
+        if danger_pressure > 0.08 {
+            self.add_civic_claim(EcoCivicClaim {
+                claimant: FactionId(3),
+                target: EcoSystemId(1),
+                claim_type: ClaimType::QuarantineRisk,
+                justification: ClaimJustification::Biosecurity,
+                evidence: vec![ChronicleEvidence::SignalCorruption],
+                legitimacy: 0.45 + danger_pressure * 0.20,
+                opposition: vec![FactionId(1)],
+            });
+            civic_evidence_added = true;
+        }
+
+        BasinExchangeReport {
+            organism: BasinOrganismKind::Colony,
+            signal_input,
+            biomass_input: 0.0,
+            toxin_buffered: 0.0,
+            civic_evidence_added,
+        }
+    }
+
+    fn ingest_mycelium_fields(&mut self, fields: &FieldGrid) -> BasinExchangeReport {
+        let biomass = fields.channel_sum(FieldLayer::Biomass);
+        let nutrient = fields.channel_sum(FieldLayer::Nutrient);
+        let cells = (self.width * self.height) as f32;
+        let biomass_input = (biomass / cells / 20.0).min(1.0);
+        let nutrient_input = (nutrient / cells / 100.0).min(1.0);
+        let mut toxin_buffered = 0.0;
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let biomass_here = fields.get(FieldLayer::Biomass, x, y);
+                if biomass_here <= 0.0 {
+                    continue;
+                }
+                let cell = &mut self.cells[idx(self.width, x, y)];
+                let buffered = (biomass_here * 0.002).min(cell.toxin_load.bioavailable);
+                cell.toxin_load.bioavailable = clamp01(cell.toxin_load.bioavailable - buffered);
+                cell.soil.decomposer_capacity =
+                    clamp01(cell.soil.decomposer_capacity + biomass_here * 0.0008);
+                cell.soil.carbon = clamp01(cell.soil.carbon + biomass_here * 0.0005);
+                toxin_buffered += buffered;
+            }
+        }
+
+        if biomass_input > 0.01 {
+            self.add_signal(
+                SignalKind::FungalPulse,
+                SignalSource::Mycelium,
+                biomass_input,
+                0.03,
+                0.04,
+                0.0,
+            );
+        }
+        self.flux.biomass += biomass_input;
+        self.flux.nutrient += nutrient_input;
+        self.flux.toxin -= toxin_buffered;
+
+        let civic_evidence_added = toxin_buffered > 0.05;
+        if civic_evidence_added {
+            self.add_civic_claim(EcoCivicClaim {
+                claimant: FactionId(1),
+                target: EcoSystemId(1),
+                claim_type: ClaimType::ProtectAsLivingInfrastructure,
+                justification: ClaimJustification::ToxinCapture,
+                evidence: vec![ChronicleEvidence::ToxinTrend],
+                legitimacy: 0.55 + toxin_buffered.min(0.25),
+                opposition: vec![FactionId(2)],
+            });
+        }
+
+        BasinExchangeReport {
+            organism: BasinOrganismKind::Mycelium,
+            signal_input: biomass_input,
+            biomass_input,
+            toxin_buffered,
+            civic_evidence_added,
+        }
     }
 
     fn update_fields(&mut self) {
@@ -990,5 +1134,54 @@ mod tests {
         let ppm = world.to_ppm_heatmap();
 
         assert!(ppm.starts_with("P3\n# symtropy-basin tick 2\n6 4\n255\n"));
+    }
+
+    #[test]
+    fn colony_fields_become_basin_signal_and_civic_pressure() {
+        let mut world = BasinWorld::old_waterworks(8, 5);
+        let mut colony = FieldGrid::new(8, 5);
+        colony.set(FieldLayer::HomePheromone, 1, 2, 400.0);
+        colony.set(FieldLayer::FoodPheromone, 4, 2, 600.0);
+        colony.set(FieldLayer::DangerPheromone, 4, 2, 400.0);
+
+        let report = world.ingest_organism_fields(BasinOrganismKind::Colony, &colony);
+
+        assert_eq!(report.organism, BasinOrganismKind::Colony);
+        assert!(report.signal_input > 0.0);
+        assert!(
+            world
+                .signals
+                .iter()
+                .any(|signal| signal.kind == SignalKind::Pheromone
+                    && signal.source == SignalSource::Colony)
+        );
+        assert!(
+            world
+                .civic_claims
+                .iter()
+                .any(|claim| claim.claim_type == ClaimType::QuarantineRisk)
+        );
+    }
+
+    #[test]
+    fn mycelium_fields_buffer_basin_toxins_and_add_evidence() {
+        let mut world = BasinWorld::old_waterworks(8, 5);
+        let before = world.metrics().toxin_load;
+        let mut mycelium = FieldGrid::new(8, 5);
+        mycelium.set(FieldLayer::Biomass, 4, 2, 30.0);
+        mycelium.set(FieldLayer::Nutrient, 4, 2, 200.0);
+
+        let report = world.ingest_organism_fields(BasinOrganismKind::Mycelium, &mycelium);
+        world.run_steps(4);
+
+        assert!(report.biomass_input > 0.0);
+        assert!(report.toxin_buffered > 0.0);
+        assert!(world.metrics().toxin_load < before);
+        assert!(
+            world
+                .civic_claims
+                .iter()
+                .any(|claim| claim.justification == ClaimJustification::ToxinCapture)
+        );
     }
 }

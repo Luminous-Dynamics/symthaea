@@ -130,6 +130,35 @@ impl ColonyWorld {
             .add(FieldLayer::DangerPheromone, x, y, intensity);
     }
 
+    /// Couple the colony to a basin-scale substrate.
+    ///
+    /// Basin toxin and standing moisture become ant danger, so a colony can
+    /// reroute without depending directly on `symtropy-basin` types.
+    pub fn absorb_basin_fields(&mut self, basin_fields: &FieldGrid) {
+        assert_eq!(
+            self.fields.width(),
+            basin_fields.width(),
+            "field widths differ"
+        );
+        assert_eq!(
+            self.fields.height(),
+            basin_fields.height(),
+            "field heights differ"
+        );
+
+        for y in 0..self.fields.height() {
+            for x in 0..self.fields.width() {
+                let toxin = basin_fields.get(FieldLayer::Toxin, x, y);
+                let moisture = basin_fields.get(FieldLayer::Moisture, x, y);
+                let flood_pressure = (moisture - 35.0).max(0.0) * 0.08;
+                let danger = toxin * 0.06 + flood_pressure;
+                if danger > 0.0 {
+                    self.fields.add(FieldLayer::DangerPheromone, x, y, danger);
+                }
+            }
+        }
+    }
+
     pub fn step(&mut self) {
         self.tick += 1;
         self.reinforce_sources();
@@ -515,5 +544,18 @@ mod tests {
         assert_eq!(metrics.tick, 20);
         assert_eq!(metrics.food_reserve, world.mind.food_reserve);
         assert!(metrics.pheromone_coherence >= 0.0);
+    }
+
+    #[test]
+    fn basin_toxin_and_moisture_raise_colony_danger() {
+        let mut world = ColonyWorld::new(8, 5, (1, 2), 8);
+        let mut basin = FieldGrid::new(8, 5);
+        basin.set(FieldLayer::Toxin, 4, 2, 100.0);
+        basin.set(FieldLayer::Moisture, 4, 2, 60.0);
+
+        world.absorb_basin_fields(&basin);
+
+        assert!(world.fields.get(FieldLayer::DangerPheromone, 4, 2) > 7.0);
+        assert_eq!(world.fields.get(FieldLayer::DangerPheromone, 1, 2), 0.0);
     }
 }

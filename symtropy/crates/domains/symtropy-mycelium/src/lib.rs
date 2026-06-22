@@ -50,6 +50,66 @@ impl MyceliumWorld {
         self.fields.add(FieldLayer::Toxin, x, y, intensity);
     }
 
+    /// Couple the network to a basin-scale substrate without depending on the
+    /// basin crate. Basin nutrients feed growth; basin toxins suppress it.
+    pub fn absorb_basin_fields(&mut self, basin_fields: &FieldGrid) {
+        assert_eq!(
+            self.fields.width(),
+            basin_fields.width(),
+            "field widths differ"
+        );
+        assert_eq!(
+            self.fields.height(),
+            basin_fields.height(),
+            "field heights differ"
+        );
+
+        for y in 0..self.fields.height() {
+            for x in 0..self.fields.width() {
+                self.fields.add(
+                    FieldLayer::Nutrient,
+                    x,
+                    y,
+                    basin_fields.get(FieldLayer::Nutrient, x, y) * 0.20,
+                );
+                self.fields.add(
+                    FieldLayer::Toxin,
+                    x,
+                    y,
+                    basin_fields.get(FieldLayer::Toxin, x, y) * 0.12,
+                );
+            }
+        }
+    }
+
+    /// Let established biomass buffer basin toxins and return nutrients.
+    pub fn buffer_basin_fields(&self, basin_fields: &mut FieldGrid) {
+        assert_eq!(
+            self.fields.width(),
+            basin_fields.width(),
+            "field widths differ"
+        );
+        assert_eq!(
+            self.fields.height(),
+            basin_fields.height(),
+            "field heights differ"
+        );
+
+        for y in 0..self.fields.height() {
+            for x in 0..self.fields.width() {
+                let biomass = self.fields.get(FieldLayer::Biomass, x, y);
+                if biomass <= 0.0 {
+                    continue;
+                }
+
+                let toxin = basin_fields.get(FieldLayer::Toxin, x, y);
+                let buffered = (biomass * 0.05).min(toxin);
+                basin_fields.set(FieldLayer::Toxin, x, y, toxin - buffered);
+                basin_fields.add(FieldLayer::Nutrient, x, y, buffered * 0.35);
+            }
+        }
+    }
+
     pub fn biomass_at(&self, x: usize, y: usize) -> f32 {
         self.fields.get(FieldLayer::Biomass, x, y)
     }
@@ -370,5 +430,30 @@ mod tests {
 
         assert!(ppm.starts_with("P3\n# symtropy-mycelium tick 4\n8 5\n255\n"));
         assert!(ppm.contains("240 240 120"));
+    }
+
+    #[test]
+    fn basin_fields_feed_and_stress_mycelium() {
+        let mut world = MyceliumWorld::new(8, 5, (1, 2));
+        let mut basin = FieldGrid::new(8, 5);
+        basin.set(FieldLayer::Nutrient, 6, 2, 100.0);
+        basin.set(FieldLayer::Toxin, 4, 2, 80.0);
+
+        world.absorb_basin_fields(&basin);
+
+        assert_eq!(world.fields.get(FieldLayer::Nutrient, 6, 2), 20.0);
+        assert!((world.fields.get(FieldLayer::Toxin, 4, 2) - 9.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn biomass_buffers_basin_toxins() {
+        let world = MyceliumWorld::new(8, 5, (1, 2));
+        let mut basin = FieldGrid::new(8, 5);
+        basin.set(FieldLayer::Toxin, 1, 2, 10.0);
+
+        world.buffer_basin_fields(&mut basin);
+
+        assert!(basin.get(FieldLayer::Toxin, 1, 2) < 10.0);
+        assert!(basin.get(FieldLayer::Nutrient, 1, 2) > 0.0);
     }
 }
