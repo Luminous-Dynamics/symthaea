@@ -11592,6 +11592,10 @@ dependencies = [
 [[package]]
 name = "symtropy-cli"
 version = "0.1.0"
+dependencies = [
+ "symtropy-colony",
+ "symtropy-mycelium",
+]
 
 [[package]]
 name = "symtropy-colony"

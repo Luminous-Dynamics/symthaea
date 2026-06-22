@@ -96,6 +96,16 @@ impl FieldGrid {
         self.channels[layer.index()].iter().sum()
     }
 
+    pub fn max_abs_diff(&self, other: &Self, layer: FieldLayer) -> f32 {
+        assert_eq!(self.width, other.width, "field widths differ");
+        assert_eq!(self.height, other.height, "field heights differ");
+        self.channels[layer.index()]
+            .iter()
+            .zip(&other.channels[layer.index()])
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0, f32::max)
+    }
+
     pub fn step_diffuse_decay(&mut self, layer: FieldLayer, params: DiffusionParams) {
         let source = vec![0.0; self.width * self.height];
         self.try_step_diffuse_decay_with_source(layer, &source, params)
@@ -193,6 +203,65 @@ impl FieldGrid {
             y: UInt32Array::from(ys),
             value: Float32Array::from(values),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldStepRequest {
+    pub layer: FieldLayer,
+    pub source: Vec<f32>,
+    pub params: DiffusionParams,
+}
+
+impl FieldStepRequest {
+    pub fn without_source(layer: FieldLayer, field: &FieldGrid, params: DiffusionParams) -> Self {
+        Self {
+            layer,
+            source: vec![0.0; field.width() * field.height()],
+            params,
+        }
+    }
+}
+
+pub trait FieldStepper {
+    fn step(&self, field: &mut FieldGrid, request: &FieldStepRequest)
+    -> Result<(), FieldStepError>;
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CpuFieldStepper;
+
+impl FieldStepper for CpuFieldStepper {
+    fn step(
+        &self,
+        field: &mut FieldGrid,
+        request: &FieldStepRequest,
+    ) -> Result<(), FieldStepError> {
+        field.try_step_diffuse_decay_with_source(request.layer, &request.source, request.params)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FieldParityReport {
+    pub max_abs_diff: f32,
+    pub epsilon: f32,
+}
+
+impl FieldParityReport {
+    pub const fn within_epsilon(&self) -> bool {
+        self.max_abs_diff <= self.epsilon
+    }
+}
+
+pub fn compare_layer_within_epsilon(
+    expected: &FieldGrid,
+    actual: &FieldGrid,
+    layer: FieldLayer,
+    epsilon: f32,
+) -> FieldParityReport {
+    FieldParityReport {
+        max_abs_diff: expected.max_abs_diff(actual, layer),
+        epsilon,
     }
 }
 
@@ -438,6 +507,22 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn cpu_stepper_matches_direct_reference_step() {
+        let mut direct = FieldGrid::new(5, 5);
+        let mut stepped = FieldGrid::new(5, 5);
+        direct.set(FieldLayer::Moisture, 2, 2, 20.0);
+        stepped.set(FieldLayer::Moisture, 2, 2, 20.0);
+
+        let params = DiffusionParams::default();
+        let request = FieldStepRequest::without_source(FieldLayer::Moisture, &stepped, params);
+        CpuFieldStepper.step(&mut stepped, &request).unwrap();
+        direct.step_diffuse_decay(FieldLayer::Moisture, params);
+
+        let report = compare_layer_within_epsilon(&direct, &stepped, FieldLayer::Moisture, 0.0);
+        assert!(report.within_epsilon(), "report={report:?}");
     }
 
     #[test]

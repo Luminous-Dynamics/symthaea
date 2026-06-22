@@ -64,6 +64,33 @@ impl MyceliumWorld {
         }
     }
 
+    /// Export a simple PPM heatmap for debug visualization.
+    ///
+    /// Biomass is green, nutrient is blue, toxin is red, and the origin is
+    /// highlighted. This mirrors the colony debug export so early viewers can
+    /// consume both organisms without a rendering dependency.
+    pub fn to_ppm_heatmap(&self) -> String {
+        let width = self.fields.width();
+        let height = self.fields.height();
+        let max_biomass = self.fields.channel_sum(FieldLayer::Biomass).max(1.0);
+        let max_nutrient = self.fields.channel_sum(FieldLayer::Nutrient).max(1.0);
+        let max_toxin = self.fields.channel_sum(FieldLayer::Toxin).max(1.0);
+        let mut out = format!(
+            "P3\n# symtropy-mycelium tick {}\n{} {}\n255\n",
+            self.tick, width, height
+        );
+
+        for y in 0..height {
+            for x in 0..width {
+                let (r, g, b) = self.debug_pixel(x, y, max_biomass, max_nutrient, max_toxin);
+                out.push_str(&format!("{r} {g} {b} "));
+            }
+            out.push('\n');
+        }
+
+        out
+    }
+
     pub fn run_steps(&mut self, steps: usize) {
         for _ in 0..steps {
             self.step();
@@ -180,6 +207,29 @@ impl MyceliumWorld {
         }
 
         false
+    }
+
+    fn debug_pixel(
+        &self,
+        x: usize,
+        y: usize,
+        max_biomass: f32,
+        max_nutrient: f32,
+        max_toxin: f32,
+    ) -> (u8, u8, u8) {
+        if (x, y) == self.origin {
+            return (240, 240, 120);
+        }
+
+        let biomass = self.fields.get(FieldLayer::Biomass, x, y);
+        let nutrient = self.fields.get(FieldLayer::Nutrient, x, y);
+        let toxin = self.fields.get(FieldLayer::Toxin, x, y);
+
+        let r = ((toxin / max_toxin.sqrt()).sqrt() * 255.0).clamp(0.0, 255.0) as u8;
+        let g = ((biomass / max_biomass.sqrt()).sqrt() * 255.0).clamp(0.0, 255.0) as u8;
+        let b = ((nutrient / max_nutrient.sqrt()).sqrt() * 255.0).clamp(0.0, 255.0) as u8;
+
+        (r, g, b)
     }
 
     fn best_growth_neighbor(
@@ -307,5 +357,18 @@ mod tests {
         world.run_steps(100);
 
         assert!(world.metrics().central_biomass > before);
+    }
+
+    #[test]
+    fn ppm_heatmap_exports_visible_mycelium_state() {
+        let mut world = MyceliumWorld::new(8, 5, (1, 2));
+        world.add_dead_biomass(6, 2, 200.0);
+        world.add_toxin(4, 1, 100.0);
+        world.run_steps(4);
+
+        let ppm = world.to_ppm_heatmap();
+
+        assert!(ppm.starts_with("P3\n# symtropy-mycelium tick 4\n8 5\n255\n"));
+        assert!(ppm.contains("240 240 120"));
     }
 }
