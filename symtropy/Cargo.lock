@@ -11763,6 +11763,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "symtropy-mycelium"
+version = "0.1.0"
+dependencies = [
+ "symtropy-lifesim-core",
+]
+
+[[package]]
 name = "symtropy-mycelix-bridge"
 version = "0.1.0"
 dependencies = [

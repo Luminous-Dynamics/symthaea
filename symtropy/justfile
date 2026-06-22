@@ -54,7 +54,7 @@ verify-core:
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo clippy -p symtropy-math -p symtropy-physics -p symtropy-render-bridge -p symtropy-bevy-core -p symtropy-consciousness-physics -- -D warnings
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo check -p symtropy-cli
     # 4. Core Tests
-    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-lifesim-core -p symtropy-colony
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-lifesim-core -p symtropy-colony -p symtropy-mycelium
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-math -p symtropy-physics -p symtropy-consciousness-physics --lib
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-physics --test replay_harness --test callback_contract
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-consciousness-physics --test accounting_verification
