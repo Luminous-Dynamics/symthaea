@@ -24,10 +24,17 @@
 //! - just the first playable room
 
 use bevy::prelude::*;
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::{
+    fs::{self, OpenOptions},
+    io::{self, Write},
+    path::{Path, PathBuf},
+};
 use symtropy_basin::{BasinIntervention, OldWaterworksScenario};
 use symtropy_bevy_core::{
     ControlMode, ControlsState, FirstPersonController, FirstPersonInputPlugin, InputIntent,
-    IntentFrame,
+    IntentFrame, ScanMode,
 };
 use symtropy_bevy_scene::{SymtropyScenePlugin, fixed_camera};
 
@@ -73,6 +80,54 @@ struct ScenarioRuntime {
     last_outcome: Option<symtropy_basin::OldWaterworksChoiceOutcome>,
 }
 
+#[derive(Resource)]
+struct ChronicleRuntime {
+    writer: Option<ChronicleWriter>,
+    field_deck_raised_written: bool,
+    lock_inspected_written: bool,
+    last_preview_key: Option<String>,
+    last_event: Option<String>,
+    last_error: Option<String>,
+}
+
+impl ChronicleRuntime {
+    fn open_default() -> Self {
+        match ChronicleWriter::open("chronicle") {
+            Ok(writer) => Self {
+                writer: Some(writer),
+                field_deck_raised_written: false,
+                lock_inspected_written: false,
+                last_preview_key: None,
+                last_event: None,
+                last_error: None,
+            },
+            Err(error) => Self {
+                writer: None,
+                field_deck_raised_written: false,
+                lock_inspected_written: false,
+                last_preview_key: None,
+                last_event: None,
+                last_error: Some(error.to_string()),
+            },
+        }
+    }
+
+    fn append(&mut self, event_type: &str, payload: Value) {
+        let Some(writer) = &mut self.writer else {
+            return;
+        };
+        match writer.append(event_type, payload) {
+            Ok(hash) => {
+                self.last_event = Some(format!("{event_type} [{hash}]"));
+                self.last_error = None;
+            }
+            Err(error) => {
+                self.last_error = Some(error.to_string());
+            }
+        }
+    }
+}
+
 #[derive(Component)]
 struct EcologyMeter {
     kind: EcologyMeterKind,
@@ -83,6 +138,156 @@ enum EcologyMeterKind {
     BasinToxin,
     ColonyStress,
     MyceliumBiomass,
+}
+
+struct ChronicleWriter {
+    events_path: PathBuf,
+    logical_time: u64,
+    last_hash: String,
+}
+
+impl ChronicleWriter {
+    fn open(dir: impl AsRef<Path>) -> io::Result<Self> {
+        let dir = dir.as_ref().to_path_buf();
+        fs::create_dir_all(dir.join("snapshots"))?;
+        fs::create_dir_all(dir.join("indexes"))?;
+        fs::create_dir_all(dir.join("signatures"))?;
+
+        let manifest_path = dir.join("manifest.json");
+        if !manifest_path.exists() {
+            fs::write(
+                &manifest_path,
+                concat!(
+                    "{\n",
+                    "  \"schema_version\": \"chronicle.manifest.v0\",\n",
+                    "  \"worldline_id\": \"seed_age_firstlight\",\n",
+                    "  \"site_id\": \"old_waterworks\",\n",
+                    "  \"writer_version\": \"old_waterworks_micro_slice.v0\",\n",
+                    "  \"min_reader_version\": \"chronicle.reader.v0\"\n",
+                    "}\n"
+                ),
+            )?;
+        }
+
+        let events_path = dir.join("events.jsonl");
+        if !events_path.exists() {
+            fs::write(&events_path, "")?;
+        }
+
+        let (logical_time, last_hash) = verify_chronicle_file(&events_path)?;
+        Ok(Self {
+            events_path,
+            logical_time,
+            last_hash,
+        })
+    }
+
+    fn append(&mut self, event_type: &str, payload: Value) -> io::Result<String> {
+        self.logical_time += 1;
+        let prev_hash = if self.logical_time == 1 {
+            "GENESIS".to_string()
+        } else {
+            self.last_hash.clone()
+        };
+
+        let mut event = json!({
+            "actor_id": "player_local",
+            "event_id": format!("evt_{:08}", self.logical_time),
+            "event_type": event_type,
+            "logical_time": self.logical_time,
+            "payload": payload,
+            "prev_hash": prev_hash,
+            "schema_version": "chronicle.event.v0",
+            "site_id": "old_waterworks",
+            "worldline_id": "seed_age_firstlight"
+        });
+        let hash = hash_event_without_signature(&event)?;
+        event["hash"] = Value::String(hash.clone());
+        event["signature"] = Value::String("placeholder".to_string());
+
+        let line = serde_json::to_string(&event).map_err(json_error)?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.events_path)?;
+        writeln!(file, "{line}")?;
+        self.last_hash = hash.clone();
+        Ok(hash)
+    }
+
+    fn events_path(&self) -> &Path {
+        &self.events_path
+    }
+}
+
+fn verify_chronicle_file(path: &Path) -> io::Result<(u64, String)> {
+    let content = fs::read_to_string(path)?;
+    let mut expected_prev = "GENESIS".to_string();
+    let mut last_hash = "GENESIS".to_string();
+    let mut last_time = 0;
+
+    for (line_index, line) in content.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let event: Value = serde_json::from_str(line).map_err(json_error)?;
+        let logical_time = event
+            .get("logical_time")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| invalid_chronicle(line_index, "missing logical_time"))?;
+        if logical_time != last_time + 1 {
+            return Err(invalid_chronicle(
+                line_index,
+                "logical_time is not strictly increasing",
+            ));
+        }
+
+        let prev_hash = event
+            .get("prev_hash")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid_chronicle(line_index, "missing prev_hash"))?;
+        if prev_hash != expected_prev {
+            return Err(invalid_chronicle(line_index, "prev_hash does not match"));
+        }
+
+        let stored_hash = event
+            .get("hash")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid_chronicle(line_index, "missing hash"))?;
+        let computed_hash = hash_event_without_signature(&event)?;
+        if stored_hash != computed_hash {
+            return Err(invalid_chronicle(line_index, "hash mismatch"));
+        }
+
+        last_time = logical_time;
+        last_hash = stored_hash.to_string();
+        expected_prev = last_hash.clone();
+    }
+
+    Ok((last_time, last_hash))
+}
+
+fn hash_event_without_signature(event: &Value) -> io::Result<String> {
+    let mut canonical = event.clone();
+    if let Some(object) = canonical.as_object_mut() {
+        object.remove("hash");
+        object.remove("signature");
+    }
+    let bytes = serde_json::to_string(&canonical).map_err(json_error)?;
+    let mut hasher = Sha256::new();
+    hasher.update(bytes.as_bytes());
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn json_error(error: serde_json::Error) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, error)
+}
+
+fn invalid_chronicle(line_index: usize, reason: &str) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("corrupt Chronicle at line {}: {reason}", line_index + 1),
+    )
 }
 
 fn main() {
@@ -108,6 +313,7 @@ fn main() {
             step_once: false,
             last_outcome: None,
         })
+        .insert_resource(ChronicleRuntime::open_default())
         .init_state::<InterfaceState>()
         .add_systems(Startup, setup)
         .add_systems(
@@ -555,7 +761,8 @@ struct DevPanelOverlay;
 
 fn interaction_system(
     intents: Res<IntentFrame>,
-    runtime: Res<ScenarioRuntime>,
+    mut runtime: ResMut<ScenarioRuntime>,
+    mut chronicle: ResMut<ChronicleRuntime>,
     player_query: Query<&Transform, With<Player>>,
     target_query: Query<(&Transform, &InteractableTarget)>,
     mut interaction_hint_query: Query<(&mut Text, &mut Visibility), With<InteractionHint>>,
@@ -581,6 +788,19 @@ fn interaction_system(
     let target = nearest.map(|(target, _)| target);
     let current_mode = controls_state.mode;
 
+    if current_mode == ControlMode::FieldDeck && !chronicle.field_deck_raised_written {
+        chronicle.append(
+            "FieldDeckRaised",
+            json!({
+                "deck_id": "field_deck_mk0",
+                "origin_profile": null,
+                "visor_assist_enabled": false,
+                "location_hint": "old_waterworks"
+            }),
+        );
+        chronicle.field_deck_raised_written = true;
+    }
+
     // Interaction Hint
     if current_mode != ControlMode::Console && near_target {
         let target = target.expect("near_target implies nearest target");
@@ -602,6 +822,10 @@ fn interaction_system(
         controls_state.mode = ControlMode::Console;
         controls_state.mouse_captured = false;
         next_state.set(InterfaceState::Console);
+        if !chronicle.lock_inspected_written {
+            chronicle.append("DeadAuthorityLockInspected", dead_authority_payload());
+            chronicle.lock_inspected_written = true;
+        }
     }
 
     // Update Inspection Text
@@ -616,10 +840,53 @@ fn interaction_system(
             controls_state.selected_tool_slot
         );
     } else if current_mode == ControlMode::FieldDeck {
+        if near_target
+            && target
+                .map(|target| target.kind == InteractableKind::PumpConsole)
+                .unwrap_or(false)
+            && matches!(
+                controls_state.scan_mode,
+                ScanMode::MachineDiagnostics
+                    | ScanMode::CivicClaims
+                    | ScanMode::NullSignalCorruption
+                    | ScanMode::RepairPreview
+            )
+            && !chronicle.lock_inspected_written
+        {
+            chronicle.append("DeadAuthorityLockInspected", dead_authority_payload());
+            chronicle.lock_inspected_written = true;
+        }
+
+        if controls_state.scan_mode == ScanMode::RepairPreview {
+            if let Some(target) = target.filter(|_| near_target) {
+                if let Some(intervention) =
+                    selected_repair_intervention(controls_state.selected_tool_slot, target.kind)
+                {
+                    let preview_key = format!("{:?}:{:?}", target.kind, intervention);
+                    if chronicle.last_preview_key.as_deref() != Some(preview_key.as_str()) {
+                        chronicle.append(
+                            "RepairPathPreviewed",
+                            repair_preview_payload(target, intervention),
+                        );
+                        chronicle.last_preview_key = Some(preview_key);
+                    }
+                    if intents.just_pressed(InputIntent::RepairTool) {
+                        let outcome = runtime.scenario.apply_choice_and_step(intervention, 6);
+                        chronicle.append(
+                            "WaterworksOutcomeRecorded",
+                            waterworks_outcome_payload(&outcome),
+                        );
+                        runtime.last_outcome = Some(outcome);
+                    }
+                }
+            }
+        }
+
         let Some(record) = runtime.scenario.records().last() else {
             **inspect_text = "FIELD DECK ECOLOGY LINK\nAwaiting basin signal...".to_string();
             return;
         };
+
         let testimony = if record.testimony.is_empty() {
             "Life testimony: no stable interpretation yet.".to_string()
         } else {
@@ -653,10 +920,18 @@ fn interaction_system(
             .as_ref()
             .map(format_outcome)
             .unwrap_or_else(|| "Last choice outcome: none yet".to_string());
+        let reading = format_field_deck_reading(
+            controls_state.scan_mode,
+            target.filter(|_| near_target),
+            controls_state.selected_tool_slot,
+            record,
+        );
+        let chronicle_status = format_chronicle_status(&chronicle);
         **inspect_text = format!(
             "FIELD DECK ECOLOGY LINK\n\
              Mode: {} ([ / ] to cycle)\n\
              Tool slot: {}\n\
+             {}\n\
              {}\n\
              Basin viability: {:.2}\n\
              Toxin load: {:.2}\n\
@@ -667,10 +942,12 @@ fn interaction_system(
              {}\n\
              {}\n\
              {}\n\
+             {}\n\
              C: Chronicle evidence | V: scan overlay | F: focus reading",
             controls_state.scan_mode.label(),
             controls_state.selected_tool_slot,
             current_target,
+            reading,
             record.basin.viability,
             record.basin.toxin_load,
             record.basin.signal_corruption,
@@ -679,6 +956,7 @@ fn interaction_system(
             events,
             testimony,
             outcome,
+            chronicle_status,
         );
     } else {
         **inspect_text = "".to_string();
@@ -715,6 +993,298 @@ fn format_outcome(outcome: &symtropy_basin::OldWaterworksChoiceOutcome) -> Strin
         "Last choice: {:?} at tick {}\n{}\n{}",
         outcome.intervention, outcome.tick, chronicle, faction
     )
+}
+
+fn selected_repair_intervention(
+    tool_slot: u8,
+    target: InteractableKind,
+) -> Option<BasinIntervention> {
+    match (tool_slot, target) {
+        (2, InteractableKind::PumpConsole) => Some(BasinIntervention::FastMechanicalRepair),
+        (3, InteractableKind::PumpConsole | InteractableKind::AntTrail) => {
+            Some(BasinIntervention::EcologicalReroute)
+        }
+        (4, InteractableKind::WillowRoots) => Some(BasinIntervention::CutWillowRoots),
+        (5, InteractableKind::MyceliumPatch) => Some(BasinIntervention::DecomposerAid),
+        (6, _) => Some(BasinIntervention::DelayRepair),
+        _ => None,
+    }
+}
+
+fn format_field_deck_reading(
+    mode: ScanMode,
+    target: Option<&InteractableTarget>,
+    tool_slot: u8,
+    record: &symtropy_basin::OldWaterworksTickRecord,
+) -> String {
+    let Some(target) = target else {
+        return "Reading: no focused system in range.".to_string();
+    };
+
+    match mode {
+        ScanMode::Infrastructure => match target.kind {
+            InteractableKind::PumpConsole => format!(
+                "SCAN/PUMP: pressure {:.2}, integrity {:.2}; physical repair possible.",
+                record.basin.water_trust, record.basin.infrastructure_integrity
+            ),
+            InteractableKind::WillowRoots => {
+                "SCAN/ROOTS: living root mass crosses pipe route; obstruction and filtration overlap."
+                    .to_string()
+            }
+            InteractableKind::AntTrail => {
+                "SCAN/TRAIL: traffic line is rerouting around wet floor and toxin pressure."
+                    .to_string()
+            }
+            InteractableKind::MyceliumPatch => format!(
+                "SCAN/MYCELIUM: biomass {:.2}; toxin buffer {:.3}.",
+                record.mycelium.total_biomass, record.mycelium_exchange.toxin_buffered
+            ),
+        },
+        ScanMode::Ecology => format!(
+            "ECOLOGY: viability {:.2}, toxin {:.2}, recovery momentum {:.2}.",
+            record.basin.viability, record.basin.toxin_load, record.basin.recovery_momentum
+        ),
+        ScanMode::MachineDiagnostics => {
+            "DIAG: machine reports GREEN; Field Deck flags biological contradiction.".to_string()
+        }
+        ScanMode::CivicClaims => match target.kind {
+            InteractableKind::PumpConsole => {
+                "CIVIC: public water charter conflicts with dead emergency authority.".to_string()
+            }
+            InteractableKind::WillowRoots => {
+                "CIVIC: Utility Sovereign sees obstruction; Watershed Commons sees living filtration."
+                    .to_string()
+            }
+            InteractableKind::AntTrail => {
+                "CIVIC: colony route is ecological evidence, not decorative wildlife.".to_string()
+            }
+            InteractableKind::MyceliumPatch => {
+                "CIVIC: decomposer aid can become a public repair argument.".to_string()
+            }
+        },
+        ScanMode::NullSignalCorruption => format!(
+            "NULL: diagnostic coherence is suspect; signal corruption {:.2}.",
+            record.basin.signal_corruption
+        ),
+        ScanMode::RepairPreview => match selected_repair_intervention(tool_slot, target.kind) {
+            Some(intervention) => format!(
+                "REPAIR PREVIEW: slot {} commits {:?} on {}. Press R to commit and write Chronicle.",
+                tool_slot, intervention, target.label
+            ),
+            None => format!(
+                "REPAIR PREVIEW: slot {} has no valid repair action for {}.",
+                tool_slot, target.label
+            ),
+        },
+        ScanMode::ChronicleEvidence => {
+            let latest = record
+                .testimony
+                .first()
+                .map(|entry| entry.summary.as_str())
+                .unwrap_or("No citable ecological testimony yet.");
+            format!("CHRONICLE EVIDENCE: {latest}")
+        }
+    }
+}
+
+fn format_chronicle_status(chronicle: &ChronicleRuntime) -> String {
+    if let Some(error) = &chronicle.last_error {
+        return format!("Chronicle writer: blocked ({error})");
+    }
+    let Some(writer) = &chronicle.writer else {
+        return "Chronicle writer: unavailable".to_string();
+    };
+    let last_event = chronicle
+        .last_event
+        .as_deref()
+        .unwrap_or("no event written this session");
+    format!(
+        "Chronicle writer: {} | {}",
+        writer.events_path().display(),
+        last_event
+    )
+}
+
+fn dead_authority_payload() -> Value {
+    json!({
+        "archive_trace": [
+            "Built 2048: Municipal drought adaptation works.",
+            "Modified 2087: Emergency Water Act automation.",
+            "Authority chain failed approximately 2113."
+        ],
+        "authority_state": "DEAD_AUTHORITY_LOCK",
+        "null_loop_detected": true,
+        "null_loop_duration": "55 years",
+        "pump_id": "PUMP_1",
+        "tank_level_percent": 12,
+        "target_id": "pump_1"
+    })
+}
+
+fn repair_preview_payload(target: &InteractableTarget, intervention: BasinIntervention) -> Value {
+    let warnings: Vec<&str> = match intervention {
+        BasinIntervention::FastMechanicalRepair => vec![
+            "Fast repair may leave ecological toxin memory unresolved.",
+            "Public legitimacy may lag behind mechanical pressure.",
+        ],
+        BasinIntervention::EcologicalReroute => vec![
+            "Repair timeline is slower.",
+            "Living filtration and colony reroute evidence are preserved.",
+        ],
+        BasinIntervention::CutWillowRoots => vec![
+            "Root obstruction falls.",
+            "Living toxin filtration may be damaged.",
+        ],
+        BasinIntervention::DecomposerAid => vec![
+            "Decomposer aid may improve recovery momentum.",
+            "Outcome depends on toxin pressure after settling.",
+        ],
+        BasinIntervention::DelayRepair => vec![
+            "Evidence quality improves.",
+            "Settlement water trust may degrade during delay.",
+        ],
+        BasinIntervention::PipeLeak
+        | BasinIntervention::WillowPlanting
+        | BasinIntervention::NullGreenwash => {
+            vec!["Scenario intervention is normally dev-controlled."]
+        }
+    };
+    json!({
+        "predicted_outcome_class": format!("{intervention:?}"),
+        "repair_path": format!("{intervention:?}"),
+        "target_id": format!("{:?}", target.kind),
+        "target_label": target.label,
+        "visible_warnings": warnings
+    })
+}
+
+fn waterworks_outcome_payload(outcome: &symtropy_basin::OldWaterworksChoiceOutcome) -> Value {
+    let chronicle_text = outcome
+        .chronicle
+        .first()
+        .map(|event| event.summary.clone())
+        .unwrap_or_else(|| format!("Chronicle: {:?} committed.", outcome.intervention));
+    let faction_memory_flags = faction_memory_flags(outcome.intervention);
+    json!({
+        "authority_state_after": authority_state_after(outcome.intervention),
+        "basin_viability": outcome.basin.viability,
+        "chronicle_text": chronicle_text,
+        "event_summaries": outcome
+            .chronicle
+            .iter()
+            .map(|event| event.summary.clone())
+            .collect::<Vec<_>>(),
+        "faction_memory_flags": faction_memory_flags,
+        "faction_reactions": outcome
+            .faction_reactions
+            .iter()
+            .map(|reaction| {
+                json!({
+                    "confidence": reaction.confidence,
+                    "faction": format!("{:?}", reaction.faction),
+                    "stance": format!("{:?}", reaction.stance),
+                    "summary": reaction.summary
+                })
+            })
+            .collect::<Vec<_>>(),
+        "legitimacy_effect": legitimacy_effect(outcome.intervention),
+        "null_drift_effect": null_drift_effect(outcome.intervention),
+        "outcome_class": outcome_class(outcome.intervention),
+        "repair_path": format!("{:?}", outcome.intervention),
+        "tick": outcome.tick,
+        "water_flow_state": water_flow_state(outcome.intervention)
+    })
+}
+
+fn outcome_class(intervention: BasinIntervention) -> &'static str {
+    match intervention {
+        BasinIntervention::FastMechanicalRepair => "FastMechanicalRepair",
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => {
+            "EcologicalRepair"
+        }
+        BasinIntervention::CutWillowRoots => "AccessStabilizedFiltrationDamaged",
+        BasinIntervention::DelayRepair => "EvidenceReviewDelay",
+        BasinIntervention::PipeLeak => "DamageRecorded",
+        BasinIntervention::WillowPlanting => "LivingFiltrationExpanded",
+        BasinIntervention::NullGreenwash => "FalseLegibilityDetected",
+    }
+}
+
+fn water_flow_state(intervention: BasinIntervention) -> &'static str {
+    match intervention {
+        BasinIntervention::FastMechanicalRepair | BasinIntervention::CutWillowRoots => {
+            "RESTORED_FAST"
+        }
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => {
+            "STABILIZING_SLOW"
+        }
+        BasinIntervention::DelayRepair => "DEFERRED",
+        BasinIntervention::PipeLeak => "FAILING",
+        BasinIntervention::WillowPlanting => "FILTERING",
+        BasinIntervention::NullGreenwash => "DIAGNOSTIC_GREEN_ONLY",
+    }
+}
+
+fn authority_state_after(intervention: BasinIntervention) -> &'static str {
+    match intervention {
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => {
+            "PUBLIC_REPAIR_UNDER_ECOLOGICAL_EVIDENCE"
+        }
+        BasinIntervention::DelayRepair => "ARCHIVE_REVIEW_OPEN",
+        BasinIntervention::FastMechanicalRepair | BasinIntervention::CutWillowRoots => "UNRESOLVED",
+        _ => "UNCHANGED",
+    }
+}
+
+fn legitimacy_effect(intervention: BasinIntervention) -> &'static str {
+    match intervention {
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => {
+            "LEGITIMACY_INCREASED"
+        }
+        BasinIntervention::DelayRepair => "LEGITIMACY_UNRESOLVED",
+        BasinIntervention::FastMechanicalRepair | BasinIntervention::CutWillowRoots => {
+            "LEGITIMACY_DEBT_INCREASED"
+        }
+        _ => "LEGITIMACY_UNCHANGED",
+    }
+}
+
+fn null_drift_effect(intervention: BasinIntervention) -> &'static str {
+    match intervention {
+        BasinIntervention::NullGreenwash => "NULL_REINFORCEMENT_CONTINUES",
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => {
+            "NULL_DRIFT_REDUCED_BY_CONTRADICTORY_EVIDENCE"
+        }
+        _ => "NULL_DRIFT_UNRESOLVED",
+    }
+}
+
+fn faction_memory_flags(intervention: BasinIntervention) -> Vec<&'static str> {
+    match intervention {
+        BasinIntervention::FastMechanicalRepair => vec![
+            "old_waterworks_repaired_fast",
+            "archive_witness_bypassed",
+            "ecological_memory_unresolved",
+        ],
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => vec![
+            "old_waterworks_repaired_legitimately",
+            "living_infrastructure_respected",
+            "dead_authority_overturned_by_evidence",
+        ],
+        BasinIntervention::CutWillowRoots => vec![
+            "old_waterworks_access_restored",
+            "living_filtration_damaged",
+            "utility_precedent_created",
+        ],
+        BasinIntervention::DelayRepair => vec![
+            "archive_witness_respected",
+            "water_repair_delayed_for_evidence",
+            "continuance_precedent_created",
+        ],
+        BasinIntervention::PipeLeak => vec!["pipe_leak_recorded"],
+        BasinIntervention::WillowPlanting => vec!["living_filtration_expanded"],
+        BasinIntervention::NullGreenwash => vec!["false_legibility_detected"],
+    }
 }
 
 fn ecological_meter_system(
@@ -862,4 +1432,90 @@ fn dev_panel_overlay_system(
         runtime.scenario.records().len(),
         metrics
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn chronicle_writer_appends_hash_chain() {
+        let dir = temp_chronicle_dir("hash_chain");
+        let mut writer = ChronicleWriter::open(&dir).expect("open Chronicle writer");
+
+        let first = writer
+            .append("FieldDeckRaised", json!({"deck_id": "field_deck_mk0"}))
+            .expect("append first event");
+        let second = writer
+            .append("DeadAuthorityLockInspected", dead_authority_payload())
+            .expect("append second event");
+
+        let lines = fs::read_to_string(dir.join("events.jsonl")).expect("read events");
+        let events: Vec<Value> = lines
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("parse event"))
+            .collect();
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["prev_hash"], "GENESIS");
+        assert_eq!(events[0]["hash"], first);
+        assert_eq!(events[1]["prev_hash"], first);
+        assert_eq!(events[1]["hash"], second);
+
+        let (logical_time, last_hash) =
+            verify_chronicle_file(&dir.join("events.jsonl")).expect("verify Chronicle");
+        assert_eq!(logical_time, 2);
+        assert_eq!(last_hash, second);
+
+        fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn chronicle_verifier_rejects_tampering() {
+        let dir = temp_chronicle_dir("tamper");
+        let mut writer = ChronicleWriter::open(&dir).expect("open Chronicle writer");
+        writer
+            .append("FieldDeckRaised", json!({"deck_id": "field_deck_mk0"}))
+            .expect("append event");
+
+        let path = dir.join("events.jsonl");
+        let tampered = fs::read_to_string(&path)
+            .expect("read events")
+            .replace("field_deck_mk0", "field_deck_mk9");
+        fs::write(&path, tampered).expect("write tampered events");
+
+        let error = verify_chronicle_file(&path).expect_err("tampering must fail");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("hash mismatch"));
+
+        fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn repair_preview_payload_names_target_and_warning() {
+        let target = InteractableTarget {
+            kind: InteractableKind::WillowRoots,
+            label: "Willow root filtration",
+        };
+        let payload = repair_preview_payload(&target, BasinIntervention::CutWillowRoots);
+
+        assert_eq!(payload["repair_path"], "CutWillowRoots");
+        assert_eq!(payload["target_id"], "WillowRoots");
+        assert!(
+            payload["visible_warnings"]
+                .as_array()
+                .expect("warnings")
+                .iter()
+                .any(|warning| warning.as_str().unwrap_or("").contains("filtration"))
+        );
+    }
+
+    fn temp_chronicle_dir(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("symtropy_old_waterworks_{name}_{unique}"))
+    }
 }

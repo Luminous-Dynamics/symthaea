@@ -11591,6 +11591,8 @@ version = "0.1.1"
 dependencies = [
  "bevy",
  "nalgebra 0.34.2",
+ "serde_json",
+ "sha2",
  "symtropy-basin",
  "symtropy-bevy-scene",
  "symtropy-math",
