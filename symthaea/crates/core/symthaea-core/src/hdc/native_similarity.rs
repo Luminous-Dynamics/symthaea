@@ -669,4 +669,40 @@ mod tests {
         assert_eq!(packed.memory_bytes(), expected_bytes);
         assert_eq!(expected_bytes, 2048, "16K dimensions should use 2KB");
     }
+
+    #[test]
+    fn test_text_bridge_to_bipolar_to_memory() {
+        use crate::hdc::BinaryHV;
+        use crate::hdc::semantic_bridge::SemanticBridge;
+        use crate::hdc::unified_hv::ContinuousHV;
+
+        // 1. Text concept -> SemanticBridge -> BinaryHV
+        let bridge = SemanticBridge::with_vocabulary(&["sensory", "cortex", "active", "inference"]);
+        let concept_binary = bridge.encode_phrase("sensory cortex active inference");
+        assert_ne!(concept_binary, BinaryHV::zero());
+
+        // 2. Convert BinaryHV -> ContinuousHV (representing NeuralBridgeV2 ContinuousHV projection)
+        let mut continuous_values = vec![0.0f32; BinaryHV::DIM];
+        for i in 0..BinaryHV::DIM {
+            let bit = (concept_binary.0[i / 8] >> (i % 8)) & 1;
+            continuous_values[i] = if bit == 1 { 1.0f32 } else { -1.0f32 };
+        }
+        let continuous_hv = ContinuousHV::from_vec(continuous_values);
+
+        // 3. Convert ContinuousHV -> PackedBipolar (standardized boundary)
+        let packed = PackedBipolar::from_continuous(&continuous_hv.values);
+        assert_eq!(packed.dimension, BinaryHV::DIM);
+
+        // 4. Store in NativeSimilarityIndex memory query
+        let index = NativeSimilarityIndex::new(BinaryHV::DIM).with_threshold(0.5);
+        index
+            .store_packed("cortex_activation", packed.clone())
+            .unwrap();
+
+        // 5. Retrieve via query
+        let results = index.query_packed(&packed, 5);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].0, "cortex_activation");
+        assert!((results[0].1 - 1.0).abs() < 1e-4);
+    }
 }
