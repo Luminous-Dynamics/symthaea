@@ -20,8 +20,11 @@ pub struct EpisodicPersistenceManager {
 
     /// Persistent memory database for cross-session episode storage.
     /// Created when `config.memory_db_path` is `Some`. Episodes are periodically
-    /// flushed (every 199 cycles) via a background thread.
+    /// flushed (every 199 cycles) via the storage runtime or a background thread.
     pub(crate) db: Option<std::sync::Arc<crate::databases::SqliteMemory>>,
+
+    /// Optional write-behind runtime for non-blocking durable memory writes.
+    pub(crate) storage_runtime: Option<crate::databases::storage_runtime::StorageRuntimeHandle>,
 
     /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
     pub(crate) flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -40,9 +43,28 @@ impl EpisodicPersistenceManager {
         Self {
             replay,
             db: None,
+            storage_runtime: None,
             flush_in_progress: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_reasoning_context: None,
         }
+    }
+
+    /// Attach a persistent SQLite memory database for periodic episode flushes.
+    pub fn attach_sqlite_db<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> crate::databases::DbResult<()> {
+        let db = crate::databases::SqliteMemory::new(path)?;
+        self.db = Some(std::sync::Arc::new(db));
+        Ok(())
+    }
+
+    /// Attach a write-behind runtime for periodic episode flushes.
+    pub fn attach_storage_runtime(
+        &mut self,
+        runtime: crate::databases::storage_runtime::StorageRuntimeHandle,
+    ) {
+        self.storage_runtime = Some(runtime);
     }
 }
 
@@ -55,10 +77,26 @@ mod tests {
         let mgr = EpisodicPersistenceManager::new(None);
         assert!(mgr.replay.is_none());
         assert!(mgr.db.is_none());
+        assert!(mgr.storage_runtime.is_none());
         assert!(
             !mgr.flush_in_progress
                 .load(std::sync::atomic::Ordering::Relaxed)
         );
         assert!(mgr.last_reasoning_context.is_none());
+    }
+
+    #[test]
+    fn test_attach_sqlite_db_initializes_persistence() {
+        let mut mgr = EpisodicPersistenceManager::new(None);
+        let path = std::env::temp_dir().join(format!(
+            "symthaea_episodic_persistence_{}.sqlite",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+
+        mgr.attach_sqlite_db(&path).unwrap();
+        assert!(mgr.db.is_some());
+
+        let _ = std::fs::remove_file(path);
     }
 }

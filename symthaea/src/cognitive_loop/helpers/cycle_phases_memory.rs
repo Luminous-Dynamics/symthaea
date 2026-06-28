@@ -712,7 +712,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         if self.stats.total_cycles % 199 == 0
             && self.stats.total_cycles > 0
-            && self.memory.episodic_persistence.db.is_some()
+            && (self.memory.episodic_persistence.storage_runtime.is_some()
+                || self.memory.episodic_persistence.db.is_some())
         {
             use std::sync::atomic::Ordering;
 
@@ -725,13 +726,9 @@ impl CognitiveLoopService {
                 if let Some(ref replay) = self.memory.episodic_persistence.replay {
                     let top_episodes = replay.get_top_episodes(16);
                     if !top_episodes.is_empty() {
-                        let Some(db) = self.memory.episodic_persistence.db.clone() else {
-                            return EpisodicReplayResult {
-                                surprise_replay_batch_size: 0,
-                                phasic_da_replay_boost: 0,
-                                memory_db_flushed: false,
-                            };
-                        };
+                        let storage_runtime =
+                            self.memory.episodic_persistence.storage_runtime.clone();
+                        let db = self.memory.episodic_persistence.db.clone();
                         let flush_guard =
                             self.memory.episodic_persistence.flush_in_progress.clone();
                         flush_guard.store(true, Ordering::Relaxed);
@@ -766,20 +763,38 @@ impl CognitiveLoopService {
                             .collect();
 
                         memory_db_flushed = true;
-                        std::thread::spawn(move || {
-                            match db.store_batch_sync(&records) {
-                                Ok(n) => {
+                        if let Some(runtime) = storage_runtime {
+                            match runtime.try_store_memory_batch(records) {
+                                Ok(()) => {
                                     tracing::debug!(
-                                        stored = n,
-                                        "Memory flush: episodes persisted to SQLite"
+                                        "Memory flush: episodes queued to storage runtime"
                                     );
                                 }
                                 Err(e) => {
-                                    tracing::warn!(error = %e, "Memory flush failed");
+                                    memory_db_flushed = false;
+                                    tracing::warn!(error = %e, "Memory flush queue failed");
                                 }
                             }
                             flush_guard.store(false, Ordering::Relaxed);
-                        });
+                        } else if let Some(db) = db {
+                            std::thread::spawn(move || {
+                                match db.store_batch_sync(&records) {
+                                    Ok(n) => {
+                                        tracing::debug!(
+                                            stored = n,
+                                            "Memory flush: episodes persisted to SQLite"
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, "Memory flush failed");
+                                    }
+                                }
+                                flush_guard.store(false, Ordering::Relaxed);
+                            });
+                        } else {
+                            memory_db_flushed = false;
+                            flush_guard.store(false, Ordering::Relaxed);
+                        }
                     }
                 }
             }
