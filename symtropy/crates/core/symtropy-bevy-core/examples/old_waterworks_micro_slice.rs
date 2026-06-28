@@ -8,6 +8,7 @@
 //! - Proximity-based interaction with the console (Press E).
 //! - Field Deck: Amber interface frame (Press Tab to toggle).
 //! - Dead authority lock inspection state (inside Field Deck).
+//! - Local Chronicle JSONL consequence log (Press C).
 //! - Panic Drop: Esc releases the mouse and exits tools instantly.
 //! - Procedural Lighting: Oscillating room intensity.
 //!
@@ -20,7 +21,6 @@
 //! - No SymLogic yet
 //! - No full Field Deck UI yet
 //! - No faction evolution yet
-//! - No Chronicle yet
 //! - just the first playable room
 
 use bevy::prelude::*;
@@ -88,19 +88,26 @@ struct ChronicleRuntime {
     last_preview_key: Option<String>,
     last_event: Option<String>,
     last_error: Option<String>,
+    panel_open: bool,
+    recent_events: Vec<ChronicleEventSummary>,
 }
 
 impl ChronicleRuntime {
     fn open_default() -> Self {
         match ChronicleWriter::open("chronicle") {
-            Ok(writer) => Self {
-                writer: Some(writer),
-                field_deck_raised_written: false,
-                lock_inspected_written: false,
-                last_preview_key: None,
-                last_event: None,
-                last_error: None,
-            },
+            Ok(writer) => {
+                let recent_events = writer.recent_events(6).unwrap_or_default();
+                Self {
+                    writer: Some(writer),
+                    field_deck_raised_written: false,
+                    lock_inspected_written: false,
+                    last_preview_key: None,
+                    last_event: None,
+                    last_error: None,
+                    panel_open: false,
+                    recent_events,
+                }
+            }
             Err(error) => Self {
                 writer: None,
                 field_deck_raised_written: false,
@@ -108,6 +115,8 @@ impl ChronicleRuntime {
                 last_preview_key: None,
                 last_event: None,
                 last_error: Some(error.to_string()),
+                panel_open: false,
+                recent_events: Vec::new(),
             },
         }
     }
@@ -120,6 +129,22 @@ impl ChronicleRuntime {
             Ok(hash) => {
                 self.last_event = Some(format!("{event_type} [{hash}]"));
                 self.last_error = None;
+                self.refresh_recent_events();
+            }
+            Err(error) => {
+                self.last_error = Some(error.to_string());
+            }
+        }
+    }
+
+    fn refresh_recent_events(&mut self) {
+        let Some(writer) = &self.writer else {
+            return;
+        };
+        match writer.recent_events(6) {
+            Ok(events) => {
+                self.recent_events = events;
+                self.last_error = None;
             }
             Err(error) => {
                 self.last_error = Some(error.to_string());
@@ -128,9 +153,32 @@ impl ChronicleRuntime {
     }
 }
 
+#[derive(Debug, Clone)]
+struct ChronicleEventSummary {
+    logical_time: u64,
+    event_type: String,
+    hash_prefix: String,
+    text: String,
+}
+
 #[derive(Component)]
 struct EcologyMeter {
     kind: EcologyMeterKind,
+}
+
+#[derive(Component)]
+struct SceneConsequenceVisual {
+    kind: SceneVisualKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SceneVisualKind {
+    Pump,
+    Console,
+    WillowRoots,
+    AntTrail,
+    MyceliumPatch,
+    Light,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -218,6 +266,61 @@ impl ChronicleWriter {
     fn events_path(&self) -> &Path {
         &self.events_path
     }
+
+    fn recent_events(&self, limit: usize) -> io::Result<Vec<ChronicleEventSummary>> {
+        read_recent_chronicle_events(&self.events_path, limit)
+    }
+}
+
+fn read_recent_chronicle_events(
+    path: &Path,
+    limit: usize,
+) -> io::Result<Vec<ChronicleEventSummary>> {
+    let content = fs::read_to_string(path)?;
+    let mut summaries = Vec::new();
+    for line in content.lines().filter(|line| !line.trim().is_empty()) {
+        let event: Value = serde_json::from_str(line).map_err(json_error)?;
+        let logical_time = event
+            .get("logical_time")
+            .and_then(Value::as_u64)
+            .unwrap_or_default();
+        let event_type = event
+            .get("event_type")
+            .and_then(Value::as_str)
+            .unwrap_or("UnknownEvent")
+            .to_string();
+        let hash_prefix = event
+            .get("hash")
+            .and_then(Value::as_str)
+            .map(|hash| hash.chars().take(12).collect())
+            .unwrap_or_else(|| "missing-hash".to_string());
+        let text = event
+            .get("payload")
+            .and_then(|payload| payload.get("chronicle_text"))
+            .and_then(Value::as_str)
+            .or_else(|| {
+                event
+                    .get("payload")
+                    .and_then(|payload| payload.get("repair_path"))
+                    .and_then(Value::as_str)
+            })
+            .or_else(|| {
+                event
+                    .get("payload")
+                    .and_then(|payload| payload.get("authority_state"))
+                    .and_then(Value::as_str)
+            })
+            .unwrap_or("event recorded")
+            .to_string();
+        summaries.push(ChronicleEventSummary {
+            logical_time,
+            event_type,
+            hash_prefix,
+            text,
+        });
+    }
+    let start = summaries.len().saturating_sub(limit);
+    Ok(summaries.split_off(start))
 }
 
 fn verify_chronicle_file(path: &Path) -> io::Result<(u64, String)> {
@@ -320,12 +423,15 @@ fn main() {
             Update,
             (
                 scenario_dev_controls_system,
+                chronicle_panel_toggle_system,
                 scenario_step_system,
                 interaction_system,
                 ecological_meter_system,
+                consequence_visual_system,
                 ui_visibility_system,
                 controls_overlay_system,
                 dev_panel_overlay_system,
+                chronicle_panel_system,
                 oscillating_light_system,
             )
                 .chain(),
@@ -395,6 +501,16 @@ fn scenario_dev_controls_system(
         runtime.paused = false;
         runtime.step_once = false;
         runtime.last_outcome = None;
+    }
+}
+
+fn chronicle_panel_toggle_system(
+    intents: Res<IntentFrame>,
+    mut chronicle: ResMut<ChronicleRuntime>,
+) {
+    if intents.just_pressed(InputIntent::OpenChroniclePanel) {
+        chronicle.panel_open = !chronicle.panel_open;
+        chronicle.refresh_recent_events();
     }
 }
 
@@ -493,6 +609,9 @@ fn setup(
         ..default()
     });
     commands.spawn((
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::Pump,
+        },
         InteractableTarget {
             kind: InteractableKind::PumpConsole,
             label: "Pump console",
@@ -504,6 +623,9 @@ fn setup(
 
     // Tank / Pipe
     commands.spawn((
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::MyceliumPatch,
+        },
         InteractableTarget {
             kind: InteractableKind::MyceliumPatch,
             label: "Toxin-buffering mycelium",
@@ -516,6 +638,9 @@ fn setup(
     // Console
     commands.spawn((
         Console,
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::Console,
+        },
         InteractableTarget {
             kind: InteractableKind::PumpConsole,
             label: "Dead-authority pump console",
@@ -531,6 +656,9 @@ fn setup(
         ..default()
     });
     commands.spawn((
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::WillowRoots,
+        },
         InteractableTarget {
             kind: InteractableKind::WillowRoots,
             label: "Willow root filtration",
@@ -546,6 +674,9 @@ fn setup(
         ..default()
     });
     commands.spawn((
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::AntTrail,
+        },
         InteractableTarget {
             kind: InteractableKind::AntTrail,
             label: "Rerouting ant trail",
@@ -605,6 +736,9 @@ fn setup(
         },
         Transform::from_xyz(0.0, 3.5, 0.0),
         OscillatingLight,
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::Light,
+        },
     ));
 
     // UI Root for interaction hint
@@ -742,6 +876,26 @@ fn setup(
         },
         TextColor(Color::srgb(1.0, 0.76, 0.46)),
     ));
+
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(32.0),
+            bottom: Val::Px(32.0),
+            width: Val::Px(680.0),
+            padding: UiRect::all(Val::Px(16.0)),
+            display: Display::None,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.015, 0.018, 0.028, 0.94)),
+        ChroniclePanelOverlay,
+        Text::new(""),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::srgb(0.88, 0.94, 1.0)),
+    ));
 }
 
 #[derive(Component)]
@@ -758,6 +912,9 @@ struct ControlsOverlay;
 
 #[derive(Component)]
 struct DevPanelOverlay;
+
+#[derive(Component)]
+struct ChroniclePanelOverlay;
 
 fn interaction_system(
     intents: Res<IntentFrame>,
@@ -1196,6 +1353,34 @@ fn waterworks_outcome_payload(outcome: &symtropy_basin::OldWaterworksChoiceOutco
     })
 }
 
+#[cfg(test)]
+fn write_waterworks_chronicle_sequence(
+    writer: &mut ChronicleWriter,
+    target: &InteractableTarget,
+    intervention: BasinIntervention,
+    outcome: &symtropy_basin::OldWaterworksChoiceOutcome,
+) -> io::Result<()> {
+    writer.append(
+        "FieldDeckRaised",
+        json!({
+            "deck_id": "field_deck_mk0",
+            "origin_profile": null,
+            "visor_assist_enabled": false,
+            "location_hint": "old_waterworks"
+        }),
+    )?;
+    writer.append("DeadAuthorityLockInspected", dead_authority_payload())?;
+    writer.append(
+        "RepairPathPreviewed",
+        repair_preview_payload(target, intervention),
+    )?;
+    writer.append(
+        "WaterworksOutcomeRecorded",
+        waterworks_outcome_payload(outcome),
+    )?;
+    Ok(())
+}
+
 fn outcome_class(intervention: BasinIntervention) -> &'static str {
     match intervention {
         BasinIntervention::FastMechanicalRepair => "FastMechanicalRepair",
@@ -1326,6 +1511,115 @@ fn ecological_meter_system(
     }
 }
 
+fn consequence_visual_system(
+    runtime: Res<ScenarioRuntime>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut material_query: Query<(
+        &SceneConsequenceVisual,
+        &MeshMaterial3d<StandardMaterial>,
+        &mut Transform,
+    )>,
+    mut light_query: Query<(&SceneConsequenceVisual, &mut PointLight)>,
+) {
+    let Some(outcome) = runtime.last_outcome.as_ref() else {
+        return;
+    };
+
+    for (visual, material, mut transform) in &mut material_query {
+        let color = consequence_color(outcome.intervention, visual.kind);
+        if let Some(mat) = materials.get_mut(&material.0) {
+            mat.base_color = color;
+            mat.emissive =
+                color.to_linear() * consequence_emissive(outcome.intervention, visual.kind);
+        }
+        transform.scale = consequence_scale(outcome.intervention, visual.kind, transform.scale);
+    }
+
+    for (visual, mut light) in &mut light_query {
+        if visual.kind == SceneVisualKind::Light {
+            light.color = consequence_color(outcome.intervention, SceneVisualKind::Light);
+        }
+    }
+}
+
+fn consequence_color(intervention: BasinIntervention, visual: SceneVisualKind) -> Color {
+    match intervention {
+        BasinIntervention::FastMechanicalRepair => match visual {
+            SceneVisualKind::Pump | SceneVisualKind::Console | SceneVisualKind::Light => {
+                Color::srgb(0.35, 0.85, 1.0)
+            }
+            SceneVisualKind::WillowRoots | SceneVisualKind::MyceliumPatch => {
+                Color::srgb(0.35, 0.28, 0.16)
+            }
+            SceneVisualKind::AntTrail => Color::srgb(0.85, 0.55, 0.12),
+        },
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => match visual {
+            SceneVisualKind::Pump | SceneVisualKind::Console => Color::srgb(0.45, 0.62, 0.70),
+            SceneVisualKind::WillowRoots
+            | SceneVisualKind::MyceliumPatch
+            | SceneVisualKind::Light => Color::srgb(0.18, 0.85, 0.32),
+            SceneVisualKind::AntTrail => Color::srgb(1.0, 0.78, 0.18),
+        },
+        BasinIntervention::CutWillowRoots => match visual {
+            SceneVisualKind::Pump | SceneVisualKind::Console | SceneVisualKind::Light => {
+                Color::srgb(0.92, 0.82, 0.35)
+            }
+            SceneVisualKind::WillowRoots | SceneVisualKind::MyceliumPatch => {
+                Color::srgb(0.55, 0.12, 0.08)
+            }
+            SceneVisualKind::AntTrail => Color::srgb(0.75, 0.45, 0.10),
+        },
+        BasinIntervention::DelayRepair => match visual {
+            SceneVisualKind::Light => Color::srgb(1.0, 0.55, 0.18),
+            _ => Color::srgb(0.55, 0.50, 0.42),
+        },
+        BasinIntervention::NullGreenwash => Color::srgb(0.08, 1.0, 0.42),
+        BasinIntervention::PipeLeak => Color::srgb(0.85, 0.12, 0.10),
+        BasinIntervention::WillowPlanting => Color::srgb(0.16, 0.75, 0.26),
+    }
+}
+
+fn consequence_emissive(intervention: BasinIntervention, visual: SceneVisualKind) -> f32 {
+    match (intervention, visual) {
+        (
+            BasinIntervention::FastMechanicalRepair,
+            SceneVisualKind::Pump | SceneVisualKind::Console,
+        ) => 0.25,
+        (
+            BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid,
+            SceneVisualKind::WillowRoots
+            | SceneVisualKind::MyceliumPatch
+            | SceneVisualKind::AntTrail,
+        ) => 0.30,
+        (
+            BasinIntervention::CutWillowRoots,
+            SceneVisualKind::WillowRoots | SceneVisualKind::MyceliumPatch,
+        ) => 0.10,
+        (BasinIntervention::NullGreenwash, _) => 0.35,
+        _ => 0.08,
+    }
+}
+
+fn consequence_scale(
+    intervention: BasinIntervention,
+    visual: SceneVisualKind,
+    current: Vec3,
+) -> Vec3 {
+    match (intervention, visual) {
+        (BasinIntervention::CutWillowRoots, SceneVisualKind::WillowRoots) => {
+            Vec3::new(current.x, 0.08, current.z)
+        }
+        (
+            BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid,
+            SceneVisualKind::MyceliumPatch,
+        ) => Vec3::new(current.x, current.y.max(3.4), current.z),
+        (BasinIntervention::EcologicalReroute, SceneVisualKind::AntTrail) => {
+            Vec3::new(current.x.max(4.8), current.y, current.z.max(0.24))
+        }
+        _ => current,
+    }
+}
+
 fn ui_visibility_system(
     state: Res<State<InterfaceState>>,
     mut query: Query<&mut Node, With<FieldDeckUI>>,
@@ -1434,6 +1728,60 @@ fn dev_panel_overlay_system(
     );
 }
 
+fn chronicle_panel_system(
+    chronicle: Res<ChronicleRuntime>,
+    runtime: Res<ScenarioRuntime>,
+    mut query: Query<(&mut Node, &mut Text), With<ChroniclePanelOverlay>>,
+) {
+    let Ok((mut node, mut text)) = query.single_mut() else {
+        return;
+    };
+    node.display = if chronicle.panel_open {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    if !chronicle.panel_open {
+        return;
+    }
+
+    let event_lines = if chronicle.recent_events.is_empty() {
+        "No Chronicle events recorded yet.".to_string()
+    } else {
+        chronicle
+            .recent_events
+            .iter()
+            .rev()
+            .map(|event| {
+                format!(
+                    "#{:03} {} [{}]\n  {}",
+                    event.logical_time, event.event_type, event.hash_prefix, event.text
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let outcome = runtime
+        .last_outcome
+        .as_ref()
+        .map(format_outcome)
+        .unwrap_or_else(|| "No committed repair outcome yet.".to_string());
+    let writer = chronicle
+        .writer
+        .as_ref()
+        .map(|writer| writer.events_path().display().to_string())
+        .unwrap_or_else(|| "unavailable".to_string());
+    let error = chronicle.last_error.as_deref().unwrap_or("none");
+
+    **text = format!(
+        "CHRONICLE / CIVIC EVIDENCE PANEL (C)\n\
+         Source: {writer}\n\
+         Last writer error: {error}\n\n\
+         Latest outcome:\n{outcome}\n\n\
+         Recent events:\n{event_lines}"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1509,6 +1857,63 @@ mod tests {
                 .iter()
                 .any(|warning| warning.as_str().unwrap_or("").contains("filtration"))
         );
+    }
+
+    #[test]
+    fn golden_playable_loop_writes_required_chronicle_sequence() {
+        let dir = temp_chronicle_dir("golden_loop");
+        let mut writer = ChronicleWriter::open(&dir).expect("open Chronicle writer");
+        let mut scenario = OldWaterworksScenario::new(16, 9);
+        scenario.apply(BasinIntervention::PipeLeak);
+        scenario.apply(BasinIntervention::NullGreenwash);
+        let outcome = scenario.apply_choice_and_step(BasinIntervention::EcologicalReroute, 6);
+        let target = InteractableTarget {
+            kind: InteractableKind::PumpConsole,
+            label: "Dead-authority pump console",
+        };
+
+        write_waterworks_chronicle_sequence(
+            &mut writer,
+            &target,
+            BasinIntervention::EcologicalReroute,
+            &outcome,
+        )
+        .expect("write golden sequence");
+
+        let path = dir.join("events.jsonl");
+        let (logical_time, _) = verify_chronicle_file(&path).expect("valid hash chain");
+        assert_eq!(logical_time, 4);
+
+        let lines = fs::read_to_string(&path).expect("read events");
+        let event_types: Vec<String> = lines
+            .lines()
+            .map(|line| {
+                let event: Value = serde_json::from_str(line).expect("parse event");
+                event["event_type"]
+                    .as_str()
+                    .expect("event_type")
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            event_types,
+            [
+                "FieldDeckRaised",
+                "DeadAuthorityLockInspected",
+                "RepairPathPreviewed",
+                "WaterworksOutcomeRecorded"
+            ]
+        );
+
+        let recent = read_recent_chronicle_events(&path, 2).expect("recent events");
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[1].event_type, "WaterworksOutcomeRecorded");
+        assert!(
+            recent[1].text.contains("ecological repair trajectory")
+                || recent[1].text.contains("Chronicle:")
+        );
+
+        fs::remove_dir_all(dir).ok();
     }
 
     fn temp_chronicle_dir(name: &str) -> PathBuf {
