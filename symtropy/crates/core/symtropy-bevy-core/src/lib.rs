@@ -12,9 +12,223 @@
 //! For Φ (integrated information) coupling, see the AGPL sibling crate
 //! `symtropy-bevy` — same API, adds `ConsciousnessField` integration.
 
-use bevy::prelude::*;
+use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*, window::CursorGrabMode};
 use nalgebra::SVector;
 use symtropy_physics::{CollisionEvent, PhysicsCallback, PhysicsWorld, body::BodyHandle};
+
+// --- First-person input intent spine ---
+
+/// Sensitivity defaults for first-person mouse look.
+pub const DEFAULT_MOUSE_SENSITIVITY: Vec2 = Vec2::new(0.0022, 0.0018);
+
+/// Component marking an entity as controlled by the reusable first-person spine.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct FirstPersonController {
+    pub walk_speed: f32,
+    pub field_deck_speed: f32,
+    pub sprint_multiplier: f32,
+    pub crouch_multiplier: f32,
+    pub mouse_sensitivity: Vec2,
+}
+
+impl Default for FirstPersonController {
+    fn default() -> Self {
+        Self {
+            walk_speed: 5.0,
+            field_deck_speed: 1.0,
+            sprint_multiplier: 1.65,
+            crouch_multiplier: 0.45,
+            mouse_sensitivity: DEFAULT_MOUSE_SENSITIVITY,
+        }
+    }
+}
+
+/// Centralized keyboard bindings for the default first-person control scheme.
+#[derive(Resource, Debug, Clone)]
+pub struct InputBindings {
+    pub move_forward: KeyCode,
+    pub move_back: KeyCode,
+    pub move_left: KeyCode,
+    pub move_right: KeyCode,
+    pub sprint: KeyCode,
+    pub crouch: KeyCode,
+    pub jump: KeyCode,
+    pub interact: KeyCode,
+    pub focus_inspect: KeyCode,
+    pub toggle_field_deck: KeyCode,
+    pub quick_tool: KeyCode,
+    pub repair_tool: KeyCode,
+    pub build_mode: KeyCode,
+    pub chronicle_panel: KeyCode,
+    pub basin_map: KeyCode,
+    pub scan_visualization: KeyCode,
+    pub previous_scan_mode: KeyCode,
+    pub next_scan_mode: KeyCode,
+    pub pause_or_release: KeyCode,
+    pub controls_overlay: KeyCode,
+    pub command_palette: KeyCode,
+    pub dev_scenario_panel: KeyCode,
+}
+
+impl Default for InputBindings {
+    fn default() -> Self {
+        Self {
+            move_forward: KeyCode::KeyW,
+            move_back: KeyCode::KeyS,
+            move_left: KeyCode::KeyA,
+            move_right: KeyCode::KeyD,
+            sprint: KeyCode::ShiftLeft,
+            crouch: KeyCode::ControlLeft,
+            jump: KeyCode::Space,
+            interact: KeyCode::KeyE,
+            focus_inspect: KeyCode::KeyF,
+            toggle_field_deck: KeyCode::Tab,
+            quick_tool: KeyCode::KeyQ,
+            repair_tool: KeyCode::KeyR,
+            build_mode: KeyCode::KeyB,
+            chronicle_panel: KeyCode::KeyC,
+            basin_map: KeyCode::KeyM,
+            scan_visualization: KeyCode::KeyV,
+            previous_scan_mode: KeyCode::BracketLeft,
+            next_scan_mode: KeyCode::BracketRight,
+            pause_or_release: KeyCode::Escape,
+            controls_overlay: KeyCode::F1,
+            command_palette: KeyCode::KeyK,
+            dev_scenario_panel: KeyCode::F10,
+        }
+    }
+}
+
+/// Per-frame named input state. Gameplay systems should consume this instead
+/// of reading raw keys directly.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct IntentFrame {
+    pub movement: Vec2,
+    pub look_delta: Vec2,
+    pub pressed: Vec<InputIntent>,
+    pub just_pressed: Vec<InputIntent>,
+}
+
+impl IntentFrame {
+    pub fn clear(&mut self) {
+        self.movement = Vec2::ZERO;
+        self.look_delta = Vec2::ZERO;
+        self.pressed.clear();
+        self.just_pressed.clear();
+    }
+
+    pub fn pressed(&self, intent: InputIntent) -> bool {
+        self.pressed.contains(&intent)
+    }
+
+    pub fn just_pressed(&self, intent: InputIntent) -> bool {
+        self.just_pressed.contains(&intent)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputIntent {
+    MoveForward,
+    MoveBack,
+    MoveLeft,
+    MoveRight,
+    Sprint,
+    Crouch,
+    Jump,
+    Interact,
+    FocusInspect,
+    OpenFieldDeck,
+    CycleFieldDeckModePrev,
+    CycleFieldDeckModeNext,
+    EquipToolSlot(u8),
+    QuickTool,
+    RepairTool,
+    BuildMode,
+    OpenChroniclePanel,
+    OpenBasinMap,
+    ToggleScanVisualization,
+    PauseOrRelease,
+    OpenControlsOverlay,
+    OpenCommandPalette,
+    OpenDevScenarioPanel,
+    PauseSimulation,
+    StepSimulation,
+    ResetScenario,
+    CaptureReplay,
+}
+
+#[derive(Resource, Debug, Clone)]
+pub struct ControlsState {
+    pub mode: ControlMode,
+    pub selected_tool_slot: u8,
+    pub scan_mode: ScanMode,
+    pub show_controls: bool,
+    pub show_dev_panel: bool,
+    pub mouse_captured: bool,
+}
+
+impl Default for ControlsState {
+    fn default() -> Self {
+        Self {
+            mode: ControlMode::FirstPerson,
+            selected_tool_slot: 1,
+            scan_mode: ScanMode::Ecology,
+            show_controls: false,
+            show_dev_panel: false,
+            mouse_captured: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlMode {
+    FirstPerson,
+    FieldDeck,
+    Console,
+    DevScenario,
+    Pause,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanMode {
+    Infrastructure,
+    Ecology,
+    MachineDiagnostics,
+    CivicClaims,
+    NullSignalCorruption,
+    RepairPreview,
+    ChronicleEvidence,
+}
+
+impl ScanMode {
+    pub const ALL: [ScanMode; 7] = [
+        ScanMode::Infrastructure,
+        ScanMode::Ecology,
+        ScanMode::MachineDiagnostics,
+        ScanMode::CivicClaims,
+        ScanMode::NullSignalCorruption,
+        ScanMode::RepairPreview,
+        ScanMode::ChronicleEvidence,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ScanMode::Infrastructure => "Infrastructure",
+            ScanMode::Ecology => "Ecology",
+            ScanMode::MachineDiagnostics => "Machine Diagnostics",
+            ScanMode::CivicClaims => "Civic Claims",
+            ScanMode::NullSignalCorruption => "Null / Signal Corruption",
+            ScanMode::RepairPreview => "Repair Preview",
+            ScanMode::ChronicleEvidence => "Chronicle Evidence",
+        }
+    }
+
+    pub fn offset(self, delta: isize) -> Self {
+        let current = Self::ALL.iter().position(|mode| *mode == self).unwrap_or(0) as isize;
+        let len = Self::ALL.len() as isize;
+        Self::ALL[((current + delta).rem_euclid(len)) as usize]
+    }
+}
 
 // --- Resource wrapping the physics world ---
 
@@ -96,6 +310,269 @@ impl<const D: usize> PhysicsCallback<D> for NoCouplingResource {
 }
 
 // --- Systems ---
+
+/// Translate raw keyboard/mouse state into named first-person intents.
+pub fn input_intent_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    mouse_motion: Res<AccumulatedMouseMotion>,
+    bindings: Res<InputBindings>,
+    mut intents: ResMut<IntentFrame>,
+) {
+    intents.clear();
+    intents.look_delta = mouse_motion.delta;
+
+    if keyboard.pressed(bindings.move_forward) {
+        intents.movement.y += 1.0;
+        intents.pressed.push(InputIntent::MoveForward);
+    }
+    if keyboard.pressed(bindings.move_back) {
+        intents.movement.y -= 1.0;
+        intents.pressed.push(InputIntent::MoveBack);
+    }
+    if keyboard.pressed(bindings.move_left) {
+        intents.movement.x -= 1.0;
+        intents.pressed.push(InputIntent::MoveLeft);
+    }
+    if keyboard.pressed(bindings.move_right) {
+        intents.movement.x += 1.0;
+        intents.pressed.push(InputIntent::MoveRight);
+    }
+    if keyboard.pressed(bindings.sprint) || keyboard.pressed(KeyCode::ShiftRight) {
+        intents.pressed.push(InputIntent::Sprint);
+    }
+    if keyboard.pressed(bindings.crouch) || keyboard.pressed(KeyCode::ControlRight) {
+        intents.pressed.push(InputIntent::Crouch);
+    }
+
+    macro_rules! add_just {
+        ($key:expr, $intent:expr) => {
+            if keyboard.just_pressed($key) {
+                intents.just_pressed.push($intent);
+            }
+        };
+    }
+    macro_rules! add_just_ctrl {
+        ($key:expr, $intent:expr) => {
+            if (keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight))
+                && keyboard.just_pressed($key)
+            {
+                intents.just_pressed.push($intent);
+            }
+        };
+    }
+
+    add_just!(bindings.jump, InputIntent::Jump);
+    add_just!(bindings.interact, InputIntent::Interact);
+    add_just!(bindings.focus_inspect, InputIntent::FocusInspect);
+    add_just!(bindings.toggle_field_deck, InputIntent::OpenFieldDeck);
+    add_just!(bindings.quick_tool, InputIntent::QuickTool);
+    add_just!(bindings.repair_tool, InputIntent::RepairTool);
+    add_just!(bindings.build_mode, InputIntent::BuildMode);
+    add_just!(bindings.chronicle_panel, InputIntent::OpenChroniclePanel);
+    add_just!(bindings.basin_map, InputIntent::OpenBasinMap);
+    add_just!(
+        bindings.scan_visualization,
+        InputIntent::ToggleScanVisualization
+    );
+    add_just!(
+        bindings.previous_scan_mode,
+        InputIntent::CycleFieldDeckModePrev
+    );
+    add_just!(bindings.next_scan_mode, InputIntent::CycleFieldDeckModeNext);
+    add_just!(bindings.pause_or_release, InputIntent::PauseOrRelease);
+    add_just!(bindings.controls_overlay, InputIntent::OpenControlsOverlay);
+    add_just_ctrl!(bindings.command_palette, InputIntent::OpenCommandPalette);
+    add_just!(
+        bindings.dev_scenario_panel,
+        InputIntent::OpenDevScenarioPanel
+    );
+
+    for (key, slot) in [
+        (KeyCode::Digit1, 1),
+        (KeyCode::Digit2, 2),
+        (KeyCode::Digit3, 3),
+        (KeyCode::Digit4, 4),
+        (KeyCode::Digit5, 5),
+        (KeyCode::Digit6, 6),
+    ] {
+        if keyboard.just_pressed(key) {
+            intents.just_pressed.push(InputIntent::EquipToolSlot(slot));
+        }
+    }
+
+    add_just!(KeyCode::KeyP, InputIntent::PauseSimulation);
+    add_just!(KeyCode::Period, InputIntent::StepSimulation);
+    add_just!(KeyCode::F8, InputIntent::ResetScenario);
+    add_just!(KeyCode::F9, InputIntent::CaptureReplay);
+
+    if mouse.just_pressed(MouseButton::Left) {
+        intents.just_pressed.push(InputIntent::FocusInspect);
+    }
+}
+
+/// Apply generic menu/tool/Field Deck mode changes from named intents.
+pub fn control_mode_system(intents: Res<IntentFrame>, mut controls: ResMut<ControlsState>) {
+    if intents.just_pressed(InputIntent::PauseOrRelease) {
+        controls.mode = ControlMode::Pause;
+        controls.mouse_captured = false;
+        controls.show_dev_panel = false;
+    }
+
+    if intents.just_pressed(InputIntent::OpenControlsOverlay) {
+        controls.show_controls = !controls.show_controls;
+    }
+
+    if intents.just_pressed(InputIntent::OpenDevScenarioPanel) {
+        controls.show_dev_panel = !controls.show_dev_panel;
+        controls.mode = if controls.show_dev_panel {
+            controls.mouse_captured = false;
+            ControlMode::DevScenario
+        } else {
+            controls.mouse_captured = true;
+            ControlMode::FirstPerson
+        };
+    }
+
+    if intents.just_pressed(InputIntent::OpenFieldDeck) {
+        controls.show_dev_panel = false;
+        match controls.mode {
+            ControlMode::FieldDeck => {
+                controls.mode = ControlMode::FirstPerson;
+                controls.mouse_captured = true;
+            }
+            _ => {
+                controls.mode = ControlMode::FieldDeck;
+                controls.mouse_captured = false;
+            }
+        }
+    }
+
+    if intents.just_pressed(InputIntent::CycleFieldDeckModePrev) {
+        controls.scan_mode = controls.scan_mode.offset(-1);
+    }
+    if intents.just_pressed(InputIntent::CycleFieldDeckModeNext) {
+        controls.scan_mode = controls.scan_mode.offset(1);
+    }
+
+    for intent in &intents.just_pressed {
+        match *intent {
+            InputIntent::EquipToolSlot(slot) => controls.selected_tool_slot = slot,
+            InputIntent::FocusInspect if controls.mode == ControlMode::Pause => {
+                controls.mode = ControlMode::FirstPerson;
+                controls.mouse_captured = true;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Sync the OS cursor with current first-person capture state.
+pub fn cursor_capture_system(
+    controls: Res<ControlsState>,
+    mut query: Query<&mut bevy::window::CursorOptions>,
+) {
+    if !controls.is_changed() {
+        return;
+    }
+    let Ok(mut cursor_options) = query.single_mut() else {
+        return;
+    };
+    cursor_options.visible = !controls.mouse_captured;
+    cursor_options.grab_mode = if controls.mouse_captured {
+        CursorGrabMode::Locked
+    } else {
+        CursorGrabMode::None
+    };
+}
+
+/// Move all entities carrying [`FirstPersonController`] from the current intent frame.
+pub fn first_person_move_system(
+    intents: Res<IntentFrame>,
+    time: Res<Time>,
+    controls: Res<ControlsState>,
+    mut query: Query<(&mut Transform, &FirstPersonController)>,
+) {
+    for (mut transform, controller) in &mut query {
+        let base_speed = match controls.mode {
+            ControlMode::FirstPerson => controller.walk_speed,
+            ControlMode::FieldDeck => controller.field_deck_speed,
+            ControlMode::Console | ControlMode::DevScenario | ControlMode::Pause => 0.0,
+        };
+
+        if base_speed == 0.0 {
+            continue;
+        }
+
+        let mut speed = base_speed;
+        if intents.pressed(InputIntent::Sprint) && controls.mode == ControlMode::FirstPerson {
+            speed *= controller.sprint_multiplier;
+        }
+        if intents.pressed(InputIntent::Crouch) {
+            speed *= controller.crouch_multiplier;
+        }
+
+        let mut direction =
+            *transform.forward() * intents.movement.y + *transform.right() * intents.movement.x;
+        direction.y = 0.0;
+        if direction.length_squared() > 0.0 {
+            direction = direction.normalize();
+            transform.translation += direction * speed * time.delta_secs();
+        }
+    }
+}
+
+/// Rotate first-person entities from accumulated mouse movement.
+pub fn first_person_mouse_look_system(
+    intents: Res<IntentFrame>,
+    controls: Res<ControlsState>,
+    mut query: Query<(&mut Transform, &FirstPersonController)>,
+) {
+    if !controls.mouse_captured || controls.mode != ControlMode::FirstPerson {
+        return;
+    }
+    let delta = intents.look_delta;
+    if delta == Vec2::ZERO {
+        return;
+    }
+
+    for (mut transform, controller) in &mut query {
+        let delta_yaw = -delta.x * controller.mouse_sensitivity.x;
+        let delta_pitch = -delta.y * controller.mouse_sensitivity.y;
+        let (yaw, pitch, roll) = transform.rotation.to_euler(EulerRot::YXZ);
+        let pitch_limit = std::f32::consts::FRAC_PI_2 - 0.01;
+        transform.rotation = Quat::from_euler(
+            EulerRot::YXZ,
+            yaw + delta_yaw,
+            (pitch + delta_pitch).clamp(-pitch_limit, pitch_limit),
+            roll,
+        );
+    }
+}
+
+/// Reusable first-person input plugin. Add [`FirstPersonController`] to the
+/// player/camera entity and read [`IntentFrame`] from game systems.
+#[derive(Default)]
+pub struct FirstPersonInputPlugin;
+
+impl Plugin for FirstPersonInputPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<InputBindings>()
+            .init_resource::<IntentFrame>()
+            .init_resource::<ControlsState>()
+            .add_systems(
+                Update,
+                (
+                    input_intent_system,
+                    control_mode_system,
+                    cursor_capture_system,
+                    first_person_move_system,
+                    first_person_mouse_look_system,
+                )
+                    .chain(),
+            );
+    }
+}
 
 /// Step the physics world with a generic callback `Resource`.
 ///
@@ -265,6 +742,38 @@ mod tests {
         let b = PhysicsBody::new(h, 0.5);
         assert_eq!(b.handle, h);
         assert!((b.visual_radius - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn default_input_bindings_match_first_person_spine() {
+        let bindings = InputBindings::default();
+        assert_eq!(bindings.move_forward, KeyCode::KeyW);
+        assert_eq!(bindings.interact, KeyCode::KeyE);
+        assert_eq!(bindings.toggle_field_deck, KeyCode::Tab);
+        assert_eq!(bindings.dev_scenario_panel, KeyCode::F10);
+    }
+
+    #[test]
+    fn scan_mode_cycles_deterministically() {
+        assert_eq!(ScanMode::Ecology.offset(1), ScanMode::MachineDiagnostics);
+        assert_eq!(
+            ScanMode::Infrastructure.offset(-1),
+            ScanMode::ChronicleEvidence
+        );
+    }
+
+    #[test]
+    fn intent_frame_tracks_named_intents() {
+        let mut frame = IntentFrame::default();
+        frame.pressed.push(InputIntent::Sprint);
+        frame.just_pressed.push(InputIntent::Interact);
+
+        assert!(frame.pressed(InputIntent::Sprint));
+        assert!(frame.just_pressed(InputIntent::Interact));
+
+        frame.clear();
+        assert!(!frame.pressed(InputIntent::Sprint));
+        assert!(!frame.just_pressed(InputIntent::Interact));
     }
 
     #[test]

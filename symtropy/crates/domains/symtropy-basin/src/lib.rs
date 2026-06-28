@@ -436,6 +436,49 @@ pub enum BasinIntervention {
     DelayRepair,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OldWaterworksFaction {
+    RepairGuild,
+    WatershedCommons,
+    UtilitySovereign,
+    QuarantineAuthority,
+    ArchiveWitness,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FactionStance {
+    Supports,
+    Opposes,
+    RequestsEvidence,
+    WarnsRisk,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FactionReaction {
+    pub faction: OldWaterworksFaction,
+    pub stance: FactionStance,
+    pub confidence: f32,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChronicleEvent {
+    pub tick: u64,
+    pub event: LifeSimEvent,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OldWaterworksChoiceOutcome {
+    pub tick: u64,
+    pub intervention: BasinIntervention,
+    pub basin: BasinMetrics,
+    pub events: Vec<LifeSimEvent>,
+    pub testimony: Vec<LifeTestimony>,
+    pub chronicle: Vec<ChronicleEvent>,
+    pub faction_reactions: Vec<FactionReaction>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BasinMetrics {
     pub tick: u64,
@@ -537,6 +580,21 @@ impl OldWaterworksScenario {
         self.basin.apply(intervention);
     }
 
+    pub fn apply_choice_and_step(
+        &mut self,
+        intervention: BasinIntervention,
+        settle_steps: usize,
+    ) -> OldWaterworksChoiceOutcome {
+        self.apply(intervention);
+        let steps = settle_steps.max(1);
+        let mut latest = None;
+        for _ in 0..steps {
+            latest = Some(self.step());
+        }
+        let record = latest.expect("settle_steps.max(1) guarantees a record");
+        self.choice_outcome(intervention, &record)
+    }
+
     pub fn step(&mut self) -> OldWaterworksTickRecord {
         self.basin.step();
 
@@ -632,6 +690,40 @@ impl OldWaterworksScenario {
                     .iter()
                     .map(|record| record.mycelium_exchange.toxin_buffered),
             ),
+        }
+    }
+
+    pub fn choice_outcome(
+        &self,
+        intervention: BasinIntervention,
+        record: &OldWaterworksTickRecord,
+    ) -> OldWaterworksChoiceOutcome {
+        let mut chronicle: Vec<_> = record
+            .events
+            .iter()
+            .copied()
+            .map(|event| ChronicleEvent {
+                tick: record.tick,
+                event,
+                summary: chronicle_summary(event, intervention),
+            })
+            .collect();
+        if chronicle.is_empty() {
+            let event = intervention_chronicle_event(intervention);
+            chronicle.push(ChronicleEvent {
+                tick: record.tick,
+                event,
+                summary: chronicle_summary(event, intervention),
+            });
+        }
+        OldWaterworksChoiceOutcome {
+            tick: record.tick,
+            intervention,
+            basin: record.basin,
+            events: record.events.clone(),
+            testimony: record.testimony.clone(),
+            chronicle,
+            faction_reactions: faction_reactions(intervention, record),
         }
     }
 
@@ -1378,6 +1470,150 @@ fn decay_flux(flux: MetabolicFlux) -> MetabolicFlux {
     }
 }
 
+fn chronicle_summary(event: LifeSimEvent, intervention: BasinIntervention) -> String {
+    match event {
+        LifeSimEvent::WetlandFiltering => {
+            "Chronicle: living filtration reduced toxin pressure after player intervention."
+                .to_string()
+        }
+        LifeSimEvent::TrailEstablished => {
+            "Chronicle: colony traffic formed a stable route through the waterworks.".to_string()
+        }
+        LifeSimEvent::TrailBroken => {
+            "Chronicle: colony route disruption recorded as ecological repair evidence.".to_string()
+        }
+        LifeSimEvent::SignalCorruptionDetected => {
+            "Chronicle: machine diagnostics contradicted biological field readings.".to_string()
+        }
+        LifeSimEvent::EcologicalRepairSucceeded => {
+            "Chronicle: ecological repair trajectory outperformed immediate mechanical recovery."
+                .to_string()
+        }
+        LifeSimEvent::LivingInfrastructureDisturbed => match intervention {
+            BasinIntervention::CutWillowRoots => {
+                "Chronicle: root cutting stabilized access while damaging living filtration."
+                    .to_string()
+            }
+            _ => "Chronicle: intervention disturbed living infrastructure.".to_string(),
+        },
+        LifeSimEvent::ToxinSpike => {
+            "Chronicle: toxin spike persisted in basin metabolism.".to_string()
+        }
+        LifeSimEvent::ColonyStarving => {
+            "Chronicle: colony food reserve fell below viable foraging margin.".to_string()
+        }
+        _ => format!("Chronicle: {event:?} after {intervention:?}."),
+    }
+}
+
+fn intervention_chronicle_event(intervention: BasinIntervention) -> LifeSimEvent {
+    match intervention {
+        BasinIntervention::FastMechanicalRepair => LifeSimEvent::LivingInfrastructureDisturbed,
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => {
+            LifeSimEvent::EcologicalRepairSucceeded
+        }
+        BasinIntervention::WillowPlanting => LifeSimEvent::WetlandFiltering,
+        BasinIntervention::NullGreenwash => LifeSimEvent::SignalCorruptionDetected,
+        BasinIntervention::CutWillowRoots => LifeSimEvent::LivingInfrastructureDisturbed,
+        BasinIntervention::DelayRepair => LifeSimEvent::LivingInfrastructureDisturbed,
+        BasinIntervention::PipeLeak => LifeSimEvent::ToxinSpike,
+    }
+}
+
+fn faction_reactions(
+    intervention: BasinIntervention,
+    record: &OldWaterworksTickRecord,
+) -> Vec<FactionReaction> {
+    let toxin = record.basin.toxin_load.min(1.0);
+    let recovery = record.basin.recovery_momentum;
+    let integrity = record.basin.infrastructure_integrity;
+    let corruption = record.basin.signal_corruption;
+    match intervention {
+        BasinIntervention::FastMechanicalRepair => vec![
+            reaction(
+                OldWaterworksFaction::UtilitySovereign,
+                FactionStance::Supports,
+                integrity,
+                "Water pressure and access stabilized quickly.",
+            ),
+            reaction(
+                OldWaterworksFaction::WatershedCommons,
+                FactionStance::WarnsRisk,
+                toxin,
+                "Fast repair may leave living filtration and toxin memory unresolved.",
+            ),
+        ],
+        BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => vec![
+            reaction(
+                OldWaterworksFaction::WatershedCommons,
+                FactionStance::Supports,
+                recovery,
+                "Basin recovery momentum improved through living infrastructure.",
+            ),
+            reaction(
+                OldWaterworksFaction::RepairGuild,
+                FactionStance::RequestsEvidence,
+                0.55,
+                "Repair timeline is slower and needs operational evidence.",
+            ),
+        ],
+        BasinIntervention::CutWillowRoots => vec![
+            reaction(
+                OldWaterworksFaction::UtilitySovereign,
+                FactionStance::Supports,
+                integrity,
+                "Root obstruction reduced; access risk fell.",
+            ),
+            reaction(
+                OldWaterworksFaction::ArchiveWitness,
+                FactionStance::WarnsRisk,
+                toxin,
+                "Root cutting damaged a toxin-filtering ecological witness.",
+            ),
+        ],
+        BasinIntervention::DelayRepair => vec![
+            reaction(
+                OldWaterworksFaction::ArchiveWitness,
+                FactionStance::RequestsEvidence,
+                0.70,
+                "Delay preserves evidence quality before irreversible repair.",
+            ),
+            reaction(
+                OldWaterworksFaction::RepairGuild,
+                FactionStance::Opposes,
+                1.0 - record.basin.water_trust,
+                "Delay increases settlement frustration and water-trust loss.",
+            ),
+        ],
+        BasinIntervention::NullGreenwash => vec![reaction(
+            OldWaterworksFaction::QuarantineAuthority,
+            FactionStance::WarnsRisk,
+            corruption,
+            "Null diagnostic coherence is not biological basin health.",
+        )],
+        BasinIntervention::PipeLeak | BasinIntervention::WillowPlanting => vec![reaction(
+            OldWaterworksFaction::ArchiveWitness,
+            FactionStance::RequestsEvidence,
+            0.50,
+            "Field readings should be preserved before further intervention.",
+        )],
+    }
+}
+
+fn reaction(
+    faction: OldWaterworksFaction,
+    stance: FactionStance,
+    confidence: f32,
+    summary: &str,
+) -> FactionReaction {
+    FactionReaction {
+        faction,
+        stance,
+        confidence: clamp01(confidence),
+        summary: summary.to_string(),
+    }
+}
+
 fn idx(width: usize, x: usize, y: usize) -> usize {
     y * width + x
 }
@@ -1638,6 +1874,41 @@ mod tests {
                 .flat_map(|record| &record.testimony)
                 .any(|entry| entry.channel == TestimonyChannel::Archive)
         );
+    }
+
+    #[test]
+    fn old_waterworks_choice_outcome_records_chronicle_and_faction_reactions() {
+        let mut scenario = OldWaterworksScenario::new(16, 9);
+        scenario.apply(BasinIntervention::PipeLeak);
+
+        let outcome = scenario.apply_choice_and_step(BasinIntervention::EcologicalReroute, 8);
+
+        assert_eq!(outcome.intervention, BasinIntervention::EcologicalReroute);
+        assert!(outcome.tick >= 8);
+        assert!(!outcome.faction_reactions.is_empty());
+        assert!(outcome.faction_reactions.iter().any(|reaction| {
+            reaction.faction == OldWaterworksFaction::WatershedCommons
+                && reaction.stance == FactionStance::Supports
+        }));
+        assert!(
+            outcome
+                .chronicle
+                .iter()
+                .any(|event| event.summary.starts_with("Chronicle:"))
+        );
+    }
+
+    #[test]
+    fn cut_roots_outcome_warns_about_living_filtration_damage() {
+        let mut scenario = OldWaterworksScenario::new(16, 9);
+        scenario.apply(BasinIntervention::WillowPlanting);
+
+        let outcome = scenario.apply_choice_and_step(BasinIntervention::CutWillowRoots, 4);
+
+        assert!(outcome.faction_reactions.iter().any(|reaction| {
+            reaction.faction == OldWaterworksFaction::ArchiveWitness
+                && reaction.stance == FactionStance::WarnsRisk
+        }));
     }
 
     #[test]
