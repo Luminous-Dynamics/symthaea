@@ -17356,6 +17356,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-quantum-comp"
+version = "0.1.0-alpha.10"
+
+[[package]]
 name = "symthaea-runtime"
 version = "0.1.0"
 dependencies = [
