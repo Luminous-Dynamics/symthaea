@@ -454,6 +454,7 @@ impl CognitiveLoopService {
         #[cfg(feature = "nurture")]
         let enable_nurture_attachment = config.enable_nurture_attachment;
         let enable_resonator_recall = config.enable_resonator_recall;
+        let enable_visualization = config.enable_visualization;
         let resonator_cfc_input_dim = config.cfc_config.input_dim;
         let resonator_genesis_phrase = config.genesis_phrase.clone();
         let has_primitive_processor = primitive_tier.primitive_processor.is_some();
@@ -636,11 +637,81 @@ impl CognitiveLoopService {
                 Some(pain_sender),
                 thermal_bridge_instance,
                 Some(thermal_sender),
+                #[cfg(any(
+                    feature = "humanoid",
+                    feature = "helicopter",
+                    feature = "flight",
+                    feature = "vehicle",
+                    feature = "auv",
+                    feature = "manipulator",
+                    feature = "exoskeleton",
+                    feature = "surgical",
+                    feature = "orbital",
+                    feature = "quadruped",
+                    feature = "subterranean",
+                    feature = "infrastructure",
+                    feature = "scavenger",
+                    feature = "agribot",
+                    feature = "biota",
+                    feature = "clime",
+                    feature = "phone"
+                ))]
+                None,
+                #[cfg(any(
+                    feature = "humanoid",
+                    feature = "helicopter",
+                    feature = "flight",
+                    feature = "vehicle",
+                    feature = "auv",
+                    feature = "manipulator",
+                    feature = "exoskeleton",
+                    feature = "surgical",
+                    feature = "orbital",
+                    feature = "quadruped",
+                    feature = "subterranean",
+                    feature = "infrastructure",
+                    feature = "scavenger",
+                    feature = "agribot",
+                    feature = "biota",
+                    feature = "clime",
+                    feature = "phone"
+                ))]
+                None,
+                #[cfg(any(
+                    feature = "humanoid",
+                    feature = "helicopter",
+                    feature = "flight",
+                    feature = "vehicle",
+                    feature = "auv",
+                    feature = "manipulator",
+                    feature = "exoskeleton",
+                    feature = "surgical",
+                    feature = "orbital",
+                    feature = "quadruped",
+                    feature = "subterranean",
+                    feature = "infrastructure",
+                    feature = "scavenger",
+                    feature = "agribot",
+                    feature = "biota",
+                    feature = "clime",
+                    feature = "phone"
+                ))]
+                Default::default(),
             )
         };
 
         #[cfg(feature = "jepa")]
         let jepa_input_dim = config.cfc_config.input_dim;
+
+        let mut episodic_persistence =
+            super::episodic_persistence_manager::EpisodicPersistenceManager::new(
+                phi_episodic_replay,
+            );
+        if let Some(ref path) = config.memory_db_path {
+            episodic_persistence
+                .attach_sqlite_db(path)
+                .map_err(|e| anyhow::anyhow!("failed to open memory_db_path {path:?}: {e}"))?;
+        }
 
         let service = Self {
             config,
@@ -754,13 +825,70 @@ impl CognitiveLoopService {
                     ),
                     semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
                     memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
-                    resonator_memory: None,
+                    resonator_memory: if enable_resonator_recall {
+                        let dim = resonator_cfc_input_dim; // matches compressed_state
+                        let res_config = crate::dynamics::resonator::ResonatorConfig {
+                            dim,
+                            max_iters: 50, // Real-time budget (default 100 too slow)
+                            convergence_threshold: 0.995, // Slightly relaxed for speed
+                            temperature: 0.1,
+                            bipolar: true,
+                        };
+                        let mut mem =
+                            crate::dynamics::resonator::ResonatorMemory::new(res_config, 500);
+
+                        // Helper: generate deterministic random bipolar HV from seed
+                        let make_hv = |seed: u64, d: usize| -> Vec<f32> {
+                            let mut state = seed ^ 0x9E3779B97F4A7C15; // xorshift64 seed-0 fix
+                            (0..d)
+                                .map(|_| {
+                                    state ^= state << 13;
+                                    state ^= state >> 7;
+                                    state ^= state << 17;
+                                    if state % 2 == 0 { 1.0 } else { -1.0 }
+                                })
+                                .collect()
+                        };
+
+                        let seed_base: u64 = resonator_genesis_phrase
+                            .as_ref()
+                            .map(|p| {
+                                let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
+                                genesis.domain("resonator_memory").r#gen::<u64>()
+                            })
+                            .unwrap_or(0xBE50_0A70_0000_5EED);
+
+                        // Codebook 1: "semantic" — 8 proto-symbols, grows dynamically
+                        let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
+                        for i in 0..8u64 {
+                            semantic_cb.add(
+                                &format!("proto_{i}"),
+                                make_hv(seed_base.wrapping_add(i), dim),
+                            );
+                        }
+                        mem.add_codebook(semantic_cb);
+
+                        // Codebook 2: "valence" — 3 fixed emotional poles
+                        let mut valence_cb = crate::dynamics::Codebook::new("valence");
+                        valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
+                        valence_cb.add("neutral", make_hv(seed_base.wrapping_add(101), dim));
+                        valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
+                        mem.add_codebook(valence_cb);
+
+                        // Codebook 3: "phi_level" — 3 consciousness tiers
+                        let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
+                        phi_cb.add("low", make_hv(seed_base.wrapping_add(200), dim));
+                        phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
+                        phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
+                        mem.add_codebook(phi_cb);
+
+                        Some(mem)
+                    } else {
+                        None
+                    },
                 },
                 causal_enhancer,
-                episodic_persistence:
-                    super::episodic_persistence_manager::EpisodicPersistenceManager::new(
-                        phi_episodic_replay,
-                    ),
+                episodic_persistence,
                 knowledge_manager: None,
             },
             feature_integ: super::feature_integration_manager::FeatureIntegrationManager {
@@ -822,7 +950,11 @@ impl CognitiveLoopService {
             carryover: CycleCarryover::default(),
             prefrontal,
             narrative_gwt,
-            attention_visualizer: None,
+            attention_visualizer: if enable_visualization {
+                Some(crate::visualization::AttentionVisualizer::new())
+            } else {
+                None
+            },
             sensorimotor: sensorimotor_built,
             #[cfg(feature = "voice-stt-live")]
             stt_capture: None,
@@ -1024,5 +1156,39 @@ impl CognitiveLoopService {
 
     pub fn temporal_backend(&self) -> TemporalBackend {
         self.temporal_network.backend_type()
+    }
+
+    /// Receive an interlocutor turn and route it to the BrocaManager.
+    pub fn receive_interlocutor_turn(&mut self, text: String, stance: Option<f32>) {
+        #[cfg(feature = "ssm_language")]
+        if let Some(ref mut broca) = self.language_comm.broca_manager {
+            broca.record_interlocutor_turn(super::broca_bridge::InterlocutorTurn {
+                text,
+                stance_delta: stance,
+            });
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{CognitiveLoopConfig, CognitiveLoopService};
+
+    #[test]
+    fn constructor_opens_memory_db_path() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea_constructor_memory_{}.sqlite",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+
+        let mut config = CognitiveLoopConfig::default();
+        config.memory_db_path = Some(path.to_string_lossy().into_owned());
+
+        let service = CognitiveLoopService::new(config).unwrap();
+        assert!(service.memory.episodic_persistence.db.is_some());
+
+        drop(service);
+        let _ = std::fs::remove_file(path);
     }
 }

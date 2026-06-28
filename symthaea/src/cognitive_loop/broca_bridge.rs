@@ -81,6 +81,10 @@ pub struct BrocaConsciousnessSignals {
     pub cube_quality: f32,
     /// Code channels from CodingAgent: [syntax_complexity, type_confidence, algorithm_pattern, error_likelihood]
     pub code_channels: Option<[f32; 4]>,
+    /// FEP prediction error / surprise (0..1). High = unexpected input.
+    pub fep_surprise: f32,
+    /// FEP pragmatic value (0..1). High = action is expected to reduce future surprise.
+    pub fep_pragmatic_value: f32,
 }
 
 // Re-export telemetry type from the types module.
@@ -95,6 +99,44 @@ pub struct NsmDiscourseRecord {
     pub coverage: f32,
     /// Cycle number when this generation occurred.
     pub cycle: u64,
+}
+
+/// A single turn from the conversation partner.
+#[cfg(feature = "ssm_language")]
+#[derive(Debug, Clone)]
+pub struct InterlocutorTurn {
+    /// Raw text of the partner's utterance.
+    pub text: String,
+    /// Optional stance hint: positive = agreement, negative = disagreement.
+    pub stance_delta: Option<f32>,
+}
+
+/// State tracking conversation partner's theory of mind.
+#[cfg(feature = "ssm_language")]
+#[derive(Debug, Clone)]
+pub struct TheoryOfMindState {
+    /// Tracked partner belief state vector.
+    pub partner_belief_hv: symthaea_core::hdc::ContinuousHV,
+    /// Familiarity level (0.0–1.0).
+    pub familiarity: f32,
+    /// Alignment score (-1.0–1.0).
+    pub alignment_score: f32,
+    /// Total interaction count.
+    pub interaction_count: u64,
+}
+
+#[cfg(feature = "ssm_language")]
+impl Default for TheoryOfMindState {
+    fn default() -> Self {
+        Self {
+            partner_belief_hv: symthaea_core::hdc::ContinuousHV::zero(
+                symthaea_core::hdc::HDC_DIMENSION,
+            ),
+            familiarity: 0.0,
+            alignment_score: 0.0,
+            interaction_count: 0,
+        }
+    }
 }
 
 /// Manager wrapping BrocaGenerator with consciousness gating and multi-turn context.
@@ -118,6 +160,8 @@ pub struct BrocaManager {
     /// enabling discourse coherence and topic continuity.
     /// Science: Pickering & Garrod (2004) — alignment in dialogue via shared priming.
     discourse_memory: std::collections::VecDeque<NsmDiscourseRecord>,
+    /// Theory of Mind state modeling the interlocutor's beliefs and alignment.
+    pub theory_of_mind: TheoryOfMindState,
 }
 
 #[cfg(feature = "ssm_language")]
@@ -142,6 +186,7 @@ impl BrocaManager {
             turn_count: 0,
             context_window: std::collections::VecDeque::new(),
             discourse_memory: std::collections::VecDeque::new(),
+            theory_of_mind: TheoryOfMindState::default(),
         }
     }
 
@@ -184,6 +229,16 @@ impl BrocaManager {
     /// Populates `ThoughtChannels` from the provided signals and delegates
     /// to `BrocaGenerator::generate()`.
     pub fn generate(&mut self, signals: BrocaConsciousnessSignals) -> Option<GenerationResult> {
+        let mut signals = signals;
+
+        // T1.3: Feed recurring_discourse_primes back into signals
+        let recurring = self.recurring_discourse_primes(0.4);
+        for prime in recurring {
+            if !signals.detected_primitives.contains(&prime) {
+                signals.detected_primitives.push(prime.clone());
+            }
+        }
+
         // Gate: don't generate if ethics verdict is Blocked.
         // Science: APA Ethics Code (2017) principle 3.04 — avoid harm.
         if signals.ethics_blocked {
@@ -219,6 +274,11 @@ impl BrocaManager {
             signals.meta_awareness,
             signals.coherence,
         );
+
+        // T1.8: fep_surprise → prediction_error proxy (channel 8) and fep_pragmatic_value → curiosity (channel 0)
+        channels.channels[0] = channels.channels[0] * 0.6 + signals.fep_pragmatic_value * 0.4;
+        channels.channels[8] =
+            (channels.channels[8] * 0.5 + signals.fep_surprise * 0.5).clamp(0.0, 1.0);
 
         // Wire NSM primitives into concept_count (channel 19) and domain_familiarity (channel 21).
         // Science: Wierzbicka (1996) — semantic decomposition depth correlates with domain knowledge.
@@ -259,17 +319,40 @@ impl BrocaManager {
         // Multi-turn context: use generate_continuing() after the first turn
         // to preserve CfC temporal context.
         // Pass NSM semantic HV and active primes through when available.
-        let result = if self.multi_turn_depth > 0 && self.turn_count > 0 {
-            self.generator.generate_continuing(&channels)
-        } else if signals.semantic_hv.is_some() || !signals.detected_primitives.is_empty() {
-            self.generator.generate_with_semantic(
-                &channels,
-                signals.semantic_hv.as_ref(),
-                &signals.detected_primitives,
-            )
+        let reset_state = !(self.multi_turn_depth > 0 && self.turn_count > 0);
+        let sem_hv = if reset_state {
+            signals.semantic_hv.as_ref()
         } else {
-            self.generator.generate(&channels)
+            None
         };
+        let empty_primes = Vec::new();
+        let primes = if reset_state {
+            &signals.detected_primitives
+        } else {
+            &empty_primes
+        };
+
+        // Bundle conversation context window (T1.1)
+        let context_hv = if !self.context_window.is_empty() {
+            let ctx_refs: Vec<&symthaea_core::hdc::ContinuousHV> =
+                self.context_window.iter().collect();
+            Some(symthaea_core::hdc::ContinuousHV::bundle(&ctx_refs))
+        } else {
+            None
+        };
+
+        // Encode and bundle knowledge context (T1.2)
+        let knowledge_hv = self.encode_knowledge_context(&signals.knowledge_context);
+
+        let result = self.generator.generate_full(
+            &channels,
+            sem_hv,
+            primes,
+            context_hv.as_ref(),
+            knowledge_hv.as_ref(),
+            reset_state,
+        );
+
         self.turn_count += 1;
         // Reset turn count when we exceed the context depth
         if self.multi_turn_depth > 0 && self.turn_count >= self.multi_turn_depth {
@@ -393,6 +476,40 @@ impl BrocaManager {
         self.context_window.clear();
     }
 
+    /// Encode each knowledge context string into an HDC vector via the generator's
+    /// tokenizer + embedding lookup, bundle them, and return (T1.2).
+    fn encode_knowledge_context(
+        &self,
+        facts: &[String],
+    ) -> Option<symthaea_core::hdc::ContinuousHV> {
+        if facts.is_empty() {
+            return None;
+        }
+        use symthaea_core::hdc::ContinuousHV;
+        let all_embs = self.generator.controller().token_embeddings();
+        let fact_hvs: Vec<ContinuousHV> = facts
+            .iter()
+            .filter_map(|fact| {
+                let ids = self.generator.tokenizer().encode(fact);
+                let embs: Vec<&ContinuousHV> = ids
+                    .iter()
+                    .filter_map(|&id| all_embs.get(id as usize))
+                    .collect();
+                if embs.is_empty() {
+                    None
+                } else {
+                    Some(ContinuousHV::bundle(&embs))
+                }
+            })
+            .collect();
+        if fact_hvs.is_empty() {
+            None
+        } else {
+            let refs: Vec<&ContinuousHV> = fact_hvs.iter().collect();
+            Some(ContinuousHV::bundle(&refs))
+        }
+    }
+
     /// Inject conversation history as context for topic persistence.
     ///
     /// Encodes each recent turn string into an HDC vector via the generator's
@@ -431,6 +548,45 @@ impl BrocaManager {
     /// Get the number of context vectors currently stored.
     pub fn context_depth(&self) -> usize {
         self.context_window.len()
+    }
+
+    /// Record a turn from the conversation partner, updating Theory of Mind.
+    pub fn record_interlocutor_turn(&mut self, turn: InterlocutorTurn) {
+        use symthaea_core::hdc::ContinuousHV;
+
+        // 1. Encode turn text into an HDC belief vector.
+        let token_ids = self.generator.tokenizer().encode(&turn.text);
+        let turn_hv = if token_ids.is_empty() {
+            ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION)
+        } else {
+            let all_embs = self.generator.controller().token_embeddings();
+            let embs: Vec<&ContinuousHV> = token_ids
+                .iter()
+                .filter_map(|&id| all_embs.get(id as usize))
+                .collect();
+            if embs.is_empty() {
+                ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION)
+            } else {
+                ContinuousHV::bundle(&embs)
+            }
+        };
+
+        // 2. Blend into the tracked partner belief HV with a learning rate
+        //    that scales with the number of turns (familiarity).
+        let lr = (0.10 + 0.05 * self.theory_of_mind.familiarity).clamp(0.05, 0.30);
+        self.theory_of_mind
+            .partner_belief_hv
+            .lerp_in_place(&turn_hv, 1.0 - lr, lr);
+        self.theory_of_mind.partner_belief_hv = self.theory_of_mind.partner_belief_hv.normalize();
+
+        // 3. Apply optional stance delta to shift alignment target.
+        if let Some(delta) = turn.stance_delta {
+            self.theory_of_mind.alignment_score =
+                (self.theory_of_mind.alignment_score + delta * 0.1).clamp(-1.0, 1.0);
+        }
+
+        self.theory_of_mind.familiarity = (self.theory_of_mind.familiarity + 0.02).clamp(0.0, 1.0);
+        self.theory_of_mind.interaction_count += 1;
     }
 }
 
@@ -499,5 +655,45 @@ mod tests {
         let telem = mgr.last_telemetry();
         assert_eq!(telem.nsm_primitive_count, 0);
         assert!(telem.nsm_grounding.abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_turn_based_belief_updates() {
+        let mut mgr = test_manager();
+
+        // 1. Initial State assertions
+        assert_eq!(mgr.theory_of_mind.familiarity, 0.0);
+        assert_eq!(mgr.theory_of_mind.alignment_score, 0.0);
+        assert_eq!(mgr.theory_of_mind.interaction_count, 0);
+
+        // 2. Record turn 1 (stance_delta = Some(0.5))
+        mgr.record_interlocutor_turn(InterlocutorTurn {
+            text: "Hello, let's cooperate and share some details".into(),
+            stance_delta: Some(0.5),
+        });
+
+        // 3. Assertions after turn 1
+        assert_eq!(mgr.theory_of_mind.interaction_count, 1);
+        assert!((mgr.theory_of_mind.familiarity - 0.02).abs() < 1e-5);
+        assert!((mgr.theory_of_mind.alignment_score - 0.05).abs() < 1e-5);
+
+        // Store belief vector to check drift later
+        let first_belief = mgr.theory_of_mind.partner_belief_hv.clone();
+
+        // 4. Record turn 2 (stance_delta = Some(-0.8))
+        mgr.record_interlocutor_turn(InterlocutorTurn {
+            text: "I actually completely disagree with this path".into(),
+            stance_delta: Some(-0.8),
+        });
+
+        // 5. Assertions after turn 2
+        assert_eq!(mgr.theory_of_mind.interaction_count, 2);
+        assert!((mgr.theory_of_mind.familiarity - 0.04).abs() < 1e-5);
+        // alignment_score should drift: 0.05 + (-0.8 * 0.1) = -0.03
+        assert!((mgr.theory_of_mind.alignment_score - (-0.03)).abs() < 1e-5);
+
+        let second_belief = mgr.theory_of_mind.partner_belief_hv.clone();
+        // Belief vector should change / drift
+        assert!(first_belief.similarity(&second_belief) < 1.0);
     }
 }

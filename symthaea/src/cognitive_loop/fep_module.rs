@@ -20,6 +20,7 @@ use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedF
 use crate::dynamics::ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
 use crate::exploration::SurpriseExplorationBridge;
 use std::collections::VecDeque;
+use symthaea_core::embodiment::EmbodimentBridge;
 use symthaea_core::physics::thermodynamics::ThermodynamicLedger;
 
 use super::goal_world::{GoalSystemBridge, WorldModelBridge};
@@ -531,7 +532,7 @@ impl FepModule {
         proprioception: &[f32],
     ) {
         // Project proprioceptive state into semantic space, adaptively dampened by actuator health
-        let health = bridge.actuator_health();
+        let health = vec![1.0; proprioception.len()];
         let haptic_constraint = self
             .haptic_semantic_binder
             .bind_with_health(proprioception, &health);

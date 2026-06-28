@@ -17,7 +17,7 @@
 //! - **AtomicBool guard**: Skips a new flush if a previous one is still
 //!   in progress (prevents pile-up under slow I/O).
 //! - **Cadence**: Flush every [`super::thresholds::EPISTEMIC_AUDITOR_FLUSH_CADENCE`]
-//!   cycles (prime: 1009). Wired in `cycle_phase_output.rs`.
+//!   cycles (prime: 1009). Wired in `cycle_phase_output/`.
 //!
 //! ## Schema
 //!

@@ -390,7 +390,7 @@ pub struct TemporalPhenomenalMetrics {
 //
 // # Diagnostic-only fields (serialized for dashboards, not read internally)
 //
-// These fields are populated in `cycle_phase_output.rs` and serialized via
+// These fields are populated in `cycle_phase_output/` and serialized via
 // `#[derive(Serialize)]` for API/dashboard consumers, but no internal code
 // reads them after population:
 //

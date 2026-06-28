@@ -370,6 +370,30 @@ impl CognitiveLoopService {
         #[cfg(feature = "foveation")]
         let foveation_top_confidence = fov_results.iter().map(|r| r.confidence).fold(0.0, f32::max);
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.5: Vision & Foveation Blending (Join into Cognitive Stream)
+        // ═══════════════════════════════════════════════════════════════════════
+        #[cfg(feature = "vision-manifold")]
+        {
+            let mut vision_hvs = Vec::new();
+            if let Some(ref vis_hv) = visual_hv {
+                vision_hvs.push(symthaea_core::hdc::BinaryHV::from_bipolar(
+                    vis_hv.as_slice(),
+                ));
+            }
+            #[cfg(feature = "foveation")]
+            for fov_res in &fov_results {
+                vision_hvs.push(symthaea_core::hdc::BinaryHV::from_bipolar(
+                    fov_res.semantic_hv.as_slice(),
+                ));
+            }
+            if !vision_hvs.is_empty() {
+                vision_hvs.insert(0, encoding_res.hv16_cached);
+                encoding_res.hv16_cached = symthaea_core::hdc::BinaryHV::bundle(&vision_hvs);
+                encoding_res.encoding_result.hdv = encoding_res.hv16_cached.to_continuous();
+            }
+        }
+
         Ok(PerceptionPhaseResult {
             encoding: PercEncoding {
                 encoding_result: encoding_res.encoding_result,

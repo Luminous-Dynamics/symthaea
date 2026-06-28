@@ -252,7 +252,7 @@ impl EmbodimentBridge for MotorBridge {
 
         let pred_error = if let Some(ref prev) = self.last_perception {
             let sim = perception.similarity(prev);
-            let pe: f32 = (1.0 - sim.max(0.0)).min(1.0);
+            let pe: f32 = (1.0 - (sim as f32).max(0.0)).min(1.0);
             pe
         } else {
             0.0_f32

@@ -149,19 +149,68 @@ impl CognitiveLoopService {
 
     /// Retrieve the current binding of proprioceptive state to semantic HDC space.
     pub fn get_proprioceptive_binding(&self) -> Option<Vec<f32>> {
-        self.sensorimotor
-            .embodiment_bridge
-            .as_ref()
-            .and_then(|b| b.last_perception_hv().map(|hv| hv.to_vec()))
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
+        {
+            if let Some(hv) = self
+                .sensorimotor
+                .embodiment_bridge
+                .as_ref()
+                .and_then(|b| b.last_perception_hv())
+                .or_else(|| self.sensorimotor.last_proprioceptive_hv.clone())
+            {
+                return Some(hv.to_vec());
+            }
+        }
+
+        None
     }
 
     /// Retrieve the current epistemic quality (sensorimotor accuracy) of the embodiment.
     pub fn get_epistemic_quality(&self) -> f64 {
-        self.sensorimotor
-            .embodiment_bridge
-            .as_ref()
-            .map(|b| b.sensorimotor_accuracy() as f64)
-            .unwrap_or(0.5)
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
+        {
+            if let Some(bridge) = self.sensorimotor.embodiment_bridge.as_ref() {
+                return bridge.sensorimotor_accuracy() as f64;
+            }
+        }
+
+        (1.0 - self.sensorimotor.somatic_bridge.systemic_stress()).clamp(0.0, 1.0)
     }
 
     /// Add a goal to the system

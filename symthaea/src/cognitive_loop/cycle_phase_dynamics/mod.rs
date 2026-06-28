@@ -2737,6 +2737,9 @@ impl CognitiveLoopService {
                     actions.extend(cached.iter().cloned());
                 }
 
+                // Retrieve spatial complexity from carryover quality parameters populated by GridEncoder.
+                let spatial_complexity = self.carryover.quality.last_grid_complexity;
+
                 let reasoning_ctx = ReasoningContext {
                     theory_metrics: ec_metrics,
                     phi: unified_psi,
@@ -2746,7 +2749,9 @@ impl CognitiveLoopService {
                     recent_utility: 0.5,
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
-                    epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
+                    epistemic_quality: (0.5 + 0.5 * (1.0 - spatial_complexity) as f64).clamp(0.1, 1.0), // spatial complexity modulates reasoning confidence
+                    grid_encoding_norm: self.carryover.quality.last_grid_norm as f64,
+                    grid_spatial_complexity: spatial_complexity as f64,
                     code_context: self.carryover.injected_code_context.take(),
                     negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
                     substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel::default(),
@@ -2988,6 +2993,8 @@ impl CognitiveLoopService {
             &math_result,
             semantic_lr_factor,
             module_timings,
+            fep_surprise as f32,
+            fep_pragmatic_value as f32,
         );
         // Return the training buffer for reuse next cycle (no allocation).
         self.training_state_buf = training_buf;

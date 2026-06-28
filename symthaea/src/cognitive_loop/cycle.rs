@@ -1348,7 +1348,7 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // Output phase coverage (cycle_phase_output.rs)
+    // Output phase coverage (cycle_phase_output/)
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
