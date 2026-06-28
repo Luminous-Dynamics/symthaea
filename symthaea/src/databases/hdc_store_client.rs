@@ -4,8 +4,8 @@
 //! HdcStore-backed ConsciousnessDatabase implementation.
 //!
 //! Vectors are stored in the zero-copy mmap'd HdcStore for O(1) access.
-//! Metadata (content, valence, arousal, psi, topics) is stored in an
-//! in-memory HashMap keyed by the same u64 ID hash.
+//! Metadata (content, valence, arousal, psi, topics) is kept in memory while
+//! running and persisted as a JSON sidecar keyed by the same u64 ID hash.
 //!
 //! This hybrid approach gives us:
 //! - Zero-copy vector reads (no deserialization)
@@ -18,10 +18,13 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, LshIndex, StoreConfig};
 
 use super::{DatabaseError, DatabaseStats, DbResult, MemoryRecord, MemoryType, SearchResult};
+
+const HDC_METADATA_SIDECAR_VERSION: u32 = 1;
 
 /// Hash a string ID to u64 for HdcStore keying.
 ///
@@ -34,7 +37,7 @@ fn id_to_u64(id: &str) -> u64 {
 }
 
 /// Metadata sidecar for a stored memory record (everything except the BinaryHV).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct RecordMetadata {
     id: String,
     memory_type: MemoryType,
@@ -47,6 +50,13 @@ struct RecordMetadata {
     metadata: String,
     consolidation_strength: f64,
     retrieval_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MetadataSidecar {
+    version: u32,
+    checksum_blake3: String,
+    records: Vec<RecordMetadata>,
 }
 
 impl RecordMetadata {
@@ -98,6 +108,8 @@ pub struct HdcStoreDatabase {
     id_map: RwLock<HashMap<String, u64>>,
     /// Store file path.
     path: PathBuf,
+    /// JSON sidecar path for persistent non-vector metadata.
+    metadata_path: PathBuf,
     /// Query counter for stats.
     total_queries: AtomicU64,
 }
@@ -107,6 +119,7 @@ impl HdcStoreDatabase {
     pub fn new(path: impl AsRef<Path>) -> DbResult<Self> {
         let path = path.as_ref().to_path_buf();
         let store_path = path.with_extension("hdc");
+        let metadata_path = path.with_extension("metadata.json");
 
         let store = if store_path.exists() {
             HdcStore::open(&store_path)
@@ -116,14 +129,19 @@ impl HdcStoreDatabase {
                 .map_err(|e| DatabaseError::ConnectionFailed(e.to_string()))?
         };
 
-        let lsh = LshIndex::new(10, 32, 42);
+        let (metadata, id_map) = Self::load_metadata_sidecar(&metadata_path, &store)?;
+        let mut lsh = LshIndex::new(10, 32, 42);
+        for (id_hash, hv) in store.iter_live() {
+            lsh.insert(id_hash, hv);
+        }
 
         Ok(Self {
             store: RwLock::new(store),
             lsh: RwLock::new(lsh),
-            metadata: RwLock::new(HashMap::new()),
-            id_map: RwLock::new(HashMap::new()),
+            metadata: RwLock::new(metadata),
+            id_map: RwLock::new(id_map),
             path: store_path,
+            metadata_path,
             total_queries: AtomicU64::new(0),
         })
     }
@@ -140,6 +158,114 @@ impl HdcStoreDatabase {
         ));
         Self::new(&tmp)
     }
+
+    fn load_metadata_sidecar(
+        path: &Path,
+        store: &HdcStore,
+    ) -> DbResult<(HashMap<u64, RecordMetadata>, HashMap<String, u64>)> {
+        if !path.exists() {
+            return Ok((HashMap::new(), HashMap::new()));
+        }
+
+        let bytes = std::fs::read(path).map_err(|e| {
+            DatabaseError::ConnectionFailed(format!("HdcStore metadata read failed: {e}"))
+        })?;
+        let records = match serde_json::from_slice::<MetadataSidecar>(&bytes) {
+            Ok(sidecar) => {
+                if sidecar.version != HDC_METADATA_SIDECAR_VERSION {
+                    tracing::warn!(
+                        path = %path.display(),
+                        version = sidecar.version,
+                        expected = HDC_METADATA_SIDECAR_VERSION,
+                        "Ignoring unsupported HdcStore metadata sidecar version"
+                    );
+                    Vec::new()
+                } else if Self::records_checksum(&sidecar.records)? != sidecar.checksum_blake3 {
+                    tracing::warn!(
+                        path = %path.display(),
+                        "Ignoring HdcStore metadata sidecar with checksum mismatch"
+                    );
+                    Vec::new()
+                } else {
+                    sidecar.records
+                }
+            }
+            Err(envelope_error) => match serde_json::from_slice::<Vec<RecordMetadata>>(&bytes) {
+                Ok(records) => {
+                    tracing::info!(
+                        path = %path.display(),
+                        "Loaded legacy HdcStore metadata sidecar without checksum"
+                    );
+                    records
+                }
+                Err(legacy_error) => {
+                    tracing::warn!(
+                        path = %path.display(),
+                        envelope_error = %envelope_error,
+                        legacy_error = %legacy_error,
+                        "Ignoring unreadable HdcStore metadata sidecar"
+                    );
+                    Vec::new()
+                }
+            },
+        };
+
+        let mut metadata = HashMap::with_capacity(records.len());
+        let mut id_map = HashMap::with_capacity(records.len());
+        for record in records {
+            let id_hash = id_to_u64(&record.id);
+            if store.get(id_hash).is_some() {
+                id_map.insert(record.id.clone(), id_hash);
+                metadata.insert(id_hash, record);
+            } else {
+                tracing::warn!(
+                    id = %record.id,
+                    "Ignoring HdcStore metadata entry without a live vector"
+                );
+            }
+        }
+
+        Ok((metadata, id_map))
+    }
+
+    fn records_checksum(records: &[RecordMetadata]) -> DbResult<String> {
+        let bytes = serde_json::to_vec(records).map_err(|e| {
+            DatabaseError::InsertFailed(format!("HdcStore metadata checksum encode failed: {e}"))
+        })?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
+    }
+
+    fn persist_metadata_sidecar(
+        path: &Path,
+        metadata: &HashMap<u64, RecordMetadata>,
+    ) -> DbResult<()> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                DatabaseError::InsertFailed(format!("HdcStore metadata mkdir failed: {e}"))
+            })?;
+        }
+
+        let mut records: Vec<_> = metadata.values().cloned().collect();
+        records.sort_by(|a, b| a.id.cmp(&b.id));
+        let sidecar = MetadataSidecar {
+            version: HDC_METADATA_SIDECAR_VERSION,
+            checksum_blake3: Self::records_checksum(&records)?,
+            records,
+        };
+        let bytes = serde_json::to_vec_pretty(&sidecar).map_err(|e| {
+            DatabaseError::InsertFailed(format!("HdcStore metadata encode failed: {e}"))
+        })?;
+
+        let tmp = path.with_extension("metadata.json.tmp");
+        std::fs::write(&tmp, bytes).map_err(|e| {
+            DatabaseError::InsertFailed(format!("HdcStore metadata write failed: {e}"))
+        })?;
+        std::fs::rename(&tmp, path).map_err(|e| {
+            DatabaseError::InsertFailed(format!("HdcStore metadata rename failed: {e}"))
+        })?;
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -155,6 +281,15 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
                 .store
                 .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
+            if let Some(existing) = store.get(id_hash).copied() {
+                let mut lsh = self
+                    .lsh
+                    .write()
+                    .map_err(|e| DatabaseError::Other(e.to_string()))?;
+                lsh.remove(id_hash, &existing);
+                drop(lsh);
+                store.delete(id_hash);
+            }
             store
                 .append(id_hash, &hv)
                 .map_err(|e| DatabaseError::InsertFailed(e.to_string()))?;
@@ -172,6 +307,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
                 .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             metadata.insert(id_hash, meta);
+            Self::persist_metadata_sidecar(&self.metadata_path, &metadata)?;
         }
         {
             let mut id_map = self
@@ -300,6 +436,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
                 .write()
                 .map_err(|e| DatabaseError::Other(e.to_string()))?;
             metadata.remove(&id_hash);
+            Self::persist_metadata_sidecar(&self.metadata_path, &metadata)?;
             drop(metadata);
 
             let mut id_map = self
@@ -421,6 +558,7 @@ impl super::ConsciousnessDatabase for HdcStoreDatabase {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::databases::ConsciousnessDatabase;
 
     fn make_record(id: &str, seed: u64) -> MemoryRecord {
         MemoryRecord {
@@ -521,5 +659,78 @@ mod tests {
 
         let all = db.list_all().await.unwrap();
         assert_eq!(all.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn reopen_restores_metadata_sidecar() {
+        let tmp = std::env::temp_dir().join(format!(
+            "hdc_store_reopen_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+
+        {
+            let db = HdcStoreDatabase::new(&tmp).unwrap();
+            db.store(make_record("persistent", 7)).await.unwrap();
+        }
+
+        {
+            let db = HdcStoreDatabase::new(&tmp).unwrap();
+            let restored = db.get("persistent").await.unwrap().unwrap();
+            assert_eq!(restored.content, "test content persistent");
+            assert_eq!(restored.encoding.similarity(&BinaryHV::random(7)), 1.0);
+        }
+
+        let _ = std::fs::remove_file(tmp.with_extension("hdc"));
+        let _ = std::fs::remove_file(tmp.with_extension("metadata.json"));
+    }
+
+    #[tokio::test]
+    async fn corrupt_metadata_sidecar_recovers_empty() {
+        let tmp = std::env::temp_dir().join(format!(
+            "hdc_store_corrupt_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+
+        {
+            let db = HdcStoreDatabase::new(&tmp).unwrap();
+            db.store(make_record("persistent", 9)).await.unwrap();
+        }
+
+        std::fs::write(tmp.with_extension("metadata.json"), b"{not valid json").unwrap();
+
+        {
+            let db = HdcStoreDatabase::new(&tmp).unwrap();
+            assert!(
+                db.get("persistent").await.unwrap().is_none(),
+                "corrupt metadata should not prevent reopening, but record metadata is unavailable"
+            );
+            assert_eq!(db.count().await.unwrap(), 1);
+        }
+
+        let _ = std::fs::remove_file(tmp.with_extension("hdc"));
+        let _ = std::fs::remove_file(tmp.with_extension("metadata.json"));
+    }
+
+    #[tokio::test]
+    async fn duplicate_id_replaces_record() {
+        let db = HdcStoreDatabase::in_memory().unwrap();
+        db.store(make_record("same", 1)).await.unwrap();
+
+        let mut replacement = make_record("same", 2);
+        replacement.content = "replacement".to_string();
+        db.store(replacement).await.unwrap();
+
+        assert_eq!(db.count().await.unwrap(), 1);
+        let stored = db.get("same").await.unwrap().unwrap();
+        assert_eq!(stored.content, "replacement");
+        assert_eq!(stored.encoding.similarity(&BinaryHV::random(2)), 1.0);
     }
 }
