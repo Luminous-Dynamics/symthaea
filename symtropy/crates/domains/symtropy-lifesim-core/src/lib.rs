@@ -8,6 +8,7 @@
 
 use arrow_array::{Float32Array, UInt32Array};
 use std::fmt;
+use std::ops::Range;
 
 #[cfg(feature = "wgpu")]
 pub mod wgpu_backend;
@@ -23,10 +24,16 @@ pub enum FieldLayer {
     Nutrient,
     Toxin,
     Biomass,
+    Heat,
+    Light,
+    Oxygen,
+    Disease,
+    SignalNoise,
+    NullContamination,
 }
 
 impl FieldLayer {
-    pub const COUNT: usize = 8;
+    pub const COUNT: usize = 14;
 
     pub const fn index(self) -> usize {
         match self {
@@ -38,8 +45,145 @@ impl FieldLayer {
             Self::Nutrient => 5,
             Self::Toxin => 6,
             Self::Biomass => 7,
+            Self::Heat => 8,
+            Self::Light => 9,
+            Self::Oxygen => 10,
+            Self::Disease => 11,
+            Self::SignalNoise => 12,
+            Self::NullContamination => 13,
         }
     }
+}
+
+/// Simple organism needs before any higher-order intelligence is applied.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Metabolism {
+    pub energy: f32,
+    pub hydration: f32,
+    pub oxygen_need: f32,
+    pub heat_tolerance: Range<f32>,
+    pub toxin_tolerance: f32,
+    pub hunger_rate: f32,
+    pub recovery_rate: f32,
+}
+
+impl Default for Metabolism {
+    fn default() -> Self {
+        Self {
+            energy: 1.0,
+            hydration: 1.0,
+            oxygen_need: 0.25,
+            heat_tolerance: 5.0..35.0,
+            toxin_tolerance: 0.30,
+            hunger_rate: 0.01,
+            recovery_rate: 0.02,
+        }
+    }
+}
+
+impl Metabolism {
+    pub fn stress_from_fields(&self, heat_c: f32, toxin: f32, oxygen: f32, moisture: f32) -> f32 {
+        let heat_stress = if heat_c < self.heat_tolerance.start {
+            (self.heat_tolerance.start - heat_c) / 20.0
+        } else if heat_c > self.heat_tolerance.end {
+            (heat_c - self.heat_tolerance.end) / 20.0
+        } else {
+            0.0
+        };
+        let toxin_stress = (toxin - self.toxin_tolerance).max(0.0);
+        let oxygen_stress = (self.oxygen_need - oxygen).max(0.0);
+        let hydration_stress = (self.hydration - moisture).max(0.0) * 0.25;
+        sanitize_unit(heat_stress + toxin_stress + oxygen_stress + hydration_stress)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LifeStage {
+    Seed,
+    Larva,
+    Juvenile,
+    Adult,
+    Elder,
+    Dormant,
+    Dead,
+    Decomposing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EcologicalRole {
+    Forager,
+    Decomposer,
+    Pollinator,
+    Grazer,
+    Predator,
+    Filterer,
+    Engineer,
+    Symbiont,
+    Scout,
+    Sentinel,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Disposition {
+    Thriving,
+    Stressed,
+    Disturbed,
+    Defensive,
+    Withdrawing,
+    Hostile,
+    Dormant,
+    Collapsing,
+}
+
+impl Disposition {
+    pub fn from_viability(viability: f32, stress: f32) -> Self {
+        let viability = sanitize_unit(viability);
+        let stress = sanitize_unit(stress);
+        if viability >= 0.75 && stress < 0.20 {
+            Self::Thriving
+        } else if viability >= 0.55 && stress < 0.45 {
+            Self::Stressed
+        } else if viability >= 0.40 && stress < 0.65 {
+            Self::Disturbed
+        } else if viability >= 0.30 {
+            Self::Withdrawing
+        } else {
+            Self::Collapsing
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LifeSimEvent {
+    TrailEstablished,
+    TrailBroken,
+    FoodSourceDepleted,
+    ColonyStarving,
+    ColonyRecovered,
+    WetlandFiltering,
+    ToxinSpike,
+    BloomStarted,
+    BloomCollapsed,
+    SpeciesIntroduced,
+    SpeciesBecameInvasive,
+    EcologicalRepairSucceeded,
+    EcologicalRepairBackfired,
+    SignalCorruptionDetected,
+    LivingInfrastructureDisturbed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TestimonyChannel {
+    Scan,
+    Diagnostic,
+    Civic,
+    Archive,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LifeTestimony {
+    pub channel: TestimonyChannel,
+    pub summary: String,
 }
 
 /// Dense 2D multi-channel field grid.
@@ -388,9 +532,64 @@ fn sanitize_source(value: f32) -> f32 {
     }
 }
 
+fn sanitize_unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn universal_ecology_layers_append_after_existing_layers() {
+        assert_eq!(FieldLayer::FoodPheromone.index(), 0);
+        assert_eq!(FieldLayer::Biomass.index(), 7);
+        assert_eq!(FieldLayer::Heat.index(), 8);
+        assert_eq!(FieldLayer::NullContamination.index(), FieldLayer::COUNT - 1);
+
+        let mut field = FieldGrid::new(2, 2);
+        field.set(FieldLayer::Oxygen, 1, 1, 0.72);
+        field.set(FieldLayer::SignalNoise, 0, 1, 0.31);
+
+        assert_eq!(field.get(FieldLayer::Oxygen, 1, 1), 0.72);
+        assert_eq!(field.get(FieldLayer::SignalNoise, 0, 1), 0.31);
+    }
+
+    #[test]
+    fn metabolism_reports_stress_from_environmental_fields() {
+        let metabolism = Metabolism {
+            toxin_tolerance: 0.2,
+            oxygen_need: 0.4,
+            heat_tolerance: 10.0..30.0,
+            ..Metabolism::default()
+        };
+
+        let calm = metabolism.stress_from_fields(20.0, 0.1, 0.8, 1.0);
+        let stressed = metabolism.stress_from_fields(44.0, 0.8, 0.1, 0.2);
+
+        assert_eq!(calm, 0.0);
+        assert!(stressed > 0.8);
+    }
+
+    #[test]
+    fn disposition_tracks_viability_and_stress_without_combat_identity() {
+        assert_eq!(
+            Disposition::from_viability(0.90, 0.05),
+            Disposition::Thriving
+        );
+        assert_eq!(
+            Disposition::from_viability(0.45, 0.60),
+            Disposition::Disturbed
+        );
+        assert_eq!(
+            Disposition::from_viability(0.20, 0.90),
+            Disposition::Collapsing
+        );
+    }
 
     #[test]
     fn diffusion_preserves_source_shape_and_decays() {

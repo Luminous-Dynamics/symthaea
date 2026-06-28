@@ -10,7 +10,9 @@
 
 use arrow_array::{Float32Array, UInt64Array};
 use symtropy_colony::{ColonyDebugMetrics, ColonyWorld};
-use symtropy_lifesim_core::{DiffusionParams, FieldGrid, FieldLayer};
+use symtropy_lifesim_core::{
+    DiffusionParams, FieldGrid, FieldLayer, LifeSimEvent, LifeTestimony, TestimonyChannel,
+};
 use symtropy_mycelium::{MyceliumMetrics, MyceliumWorld};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -430,6 +432,8 @@ pub enum BasinIntervention {
     WillowPlanting,
     NullGreenwash,
     DecomposerAid,
+    CutWillowRoots,
+    DelayRepair,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -468,6 +472,8 @@ pub struct OldWaterworksTickRecord {
     pub mycelium: MyceliumMetrics,
     pub colony_exchange: BasinExchangeReport,
     pub mycelium_exchange: BasinExchangeReport,
+    pub events: Vec<LifeSimEvent>,
+    pub testimony: Vec<LifeTestimony>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -547,6 +553,7 @@ impl OldWaterworksScenario {
         let mycelium_exchange = self
             .basin
             .ingest_organism_fields(BasinOrganismKind::Mycelium, &self.mycelium.fields);
+        let events = self.derive_events(&colony_exchange, &mycelium_exchange);
 
         let record = OldWaterworksTickRecord {
             tick: self.basin.tick(),
@@ -555,7 +562,11 @@ impl OldWaterworksScenario {
             mycelium: self.mycelium.metrics(),
             colony_exchange,
             mycelium_exchange,
+            events,
+            testimony: Vec::new(),
         };
+        let mut record = record;
+        record.testimony = self.derive_testimony(&record);
         self.records.push(record.clone());
         record
     }
@@ -622,6 +633,82 @@ impl OldWaterworksScenario {
                     .map(|record| record.mycelium_exchange.toxin_buffered),
             ),
         }
+    }
+
+    fn derive_events(
+        &self,
+        colony_exchange: &BasinExchangeReport,
+        mycelium_exchange: &BasinExchangeReport,
+    ) -> Vec<LifeSimEvent> {
+        let metrics = self.basin.metrics();
+        let colony = self.colony.debug_metrics();
+        let mut events = Vec::new();
+
+        if metrics.toxin_load > 0.55 {
+            events.push(LifeSimEvent::ToxinSpike);
+        }
+        if mycelium_exchange.toxin_buffered > 0.02 {
+            events.push(LifeSimEvent::WetlandFiltering);
+        }
+        if colony_exchange.signal_input > 0.02 {
+            events.push(LifeSimEvent::TrailEstablished);
+        }
+        if colony.stress > 1.0 {
+            events.push(LifeSimEvent::TrailBroken);
+        }
+        if colony.food_reserve < 10 {
+            events.push(LifeSimEvent::ColonyStarving);
+        }
+        if metrics.signal_corruption > 0.35 {
+            events.push(LifeSimEvent::SignalCorruptionDetected);
+        }
+        if metrics.recovery_momentum > 0.55 && metrics.toxin_load < 0.45 {
+            events.push(LifeSimEvent::EcologicalRepairSucceeded);
+        }
+        if metrics.infrastructure_integrity < 0.45 && metrics.extinction_debt > 0.35 {
+            events.push(LifeSimEvent::LivingInfrastructureDisturbed);
+        }
+
+        events.sort_by_key(|event| *event as u8);
+        events.dedup();
+        events
+    }
+
+    fn derive_testimony(&self, record: &OldWaterworksTickRecord) -> Vec<LifeTestimony> {
+        let mut testimony = Vec::new();
+
+        if record.colony_exchange.signal_input > 0.02 {
+            testimony.push(LifeTestimony {
+                channel: TestimonyChannel::Scan,
+                summary: "Trail coherence rising; colony has established a stable route."
+                    .to_string(),
+            });
+        }
+        if record.colony.stress > 1.0 {
+            testimony.push(LifeTestimony {
+                channel: TestimonyChannel::Diagnostic,
+                summary: "Return path disrupted; foragers are rerouting around wet toxin pressure."
+                    .to_string(),
+            });
+        }
+        if record.mycelium_exchange.toxin_buffered > 0.02 {
+            testimony.push(LifeTestimony {
+                channel: TestimonyChannel::Civic,
+                summary:
+                    "Living filtration active; mechanical repair may damage toxin-buffering tissue."
+                        .to_string(),
+            });
+        }
+        if record.basin.signal_corruption > 0.35 {
+            testimony.push(LifeTestimony {
+                channel: TestimonyChannel::Archive,
+                summary:
+                    "Machine status reports green while biological signals remain contradictory."
+                        .to_string(),
+            });
+        }
+
+        testimony
     }
 }
 
@@ -833,6 +920,46 @@ impl BasinWorld {
                 self.flux.nutrient += 1.0;
                 self.flux.carbon += 0.8;
             }
+            BasinIntervention::CutWillowRoots => {
+                for cell in &mut self.cells {
+                    cell.root_intrusion = clamp01(cell.root_intrusion - 0.18);
+                    cell.infrastructure_integrity = clamp01(cell.infrastructure_integrity + 0.10);
+                    cell.toxin_load.bioavailable = clamp01(cell.toxin_load.bioavailable + 0.08);
+                    cell.soil.carbon = clamp01(cell.soil.carbon - 0.05);
+                    cell.soil.decomposer_capacity = clamp01(cell.soil.decomposer_capacity - 0.06);
+                }
+                self.flux.labor += 1.2;
+                self.flux.biomass -= 0.8;
+                self.flux.toxin += 1.1;
+                self.add_civic_claim(EcoCivicClaim {
+                    claimant: FactionId(2),
+                    target: EcoSystemId(1),
+                    claim_type: ClaimType::AuthorizeMechanicalRepair,
+                    justification: ClaimJustification::WaterSecurity,
+                    evidence: vec![ChronicleEvidence::PipeLeakDetected],
+                    legitimacy: 0.58,
+                    opposition: vec![FactionId(1)],
+                });
+            }
+            BasinIntervention::DelayRepair => {
+                for cell in &mut self.cells {
+                    cell.water.trust = clamp01(cell.water.trust - 0.04);
+                    cell.water.standing = clamp01(cell.water.standing + 0.03);
+                    cell.toxin_load.bioavailable = clamp01(cell.toxin_load.bioavailable + 0.015);
+                    cell.soil.decomposer_capacity = clamp01(cell.soil.decomposer_capacity + 0.03);
+                }
+                self.flux.disease += 0.4;
+                self.flux.nutrient += 0.3;
+                self.add_civic_claim(EcoCivicClaim {
+                    claimant: FactionId(4),
+                    target: EcoSystemId(1),
+                    claim_type: ClaimType::RequireEvidenceReview,
+                    justification: ClaimJustification::BoundaryIntegrity,
+                    evidence: vec![ChronicleEvidence::RecoveryTrajectory],
+                    legitimacy: 0.52,
+                    opposition: vec![FactionId(2)],
+                });
+            }
         }
     }
 
@@ -1038,6 +1165,50 @@ impl BasinWorld {
                     y,
                     cell.soil.decomposer_capacity * 40.0 + cell.soil.carbon * 20.0,
                 );
+                self.fields.set(
+                    FieldLayer::Heat,
+                    x,
+                    y,
+                    cell.heat.temperature_c + cell.heat.heat_stress * 50.0,
+                );
+                self.fields.set(
+                    FieldLayer::Light,
+                    x,
+                    y,
+                    70.0 * (1.0 - cell.atmosphere.particulates),
+                );
+                self.fields.set(
+                    FieldLayer::Oxygen,
+                    x,
+                    y,
+                    100.0 * (1.0 - cell.water.standing * 0.35 - cell.toxin_load.total() * 0.15),
+                );
+                self.fields.set(
+                    FieldLayer::Disease,
+                    x,
+                    y,
+                    100.0
+                        * (cell.water.standing * 0.55
+                            + (1.0 - cell.soil.decomposer_capacity) * 0.20),
+                );
+                self.fields.set(
+                    FieldLayer::SignalNoise,
+                    x,
+                    y,
+                    100.0 * self.signal_corruption(),
+                );
+                self.fields.set(
+                    FieldLayer::NullContamination,
+                    x,
+                    y,
+                    100.0 * self.null_contamination(),
+                );
+                self.fields.set(
+                    FieldLayer::Biomass,
+                    x,
+                    y,
+                    80.0 * (cell.soil.carbon + cell.soil.decomposer_capacity) * 0.5,
+                );
             }
         }
     }
@@ -1052,6 +1223,13 @@ impl BasinWorld {
         self.fields.step_diffuse_decay(FieldLayer::Moisture, params);
         self.fields.step_diffuse_decay(FieldLayer::Toxin, params);
         self.fields.step_diffuse_decay(FieldLayer::Nutrient, params);
+        self.fields.step_diffuse_decay(FieldLayer::Heat, params);
+        self.fields.step_diffuse_decay(FieldLayer::Oxygen, params);
+        self.fields.step_diffuse_decay(FieldLayer::Disease, params);
+        self.fields
+            .step_diffuse_decay(FieldLayer::SignalNoise, params);
+        self.fields
+            .step_diffuse_decay(FieldLayer::NullContamination, params);
     }
 
     fn decay_signals(&mut self) {
@@ -1077,6 +1255,15 @@ impl BasinWorld {
         } else {
             clamp01(weighted / total)
         }
+    }
+
+    fn null_contamination(&self) -> f32 {
+        self.signals
+            .iter()
+            .filter(|signal| signal.source == SignalSource::NullSystem)
+            .map(|signal| signal.intensity * signal.corruption)
+            .sum::<f32>()
+            .min(1.0)
     }
 
     fn update_civic_legitimacy(&mut self) {
@@ -1354,6 +1541,50 @@ mod tests {
     }
 
     #[test]
+    fn basin_projects_universal_ecology_fields() {
+        let mut world = BasinWorld::old_waterworks(8, 5);
+        world.apply(BasinIntervention::PipeLeak);
+        world.apply(BasinIntervention::NullGreenwash);
+        world.run_steps(2);
+
+        let center = (world.width() / 2, world.height() / 2);
+
+        assert!(world.fields.get(FieldLayer::Heat, center.0, center.1) > 0.0);
+        assert!(world.fields.get(FieldLayer::Oxygen, center.0, center.1) > 0.0);
+        assert!(world.fields.get(FieldLayer::Disease, center.0, center.1) > 0.0);
+        assert!(
+            world
+                .fields
+                .get(FieldLayer::NullContamination, center.0, center.1)
+                > 0.0
+        );
+    }
+
+    #[test]
+    fn root_cut_and_delay_create_different_ecological_tradeoffs() {
+        let mut cut = BasinWorld::old_waterworks(12, 8);
+        cut.apply(BasinIntervention::WillowPlanting);
+        cut.apply(BasinIntervention::CutWillowRoots);
+        cut.run_steps(6);
+
+        let mut delayed = BasinWorld::old_waterworks(12, 8);
+        delayed.apply(BasinIntervention::WillowPlanting);
+        delayed.apply(BasinIntervention::DelayRepair);
+        delayed.run_steps(6);
+
+        assert!(
+            cut.metrics().infrastructure_integrity > delayed.metrics().infrastructure_integrity
+        );
+        assert!(cut.metrics().toxin_load > delayed.metrics().toxin_load);
+        assert!(
+            delayed
+                .civic_claims
+                .iter()
+                .any(|claim| claim.justification == ClaimJustification::BoundaryIntegrity)
+        );
+    }
+
+    #[test]
     fn old_waterworks_scenario_couples_basin_colony_and_mycelium() {
         let mut scenario = OldWaterworksScenario::new(16, 9);
         scenario.apply(BasinIntervention::PipeLeak);
@@ -1378,6 +1609,34 @@ mod tests {
                 .records()
                 .iter()
                 .any(|record| record.mycelium_exchange.toxin_buffered > 0.0)
+        );
+    }
+
+    #[test]
+    fn old_waterworks_scenario_emits_lifesim_events_and_testimony() {
+        let mut scenario = OldWaterworksScenario::new(16, 9);
+        scenario.apply(BasinIntervention::PipeLeak);
+        scenario.apply(BasinIntervention::NullGreenwash);
+
+        scenario.run_steps(20);
+
+        assert!(scenario.records().iter().any(|record| {
+            record
+                .events
+                .contains(&LifeSimEvent::SignalCorruptionDetected)
+        }));
+        assert!(
+            scenario
+                .records()
+                .iter()
+                .any(|record| record.events.contains(&LifeSimEvent::WetlandFiltering))
+        );
+        assert!(
+            scenario
+                .records()
+                .iter()
+                .flat_map(|record| &record.testimony)
+                .any(|entry| entry.channel == TestimonyChannel::Archive)
         );
     }
 

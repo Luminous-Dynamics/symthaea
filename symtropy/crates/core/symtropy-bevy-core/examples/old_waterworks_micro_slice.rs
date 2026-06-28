@@ -412,6 +412,8 @@ fn input_intent_system(
         (KeyCode::F5, BasinIntervention::WillowPlanting),
         (KeyCode::F6, BasinIntervention::NullGreenwash),
         (KeyCode::F7, BasinIntervention::DecomposerAid),
+        (KeyCode::F11, BasinIntervention::CutWillowRoots),
+        (KeyCode::F12, BasinIntervention::DelayRepair),
     ] {
         if keyboard.just_pressed(key) {
             intents
@@ -967,6 +969,30 @@ fn interaction_system(
             **inspect_text = "FIELD DECK ECOLOGY LINK\nAwaiting basin signal...".to_string();
             return;
         };
+        let testimony = if record.testimony.is_empty() {
+            "Life testimony: no stable interpretation yet.".to_string()
+        } else {
+            record
+                .testimony
+                .iter()
+                .take(3)
+                .map(|entry| format!("{:?}: {}", entry.channel, entry.summary))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let events = if record.events.is_empty() {
+            "Events: none".to_string()
+        } else {
+            format!(
+                "Events: {}",
+                record
+                    .events
+                    .iter()
+                    .map(|event| format!("{event:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
         **inspect_text = format!(
             "FIELD DECK ECOLOGY LINK\n\
              Mode: {} ([ / ] to cycle)\n\
@@ -977,6 +1003,8 @@ fn interaction_system(
              Colony stress: {:.2}\n\
              Mycelium toxin buffered: {:.3}\n\
              Machine status: GREEN / BIOLOGICAL STATUS: CONFLICT\n\
+             {}\n\
+             {}\n\
              C: Chronicle evidence | V: scan overlay | F: focus reading",
             controls_state.scan_mode.label(),
             controls_state.selected_tool_slot,
@@ -985,6 +1013,8 @@ fn interaction_system(
             record.basin.signal_corruption,
             record.colony.stress,
             record.mycelium_exchange.toxin_buffered,
+            events,
+            testimony,
         );
     } else {
         **inspect_text = "".to_string();
@@ -1125,6 +1155,8 @@ fn dev_panel_overlay_system(
          F7 decomposer aid\n\
          F8 reset scenario\n\
          F9 capture replay marker (intent only)\n\
+         F11 cut willow roots\n\
+         F12 delay repair for evidence review\n\
          P pause/resume simulation\n\
          . step one tick\n\n\
          Simulation paused: {}\n\
