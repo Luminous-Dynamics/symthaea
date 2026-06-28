@@ -1,0 +1,35 @@
+symthaea-visual-compression-probe v0.1.0-alpha.8
+
+Verified archive root path:
+crates/domains/symthaea-visual-compression-probe/
+
+Files:
+- CHANGELOG.md
+- Cargo.toml
+- README.md
+- docs/ALPHA3_EXPERIMENT_HARNESS.md
+- docs/ALPHA4_INTEGRATION.md
+- docs/ALPHA5_WORKSPACE_HARDENING.md
+- docs/ALPHA6_TEST_FIX.md
+- docs/ALPHA7_HASH_FIX.md
+- docs/ALPHA8_SCOPE_FIX.md
+- docs/EXPERIMENTS.md
+- docs/FORMAT.md
+- docs/LOCAL_VERIFICATION.md
+- docs/MONOREPO_INSTALL.md
+- docs/ROADMAP.md
+- examples/build_corpus.rs
+- examples/make_fixture.rs
+- fixtures/tiny_crack_scan.pgm
+- fixtures/tiny_pump_scan.pgm
+- fixtures/tiny_pump_scan_after.pgm
+- scripts/svcp-smoke.sh
+- src/bin/svcp.rs
+- src/lib.rs
+- tests/fixture_workflow.rs
+
+Alpha.8 notes:
+- fixes missing test helper compile failure from alpha.7
+- keeps alpha.7 canonical packet hash behavior
+- keeps alpha.6 PSNR infinity fix
+- no runtime codec or CLI behavior changes

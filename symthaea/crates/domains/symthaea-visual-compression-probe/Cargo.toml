@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-visual-compression-probe"
+version = "0.1.0-alpha.8"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Dependency-light probe crate for cognitive visual compression: spectral block packets, HDC signatures, and topology fingerprints."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+readme = "README.md"
+keywords = ["hdc", "compression", "topology", "vision", "symthaea"]
+categories = ["compression", "science"]
+
+[lints]
+workspace = true
+
+[lib]
+name = "symthaea_visual_compression_probe"
+path = "src/lib.rs"
+
+[[bin]]
+name = "svcp"
+path = "src/bin/svcp.rs"
+
+[dependencies]
