@@ -539,21 +539,13 @@ impl LanceMemory {
         }
 
         let table = self.table().await?;
-        let schema = memories_schema();
-
         for chunk in records.chunks(1000) {
-            let mut batches: Vec<Result<RecordBatch, ArrowError>> = Vec::with_capacity(chunk.len());
+            let mut batches: Vec<RecordBatch> = Vec::with_capacity(chunk.len());
             for record in chunk {
-                batches.push(record_to_batch(record).map_err(|e| {
-                    ArrowError::ExternalError(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    )))
-                }));
+                batches.push(record_to_batch(record)?);
             }
 
-            let reader = RecordBatchIterator::new(batches, schema.clone());
-            table.add(reader).execute().await.map_err(|e| {
+            table.add(batches).execute().await.map_err(|e| {
                 DatabaseError::InsertFailed(format!("Migration batch insert failed: {e}"))
             })?;
         }
