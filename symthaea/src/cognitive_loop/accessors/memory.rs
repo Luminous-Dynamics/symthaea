@@ -176,7 +176,7 @@ impl CognitiveLoopService {
                 .and_then(|b| b.last_perception_hv())
                 .or_else(|| self.sensorimotor.last_proprioceptive_hv.clone())
             {
-                return Some(hv.to_vec());
+                return Some(hv.values.clone());
             }
         }
 
