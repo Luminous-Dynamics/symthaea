@@ -38,9 +38,19 @@ use symtropy_bevy_core::{
 };
 use symtropy_bevy_scene::{SymtropyScenePlugin, fixed_camera};
 
-const INTERACTION_DISTANCE: f32 = 2.5;
+const OLD_WATERWORKS_ROOM: RoomScaleSpec = RoomScaleSpec {
+    half_extent: 14.0,
+    wall_height: 5.5,
+    floor_thickness: 0.2,
+    player_eye_height: 1.45,
+    player_walk_speed: 3.6,
+    player_field_deck_speed: 0.75,
+    interaction_distance: 3.0,
+};
+
+const INTERACTION_DISTANCE: f32 = OLD_WATERWORKS_ROOM.interaction_distance;
 #[cfg(test)]
-const OLD_WATERWORKS_VISIBLE_PROP_COUNT: usize = 9;
+const OLD_WATERWORKS_VISIBLE_PROP_COUNT: usize = OLD_WATERWORKS_PROP_SPECS.len();
 #[cfg(test)]
 const OLD_WATERWORKS_MATERIAL_PALETTE: &[&str] = &[
     "dry_concrete",
@@ -53,6 +63,91 @@ const OLD_WATERWORKS_MATERIAL_PALETTE: &[&str] = &[
     "chronicle_seal",
     "field_deck_scanline",
 ];
+
+const OLD_WATERWORKS_PROP_SPECS: &[ScenePropSpec] = &[
+    ScenePropSpec {
+        label: "overhead pipe",
+        position: [-1.0, 3.65, -12.6],
+        scale: [19.0, 0.18, 0.18],
+        material: SceneMaterialSlot::PaintedSteel,
+    },
+    ScenePropSpec {
+        label: "rust leak pipe",
+        position: [-12.6, 2.1, -1.0],
+        scale: [0.18, 0.18, 14.5],
+        material: SceneMaterialSlot::RustedMetal,
+    },
+    ScenePropSpec {
+        label: "valve wheel crossbar",
+        position: [-8.2, 1.65, -5.4],
+        scale: [0.10, 0.9, 0.10],
+        material: SceneMaterialSlot::WarningStripe,
+    },
+    ScenePropSpec {
+        label: "walkway grate",
+        position: [3.5, 0.03, -7.3],
+        scale: [7.0, 0.05, 1.2],
+        material: SceneMaterialSlot::PaintedSteel,
+    },
+    ScenePropSpec {
+        label: "warning sign",
+        position: [6.8, 2.0, -13.85],
+        scale: [2.2, 0.75, 0.05],
+        material: SceneMaterialSlot::WarningStripe,
+    },
+    ScenePropSpec {
+        label: "waterline stain",
+        position: [-13.86, 0.85, 1.0],
+        scale: [0.04, 0.24, 17.0],
+        material: SceneMaterialSlot::StainedConcrete,
+    },
+    ScenePropSpec {
+        label: "repair crate",
+        position: [5.8, 0.35, 5.2],
+        scale: [1.2, 0.7, 0.9],
+        material: SceneMaterialSlot::PaintedSteel,
+    },
+    ScenePropSpec {
+        label: "exposed conduit",
+        position: [12.5, 2.55, 3.8],
+        scale: [0.12, 0.12, 5.4],
+        material: SceneMaterialSlot::RustedMetal,
+    },
+    ScenePropSpec {
+        label: "field deck scan plane",
+        position: [-2.0, 2.25, -0.85],
+        scale: [2.6, 0.04, 1.7],
+        material: SceneMaterialSlot::Scanline,
+    },
+];
+
+#[derive(Debug, Clone, Copy)]
+struct RoomScaleSpec {
+    half_extent: f32,
+    wall_height: f32,
+    floor_thickness: f32,
+    player_eye_height: f32,
+    player_walk_speed: f32,
+    player_field_deck_speed: f32,
+    interaction_distance: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ScenePropSpec {
+    label: &'static str,
+    position: [f32; 3],
+    scale: [f32; 3],
+    material: SceneMaterialSlot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SceneMaterialSlot {
+    PaintedSteel,
+    RustedMetal,
+    WarningStripe,
+    StainedConcrete,
+    Scanline,
+}
 
 #[derive(Component)]
 struct Player;
@@ -640,6 +735,38 @@ fn oscillating_light_system(
     }
 }
 
+struct SceneMaterialHandles {
+    painted_steel: Handle<StandardMaterial>,
+    rusted_metal: Handle<StandardMaterial>,
+    warning_stripe: Handle<StandardMaterial>,
+    stained_concrete: Handle<StandardMaterial>,
+    scanline: Handle<StandardMaterial>,
+}
+
+impl SceneMaterialHandles {
+    fn get(&self, slot: SceneMaterialSlot) -> Handle<StandardMaterial> {
+        match slot {
+            SceneMaterialSlot::PaintedSteel => self.painted_steel.clone(),
+            SceneMaterialSlot::RustedMetal => self.rusted_metal.clone(),
+            SceneMaterialSlot::WarningStripe => self.warning_stripe.clone(),
+            SceneMaterialSlot::StainedConcrete => self.stained_concrete.clone(),
+            SceneMaterialSlot::Scanline => self.scanline.clone(),
+        }
+    }
+}
+
+fn vec3(values: [f32; 3]) -> Vec3 {
+    Vec3::new(values[0], values[1], values[2])
+}
+
+fn old_waterworks_controller() -> FirstPersonController {
+    FirstPersonController {
+        walk_speed: OLD_WATERWORKS_ROOM.player_walk_speed,
+        field_deck_speed: OLD_WATERWORKS_ROOM.player_field_deck_speed,
+        ..default()
+    }
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -705,6 +832,13 @@ fn setup(
         alpha_mode: AlphaMode::Blend,
         ..default()
     });
+    let material_handles = SceneMaterialHandles {
+        painted_steel: painted_steel_mat.clone(),
+        rusted_metal: rusted_metal_mat.clone(),
+        warning_stripe: warning_stripe_mat.clone(),
+        stained_concrete: stained_concrete_mat.clone(),
+        scanline: scanline_mat.clone(),
+    };
 
     // Meshes
     let cube_mesh = meshes.add(Cuboid::default());
@@ -713,17 +847,24 @@ fn setup(
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(wet_concrete_mat.clone()),
-        Transform::from_xyz(0.0, -0.1, 0.0).with_scale(Vec3::new(20.0, 0.2, 20.0)),
+        Transform::from_xyz(0.0, -OLD_WATERWORKS_ROOM.floor_thickness * 0.5, 0.0).with_scale(
+            Vec3::new(
+                OLD_WATERWORKS_ROOM.half_extent * 2.0,
+                OLD_WATERWORKS_ROOM.floor_thickness,
+                OLD_WATERWORKS_ROOM.half_extent * 2.0,
+            ),
+        ),
     ));
 
     // Walls
-    let wall_height = 4.0;
+    let wall_height = OLD_WATERWORKS_ROOM.wall_height;
+    let half_extent = OLD_WATERWORKS_ROOM.half_extent;
     // North
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(stained_concrete_mat.clone()),
-        Transform::from_xyz(0.0, wall_height / 2.0, -10.0).with_scale(Vec3::new(
-            20.0,
+        Transform::from_xyz(0.0, wall_height / 2.0, -half_extent).with_scale(Vec3::new(
+            half_extent * 2.0,
             wall_height,
             0.2,
         )),
@@ -732,8 +873,8 @@ fn setup(
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(dry_concrete_mat.clone()),
-        Transform::from_xyz(0.0, wall_height / 2.0, 10.0).with_scale(Vec3::new(
-            20.0,
+        Transform::from_xyz(0.0, wall_height / 2.0, half_extent).with_scale(Vec3::new(
+            half_extent * 2.0,
             wall_height,
             0.2,
         )),
@@ -742,20 +883,20 @@ fn setup(
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(dry_concrete_mat.clone()),
-        Transform::from_xyz(10.0, wall_height / 2.0, 0.0).with_scale(Vec3::new(
+        Transform::from_xyz(half_extent, wall_height / 2.0, 0.0).with_scale(Vec3::new(
             0.2,
             wall_height,
-            20.0,
+            half_extent * 2.0,
         )),
     ));
     // West
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(stained_concrete_mat.clone()),
-        Transform::from_xyz(-10.0, wall_height / 2.0, 0.0).with_scale(Vec3::new(
+        Transform::from_xyz(-half_extent, wall_height / 2.0, 0.0).with_scale(Vec3::new(
             0.2,
             wall_height,
-            20.0,
+            half_extent * 2.0,
         )),
     ));
 
@@ -803,67 +944,12 @@ fn setup(
     ));
 
     // Low-cost silhouettes and decals for the material truth pass.
-    let prop_specs = [
-        (
-            "overhead pipe",
-            Vec3::new(-1.0, 3.05, -8.8),
-            Vec3::new(14.0, 0.18, 0.18),
-            painted_steel_mat.clone(),
-        ),
-        (
-            "rust leak pipe",
-            Vec3::new(-8.8, 1.9, -1.0),
-            Vec3::new(0.18, 0.18, 10.5),
-            rusted_metal_mat.clone(),
-        ),
-        (
-            "valve wheel crossbar",
-            Vec3::new(-6.2, 1.65, -4.5),
-            Vec3::new(0.10, 0.9, 0.10),
-            warning_stripe_mat.clone(),
-        ),
-        (
-            "walkway grate",
-            Vec3::new(2.5, 0.03, -5.8),
-            Vec3::new(5.5, 0.05, 1.2),
-            painted_steel_mat.clone(),
-        ),
-        (
-            "warning sign",
-            Vec3::new(5.5, 1.8, -9.85),
-            Vec3::new(2.2, 0.75, 0.05),
-            warning_stripe_mat.clone(),
-        ),
-        (
-            "waterline stain",
-            Vec3::new(-9.86, 0.85, 1.0),
-            Vec3::new(0.04, 0.24, 12.0),
-            stained_concrete_mat.clone(),
-        ),
-        (
-            "repair crate",
-            Vec3::new(4.2, 0.35, 3.8),
-            Vec3::new(1.2, 0.7, 0.9),
-            painted_steel_mat.clone(),
-        ),
-        (
-            "exposed conduit",
-            Vec3::new(8.9, 2.35, 2.8),
-            Vec3::new(0.12, 0.12, 4.0),
-            rusted_metal_mat.clone(),
-        ),
-        (
-            "field deck scan plane",
-            Vec3::new(-2.0, 2.25, -0.85),
-            Vec3::new(2.6, 0.04, 1.7),
-            scanline_mat.clone(),
-        ),
-    ];
-    for (_label, position, scale, material) in prop_specs {
+    for spec in OLD_WATERWORKS_PROP_SPECS {
         commands.spawn((
+            Name::new(spec.label),
             Mesh3d(cube_mesh.clone()),
-            MeshMaterial3d(material),
-            Transform::from_translation(position).with_scale(scale),
+            MeshMaterial3d(material_handles.get(spec.material)),
+            Transform::from_translation(vec3(spec.position)).with_scale(vec3(spec.scale)),
         ));
     }
 
@@ -873,7 +959,7 @@ fn setup(
         },
         Mesh3d(cube_mesh.clone()),
         MeshMaterial3d(dirty_water_mat),
-        Transform::from_xyz(0.5, 0.02, 2.8).with_scale(Vec3::new(7.5, 0.04, 3.2)),
+        Transform::from_xyz(0.5, 0.02, 3.8).with_scale(Vec3::new(10.0, 0.04, 4.0)),
     ));
 
     commands.spawn((
@@ -957,8 +1043,11 @@ fn setup(
     // Player/Camera
     commands.spawn((
         Player,
-        FirstPersonController::default(),
-        fixed_camera(Vec3::new(0.0, 1.7, 5.0), Vec3::new(0.0, 1.7, 0.0)),
+        old_waterworks_controller(),
+        fixed_camera(
+            Vec3::new(0.0, OLD_WATERWORKS_ROOM.player_eye_height, 7.0),
+            Vec3::new(0.0, OLD_WATERWORKS_ROOM.player_eye_height, 0.0),
+        ),
     ));
 
     // Light source (additional to the sun)
@@ -2403,6 +2492,35 @@ mod tests {
                 .iter()
                 .any(|material| material.contains("magenta") || material.contains("missing"))
         );
+    }
+
+    #[test]
+    fn old_waterworks_room_scale_keeps_first_person_space_readable() {
+        assert!(OLD_WATERWORKS_ROOM.half_extent >= 14.0);
+        assert!(OLD_WATERWORKS_ROOM.wall_height >= 5.0);
+        assert!(OLD_WATERWORKS_ROOM.player_eye_height <= 1.5);
+        assert!(OLD_WATERWORKS_ROOM.player_walk_speed <= 4.0);
+        assert!(OLD_WATERWORKS_ROOM.interaction_distance >= 3.0);
+    }
+
+    #[test]
+    fn old_waterworks_scene_props_stay_inside_room_bounds() {
+        for spec in OLD_WATERWORKS_PROP_SPECS {
+            let [x, _, z] = spec.position;
+            let [sx, _, sz] = spec.scale;
+            let max_x = x.abs() + sx * 0.5;
+            let max_z = z.abs() + sz * 0.5;
+            assert!(
+                max_x <= OLD_WATERWORKS_ROOM.half_extent,
+                "{} exceeds x bounds: {max_x}",
+                spec.label
+            );
+            assert!(
+                max_z <= OLD_WATERWORKS_ROOM.half_extent,
+                "{} exceeds z bounds: {max_z}",
+                spec.label
+            );
+        }
     }
 
     fn temp_chronicle_dir(name: &str) -> PathBuf {
