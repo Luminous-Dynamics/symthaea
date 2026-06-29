@@ -43,6 +43,7 @@ const OLD_WATERWORKS_ROOM: RoomScaleSpec = RoomScaleSpec {
     wall_height: 5.5,
     floor_thickness: 0.2,
     player_eye_height: 1.45,
+    player_radius: 0.45,
     player_walk_speed: 3.6,
     player_field_deck_speed: 0.75,
     interaction_distance: 3.0,
@@ -127,6 +128,7 @@ struct RoomScaleSpec {
     wall_height: f32,
     floor_thickness: f32,
     player_eye_height: f32,
+    player_radius: f32,
     player_walk_speed: f32,
     player_field_deck_speed: f32,
     interaction_distance: f32,
@@ -627,6 +629,7 @@ fn main() {
             )
                 .chain(),
         )
+        .add_systems(PostUpdate, player_room_bounds_system)
         .run();
 }
 
@@ -724,6 +727,20 @@ fn chronicle_panel_toggle_system(
     }
 }
 
+fn clamp_to_old_waterworks_room(mut position: Vec3) -> Vec3 {
+    let bound = OLD_WATERWORKS_ROOM.half_extent - OLD_WATERWORKS_ROOM.player_radius;
+    position.x = position.x.clamp(-bound, bound);
+    position.z = position.z.clamp(-bound, bound);
+    position.y = OLD_WATERWORKS_ROOM.player_eye_height;
+    position
+}
+
+fn player_room_bounds_system(mut query: Query<&mut Transform, With<Player>>) {
+    for mut transform in &mut query {
+        transform.translation = clamp_to_old_waterworks_room(transform.translation);
+    }
+}
+
 fn oscillating_light_system(
     time: Res<Time>,
     mut query: Query<&mut PointLight, With<OscillatingLight>>,
@@ -767,6 +784,42 @@ fn old_waterworks_controller() -> FirstPersonController {
     }
 }
 
+fn old_waterworks_material(base_color: Color) -> StandardMaterial {
+    StandardMaterial {
+        base_color,
+        unlit: true,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
+        ..default()
+    }
+}
+
+fn old_waterworks_emissive_material(base_color: Color, emissive_strength: f32) -> StandardMaterial {
+    StandardMaterial {
+        base_color,
+        emissive: base_color.to_linear() * emissive_strength,
+        unlit: true,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
+        ..default()
+    }
+}
+
+fn old_waterworks_translucent_material(
+    base_color: Color,
+    emissive_strength: f32,
+) -> StandardMaterial {
+    StandardMaterial {
+        base_color,
+        emissive: base_color.to_linear() * emissive_strength,
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
+        ..default()
+    }
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -774,64 +827,32 @@ fn setup(
 ) {
     // Deliberate procedural material palette. The playable slice must not depend
     // on missing texture fallback colors to communicate the room.
-    let dry_concrete_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.30, 0.31, 0.30),
-        perceptual_roughness: 0.92,
-        ..default()
-    });
-    let wet_concrete_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.13, 0.15, 0.16),
-        perceptual_roughness: 0.78,
-        reflectance: 0.22,
-        ..default()
-    });
-    let stained_concrete_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.18, 0.23, 0.18),
-        perceptual_roughness: 0.96,
-        ..default()
-    });
-    let rusted_metal_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.54, 0.20, 0.09),
-        metallic: 0.35,
-        perceptual_roughness: 0.88,
-        ..default()
-    });
-    let painted_steel_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.23, 0.34, 0.38),
-        metallic: 0.45,
-        perceptual_roughness: 0.65,
-        ..default()
-    });
-    let console_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.22, 0.27, 0.24),
-        emissive: Color::srgb(0.02, 0.10, 0.08).to_linear() * 0.08,
-        metallic: 0.2,
-        perceptual_roughness: 0.7,
-        ..default()
-    });
-    let warning_stripe_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.92, 0.68, 0.10),
-        emissive: Color::srgb(0.24, 0.14, 0.01).to_linear() * 0.08,
-        ..default()
-    });
-    let dirty_water_mat = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.05, 0.12, 0.13, 0.72),
-        alpha_mode: AlphaMode::Blend,
-        perceptual_roughness: 0.42,
-        reflectance: 0.35,
-        ..default()
-    });
-    let chronicle_seal_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.95, 0.74, 0.18),
-        emissive: Color::srgb(0.95, 0.55, 0.12).to_linear() * 0.45,
-        ..default()
-    });
-    let scanline_mat = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.18, 0.72, 1.0, 0.58),
-        emissive: Color::srgb(0.08, 0.45, 1.0).to_linear() * 0.35,
-        alpha_mode: AlphaMode::Blend,
-        ..default()
-    });
+    let dry_concrete_mat = materials.add(old_waterworks_material(Color::srgb(0.30, 0.31, 0.30)));
+    let wet_concrete_mat = materials.add(old_waterworks_material(Color::srgb(0.13, 0.15, 0.16)));
+    let stained_concrete_mat =
+        materials.add(old_waterworks_material(Color::srgb(0.18, 0.23, 0.18)));
+    let rusted_metal_mat = materials.add(old_waterworks_material(Color::srgb(0.54, 0.20, 0.09)));
+    let painted_steel_mat = materials.add(old_waterworks_material(Color::srgb(0.23, 0.34, 0.38)));
+    let console_mat = materials.add(old_waterworks_emissive_material(
+        Color::srgb(0.22, 0.27, 0.24),
+        0.08,
+    ));
+    let warning_stripe_mat = materials.add(old_waterworks_emissive_material(
+        Color::srgb(0.92, 0.68, 0.10),
+        0.08,
+    ));
+    let dirty_water_mat = materials.add(old_waterworks_translucent_material(
+        Color::srgba(0.05, 0.12, 0.13, 0.72),
+        0.02,
+    ));
+    let chronicle_seal_mat = materials.add(old_waterworks_emissive_material(
+        Color::srgb(0.95, 0.74, 0.18),
+        0.45,
+    ));
+    let scanline_mat = materials.add(old_waterworks_translucent_material(
+        Color::srgba(0.18, 0.72, 1.0, 0.58),
+        0.35,
+    ));
     let material_handles = SceneMaterialHandles {
         painted_steel: painted_steel_mat.clone(),
         rusted_metal: rusted_metal_mat.clone(),
@@ -971,11 +992,10 @@ fn setup(
         Transform::from_xyz(-0.65, 2.18, -2.95).with_scale(Vec3::new(0.55, 0.08, 0.35)),
     ));
 
-    let willow_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.22, 0.36, 0.12),
-        emissive: Color::srgb(0.12, 0.20, 0.06).to_linear() * 0.08,
-        ..default()
-    });
+    let willow_mat = materials.add(old_waterworks_emissive_material(
+        Color::srgb(0.22, 0.36, 0.12),
+        0.08,
+    ));
     commands.spawn((
         SceneConsequenceVisual {
             kind: SceneVisualKind::WillowRoots,
@@ -989,11 +1009,10 @@ fn setup(
         Transform::from_xyz(1.5, 0.25, -2.5).with_scale(Vec3::new(3.0, 0.2, 0.35)),
     ));
 
-    let ant_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.9, 0.65, 0.18),
-        emissive: Color::srgb(0.9, 0.45, 0.10).to_linear() * 0.12,
-        ..default()
-    });
+    let ant_mat = materials.add(old_waterworks_emissive_material(
+        Color::srgb(0.9, 0.65, 0.18),
+        0.12,
+    ));
     commands.spawn((
         SceneConsequenceVisual {
             kind: SceneVisualKind::AntTrail,
@@ -1027,11 +1046,7 @@ fn setup(
         ),
     ];
     for (kind, position, color) in meter_specs {
-        let material = materials.add(StandardMaterial {
-            base_color: color,
-            emissive: color.to_linear() * 0.08,
-            ..default()
-        });
+        let material = materials.add(old_waterworks_emissive_material(color, 0.08));
         commands.spawn((
             EcologyMeter { kind },
             Mesh3d(cube_mesh.clone()),
@@ -2495,12 +2510,35 @@ mod tests {
     }
 
     #[test]
+    fn old_waterworks_material_helpers_are_unlit_and_not_magenta() {
+        for material in [
+            old_waterworks_material(Color::srgb(0.30, 0.31, 0.30)),
+            old_waterworks_emissive_material(Color::srgb(0.54, 0.20, 0.09), 0.1),
+            old_waterworks_translucent_material(Color::srgba(0.05, 0.12, 0.13, 0.72), 0.1),
+        ] {
+            assert!(material.unlit);
+            let color = material.base_color.to_srgba();
+            let looks_like_magenta = color.red > 0.8 && color.green < 0.25 && color.blue > 0.8;
+            assert!(!looks_like_magenta);
+        }
+    }
+
+    #[test]
     fn old_waterworks_room_scale_keeps_first_person_space_readable() {
         assert!(OLD_WATERWORKS_ROOM.half_extent >= 14.0);
         assert!(OLD_WATERWORKS_ROOM.wall_height >= 5.0);
         assert!(OLD_WATERWORKS_ROOM.player_eye_height <= 1.5);
         assert!(OLD_WATERWORKS_ROOM.player_walk_speed <= 4.0);
         assert!(OLD_WATERWORKS_ROOM.interaction_distance >= 3.0);
+    }
+
+    #[test]
+    fn old_waterworks_room_bounds_clamp_player_inside_walls() {
+        let clamped = clamp_to_old_waterworks_room(Vec3::new(999.0, 99.0, -999.0));
+        let bound = OLD_WATERWORKS_ROOM.half_extent - OLD_WATERWORKS_ROOM.player_radius;
+        assert_eq!(clamped.x, bound);
+        assert_eq!(clamped.z, -bound);
+        assert_eq!(clamped.y, OLD_WATERWORKS_ROOM.player_eye_height);
     }
 
     #[test]
