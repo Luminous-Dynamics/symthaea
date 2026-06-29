@@ -78,6 +78,33 @@ pub fn golden_count() -> usize {
     26
 }
 
+pub const HARVEST_PROMPTS: &[&str] = &[
+    "set up postgresql with pgvector",
+    "configure postgresql service",
+    "enable nginx web server",
+    "enable redis cache server",
+    "enable docker and add my user to the docker group",
+    "set up ipfs kubo node",
+    "enable tailscale VPN",
+    "configure prometheus monitoring",
+    "grafana dashboard server",
+    "configure CUPS printing service",
+    "enable systemd-resolved for DNS",
+    "configure nvidia gpu drivers",
+    "enable nvidia hardware acceleration",
+    "set up sway window manager",
+    "enable kde plasma desktop environment",
+    "enable hyprland wayland compositor",
+    "set up hyprland with fonts",
+    "set up gnome desktop environment",
+    "open firewall ports 80 and 443",
+    "open port 8080 in firewall",
+    "open udp port 51820 for wireguard",
+    "set up a rust dev environment with rust-analyzer and mold",
+    "rust dev shell with sccache and openssl",
+    "set up a node development environment with typescript",
+];
+
 // ── Service goldens ───────────────────────────────────────────────────────
 
 const POSTGRESQL_PGVECTOR: &str = r#"{ config, pkgs, ... }:
