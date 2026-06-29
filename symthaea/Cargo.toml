@@ -13,6 +13,8 @@ exclude = [
     "crates/symthaea-zkproof/host",
     "crates/symthaea-muse-wasm",
     "crates/symthaea-spore/fuzz",
+    "crates/domains/spark-engine",
+    "crates/domains/symthaea-lab",
 ]
 default-members = [
     "xtask",
@@ -31,6 +33,7 @@ wasm = ["symthaea-spore", "symthaea-web"]
 robotics = ["symthaea-multirotor", "symthaea-helicopter", "symthaea-humanoid", "symthaea-auv"]
 engineering = [
     "symthaea-sim-bridge",
+    "symthaea-control",
     "symthaea-digital-twin",
     "symthaea-formal-safety",
     "symthaea-engineering",
@@ -58,6 +61,8 @@ nonsensical_open_options = "deny"
 unused_io_amount = "deny"
 
 [workspace.dependencies]
+log = "0.4"
+url = "2.5"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 getrandom = "0.2"
 mycelix-zkp-core = { path = "../mycelix-workspace/crates/mycelix-zkp-core", features = ["dilithium"] }
@@ -76,8 +81,8 @@ iceoryx2 = "0.9"
 z3 = { version = "0.12", features = ["static-link-z3"] }
 candle-core = { version = "0.8", default-features = false }
 candle-nn = "0.8"
-arrow-array = "56"
-arrow-schema = "56"
+arrow-array = "58"
+arrow-schema = "58"
 ndarray = { version = "0.16", features = ["rayon", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -109,7 +114,7 @@ tree-sitter-nix = "0.3"
 hex = "0.4"
 ed25519-dalek = "=2.1.0"
 syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
 lru = "0.16"
 serial_test = "3.2"
@@ -119,7 +124,7 @@ num-complex = "0.4"
 libc = "0.2"
 csv = "1.3"
 axum = { version = "0.8", features = ["ws"] }
-symtropy-robotics-bridge-core = { path = "../symtropy/crates/symtropy-robotics-bridge-core" }
+symtropy-robotics-bridge-core = { path = "../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
 
 [package]
 name = "symthaea"
@@ -165,7 +170,7 @@ symthaea-causal-reasoning = { path = "crates/core/symthaea-causal-reasoning", de
 symthaea-fep = { path = "crates/core/symthaea-fep" }
 
 # Shared positioning and peer-fusion primitives
-positioning = { path = "/srv/luminous-dynamics/mycelix-workspace/mycelix-position/lib/positioning" }
+positioning = { path = "../mycelix-workspace/mycelix-position/lib/positioning" }
 
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/domains/symthaea-dream" }
@@ -205,13 +210,13 @@ symthaea-observability = { path = "crates/domains/symthaea-observability", optio
 symthaea-support = { path = "crates/domains/symthaea-support", optional = true }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
-mycelix-fl-core = { path = "/srv/luminous-dynamics/mycelix-workspace/crates/mycelix-fl-core", optional = true }
+mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
 
 # Mycelix Conductor bridge - governance dispatch to Holochain conductor
 symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor", optional = true }
 
 # Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
-mycelix-crypto = { path = "/srv/luminous-dynamics/mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
+mycelix-crypto = { path = "../mycelix-workspace/mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/core/symthaea-stt", optional = true }
@@ -367,7 +372,7 @@ iroh = { version = "0.97", optional = true }
 
 # LanceDB: Columnar vector storage backend (optional)
 # Implementation: src/databases/lance_client.rs
-lancedb = { version = "0.23", optional = true }
+lancedb = { version = "0.30", optional = true }
 
 # DuckDB: Epistemic Auditor analytics backend (optional, bundled for reproducibility)
 # Note: does NOT conflict with rusqlite (libduckdb-sys has no links="sqlite3")
@@ -377,7 +382,7 @@ arrow-schema = { workspace = true, optional = true }
 futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
-mycelix-sdk = { path = "/srv/luminous-dynamics/mycelix-workspace/sdk", optional = true, default-features = false, features = ["standalone"] }
+mycelix-sdk = { path = "../mycelix-workspace/sdk", optional = true, default-features = false, features = ["standalone"] }
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Prism epistemic search (local, offline, 16,384-bit BinaryHV)
@@ -434,12 +439,9 @@ ed25519-dalek = { workspace = true, optional = true }  # MFDI identity signature
 # MFDI credential hashing (already consolidated at line 281)
 chrono = { workspace = true }
 regex = { workspace = true }
-# Note: wasmtime 29.x has a critical CVE affecting aarch64 with the Winch
-# compiler backend (sandbox-escape memory access, fix: 36.0.7). NOT
-# exploitable in this build — the Winch feature is not enabled and the
-# default Cranelift backend is unaffected. Version staying at 29.0 until
-# we land the 29→36 migration (significant API break).
-wasmtime = { version = "29.0", optional = true }
+# WASM sandboxing support. Keep on a RustSec-clean branch; older 29.x releases
+# carry multiple 2026 sandbox advisories.
+wasmtime = { version = "44.0.1", optional = true }
 
 # bumpalo removed from main crate: only used in symthaea-core
 
@@ -1009,15 +1011,15 @@ required-features = ["multirotor-mujoco"]
 
 [[example]]
 name = "engineering_school_benchmarks"
-path = "/srv/luminous-dynamics/symthaea/examples/engineering_school_benchmarks.rs"
+path = "examples/engineering_school_benchmarks.rs"
 
 [[example]]
 name = "sovereign_design_loop"
-path = "/srv/luminous-dynamics/symthaea/examples/sovereign_design_loop.rs"
+path = "examples/sovereign_design_loop.rs"
 
 [[example]]
 name = "demo_proof_caching"
-path = "/srv/luminous-dynamics/symthaea/examples/demo_proof_caching.rs"
+path = "examples/demo_proof_caching.rs"
 required-features = ["code_generation"]
 
 [[example]]
@@ -1094,6 +1096,9 @@ required-features = ["code_generation"]
 [[test]]
 name = "hardware_stress"
 required-features = ["code_generation"]
+
+[[test]]
+name = "time_waterfall_regression"
 
 
 [[example]]
@@ -1865,16 +1870,21 @@ codegen-units = 1
 strip = true
 
 [patch.crates-io]
-curve25519-dalek-derive = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/curve25519-dalek-derive" }
-curve25519-dalek = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/curve25519-dalek" }
-ed25519-dalek = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/ed25519-dalek" }
-x25519-dalek = { path = "/srv/luminous-dynamics/symthaea/patches/ed25519-dalek/x25519-dalek" }
-iroh = { path = "/srv/luminous-dynamics/symthaea/patches/iroh/iroh" }
-iroh-base = { path = "/srv/luminous-dynamics/symthaea/patches/iroh/iroh-base" }
-iroh-relay = { path = "/srv/luminous-dynamics/symthaea/patches/iroh/iroh-relay" }
+std_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/std_msgs" }
+sensor_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/sensor_msgs" }
+trajectory_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/trajectory_msgs" }
+builtin_interfaces = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/builtin_interfaces" }
+geometry_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/geometry_msgs" }
+curve25519-dalek-derive = { path = "patches/ed25519-dalek/curve25519-dalek-derive" }
+curve25519-dalek = { path = "patches/ed25519-dalek/curve25519-dalek" }
+ed25519-dalek = { path = "patches/ed25519-dalek/ed25519-dalek" }
+x25519-dalek = { path = "patches/ed25519-dalek/x25519-dalek" }
+iroh = { path = "patches/iroh/iroh" }
+iroh-base = { path = "patches/iroh/iroh-base" }
+iroh-relay = { path = "patches/iroh/iroh-relay" }
 # cudarc 0.13.9 does not ship CUDA 12.9 bindings. The vendored copy
 # aliases CUDA 12.9 to its CUDA 12.8 bindings for local Broca GPU builds.
-cudarc = { path = "/srv/luminous-dynamics/symthaea/vendor/cudarc-0.13.9-cuda129" }
+cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }
 
 [profile.release.package.symthaea-physics-catalog]
 opt-level = "z"

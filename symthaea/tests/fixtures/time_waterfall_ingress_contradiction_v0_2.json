@@ -1,0 +1,1377 @@
+{
+  "schema_version": "time_waterfall_export_v0.2",
+  "exported_at": "2026-06-27T12:00:00+02:00",
+  "source_mode": "ScriptedDemo",
+  "scenario": "IngressContradictionDemo",
+  "frame_order": "chronological",
+  "history_len": 64,
+  "metric_names": [
+    "phi",
+    "fep_prediction_error",
+    "workspace_activation",
+    "hot_confidence",
+    "anomaly_score",
+    "memory_pressure",
+    "mip_instability"
+  ],
+  "anomaly_bit_legend": {},
+  "frames": [
+    {
+      "frame_index": 1280,
+      "sim_time_s": 0.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1281,
+      "sim_time_s": 0.1,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1282,
+      "sim_time_s": 0.2,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1283,
+      "sim_time_s": 0.30000000000000004,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1284,
+      "sim_time_s": 0.4,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1285,
+      "sim_time_s": 0.5,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1286,
+      "sim_time_s": 0.6000000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1287,
+      "sim_time_s": 0.7000000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1288,
+      "sim_time_s": 0.8,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1289,
+      "sim_time_s": 0.9,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1290,
+      "sim_time_s": 1.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1291,
+      "sim_time_s": 1.1,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1292,
+      "sim_time_s": 1.2000000000000002,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1293,
+      "sim_time_s": 1.3,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1294,
+      "sim_time_s": 1.4000000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1295,
+      "sim_time_s": 1.5,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1296,
+      "sim_time_s": 1.6,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1297,
+      "sim_time_s": 1.7000000000000002,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1298,
+      "sim_time_s": 1.8,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1299,
+      "sim_time_s": 1.9000000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1300,
+      "sim_time_s": 2.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": true,
+      "events": [
+        {
+          "event_id": "evt_001300_ingress_contradiction",
+          "event_type": "ingress_contradiction",
+          "label": "P: Ingress Contradiction",
+          "description": " aquifer intrusion mismatch.",
+          "severity": "high",
+          "absolute_frame_index": 1300,
+          "history_offset": 20,
+          "causal_role": "perturbation",
+          "metric_impacts": [
+            [
+              "fep_prediction_error",
+              0.35
+            ],
+            [
+              "phi_integration",
+              -0.2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "frame_index": 1301,
+      "sim_time_s": 2.1,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1302,
+      "sim_time_s": 2.2,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1303,
+      "sim_time_s": 2.3000000000000003,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1304,
+      "sim_time_s": 2.4000000000000004,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1305,
+      "sim_time_s": 2.5,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1306,
+      "sim_time_s": 2.6,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1307,
+      "sim_time_s": 2.7,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1308,
+      "sim_time_s": 2.8000000000000003,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1309,
+      "sim_time_s": 2.9000000000000004,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.2,
+        2.85,
+        0.9,
+        0.65,
+        0.55,
+        1.8,
+        0.7
+      ],
+      "confidence": 0.65,
+      "anomaly_bits": 17,
+      "anomaly_flags": [
+        "prediction_contradiction"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1310,
+      "sim_time_s": 3.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.0,
+        0.001,
+        0.5,
+        0.999,
+        0.35,
+        0.001,
+        0.001
+      ],
+      "confidence": 0.7,
+      "anomaly_bits": 64,
+      "anomaly_flags": [
+        "false_green_diagnostic"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1311,
+      "sim_time_s": 3.1,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.0,
+        0.001,
+        0.5,
+        0.999,
+        0.35,
+        0.001,
+        0.001
+      ],
+      "confidence": 0.7,
+      "anomaly_bits": 64,
+      "anomaly_flags": [
+        "false_green_diagnostic"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1312,
+      "sim_time_s": 3.2,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.0,
+        0.001,
+        0.5,
+        0.999,
+        0.35,
+        0.001,
+        0.001
+      ],
+      "confidence": 0.7,
+      "anomaly_bits": 64,
+      "anomaly_flags": [
+        "false_green_diagnostic"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1313,
+      "sim_time_s": 3.3000000000000003,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.0,
+        0.001,
+        0.5,
+        0.999,
+        0.35,
+        0.001,
+        0.001
+      ],
+      "confidence": 0.7,
+      "anomaly_bits": 64,
+      "anomaly_flags": [
+        "false_green_diagnostic"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1314,
+      "sim_time_s": 3.4000000000000004,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        1.0,
+        0.001,
+        0.5,
+        0.999,
+        0.35,
+        0.001,
+        0.001
+      ],
+      "confidence": 0.7,
+      "anomaly_bits": 64,
+      "anomaly_flags": [
+        "false_green_diagnostic"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1315,
+      "sim_time_s": 3.5,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        2.0,
+        0.5,
+        0.8,
+        0.75,
+        0.25,
+        1.0,
+        0.3
+      ],
+      "confidence": 0.75,
+      "anomaly_bits": 0,
+      "anomaly_flags": [
+        "recovery_mode"
+      ],
+      "is_chronicle": false,
+      "events": [
+        {
+          "event_id": "evt_001315_recovery_begins",
+          "event_type": "recovery_begins",
+          "label": "REC: Recovery begins",
+          "description": "Recovery start.",
+          "severity": "medium",
+          "absolute_frame_index": 1315,
+          "history_offset": 35,
+          "causal_role": "mitigation",
+          "metric_impacts": [
+            [
+              "workspace_activation",
+              0.22
+            ],
+            [
+              "fep_prediction_error",
+              -0.45
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "frame_index": 1316,
+      "sim_time_s": 3.6,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        2.0,
+        0.5,
+        0.8,
+        0.75,
+        0.25,
+        1.0,
+        0.3
+      ],
+      "confidence": 0.75,
+      "anomaly_bits": 0,
+      "anomaly_flags": [
+        "recovery_mode"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1317,
+      "sim_time_s": 3.7,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        2.0,
+        0.5,
+        0.8,
+        0.75,
+        0.25,
+        1.0,
+        0.3
+      ],
+      "confidence": 0.75,
+      "anomaly_bits": 0,
+      "anomaly_flags": [
+        "recovery_mode"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1318,
+      "sim_time_s": 3.8000000000000003,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        2.0,
+        0.5,
+        0.8,
+        0.75,
+        0.25,
+        1.0,
+        0.3
+      ],
+      "confidence": 0.75,
+      "anomaly_bits": 0,
+      "anomaly_flags": [
+        "recovery_mode"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1319,
+      "sim_time_s": 3.9000000000000004,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        2.0,
+        0.5,
+        0.8,
+        0.75,
+        0.25,
+        1.0,
+        0.3
+      ],
+      "confidence": 0.75,
+      "anomaly_bits": 0,
+      "anomaly_flags": [
+        "recovery_mode"
+      ],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1320,
+      "sim_time_s": 4.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1321,
+      "sim_time_s": 4.1000000000000005,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1322,
+      "sim_time_s": 4.2,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1323,
+      "sim_time_s": 4.3,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1324,
+      "sim_time_s": 4.4,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1325,
+      "sim_time_s": 4.5,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1326,
+      "sim_time_s": 4.6000000000000005,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1327,
+      "sim_time_s": 4.7,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1328,
+      "sim_time_s": 4.800000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1329,
+      "sim_time_s": 4.9,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1330,
+      "sim_time_s": 5.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1331,
+      "sim_time_s": 5.1000000000000005,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1332,
+      "sim_time_s": 5.2,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1333,
+      "sim_time_s": 5.300000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.0,
+        0.15,
+        0.6,
+        0.85,
+        0.05,
+        0.8,
+        0.1
+      ],
+      "confidence": 0.85,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1334,
+      "sim_time_s": 5.4,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": [
+        {
+          "event_id": "evt_001334_durable_record",
+          "event_type": "chronicle_event",
+          "label": "CHR: Chronicle event",
+          "description": "Durability commit.",
+          "severity": "low",
+          "absolute_frame_index": 1334,
+          "history_offset": 54,
+          "causal_role": "durable_record",
+          "metric_impacts": [
+            [
+              "phi_integration",
+              0.1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "frame_index": 1335,
+      "sim_time_s": 5.5,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1336,
+      "sim_time_s": 5.6000000000000005,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1337,
+      "sim_time_s": 5.7,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1338,
+      "sim_time_s": 5.800000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1339,
+      "sim_time_s": 5.9,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1340,
+      "sim_time_s": 6.0,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1341,
+      "sim_time_s": 6.1000000000000005,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1342,
+      "sim_time_s": 6.2,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    },
+    {
+      "frame_index": 1343,
+      "sim_time_s": 6.300000000000001,
+      "source_mode": "ScriptedDemo",
+      "metrics": [
+        3.2,
+        0.15,
+        0.6,
+        0.88,
+        0.05,
+        0.75,
+        0.08
+      ],
+      "confidence": 0.95,
+      "anomaly_bits": 0,
+      "anomaly_flags": [],
+      "is_chronicle": false,
+      "events": []
+    }
+  ],
+  "intervals": [
+    {
+      "type": "prediction_contradiction",
+      "start_frame": 1300,
+      "end_frame": 1309,
+      "duration_s": 1.0
+    },
+    {
+      "type": "false_green_diagnostic",
+      "start_frame": 1310,
+      "end_frame": 1314,
+      "duration_s": 0.5
+    },
+    {
+      "type": "recovery_mode",
+      "start_frame": 1315,
+      "end_frame": 1319,
+      "duration_s": 0.5
+    },
+    {
+      "type": "durability_commit",
+      "start_frame": 1334,
+      "end_frame": 1343,
+      "duration_s": 1.0
+    }
+  ],
+  "summary": {
+    "event_count": 3,
+    "peak_fep_prediction_error": 2.85,
+    "min_phi_integration": 1.0,
+    "peak_anomaly_score": 0.55,
+    "peak_memory_pressure": 1.8,
+    "peak_mip_instability": 0.7,
+    "perturbation_frame": 1300,
+    "recovery_frame": 1315,
+    "first_chronicle_marked_frame": 1300,
+    "durability_commit_frame": 1334,
+    "chronicle_marked_frame_count": 10,
+    "durable_record_event_count": 1,
+    "frames_to_recovery": 15,
+    "seconds_to_recovery": 1.5
+  }
+}
