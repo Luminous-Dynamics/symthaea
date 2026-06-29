@@ -21,6 +21,7 @@
 //! changed (surprise > threshold) are transmitted, typically 20% of
 //! patches → ~6KB/frame at 5Hz = 30KB/sec.
 
+use bincode::Options;
 use serde::{Deserialize, Serialize};
 
 /// Protocol version identifier.
@@ -32,8 +33,23 @@ pub const RDP_ALPN: &[u8] = b"symthaea/rdp/2";
 /// Maximum patches per delta frame.
 pub const MAX_DELTA_PATCHES: usize = 1024;
 
+/// Maximum patches in a full frame snapshot.
+pub const MAX_FULL_FRAME_PATCHES: usize = 16_384;
+
+/// Maximum quantized values per visual patch.
+pub const MAX_PATCH_VALUES: usize = 4_096;
+
+/// Maximum input events in one reverse-path frame.
+pub const MAX_INPUT_EVENTS: usize = 256;
+
 /// Maximum audio payload per frame (16 KB).
 pub const RDP_AUDIO_MAX_CHUNK_BYTES: usize = 16384;
+
+/// Maximum encoded RdpFrame plaintext before AEAD sealing.
+pub const RDP_MAX_FRAME_BIN_BYTES: u64 = 4 * 1024 * 1024;
+
+/// Maximum encoded InputFrame plaintext before AEAD sealing.
+pub const RDP_MAX_INPUT_BIN_BYTES: u64 = 64 * 1024;
 
 /// A remote display frame: either a full snapshot or a delta update.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,6 +287,10 @@ pub enum FrameCodecError {
     Encode(bincode::Error),
     /// bincode deserialization failure (malformed input).
     Decode(bincode::Error),
+    /// Binary payload exceeded the codec limit before decode.
+    FrameTooLarge { len: usize, max: u64 },
+    /// Decoded frame failed structural validation.
+    InvalidFrame(String),
 }
 
 impl std::fmt::Display for FrameCodecError {
@@ -278,6 +298,13 @@ impl std::fmt::Display for FrameCodecError {
         match self {
             Self::Encode(e) => write!(f, "RdpFrame encode failed: {e}"),
             Self::Decode(e) => write!(f, "RdpFrame decode failed: {e}"),
+            Self::FrameTooLarge { len, max } => {
+                write!(
+                    f,
+                    "RdpFrame decode rejected oversized payload: {len} > {max}"
+                )
+            }
+            Self::InvalidFrame(reason) => write!(f, "RdpFrame validation failed: {reason}"),
         }
     }
 }
@@ -285,32 +312,163 @@ impl std::fmt::Display for FrameCodecError {
 impl std::error::Error for FrameCodecError {}
 
 impl RdpFrame {
+    fn validate(&self) -> Result<(), FrameCodecError> {
+        match self {
+            Self::Full(frame) => {
+                if frame.patches.len() > MAX_FULL_FRAME_PATCHES {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "full frame has {} patches, max {MAX_FULL_FRAME_PATCHES}",
+                        frame.patches.len()
+                    )));
+                }
+                let grid_cells = frame.patch_cols as usize * frame.patch_rows as usize;
+                if frame.patches.len() > grid_cells {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "full frame has {} patches for {grid_cells} grid cells",
+                        frame.patches.len()
+                    )));
+                }
+                if let Some((idx, patch)) = frame
+                    .patches
+                    .iter()
+                    .enumerate()
+                    .find(|(_, patch)| patch.values.len() > MAX_PATCH_VALUES)
+                {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "full frame patch {idx} has {} values, max {MAX_PATCH_VALUES}",
+                        patch.values.len()
+                    )));
+                }
+                if frame.harmony.len() > 256 {
+                    return Err(FrameCodecError::InvalidFrame(
+                        "harmony label exceeds 256 bytes".to_string(),
+                    ));
+                }
+            }
+            Self::Delta(frame) => {
+                if frame.patches.len() > MAX_DELTA_PATCHES {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "delta frame has {} patches, max {MAX_DELTA_PATCHES}",
+                        frame.patches.len()
+                    )));
+                }
+                if let Some((idx, patch)) = frame
+                    .patches
+                    .iter()
+                    .enumerate()
+                    .find(|(_, patch)| patch.values.len() > MAX_PATCH_VALUES)
+                {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "delta patch {idx} has {} values, max {MAX_PATCH_VALUES}",
+                        patch.values.len()
+                    )));
+                }
+            }
+            Self::Input(input) => input.validate()?,
+            Self::Control(control) => control.validate()?,
+            Self::Audio(audio) => {
+                if audio.data.len() > RDP_AUDIO_MAX_CHUNK_BYTES {
+                    return Err(FrameCodecError::InvalidFrame(format!(
+                        "audio frame has {} bytes, max {RDP_AUDIO_MAX_CHUNK_BYTES}",
+                        audio.data.len()
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Serialize this frame to a compact binary envelope using bincode.
     ///
     /// The binary path is ~3-5× smaller than `serde_json::to_vec(&self)`
     /// and is the wire format consumed by `rdp_wire::seal_frame()` before
     /// ChaCha20-Poly1305 sealing. Tests + dev-inspect paths still use JSON.
     pub fn to_bin(&self) -> Result<Vec<u8>, FrameCodecError> {
-        bincode::serialize(self).map_err(FrameCodecError::Encode)
+        self.validate()?;
+        bincode::options()
+            .with_limit(RDP_MAX_FRAME_BIN_BYTES)
+            .serialize(self)
+            .map_err(FrameCodecError::Encode)
     }
 
     /// Deserialize a binary envelope back into an `RdpFrame`.
     ///
     /// Fails on truncation, byte corruption, or version skew between peers.
     pub fn from_bin(bytes: &[u8]) -> Result<Self, FrameCodecError> {
-        bincode::deserialize(bytes).map_err(FrameCodecError::Decode)
+        if bytes.len() as u64 > RDP_MAX_FRAME_BIN_BYTES {
+            return Err(FrameCodecError::FrameTooLarge {
+                len: bytes.len(),
+                max: RDP_MAX_FRAME_BIN_BYTES,
+            });
+        }
+        let frame: Self = bincode::options()
+            .with_limit(RDP_MAX_FRAME_BIN_BYTES)
+            .deserialize(bytes)
+            .map_err(FrameCodecError::Decode)?;
+        frame.validate()?;
+        Ok(frame)
     }
 }
 
 impl InputFrame {
+    fn validate(&self) -> Result<(), FrameCodecError> {
+        if self.events.len() > MAX_INPUT_EVENTS {
+            return Err(FrameCodecError::InvalidFrame(format!(
+                "input frame has {} events, max {MAX_INPUT_EVENTS}",
+                self.events.len()
+            )));
+        }
+        Ok(())
+    }
+
     /// Serialize an InputFrame (viewer → server reverse path) to binary.
     pub fn to_bin(&self) -> Result<Vec<u8>, FrameCodecError> {
-        bincode::serialize(self).map_err(FrameCodecError::Encode)
+        self.validate()?;
+        bincode::options()
+            .with_limit(RDP_MAX_INPUT_BIN_BYTES)
+            .serialize(self)
+            .map_err(FrameCodecError::Encode)
     }
 
     /// Deserialize an InputFrame from a binary envelope.
     pub fn from_bin(bytes: &[u8]) -> Result<Self, FrameCodecError> {
-        bincode::deserialize(bytes).map_err(FrameCodecError::Decode)
+        if bytes.len() as u64 > RDP_MAX_INPUT_BIN_BYTES {
+            return Err(FrameCodecError::FrameTooLarge {
+                len: bytes.len(),
+                max: RDP_MAX_INPUT_BIN_BYTES,
+            });
+        }
+        let input: Self = bincode::options()
+            .with_limit(RDP_MAX_INPUT_BIN_BYTES)
+            .deserialize(bytes)
+            .map_err(FrameCodecError::Decode)?;
+        input.validate()?;
+        Ok(input)
+    }
+}
+
+impl ControlMessage {
+    fn validate(&self) -> Result<(), FrameCodecError> {
+        match self {
+            Self::Hello { client_name, .. } if client_name.len() > 256 => Err(
+                FrameCodecError::InvalidFrame("client_name exceeds 256 bytes".to_string()),
+            ),
+            Self::Welcome { server_name, .. } if server_name.len() > 256 => Err(
+                FrameCodecError::InvalidFrame("server_name exceeds 256 bytes".to_string()),
+            ),
+            Self::Goodbye { reason } if reason.len() > 1024 => Err(FrameCodecError::InvalidFrame(
+                "goodbye reason exceeds 1024 bytes".to_string(),
+            )),
+            Self::ConsciousnessAttestation { signature, .. } if signature.len() > 256 => {
+                Err(FrameCodecError::InvalidFrame(
+                    "attestation signature exceeds 256 bytes".to_string(),
+                ))
+            }
+            Self::ClipboardUpdate { data, .. } if data.len() > 1024 * 1024 => Err(
+                FrameCodecError::InvalidFrame("clipboard payload exceeds 1MiB".to_string()),
+            ),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -434,6 +592,50 @@ mod tests {
     fn test_from_bin_rejects_garbage() {
         let bad = [0xFFu8; 8];
         assert!(RdpFrame::from_bin(&bad).is_err());
+    }
+
+    #[test]
+    fn oversized_binary_frame_is_rejected_before_decode() {
+        let bytes = vec![0u8; RDP_MAX_FRAME_BIN_BYTES as usize + 1];
+        let err = RdpFrame::from_bin(&bytes).unwrap_err();
+        assert!(matches!(err, FrameCodecError::FrameTooLarge { .. }));
+    }
+
+    #[test]
+    fn oversized_delta_patch_is_rejected() {
+        let frame = RdpFrame::Delta(DeltaFrame {
+            frame_id: 1,
+            base_frame_id: 0,
+            timestamp_ms: 1,
+            patches: vec![DeltaPatch {
+                index: 0,
+                surprise: 1.0,
+                values: vec![0; MAX_PATCH_VALUES + 1],
+            }],
+            consciousness_level: 0.5,
+        });
+
+        let err = frame.to_bin().unwrap_err();
+        assert!(matches!(err, FrameCodecError::InvalidFrame(_)));
+    }
+
+    #[test]
+    fn oversized_input_batch_is_rejected() {
+        let input = InputFrame {
+            sequence: 1,
+            timestamp_ms: 1,
+            events: (0..=MAX_INPUT_EVENTS)
+                .map(|_| InputEvent::Pointer {
+                    x: 0.5,
+                    y: 0.5,
+                    button: 0,
+                    pressed: false,
+                })
+                .collect(),
+        };
+
+        let err = input.to_bin().unwrap_err();
+        assert!(matches!(err, FrameCodecError::InvalidFrame(_)));
     }
 
     #[test]

@@ -51,6 +51,8 @@ pub use streaming::{StreamConfig, TensorStream};
 pub use ticket::TicketManager;
 
 use crate::swarm::{ConsciousnessVector, SwarmConfig, SwarmError, SwarmResult};
+#[cfg(feature = "swarm")]
+use bincode::Options;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -605,7 +607,10 @@ impl IrohChannel {
                 reason: e.to_string(),
             })?;
 
-        bincode::deserialize(&bytes).map_err(|e| SwarmError::SerializationError(e.to_string()))
+        bincode::options()
+            .with_limit(1024 * 1024)
+            .deserialize(&bytes)
+            .map_err(|e| SwarmError::SerializationError(e.to_string()))
     }
 
     /// Receive and verify a consciousness vector using attestation.
@@ -648,9 +653,10 @@ impl IrohChannel {
         match attestation {
             Some(mgr) => {
                 // Secure path: deserialize as AttestedCV, verify signature + trust
-                let attested: crate::swarm::AttestedConsciousnessVector =
-                    bincode::deserialize(&bytes)
-                        .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+                let attested: crate::swarm::AttestedConsciousnessVector = bincode::options()
+                    .with_limit(1024 * 1024)
+                    .deserialize(&bytes)
+                    .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
                 let manager = mgr.read();
                 if manager.requires_attestation() {
@@ -672,7 +678,9 @@ impl IrohChannel {
                         "recv_verified_consciousness called without AttestationManager — \
                          accepting unverified CV (debug build only)"
                     );
-                    bincode::deserialize(&bytes)
+                    bincode::options()
+                        .with_limit(1024 * 1024)
+                        .deserialize(&bytes)
                         .map_err(|e| SwarmError::SerializationError(e.to_string()))
                 }
                 #[cfg(not(debug_assertions))]

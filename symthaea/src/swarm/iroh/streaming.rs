@@ -7,6 +7,7 @@
 //! Designed for <50ms latency tensor exchange between consciousness nodes.
 
 use crate::swarm::{ConsciousnessVector, SwarmError, SwarmResult, TensorPayload};
+use bincode::Options;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::Duration;
@@ -208,9 +209,20 @@ impl TensorStream {
         } else {
             data.to_vec()
         };
+        if bytes.len() > self.config.max_message_size {
+            return Err(SwarmError::TensorStreamError {
+                reason: format!(
+                    "Received consciousness payload too large: {} bytes (max: {})",
+                    bytes.len(),
+                    self.config.max_message_size
+                ),
+            });
+        }
 
         // Deserialize
-        let state: ConsciousnessVector = bincode::deserialize(&bytes)
+        let state: ConsciousnessVector = bincode::options()
+            .with_limit(self.config.max_message_size as u64)
+            .deserialize(&bytes)
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         // Update stats
@@ -229,9 +241,20 @@ impl TensorStream {
         } else {
             data.to_vec()
         };
+        if bytes.len() > self.config.max_message_size {
+            return Err(SwarmError::TensorStreamError {
+                reason: format!(
+                    "Received tensor payload too large: {} bytes (max: {})",
+                    bytes.len(),
+                    self.config.max_message_size
+                ),
+            });
+        }
 
         // Deserialize
-        let tensor: TensorPayload = bincode::deserialize(&bytes)
+        let tensor: TensorPayload = bincode::options()
+            .with_limit(self.config.max_message_size as u64)
+            .deserialize(&bytes)
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         // Update stats

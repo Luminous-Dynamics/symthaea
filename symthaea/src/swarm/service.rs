@@ -62,6 +62,8 @@ use crate::swarm::{
 #[cfg(feature = "swarm")]
 use crate::swarm::IrohNode;
 use crate::swarm::config::BootstrapConfig;
+#[cfg(feature = "swarm")]
+use bincode::Options;
 use parking_lot::RwLock;
 use positioning::{GaussianEstimate3D, PeerEstimate3D, PeerFusion3D, PublishableEstimate3D};
 use std::collections::HashMap;
@@ -718,7 +720,9 @@ impl NetworkService {
         })??;
 
         // Step 4: Deserialize response
-        let response_msg: super::SwarmMessage = bincode::deserialize(&response_bytes)
+        let response_msg: super::SwarmMessage = bincode::options()
+            .with_limit(4096)
+            .deserialize(&response_bytes)
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         let (signed_nonce, agent_key) = match response_msg {
@@ -916,7 +920,9 @@ impl NetworkService {
                     reason: e.to_string(),
                 })?;
 
-        let challenge_msg: super::SwarmMessage = bincode::deserialize(&challenge_bytes)
+        let challenge_msg: super::SwarmMessage = bincode::options()
+            .with_limit(4096)
+            .deserialize(&challenge_bytes)
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         let nonce = match challenge_msg {
@@ -1156,7 +1162,10 @@ impl NetworkService {
         if let Some(ref socket) = *self.telepathic_socket.read() {
             let socket_clone = socket.clone();
             tokio::spawn(async move {
-                if let Err(e) = socket_clone.broadcast(msg).await {
+                if let Err(e) = socket_clone
+                    .broadcast(symthaea_swarm::SwarmMessage::State(msg))
+                    .await
+                {
                     tracing::warn!("Failed to broadcast swarm state: {e}");
                 }
             });
