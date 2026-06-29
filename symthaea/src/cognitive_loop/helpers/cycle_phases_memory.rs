@@ -764,7 +764,9 @@ impl CognitiveLoopService {
 
                         memory_db_flushed = true;
                         if let Some(runtime) = storage_runtime {
-                            match runtime.try_store_memory_batch(records) {
+                            match runtime
+                                .try_store_memory_batch_guarded(records, flush_guard.clone())
+                            {
                                 Ok(()) => {
                                     tracing::debug!(
                                         "Memory flush: episodes queued to storage runtime"
@@ -772,10 +774,10 @@ impl CognitiveLoopService {
                                 }
                                 Err(e) => {
                                     memory_db_flushed = false;
+                                    flush_guard.store(false, Ordering::Relaxed);
                                     tracing::warn!(error = %e, "Memory flush queue failed");
                                 }
                             }
-                            flush_guard.store(false, Ordering::Relaxed);
                         } else if let Some(db) = db {
                             std::thread::spawn(move || {
                                 match db.store_batch_sync(&records) {

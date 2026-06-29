@@ -7,7 +7,10 @@
 //! provides a small write-behind worker that accepts durable memory operations
 //! through a bounded channel and applies them outside the hot path.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use tokio::sync::{mpsc, mpsc::error::TrySendError, oneshot};
 use tokio::task::JoinHandle;
@@ -24,6 +27,8 @@ pub enum StorageOp {
     StoreMemory(MemoryRecord),
     /// Store or replace a batch of memory records.
     StoreMemoryBatch(Vec<MemoryRecord>),
+    /// Store or replace a batch, then clear a caller-owned in-flight guard.
+    StoreMemoryBatchGuarded(Vec<MemoryRecord>, Arc<AtomicBool>),
     /// Delete a memory by ID.
     DeleteMemory(String),
     /// Ask the worker to flush all previously accepted operations.
@@ -91,6 +96,24 @@ impl StorageRuntimeHandle {
         }
         self.tx
             .try_send(StorageOp::StoreMemoryBatch(records))
+            .map_err(|err| match err {
+                TrySendError::Full(_) => StorageRuntimeError::Full,
+                TrySendError::Closed(_) => StorageRuntimeError::Closed,
+            })
+    }
+
+    /// Try to enqueue a batch store and clear `guard` after the worker applies it.
+    pub fn try_store_memory_batch_guarded(
+        &self,
+        records: Vec<MemoryRecord>,
+        guard: Arc<AtomicBool>,
+    ) -> Result<(), StorageRuntimeError> {
+        if records.is_empty() {
+            guard.store(false, Ordering::Relaxed);
+            return Ok(());
+        }
+        self.tx
+            .try_send(StorageOp::StoreMemoryBatchGuarded(records, guard))
             .map_err(|err| match err {
                 TrySendError::Full(_) => StorageRuntimeError::Full,
                 TrySendError::Closed(_) => StorageRuntimeError::Closed,
@@ -188,6 +211,12 @@ async fn storage_worker(
                     tracing::warn!(error = %err, "storage runtime failed to store memory batch");
                 }
             }
+            StorageOp::StoreMemoryBatchGuarded(records, guard) => {
+                if let Err(err) = backend.store_batch(records).await {
+                    tracing::warn!(error = %err, "storage runtime failed to store guarded memory batch");
+                }
+                guard.store(false, Ordering::Relaxed);
+            }
             StorageOp::DeleteMemory(id) => {
                 if let Err(err) = backend.delete(&id).await {
                     tracing::warn!(error = %err, id, "storage runtime failed to delete memory");
@@ -276,6 +305,30 @@ mod tests {
         assert_eq!(db.count().await.unwrap(), 2);
         assert!(db.get("batch-a").await.unwrap().is_some());
         assert!(db.get("batch-b").await.unwrap().is_some());
+
+        runtime.shutdown().await.unwrap();
+        worker.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn storage_runtime_clears_guard_after_batch_write() {
+        let db = Arc::new(SqliteMemory::in_memory().unwrap());
+        let backend: Arc<dyn ConsciousnessDatabase> = db.clone();
+        let (runtime, worker) = spawn_storage_runtime(backend, 8);
+        let guard = Arc::new(AtomicBool::new(true));
+
+        runtime
+            .try_store_memory_batch_guarded(
+                vec![record("guarded-a", 6), record("guarded-b", 7)],
+                guard.clone(),
+            )
+            .unwrap();
+        runtime.flush().await.unwrap();
+
+        assert!(!guard.load(Ordering::Relaxed));
+        assert_eq!(db.count().await.unwrap(), 2);
+        assert!(db.get("guarded-a").await.unwrap().is_some());
+        assert!(db.get("guarded-b").await.unwrap().is_some());
 
         runtime.shutdown().await.unwrap();
         worker.await.unwrap();
