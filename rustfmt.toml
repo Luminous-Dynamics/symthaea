@@ -1,8 +1,0 @@
-ignore = [
-    "symthaea/_archive-2026-06-10/**",
-    "symthaea/_archive-2026-06-13-cleanup/**",
-    "symthaea/_archive-2026-06-14-cleanup/**",
-    "_archive-2026-06-10/**",
-    "_archive-2026-06-13-cleanup/**",
-    "_archive-2026-06-14-cleanup/**",
-]
