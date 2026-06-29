@@ -5,4 +5,15 @@
 
 [assets]
 # Assets
-pump_texture = { path = "../materials/pump_rust.jpg", type = "texture" }
+pump_texture = { path = "../materials/pump_rust.jpg", type = "texture", approved_for_game = false, notes = "Optional reference texture only; the Bevy micro-slice uses procedural fallback materials so missing textures cannot create magenta release blockers." }
+
+[procedural_materials]
+dry_concrete = { source = "generated", license = "project", approved_for_game = true, notes = "Intentional greybox concrete baseline." }
+wet_concrete = { source = "generated", license = "project", approved_for_game = true, notes = "Dark floor material for water-damaged municipal surfaces." }
+algae_stained_concrete = { source = "generated", license = "project", approved_for_game = true, notes = "Green-brown wall staining and waterline history." }
+rusted_metal = { source = "generated", license = "project", approved_for_game = true, notes = "Pump, exposed conduit, and aged pipe fallback." }
+old_painted_steel = { source = "generated", license = "project", approved_for_game = true, notes = "Tank, grating, repair crate, and utility surfaces." }
+dirty_water = { source = "generated", license = "project", approved_for_game = true, notes = "Translucent flooded floor patch." }
+warning_stripe = { source = "generated", license = "project", approved_for_game = true, notes = "Hazard signage and valve marker." }
+chronicle_seal = { source = "generated", license = "project", approved_for_game = true, notes = "Emissive civic evidence tag after repair consequence." }
+field_deck_scanline = { source = "generated", license = "project", approved_for_game = true, notes = "Transparent scan/preview plane around inspected infrastructure." }

@@ -39,6 +39,20 @@ use symtropy_bevy_core::{
 use symtropy_bevy_scene::{SymtropyScenePlugin, fixed_camera};
 
 const INTERACTION_DISTANCE: f32 = 2.5;
+#[cfg(test)]
+const OLD_WATERWORKS_VISIBLE_PROP_COUNT: usize = 9;
+#[cfg(test)]
+const OLD_WATERWORKS_MATERIAL_PALETTE: &[&str] = &[
+    "dry_concrete",
+    "wet_concrete",
+    "algae_stained_concrete",
+    "rusted_metal",
+    "old_painted_steel",
+    "dirty_water",
+    "warning_stripe",
+    "chronicle_seal",
+    "field_deck_scanline",
+];
 
 #[derive(Component)]
 struct Player;
@@ -78,6 +92,82 @@ struct ScenarioRuntime {
     paused: bool,
     step_once: bool,
     last_outcome: Option<symtropy_basin::OldWaterworksChoiceOutcome>,
+}
+
+#[derive(Resource, Debug, Clone)]
+struct SliceRuntime {
+    origin: PlayerOrigin,
+    pending_repair: Option<PendingRepair>,
+    ending_card_open: bool,
+}
+
+impl Default for SliceRuntime {
+    fn default() -> Self {
+        Self {
+            origin: PlayerOrigin::BasinBornTechnician,
+            pending_repair: None,
+            ending_card_open: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlayerOrigin {
+    BasinBornTechnician,
+    ArchiveApprentice,
+    CorporateUtilityDefector,
+}
+
+impl PlayerOrigin {
+    const ALL: [Self; 3] = [
+        Self::BasinBornTechnician,
+        Self::ArchiveApprentice,
+        Self::CorporateUtilityDefector,
+    ];
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::BasinBornTechnician => "basin_born_technician",
+            Self::ArchiveApprentice => "archive_apprentice",
+            Self::CorporateUtilityDefector => "corporate_utility_defector",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::BasinBornTechnician => "Basin-Born Technician",
+            Self::ArchiveApprentice => "Archive Apprentice",
+            Self::CorporateUtilityDefector => "Corporate Utility Defector",
+        }
+    }
+
+    fn field_deck_note(self) -> &'static str {
+        match self {
+            Self::BasinBornTechnician => {
+                "Origin note: repair scars and water-pressure risk stand out first."
+            }
+            Self::ArchiveApprentice => {
+                "Origin note: authority chain damage and witness gaps stand out first."
+            }
+            Self::CorporateUtilityDefector => {
+                "Origin note: private firmware residue and ownership locks stand out first."
+            }
+        }
+    }
+
+    fn next(self) -> Self {
+        let index = Self::ALL
+            .iter()
+            .position(|profile| *profile == self)
+            .unwrap_or(0);
+        Self::ALL[(index + 1) % Self::ALL.len()]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingRepair {
+    target_kind: InteractableKind,
+    intervention: BasinIntervention,
 }
 
 #[derive(Resource)]
@@ -178,6 +268,8 @@ enum SceneVisualKind {
     WillowRoots,
     AntTrail,
     MyceliumPatch,
+    DirtyWater,
+    EvidenceTag,
     Light,
 }
 
@@ -416,6 +508,7 @@ fn main() {
             step_once: false,
             last_outcome: None,
         })
+        .insert_resource(SliceRuntime::default())
         .insert_resource(ChronicleRuntime::open_default())
         .init_state::<InterfaceState>()
         .add_systems(Startup, setup)
@@ -423,15 +516,18 @@ fn main() {
             Update,
             (
                 scenario_dev_controls_system,
+                slice_control_system,
                 chronicle_panel_toggle_system,
                 scenario_step_system,
                 interaction_system,
                 ecological_meter_system,
                 consequence_visual_system,
                 ui_visibility_system,
+                objective_overlay_system,
                 controls_overlay_system,
                 dev_panel_overlay_system,
                 chronicle_panel_system,
+                ending_card_system,
                 oscillating_light_system,
             )
                 .chain(),
@@ -452,6 +548,7 @@ fn scenario_dev_controls_system(
     intents: Res<IntentFrame>,
     controls: Res<ControlsState>,
     mut runtime: ResMut<ScenarioRuntime>,
+    mut slice: ResMut<SliceRuntime>,
     mut next_state: ResMut<NextState<InterfaceState>>,
 ) {
     if intents.just_pressed(InputIntent::PauseOrRelease) {
@@ -501,6 +598,24 @@ fn scenario_dev_controls_system(
         runtime.paused = false;
         runtime.step_once = false;
         runtime.last_outcome = None;
+        slice.pending_repair = None;
+        slice.ending_card_open = false;
+    }
+}
+
+fn slice_control_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    intents: Res<IntentFrame>,
+    mut slice: ResMut<SliceRuntime>,
+) {
+    if keyboard.just_pressed(KeyCode::KeyO) {
+        slice.origin = slice.origin.next();
+        slice.pending_repair = None;
+    }
+
+    if intents.just_pressed(InputIntent::PauseOrRelease) {
+        slice.pending_repair = None;
+        slice.ending_card_open = false;
     }
 }
 
@@ -527,25 +642,67 @@ fn oscillating_light_system(
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Materials
-    let floor_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.2, 0.2, 0.22),
+    // Deliberate procedural material palette. The playable slice must not depend
+    // on missing texture fallback colors to communicate the room.
+    let dry_concrete_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.30, 0.31, 0.30),
+        perceptual_roughness: 0.92,
         ..default()
     });
-    let wall_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.3, 0.3, 0.35),
+    let wet_concrete_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.13, 0.15, 0.16),
+        perceptual_roughness: 0.78,
+        reflectance: 0.22,
         ..default()
     });
-    let tank_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.1, 0.1, 0.4),
+    let stained_concrete_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.18, 0.23, 0.18),
+        perceptual_roughness: 0.96,
+        ..default()
+    });
+    let rusted_metal_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.54, 0.20, 0.09),
+        metallic: 0.35,
+        perceptual_roughness: 0.88,
+        ..default()
+    });
+    let painted_steel_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.23, 0.34, 0.38),
+        metallic: 0.45,
+        perceptual_roughness: 0.65,
         ..default()
     });
     let console_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.5, 0.5, 0.1),
+        base_color: Color::srgb(0.22, 0.27, 0.24),
+        emissive: Color::srgb(0.02, 0.10, 0.08).to_linear() * 0.08,
+        metallic: 0.2,
+        perceptual_roughness: 0.7,
+        ..default()
+    });
+    let warning_stripe_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.92, 0.68, 0.10),
+        emissive: Color::srgb(0.24, 0.14, 0.01).to_linear() * 0.08,
+        ..default()
+    });
+    let dirty_water_mat = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.05, 0.12, 0.13, 0.72),
+        alpha_mode: AlphaMode::Blend,
+        perceptual_roughness: 0.42,
+        reflectance: 0.35,
+        ..default()
+    });
+    let chronicle_seal_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.95, 0.74, 0.18),
+        emissive: Color::srgb(0.95, 0.55, 0.12).to_linear() * 0.45,
+        ..default()
+    });
+    let scanline_mat = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.18, 0.72, 1.0, 0.58),
+        emissive: Color::srgb(0.08, 0.45, 1.0).to_linear() * 0.35,
+        alpha_mode: AlphaMode::Blend,
         ..default()
     });
 
@@ -555,7 +712,7 @@ fn setup(
     // Floor
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(floor_mat),
+        MeshMaterial3d(wet_concrete_mat.clone()),
         Transform::from_xyz(0.0, -0.1, 0.0).with_scale(Vec3::new(20.0, 0.2, 20.0)),
     ));
 
@@ -564,7 +721,7 @@ fn setup(
     // North
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(wall_mat.clone()),
+        MeshMaterial3d(stained_concrete_mat.clone()),
         Transform::from_xyz(0.0, wall_height / 2.0, -10.0).with_scale(Vec3::new(
             20.0,
             wall_height,
@@ -574,7 +731,7 @@ fn setup(
     // South
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(wall_mat.clone()),
+        MeshMaterial3d(dry_concrete_mat.clone()),
         Transform::from_xyz(0.0, wall_height / 2.0, 10.0).with_scale(Vec3::new(
             20.0,
             wall_height,
@@ -584,7 +741,7 @@ fn setup(
     // East
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(wall_mat.clone()),
+        MeshMaterial3d(dry_concrete_mat.clone()),
         Transform::from_xyz(10.0, wall_height / 2.0, 0.0).with_scale(Vec3::new(
             0.2,
             wall_height,
@@ -594,7 +751,7 @@ fn setup(
     // West
     commands.spawn((
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(wall_mat.clone()),
+        MeshMaterial3d(stained_concrete_mat.clone()),
         Transform::from_xyz(-10.0, wall_height / 2.0, 0.0).with_scale(Vec3::new(
             0.2,
             wall_height,
@@ -603,11 +760,6 @@ fn setup(
     ));
 
     // Pump
-    let pump_texture = asset_server.load("symtropy/old_waterworks/materials/pump_rust.jpg");
-    let pump_mat = materials.add(StandardMaterial {
-        base_color_texture: Some(pump_texture),
-        ..default()
-    });
     commands.spawn((
         SceneConsequenceVisual {
             kind: SceneVisualKind::Pump,
@@ -617,7 +769,7 @@ fn setup(
             label: "Pump console",
         },
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(pump_mat),
+        MeshMaterial3d(rusted_metal_mat.clone()),
         Transform::from_xyz(-2.0, 1.0, -2.0).with_scale(Vec3::new(2.0, 2.0, 2.0)),
     ));
 
@@ -631,7 +783,7 @@ fn setup(
             label: "Toxin-buffering mycelium",
         },
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(tank_mat),
+        MeshMaterial3d(painted_steel_mat.clone()),
         Transform::from_xyz(-5.0, 1.5, 5.0).with_scale(Vec3::new(1.5, 3.0, 1.5)),
     ));
 
@@ -646,8 +798,91 @@ fn setup(
             label: "Dead-authority pump console",
         },
         Mesh3d(cube_mesh.clone()),
-        MeshMaterial3d(console_mat),
+        MeshMaterial3d(console_mat.clone()),
         Transform::from_xyz(8.0, 1.2, 0.0).with_scale(Vec3::new(0.5, 1.0, 1.5)),
+    ));
+
+    // Low-cost silhouettes and decals for the material truth pass.
+    let prop_specs = [
+        (
+            "overhead pipe",
+            Vec3::new(-1.0, 3.05, -8.8),
+            Vec3::new(14.0, 0.18, 0.18),
+            painted_steel_mat.clone(),
+        ),
+        (
+            "rust leak pipe",
+            Vec3::new(-8.8, 1.9, -1.0),
+            Vec3::new(0.18, 0.18, 10.5),
+            rusted_metal_mat.clone(),
+        ),
+        (
+            "valve wheel crossbar",
+            Vec3::new(-6.2, 1.65, -4.5),
+            Vec3::new(0.10, 0.9, 0.10),
+            warning_stripe_mat.clone(),
+        ),
+        (
+            "walkway grate",
+            Vec3::new(2.5, 0.03, -5.8),
+            Vec3::new(5.5, 0.05, 1.2),
+            painted_steel_mat.clone(),
+        ),
+        (
+            "warning sign",
+            Vec3::new(5.5, 1.8, -9.85),
+            Vec3::new(2.2, 0.75, 0.05),
+            warning_stripe_mat.clone(),
+        ),
+        (
+            "waterline stain",
+            Vec3::new(-9.86, 0.85, 1.0),
+            Vec3::new(0.04, 0.24, 12.0),
+            stained_concrete_mat.clone(),
+        ),
+        (
+            "repair crate",
+            Vec3::new(4.2, 0.35, 3.8),
+            Vec3::new(1.2, 0.7, 0.9),
+            painted_steel_mat.clone(),
+        ),
+        (
+            "exposed conduit",
+            Vec3::new(8.9, 2.35, 2.8),
+            Vec3::new(0.12, 0.12, 4.0),
+            rusted_metal_mat.clone(),
+        ),
+        (
+            "field deck scan plane",
+            Vec3::new(-2.0, 2.25, -0.85),
+            Vec3::new(2.6, 0.04, 1.7),
+            scanline_mat.clone(),
+        ),
+    ];
+    for (_label, position, scale, material) in prop_specs {
+        commands.spawn((
+            Mesh3d(cube_mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_translation(position).with_scale(scale),
+        ));
+    }
+
+    commands.spawn((
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::DirtyWater,
+        },
+        Mesh3d(cube_mesh.clone()),
+        MeshMaterial3d(dirty_water_mat),
+        Transform::from_xyz(0.5, 0.02, 2.8).with_scale(Vec3::new(7.5, 0.04, 3.2)),
+    ));
+
+    commands.spawn((
+        SceneConsequenceVisual {
+            kind: SceneVisualKind::EvidenceTag,
+        },
+        Mesh3d(cube_mesh.clone()),
+        MeshMaterial3d(chronicle_seal_mat),
+        Transform::from_xyz(-0.65, 2.18, -2.95).with_scale(Vec3::new(0.55, 0.08, 0.35)),
     ));
 
     let willow_mat = materials.add(StandardMaterial {
@@ -840,6 +1075,26 @@ fn setup(
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
+            left: Val::Px(24.0),
+            top: Val::Px(88.0),
+            width: Val::Px(560.0),
+            padding: UiRect::all(Val::Px(12.0)),
+            display: Display::Flex,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.015, 0.02, 0.025, 0.72)),
+        ObjectiveOverlay,
+        Text::new(""),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::srgb(0.88, 0.96, 1.0)),
+    ));
+
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
             left: Val::Px(20.0),
             top: Val::Px(20.0),
             width: Val::Px(520.0),
@@ -896,6 +1151,26 @@ fn setup(
         },
         TextColor(Color::srgb(0.88, 0.94, 1.0)),
     ));
+
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(18.0),
+            right: Val::Percent(18.0),
+            top: Val::Percent(18.0),
+            padding: UiRect::all(Val::Px(24.0)),
+            display: Display::None,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.02, 0.018, 0.012, 0.96)),
+        EndingCardOverlay,
+        Text::new(""),
+        TextFont {
+            font_size: 18.0,
+            ..default()
+        },
+        TextColor(Color::srgb(1.0, 0.90, 0.66)),
+    ));
 }
 
 #[derive(Component)]
@@ -916,9 +1191,16 @@ struct DevPanelOverlay;
 #[derive(Component)]
 struct ChroniclePanelOverlay;
 
+#[derive(Component)]
+struct ObjectiveOverlay;
+
+#[derive(Component)]
+struct EndingCardOverlay;
+
 fn interaction_system(
     intents: Res<IntentFrame>,
     mut runtime: ResMut<ScenarioRuntime>,
+    mut slice: ResMut<SliceRuntime>,
     mut chronicle: ResMut<ChronicleRuntime>,
     player_query: Query<&Transform, With<Player>>,
     target_query: Query<(&Transform, &InteractableTarget)>,
@@ -950,7 +1232,7 @@ fn interaction_system(
             "FieldDeckRaised",
             json!({
                 "deck_id": "field_deck_mk0",
-                "origin_profile": null,
+                "origin_profile": slice.origin.id(),
                 "visor_assist_enabled": false,
                 "location_hint": "old_waterworks"
             }),
@@ -1023,17 +1305,31 @@ fn interaction_system(
                     if chronicle.last_preview_key.as_deref() != Some(preview_key.as_str()) {
                         chronicle.append(
                             "RepairPathPreviewed",
-                            repair_preview_payload(target, intervention),
+                            repair_preview_payload(target, intervention, slice.origin),
                         );
                         chronicle.last_preview_key = Some(preview_key);
                     }
                     if intents.just_pressed(InputIntent::RepairTool) {
-                        let outcome = runtime.scenario.apply_choice_and_step(intervention, 6);
-                        chronicle.append(
-                            "WaterworksOutcomeRecorded",
-                            waterworks_outcome_payload(&outcome),
-                        );
-                        runtime.last_outcome = Some(outcome);
+                        let pending = PendingRepair {
+                            target_kind: target.kind,
+                            intervention,
+                        };
+                        if slice.pending_repair == Some(pending) {
+                            let outcome = runtime.scenario.apply_choice_and_step(intervention, 6);
+                            chronicle.append(
+                                "RepairPathCommitted",
+                                repair_commit_payload(target, intervention, slice.origin),
+                            );
+                            chronicle.append(
+                                "WaterworksOutcomeRecorded",
+                                waterworks_outcome_payload(&outcome, slice.origin),
+                            );
+                            runtime.last_outcome = Some(outcome);
+                            slice.pending_repair = None;
+                            slice.ending_card_open = true;
+                        } else {
+                            slice.pending_repair = Some(pending);
+                        }
                     }
                 }
             }
@@ -1082,12 +1378,15 @@ fn interaction_system(
             target.filter(|_| near_target),
             controls_state.selected_tool_slot,
             record,
+            &slice,
         );
         let chronicle_status = format_chronicle_status(&chronicle);
         **inspect_text = format!(
             "FIELD DECK ECOLOGY LINK\n\
+             Origin: {}\n\
              Mode: {} ([ / ] to cycle)\n\
              Tool slot: {}\n\
+             {}\n\
              {}\n\
              {}\n\
              Basin viability: {:.2}\n\
@@ -1101,9 +1400,11 @@ fn interaction_system(
              {}\n\
              {}\n\
              C: Chronicle evidence | V: scan overlay | F: focus reading",
+            slice.origin.label(),
             controls_state.scan_mode.label(),
             controls_state.selected_tool_slot,
             current_target,
+            slice.origin.field_deck_note(),
             reading,
             record.basin.viability,
             record.basin.toxin_load,
@@ -1173,6 +1474,7 @@ fn format_field_deck_reading(
     target: Option<&InteractableTarget>,
     tool_slot: u8,
     record: &symtropy_basin::OldWaterworksTickRecord,
+    slice: &SliceRuntime,
 ) -> String {
     let Some(target) = target else {
         return "Reading: no focused system in range.".to_string();
@@ -1224,10 +1526,23 @@ fn format_field_deck_reading(
             record.basin.signal_corruption
         ),
         ScanMode::RepairPreview => match selected_repair_intervention(tool_slot, target.kind) {
-            Some(intervention) => format!(
-                "REPAIR PREVIEW: slot {} commits {:?} on {}. Press R to commit and write Chronicle.",
-                tool_slot, intervention, target.label
-            ),
+            Some(intervention) => {
+                let pending = PendingRepair {
+                    target_kind: target.kind,
+                    intervention,
+                };
+                if slice.pending_repair == Some(pending) {
+                    format!(
+                        "REPAIR CONFIRM: {:?} on {} is armed. Press R again to commit Chronicle precedent.",
+                        intervention, target.label
+                    )
+                } else {
+                    format!(
+                        "REPAIR PREVIEW: slot {} selects {:?} on {}. Press R to arm confirmation.",
+                        tool_slot, intervention, target.label
+                    )
+                }
+            }
             None => format!(
                 "REPAIR PREVIEW: slot {} has no valid repair action for {}.",
                 tool_slot, target.label
@@ -1278,7 +1593,11 @@ fn dead_authority_payload() -> Value {
     })
 }
 
-fn repair_preview_payload(target: &InteractableTarget, intervention: BasinIntervention) -> Value {
+fn repair_preview_payload(
+    target: &InteractableTarget,
+    intervention: BasinIntervention,
+    origin: PlayerOrigin,
+) -> Value {
     let warnings: Vec<&str> = match intervention {
         BasinIntervention::FastMechanicalRepair => vec![
             "Fast repair may leave ecological toxin memory unresolved.",
@@ -1309,13 +1628,34 @@ fn repair_preview_payload(target: &InteractableTarget, intervention: BasinInterv
     json!({
         "predicted_outcome_class": format!("{intervention:?}"),
         "repair_path": format!("{intervention:?}"),
+        "origin_profile": origin.id(),
+        "origin_note": origin.field_deck_note(),
         "target_id": format!("{:?}", target.kind),
         "target_label": target.label,
         "visible_warnings": warnings
     })
 }
 
-fn waterworks_outcome_payload(outcome: &symtropy_basin::OldWaterworksChoiceOutcome) -> Value {
+fn repair_commit_payload(
+    target: &InteractableTarget,
+    intervention: BasinIntervention,
+    origin: PlayerOrigin,
+) -> Value {
+    json!({
+        "charter_context": "Firstlight Public Repair Charter",
+        "origin_profile": origin.id(),
+        "origin_label": origin.label(),
+        "repair_path": format!("{intervention:?}"),
+        "target_id": format!("{:?}", target.kind),
+        "target_label": target.label,
+        "witness_mode_used": true
+    })
+}
+
+fn waterworks_outcome_payload(
+    outcome: &symtropy_basin::OldWaterworksChoiceOutcome,
+    origin: PlayerOrigin,
+) -> Value {
     let chronicle_text = outcome
         .chronicle
         .first()
@@ -1326,6 +1666,9 @@ fn waterworks_outcome_payload(outcome: &symtropy_basin::OldWaterworksChoiceOutco
         "authority_state_after": authority_state_after(outcome.intervention),
         "basin_viability": outcome.basin.viability,
         "chronicle_text": chronicle_text,
+        "origin_profile": origin.id(),
+        "origin_label": origin.label(),
+        "origin_interpretation": origin.field_deck_note(),
         "event_summaries": outcome
             .chronicle
             .iter()
@@ -1359,12 +1702,13 @@ fn write_waterworks_chronicle_sequence(
     target: &InteractableTarget,
     intervention: BasinIntervention,
     outcome: &symtropy_basin::OldWaterworksChoiceOutcome,
+    origin: PlayerOrigin,
 ) -> io::Result<()> {
     writer.append(
         "FieldDeckRaised",
         json!({
             "deck_id": "field_deck_mk0",
-            "origin_profile": null,
+            "origin_profile": origin.id(),
             "visor_assist_enabled": false,
             "location_hint": "old_waterworks"
         }),
@@ -1372,11 +1716,11 @@ fn write_waterworks_chronicle_sequence(
     writer.append("DeadAuthorityLockInspected", dead_authority_payload())?;
     writer.append(
         "RepairPathPreviewed",
-        repair_preview_payload(target, intervention),
+        repair_preview_payload(target, intervention, origin),
     )?;
     writer.append(
         "WaterworksOutcomeRecorded",
-        waterworks_outcome_payload(outcome),
+        waterworks_outcome_payload(outcome, origin),
     )?;
     Ok(())
 }
@@ -1545,32 +1889,40 @@ fn consequence_visual_system(
 fn consequence_color(intervention: BasinIntervention, visual: SceneVisualKind) -> Color {
     match intervention {
         BasinIntervention::FastMechanicalRepair => match visual {
-            SceneVisualKind::Pump | SceneVisualKind::Console | SceneVisualKind::Light => {
-                Color::srgb(0.35, 0.85, 1.0)
-            }
+            SceneVisualKind::Pump
+            | SceneVisualKind::Console
+            | SceneVisualKind::EvidenceTag
+            | SceneVisualKind::Light => Color::srgb(0.35, 0.85, 1.0),
             SceneVisualKind::WillowRoots | SceneVisualKind::MyceliumPatch => {
                 Color::srgb(0.35, 0.28, 0.16)
             }
             SceneVisualKind::AntTrail => Color::srgb(0.85, 0.55, 0.12),
+            SceneVisualKind::DirtyWater => Color::srgba(0.08, 0.18, 0.20, 0.68),
         },
         BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid => match visual {
             SceneVisualKind::Pump | SceneVisualKind::Console => Color::srgb(0.45, 0.62, 0.70),
             SceneVisualKind::WillowRoots
             | SceneVisualKind::MyceliumPatch
+            | SceneVisualKind::EvidenceTag
             | SceneVisualKind::Light => Color::srgb(0.18, 0.85, 0.32),
             SceneVisualKind::AntTrail => Color::srgb(1.0, 0.78, 0.18),
+            SceneVisualKind::DirtyWater => Color::srgba(0.04, 0.16, 0.12, 0.60),
         },
         BasinIntervention::CutWillowRoots => match visual {
-            SceneVisualKind::Pump | SceneVisualKind::Console | SceneVisualKind::Light => {
-                Color::srgb(0.92, 0.82, 0.35)
-            }
+            SceneVisualKind::Pump
+            | SceneVisualKind::Console
+            | SceneVisualKind::EvidenceTag
+            | SceneVisualKind::Light => Color::srgb(0.92, 0.82, 0.35),
             SceneVisualKind::WillowRoots | SceneVisualKind::MyceliumPatch => {
                 Color::srgb(0.55, 0.12, 0.08)
             }
             SceneVisualKind::AntTrail => Color::srgb(0.75, 0.45, 0.10),
+            SceneVisualKind::DirtyWater => Color::srgba(0.18, 0.10, 0.07, 0.72),
         },
         BasinIntervention::DelayRepair => match visual {
             SceneVisualKind::Light => Color::srgb(1.0, 0.55, 0.18),
+            SceneVisualKind::EvidenceTag => Color::srgb(1.0, 0.72, 0.20),
+            SceneVisualKind::DirtyWater => Color::srgba(0.12, 0.13, 0.12, 0.78),
             _ => Color::srgb(0.55, 0.50, 0.42),
         },
         BasinIntervention::NullGreenwash => Color::srgb(0.08, 1.0, 0.42),
@@ -1583,13 +1935,14 @@ fn consequence_emissive(intervention: BasinIntervention, visual: SceneVisualKind
     match (intervention, visual) {
         (
             BasinIntervention::FastMechanicalRepair,
-            SceneVisualKind::Pump | SceneVisualKind::Console,
+            SceneVisualKind::Pump | SceneVisualKind::Console | SceneVisualKind::EvidenceTag,
         ) => 0.25,
         (
             BasinIntervention::EcologicalReroute | BasinIntervention::DecomposerAid,
             SceneVisualKind::WillowRoots
             | SceneVisualKind::MyceliumPatch
-            | SceneVisualKind::AntTrail,
+            | SceneVisualKind::AntTrail
+            | SceneVisualKind::EvidenceTag,
         ) => 0.30,
         (
             BasinIntervention::CutWillowRoots,
@@ -1656,7 +2009,8 @@ fn controls_overlay_system(
          E interact/use focused object | F focus inspect\n\
          Tab Field Deck | [ / ] scan mode | V scan visualization\n\
          1-6 toolbelt slots | Q quick tool | R repair tool | B build mode\n\
-         C Chronicle/evidence | M basin map | Ctrl+K command palette\n\
+         R in Repair Preview: arm, then confirm repair consequence\n\
+         C Chronicle/evidence | O cycle origin | M basin map | Ctrl+K command palette\n\
          F10 dev scenario panel | Esc release mouse / pause\n\n\
          Mode: {:?}\n\
          Mouse captured: {}\n\
@@ -1670,6 +2024,121 @@ fn controls_overlay_system(
         controls.scan_mode.label(),
         runtime.paused,
         runtime.scenario.records().len()
+    );
+}
+
+fn objective_overlay_system(
+    controls: Res<ControlsState>,
+    runtime: Res<ScenarioRuntime>,
+    slice: Res<SliceRuntime>,
+    chronicle: Res<ChronicleRuntime>,
+    mut query: Query<&mut Text, With<ObjectiveOverlay>>,
+) {
+    let Ok(mut text) = query.single_mut() else {
+        return;
+    };
+    let objective = current_objective(&runtime, &slice, &chronicle, &controls);
+    **text = format!(
+        "OLD WATERWORKS OBJECTIVE\n\
+         Origin: {} (press O to cycle prototype origin)\n\
+         {}",
+        slice.origin.label(),
+        objective
+    );
+}
+
+fn current_objective(
+    runtime: &ScenarioRuntime,
+    slice: &SliceRuntime,
+    chronicle: &ChronicleRuntime,
+    controls: &ControlsState,
+) -> String {
+    if runtime.last_outcome.is_some() {
+        return "Outcome recorded. Press C for Chronicle evidence or Esc to close ending card."
+            .to_string();
+    }
+    if slice.pending_repair.is_some() {
+        return "Repair path armed. Press R again in Repair Preview to commit public precedent."
+            .to_string();
+    }
+    if chronicle
+        .recent_events
+        .iter()
+        .any(|event| event.event_type == "RepairPathPreviewed")
+    {
+        return "Repair path previewed. Choose the consequence you are willing to make public."
+            .to_string();
+    }
+    if chronicle.lock_inspected_written {
+        return "Dead authority inspected. Open Field Deck Repair Preview and select a tool slot."
+            .to_string();
+    }
+    if controls.mode == ControlMode::FieldDeck {
+        return "Field Deck raised. Inspect the dead-authority pump in DIAG, CIVIC, NULL, or REPAIR."
+            .to_string();
+    }
+    "Inspect the dead-authority pump. Use Tab for Field Deck, E near the console, F1 for controls."
+        .to_string()
+}
+
+fn ending_card_system(
+    slice: Res<SliceRuntime>,
+    runtime: Res<ScenarioRuntime>,
+    chronicle: Res<ChronicleRuntime>,
+    mut query: Query<(&mut Node, &mut Text), With<EndingCardOverlay>>,
+) {
+    let Ok((mut node, mut text)) = query.single_mut() else {
+        return;
+    };
+    node.display = if slice.ending_card_open {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    if !slice.ending_card_open {
+        return;
+    }
+
+    let Some(outcome) = runtime.last_outcome.as_ref() else {
+        **text = "No outcome recorded yet.".to_string();
+        return;
+    };
+    let hash = chronicle
+        .recent_events
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "WaterworksOutcomeRecorded")
+        .map(|event| event.hash_prefix.as_str())
+        .unwrap_or("pending");
+    let faction = outcome
+        .faction_reactions
+        .iter()
+        .map(|reaction| {
+            format!(
+                "{:?} {:?}: {}",
+                reaction.faction, reaction.stance, reaction.summary
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    **text = format!(
+        "OLD WATERWORKS OUTCOME RECORDED\n\
+         Origin: {}\n\
+         Repair path: {:?}\n\
+         Water state: {}\n\
+         Legitimacy: {}\n\
+         Authority: {}\n\
+         Chronicle hash: {}\n\n\
+         Faction reactions:\n{}\n\n\
+         Press C for full Chronicle panel. Press Esc to return.",
+        slice.origin.label(),
+        outcome.intervention,
+        water_flow_state(outcome.intervention),
+        legitimacy_effect(outcome.intervention),
+        authority_state_after(outcome.intervention),
+        hash,
+        faction
     );
 }
 
@@ -1846,9 +2315,14 @@ mod tests {
             kind: InteractableKind::WillowRoots,
             label: "Willow root filtration",
         };
-        let payload = repair_preview_payload(&target, BasinIntervention::CutWillowRoots);
+        let payload = repair_preview_payload(
+            &target,
+            BasinIntervention::CutWillowRoots,
+            PlayerOrigin::ArchiveApprentice,
+        );
 
         assert_eq!(payload["repair_path"], "CutWillowRoots");
+        assert_eq!(payload["origin_profile"], "archive_apprentice");
         assert_eq!(payload["target_id"], "WillowRoots");
         assert!(
             payload["visible_warnings"]
@@ -1877,6 +2351,7 @@ mod tests {
             &target,
             BasinIntervention::EcologicalReroute,
             &outcome,
+            PlayerOrigin::BasinBornTechnician,
         )
         .expect("write golden sequence");
 
@@ -1914,6 +2389,20 @@ mod tests {
         );
 
         fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn old_waterworks_material_truth_gate_has_required_placeholders() {
+        assert!(OLD_WATERWORKS_VISIBLE_PROP_COUNT >= 5);
+        assert!(OLD_WATERWORKS_MATERIAL_PALETTE.contains(&"wet_concrete"));
+        assert!(OLD_WATERWORKS_MATERIAL_PALETTE.contains(&"rusted_metal"));
+        assert!(OLD_WATERWORKS_MATERIAL_PALETTE.contains(&"dirty_water"));
+        assert!(OLD_WATERWORKS_MATERIAL_PALETTE.contains(&"chronicle_seal"));
+        assert!(
+            !OLD_WATERWORKS_MATERIAL_PALETTE
+                .iter()
+                .any(|material| material.contains("magenta") || material.contains("missing"))
+        );
     }
 
     fn temp_chronicle_dir(name: &str) -> PathBuf {
