@@ -449,7 +449,8 @@ mod tests {
             let expected = crate::diversity::heterozygosity_after_generations(h0, ne, r#gen);
             assert!(
                 (predicted - expected).abs() < 1e-12,
-                "neutral prediction at r#gen {r#gen}: {predicted} vs {expected}"
+                "neutral prediction at gen {gen}: {predicted} vs {expected}",
+                gen = r#gen
             );
         }
     }
@@ -463,7 +464,8 @@ mod tests {
             let h = PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, r#gen);
             assert!(
                 h <= prev + 1e-12,
-                "should decay: r#gen {r#gen}, {h} > {prev}"
+                "should decay: gen {gen}, {h} > {prev}",
+                gen = r#gen
             );
             assert!(h >= 0.0);
             prev = h;
@@ -480,7 +482,8 @@ mod tests {
             pred.reset();
             assert!(
                 (0.0..=1.0).contains(&h),
-                "calibrated at r#gen {r#gen} should be in [0,1]: got {h}"
+                "calibrated at gen {gen} should be in [0,1]: got {h}",
+                gen = r#gen
             );
         }
     }

@@ -1,0 +1,34 @@
+[package]
+name = "symtropy-synthetic-physics"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Synthetic Physics Lab — deterministic graph-rewriting experiments for emergent metric space discovery"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["synthetic-physics", "graph-rewriting", "emergent-geometry", "attractor", "topology"]
+categories = ["science", "algorithms", "simulation"]
+
+# SEALED EXPERIMENTAL LANE
+# This crate has NO dependency on production game code, robotics crates, or symthaea-fep.
+# No graph update rule graduates to production until it survives the attractor lab.
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+tracing.workspace = true
+rand.workspace = true
+petgraph = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "attractor_bench"
+harness = false

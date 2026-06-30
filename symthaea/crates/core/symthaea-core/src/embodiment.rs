@@ -396,6 +396,20 @@ pub trait EmbodimentBridge: Send + Sync {
 
     /// Number of actuators.
     fn num_actuators(&self) -> usize;
+    /// Return current health/reliability for each actuator [0.0, 1.0].
+    fn actuator_health(&self) -> Vec<f32> {
+        vec![1.0; self.num_actuators()]
+    }
+
+    /// Return the last encoded perception HV.
+    fn last_perception_hv(&self) -> Option<ContinuousHV> {
+        None
+    }
+
+    /// Return current sensorimotor accuracy [0.0, 1.0].
+    fn sensorimotor_accuracy(&self) -> f32 {
+        1.0
+    }
 
     /// Total steps executed.
     fn total_steps(&self) -> usize;
@@ -481,6 +495,20 @@ pub trait PlatformPlugin: Send + Sync {
 
     /// Number of actuators for this platform.
     fn num_actuators(&self) -> usize;
+    /// Return current health/reliability for each actuator [0.0, 1.0].
+    fn actuator_health(&self) -> Vec<f32> {
+        vec![1.0; self.num_actuators()]
+    }
+
+    /// Return the last encoded perception HV.
+    fn last_perception_hv(&self) -> Option<ContinuousHV> {
+        None
+    }
+
+    /// Return current sensorimotor accuracy [0.0, 1.0].
+    fn sensorimotor_accuracy(&self) -> f32 {
+        1.0
+    }
 
     /// Create a new embodiment bridge from a genesis seed.
     fn create_bridge(&self, genesis: &crate::genesis::GenesisSeed) -> Box<dyn EmbodimentBridge>;

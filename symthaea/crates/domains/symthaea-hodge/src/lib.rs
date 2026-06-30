@@ -897,6 +897,10 @@ fn symmetric_eigenvectors(mat: &[Vec<f64>]) -> Vec<Vec<f64>> {
 }
 
 pub mod consciousness_topology;
+pub mod homology;
+pub mod persistence_bridge;
+
+pub use persistence_bridge::export_persistence;
 
 // ============================================================================
 // TESTS
@@ -1662,6 +1666,54 @@ mod tests {
                     lk[i][i]
                 );
             }
+        }
+    }
+}
+
+/// Number of harmony dimensions for topology analysis.
+pub const N_HARMONIES: usize = 8;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopologicalFeature {
+    Component,
+    Cycle,
+    Void,
+}
+
+#[derive(Debug, Clone)]
+pub struct PersistentFeature {
+    pub feature_type: TopologicalFeature,
+    pub birth: f64,
+    pub death: f64,
+    pub persistence: f64,
+}
+
+impl PersistentFeature {
+    pub fn new(feature_type: TopologicalFeature, birth: f64, death: f64) -> Self {
+        Self {
+            feature_type,
+            birth,
+            death,
+            persistence: death - birth,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HodgeFractions {
+    pub gradient: f64,
+    pub curl: f64,
+    pub harmonic: f64,
+    pub scales_sampled: usize,
+    pub total_weight: f64,
+    pub critical_scale: f64,
+    pub at_criticality: bool,
+}
+
+impl BettiNumbers {
+    pub fn new(beta_0: usize, beta_1: usize, beta_2: usize) -> Self {
+        Self {
+            numbers: vec![beta_0, beta_1, beta_2],
         }
     }
 }

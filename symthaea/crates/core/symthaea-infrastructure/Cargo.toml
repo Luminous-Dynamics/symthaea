@@ -11,7 +11,7 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 [dependencies]
 symthaea-core = { path = "../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
-symthaea-silicon = { path = "../../symthaea-silicon" }
+symthaea-silicon = { path = "../../domains/symthaea-silicon" }
 symthaea-agribot = { path = "../../domains/symthaea-agribot" }
 symthaea-clime = { path = "../../domains/symthaea-clime" }
 symthaea-engineering = { path = "../../domains/symthaea-engineering" }

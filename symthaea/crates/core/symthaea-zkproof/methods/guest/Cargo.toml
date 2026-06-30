@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-zkproof-guest"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+risc0-zkvm = { version = "3.0", default-features = false }
+symthaea-zkproof-core = { path = "../../core", default-features = false }

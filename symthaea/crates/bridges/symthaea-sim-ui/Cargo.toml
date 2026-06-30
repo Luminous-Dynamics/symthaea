@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-sim-ui"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Leptos web UI for the Mycelix Civilization Simulator toggle matrix"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+web-sys = { version = "0.3", features = ["Window", "Document", "HtmlInputElement"] }

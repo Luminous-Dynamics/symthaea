@@ -366,6 +366,7 @@ pub mod fol_ext_smt; // Phase 2: SMT-LIB2 serializer + fragment detection for Fo
 pub mod fol_formula_ext; // Phase 2: FOL with arithmetic (Term + FolFormulaExt over ℤ/ℕ/ℝ)
 pub mod foundations;
 pub mod functional_equations;
+pub mod gpu_compute; // WGPU-accelerated linear algebra primitives
 pub mod graph_theory; // Graph algorithms: BFS, DFS, Dijkstra, MST, coloring, combinatorics
 pub mod hv_pool;
 pub mod imo_benchmark;

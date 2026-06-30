@@ -16,3 +16,6 @@ name = "hodge_bench"
 harness = false
 
 [dependencies]
+rayon.workspace = true
+serde = { workspace = true, features = ["derive"] }
+symthaea-core = { path = "../../core/symthaea-core" }

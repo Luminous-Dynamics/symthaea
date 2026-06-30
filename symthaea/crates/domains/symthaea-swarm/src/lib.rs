@@ -104,7 +104,6 @@ pub enum SwarmMessage {
     HapticPulse(HapticPulseMsg),
     ProofGossip(SwarmProofMsg),
     LawGossip(LawGossipMsg),
-    MacroGossip(MacroGossipMsg),
     CurvatureGossip(CurvatureGossipMsg),
     SocialPhiGossip(SocialPhiGossipMsg),
     MutualAid(MutualAidMsg),

@@ -185,41 +185,18 @@ impl NixActiveInference {
         let efe =
             -(pragmatic + self.curiosity_weight * epistemic + self.episodic_weight * episodic);
 
-        let rationale = format!(
-            "{action:?}: pragmatic={pragmatic:.3}, epistemic={epistemic:.3}, episodic={episodic:.3} → EFE={efe:.3}"
-        );
-
-        ScoredAction {
-            action: action.clone(),
-            expected_free_energy: efe,
-            pragmatic_value: pragmatic,
-            epistemic_value: epistemic,
-            episodic_valence: episodic,
-            rationale,
-        }
-    }
-
-    /// Update the world model with a new system state observation.
-    pub fn observe_state(&mut self, state: ContinuousHV) {
-        self.world_model.observe(state);
-    }
-
-    /// Record a completed action for learning.
-    pub fn learn_from_outcome(
-        &mut self,
-        state_before: &ContinuousHV,
-        action: ActionCategory,
-        state_after: &ContinuousHV,
-        outcome: EpisodeOutcome,
-        phi: f64,
-    ) {
-        // Update the world model's transition model
-        self.world_model
-            .learn_transition(state_before, action.clone(), state_after);
-
         // Compute prediction error
         let predicted = self.world_model.predict_state(&action);
         let prediction_error = 1.0 - predicted.similarity(state_after).max(0.0) as f64;
+
+        // Modulate curiosity weight based on prediction error (epistemic modulation)
+        // High prediction error -> surprise. Increase exploration drive slightly.
+        // Low prediction error -> model is accurate. Restabilize exploration drive.
+        if prediction_error > 0.4 {
+            self.curiosity_weight = (self.curiosity_weight + 0.05).min(0.8);
+        } else {
+            self.curiosity_weight = (self.curiosity_weight - 0.02).max(0.1);
+        }
 
         // Record in episodic memory (Φ-gated)
         #[cfg(feature = "native")]

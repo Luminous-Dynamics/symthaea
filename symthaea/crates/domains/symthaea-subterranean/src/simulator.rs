@@ -27,6 +27,10 @@ impl SimpleSubterraneanSimulator {
             state: SubterraneanState::home(),
         }
     }
+
+    pub fn state_mut(&mut self) -> &mut SubterraneanState {
+        &mut self.state
+    }
 }
 
 impl SubterraneanPhysicsSimulator for SimpleSubterraneanSimulator {

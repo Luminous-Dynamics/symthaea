@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package symthaea.telemetry;
+
+service TelemetryService {
+  rpc StreamTelemetry (TelemetryRequest) returns (stream TelemetryFrame);
+}
+
+message TelemetryRequest {
+  string client_id = 1;
+}
+
+message TelemetryFrame {
+  // Core spectral phi from SpectralMIPFinder (IIT)
+  double phi = 1;
+  // Betti cycle lifespans: drives ring count/intensity
+  repeated float harmonies = 2;
+  repeated float neuromodulators = 3;
+  // E_FEP: embodied arousal, drives Ego Core radius
+  float arousal = 4;
+  // Phi_sync: cross-modal synchrony, drives jitter damping
+  float uncertainty = 5;
+  double surprise = 6;
+  string timestamp = 7;
+  MentalMovieFrame mental_movie = 8;
+
+  // === 7-Theory Consciousness Synthesis Fields ===
+  // A_GWT: Global Workspace broadcast power -> spoke opacity
+  double gwt_broadcast = 9;
+  // M_HOT: Metacognitive confidence -> second ring layer color
+  double hot_metacognitive = 10;
+  // S_AST: Temporal coherence (attention schema) -> node rotation speed
+  double ast_temporal = 11;
+  // K_W: Narrative/predictive coherence -> knowledge world model
+  double knowledge_coherence = 12;
+  // Embodiment level from FEP (complements arousal)
+  double embodiment_level = 13;
+  // Self-awareness level (HOT depth)
+  double self_awareness = 14;
+  // Topological unity (the Phi_master multiplicative invariant)
+  double topological_unity = 15;
+}
+
+message MentalMovieFrame {
+  bytes pixel_data = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+  uint32 channels = 4;
+  float semantic_coherence = 5;
+  uint64 sequence_index = 6;
+}

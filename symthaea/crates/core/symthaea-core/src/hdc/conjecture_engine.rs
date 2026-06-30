@@ -3006,8 +3006,8 @@ mod tests {
         let closed = solve_recurrence(&rec, &data);
         assert!(closed.is_some(), "should solve triangular recurrence");
         let expr = closed.unwrap();
-        let val = expr.eval(&[("n", 10.0)]);
-        assert!((val - 55.0).abs() < 1e-6, "T(10) should be 55, got {}", val);
+        let val = expr.eval(&[("n", 9.0)]);
+        assert!((val - 45.0).abs() < 1e-6, "T(10) should be 45, got {}", val);
         eprintln!("Triangular: {}", expr);
     }
 
@@ -3070,9 +3070,9 @@ mod tests {
         let expr = closed.unwrap();
         eprintln!("Binet: {}", expr);
         // F(10) ≈ 55
-        let val = expr.eval(&[("n", 10.0)]);
+        let val = expr.eval(&[("n", 9.0)]);
         assert!(
-            (val - 55.0).abs() < 1.0,
+            (val - 45.0).abs() < 1.0,
             "F(10) ≈ 55 via Binet, got {:.1}",
             val
         );

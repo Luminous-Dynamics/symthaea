@@ -13,6 +13,10 @@ pub mod reward;
 pub mod simulator;
 pub mod training;
 pub mod types;
+pub use controller::*;
+pub use encoder::*;
+pub use simulator::*;
+pub use types::*;
 
 pub use crate::control::GaitControlProfile;
 pub use control::{

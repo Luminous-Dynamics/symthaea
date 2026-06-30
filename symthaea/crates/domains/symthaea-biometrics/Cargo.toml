@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-biometrics"
+version = "0.1.0"
+edition = "2024"
+description = "Behavioral biometrics: encode mouse/keyboard telemetry into HDC stress vectors"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-muse = { path = "../symthaea-muse", optional = true }
+
+[dev-dependencies]
+symthaea-muse = { path = "../symthaea-muse" }
+
+[features]
+default = []
+muse-bridge = ["symthaea-muse"]
+
+[lints]
+workspace = true

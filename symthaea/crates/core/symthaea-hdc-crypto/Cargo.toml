@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-hdc-crypto"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
+description = "Information-theoretically secure homomorphic encryption on hyperdimensional binary vectors"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+keywords = ["homomorphic-encryption", "hyperdimensional-computing", "cryptography", "privacy", "fhe"]
+categories = ["cryptography"]
+readme = "README.md"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+blake3 = "1"
+
+[dev-dependencies]
+serde_json = "1"
+
+[features]
+default = []

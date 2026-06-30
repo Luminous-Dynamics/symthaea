@@ -34,7 +34,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
 rayon = { workspace = true, optional = true }
 symthaea-stt = { path = "../../core/symthaea-stt", optional = true }
-tree-sitter = "0.24"
+tree-sitter.workspace = true
 regex = "1.10"
 tempfile = "3.10"
 sled = "0.34"
@@ -50,9 +50,9 @@ pqcrypto-traits = "0.3"
 tree-sitter-rust = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
-symthaea-lean-bridge = { path = "../../symthaea-lean-bridge" }
-symthaea-runtime = { path = "../../symthaea-runtime" }
-symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/symtropy-robotics-bridge-core" }
+symthaea-lean-bridge = { path = "../../bridges/symthaea-lean-bridge" }
+symthaea-runtime = { path = "../../core/symthaea-runtime" }
+symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
 systemstat = "0.2"
 tokio-websockets = { version = "0.12", features = ["server"] }
 
@@ -60,12 +60,12 @@ tokio-websockets = { version = "0.12", features = ["server"] }
 ureq = { version = "2.9" }
 
 # Candle ML framework (GPU-accelerated training + inference)
-candle-core = { workspace = true }
-candle-nn = { workspace = true, optional = true }
+candle-core = { version = "0.10.2", optional = true }
+candle-nn = { version = "0.10.2", optional = true }
 hf-hub = { version = "0.4", optional = true }
 urlencoding = "2.1"
 tokenizers = { version = "0.21", optional = true }
-wasmtime = { version = "29.0", optional = true }
+wasmtime = { version = "44.0.1", optional = true }
 rustyline = "14.0"
 bytemuck = "1.25.0"
 lru.workspace = true
@@ -230,6 +230,7 @@ test-helpers = ["mamba-cpu"]
 therapeutic = []
 speech-data = ["dep:symthaea-stt"]
 code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
+highway-projection = []
 
 [[bin]]
 name = "fused_cognitive_node"

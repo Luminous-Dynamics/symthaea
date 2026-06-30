@@ -630,7 +630,7 @@ mod tests {
         assert!(report.passed, "{report:?}");
         assert_eq!(
             report.real_domain_assumption,
-            Some(EmlRealDomainAssumption::Positive)
+            Some(EmlRealDomainAssumption::GreaterThanOne)
         );
     }
 

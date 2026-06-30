@@ -16,11 +16,17 @@ impl EpistemicWatchdog {
                         if !std::path::Path::new(path).exists() {
                             errors.push(format!("Proof missing for '{}': {}", claim.name, path));
                         } else if !Self::verify_formal_proof(path) {
-                            errors.push(format!("Proof failed verification for '{}': {}", claim.name, path));
+                            errors.push(format!(
+                                "Proof failed verification for '{}': {}",
+                                claim.name, path
+                            ));
                         }
                     }
                     None => {
-                        errors.push(format!("Claim '{}' is marked Proven but lacks proof path.", claim.name));
+                        errors.push(format!(
+                            "Claim '{}' is marked Proven but lacks proof path.",
+                            claim.name
+                        ));
                     }
                 }
             }
@@ -35,11 +41,8 @@ impl EpistemicWatchdog {
 
     fn verify_formal_proof(path: &str) -> bool {
         // Invokes Lean 4 compiler (lake) for formal verification
-        let output = Command::new("lake")
-            .arg("lean")
-            .arg(path)
-            .status();
-        
+        let output = Command::new("lake").arg("lean").arg(path).status();
+
         output.map(|s| s.success()).unwrap_or(false)
     }
 }

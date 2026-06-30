@@ -161,6 +161,18 @@ pub struct LanguageControllerConfig {
     /// Default 0.3 — gentle seeding that doesn't overwhelm learned dynamics.
     #[serde(default = "default_thought_seed_scale")]
     pub thought_seed_scale: f32,
+
+    // ── Tier 2: Recurrent Highway Network ──
+    /// Enable RHN highway projection between CfC and logits.
+    #[serde(default)]
+    pub enable_highway_projection: bool,
+    /// Number of highway layers (1-3 recommended).
+    #[serde(default = "default_highway_layers")]
+    pub highway_layers: usize,
+}
+
+fn default_highway_layers() -> usize {
+    2
 }
 
 fn default_logit_scale() -> f32 {
@@ -230,6 +242,8 @@ impl Default for LanguageControllerConfig {
             orthogonal_position_count: default_orthogonal_position_count(),
             enable_thought_seeding: true,
             thought_seed_scale: default_thought_seed_scale(),
+            enable_highway_projection: false,
+            highway_layers: default_highway_layers(),
         }
     }
 }
@@ -282,6 +296,10 @@ pub struct LanguageController {
     /// Optional Liquid-Mamba fusion generator.
     #[cfg(feature = "mamba-cpu")]
     pub liquid_mamba: Option<Box<crate::liquid_mamba::LiquidMambaGenerator>>,
+
+    /// Optional RHN highway projection (between CfC and logits).
+    #[cfg(feature = "highway-projection")]
+    pub highway: Option<crate::highway_projection::BrocaHighwayProjection>,
 }
 
 impl LanguageController {
@@ -330,6 +348,16 @@ impl LanguageController {
         #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         let gpu_embeddings = Self::build_gpu_cache(&token_embeddings);
 
+        #[cfg(feature = "highway-projection")]
+        let highway = if config.enable_highway_projection {
+            Some(crate::highway_projection::BrocaHighwayProjection::new(
+                genesis,
+                config.highway_layers,
+            ))
+        } else {
+            None
+        };
+
         Self {
             network,
             token_embeddings,
@@ -346,6 +374,9 @@ impl LanguageController {
 
             #[cfg(feature = "mamba-cpu")]
             liquid_mamba: None,
+
+            #[cfg(feature = "highway-projection")]
+            highway,
         }
     }
 
@@ -525,6 +556,15 @@ impl LanguageController {
         } else {
             output_hv
         };
+
+        #[cfg(feature = "highway-projection")]
+        let logit_hv = if let Some(ref hwy) = self.highway {
+            hwy.project(&logit_hv, self.coherence_for_dt)
+        } else {
+            logit_hv
+        };
+
+        self.last_logit_hv = Some(logit_hv.clone());
 
         // 4. Weight-tied logits
         let mut logits = self.compute_logits(&logit_hv);
@@ -766,6 +806,30 @@ impl LanguageController {
             })
     }
 
+    /// Get a copy of the current highway weights.
+    #[cfg(feature = "highway-projection")]
+    pub fn highway_weights(&self) -> Option<Vec<f32>> {
+        self.highway.as_ref().map(|hwy| hwy.flatten_weights())
+    }
+
+    /// Get a copy of the current highway weights (fallback when feature is disabled).
+    #[cfg(not(feature = "highway-projection"))]
+    pub fn highway_weights(&self) -> Option<Vec<f32>> {
+        None
+    }
+
+    /// Restore highway weights.
+    #[cfg(feature = "highway-projection")]
+    pub fn restore_highway_weights(&mut self, weights: Vec<f32>) {
+        if let Some(ref mut hwy) = self.highway {
+            hwy.restore_weights(&weights);
+        }
+    }
+
+    /// Restore highway weights (fallback when feature is disabled).
+    #[cfg(not(feature = "highway-projection"))]
+    pub fn restore_highway_weights(&mut self, _weights: Vec<f32>) {}
+
     /// Reset momentum on all CfC neurons. Call between BPTT training epochs
     /// to prevent accumulated directional bias from 67K+ gradient steps.
     pub fn reset_network_momentum(&mut self) {
@@ -857,6 +921,15 @@ impl LanguageController {
         } else {
             output_hv
         };
+
+        #[cfg(feature = "highway-projection")]
+        let logit_hv = if let Some(ref hwy) = self.highway {
+            hwy.project(&logit_hv, self.coherence_for_dt)
+        } else {
+            logit_hv
+        };
+
+        self.last_logit_hv = Some(logit_hv.clone());
 
         // 4. Sparse logits: only compute similarity for active indices
         let mut logits = vec![f32::NEG_INFINITY; self.token_embeddings.len()];
@@ -1376,5 +1449,73 @@ mod tests {
             f32::NEG_INFINITY,
             "Index 3 should be -inf"
         );
+    }
+
+    #[cfg(feature = "highway-projection")]
+    #[test]
+    fn test_highway_projection_pass_through() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_highway_projection = true;
+        config.highway_layers = 2;
+
+        let mut ctrl = LanguageController::new(&genesis, &config);
+        assert!(ctrl.highway.is_some());
+
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "test_thought", HDC_DIMENSION);
+        let logits = ctrl.forward_step(&thought_hv, 0, 0);
+
+        assert_eq!(logits.len(), 32);
+        assert!(logits.iter().all(|l| l.is_finite()));
+    }
+
+    #[cfg(feature = "highway-projection")]
+    #[test]
+    fn test_checkpoint_with_highway_weights() {
+        use crate::checkpoint::BrocaCheckpoint;
+
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_highway_projection = true;
+
+        let mut ctrl = LanguageController::new(&genesis, &config);
+        let weights = ctrl.highway_weights();
+        assert!(weights.is_some());
+
+        let mut checkpoint = BrocaCheckpoint {
+            version: crate::checkpoint::CHECKPOINT_VERSION,
+            token_embeddings: ctrl.token_embeddings().to_vec(),
+            network_state: ctrl.network().clone(),
+            vocab: crate::tokenizer::VocabFile {
+                tokens: vec![],
+                merges: vec![],
+            },
+            config: crate::generator::BrocaConfig {
+                controller: config.clone(),
+                ..Default::default()
+            },
+            training_epoch: 1,
+            training_loss: 0.1,
+            adam_state: None,
+            projection_weights: None,
+            highway_weights: weights,
+            liquid_mamba_config: None,
+            metadata: crate::checkpoint::BrocaCheckpointMetadata::default(),
+            checksum: [0u8; 32],
+        };
+
+        let temp_dir = std::env::temp_dir();
+        let path = temp_dir.join("broca_highway_test.bin");
+        checkpoint.save_to_file(&path).unwrap();
+
+        let loaded = BrocaCheckpoint::load_from_file(&path).unwrap();
+        assert!(loaded.verify());
+
+        let mut ctrl2 = LanguageController::new(&genesis, &config);
+        if let Some(w) = loaded.highway_weights {
+            ctrl2.restore_highway_weights(w);
+        }
+
+        assert_eq!(ctrl.highway_weights(), ctrl2.highway_weights());
     }
 }

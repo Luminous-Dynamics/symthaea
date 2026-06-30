@@ -273,7 +273,7 @@ pub struct FactCheckResult {
 // GLOBAL LEDGER TYPE
 // ==============================================================================
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
 pub enum GlobalClaimStatus {
     Heuristic,
     Formalized,
@@ -303,5 +303,20 @@ impl GlobalEpistemicLedger {
             GlobalClaimStatus::Proven => c.formal_proof_path.is_some(),
             _ => true,
         })
+    }
+}
+impl EpistemicCoordinate {
+    pub fn new(
+        empirical: EmpiricalLevel,
+        normative: NormativeLevel,
+        materiality: MaterialityLevel,
+        context: EpistemicContext,
+    ) -> Self {
+        Self {
+            empirical,
+            normative,
+            materiality,
+            context,
+        }
     }
 }

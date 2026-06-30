@@ -382,6 +382,22 @@ impl BrocaGenerator {
         }
     }
 
+    /// Create a generator for a specific coding substrate.
+    ///
+    /// Automatically selects the optimized tokenizer and configures
+    /// code-aware gating.
+    pub fn for_substrate(genesis: &GenesisSeed, config: BrocaConfig, substrate: &str) -> Self {
+        let tokenizer = BpeTokenizer::for_substrate_distillation(substrate);
+        let mut generator = Self::with_tokenizer(genesis, config, tokenizer);
+
+        // Auto-enable code gate and configure substrate-specific settings
+        generator.config.gating.enable_code_gate = true;
+        generator.code_gate =
+            crate::gating::CodeGate::new(generator.tokenizer(), &generator.config.gating);
+
+        generator
+    }
+
     /// Create a generator with the 4K vocabulary (4,096 tokens).
     ///
     /// Use this for production training and deployment. The 4K vocabulary covers
@@ -448,9 +464,10 @@ impl BrocaGenerator {
     ) -> anyhow::Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
         // Path 1: Try full BrocaCheckpoint (CfC-HDC + all state)
         if let Ok(checkpoint) = BrocaCheckpoint::load_from_file(&path) {
+            let adam = checkpoint.adam_state.clone();
             return Ok((
                 Self::from_checkpoint_struct(checkpoint, genesis),
-                None::<AdamState>,
+                adam,
                 None::<Vec<f32>>,
                 None::<String>,
             ));
@@ -500,9 +517,10 @@ impl BrocaGenerator {
     ) -> anyhow::Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
         // Path 1: Try full BrocaCheckpoint
         if let Ok(checkpoint) = BrocaCheckpoint::load_from_file_allow_checksum_mismatch(&path) {
+            let adam = checkpoint.adam_state.clone();
             return Ok((
                 Self::from_checkpoint_struct(checkpoint, genesis),
-                None::<AdamState>,
+                adam,
                 None::<Vec<f32>>,
                 None::<String>,
             ));
@@ -550,6 +568,9 @@ impl BrocaGenerator {
         r#gen
             .controller
             .restore_token_embeddings(checkpoint.token_embeddings);
+        if let Some(hwy_w) = checkpoint.highway_weights {
+            r#gen.controller.restore_highway_weights(hwy_w);
+        }
         r#gen
     }
 
@@ -573,6 +594,7 @@ impl BrocaGenerator {
             training_loss,
             adam_state,
             projection_weights,
+            highway_weights: self.controller.highway_weights(),
             liquid_mamba_config,
             metadata: crate::checkpoint::BrocaCheckpointMetadata::default(), // Will be populated in save_to_file eventually
             checksum: [0u8; 32],
@@ -606,6 +628,8 @@ impl BrocaGenerator {
             true,
             semantic_hv,
             active_primes,
+            None,
+            None,
         )
     }
 
@@ -635,7 +659,28 @@ impl BrocaGenerator {
         on_token: &mut dyn FnMut(&str),
         reset_state: bool,
     ) -> GenerationResult {
-        self.generate_internal_with_semantic(channels, on_token, reset_state, None, &[])
+        self.generate_internal_with_semantic(channels, on_token, reset_state, None, &[], None, None)
+    }
+
+    /// Public generation method supporting both NSM semantics, conversation context, and knowledge context.
+    pub fn generate_full(
+        &mut self,
+        channels: &ThoughtChannels,
+        semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+        active_primes: &[String],
+        context_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+        knowledge_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+        reset_state: bool,
+    ) -> GenerationResult {
+        self.generate_internal_with_semantic(
+            channels,
+            &mut |_| {},
+            reset_state,
+            semantic_hv,
+            active_primes,
+            context_hv,
+            knowledge_hv,
+        )
     }
 
     /// Internal generation with configurable state reset and optional NSM semantic HV.
@@ -646,6 +691,8 @@ impl BrocaGenerator {
         reset_state: bool,
         semantic_hv: Option<&symthaea_core::hdc::ContinuousHV>,
         active_primes: &[String],
+        context_hv: Option<&symthaea_core::hdc::ContinuousHV>,
+        knowledge_hv: Option<&symthaea_core::hdc::ContinuousHV>,
     ) -> GenerationResult {
         // 1. Encode thought channels once
         let thought_hv_original = self.encoder.encode(channels);
@@ -661,6 +708,16 @@ impl BrocaGenerator {
                     thought_hv.lerp_in_place(sem_hv, 1.0 - alpha, alpha);
                 }
             }
+        }
+
+        // 1c. Blend conversation context HV at 20% weight if provided (T1.1).
+        if let Some(ctx_hv) = context_hv {
+            thought_hv.lerp_in_place(ctx_hv, 0.80, 0.20);
+        }
+
+        // 1d. Blend knowledge context HV at 15% weight if provided (T1.2).
+        if let Some(kn_hv) = knowledge_hv {
+            thought_hv.lerp_in_place(kn_hv, 0.85, 0.15);
         }
 
         // 2. Compute max tokens (consciousness-gated, then time-pressure-adjusted)

@@ -90,7 +90,7 @@ impl Default for TopologyConfig {
             max_dimension: 2, // Compute β₀, β₁, β₂
             filtration_levels: 10,
             min_persistence: 0.1,
-            max_points: 100,
+            max_points: 24, // Reduced from 100 to prevent O(N^3) matrix reduction hangs
             edge_threshold: 0.5,
             estimate_curvature: true,
         }
@@ -234,6 +234,110 @@ impl PersistencePair {
     }
 }
 
+fn symmetric_difference(a: &[usize], b: &[usize]) -> Vec<usize> {
+    let mut result = Vec::new();
+    let mut i = 0;
+    let mut j = 0;
+    while i < a.len() && j < b.len() {
+        if a[i] < b[j] {
+            result.push(a[i]);
+            i += 1;
+        } else if a[i] > b[j] {
+            result.push(b[j]);
+            j += 1;
+        } else {
+            i += 1;
+            j += 1;
+        }
+    }
+    while i < a.len() {
+        result.push(a[i]);
+        i += 1;
+    }
+    while j < b.len() {
+        result.push(b[j]);
+        j += 1;
+    }
+    result
+}
+
+pub fn compute_persistent_homology(complex: &SimplicialComplex) -> Vec<PersistencePair> {
+    let mut simplices: Vec<(Simplex, f64)> = complex
+        .filtration_values
+        .iter()
+        .map(|(s, f)| (s.clone(), *f))
+        .collect();
+
+    simplices.sort_by(|(s1, f1), (s2, f2)| {
+        f1.partial_cmp(f2)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| s1.dimension().cmp(&s2.dimension()))
+    });
+
+    let mut simplex_to_idx: HashMap<Simplex, usize> = HashMap::new();
+    for (i, (s, _)) in simplices.iter().enumerate() {
+        simplex_to_idx.insert(s.clone(), i);
+    }
+
+    let n = simplices.len();
+    let mut r: Vec<Vec<usize>> = vec![Vec::new(); n];
+
+    for (j, (s, _)) in simplices.iter().enumerate() {
+        let mut boundary = Vec::new();
+        for face in s.faces() {
+            if let Some(&i) = simplex_to_idx.get(&face) {
+                boundary.push(i);
+            }
+        }
+        boundary.sort_unstable();
+        r[j] = boundary;
+    }
+
+    let mut low_to_col: HashMap<usize, usize> = HashMap::new();
+    let mut pairs = Vec::new();
+
+    for j in 0..n {
+        while let Some(&i) = r[j].last() {
+            if let Some(&j_prime) = low_to_col.get(&i) {
+                r[j] = symmetric_difference(&r[j], &r[j_prime]);
+            } else {
+                low_to_col.insert(i, j);
+                break;
+            }
+        }
+    }
+
+    let mut deaths: HashSet<usize> = HashSet::new();
+
+    for (&i, &j) in &low_to_col {
+        deaths.insert(i);
+        deaths.insert(j);
+
+        let (s_birth, birth_val) = &simplices[i];
+        let (_s_death, death_val) = &simplices[j];
+
+        let dim = s_birth.dimension();
+        pairs.push(PersistencePair {
+            dimension: dim,
+            birth: *birth_val,
+            death: Some(*death_val),
+        });
+    }
+
+    for i in 0..n {
+        if !deaths.contains(&i) {
+            let (s_birth, birth_val) = &simplices[i];
+            pairs.push(PersistencePair {
+                dimension: s_birth.dimension(),
+                birth: *birth_val,
+                death: None,
+            });
+        }
+    }
+
+    pairs
+}
+
 /// Betti numbers at a specific filtration level
 #[derive(Debug, Clone, Default)]
 pub struct BettiNumbers {
@@ -248,26 +352,29 @@ pub struct BettiNumbers {
 }
 
 impl BettiNumbers {
-    /// Compute from a simplicial complex using boundary matrix
     pub fn from_complex(complex: &SimplicialComplex) -> Self {
-        // Simplified computation using face counts and Euler formula
+        let pairs = compute_persistent_homology(complex);
+        let mut beta_0 = 0;
+        let mut beta_1 = 0;
+        let mut beta_2 = 0;
+
+        for pair in pairs {
+            if pair.death.is_none() {
+                match pair.dimension {
+                    0 => beta_0 += 1,
+                    1 => beta_1 += 1,
+                    2 => beta_2 += 1,
+                    _ => {}
+                }
+            }
+        }
+
         let face_counts = complex.face_counts();
-
-        // β₀ = number of vertices in component analysis
-        let beta_0 = Self::count_components(complex);
-
-        // Approximate β₁ using Euler: χ = V - E + F for surfaces
-        // χ = β₀ - β₁ + β₂
         let v = face_counts.first().copied().unwrap_or(0) as i64;
         let e = face_counts.get(1).copied().unwrap_or(0) as i64;
         let f = face_counts.get(2).copied().unwrap_or(0) as i64;
-
-        let euler = v - e + f;
-
-        // Estimate β₁ (loops): typically V - E + F = β₀ - β₁ + β₂
-        // If β₂ is small, β₁ ≈ β₀ - euler
-        let beta_1 = ((beta_0 as i64) - euler).max(0) as usize;
-        let beta_2 = 0; // Simplified: would need proper homology computation
+        let t = face_counts.get(3).copied().unwrap_or(0) as i64;
+        let euler = v - e + f - t;
 
         Self {
             beta_0,
@@ -275,48 +382,6 @@ impl BettiNumbers {
             beta_2,
             euler_characteristic: euler,
         }
-    }
-
-    /// Count connected components using union-find
-    fn count_components(complex: &SimplicialComplex) -> usize {
-        let vertices: Vec<_> = complex
-            .simplices_at_dim(0)
-            .iter()
-            .filter_map(|s| s.vertices.first().copied())
-            .collect();
-
-        if vertices.is_empty() {
-            return 0;
-        }
-
-        let max_v = vertices.iter().max().copied().unwrap_or(0);
-        let mut parent: Vec<usize> = (0..=max_v).collect();
-
-        fn find(parent: &mut [usize], x: usize) -> usize {
-            if parent[x] != x {
-                parent[x] = find(parent, parent[x]);
-            }
-            parent[x]
-        }
-
-        fn union(parent: &mut [usize], x: usize, y: usize) {
-            let px = find(parent, x);
-            let py = find(parent, y);
-            if px != py {
-                parent[px] = py;
-            }
-        }
-
-        // Union vertices connected by edges
-        for edge in complex.simplices_at_dim(1) {
-            if edge.vertices.len() >= 2 {
-                union(&mut parent, edge.vertices[0], edge.vertices[1]);
-            }
-        }
-
-        // Count unique roots among vertices
-        let roots: HashSet<_> = vertices.iter().map(|&v| find(&mut parent, v)).collect();
-        roots.len()
     }
 
     /// Consciousness interpretation
@@ -538,39 +603,9 @@ impl ConsciousnessTopologyAnalyzer {
         }
     }
 
-    /// Compute simplified persistence pairs
+    /// Compute true persistent homology using Z2 matrix reduction
     fn compute_persistence(&self) -> Vec<PersistencePair> {
-        let mut pairs = Vec::new();
-
-        // β₀ features: One component born at 0, persists to infinity
-        let betti = BettiNumbers::from_complex(&self.current_complex);
-
-        // Main component (born at 0, never dies)
-        pairs.push(PersistencePair {
-            dimension: 0,
-            birth: 0.0,
-            death: None,
-        });
-
-        // Additional components that merge (if β₀ > 1, they have finite lifetime)
-        for _ in 1..betti.beta_0 {
-            pairs.push(PersistencePair {
-                dimension: 0,
-                birth: 0.0,
-                death: Some(self.config.edge_threshold),
-            });
-        }
-
-        // β₁ features (loops)
-        for _ in 0..betti.beta_1 {
-            pairs.push(PersistencePair {
-                dimension: 1,
-                birth: self.config.edge_threshold * 0.5,
-                death: Some(self.config.edge_threshold),
-            });
-        }
-
-        pairs
+        compute_persistent_homology(&self.current_complex)
     }
 
     /// Estimate manifold curvature

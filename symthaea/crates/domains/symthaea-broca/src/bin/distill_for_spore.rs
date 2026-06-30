@@ -110,6 +110,7 @@ fn main() -> Result<()> {
         // Strip training-only state
         adam_state: None,
         projection_weights: None,
+        highway_weights: checkpoint.highway_weights,
         liquid_mamba_config: None,
         metadata: checkpoint.metadata,
         checksum: [0u8; 32],

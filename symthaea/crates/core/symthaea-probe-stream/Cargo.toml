@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-probe-stream"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
+description = "Probe-matrix streaming adapter: turns embedding oracles into real-time ContinuousHV streams for the Holographic Liquid Brain"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+keywords = ["hyperdimensional-computing", "neural-bridge", "ltc", "probe", "streaming"]
+categories = ["science", "algorithms"]
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+symthaea-hdc-ltc = { path = "../symthaea-hdc-ltc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+
+[dev-dependencies]
+tempfile = "3"

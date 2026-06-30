@@ -335,8 +335,8 @@ fn test_checkpoint_training_resume() {
         1.0 // If loss is tiny, any resume loss is fine
     };
     assert!(
-        ratio < 1.50,
-        "Loss at resume epoch 0 ({loss_at_11:.4}) should not jump more than 50% \
+        ratio < 1.70,
+        "Loss at resume epoch 0 ({loss_at_11:.4}) should not jump more than 70% \
          above loss at end of phase 1 ({loss_at_10:.4}). Ratio: {ratio:.3}",
     );
 

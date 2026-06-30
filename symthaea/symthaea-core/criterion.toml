@@ -1,5 +1,0 @@
-sample_size = 50
-warm_up_time = 1
-measurement_time = 3
-noise_threshold = 0.02
-confidence_level = 0.95

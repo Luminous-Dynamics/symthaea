@@ -7,4 +7,3 @@ description = "Lightweight coding feedback taxonomy and repair hints for Symthae
 
 [lib]
 path = "src/lib.rs"
-

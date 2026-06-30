@@ -130,7 +130,7 @@ rand = { workspace = true }
 matrixmultiply = "0.3"
 
 # GPU-accelerated training via candle (CUDA auto-detection)
-candle-core = { workspace = true, optional = true }
+candle-core = "0.10.2"
 
 [dev-dependencies]
 criterion = "0.5"

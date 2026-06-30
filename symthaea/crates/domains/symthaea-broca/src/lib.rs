@@ -36,6 +36,7 @@ pub mod generic_structural_scorer_integration;
 pub mod go_walker;
 #[cfg(feature = "gpu")]
 pub mod gpu_cfc;
+pub mod highway_projection;
 pub mod invariant_discovery;
 pub mod inverse_harvester;
 pub mod living_manifests;
@@ -126,6 +127,7 @@ pub use generic_structural_scorer_integration::{
     GenericStructuralScorer, StructuralVerdict as GenericStructuralVerdict,
 };
 pub use go_walker::GoWalker;
+pub use highway_projection::BrocaHighwayProjection;
 pub use invariant_discovery::InvariantDiscovery;
 pub use inverse_harvester::{InverseHarvestPair, InverseHarvester};
 pub use living_manifests::{ComponentDoc, LivingManifest, LivingManifestGenerator};

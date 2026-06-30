@@ -448,105 +448,72 @@ impl ConsciousnessTopology {
         }
     }
 
-    /// Compute Betti numbers at scale
+    /// Compute Betti numbers at scale using true Vietoris-Rips persistent homology boundary matrix reduction.
     fn compute_betti_numbers(&self, scale: f64) -> BettiNumbers {
-        // Build adjacency based on similarity
         let n = self.states.len();
-        let mut connected = vec![vec![false; n]; n];
+        if n == 0 {
+            return BettiNumbers::default();
+        }
 
+        // 1. Compute pairwise distances: d(i, j) = 1.0 - similarity(i, j)
+        let mut dists = vec![vec![0.0f64; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                let sim = self.states[i].similarity(&self.states[j]) as f64;
+                dists[i][j] = (1.0 - sim).max(0.0);
+            }
+        }
+
+        // 2. Identify all simplices in the Vietoris-Rips complex up to dimension 2
+        // We filter by birth time <= 1.0 - scale (which corresponds to similarity >= scale)
+        let eps = (1.0 - scale).max(0.0);
+
+        #[derive(Clone, Debug)]
+        struct Simplex {
+            dim: usize,
+            vertices: Vec<usize>,
+            birth: f64,
+        }
+
+        let mut simplices = Vec::new();
+
+        // 0-simplices (Vertices)
+        for i in 0..n {
+            simplices.push(Simplex {
+                dim: 0,
+                vertices: vec![i],
+                birth: 0.0,
+            });
+        }
+
+        // 1-simplices (Edges)
         for i in 0..n {
             for j in (i + 1)..n {
-                let similarity = self.states[i].similarity(&self.states[j]) as f64;
-                if similarity >= scale {
-                    connected[i][j] = true;
-                    connected[j][i] = true;
+                let d = dists[i][j];
+                if d <= eps {
+                    simplices.push(Simplex {
+                        dim: 1,
+                        vertices: vec![i, j],
+                        birth: d,
+                    });
                 }
             }
         }
 
-        // β₀: Count connected components (simplified Union-Find)
-        let beta_0 = self.count_components(&connected);
-
-        // β₁: Estimate cycles (simplified - count triangles)
-        let beta_1 = if self.config.detect_cycles {
-            self.estimate_cycles(&connected)
-        } else {
-            0
-        };
-
-        // β₂: Estimate voids (simplified - count tetrahedra)
-        let beta_2 = if self.config.detect_voids {
-            self.estimate_voids(&connected)
-        } else {
-            0
-        };
-
-        BettiNumbers::new(beta_0, beta_1, beta_2)
-    }
-
-    /// Count connected components
-    fn count_components(&self, connected: &[Vec<bool>]) -> usize {
-        let n = connected.len();
-        let mut visited = vec![false; n];
-        let mut count = 0;
-
-        for i in 0..n {
-            if !visited[i] {
-                // DFS to mark component
-                self.dfs(i, connected, &mut visited);
-                count += 1;
-            }
-        }
-
-        count
-    }
-
-    /// Depth-first search
-    fn dfs(&self, node: usize, connected: &[Vec<bool>], visited: &mut [bool]) {
-        visited[node] = true;
-        for neighbor in 0..connected.len() {
-            if connected[node][neighbor] && !visited[neighbor] {
-                self.dfs(neighbor, connected, visited);
-            }
-        }
-    }
-
-    /// Estimate number of cycles (β₁)
-    fn estimate_cycles(&self, connected: &[Vec<bool>]) -> usize {
-        let n = connected.len();
-        let mut cycles = 0;
-
-        // Count triangles (simplification: each triangle contributes to β₁)
-        for i in 0..n {
-            for j in (i + 1)..n {
-                if connected[i][j] {
-                    for k in (j + 1)..n {
-                        if connected[i][k] && connected[j][k] {
-                            cycles += 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Estimate β₁ (rough approximation)
-        (cycles / 3).max(0)
-    }
-
-    /// Estimate number of voids (β₂)
-    fn estimate_voids(&self, connected: &[Vec<bool>]) -> usize {
-        let n = connected.len();
-        let mut voids = 0;
-
-        // Count tetrahedra (4-cliques) - simplified void detection
-        for i in 0..n {
-            for j in (i + 1)..n {
-                if connected[i][j] {
-                    for k in (j + 1)..n {
-                        if connected[i][k] && connected[j][k] {
-                            for l in (k + 1)..n {
-                                if connected[i][l] && connected[j][l] && connected[k][l] {
-                                    voids += 1;
+        // 2-simplices (Triangles)
+        if self.config.detect_voids || self.config.detect_cycles {
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    if dists[i][j] <= eps {
+                        for k in (j + 1)..n {
+                            if dists[i][k] <= eps && dists[j][k] <= eps {
+                                let birth = dists[i][j].max(dists[i][k]).max(dists[j][k]);
+                                if birth <= eps {
+                                    simplices.push(Simplex {
+                                        dim: 2,
+                                        vertices: vec![i, j, k],
+                                        birth,
+                                    });
                                 }
                             }
                         }
@@ -555,70 +522,303 @@ impl ConsciousnessTopology {
             }
         }
 
-        // Estimate β₂ (very rough approximation)
-        (voids / 4).max(0)
+        // 3. Sort simplices by birth time, then by dimension
+        simplices.sort_by(|a, b| {
+            a.birth
+                .partial_cmp(&b.birth)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.dim.cmp(&b.dim))
+        });
+
+        use std::collections::HashMap;
+        let mut simplex_indices = HashMap::new();
+        for (idx, s) in simplices.iter().enumerate() {
+            simplex_indices.insert(s.vertices.clone(), idx);
+        }
+
+        // 4. Boundary matrix D columns
+        let m = simplices.len();
+        let mut d_cols: Vec<Vec<usize>> = vec![Vec::new(); m];
+
+        for j in 0..m {
+            let s = &simplices[j];
+            if s.dim == 1 {
+                let v0 = vec![s.vertices[0]];
+                let v1 = vec![s.vertices[1]];
+                if let (Some(&i0), Some(&i1)) = (simplex_indices.get(&v0), simplex_indices.get(&v1))
+                {
+                    d_cols[j] = vec![i0, i1];
+                    d_cols[j].sort();
+                }
+            } else if s.dim == 2 {
+                let f0 = vec![s.vertices[1], s.vertices[2]];
+                let f1 = vec![s.vertices[0], s.vertices[2]];
+                let f2 = vec![s.vertices[0], s.vertices[1]];
+                let mut boundary = Vec::new();
+                for f in &[f0, f1, f2] {
+                    if let Some(&idx) = simplex_indices.get(f) {
+                        boundary.push(idx);
+                    }
+                }
+                boundary.sort();
+                d_cols[j] = boundary;
+            }
+        }
+
+        // 5. Reduce boundary matrix
+        let mut pivot_to_col: HashMap<usize, usize> = HashMap::new();
+        for j in 0..m {
+            while let Some(&pivot) = d_cols[j].last() {
+                if let Some(&k) = pivot_to_col.get(&pivot) {
+                    let mut new_col = Vec::new();
+                    let (mut it_j, mut it_k) =
+                        (d_cols[j].iter().peekable(), d_cols[k].iter().peekable());
+                    while let (Some(&&val_j), Some(&&val_k)) = (it_j.peek(), it_k.peek()) {
+                        if val_j == val_k {
+                            it_j.next();
+                            it_k.next();
+                        } else if val_j < val_k {
+                            new_col.push(val_j);
+                            it_j.next();
+                        } else {
+                            new_col.push(val_k);
+                            it_k.next();
+                        }
+                    }
+                    for val in it_j {
+                        new_col.push(*val);
+                    }
+                    for val in it_k {
+                        new_col.push(*val);
+                    }
+                    d_cols[j] = new_col;
+                } else {
+                    pivot_to_col.insert(pivot, j);
+                    break;
+                }
+            }
+        }
+
+        // 6. Calculate Betti numbers
+        let mut creators = vec![0; 3];
+        let mut killers = vec![0; 3];
+
+        for j in 0..m {
+            let dim = simplices[j].dim;
+            if dim < 3 {
+                if d_cols[j].is_empty() {
+                    creators[dim] += 1;
+                } else {
+                    let pivot_idx = *d_cols[j].last().unwrap();
+                    let pivot_dim = simplices[pivot_idx].dim;
+                    killers[pivot_dim] += 1;
+                }
+            }
+        }
+
+        let beta_0 = creators[0] - killers[0];
+        let beta_1 = if self.config.detect_cycles {
+            creators[1] - killers[1]
+        } else {
+            0
+        };
+        let beta_2 = if self.config.detect_voids {
+            creators[2] - killers[2]
+        } else {
+            0
+        };
+
+        BettiNumbers::new(beta_0, beta_1, beta_2)
     }
 
-    /// Compute persistent features across scales
+    /// Compute persistent features across scales using true Vietoris-Rips persistent homology.
     fn compute_persistent_features(&self) -> Vec<PersistentFeature> {
-        let mut features = Vec::new();
+        let n = self.states.len();
+        if n == 0 {
+            return Vec::new();
+        }
 
-        // Sample scales from 0 to max_scale
-        let scales: Vec<f64> = (0..self.config.num_scales)
-            .map(|i| (i as f64 / self.config.num_scales as f64) * self.config.max_scale)
-            .collect();
+        // Compute pairwise distances
+        let mut dists = vec![vec![0.0f64; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                let sim = self.states[i].similarity(&self.states[j]) as f64;
+                dists[i][j] = (1.0 - sim).max(0.0);
+            }
+        }
 
-        // Track features across scales
-        let mut prev_betti = BettiNumbers::default();
+        #[derive(Clone, Debug)]
+        struct Simplex {
+            dim: usize,
+            vertices: Vec<usize>,
+            birth: f64,
+        }
 
-        for (idx, &scale) in scales.iter().enumerate() {
-            let betti = self.compute_betti_numbers(scale);
+        let mut simplices = Vec::new();
 
-            // Detect birth/death of components
-            if idx > 0 {
-                // Components appearing
-                if betti.beta_0 > prev_betti.beta_0 {
-                    let diff = betti.beta_0 - prev_betti.beta_0;
-                    for _ in 0..diff {
-                        features.push(PersistentFeature::new(
-                            TopologicalFeature::Component,
-                            scale,
-                            self.config.max_scale, // Assume persists to end
-                        ));
-                    }
-                }
+        // 0-simplices
+        for i in 0..n {
+            simplices.push(Simplex {
+                dim: 0,
+                vertices: vec![i],
+                birth: 0.0,
+            });
+        }
 
-                // Cycles appearing
-                if betti.beta_1 > prev_betti.beta_1 {
-                    let diff = betti.beta_1 - prev_betti.beta_1;
-                    for _ in 0..diff {
-                        features.push(PersistentFeature::new(
-                            TopologicalFeature::Cycle,
-                            scale,
-                            self.config.max_scale,
-                        ));
-                    }
-                }
+        // 1-simplices
+        for i in 0..n {
+            for j in (i + 1)..n {
+                simplices.push(Simplex {
+                    dim: 1,
+                    vertices: vec![i, j],
+                    birth: dists[i][j],
+                });
+            }
+        }
 
-                // Voids appearing
-                if betti.beta_2 > prev_betti.beta_2 {
-                    let diff = betti.beta_2 - prev_betti.beta_2;
-                    for _ in 0..diff {
-                        features.push(PersistentFeature::new(
-                            TopologicalFeature::Void,
-                            scale,
-                            self.config.max_scale,
-                        ));
+        // 2-simplices
+        if self.config.detect_voids || self.config.detect_cycles {
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    for k in (j + 1)..n {
+                        let birth = dists[i][j].max(dists[i][k]).max(dists[j][k]);
+                        simplices.push(Simplex {
+                            dim: 2,
+                            vertices: vec![i, j, k],
+                            birth,
+                        });
                     }
                 }
             }
-
-            prev_betti = betti;
         }
 
-        // Filter by persistence threshold
-        features.retain(|f| f.persistence >= self.config.min_persistence);
+        // Sort all simplices by birth time, then by dimension
+        simplices.sort_by(|a, b| {
+            a.birth
+                .partial_cmp(&b.birth)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.dim.cmp(&b.dim))
+        });
 
+        use std::collections::HashMap;
+        let mut simplex_indices = HashMap::new();
+        for (idx, s) in simplices.iter().enumerate() {
+            simplex_indices.insert(s.vertices.clone(), idx);
+        }
+
+        let m = simplices.len();
+        let mut d_cols: Vec<Vec<usize>> = vec![Vec::new(); m];
+
+        for j in 0..m {
+            let s = &simplices[j];
+            if s.dim == 1 {
+                let v0 = vec![s.vertices[0]];
+                let v1 = vec![s.vertices[1]];
+                if let (Some(&i0), Some(&i1)) = (simplex_indices.get(&v0), simplex_indices.get(&v1))
+                {
+                    d_cols[j] = vec![i0, i1];
+                    d_cols[j].sort();
+                }
+            } else if s.dim == 2 {
+                let f0 = vec![s.vertices[1], s.vertices[2]];
+                let f1 = vec![s.vertices[0], s.vertices[2]];
+                let f2 = vec![s.vertices[0], s.vertices[1]];
+                let mut boundary = Vec::new();
+                for f in &[f0, f1, f2] {
+                    if let Some(&idx) = simplex_indices.get(f) {
+                        boundary.push(idx);
+                    }
+                }
+                boundary.sort();
+                d_cols[j] = boundary;
+            }
+        }
+
+        let mut pivot_to_col: HashMap<usize, usize> = HashMap::new();
+        let mut features = Vec::new();
+
+        let mut birth_times = vec![0.0f64; m];
+        for j in 0..m {
+            birth_times[j] = simplices[j].birth;
+        }
+
+        for j in 0..m {
+            while let Some(&pivot) = d_cols[j].last() {
+                if let Some(&k) = pivot_to_col.get(&pivot) {
+                    let mut new_col = Vec::new();
+                    let (mut it_j, mut it_k) =
+                        (d_cols[j].iter().peekable(), d_cols[k].iter().peekable());
+                    while let (Some(&&val_j), Some(&&val_k)) = (it_j.peek(), it_k.peek()) {
+                        if val_j == val_k {
+                            it_j.next();
+                            it_k.next();
+                        } else if val_j < val_k {
+                            new_col.push(val_j);
+                            it_j.next();
+                        } else {
+                            new_col.push(val_k);
+                            it_k.next();
+                        }
+                    }
+                    for val in it_j {
+                        new_col.push(*val);
+                    }
+                    for val in it_k {
+                        new_col.push(*val);
+                    }
+                    d_cols[j] = new_col;
+                } else {
+                    pivot_to_col.insert(pivot, j);
+                    break;
+                }
+            }
+        }
+
+        let mut killed = vec![false; m];
+        for (&pivot, &col) in &pivot_to_col {
+            let birth = birth_times[pivot];
+            let death = birth_times[col];
+            let dim = simplices[pivot].dim;
+            killed[pivot] = true;
+
+            // Map distance birth/death back to similarity coordinates:
+            // Similarity scale = 1.0 - distance
+            let sim_birth = 1.0 - death;
+            let sim_death = 1.0 - birth;
+
+            if sim_death > sim_birth + 1e-5 {
+                let f_type = match dim {
+                    0 => Some(TopologicalFeature::Component),
+                    1 => Some(TopologicalFeature::Cycle),
+                    _ => None,
+                };
+                if let Some(feature_type) = f_type {
+                    features.push(PersistentFeature::new(feature_type, sim_birth, sim_death));
+                }
+            }
+        }
+
+        for j in 0..m {
+            if simplices[j].dim < 2 && !killed[j] && d_cols[j].is_empty() {
+                let birth = birth_times[j];
+                let death = self.config.max_scale; // distance max scale (e.g. 1.0)
+                let sim_birth = 0.0; // Persists to similarity scale 0
+                let sim_death = 1.0 - birth;
+
+                if sim_death > sim_birth + 1e-5 {
+                    let f_type = match simplices[j].dim {
+                        0 => Some(TopologicalFeature::Component),
+                        1 => Some(TopologicalFeature::Cycle),
+                        _ => None,
+                    };
+                    if let Some(feature_type) = f_type {
+                        features.push(PersistentFeature::new(feature_type, sim_birth, sim_death));
+                    }
+                }
+            }
+        }
+
+        features.retain(|f| f.persistence >= self.config.min_persistence);
         features
     }
 

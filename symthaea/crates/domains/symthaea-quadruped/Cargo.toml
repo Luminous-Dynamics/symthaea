@@ -12,11 +12,11 @@ rand = { workspace = true }
 proptest = "1"
 
 [dependencies.symtropy-physics]
-path = "../../../../symtropy/crates/symtropy-physics"
+path = "../../../../symtropy/crates/core/symtropy-physics"
 optional = true
 
 [dependencies.symtropy-math]
-path = "../../../../symtropy/crates/symtropy-math"
+path = "../../../../symtropy/crates/core/symtropy-math"
 optional = true
 
 [dependencies.nalgebra]

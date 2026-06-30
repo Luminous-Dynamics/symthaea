@@ -400,6 +400,15 @@ pub trait SimulationBackend: std::fmt::Debug + Send + Sync {
 
     /// Run a normalized simulation request.
     fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError>;
+
+    /// Spawns the simulator as a persistent background daemon/process.
+    /// Returns the child process handle if supported, or None if not supported.
+    fn spawn_daemon(
+        &self,
+        _request: &SimulationRequest,
+    ) -> Result<Option<std::process::Child>, SimulationError> {
+        Ok(None)
+    }
 }
 
 /// Orchestrator for multiple simulation backends.
@@ -433,6 +442,17 @@ impl SimulationRegistry {
             .find_backend(request.solver)
             .ok_or_else(|| SimulationError::SolverUnavailable(request.solver))?;
         backend.run(request)
+    }
+
+    /// Spawn a simulation daemon using the first matching backend.
+    pub fn spawn_daemon(
+        &self,
+        request: &SimulationRequest,
+    ) -> Result<Option<std::process::Child>, SimulationError> {
+        let backend = self
+            .find_backend(request.solver)
+            .ok_or_else(|| SimulationError::SolverUnavailable(request.solver))?;
+        backend.spawn_daemon(request)
     }
 }
 

@@ -13,7 +13,7 @@ categories = ["science", "algorithms"]
 
 [features]
 default = []
-symthaea-backend = ["dep:symthaea"]
+symthaea-backend = ["symthaea-core/ctc_wiring"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 neural_validation = ["symthaea-core/neural_validation"]  # TRIBE v2 fMRI comparison benchmark
 nuclear-benchmarks = ["dep:symthaea-nuclear"]            # Nuclear physics science benchmarks
@@ -25,7 +25,6 @@ symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 symthaea-ssm = { path = "../symthaea-ssm" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
-symthaea = { path = "../../..", optional = true }
 symthaea-neuroevolution = { path = "../symthaea-neuroevolution", optional = true }
 symthaea-nuclear = { path = "../symthaea-nuclear", optional = true }
 symthaea-materials = { path = "../symthaea-materials", optional = true }

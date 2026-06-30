@@ -117,6 +117,8 @@ pub struct BrocaCheckpoint {
     pub adam_state: Option<AdamState>,
     pub projection_weights: Option<Vec<f32>>,
     #[serde(default)]
+    pub highway_weights: Option<Vec<f32>>,
+    #[serde(default)]
     pub liquid_mamba_config: Option<String>,
     #[serde(default)]
     pub metadata: BrocaCheckpointMetadata,

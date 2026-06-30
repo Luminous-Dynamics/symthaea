@@ -15,7 +15,7 @@ categories = ["science", "algorithms", "multimedia::video"]
 image = "0.24"
 
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-perception = { path = "../../symthaea-perception", optional = true }
+symthaea-perception = { path = "../symthaea-perception", optional = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 
