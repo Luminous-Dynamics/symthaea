@@ -3,8 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Hierarchical Active Inference — Scale-free cognitive coordination.
 
-use crate::{ActiveInferenceAgent, Observation, types::HiddenState};
-use serde::{Deserialize, Serialize};
+use crate::{ActiveInferenceAgent, Observation};
 
 /// A hierarchical coordination of nested Active Inference agents.
 ///

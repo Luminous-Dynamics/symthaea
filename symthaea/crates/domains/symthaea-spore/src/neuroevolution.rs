@@ -11,7 +11,6 @@
 //! `TickResult::ChampionSwapped` signals the SporeEngine to update its CfC config.
 
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNetwork, UnifiedNetworkConfig};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
