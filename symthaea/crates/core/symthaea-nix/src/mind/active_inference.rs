@@ -185,7 +185,32 @@ impl NixActiveInference {
         let efe =
             -(pragmatic + self.curiosity_weight * epistemic + self.episodic_weight * episodic);
 
-        // Compute prediction error
+        ScoredAction {
+            action: action.clone(),
+            expected_free_energy: efe,
+            pragmatic_value: pragmatic,
+            epistemic_value: epistemic,
+            episodic_valence: episodic,
+            rationale: format!(
+                "{action} scored from pragmatic={pragmatic:.3}, epistemic={epistemic:.3}, episodic={episodic:.3}"
+            ),
+        }
+    }
+
+    /// Observe the current encoded NixOS state.
+    pub fn observe_state(&mut self, state: ContinuousHV) {
+        self.world_model.observe(state);
+    }
+
+    /// Learn from an observed action outcome.
+    pub fn learn_from_outcome(
+        &mut self,
+        state_before: &ContinuousHV,
+        action: ActionCategory,
+        state_after: &ContinuousHV,
+        outcome: EpisodeOutcome,
+        phi: f64,
+    ) {
         let predicted = self.world_model.predict_state(&action);
         let prediction_error = 1.0 - predicted.similarity(state_after).max(0.0) as f64;
 
@@ -197,6 +222,10 @@ impl NixActiveInference {
         } else {
             self.curiosity_weight = (self.curiosity_weight - 0.02).max(0.1);
         }
+
+        self.world_model
+            .learn_transition(state_before, action.clone(), state_after);
+        self.world_model.observe(state_after.clone());
 
         // Record in episodic memory (Φ-gated)
         #[cfg(feature = "native")]
@@ -232,7 +261,7 @@ impl NixActiveInference {
                 state_before.clone(),
                 &cmd,
                 state_after.clone(),
-                outcome,
+                outcome.clone(),
                 phi,
                 prediction_error,
             );
