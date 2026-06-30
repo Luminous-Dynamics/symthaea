@@ -149,3 +149,12 @@ symthaea/
 data/midi/
 data/samples/
 data/mot-sample/
+
+# Local archive / handoff trees
+disabled-crates/
+disabled-hdc-zkp-bench/
+final_handover_artifacts/
+pillars/
+
+# Standalone demo experiments
+demos/infin-love/
