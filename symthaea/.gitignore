@@ -36,6 +36,7 @@ logs/
 # Environment
 .env
 .env.local
+.secrets/
 .venv/
 **/.venv/
 
@@ -106,6 +107,12 @@ LibriSpeech-Alignments.zip
 # Benchmark output
 *_output.txt
 benchmark_output/
+build_audit.json
+metadata.json
+time_waterfall_export.json
+rust-logic-pairs*.jsonl
+target_test/
+tda_test
 
 # LaTeX byproducts
 papers/latex/*.aux
@@ -129,6 +136,7 @@ audio_output/
 
 # Video output from MuJoCo demos
 video_output/
+mujoco-*/
 
 # Runtime logs
 MUJOCO_LOG.TXT
