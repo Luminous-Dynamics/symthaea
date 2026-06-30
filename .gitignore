@@ -319,3 +319,13 @@ configs/
 /xenia-server/
 /xenia-peer/
 .aider*
+
+# === Monorepo Scratch & Tool Cleanup ===
+fix_*.py
+repair_*.py
+patch_*.py
+
+# Discarded environment backups
+**/_archive-*/
+**/_archive-disabled-*/
+**/_archive-infrastructure-*/
