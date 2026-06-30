@@ -65,6 +65,8 @@ fn main() {
         cycle_id: 1,
         neuromod_exploration_mod: 1.0,
         epistemic_quality: 0.5,
+        grid_encoding_norm: 0.0,
+        grid_spatial_complexity: 0.0,
     };
 
     let r1 = engine.reason(&ctx1);
@@ -131,6 +133,8 @@ fn main() {
         cycle_id: 2,
         neuromod_exploration_mod: 1.0,
         epistemic_quality: 0.5,
+        grid_encoding_norm: 0.0,
+        grid_spatial_complexity: 0.0,
     };
 
     let r2 = engine.reason(&ctx2);
@@ -188,6 +192,8 @@ fn main() {
         cycle_id: 3,
         neuromod_exploration_mod: 1.0,
         epistemic_quality: 0.5,
+        grid_encoding_norm: 0.0,
+        grid_spatial_complexity: 0.0,
     };
 
     let r3 = engine.reason(&ctx3);

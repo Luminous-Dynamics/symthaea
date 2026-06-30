@@ -132,7 +132,7 @@ thought.code_context = Some(CodeContext {
 });
 ```
 
-**Touches**: `cycle_phase_dynamics.rs`, `cycle_phase_output.rs`, mind's thought extraction
+**Touches**: `cycle_phase_dynamics.rs`, `cycle_phase_output/`, mind's thought extraction
 
 ### 1.2 Add CODE_GENERATION_SYSTEM_PROMPT
 
@@ -1168,7 +1168,7 @@ Phase 6 is independent future work.
 | File | Phase | Change |
 |------|-------|--------|
 | `src/cognitive_loop/cycle_phase_dynamics.rs` | 1,2 | Populate CodeContext; wire reasoning to code |
-| `src/cognitive_loop/cycle_phase_output.rs` | 1 | Attach CodeContext to StructuredThought |
+| `src/cognitive_loop/cycle_phase_output/` | 1 | Attach CodeContext to StructuredThought |
 | `src/mind/structured_thought.rs` | 1 | Enrich to_translation_prompt() with CodeSpec |
 | `src/language/llm_organ.rs` | 1 | Swap system prompt for code tasks |
 | `src/consciousness/reasoning_engine/types.rs` | 2 | Add code_intent to ReasoningContext |

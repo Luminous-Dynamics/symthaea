@@ -42,24 +42,19 @@ trained-model claim is narrower than previously framed.
 | Tier 3 cache | `src/language/learned_idioms.rs` | 14 | auto |
 | Module-eval cache | `src/language/nix_eval_cache.rs` | 9 | auto |
 | Intent bridge (→ Broca) | `src/language/nix_broca_bridge.rs` | 9 | — |
-| Distillation harvester | `examples/harvest_nix_distillation.rs` | — | `cargo run --features code_generation --example harvest_nix_distillation` |
+| Distillation harvester | `examples/harvest_distillation.rs` | — | `cargo run --features code_generation --example harvest_distillation -- --substrate nix` |
 | Broca trainer | `crates/symthaea-broca/src/bin/distill_nix_train.rs` | — | `cargo run --bin distill_nix_train -p symthaea-broca -- --epochs 25` |
 | Generation demo | `crates/symthaea-broca/src/bin/distill_nix_generate.rs` | — | `cargo run --bin distill_nix_generate -p symthaea-broca` |
 
-### Substrate-independence (scorers for two more)
+### Substrate-independence (scorers for three)
 
 | Substrate | Module | Parser backend | Tests |
 |---|---|---|---|
+| Nix | `src/language/nix_scorer.rs` | `rnix` | 15 |
 | Docker Compose (YAML) | `src/language/compose_scorer.rs` | `serde_yaml` 0.9 | 8 |
-| Terraform (HCL) | `src/language/hcl_scorer.rs` | `hcl-rs` 0.18 | 13 (including heredocs, `var.x` traversals, `[for … in …]`, `a ? b : c`) |
+| Terraform (HCL) | `src/language/hcl_scorer.rs` | `hcl-rs` 0.18 | 13 |
 
-Same `flatten → compare → verdict` architecture across all three
-substrates. Each uses its own battle-tested parser (`rnix`,
-`serde_yaml`, `hcl-rs`) but converges on a shared `pass()` /
-`summary()` / `missing_required`/`value_mismatches`/`extraneous`
-interface. The substrate-independence claim isn't theoretical —
-three live scorers pass 36 tests covering the common-case shapes in
-each ecosystem.
+All three substrates are now integrated into the unified `substrate.rs` bridge and the generalized `harvest_distillation.rs` example.
 
 ## Honest benchmark numbers
 

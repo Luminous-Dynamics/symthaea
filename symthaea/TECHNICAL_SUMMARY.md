@@ -8,8 +8,8 @@ This document summarizes the architectural and scientific enhancements implement
 - **Autonomous Benchmarking:** Implemented `benchmark_runner` (with `conscious-benchmark` subcommand) to autonomously stress-test consciousness metrics ($\Phi$ and Betti numbers) and trigger threshold self-repair.
 
 ## 2. Scientific Foundation
-- **Topological Analysis:** Replaced heuristic Betti number counting with a robust `HomologySolver` (using boundary matrices and Smith Normal Form over $\mathbb{Z}_2$) to enable high-fidelity analysis of moral/consciousness manifolds.
-- **2D FEM Engine:** Expanded the FEM engine in `symthaea-core` to support 2D Poisson equations, significantly increasing Symthaea's spatial and physical reasoning precision.
+- **Topological Analysis:** Transitioning from heuristic Betti number counting to a robust `HomologySolver` (using boundary matrices and Smith Normal Form over $\mathbb{Z}_2$) to enable high-fidelity analysis of moral/consciousness manifolds. [ACTIVE GAP]
+- **2D FEM Engine:** Scaling the FEM engine in `symthaea-core` from 1D to support 2D Poisson equations, which will increase Symthaea's spatial and physical reasoning precision. [ACTIVE GAP]
 - **Optimal Control:** Added a core `ControlEngine` featuring DARE and LQR solvers, allowing for model-based optimal control policy generation.
 
 ## 3. Cognitive Governance & Adaptivity

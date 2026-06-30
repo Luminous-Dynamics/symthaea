@@ -969,7 +969,7 @@ infrastructure.
       capability probed and green on this machine.
     - Pre-existing breakage fix: cognitive-loop cfg gates for
       embodiment fields (`sensorimotor_execution.rs`, `config/mod.rs`,
-      `accessors/system.rs`, `cycle_phase_output.rs`, `mod.rs`) now
+      `accessors/system.rs`, `cycle_phase_output/`, `mod.rs`) now
       include `feature = "phone"` to match the commit `01d12dd5728`
       intent. Main had been uncompileable under `phone` feature
       since April 12.

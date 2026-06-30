@@ -24,7 +24,7 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 mod benches {
     use super::*;
     use symthaea::consciousness::epistemic_conflict::{
-        ConflictDetector, MultiTheoryMetrics, TheoryCalibrator, phi_integration::effective_phi,
+        ConflictDetector, MultiTheoryMetrics, phi_integration::effective_phi,
     };
     use symthaea::consciousness::reasoning_engine::{ConsciousReasoningEngine, ReasoningContext};
     use symthaea::consciousness::temporal_planning::types::PlannedAction;
@@ -98,6 +98,8 @@ mod benches {
             cycle_id: 0,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: 0.5,
+            grid_encoding_norm: 0.0,
+            grid_spatial_complexity: 0.0,
         };
 
         c.bench_function("full_tier0_cycle", |b| {
@@ -122,6 +124,8 @@ mod benches {
             cycle_id: 0,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: 0.5,
+            grid_encoding_norm: 0.0,
+            grid_spatial_complexity: 0.0,
         };
 
         c.bench_function("full_tier1_cycle", |b| {
@@ -151,6 +155,8 @@ mod benches {
             cycle_id: 0,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: 0.5,
+            grid_encoding_norm: 0.0,
+            grid_spatial_complexity: 0.0,
         };
 
         c.bench_function("full_tier2_cycle", |b| {
@@ -195,6 +201,8 @@ mod benches {
                         cycle_id: i,
                         neuromod_exploration_mod: 1.0,
                         epistemic_quality: 0.5,
+                        grid_encoding_norm: 0.0,
+                        grid_spatial_complexity: 0.0,
                     };
                     black_box(engine.reason(&ctx));
                 }

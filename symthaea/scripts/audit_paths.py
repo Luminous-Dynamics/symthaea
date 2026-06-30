@@ -16,6 +16,7 @@ IGNORED_SYMLINK_ROOTS = (
     ROOT / "data",
     ROOT / "papers",
     ROOT / "docs" / "demos",
+    ROOT / "pillars",
     ROOT / "crates" / "symthaea-core" / "docs" / "demos",
     ROOT / "target",
     ROOT / "target_test",
@@ -50,6 +51,12 @@ def manifest_path_dependencies(manifest: Path) -> list[tuple[str, str]]:
                 if isinstance(spec, dict) and "path" in spec:
                     dependencies.append((f"{target}:{name}", spec["path"]))
     return dependencies
+
+
+def manifest_autotests_enabled(manifest: Path) -> bool:
+    with manifest.open("rb") as handle:
+        document = tomllib.load(handle)
+    return bool(document.get("package", {}).get("autotests", True))
 
 
 def is_ignored_symlink(path: Path) -> bool:
@@ -102,7 +109,7 @@ def main() -> int:
     )
     if app is None:
         errors.append("application package at repository root is not a workspace member")
-    else:
+    elif manifest_autotests_enabled(app_manifest):
         discovered = {
             Path(target["src_path"]).stem
             for target in app["targets"]

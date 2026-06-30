@@ -30,7 +30,8 @@
 | `algebraic_geometry.rs` | — | 16 | **Tested with Known Limits** | Yes (numerical) | Newton's method on systems, Gauss elimination Jacobian solve, elliptic curve group law, Bézout. Self-labels "Numerical Algebraic Geometry" — no Gröbner bases, no symbolic ideals. |
 | `category_theory.rs` | 954 | 16 | **Tested with Known Limits** | Partial | Small categories, functors, natural transformations, adjunctions, monads, Yoneda. No topoi, derived categories, sheaves. |
 | `measure_probability.rs` | 573 | 15 | **Tested with Known Limits** | Yes | σ-algebra axiom validator (Ω, ∅, complement closure, pairwise union closure), measure spaces, martingales, Brownian motion, Itô's lemma, CLT, KS statistic. Radon-Nikodym absent. |
-| `consciousness_topology.rs` | 1,806 | — | **Research / Partial** | No | β₀ real (DFS connected-components). β₁ **heuristic** (`consciousness_topology.rs:470`: "Estimate cycles - simplified - count triangles"). β₂ **heuristic** (`:477`: "Estimate voids - count tetrahedra"). No Vietoris-Rips filtration, no boundary operators, no persistent-homology reduction. |
+| `consciousness_topology.rs` | 1,806 | — | **Research / Partial** | No | β₀ real (DFS connected-components). β₁/β₂ transitioning to robust SNF/Persistence via `symthaea-hodge`. |
+| `fem.rs` | 280 | 3 | **Tested with Known Limits** | Yes (numerical) | 1D and 2D Poisson solvers implemented via Galerkin weak forms and Sparse Conjugate Gradient (CSR). Coupled to Φ measurement. |
 | `linear_algebra.rs` | 3,041 | — | **Production** | Yes | QR, SVD, eigensolvers, GMRES, PCA, Cholesky (prior-verified). |
 | `calculus.rs` + `autodiff.rs` + `autodiff_phi.rs` | 4,983 | — | **Production** | Yes | Forward/reverse AD, specialized Φ-gradient tracking. |
 | `differential_equations.rs` | 1,906 | — | **Production** | Yes | ODE/PDE solvers, bifurcation, attractor detection. |
@@ -41,6 +42,14 @@
 | `functional_analysis.rs` | 1,623 | 17 | **Tested with Known Limits** | Yes (finite-dim) | L² spaces, bounded operators, Jacobi eigenvalue, Sobolev norms H¹/H², Fredholm alternative. Entire module is finite-dimensional; no distributions, no weak solutions on infinite-dim Hilbert spaces. |
 | `conjecture_engine.rs` | 11,097 | — | **Production** | Yes (external Z3) | Symbolic regression GP, Z3 auto-proof (`:3157` `auto_prove_via_z3`, `:4362` `expr_to_smtlib2`), Bayesian confidence. 6 PROVEN conjectures via `ramanujan_showcase.rs` (seed=42 deterministic). |
 | `abstract_thought/` (4 files) | 2,777 | — | **Research / Partial** | No | Meta-HDC, dynamic grammar, category discovery, macro quality. Wired to conjecture engine; does NOT talk to `GridEncoder` (ARC-AGI-2 integration gap). |
+
+---
+
+## Domain-Specific Crates
+
+| Module | LOC | Tests | Status | External Comm. | Notes |
+|--------|-----|-------|--------|----------------|-------|
+| `symthaea-hodge/homology.rs` | 245 | 3 | **Tested with Known Limits** | Yes | Discrete algebraic homology solver (SNF over ℤ₂) with support for Persistent Homology (Vietoris-Rips). |
 
 ---
 
@@ -66,9 +75,8 @@
 
 These are pillars that either do not exist or exist as name-only scaffolding:
 
-- **Finite-element / spectral PDE solvers** — `differential_equations.rs` covers ODE + method-of-lines on trivial grids. No FEM assembly, no Galerkin weak form, no multigrid, no unstructured mesh.
 - **Stochastic calculus / SDEs** — `measure_probability.rs` mentions Itô; no Milstein, no Fokker-Planck solver, no Langevin integrator as general library.
-- **Persistent homology** — β₁, β₂ are heuristic (see `consciousness_topology.rs` row). No Vietoris-Rips filtration, no Ripser-level diagram.
+- **Persistent homology** — Discrete persistence tracking implemented; full Ripser-level barcode visualization still a gap.
 - **Control theory** — LQR, MPC, H-∞, observability Gramians absent as a general library. Robotics crates have bespoke controllers.
 - **Fiber bundles / connections / characteristic classes** — `riemannian_geometry.rs` has Ricci flow; no principal bundles, no Chern/Pontryagin classes.
 - **Gröbner bases** — `algebraic_geometry.rs` is numerical only.
