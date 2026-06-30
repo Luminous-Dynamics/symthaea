@@ -1,0 +1,29 @@
+[package]
+name = "symthaea-iso20022"
+version = "0.1.0"
+edition = "2024"
+description = "SWIFT ISO 20022 message parsing and Mycelix bridge — pacs.008 → Holochain payment operations via HTLC settlement"
+license = "AGPL-3.0-or-later"
+authors = ["Tristan Stoltz <tristan.stoltz@luminousdynamics.com>"]
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+# ISO 20022 XML parsing (pacs.008, camt, etc.)
+quick-xml  = { version = "0.37", features = ["serialize"] }
+# HTLC preimage hashing (Blake3 — fast, secure)
+blake3     = "1"
+# Timestamps for HTLC expiry and message dating
+chrono     = { version = "0.4", features = ["serde"] }
+# HTLC secret generation
+rand       = "0.8"
+# Hex encoding for HTLC hashes
+hex        = "0.4"
+# Serialization
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Error types
+thiserror  = "1"
+# Tracing
+tracing    = "0.1"
+
+[workspace]

@@ -15,4 +15,6 @@ thiserror = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
-# symthaea-iso20022 = { path = "../symthaea-iso20022" }
+symthaea-iso20022 = { path = "../symthaea-iso20022" }
+
+[workspace]
