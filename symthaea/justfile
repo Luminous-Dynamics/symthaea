@@ -1,0 +1,34 @@
+# Symthaea Justfile
+# Provides quick access to common build, test, and maintenance commands.
+
+# Default task: list all available commands
+default:
+    @just --list
+
+# Check the entire workspace for compilation errors
+check:
+    nix develop .#rust --command cargo check --workspace --all-targets
+
+# Build the entire workspace
+build:
+    nix develop .#rust --command cargo build --workspace
+
+# Run all tests (requires cargo-nextest)
+test:
+    nix develop .#rust --command cargo nextest run --workspace
+
+# Run the project with the default profile
+run:
+    nix develop .#rust --command cargo run
+
+# Format all code using rustfmt
+fmt:
+    nix develop .#rust --command cargo fmt --all
+
+# Run clippy on the workspace
+lint:
+    nix develop .#rust --command cargo clippy --workspace --all-targets -- -D warnings
+
+# Clean the target directory
+clean:
+    nix develop .#rust --command cargo clean
