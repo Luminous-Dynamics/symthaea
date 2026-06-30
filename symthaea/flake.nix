@@ -7,9 +7,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
+    nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, nix-ros-overlay }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       
@@ -19,7 +20,7 @@
 
       eachSystem = flake-utils.lib.eachDefaultSystem (system:
         let
-          overlays = [ (import rust-overlay) ];
+          overlays = [ (import rust-overlay) nix-ros-overlay.overlays.default ];
           pkgs = import nixpkgs {
             inherit system overlays;
             config.android_sdk.accept_license = true;
@@ -436,6 +437,54 @@ EOF
             export LD_LIBRARY_PATH="${rustLibPath}:$LD_LIBRARY_PATH"
             echo ""
             echo "Symthaea Rust shell"
+            echo ""
+          '';
+
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+        };
+
+        devShells.ros = pkgs.mkShell {
+          buildInputs = rustBuildInputs ++ (with pkgs.rosPackages.humble; [
+            ros-core
+            rclcpp
+            rclpy
+            std-msgs
+            sensor-msgs
+            trajectory-msgs
+            builtin-interfaces
+            geometry-msgs
+          ]);
+          inherit nativeBuildInputs;
+
+          shellHook = commonShellHook + ''
+            export LD_LIBRARY_PATH="${rustLibPath}:$LD_LIBRARY_PATH"
+            # Attempt to source ROS2 setup
+            if [ -f ${pkgs.rosPackages.humble.ros-core}/setup.bash ]; then
+              source ${pkgs.rosPackages.humble.ros-core}/setup.bash
+            fi
+
+            # Copy and patch Rust ROS2 message bindings for compatibility with rosidl_runtime_rs 0.4.2
+            mkdir -p crates/bridges/symthaea-ros-bridge/ros_msgs
+            rm -rf crates/bridges/symthaea-ros-bridge/ros_msgs/*
+
+            copy_and_patch() {
+              local src=$1
+              local dest=$2
+              cp -RL "$src" "$dest"
+              chmod -R +w "$dest"
+              sed -i 's/rosidl_runtime_rs = "0.6"/rosidl_runtime_rs = "0.4.2"/g' "$dest/Cargo.toml"
+            }
+
+            copy_and_patch "${pkgs.rosPackages.humble.std-msgs}/share/std_msgs/rust" "crates/bridges/symthaea-ros-bridge/ros_msgs/std_msgs"
+            copy_and_patch "${pkgs.rosPackages.humble.sensor-msgs}/share/sensor_msgs/rust" "crates/bridges/symthaea-ros-bridge/ros_msgs/sensor_msgs"
+            copy_and_patch "${pkgs.rosPackages.humble.trajectory-msgs}/share/trajectory_msgs/rust" "crates/bridges/symthaea-ros-bridge/ros_msgs/trajectory_msgs"
+            copy_and_patch "${pkgs.rosPackages.humble.builtin-interfaces}/share/builtin_interfaces/rust" "crates/bridges/symthaea-ros-bridge/ros_msgs/builtin_interfaces"
+            copy_and_patch "${pkgs.rosPackages.humble.geometry-msgs}/share/geometry_msgs/rust" "crates/bridges/symthaea-ros-bridge/ros_msgs/geometry_msgs"
+
+            echo ""
+            echo "Symthaea ROS2/Gazebo Bridge Shell"
             echo ""
           '';
 
