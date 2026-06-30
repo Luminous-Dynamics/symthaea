@@ -11,6 +11,7 @@ use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+use std::thread;
 
 use tokio::sync::{mpsc, mpsc::error::TrySendError, oneshot};
 use tokio::task::JoinHandle;
@@ -195,6 +196,32 @@ pub fn spawn_storage_runtime(
     (handle, join)
 }
 
+/// Spawn a write-behind storage worker on its own OS thread.
+///
+/// Use this from synchronous constructors that cannot assume an ambient Tokio
+/// runtime. The worker owns a small current-thread runtime internally; callers
+/// still interact through the same non-blocking [`StorageRuntimeHandle`].
+pub fn spawn_storage_runtime_threaded(
+    backend: Arc<dyn ConsciousnessDatabase>,
+    capacity: usize,
+) -> (StorageRuntimeHandle, thread::JoinHandle<()>) {
+    let capacity = capacity.max(1);
+    let (tx, rx) = mpsc::channel(capacity);
+    let handle = StorageRuntimeHandle { tx };
+    let join = thread::spawn(move || {
+        match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime.block_on(storage_worker(backend, rx)),
+            Err(err) => {
+                tracing::warn!(error = %err, "storage runtime failed to create Tokio runtime");
+            }
+        }
+    });
+    (handle, join)
+}
+
 async fn storage_worker(
     backend: Arc<dyn ConsciousnessDatabase>,
     mut rx: mpsc::Receiver<StorageOp>,
@@ -332,5 +359,29 @@ mod tests {
 
         runtime.shutdown().await.unwrap();
         worker.await.unwrap();
+    }
+
+    #[test]
+    fn threaded_storage_runtime_flushes_batch_writes() {
+        let db = Arc::new(SqliteMemory::in_memory().unwrap());
+        let backend: Arc<dyn ConsciousnessDatabase> = db.clone();
+        let (runtime, worker) = spawn_storage_runtime_threaded(backend, 8);
+
+        runtime
+            .try_store_memory_batch(vec![record("threaded-a", 8), record("threaded-b", 9)])
+            .unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            runtime.flush().await.unwrap();
+            assert_eq!(db.count().await.unwrap(), 2);
+            assert!(db.get("threaded-a").await.unwrap().is_some());
+            assert!(db.get("threaded-b").await.unwrap().is_some());
+            runtime.shutdown().await.unwrap();
+        });
+        worker.join().unwrap();
     }
 }

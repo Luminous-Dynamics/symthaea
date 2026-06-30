@@ -15,7 +15,7 @@ Symthaea does not have one database. Storage is split by latency and query shape
 | Role | Current implementation | Status |
 | --- | --- | --- |
 | Hot cognitive state | In-memory cognitive loop structures | Default |
-| Durable local memory and metadata | `SqliteMemory` via `ConsciousnessDatabase` | Default |
+| Durable local memory and metadata | `SqliteMemory` via `ConsciousnessDatabase` and `StorageRuntimeHandle` | Default |
 | Persistent vector/HDC memory | `LanceMemory` behind `lancedb-backend` | Optional |
 | Zero-copy local BinaryHV store | `HdcStoreDatabase` behind `hdc-store` | Optional |
 | Telemetry analytics | DuckDB behind `epistemic_auditor` | Optional |
@@ -39,11 +39,17 @@ This keeps the cognitive layer from depending on database-specific behavior and 
 `databases::storage_runtime` provides a bounded write-behind worker for durable memory writes:
 
 - hot paths can use `try_store_memory` / `try_delete_memory`;
+- batch episodic flushes can use `try_store_memory_batch_guarded`;
 - non-hot paths can await queue capacity;
 - tests and shutdown paths can call `flush`;
 - persistent backend errors are logged by the worker and do not stall the cognitive cycle.
 
-The next integration step is to route cognitive-cycle persistence through this runtime while keeping retrieval served from warm in-memory state.
+When `memory_db_path` is configured, `EpisodicPersistenceManager` now attaches
+SQLite through a thread-backed storage runtime. This keeps the synchronous
+`CognitiveLoopService::new` constructor usable outside Tokio while preserving
+non-blocking, batched write-behind persistence for periodic episode flushes.
+If no runtime is attached, the older background-thread fallback remains as a
+compatibility path.
 
 ## Backend Roles
 
@@ -78,8 +84,7 @@ Qdrant, Tantivy, redb, and Postgres/pgvector remain valid future backends, but s
 
 ## Next Implementation Steps
 
-1. Migrate cognitive-loop writes to `StorageRuntimeHandle`.
-2. Keep reads on in-memory caches/snapshots, with explicit refresh points.
-3. Add a DuckDB/Parquet telemetry sink behind a `TelemetrySink` trait.
-4. Add backend benchmarks for SQLite, LanceDB, and HDC store under the same contract workload.
-5. Only then evaluate Qdrant/Tantivy/Postgres for concrete production query shapes.
+1. Keep reads on in-memory caches/snapshots, with explicit refresh points.
+2. Add a DuckDB/Parquet telemetry sink behind a `TelemetrySink` trait.
+3. Add backend benchmarks for SQLite, LanceDB, and HDC store under the same contract workload.
+4. Only then evaluate Qdrant/Tantivy/Postgres for concrete production query shapes.

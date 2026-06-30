@@ -26,6 +26,9 @@ pub struct EpisodicPersistenceManager {
     /// Optional write-behind runtime for non-blocking durable memory writes.
     pub(crate) storage_runtime: Option<crate::databases::storage_runtime::StorageRuntimeHandle>,
 
+    /// Worker backing the storage runtime when it was spawned from this manager.
+    storage_worker: Option<std::thread::JoinHandle<()>>,
+
     /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
     pub(crate) flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
 
@@ -44,6 +47,7 @@ impl EpisodicPersistenceManager {
             replay,
             db: None,
             storage_runtime: None,
+            storage_worker: None,
             flush_in_progress: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_reasoning_context: None,
         }
@@ -55,7 +59,16 @@ impl EpisodicPersistenceManager {
         path: P,
     ) -> crate::databases::DbResult<()> {
         let db = crate::databases::SqliteMemory::new(path)?;
-        self.db = Some(std::sync::Arc::new(db));
+        let db = std::sync::Arc::new(db);
+        let backend: std::sync::Arc<dyn crate::databases::ConsciousnessDatabase> = db.clone();
+        let (runtime, worker) = crate::databases::storage_runtime::spawn_storage_runtime_threaded(
+            backend,
+            crate::databases::storage_runtime::DEFAULT_STORAGE_QUEUE_CAPACITY,
+        );
+        self.stop_owned_storage_worker();
+        self.db = Some(db);
+        self.storage_runtime = Some(runtime);
+        self.storage_worker = Some(worker);
         Ok(())
     }
 
@@ -64,7 +77,23 @@ impl EpisodicPersistenceManager {
         &mut self,
         runtime: crate::databases::storage_runtime::StorageRuntimeHandle,
     ) {
+        self.stop_owned_storage_worker();
         self.storage_runtime = Some(runtime);
+    }
+
+    fn stop_owned_storage_worker(&mut self) {
+        self.storage_runtime.take();
+        if let Some(worker) = self.storage_worker.take() {
+            if worker.join().is_err() {
+                tracing::warn!("episodic storage runtime worker panicked during shutdown");
+            }
+        }
+    }
+}
+
+impl Drop for EpisodicPersistenceManager {
+    fn drop(&mut self) {
+        self.stop_owned_storage_worker();
     }
 }
 
@@ -78,6 +107,7 @@ mod tests {
         assert!(mgr.replay.is_none());
         assert!(mgr.db.is_none());
         assert!(mgr.storage_runtime.is_none());
+        assert!(mgr.storage_worker.is_none());
         assert!(
             !mgr.flush_in_progress
                 .load(std::sync::atomic::Ordering::Relaxed)
@@ -96,6 +126,8 @@ mod tests {
 
         mgr.attach_sqlite_db(&path).unwrap();
         assert!(mgr.db.is_some());
+        assert!(mgr.storage_runtime.is_some());
+        assert!(mgr.storage_worker.is_some());
 
         let _ = std::fs::remove_file(path);
     }
