@@ -1878,7 +1878,6 @@ geometry_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/geometry_m
 curve25519-dalek-derive = { path = "patches/ed25519-dalek/curve25519-dalek-derive" }
 curve25519-dalek = { path = "patches/ed25519-dalek/curve25519-dalek" }
 ed25519-dalek = { path = "patches/ed25519-dalek/ed25519-dalek" }
-x25519-dalek = { path = "patches/ed25519-dalek/x25519-dalek" }
 iroh = { path = "patches/iroh/iroh" }
 iroh-base = { path = "patches/iroh/iroh-base" }
 iroh-relay = { path = "patches/iroh/iroh-relay" }
