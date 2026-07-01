@@ -367,9 +367,13 @@ pub fn RemoteInstallPanel(
     let saved_target = load_from_storage("si_target_addr")
         .unwrap_or_else(|| "sovereign-inoculation.local".to_string());
     let (target_addr, set_target_addr) = signal(saved_target);
-    // SSH password restored from sessionStorage (survives page refresh, cleared on tab close)
-    let saved_ssh_pw = load_from_session("si_ssh_password").unwrap_or_default();
-    let (ssh_password, set_ssh_password) = signal(saved_ssh_pw);
+    // SECURITY: SSH password is in-memory only for this signal's lifetime --
+    // never written to sessionStorage. A page reload starts with an empty
+    // password (matching manage.rs's `ssh_pass` pattern) rather than
+    // reading a plaintext credential back out of browser storage, where
+    // any XSS or malicious extension with page access could read it for
+    // as long as the tab stays open.
+    let (ssh_password, set_ssh_password) = signal(String::new());
     // Advanced mode: allow custom relay URL (hidden by default)
     let show_advanced = RwSignal::new(false);
     let saved_relay_url = load_from_storage("si_relay_url").unwrap_or_default();
@@ -1113,7 +1117,14 @@ pub fn RemoteInstallPanel(
             "#,
             ips = ip_list_js
         );
-        let _ = js_sys::eval(&scan_js);
+        // Function::new_no_args instead of eval() for safety (matches
+        // install.rs's detect_timezone() convention) -- no untrusted data
+        // flows into `scan_js` today (only hardcoded IP prefixes/ports),
+        // but eval() has no such guarantee for any future change to this
+        // function, whereas Function() at least keeps execution out of the
+        // calling scope.
+        let scan_fn = js_sys::Function::new_no_args(&scan_js);
+        let _ = scan_fn.call0(&wasm_bindgen::JsValue::NULL);
 
         // Poll for discovery result
         let cb = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
@@ -1266,9 +1277,10 @@ pub fn RemoteInstallPanel(
                                     placeholder="sovereign"
                                     prop:value=ssh_password
                                     on:input=move |ev| {
-                                        let v = event_target_value(&ev);
-                                        save_to_session("si_ssh_password", &v);
-                                        set_ssh_password.set(v);
+                                        // In-memory only -- see the signal's
+                                        // definition above for why this is
+                                        // never persisted to sessionStorage.
+                                        set_ssh_password.set(event_target_value(&ev));
                                     }
                                 />
                             </div>

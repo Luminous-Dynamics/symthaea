@@ -117,10 +117,23 @@ impl MuJoCoSimulator {
 
     /// Dynamically change body mass (recomputes derived inertial quantities).
     pub fn set_body_mass(&mut self, new_mass: f64) {
-        // SAFETY: mujoco-rs doesn't expose model parameter mutation. We cast to mutable
-        // and call mj_setConst to re-derive model constants after mass change.
+        // SAFETY: mujoco-rs doesn't expose model parameter mutation, so we
+        // cast to mutable and call mj_setConst to re-derive model constants
+        // after mass change. `self.body_id` is bounds-checked against the
+        // model's actual body count before the write, since a custom MJCF
+        // loaded via the public `MuJoCoSimulator::new(path)` constructor
+        // could have fewer bodies than `self.body_id` expects, which would
+        // otherwise write past the end of the `body_mass` array.
         unsafe {
             let model_ffi = self.model.ffi() as *const _ as *mut mujoco_rs::mujoco_c::mjModel;
+            let nbody = (*model_ffi).nbody as usize;
+            if self.body_id >= nbody {
+                eprintln!(
+                    "set_body_mass: body_id {} out of bounds for model with {} bodies -- ignoring",
+                    self.body_id, nbody
+                );
+                return;
+            }
             (*model_ffi).body_mass.add(self.body_id).write(new_mass);
             mujoco_rs::mujoco_c::mj_setConst(model_ffi, self.data.ffi_mut());
         }
@@ -129,10 +142,23 @@ impl MuJoCoSimulator {
     /// Dynamically limit thrust actuator range.
     /// Modifies the upper bound of actuator 0 (body_thrust).
     pub fn set_thrust_limit(&mut self, max_thrust: f64) {
-        // SAFETY: mujoco-rs doesn't expose actuator parameter mutation.
-        // We cast to mutable to modify the control range directly.
+        // SAFETY: mujoco-rs doesn't expose actuator parameter mutation, so
+        // we cast to mutable to modify the control range directly.
+        // `actuator_ctrlrange` is a flat [min0, max0, min1, max1, ...]
+        // array of length `2 * nu`; index 1 (actuator 0's upper bound) is
+        // only valid when the model has at least one actuator. A custom
+        // MJCF with zero actuators would otherwise let this write past the
+        // end of the array.
         unsafe {
             let model_ffi = self.model.ffi() as *const _ as *mut mujoco_rs::mujoco_c::mjModel;
+            let nu = (*model_ffi).nu as usize;
+            if nu < 1 {
+                eprintln!(
+                    "set_thrust_limit: model has {} actuators, need at least 1 -- ignoring",
+                    nu
+                );
+                return;
+            }
             (*model_ffi).actuator_ctrlrange.add(1).write(max_thrust);
         }
     }

