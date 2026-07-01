@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-sensors"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Shared sensor simulation for Symthaea robotics — force/torque, joint encoders, IMU"
+
+[dependencies]
+# [standalone-stripped] symtropy-physics = { path = "../../../../symtropy/crates/core/symtropy-physics" }
+# [standalone-stripped] symtropy-math = { path = "../../../../symtropy/crates/core/symtropy-math" }
+nalgebra = "0.34"
+rand = { workspace = true }

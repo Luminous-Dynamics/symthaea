@@ -1,9 +1,0 @@
-[package]
-name = "positioning"
-version = "0.1.0"
-edition = "2024"
-description = "Decentralized cooperative positioning: trilateration, ranging models, EKF, GDOP"
-license = "AGPL-3.0-or-later"
-
-[dependencies]
-serde = { version = "1.0", features = ["derive"] }

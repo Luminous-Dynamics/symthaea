@@ -1,0 +1,29 @@
+[package]
+name = "symthaea-bevy-dash"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bevy-based 3D visualization dashboard for Symthaea's consciousness topology and digital twin state"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+bevy = { version = "0.15", default-features = false, features = ["bevy_winit", "bevy_render", "bevy_pbr", "bevy_gltf", "x11", "wayland", "bevy_ui", "bevy_sprite", "bevy_gizmos"] }
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-workspace = { path = "../../core/symthaea-workspace" }
+symthaea-phi-oracle = { path = "../../symthaea-phi-oracle" }
+symthaea-digital-twin = { path = "../../domains/symthaea-digital-twin" }
+symthaea-subterranean = { path = "../../domains/symthaea-subterranean" }
+symthaea-telemetry-grpc = { path = "../symthaea-telemetry-grpc" }
+bevy_egui = "0.31"
+egui_plot = "0.29"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tonic = "0.12"
+tokio = { version = "1", features = ["full"] }
+
+
+[features]
+default = []
+inspector = [] # TODO: Add bevy-inspector-egui integration

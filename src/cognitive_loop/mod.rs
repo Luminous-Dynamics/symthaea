@@ -95,7 +95,6 @@ pub mod snapshot;
 pub use snapshot::*;
 
 pub mod flow;
-pub mod genesis_bridge;
 pub use flow::*;
 
 pub mod learning;
@@ -450,9 +449,6 @@ pub struct CognitiveLoopService {
 
     /// Consolidated FEP / Active Inference subsystem (10 fields -> 1).
     fep: fep_module::FepModule,
-
-    /// Innate traits derived from genome (Genesis Bridge).
-    pub(crate) innate_traits: genesis_bridge::InnateTraits,
 
     /// Latest mental simulation (imagination) result.
     #[cfg(feature = "vision-manifold")]

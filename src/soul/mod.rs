@@ -209,7 +209,7 @@ impl Soul {
             ),
             (
                 "reciprocity",
-                "Mutual Reciprocity",
+                "Sacred Reciprocity",
                 "Generous flow and mutual upliftment",
             ),
             (

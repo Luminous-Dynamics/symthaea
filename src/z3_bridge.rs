@@ -358,11 +358,13 @@ impl Z3Bridge {
 
         // Build SMTLIB2 constraints: for each (i,j), |Ric_ij - k*g_ij| < tol
         let mut assertions = Vec::new();
+        let mut residuals = Vec::new();
         for i in 0..dim {
             for j in 0..dim {
                 let ric = ricci_components[i * dim + j];
                 let g = metric_components[i * dim + j];
                 let residual = (ric - k * g).abs();
+                residuals.push(residual);
                 let smt = format!(
                     "; Einstein residual at ({i},{j}): |{:.6} - {:.6}*{:.6}| = {:.12}\n\
                      (assert (<= (- (abs {:.6}) 0.0) {:.12}))",
@@ -381,15 +383,7 @@ impl Z3Bridge {
         if let Some(output) = self.run_z3(&smt) {
             parse_sat_result(&output)
         } else {
-            // Internal numeric fallback
-            let max_residual = (0..dim * dim)
-                .map(|idx| {
-                    let i = idx / dim;
-                    let j = idx % dim;
-                    (ricci_components[i * dim + j] - k * metric_components[i * dim + j]).abs()
-                })
-                .fold(0.0_f64, f64::max);
-
+            let max_residual = residuals.iter().copied().fold(0.0_f64, f64::max);
             if max_residual <= tolerance {
                 VerificationResult::Sat {
                     witness: Some(format!("max_residual={max_residual:.2e}, k={k:.4}")),
@@ -397,7 +391,8 @@ impl Z3Bridge {
             } else {
                 VerificationResult::Unsat {
                     core: Some(format!(
-                        "max_residual={max_residual:.2e} > tol={tolerance:.2e}"
+                        "residuals={:?}, max_residual={max_residual:.2e} > tol={tolerance:.2e}",
+                        residuals
                     )),
                 }
             }

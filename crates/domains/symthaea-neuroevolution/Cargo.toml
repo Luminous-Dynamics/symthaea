@@ -1,0 +1,28 @@
+[package]
+name = "symthaea-neuroevolution"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "CfC-HDC Neuroevolution: evolve neural organisms via Free Energy minimization"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["neuroevolution", "cfc", "hdc", "free-energy", "consciousness"]
+categories = ["science", "algorithms"]
+
+
+[features]
+default = []
+parallel = ["dep:rayon"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core", default-features = false }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+blake3 = { workspace = true }
+rayon = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

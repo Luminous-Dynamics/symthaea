@@ -1109,6 +1109,7 @@ impl CognitiveLoopConfig {
     /// Create configuration for a platform's preferred operating domain.
     pub fn for_platform(platform: symthaea_core::embodiment::EmbodimentPlatform) -> Self {
         let capability = crate::domain::PlatformCapabilityProfile::for_platform(platform);
+        #[allow(unused_mut)]
         let mut config = Self {
             domain_profile: capability.preferred_domain_profile(),
             ..Default::default()
@@ -1151,6 +1152,7 @@ impl CognitiveLoopConfig {
         } else {
             capability.preferred_domain_profile()
         };
+        #[allow(unused_mut)]
         let mut config = Self {
             domain_profile: resolved_domain,
             ..Default::default()

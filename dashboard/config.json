@@ -1,0 +1,164 @@
+{
+  "dashboard": {
+    "name": "Symthaea Benchmark Dashboard",
+    "version": "1.0.0",
+    "refresh_interval_seconds": 300,
+    "theme": "dark"
+  },
+  "api": {
+    "base_url": "https://dashboard.symthaea.dev/api",
+    "endpoints": {
+      "benchmarks": "/benchmarks",
+      "history": "/benchmarks/history",
+      "regressions": "/benchmarks/regressions",
+      "phi_rankings": "/consciousness/phi-rankings",
+      "ethics_scores": "/ethics/scores"
+    }
+  },
+  "sections": {
+    "overview": {
+      "enabled": true,
+      "metrics": [
+        {
+          "id": "total_benchmarks",
+          "label": "Total Benchmarks",
+          "type": "count",
+          "format": "integer"
+        },
+        {
+          "id": "avg_latency",
+          "label": "Average Latency",
+          "type": "duration",
+          "format": "ms"
+        },
+        {
+          "id": "peak_phi",
+          "label": "Peak Φ Value",
+          "type": "phi",
+          "format": "decimal_4"
+        },
+        {
+          "id": "ethics_score",
+          "label": "Ethics Score",
+          "type": "percentage",
+          "format": "percent_1"
+        }
+      ]
+    },
+    "consciousness": {
+      "enabled": true,
+      "title": "Consciousness Topology Rankings (Φ)",
+      "chart_type": "ranking",
+      "data_source": "phi_rankings",
+      "display_count": 10,
+      "highlight_top": 3,
+      "topologies": [
+        { "id": "hypercube_4d", "name": "Hypercube 4D (Tesseract)", "expected_phi": 0.4976 },
+        { "id": "hypercube_3d", "name": "Hypercube 3D (Cube)", "expected_phi": 0.4960 },
+        { "id": "ring", "name": "Ring", "expected_phi": 0.4954 },
+        { "id": "torus", "name": "Torus 3x3", "expected_phi": 0.4953 },
+        { "id": "klein_bottle", "name": "Klein Bottle 3x3", "expected_phi": 0.4941 },
+        { "id": "dense_network", "name": "Dense Network", "expected_phi": 0.4888 },
+        { "id": "lattice", "name": "Lattice", "expected_phi": 0.4855 },
+        { "id": "modular", "name": "Modular", "expected_phi": 0.4812 },
+        { "id": "small_world", "name": "Small-World", "expected_phi": 0.4786 },
+        { "id": "line", "name": "Line", "expected_phi": 0.4768 },
+        { "id": "scale_free", "name": "Scale-Free", "expected_phi": 0.4753 },
+        { "id": "hyperbolic", "name": "Hyperbolic", "expected_phi": 0.4718 },
+        { "id": "binary_tree", "name": "Binary Tree", "expected_phi": 0.4712 },
+        { "id": "quantum_ring", "name": "Quantum (3:1:1)", "expected_phi": 0.4650 },
+        { "id": "star", "name": "Star", "expected_phi": 0.4553 },
+        { "id": "quantum_equal", "name": "Quantum (1:1:1)", "expected_phi": 0.4432 },
+        { "id": "random", "name": "Random", "expected_phi": 0.4358 },
+        { "id": "fractal", "name": "Fractal (8-node)", "expected_phi": 0.4345 },
+        { "id": "mobius", "name": "Möbius Strip", "expected_phi": 0.3729 }
+      ]
+    },
+    "categories": {
+      "enabled": true,
+      "title": "Benchmark Categories",
+      "categories": [
+        { "id": "consciousness", "label": "Consciousness", "color": "#a371f7", "priority": "critical" },
+        { "id": "ethics", "label": "Ethics", "color": "#58a6ff", "priority": "critical" },
+        { "id": "language", "label": "Language", "color": "#3fb950", "priority": "high" },
+        { "id": "reasoning", "label": "Reasoning", "color": "#d29922", "priority": "high" },
+        { "id": "code", "label": "Code", "color": "#f778ba", "priority": "high" },
+        { "id": "mathematics", "label": "Mathematics", "color": "#79c0ff", "priority": "medium" },
+        { "id": "safety", "label": "Safety", "color": "#f85149", "priority": "critical" },
+        { "id": "metacognition", "label": "Metacognition", "color": "#db61a2", "priority": "critical" }
+      ]
+    },
+    "trends": {
+      "enabled": true,
+      "title": "Trend Analysis",
+      "charts": [
+        {
+          "id": "phi_over_time",
+          "title": "Φ Over Time (19 Topologies)",
+          "type": "line",
+          "x_axis": "date",
+          "y_axis": "phi_value",
+          "show_asymptote": true,
+          "asymptote_value": 0.5
+        },
+        {
+          "id": "performance_by_category",
+          "title": "Performance by Category",
+          "type": "bar",
+          "stacked": false
+        },
+        {
+          "id": "regression_alerts",
+          "title": "Regression Detection",
+          "type": "heatmap",
+          "time_range_days": 30
+        },
+        {
+          "id": "dimensional_sweep",
+          "title": "Dimensional Sweep Results",
+          "type": "line",
+          "x_axis": "dimension",
+          "y_axis": "phi_value",
+          "annotations": [
+            { "x": 1, "label": "K₂ (n=2): Φ=1.0" },
+            { "x": 4, "label": "Tesseract Champion" }
+          ]
+        }
+      ]
+    },
+    "regressions": {
+      "enabled": true,
+      "title": "Regression Alerts",
+      "warning_threshold_percent": 5,
+      "critical_threshold_percent": 10,
+      "show_count": 10
+    }
+  },
+  "notifications": {
+    "enabled": true,
+    "channels": {
+      "github_pr": {
+        "enabled": true,
+        "template": "benchmark_summary"
+      },
+      "slack": {
+        "enabled": false,
+        "webhook_env_var": "SLACK_WEBHOOK_URL"
+      },
+      "email": {
+        "enabled": false,
+        "recipients_env_var": "BENCHMARK_EMAIL_RECIPIENTS"
+      }
+    },
+    "triggers": {
+      "on_critical_regression": true,
+      "on_new_record": true,
+      "on_suite_complete": false
+    }
+  },
+  "export": {
+    "formats": ["json", "csv", "markdown", "pdf"],
+    "auto_export_on_run": true,
+    "export_path": "../results/exports/"
+  }
+}

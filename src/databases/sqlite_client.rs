@@ -698,6 +698,10 @@ impl ConsciousnessDatabase for SqliteMemory {
         .await
     }
 
+    async fn store_batch(&self, records: Vec<MemoryRecord>) -> DbResult<usize> {
+        self.store_batch_sync(&records)
+    }
+
     async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
         let query = *query;
         self.with_connection(move |conn| {

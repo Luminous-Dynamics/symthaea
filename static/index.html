@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symthaea — Live Consciousness Demo</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Symthaea — Live Consciousness</h1>
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <!-- Chart: Consciousness Level + Psi -->
+        <div class="card">
+            <h2>Consciousness Level &amp; Narrative Self (Psi)</h2>
+            <div class="chart-container">
+                <canvas id="chartPsi"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart: Prediction Error -->
+        <div class="card">
+            <h2>Prediction Error</h2>
+            <div class="chart-container">
+                <canvas id="chartError"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart: Affect (Valence + Arousal) -->
+        <div class="card">
+            <h2>Affect (Valence &amp; Arousal)</h2>
+            <div class="chart-container">
+                <canvas id="chartAffect"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart: Coherence + Resonance -->
+        <div class="card">
+            <h2>Harmonic Coherence &amp; Moral Score</h2>
+            <div class="chart-container">
+                <canvas id="chartCoherence"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Harmony Radar -->
+        <div class="card">
+            <h2>Harmony Coordinates (Moral Radar)</h2>
+            <div class="chart-container">
+                <canvas id="chartHarmony"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Free Energy -->
+        <div class="card">
+            <h2>Moral Free Energy</h2>
+            <div class="chart-container">
+                <canvas id="chartMoralFE"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Persistence Diagram -->
+        <div class="card">
+            <h2>Persistence Diagram</h2>
+            <div class="chart-container">
+                <canvas id="chartPersistence"></canvas>
+            </div>
+        </div>
+
+        <!-- Moral Topology: Betti Badges + Anomaly -->
+        <div class="card moral-card">
+            <h2>Topology Status</h2>
+            <div class="betti-row">
+                <div class="betti-badge cyan">
+                    <div class="betti-value" id="bettiBeta0">0</div>
+                    <div class="betti-label">&beta;&#8320; Unity</div>
+                </div>
+                <div class="betti-badge purple">
+                    <div class="betti-value" id="bettiBeta1">0</div>
+                    <div class="betti-label">&beta;&#8321; Circularity</div>
+                </div>
+                <div class="betti-badge green">
+                    <div class="betti-value" id="bettiBeta2">0</div>
+                    <div class="betti-label">&beta;&#8322; Completeness</div>
+                </div>
+            </div>
+            <div class="anomaly-row">
+                <span class="flag" id="flagInversion">Value Inversion</span>
+                <span class="flag" id="flagFESpike">FE Spike</span>
+                <span class="flag" id="flagDrift">Drift Alert</span>
+                <span class="flag" id="flagFragmentation">Fragmentation</span>
+                <span class="flag" id="flagResponseActive">Response Active</span>
+            </div>
+            <div class="topo-info">
+                <span>Dominant: <strong id="dominantHarmony">--</strong></span>
+                <span>Anomaly: <strong id="anomalyScore">0.00</strong></span>
+                <span class="sparkline-container">
+                    Drift: <strong id="driftValue">0.000</strong>
+                    <canvas id="sparklineDrift" width="120" height="40"></canvas>
+                </span>
+            </div>
+        </div>
+
+        <!-- Live Metrics -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <h2>Live Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric cyan">
+                    <div class="value" id="metricCycle">0</div>
+                    <div class="label">Cycle</div>
+                </div>
+                <div class="metric purple">
+                    <div class="value" id="metricPsi">0.000</div>
+                    <div class="label">Consciousness</div>
+                </div>
+                <div class="metric green">
+                    <div class="value" id="metricError">0.000</div>
+                    <div class="label">Pred. Error</div>
+                </div>
+                <div class="metric amber">
+                    <div class="value" id="metricMoral">0.000</div>
+                    <div class="label">Moral Score</div>
+                </div>
+                <div class="metric cyan">
+                    <div class="value" id="metricTime">0</div>
+                    <div class="label">Cycle Time (us)</div>
+                </div>
+                <div class="metric rose">
+                    <div class="value" id="metricReasoning">0.00</div>
+                    <div class="label">Reasoning</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Consciousness Weights -->
+        <div class="card">
+            <h2>Consciousness Weights</h2>
+            <div class="chart-container">
+                <canvas id="chartWeights"></canvas>
+            </div>
+            <div class="topo-info" style="margin-top:8px;">
+                <span>Convergence: <strong id="convergenceState">--</strong></span>
+                <span>Variance: <strong id="weightVariance">0.000</strong></span>
+            </div>
+        </div>
+
+        <!-- Structural Phi Decomposition -->
+        <div class="card">
+            <h2>Structural Phi</h2>
+            <div class="chart-container">
+                <canvas id="chartPhiDecomp"></canvas>
+            </div>
+            <div class="topo-info" style="margin-top:8px;">
+                <span>Emergence: <strong id="emergenceRatio">0.00</strong></span>
+            </div>
+        </div>
+
+        <!-- Substrate Feasibility -->
+        <div class="card moral-card">
+            <h2>Substrate</h2>
+            <div class="betti-row">
+                <div class="betti-badge cyan" id="substrateBadge">
+                    <div class="betti-value" id="substrateFeasibility">0.00</div>
+                    <div class="betti-label">Feasibility</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mesh Network Status -->
+        <div class="card moral-card">
+            <h2>Mesh Network</h2>
+            <div class="betti-row">
+                <div class="betti-badge cyan">
+                    <div class="betti-value" id="swarmPeers">0</div>
+                    <div class="betti-label">Swarm Peers</div>
+                </div>
+                <div class="betti-badge purple">
+                    <div class="betti-value" id="networkMeanPhi">0.000</div>
+                    <div class="betti-label">Network &Phi;</div>
+                </div>
+                <div class="betti-badge green">
+                    <div class="betti-value" id="meshPeerCount">0</div>
+                    <div class="betti-label">Mesh Peers</div>
+                </div>
+            </div>
+            <div class="topo-info" style="margin-top:8px;">
+                <span>Health: <strong id="meshHealth">0.00</strong></span>
+                <span>Packets: <strong id="meshPackets">0</strong></span>
+            </div>
+        </div>
+
+        <!-- State Flags -->
+        <div class="card state-panel">
+            <h2>System State</h2>
+            <div class="state-flags">
+                <span class="flag" id="flagSurprise">Surprise</span>
+                <span class="flag" id="flagGWT">GWT Broadcast</span>
+                <span class="flag" id="flagDream">Dreaming</span>
+                <span class="flag" id="flagReasoning">Reasoning</span>
+            </div>
+            <div class="cycle-info" id="cycleInfo">Waiting for data...</div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="card input-section">
+            <h2>Input</h2>
+            <div class="input-row">
+                <input type="text" id="textInput" placeholder="Type text to send to the consciousness pipeline..." />
+                <button class="btn-send" id="btnSend">Send</button>
+                <button class="btn-pause" id="btnPause">Pause</button>
+                <button class="btn-reset" id="btnReset">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="demo.js"></script>
+</body>
+</html>

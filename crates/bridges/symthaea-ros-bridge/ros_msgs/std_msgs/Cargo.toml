@@ -1,0 +1,18 @@
+[package]
+name = "std_msgs"
+version = "4.9.1"
+edition = "2021"
+
+[dependencies]
+rosidl_runtime_rs = "0.4.2"
+serde = { version = "1", optional = true, features = ["derive"] }
+serde-big-array = { version = "0.5.1", optional = true }
+
+# ROS Dependencies
+builtin_interfaces = "*"
+
+[features]
+serde = ['dep:serde', 'dep:serde-big-array', 'rosidl_runtime_rs/serde', 'builtin_interfaces/serde']
+
+[package.metadata.ros-env]
+include = true

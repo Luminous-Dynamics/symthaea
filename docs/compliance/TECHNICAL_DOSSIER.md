@@ -113,7 +113,7 @@ Symthaea's ethics engine evaluates every action against eight value dimensions, 
 | 3 | **Integral Wisdom** | Truth-Knowing | 0.13 | `prediction.rs` → epistemic EFE, uncertainty-driven exploration |
 | 4 | **Infinite Play** | Creative-Knowing | 0.10 | `curiosity_drive.rs` → surprise-driven exploration, dream replay |
 | 5 | **Universal Interconnectedness** | Relational-Knowing | 0.13 | `mesh/dual_layer.rs` → multi-agent cognitive vector sharing |
-| 6 | **Mutual Reciprocity** | Exchange-Knowing | 0.10 | `mycelix-fl-core/` → federated learning, Byzantine detection |
+| 6 | **Sacred Reciprocity** | Exchange-Knowing | 0.10 | `mycelix-fl-core/` → federated learning, Byzantine detection |
 | 7 | **Evolutionary Progression** | Developmental-Knowing | 0.10 | `learning.rs` → meta-cognitive monitoring, Phi trajectory tracking |
 | 8 | **Sacred Stillness** | Apophatic-Knowing | 0.10 | `neuromodulators.rs` → GABA/adenosine grounding, circadian gating, DMN |
 

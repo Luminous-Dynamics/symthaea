@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-wisdom"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Philosophical grounding — harmonics, autopoiesis, and meta-cognition for computational consciousness"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "wisdom", "autopoiesis", "harmonics", "meta-cognition"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+serde = { workspace = true }

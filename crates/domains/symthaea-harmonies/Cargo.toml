@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-harmonies"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Eight Harmonies value alignment framework — evaluate actions against ethical and consciousness principles"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "harmonies", "ethics", "values", "alignment"]
+categories = ["science"]
+
+[dependencies]
+serde = { workspace = true }
+symthaea-types = { path = "../../core/symthaea-types" }
+symthaea-core = { path = "../../core/symthaea-core" }

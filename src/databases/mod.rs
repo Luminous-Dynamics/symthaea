@@ -75,6 +75,7 @@ use async_trait::async_trait;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 pub mod sqlite_client;
+pub mod storage_runtime;
 
 #[cfg(feature = "lancedb-backend")]
 pub mod lance_client;
@@ -163,7 +164,7 @@ impl std::error::Error for DatabaseError {}
 /// | Semantic | Long-term | Facts without context | "Python is a programming language" |
 /// | Procedural | Long-term | How-to knowledge | "Steps to debug code" |
 /// | Working | Short-term | Active processing | "Current conversation topic" |
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MemoryType {
     /// Autobiographical memories of specific events.
     ///
@@ -365,12 +366,165 @@ pub struct DatabaseStats {
 }
 
 // ============================================================================
-// Database Trait
+// Storage Traits
 // ============================================================================
 
 #[cfg(feature = "school_learning")]
 use crate::school::curriculum::Curriculum;
 use symthaea_dream::CausalLink;
+
+/// Durable memory-record operations.
+///
+/// Use this trait when code needs ordinary record persistence but does not need
+/// vector search, causal links, curricula, or backend-specific health details.
+#[async_trait]
+pub trait MemoryRecordStore: Send + Sync {
+    /// Store a memory record, replacing any existing record with the same ID.
+    async fn store_memory(&self, record: MemoryRecord) -> DbResult<()>;
+
+    /// Store multiple memory records, replacing any existing records with the same IDs.
+    async fn store_memory_batch(&self, records: Vec<MemoryRecord>) -> DbResult<usize>;
+
+    /// Retrieve a specific memory by its unique ID.
+    async fn get_memory(&self, id: &str) -> DbResult<Option<MemoryRecord>>;
+
+    /// Delete a memory by its unique ID.
+    async fn delete_memory(&self, id: &str) -> DbResult<bool>;
+
+    /// Count total number of memories in the store.
+    async fn memory_count(&self) -> DbResult<usize>;
+
+    /// List all records in the store for migration/export.
+    async fn list_memories(&self) -> DbResult<Vec<MemoryRecord>>;
+}
+
+/// Binary hypervector similarity search.
+///
+/// Use this for HDC/vector retrieval without depending on metadata ownership or
+/// causal-event storage. Backends may implement this via brute force, LSH,
+/// LanceDB, mmap indexes, or a remote vector service.
+#[async_trait]
+pub trait BinaryHvSearchBackend: Send + Sync {
+    /// Search for memories similar to the query hypervector.
+    async fn search_binary_hv(&self, query: &BinaryHV, top_k: usize)
+    -> DbResult<Vec<SearchResult>>;
+
+    /// Search with an optional backend-specific predicate.
+    async fn search_binary_hv_filtered(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>>;
+}
+
+/// Storage health and observability.
+#[async_trait]
+pub trait StorageHealthBackend: Send + Sync {
+    /// Check whether the backend is healthy.
+    async fn storage_health_check(&self) -> DbResult<bool>;
+
+    /// Return backend statistics for monitoring and debugging.
+    async fn storage_stats(&self) -> DbResult<DatabaseStats>;
+}
+
+/// Durable causal-event storage.
+///
+/// Kept separate from memory search so vector stores are not forced to pretend
+/// they are event logs.
+#[async_trait]
+pub trait CausalEventStore: Send + Sync {
+    /// Store causal links into the backend.
+    async fn store_causal_events(&self, links: &[CausalLink]) -> DbResult<()>;
+
+    /// Retrieve all causal links from the backend.
+    async fn get_causal_events(&self) -> DbResult<Vec<CausalLink>>;
+}
+
+#[async_trait]
+impl<T> MemoryRecordStore for T
+where
+    T: ConsciousnessDatabase + ?Sized,
+{
+    async fn store_memory(&self, record: MemoryRecord) -> DbResult<()> {
+        ConsciousnessDatabase::store(self, record).await
+    }
+
+    async fn store_memory_batch(&self, records: Vec<MemoryRecord>) -> DbResult<usize> {
+        ConsciousnessDatabase::store_batch(self, records).await
+    }
+
+    async fn get_memory(&self, id: &str) -> DbResult<Option<MemoryRecord>> {
+        ConsciousnessDatabase::get(self, id).await
+    }
+
+    async fn delete_memory(&self, id: &str) -> DbResult<bool> {
+        ConsciousnessDatabase::delete(self, id).await
+    }
+
+    async fn memory_count(&self) -> DbResult<usize> {
+        ConsciousnessDatabase::count(self).await
+    }
+
+    async fn list_memories(&self) -> DbResult<Vec<MemoryRecord>> {
+        ConsciousnessDatabase::list_all(self).await
+    }
+}
+
+#[async_trait]
+impl<T> BinaryHvSearchBackend for T
+where
+    T: ConsciousnessDatabase + ?Sized,
+{
+    async fn search_binary_hv(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+    ) -> DbResult<Vec<SearchResult>> {
+        ConsciousnessDatabase::search_similar(self, query, top_k).await
+    }
+
+    async fn search_binary_hv_filtered(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
+        ConsciousnessDatabase::search_similar_filtered(self, query, top_k, filter).await
+    }
+}
+
+#[async_trait]
+impl<T> StorageHealthBackend for T
+where
+    T: ConsciousnessDatabase + ?Sized,
+{
+    async fn storage_health_check(&self) -> DbResult<bool> {
+        ConsciousnessDatabase::health_check(self).await
+    }
+
+    async fn storage_stats(&self) -> DbResult<DatabaseStats> {
+        ConsciousnessDatabase::stats(self).await
+    }
+}
+
+#[async_trait]
+impl<T> CausalEventStore for T
+where
+    T: ConsciousnessDatabase + ?Sized,
+{
+    async fn store_causal_events(&self, links: &[CausalLink]) -> DbResult<()> {
+        ConsciousnessDatabase::store_causal_links(self, links).await
+    }
+
+    async fn get_causal_events(&self) -> DbResult<Vec<CausalLink>> {
+        ConsciousnessDatabase::get_causal_links(self).await
+    }
+}
+
+// ============================================================================
+// Compatibility Database Facade
+// ============================================================================
 
 /// Trait for consciousness database backends.
 ///
@@ -387,6 +541,15 @@ use symthaea_dream::CausalLink;
 pub trait ConsciousnessDatabase: Send + Sync {
     /// Store a memory record, replacing any existing record with the same ID.
     async fn store(&self, record: MemoryRecord) -> DbResult<()>;
+
+    /// Store multiple memory records, replacing any existing records with the same IDs.
+    async fn store_batch(&self, records: Vec<MemoryRecord>) -> DbResult<usize> {
+        let count = records.len();
+        for record in records {
+            self.store(record).await?;
+        }
+        Ok(count)
+    }
 
     /// Search for memories similar to the query hypervector.
     ///
@@ -557,6 +720,56 @@ pub use hdc_store_client::HdcStoreDatabase;
 mod tests {
     use super::*;
 
+    fn contract_record(id: &str, seed: u64) -> MemoryRecord {
+        MemoryRecord {
+            id: id.to_string(),
+            memory_type: MemoryType::Episodic,
+            encoding: BinaryHV::random(seed),
+            content: format!("contract memory {id}"),
+            timestamp_ms: 1_700_000_000_000 + seed,
+            valence: 0.25,
+            arousal: 0.5,
+            psi: 0.75,
+            topics: vec!["contract".to_string()],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        }
+    }
+
+    async fn assert_memory_backend_contract(db: &dyn ConsciousnessDatabase) {
+        assert_eq!(db.count().await.unwrap(), 0);
+        assert!(db.health_check().await.unwrap());
+
+        db.store(contract_record("exact", 42)).await.unwrap();
+        db.store(contract_record("other", 777)).await.unwrap();
+        assert_eq!(db.count().await.unwrap(), 2);
+
+        let exact = db.get("exact").await.unwrap().unwrap();
+        assert_eq!(exact.content, "contract memory exact");
+
+        let results = db.search_similar(&BinaryHV::random(42), 2).await.unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].record.id, "exact");
+        assert!(results[0].similarity >= results[1].similarity);
+
+        let mut replacement = contract_record("exact", 99);
+        replacement.content = "replacement".to_string();
+        db.store(replacement).await.unwrap();
+        assert_eq!(db.count().await.unwrap(), 2);
+        let replaced = db.get("exact").await.unwrap().unwrap();
+        assert_eq!(replaced.content, "replacement");
+        assert_eq!(replaced.encoding.similarity(&BinaryHV::random(99)), 1.0);
+
+        assert!(db.delete("other").await.unwrap());
+        assert!(!db.delete("missing").await.unwrap());
+        assert_eq!(db.count().await.unwrap(), 1);
+
+        let all = db.list_all().await.unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "exact");
+    }
+
     #[test]
     fn test_default_database_config_is_valid() {
         let config = DatabaseConfig::default();
@@ -607,5 +820,49 @@ mod tests {
             config.validate().is_ok(),
             "None path (in-memory) should be valid"
         );
+    }
+
+    #[tokio::test]
+    async fn sqlite_memory_backend_contract() {
+        let db = SqliteMemory::in_memory().unwrap();
+        assert_memory_backend_contract(&db).await;
+    }
+
+    #[tokio::test]
+    async fn sqlite_supports_narrow_storage_traits() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = contract_record("narrow", 123);
+
+        MemoryRecordStore::store_memory(&db, record).await.unwrap();
+        assert_eq!(MemoryRecordStore::memory_count(&db).await.unwrap(), 1);
+
+        let found = MemoryRecordStore::get_memory(&db, "narrow")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.content, "contract memory narrow");
+
+        let results = BinaryHvSearchBackend::search_binary_hv(&db, &BinaryHV::random(123), 1)
+            .await
+            .unwrap();
+        assert_eq!(results[0].record.id, "narrow");
+
+        assert!(
+            StorageHealthBackend::storage_health_check(&db)
+                .await
+                .unwrap()
+        );
+        assert!(
+            MemoryRecordStore::delete_memory(&db, "narrow")
+                .await
+                .unwrap()
+        );
+    }
+
+    #[cfg(feature = "hdc-store")]
+    #[tokio::test]
+    async fn hdc_store_memory_backend_contract() {
+        let db = HdcStoreDatabase::in_memory().unwrap();
+        assert_memory_backend_contract(&db).await;
     }
 }

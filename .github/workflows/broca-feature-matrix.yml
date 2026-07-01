@@ -1,0 +1,68 @@
+name: Broca Feature Matrix
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/symthaea-broca/**"
+      - ".github/workflows/broca-feature-matrix.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  broca-check:
+    name: symthaea-broca (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: no-default-features
+            command: cargo check -p symthaea-broca --no-default-features
+          - name: default
+            command: cargo check -p symthaea-broca
+          - name: mamba-cpu
+            command: cargo check -p symthaea-broca --features mamba-cpu
+          - name: test-helpers
+            command: cargo test -p symthaea-broca --features "mamba-cpu,test-helpers" --tests --no-run
+          - name: canonical-eval
+            command: cargo test -p symthaea-broca --lib evaluation::tests::test_canonical_eval_dataset_loads
+          - name: canonical-quality-gate
+            command: cargo test -p symthaea-broca --lib evaluation::tests::test_quality_gate_thresholds_fail
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-broca-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-broca-${{ matrix.name }}-
+            ${{ runner.os }}-broca-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
+
+      - name: Run feature check
+        run: ${{ matrix.command }}

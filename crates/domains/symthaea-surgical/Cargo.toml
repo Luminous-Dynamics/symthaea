@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-surgical"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+serde = { workspace = true }
+rand = { workspace = true }
+proptest = "1"
+
+[features]
+default = []

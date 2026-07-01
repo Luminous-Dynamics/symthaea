@@ -1,7 +1,0 @@
-node_modules/
-dist/
-wasm/
-*.log
-.DS_Store
-coverage/
-.turbo

@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-pulse"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Status Card — human-friendly consciousness dashboard"
+
+[[bin]]
+name = "symthaea-pulse"
+path = "src/main.rs"
+
+[dependencies]
+# [standalone-stripped] symthaea = { path = "../../.." }
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-broca = { path = "../symthaea-broca" }
+symthaea-psych-bench = { path = "../symthaea-psych-bench" }
+symthaea-types = { path = "../../core/symthaea-types" }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -152,8 +152,8 @@ impl EpistemicCoordinate {
 
     /// Convert to the shared canonical type.
     pub fn to_shared(&self, context: EpistemicContext) -> SharedEpistemicCoordinate {
-        SharedEpistemicCoordinate::new(
-            match self.empirical {
+        SharedEpistemicCoordinate {
+            empirical: match self.empirical {
                 EmpiricalTier::E0Null => EmpiricalLevel::E0Null,
                 EmpiricalTier::E1Testimonial => EmpiricalLevel::E1Testimonial,
                 EmpiricalTier::E2PrivatelyVerifiable => EmpiricalLevel::E2PrivatelyVerifiable,
@@ -162,20 +162,20 @@ impl EpistemicCoordinate {
                 }
                 EmpiricalTier::E4PubliclyReproducible => EmpiricalLevel::E4PubliclyReproducible,
             },
-            match self.normative {
+            normative: match self.normative {
                 NormativeTier::N0Personal => NormativeLevel::N0Personal,
                 NormativeTier::N1Communal => NormativeLevel::N1Communal,
                 NormativeTier::N2Network => NormativeLevel::N2Network,
                 NormativeTier::N3Axiomatic => NormativeLevel::N3Axiomatic,
             },
-            match self.materiality {
+            materiality: match self.materiality {
                 MaterialityTier::M0Ephemeral => MaterialityLevel::M0Ephemeral,
                 MaterialityTier::M1Temporal => MaterialityLevel::M1Temporal,
                 MaterialityTier::M2Persistent => MaterialityLevel::M2Persistent,
                 MaterialityTier::M3Foundational => MaterialityLevel::M3Foundational,
             },
             context,
-        )
+        }
     }
 }
 

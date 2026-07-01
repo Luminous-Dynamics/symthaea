@@ -4,6 +4,7 @@
 //! TCP-based backend for real network communication.
 
 use async_trait::async_trait;
+use bincode::Options;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -105,9 +106,12 @@ async fn read_framed(
             reason: e.to_string(),
         })?;
 
-    bincode::deserialize(&data).map_err(|e| NetworkError::Serialization {
-        reason: e.to_string(),
-    })
+    bincode::options()
+        .with_limit(TCP_MAX_MESSAGE_SIZE as u64)
+        .deserialize(&data)
+        .map_err(|e| NetworkError::Serialization {
+            reason: e.to_string(),
+        })
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,3 @@
+[reproduce] repo root: /srv/luminous-dynamics/symthaea/papers
+[reproduce] paper dir: /srv/luminous-dynamics/symthaea/papers/physics-math/ramanujan
+[reproduce] running ramanujan_showcase (release profile)...

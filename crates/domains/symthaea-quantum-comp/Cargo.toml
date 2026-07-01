@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-quantum-comp"
+version = "0.1.0-alpha.10"
+edition = "2024"
+authors = ["Luminous Dynamics"]
+license = "MIT"
+description = "Experimental quantum and quantum-inspired substrate probes for Symthaea HDC cognition research. Does not claim quantum consciousness."
+repository = "https://github.com/luminous-dynamics/symthaea"
+readme = "README.md"
+keywords = ["hdc", "quantum", "cognition", "research", "benchmark"]
+categories = ["science", "simulation", "algorithms"]
+
+[lib]
+name = "symthaea_quantum_comp"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+serde = []
+python-bindings = []
+qasm-export = []
+
+[dependencies]
+
+[dev-dependencies]

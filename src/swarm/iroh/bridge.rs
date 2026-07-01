@@ -333,7 +333,9 @@ impl IrohBridgeActor {
                 let socket_clone = socket.clone();
                 let state_clone = swarm_state.clone();
                 tokio::spawn(async move {
-                    let _ = socket_clone.broadcast(state_clone).await;
+                    let _ = socket_clone
+                        .broadcast(symthaea_swarm::SwarmMessage::State(state_clone))
+                        .await;
                 });
             }
         }

@@ -1,0 +1,81 @@
+# Symthaea Service - Consciousness-Aware IPC Daemon
+# D1: Systemd Integration
+#
+# Install: sudo cp symthaea.service /etc/systemd/system/
+# Enable:  sudo systemctl enable symthaea
+# Start:   sudo systemctl start symthaea
+# Status:  sudo systemctl status symthaea
+#
+# For NixOS, add to configuration.nix:
+#   systemd.services.symthaea = {
+#     description = "Symthaea Consciousness Service";
+#     wantedBy = [ "multi-user.target" ];
+#     serviceConfig = {
+#       ExecStart = "${pkgs.symthaea}/bin/symthaea-service";
+#       Restart = "always";
+#       RuntimeDirectory = "symthaea";
+#     };
+#   };
+
+[Unit]
+Description=Symthaea Consciousness-Aware IPC Service
+Documentation=https://github.com/Luminous-Dynamics/symthaea-hlb
+After=network.target
+
+[Service]
+Type=simple
+
+# Run as dedicated user (create if needed)
+# User=symthaea
+# Group=symthaea
+
+# Service binary
+ExecStart=/usr/local/bin/symthaea-service --socket /run/symthaea/symthaea.sock
+
+# Socket activation (optional - uncomment to use)
+# ExecStart=/usr/local/bin/symthaea-service --socket-activation
+
+# Environment
+Environment=RUST_LOG=symthaea=info
+Environment=SYMTHAEA_STATE_DIR=/var/lib/symthaea
+
+# Runtime directory for socket
+RuntimeDirectory=symthaea
+RuntimeDirectoryMode=0755
+
+# State directory for persistence
+StateDirectory=symthaea
+StateDirectoryMode=0750
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+WatchdogSec=30
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+CPUQuota=50%
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# Allow read access to NixOS config
+ReadOnlyPaths=/etc/nixos
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=symthaea
+
+[Install]
+WantedBy=multi-user.target

@@ -779,4 +779,43 @@ mod tests {
         let rivals = sc.get_rivals();
         assert!(!rivals.is_empty(), "Should have at least one rival");
     }
+
+    #[test]
+    fn test_moral_algebra_and_empathy_coupling() {
+        let mut sc = SocialCoherence::default();
+        let agent_id = "external_agent";
+
+        // Scenario 1: Agent behaves morally/cooperatively, triggering empathy and positive outcomes.
+        let behavior = ContinuousHV::random(512, 0x5EED_1111);
+        let context_coop = ContinuousHV::random(512, 0x1234_5678);
+        sc.observe_agent(agent_id, &behavior, &context_coop);
+
+        sc.record_interaction(
+            agent_id,
+            InteractionType::Cooperation,
+            0.9,
+            context_coop.clone(),
+            "assisted",
+            "thanked",
+        );
+
+        let model = sc.get_mental_model(agent_id).unwrap();
+        assert!(model.emotional_state.trust_toward_us > 0.5);
+        assert!(model.emotional_state.valence > 0.0);
+        assert!(sc.should_cooperate(agent_id));
+
+        // Scenario 2: Agent acts in conflict, indicating a moral/empathic violation.
+        sc.record_interaction(
+            agent_id,
+            InteractionType::Conflict,
+            -0.8,
+            context_coop,
+            "offered_hand",
+            "slapped",
+        );
+
+        let model_after = sc.get_mental_model(agent_id).unwrap();
+        assert!(model_after.emotional_state.trust_toward_us < 0.6);
+        assert!(model_after.emotional_state.valence < 0.5);
+    }
 }

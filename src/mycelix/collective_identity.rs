@@ -11,7 +11,7 @@
 //!
 //! Based on the dominant harmonies across all agents:
 //! - **Exploratory**: high Infinite Play + curiosity → community is experimenting
-//! - **Protective**: high Pan-Sentient Care + Mutual Reciprocity → community is nurturing
+//! - **Protective**: high Pan-Sentient Care + Sacred Reciprocity → community is nurturing
 //! - **Creative**: high Infinite Play + Evolutionary Progression → community is building
 //! - **Reflective**: high Sacred Stillness + Integral Wisdom → community is integrating
 
@@ -38,7 +38,7 @@ pub struct CollectiveKosmicSong {
 pub enum CommunityMode {
     /// High Infinite Play + curiosity → experimentation and exploration.
     Exploratory,
-    /// High Pan-Sentient Care + Mutual Reciprocity → nurturing and protection.
+    /// High Pan-Sentient Care + Sacred Reciprocity → nurturing and protection.
     Protective,
     /// High Infinite Play + Evolutionary Progression → building and creation.
     Creative,

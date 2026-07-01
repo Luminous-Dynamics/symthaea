@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/service-protocol-v1.schema.json",
+  "title": "Symthaea Service Protocol v1",
+  "description": "JSON-line request envelope for the Symthaea service daemon. Requests are line-delimited JSON objects sent over the service socket or TCP listener. Some recognized request types, such as gui_widget_change and parse_nix_config, are currently reserved and return not_implemented.",
+  "type": "object",
+  "properties": {
+    "protocol_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Optional protocol version. When supplied it must equal 1."
+    },
+    "authorization": {
+      "type": "string",
+      "pattern": "^Bearer .+",
+      "description": "Required for authenticated requests when service auth is enabled."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ping",
+        "protocol",
+        "status",
+        "introspect",
+        "sleep",
+        "save",
+        "shutdown",
+        "audit_events",
+        "query",
+        "speak",
+        "listen",
+        "voice_turn",
+        "voice_status",
+        "intellisense",
+        "validate_command",
+        "execute_gated",
+        "stream_metrics",
+        "gui_widget_change",
+        "parse_nix_config",
+        "semantic_search",
+        "partnership"
+      ]
+    },
+    "path": {
+      "type": "string",
+      "description": "Optional save destination for type=save."
+    },
+    "content": {
+      "type": "string",
+      "description": "Required for type=query."
+    },
+    "text": {
+      "type": "string",
+      "description": "Required for type=speak."
+    },
+    "partial_input": {
+      "type": "string",
+      "description": "Required for type=intellisense."
+    },
+    "cursor_position": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional cursor position for type=intellisense."
+    },
+    "context": {
+      "type": "object",
+      "description": "Optional shell context for type=intellisense."
+    },
+    "command": {
+      "type": "string",
+      "description": "Required for validate_command and execute_gated."
+    },
+    "phi_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "require_confirmation": {
+      "type": "boolean"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "interval_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional interval for type=stream_metrics."
+    },
+    "widget_id": {
+      "type": "string",
+      "description": "Required for type=gui_widget_change."
+    },
+    "new_value": {
+      "description": "Required for type=gui_widget_change."
+    },
+    "semantic_intent": {
+      "type": "string",
+      "description": "Optional semantic hint for type=gui_widget_change."
+    },
+    "nix_content": {
+      "type": "string",
+      "description": "Required for type=parse_nix_config."
+    },
+    "source_file": {
+      "type": "string",
+      "description": "Optional source file for type=parse_nix_config."
+    },
+    "query": {
+      "type": "string",
+      "description": "Required for type=semantic_search."
+    },
+    "search_type": {
+      "type": "string",
+      "enum": ["packages", "options", "services"],
+      "description": "Required for type=semantic_search."
+    }
+  },
+  "required": ["type"],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "query" }
+        }
+      },
+      "then": {
+        "required": ["content"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "speak" }
+        }
+      },
+      "then": {
+        "required": ["text"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "intellisense" }
+        }
+      },
+      "then": {
+        "required": ["partial_input"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "enum": ["validate_command", "execute_gated"] }
+        }
+      },
+      "then": {
+        "required": ["command"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "gui_widget_change" }
+        }
+      },
+      "then": {
+        "required": ["widget_id", "new_value"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "parse_nix_config" }
+        }
+      },
+      "then": {
+        "required": ["nix_content"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "semantic_search" }
+        }
+      },
+      "then": {
+        "required": ["query", "search_type"]
+      }
+    }
+  ]
+}

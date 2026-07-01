@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-mujoco-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Generic MuJoCo adapter boundary for Symthaea engineering simulation requests"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["mujoco", "robotics", "simulation", "engineering"]
+categories = ["simulation", "science"]
+
+[dependencies]
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-humanoid = { path = "../../domains/symthaea-humanoid" }
+

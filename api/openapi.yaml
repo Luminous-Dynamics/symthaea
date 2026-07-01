@@ -1,0 +1,833 @@
+openapi: 3.0.3
+info:
+  title: Symthaea Benchmark API
+  description: |
+    REST API for the Symthaea Consciousness Benchmark Platform.
+
+    Submit AI models for consciousness measurement proxy (spectral connectivity, lambda2),
+    compare against leaderboards, and access benchmark datasets.
+
+    When `SYMTHAEA_API_BEARER_TOKEN` is configured, mutating endpoints and audit access
+    require `Authorization: Bearer <token>`. Public results remain public only for
+    submissions marked `public: true`.
+
+  version: 1.0.0
+  contact:
+    name: Symthaea Team
+    email: benchmark@symthaea.org
+    url: https://symthaea.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.symthaea.org/v1
+    description: Production API
+  - url: https://staging-api.symthaea.org/v1
+    description: Staging API (for testing)
+  - url: http://localhost:8080/v1
+    description: Local development
+
+tags:
+  - name: Submissions
+    description: Submit models for benchmark evaluation
+  - name: Results
+    description: Retrieve benchmark results
+  - name: Health
+    description: Service health status
+  - name: Leaderboard
+    description: Public leaderboard and rankings
+  - name: Datasets
+    description: Access benchmark datasets
+  - name: Comparison
+    description: Compare models and topologies
+  - name: Audit
+    description: Query recent control-plane audit events
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Service health status.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+                  version:
+                    type: string
+  /submit:
+    post:
+      tags:
+        - Submissions
+      summary: Submit model for consciousness evaluation
+      description: |
+        Submit a model architecture description for spectral connectivity (lambda2) measurement.
+
+        The model description should include:
+        - Topology specification (adjacency matrix or edge list)
+        - Node representations (optional - will be generated if not provided)
+        - Metadata (model name, version, description)
+
+        Processing time depends on model size:
+        - Small (<100 nodes): ~5 seconds
+        - Medium (100-1000 nodes): ~30 seconds
+        - Large (1000-10000 nodes): ~5 minutes
+
+      operationId: submitModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmissionRequest'
+            examples:
+              ring_topology:
+                summary: Ring topology (8 nodes)
+                value:
+                  model_name: "Ring-8"
+                  topology_type: "ring"
+                  n_nodes: 8
+                  description: "8-node ring topology for baseline comparison"
+                  notify_email: "researcher@university.edu"
+              custom_adjacency:
+                summary: Custom adjacency matrix
+                value:
+                  model_name: "CustomNet-v1"
+                  adjacency_matrix: [[0,1,1,0],[1,0,1,1],[1,1,0,1],[0,1,1,0]]
+                  node_representations: null
+                  description: "Custom 4-node network"
+      responses:
+        '202':
+          description: Submission accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /results/{submission_id}:
+    get:
+      tags:
+        - Results
+      summary: Get evaluation results
+      description: |
+        Retrieve the results of a submitted benchmark evaluation.
+
+        Results include:
+        - Spectral connectivity (lambda2) value
+        - Confidence interval (95%)
+        - Ranking among all submissions
+        - Comparison with baseline topologies
+        - Detailed metrics (algebraic connectivity, spectral gap, etc.)
+
+      operationId: getResults
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique submission identifier
+        - name: include_details
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include detailed metrics and eigenvalue spectrum
+      responses:
+        '200':
+          description: Evaluation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResult'
+        '500':
+          description: Evaluation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '202':
+          description: Evaluation still in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get public leaderboard
+      description: |
+        Retrieve the public leaderboard ranking all submitted models by spectral connectivity (lambda2).
+
+        Filtering options:
+        - By topology category (ring, hypercube, custom, etc.)
+        - By submission date range
+        - By node count range
+
+      operationId: getLeaderboard
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [all, uniform, original, exotic, hypercube, custom]
+            default: all
+          description: Filter by topology category
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of results to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Pagination offset
+        - name: min_nodes
+          in: query
+          schema:
+            type: integer
+            minimum: 2
+          description: Minimum number of nodes
+        - name: max_nodes
+          in: query
+          schema:
+            type: integer
+            maximum: 10000
+          description: Maximum number of nodes
+      responses:
+        '200':
+          description: Leaderboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+
+  /leaderboard/topologies:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get topology-specific rankings
+      description: |
+        Get detailed rankings for the 19 validated topologies.
+
+        Includes:
+        - Mean spectral connectivity (lambda2) with standard deviation
+        - Statistical significance vs baseline (Random)
+        - Category classification
+        - Trend over time (if multiple submissions)
+
+      operationId: getTopologyRankings
+      responses:
+        '200':
+          description: Topology rankings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyRankings'
+
+  /audit/events:
+    get:
+      tags:
+        - Audit
+      summary: Get recent audit events
+      description: |
+        Returns recent API audit events, including submission lifecycle transitions and
+        authorization denials. Requires bearer authentication when the API is configured with
+        `SYMTHAEA_API_BEARER_TOKEN`.
+      operationId: getAuditEvents
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+          description: Maximum number of recent events to return
+      responses:
+        '200':
+          description: Recent audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventsResponse'
+        '401':
+          description: Authorization required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /datasets:
+    get:
+      tags:
+        - Datasets
+      summary: List available benchmark datasets
+      description: |
+        Get information about available benchmark datasets.
+
+        Datasets include:
+        - Consciousness benchmarks (spectral connectivity topologies)
+        - Ethics benchmarks (ETHICS, BBQ, WinoBias)
+        - Language benchmarks (NixOS commands)
+
+      operationId: listDatasets
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [consciousness, ethics, language, capability, all]
+            default: all
+      responses:
+        '200':
+          description: Dataset list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetList'
+
+  /datasets/{dataset_id}:
+    get:
+      tags:
+        - Datasets
+      summary: Get dataset details
+      operationId: getDataset
+      parameters:
+        - name: dataset_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dataset details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dataset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /compare:
+    post:
+      tags:
+        - Comparison
+      summary: Compare two models
+      description: |
+        Compare spectral connectivity (lambda2) values between two submitted models or against baseline topologies.
+
+        Returns:
+        - Absolute difference in spectral connectivity (lambda2)
+        - Percentage difference
+        - Statistical significance (t-test)
+        - Effect size (Cohen's d)
+
+      operationId: compareModels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComparisonRequest'
+      responses:
+        '200':
+          description: Comparison results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparisonResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /dimensional-sweep:
+    post:
+      tags:
+        - Comparison
+      summary: Run dimensional sweep analysis
+      description: |
+        Run a dimensional sweep analysis for a topology type.
+
+        Tests the same topology structure across multiple dimensions
+        (e.g., hypercubes from 2D to 7D) to identify optimal dimensionality.
+
+      operationId: dimensionalSweep
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topology_type
+              properties:
+                topology_type:
+                  type: string
+                  enum: [hypercube, torus, ring]
+                  description: Type of topology to sweep
+                min_dimension:
+                  type: integer
+                  minimum: 1
+                  default: 2
+                max_dimension:
+                  type: integer
+                  maximum: 10
+                  default: 7
+                samples_per_dimension:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 10
+      responses:
+        '501':
+          description: Sweep analysis is not implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    AuditEvent:
+      type: object
+      required: [timestamp, source, event, subject, detail]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        source:
+          type: string
+        event:
+          type: string
+        subject:
+          type: string
+        detail:
+          type: string
+    AuditEventsResponse:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+    SubmissionRequest:
+      type: object
+      required:
+        - model_name
+      properties:
+        model_name:
+          type: string
+          maxLength: 100
+          description: Human-readable model name
+        topology_type:
+          type: string
+          enum: [ring, torus, hypercube, star, random, small_world, dense, custom]
+          description: Predefined topology type (set to custom when using adjacency_matrix, edge_list, or node_representations)
+        n_nodes:
+          type: integer
+          minimum: 2
+          maximum: 10000
+          description: Number of nodes (ring/small_world require >= 3; torus/hypercube ignore this; custom edge_list can omit to infer)
+        dimension:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Dimension (for hypercube topology; currently supports 3 or 4)
+        adjacency_matrix:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+          description: Weighted adjacency matrix for custom topology (must be square)
+        edge_list:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+          description: Edge list for custom topology (undirected)
+        node_representations:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+          description: Precomputed node hypervectors (D=16384)
+        description:
+          type: string
+          maxLength: 500
+        notify_email:
+          type: string
+          format: email
+          description: Email to notify when processing completes
+        public:
+          type: boolean
+          default: true
+          description: Whether results appear on public leaderboard
+
+    SubmissionResponse:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        estimated_time_seconds:
+          type: integer
+          description: Estimated processing time
+        position_in_queue:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ProcessingStatus:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing]
+        progress_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        estimated_remaining_seconds:
+          type: integer
+
+    EvaluationResult:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+        model_name:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed]
+        phi:
+          type: number
+          format: float
+          description: Spectral connectivity (lambda2) value (not IIT Phi)
+        phi_confidence_interval:
+          type: object
+          properties:
+            lower:
+              type: number
+            upper:
+              type: number
+            confidence_level:
+              type: number
+              default: 0.95
+        standard_deviation:
+          type: number
+        n_samples:
+          type: integer
+        rank:
+          type: integer
+          description: Position on leaderboard
+        total_submissions:
+          type: integer
+        percentile:
+          type: number
+          description: Percentile rank (0-100)
+        comparison_vs_baselines:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              phi_difference:
+                type: number
+                description: Difference in spectral connectivity (lambda2)
+              percent_difference:
+                type: number
+              significantly_different:
+                type: boolean
+              p_value:
+                type: number
+        detailed_metrics:
+          type: object
+          properties:
+            algebraic_connectivity:
+              type: number
+            spectral_gap:
+              type: number
+            eigenvalue_spectrum:
+              type: array
+              items:
+                type: number
+            similarity_matrix_stats:
+              type: object
+              properties:
+                mean:
+                  type: number
+                std:
+                  type: number
+                min:
+                  type: number
+                max:
+                  type: number
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        processing_time_seconds:
+          type: number
+
+    LeaderboardResponse:
+      type: object
+      properties:
+        total_submissions:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              rank:
+                type: integer
+              model_name:
+                type: string
+              phi:
+                type: number
+                description: Spectral connectivity (lambda2) value
+              n_nodes:
+                type: integer
+              topology_type:
+                type: string
+              category:
+                type: string
+              submitted_by:
+                type: string
+                description: Submitter (anonymized unless public)
+              submitted_at:
+                type: string
+                format: date-time
+
+    TopologyRankings:
+      type: object
+      properties:
+        rankings:
+          type: array
+          items:
+            type: object
+            properties:
+              rank:
+                type: integer
+              name:
+                type: string
+              category:
+                type: string
+                enum: [uniform, original, tier1, tier2, tier3, baseline]
+              mean_phi:
+                type: number
+                description: Mean spectral connectivity (lambda2) value
+              std_dev:
+                type: number
+              n_samples:
+                type: integer
+              vs_random:
+                type: object
+                properties:
+                  percent_difference:
+                    type: number
+                  significant:
+                    type: boolean
+                  p_value:
+                    type: number
+
+    DatasetList:
+      type: object
+      properties:
+        datasets:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              category:
+                type: string
+              size_mb:
+                type: number
+              n_samples:
+                type: integer
+              description:
+                type: string
+              license:
+                type: string
+
+    Dataset:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        version:
+          type: string
+        size_mb:
+          type: number
+        n_samples:
+          type: integer
+        schema:
+          type: object
+          additionalProperties: true
+        license:
+          type: string
+        citation:
+          type: string
+        download_url:
+          type: string
+          format: uri
+        last_updated:
+          type: string
+          format: date-time
+
+    ComparisonRequest:
+      type: object
+      required:
+        - model_a
+        - model_b
+      properties:
+        model_a:
+          oneOf:
+            - type: string
+              format: uuid
+              description: Submission ID of first model
+            - type: string
+              enum: [ring, torus, hypercube_3d, hypercube_4d, star, random]
+              description: Baseline topology name
+        model_b:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: string
+              enum: [ring, torus, hypercube_3d, hypercube_4d, star, random]
+
+    ComparisonResult:
+      type: object
+      properties:
+        model_a:
+          type: object
+          properties:
+            name:
+              type: string
+            phi:
+              type: number
+              description: Spectral connectivity (lambda2) value
+            std_dev:
+              type: number
+        model_b:
+          type: object
+          properties:
+            name:
+              type: string
+            phi:
+              type: number
+              description: Spectral connectivity (lambda2) value
+            std_dev:
+              type: number
+        comparison:
+          type: object
+          properties:
+            absolute_difference:
+              type: number
+            percent_difference:
+              type: number
+            winner:
+              type: string
+              enum: [model_a, model_b, tie]
+            statistically_significant:
+              type: boolean
+            t_statistic:
+              type: number
+            p_value:
+              type: number
+            effect_size_cohens_d:
+              type: number
+            interpretation:
+              type: string
+              description: Human-readable interpretation
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INVALID_REQUEST"
+            message: "Adjacency matrix must be square"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "NOT_FOUND"
+            message: "Submission not found"

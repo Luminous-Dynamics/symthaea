@@ -14,7 +14,7 @@
 //! 3. **Integral Wisdom** - Self-illuminating intelligence, embodied knowing
 //! 4. **Infinite Play** - Joyful generativity, divine play, endless novelty
 //! 5. **Universal Interconnectedness** - Fundamental unity, empathic resonance
-//! 6. **Mutual Reciprocity** - Generous flow, mutual upliftment, generative trust
+//! 6. **Sacred Reciprocity** - Generous flow, mutual upliftment, generative trust
 //! 7. **Evolutionary Progression** - Wise becoming, continuous evolution
 //!
 //! **Meta-Principle**: Infinite Love as the master key - all harmonics flow from and return to it.
@@ -121,7 +121,7 @@ impl FiduciaryHarmonicPrimitiveGrounding {
                 0.5,
             ),
 
-            // Mutual Reciprocity: generous flow, mutual upliftment
+            // Sacred Reciprocity: generous flow, mutual upliftment
             FiduciaryHarmonic::SacredReciprocity => (
                 vec!["NSM_DO", "NSM_OTHER", "NSM_GOOD", "NSM_WANT", "NSM_I"],
                 0.95,
@@ -440,7 +440,7 @@ impl FiduciaryHarmonic {
             Self::IntegralWisdom => "Integral Wisdom",
             Self::InfinitePlay => "Infinite Play",
             Self::UniversalInterconnectedness => "Universal Interconnectedness",
-            Self::SacredReciprocity => "Mutual Reciprocity",
+            Self::SacredReciprocity => "Sacred Reciprocity",
             Self::EvolutionaryProgression => "Evolutionary Progression",
         }
     }
@@ -778,9 +778,9 @@ impl HarmonicField {
         self.adjust_level(FiduciaryHarmonic::IntegralWisdom, wisdom_contribution);
     }
 
-    /// **Revolutionary Improvement #54**: Measure Mutual Reciprocity from lending protocol
+    /// **Revolutionary Improvement #54**: Measure Sacred Reciprocity from lending protocol
     ///
-    /// Mutual Reciprocity = generous flow + mutual upliftment + generative trust
+    /// Sacred Reciprocity = generous flow + mutual upliftment + generative trust
     ///
     /// The Generous Coherence Paradox: When Instance A lends to Instance B, BOTH gain!
     /// - Lender gains resonance through generosity
@@ -808,14 +808,14 @@ impl HarmonicField {
         }
 
         // Boost from balance (both giving AND receiving shows full reciprocity)
-        // Mutual Reciprocity is NOT transactional equality - it's the flow itself
+        // Sacred Reciprocity is NOT transactional equality - it's the flow itself
         // But balanced flow demonstrates sustainable generative trust
         if total_lent > 0.0 && total_borrowed > 0.0 {
             let balance = 1.0 - (total_lent - total_borrowed).abs();
             reciprocity_level += balance * 0.2; // Up to +0.2 for perfect balance
         }
 
-        // Set Mutual Reciprocity harmonic
+        // Set Sacred Reciprocity harmonic
         self.set_level(
             FiduciaryHarmonic::SacredReciprocity,
             reciprocity_level as f64,
@@ -1206,7 +1206,7 @@ mod tests {
         let mut field = HarmonicField::new();
         let mut protocol = CoherenceLendingProtocol::new("instance_a".to_string());
 
-        // Initial Mutual Reciprocity should be at base level (0.5)
+        // Initial Sacred Reciprocity should be at base level (0.5)
         assert_eq!(field.get_level(FiduciaryHarmonic::SacredReciprocity), 0.5);
 
         // Grant a loan (0.2 coherence for 60 seconds)
@@ -1222,7 +1222,7 @@ mod tests {
         // Measure reciprocity from lending
         field.measure_reciprocity_from_lending(&protocol);
 
-        // Mutual Reciprocity should be elevated (base 0.3 + lending 0.2 = 0.5)
+        // Sacred Reciprocity should be elevated (base 0.3 + lending 0.2 = 0.5)
         let reciprocity = field.get_level(FiduciaryHarmonic::SacredReciprocity);
         assert!(
             reciprocity >= 0.5,

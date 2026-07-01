@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-manipulator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+symthaea-core = { version = "0.5.0", path = "../../core/symthaea-core" }
+symthaea-fep = { version = "0.1.0", path = "../../core/symthaea-fep" }
+symthaea-swarm = { version = "0.1.0", path = "../symthaea-swarm" }
+symtropy-physics = "0.2.1"
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+proptest = "1.0"
+

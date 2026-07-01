@@ -546,6 +546,8 @@ mod tests {
             cycle_id: 1,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: 0.5,
+            grid_encoding_norm: 0.0,
+            grid_spatial_complexity: 0.0,
             code_context: None,
             substrate_cost_model: Default::default(),
         }

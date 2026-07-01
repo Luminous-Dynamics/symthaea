@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-consciousness-equation"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Master Consciousness Equation — 7-theory synthesis of IIT, GWT, HOT, attention, embodiment, knowledge, and synchrony into a single computable Phi metric."
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+keywords = ["consciousness", "iit", "phi", "simulation", "neuroscience"]
+categories = ["science", "simulation"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+# Required: std::time::Instant panics on wasm32-unknown-unknown.
+# web-time provides a drop-in Instant that uses performance.now() in browsers.
+web-time = "1"

@@ -1,0 +1,27 @@
+[package]
+name = "symthaea-telemetry-sink"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Telemetry sink — wires FEP, Phi-Oracle, and GWT metrics into the 2.5D Projection WaterfallBuffer"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["telemetry", "projection", "fep", "phi", "consciousness"]
+categories = ["science", "visualization"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+tracing.workspace = true
+
+symthaea-projection = { path = "../symthaea-projection" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-phi-oracle = { path = "../../symthaea-phi-oracle" }
+symthaea-workspace = { path = "../../core/symthaea-workspace" }
+
+[dev-dependencies]
+proptest = "1"

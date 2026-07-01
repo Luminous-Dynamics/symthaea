@@ -219,8 +219,8 @@ impl HarmonyTension {
     fn generate_resolution(harmony_a: &str, harmony_b: &str) -> String {
         // Known tension patterns and resolutions
         match (harmony_a, harmony_b) {
-            ("Mutual Reciprocity", "Pan-Sentient Flourishing")
-            | ("Pan-Sentient Flourishing", "Mutual Reciprocity") => {
+            ("Sacred Reciprocity", "Pan-Sentient Flourishing")
+            | ("Pan-Sentient Flourishing", "Sacred Reciprocity") => {
                 "Consider whether the reciprocity truly serves flourishing, \
                  or if generosity without expectation might be more aligned."
                     .to_string()
@@ -236,8 +236,8 @@ impl HarmonyTension {
                  Consider whether the disruption serves longer-term harmony."
                     .to_string()
             }
-            ("Mutual Reciprocity", "Evolutionary Progression")
-            | ("Evolutionary Progression", "Mutual Reciprocity") => {
+            ("Sacred Reciprocity", "Evolutionary Progression")
+            | ("Evolutionary Progression", "Sacred Reciprocity") => {
                 "Progress may require accepting gifts or support without immediate return. \
                  Trust that contribution flows in many directions."
                     .to_string()

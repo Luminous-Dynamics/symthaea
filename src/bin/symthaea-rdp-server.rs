@@ -16,7 +16,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use tracing::{info, warn};
+use tracing::info;
 
 use symthaea::swarm::rdp_capture::TestCapture;
 use symthaea::swarm::rdp_input::{InputInjector, LoggingInjector};

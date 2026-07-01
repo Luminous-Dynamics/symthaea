@@ -1,0 +1,44 @@
+[package]
+name = "symthaea-phone-embodiment"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Phone screen embodiment for Symthaea — ADB-based perception-action loop"
+
+[features]
+default = []
+# Persistent-stream capture path via scrcpy-server pushed over ADB.
+# Requires `nix develop` shell with ffmpeg (HEVC decoder) for first build.
+scrcpy = ["dep:sha2", "dep:ffmpeg-next"]
+# Research-only AV1 software-decode path for Phase II.5 compressed-domain
+# perception experiments. Not used by the production capture loop.
+av1-research = ["dep:rav1d"]
+# Last-resort H.264 decoder behind openh264; only built explicitly.
+h264-fallback = ["dep:openh264"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# scrcpy feature deps
+sha2 = { version = "0.10", optional = true }
+ffmpeg-next = { version = "7", optional = true }
+
+# av1-research feature dep
+rav1d = { version = "0.1", optional = true }
+
+# h264-fallback feature dep
+# Bumped 0.6 → 0.8 to resolve heap-overflow vuln in decoding functions
+# (GHSA, fix: 0.8.0). Feature-gated behind `h264-fallback`.
+openh264 = { version = "0.8", optional = true }
+
+[[example]]
+name = "record_scrcpy_sample"
+required-features = ["scrcpy"]
+
+[[example]]
+name = "scrcpy_soak"
+required-features = ["scrcpy"]

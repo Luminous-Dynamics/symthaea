@@ -89,6 +89,8 @@ pub mod coding_prediction_error;
 #[cfg(feature = "code_generation")]
 pub mod compose_codegen;
 #[cfg(feature = "code_generation")]
+pub mod compose_eval_goldens;
+#[cfg(feature = "code_generation")]
 pub mod compose_scorer;
 #[cfg(feature = "code_generation")]
 pub mod config_parser;
@@ -96,6 +98,10 @@ pub mod config_parser;
 pub mod emitters;
 #[cfg(feature = "code_generation")]
 pub mod epistemic_generation;
+#[cfg(feature = "code_generation")]
+pub mod hcl_codegen;
+#[cfg(feature = "code_generation")]
+pub mod hcl_eval_goldens;
 #[cfg(feature = "code_generation")]
 pub mod hcl_scorer;
 #[cfg(feature = "code_generation")]
@@ -130,6 +136,8 @@ pub mod program_node_translator;
 #[cfg(feature = "code_generation")]
 pub mod python_parser;
 #[cfg(feature = "code_generation")]
+pub mod python_scorer;
+#[cfg(feature = "code_generation")]
 pub mod repair_memory;
 #[cfg(feature = "code_generation")]
 pub mod repair_taxonomy;
@@ -138,9 +146,13 @@ pub mod repo_map;
 #[cfg(feature = "code_generation")]
 pub mod rust_ast_hdc;
 #[cfg(feature = "code_generation")]
+pub mod rust_eval_goldens;
+#[cfg(feature = "code_generation")]
 pub mod rust_lsp;
 #[cfg(feature = "code_generation")]
 pub mod rust_parser;
+#[cfg(feature = "code_generation")]
+pub mod rust_scorer;
 #[cfg(feature = "code_generation")]
 pub mod semantic_repair;
 #[cfg(feature = "code_generation")]
@@ -149,6 +161,8 @@ pub mod sequencer_benchmark;
 pub mod sequencer_training;
 #[cfg(feature = "code_generation")]
 pub mod structural_prototype;
+#[cfg(feature = "code_generation")]
+pub mod substrate;
 #[cfg(feature = "code_generation")]
 pub mod triune_intent;
 #[cfg(feature = "code_generation")]

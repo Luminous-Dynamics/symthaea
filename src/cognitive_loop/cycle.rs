@@ -210,6 +210,10 @@ impl CognitiveLoopService {
         // PHASE 1: PERCEPTION
         // Safety checks, encoding, moral evaluation, strategy, urgency
         // ═══════════════════════════════════════════════════════════════════
+
+        // Ground consciousness model trust in real-time physical accuracy (Epistemic Humility)
+        let epistemic_quality = self.get_epistemic_quality();
+
         let mut perception = match self.phase_perception(input, cycle_start, &mut module_timings) {
             Ok(p) => p,
             Err(blocked) => return *blocked,
@@ -624,21 +628,37 @@ impl CognitiveLoopService {
                 && self.stats.total_cycles as usize % self.config.fhe_aggregation_interval == 0
             {
                 if let Some(collective_wisdom) = self.swarm_manager.try_aggregate_and_decrypt() {
-                    // Integrate collective wisdom: blend into the encoder's codebook
-                    // via similarity-weighted update. The decrypted aggregate carries
-                    // the majority-vote consensus of recent peer states.
-                    let sim = perception
-                        .encoding
-                        .hv16_cached
-                        .similarity(&collective_wisdom);
-                    tracing::debug!(
-                        target: "cognitive_loop::fhe",
-                        pool_count = self.swarm_manager.wisdom_pool_count(),
-                        contributions = self.swarm_manager.fhe_contributions_total(),
-                        aggregations = self.swarm_manager.fhe_aggregations_total(),
-                        local_collective_sim = %format!("{sim:.4}"),
-                        "FHE collective wisdom aggregated"
-                    );
+                    // Epistemic Humility: Only integrate if local confidence > 0.4
+                    // High local uncertainty suggests we are currently exploring;
+                    // trust local experience over swarm consensus during high discovery phases.
+                    let local_confidence = self.stats.prediction_confidence;
+                    if local_confidence > 0.4 {
+                        let sim = perception
+                            .encoding
+                            .hv16_cached
+                            .similarity(&collective_wisdom);
+
+                        // Apply collective update weighted by current reliability
+                        let update_weight = (local_confidence * 0.2).clamp(0.05, 0.25);
+                        perception.encoding.hv16_cached.lerp_in_place(
+                            &collective_wisdom,
+                            1.0 - update_weight,
+                            update_weight,
+                        );
+
+                        tracing::debug!(
+                            target: "cognitive_loop::fhe",
+                            pool_count = self.swarm_manager.wisdom_pool_count(),
+                            local_confidence = %format!("{local_confidence:.4}"),
+                            local_collective_sim = %format!("{sim:.4}"),
+                            "FHE collective wisdom consolidated"
+                        );
+                    } else {
+                        tracing::debug!(
+                            target: "cognitive_loop::fhe",
+                            "Epistemic Humility: High local uncertainty; swarm wisdom ignored"
+                        );
+                    }
                 }
             }
         }
@@ -1328,7 +1348,7 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // Output phase coverage (cycle_phase_output.rs)
+    // Output phase coverage (cycle_phase_output/)
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]

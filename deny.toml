@@ -1,0 +1,80 @@
+# cargo-deny configuration for Symthaea workspace
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# cargo-deny v2 simplified format
+ignore = [
+    # Marvin Attack timing sidechannel in rsa crate (indirect dep, no direct exposure)
+    "RUSTSEC-2023-0071",
+    # AWS-LC X.509 name constraints bypass (transitive via rustls/reqwest, no direct cert validation)
+    "RUSTSEC-2026-0044",
+    # AWS-LC CRL distribution point logic error (transitive, same chain)
+    "RUSTSEC-2026-0048",
+    # Bincode unmaintained (transitive dep, no replacement available)
+    "RUSTSEC-2025-0141",
+    # paste crate unmaintained (transitive dep via holochain/wasmtime)
+    "RUSTSEC-2024-0436",
+    # proc-macro-error unmaintained (transitive: hdk_derive → hdi/hdk; can't fix until Holochain upgrades)
+    "RUSTSEC-2024-0370",
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "BSL-1.0",
+    "CC0-1.0",
+    "OpenSSL",
+    "MPL-2.0",
+    "AGPL-3.0-or-later",
+    "AGPL-3.0-only",
+    "Unlicense",
+    "CDLA-Permissive-2.0",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    "bzip2-1.0.6",
+]
+confidence-threshold = 0.8
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "lowest-version"
+# Known acceptable duplicates (transitive, can't consolidate without major bumps)
+skip = [
+    # png (via image 0.24) pulls bitflags 1.x; rest of ecosystem uses 2.x
+    { name = "bitflags", version = "=1.3.2" },
+    # rand 0.8 (ours) vs rand 0.9 (some transitive deps)
+    { name = "rand", version = ">=0.9, <1.0" },
+    { name = "rand_core", version = ">=0.9, <1.0" },
+    { name = "rand_chacha", version = ">=0.9, <1.0" },
+    { name = "getrandom", version = ">=0.3, <1.0" },
+    # hashbrown versions from different deps (rusqlite, lru, indexmap)
+    { name = "hashbrown", version = "=0.14" },
+    { name = "hashbrown", version = "=0.16" },
+    { name = "foldhash", version = ">=0.2, <1.0" },
+    # gemm/dyn-stack duplicates from candle-core 0.8 pulling both 0.17 and 0.18
+    { name = "gemm", version = "=0.17.1" },
+    { name = "gemm-common", version = "=0.17.1" },
+    { name = "dyn-stack", version = "=0.10.0" },
+]
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

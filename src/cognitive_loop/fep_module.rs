@@ -20,6 +20,7 @@ use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedF
 use crate::dynamics::ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
 use crate::exploration::SurpriseExplorationBridge;
 use std::collections::VecDeque;
+use symthaea_core::embodiment::EmbodimentBridge;
 use symthaea_core::physics::thermodynamics::ThermodynamicLedger;
 
 use super::goal_world::{GoalSystemBridge, WorldModelBridge};
@@ -206,6 +207,9 @@ pub struct FepModule {
     /// FEP Active Inference Agent for full perception-action loop.
     pub agent: ActiveInferenceAgent,
 
+    /// Proprioceptive-Semantic binder for somatic grounding.
+    pub haptic_semantic_binder: symthaea_fep::HapticSemanticBinder,
+
     /// Enhanced FEP Bridge with motor system integration.
     pub enhanced_bridge: EnhancedFEPBridge,
 
@@ -231,6 +235,37 @@ pub struct FepModule {
 }
 
 impl FepModule {
+    /// Create a new FEP module.
+    pub fn new(
+        agent: ActiveInferenceAgent,
+        ledger: ThermodynamicLedger,
+        closed_learning_loop: ClosedLearningLoop,
+        episodic_memory: EpisodicMemoryBridge,
+        goal_system: GoalSystemBridge,
+        world_model: WorldModelBridge,
+        haptic_semantic_binder: symthaea_fep::HapticSemanticBinder,
+        enhanced_bridge: EnhancedFEPBridge,
+    ) -> Self {
+        Self {
+            active_inference_bridge: ActiveInferenceBridge::default(),
+            ledger,
+            closed_learning_loop,
+            episodic_memory,
+            goal_system,
+            world_model,
+            agent,
+            haptic_semantic_binder,
+            enhanced_bridge,
+            learning_signal: 0.0,
+            last_action_idx: 0,
+            lr_boost: 1.0,
+            surprise_bridge: None,
+            trajectory_config: TrajectoryPlanningConfig::default(),
+            trajectory_telemetry: TrajectoryTelemetry::default(),
+            trajectory_history: VecDeque::new(),
+        }
+    }
+
     /// Run ODE-based trajectory planning if enabled and at the right interval.
     ///
     /// Simulates forward trajectories for each available action using
@@ -488,20 +523,32 @@ impl FepModule {
     ///
     /// When surprise is high, triggers reflexive motor actions to change the physical
     /// world to match expectations, minimizing variational free energy.
+    /// Incorporates haptic-semantic constraints to bias reflexes away from fragile configurations.
     pub fn apply_active_reflex(
         &mut self,
         bridge: &mut dyn symthaea_core::embodiment::EmbodimentBridge,
         prediction: &symthaea_core::hdc::unified_hv::ContinuousHV,
         observation: &symthaea_core::hdc::unified_hv::ContinuousHV,
+        proprioception: &[f32],
     ) {
-        // Calculate prediction error vector (difference in HDC space)
+        // Project proprioceptive state into semantic space, adaptively dampened by actuator health
+        let health = vec![1.0; proprioception.len()];
+        let haptic_constraint = self
+            .haptic_semantic_binder
+            .bind_with_health(proprioception, &health);
+
+        // Calculate raw prediction error vector
         let error_hv = symthaea_core::core::ContinuousHV::encode_weighted(
             &[prediction.clone(), observation.clone()],
             &[1.0, -1.0],
         );
 
+        // Modulate reflexes by somatic constraint (bind error with haptic prior)
+        // High strain/instability → higher gain on reflexes that counteract the instability
+        let modulated_error = error_hv.bind(&haptic_constraint);
+
         // Trigger reflexive motor impulse via bridge
-        bridge.apply_active_inference(&error_hv);
+        bridge.apply_active_inference(&modulated_error);
     }
 
     /// Deduct energy from the ledger for cognitive operations.

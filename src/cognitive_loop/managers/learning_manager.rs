@@ -43,6 +43,8 @@ pub struct LearningManager {
     /// Updated from ReputationBridge when Mycelix peer reputation data arrives.
     #[cfg(feature = "epistemic")]
     reputation_lr_modifier: f64,
+    last_peer_wisdom_hash: [u8; 32],
+    federated_wisdom_acc: f32,
 }
 
 impl Default for LearningManager {
@@ -56,7 +58,9 @@ impl Default for LearningManager {
             low_arousal_streak: 0,
             error_trend: 0.0,
             #[cfg(feature = "epistemic")]
-            reputation_lr_modifier: 1.0, // neutral default
+            reputation_lr_modifier: 1.0,
+            last_peer_wisdom_hash: [0u8; 32],
+            federated_wisdom_acc: 0.0, // neutral default
         }
     }
 }
@@ -77,7 +81,7 @@ impl LearningManager {
     const PLASTICITY_RATE: f32 = 0.05;
 
     /// Maximum plasticity boost from surprise.
-    const MAX_PLASTICITY: f32 = 0.95;
+    const MAX_PLASTICITY_VAL: f32 = 0.95;
 
     /// Minimum plasticity (always retain some learning capacity).
     const MIN_PLASTICITY: f32 = 0.1;
@@ -103,7 +107,7 @@ impl LearningManager {
     /// priming waking plasticity for enhanced encoding of new experiences.
     ///
     /// Science: Diekelmann & Born (2010) — effective consolidation enhances subsequent
-    /// encoding; Walker (2017) — post-sleep learning enhancement.
+    /// Apply a plasticity boost from dream consolidation quality.
     pub fn apply_dream_consolidation_boost(&mut self, consolidation_reliability: f32) {
         use super::super::thresholds::{
             DREAM_CONSOLIDATION_LR_BOOST, DREAM_CONSOLIDATION_LR_THRESHOLD,
@@ -114,8 +118,37 @@ impl LearningManager {
             let boost = (consolidation_reliability - DREAM_CONSOLIDATION_LR_THRESHOLD as f32)
                 * DREAM_CONSOLIDATION_LR_BOOST as f32;
             self.plasticity =
-                (self.plasticity + boost).clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY);
+                (self.plasticity + boost).clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY_VAL);
         }
+    }
+
+    /// Inject peer-shared wisdom into the learning system with epistemic humility.
+    ///
+    /// Returns true if the wisdom was newly integrated.
+    pub fn inject_federated_wisdom(&mut self, peer_id: String, hash: [u8; 32], value: f32) -> bool {
+        if hash == self.last_peer_wisdom_hash {
+            return false;
+        }
+        self.last_peer_wisdom_hash = hash;
+
+        // Epistemic Humility: Don't trust peer wisdom blindly.
+        // Integrate only a fraction based on trust (here hardcoded humility factor 0.3).
+        let humility_factor = 0.3;
+        let integrated_value = value * humility_factor;
+
+        self.federated_wisdom_acc += integrated_value;
+
+        // High-value federated wisdom boosts local plasticity to facilitate integration
+        let boost = (integrated_value * 0.05).min(0.1);
+        self.plasticity = (self.plasticity + boost).min(Self::MAX_PLASTICITY_VAL);
+
+        tracing::debug!(
+            "🧪 Epistemic Humility: Integrated {:.2} from {} (raw={:.2})",
+            integrated_value,
+            peer_id,
+            value
+        );
+        true
     }
 
     fn mean_surprise(&self) -> f32 {
@@ -169,8 +202,8 @@ impl CognitiveSubsystem for LearningManager {
         } else {
             0.0 // neutral zone
         };
-        self.plasticity =
-            (self.plasticity + plasticity_drive).clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY);
+        self.plasticity = (self.plasticity + plasticity_drive)
+            .clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY_VAL);
 
         // Plasticity → LR modulation
         // High plasticity = higher learning rate

@@ -1513,7 +1513,7 @@ mod tests {
     fn test_tension_detection_opposite_scores() {
         // Create a mock result with opposing harmony scores
         let harmony_scores = vec![
-            ("Mutual Reciprocity".to_string(), 0.6),
+            ("Sacred Reciprocity".to_string(), 0.6),
             ("Pan-Sentient Flourishing".to_string(), -0.4),
             ("Integral Wisdom".to_string(), 0.3),
         ];
@@ -1541,7 +1541,7 @@ mod tests {
         let evaluator = UnifiedValueEvaluator::new();
         let tensions = evaluator.detect_tensions(&result);
 
-        // Should detect tension between Mutual Reciprocity (+0.6) and Pan-Sentient Flourishing (-0.4)
+        // Should detect tension between Sacred Reciprocity (+0.6) and Pan-Sentient Flourishing (-0.4)
         assert!(!tensions.is_empty(), "Should detect at least one tension");
 
         let tension = &tensions[0];
@@ -1563,7 +1563,7 @@ mod tests {
     fn test_tension_detection_no_tension() {
         // Create a result where all harmonies agree
         let harmony_scores = vec![
-            ("Mutual Reciprocity".to_string(), 0.5),
+            ("Sacred Reciprocity".to_string(), 0.5),
             ("Pan-Sentient Flourishing".to_string(), 0.6),
             ("Integral Wisdom".to_string(), 0.4),
         ];

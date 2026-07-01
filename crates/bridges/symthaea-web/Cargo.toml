@@ -1,0 +1,46 @@
+[package]
+name = "symthaea-web"
+version = "0.1.0"
+edition = "2024"
+description = "Symthaea consciousness portal — pure Rust/Leptos CSR frontend"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+leptos_meta = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+gloo-timers = { version = "0.3", features = ["futures"] }
+symthaea-app-db = { path = "../../core/symthaea-app-db" }
+console_error_panic_hook = "0.1"
+console_log = "1"
+log = "0.4"
+serde-wasm-bindgen = "0.6"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "Window", "Document", "Element", "HtmlElement",
+    "HtmlCanvasElement", "CanvasRenderingContext2d",
+    "HtmlInputElement", "HtmlButtonElement",
+    "Worker", "WorkerOptions", "WorkerType", "MessageEvent", "ErrorEvent",
+    "Blob", "BlobPropertyBag", "Url",
+    "Performance",
+    "KeyboardEvent", "MouseEvent",
+    "console",
+    # Service Worker caching
+    "Navigator", "ServiceWorkerContainer", "ServiceWorkerRegistration",
+    # WebSocket + Storage for installer
+    "WebSocket", "CloseEvent", "Storage",
+    # URL params for QR code auto-connect
+    "Location", "UrlSearchParams",
+]
+
+[features]
+default = []
+installer = []
+usb-creator = []
+manage = []

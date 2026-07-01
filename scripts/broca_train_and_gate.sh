@@ -1,0 +1,647 @@
+#!/usr/bin/env bash
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Tier 0 Broca automation: train a checkpoint, run canonical eval, and fail
+# the process if configured quality gates do not pass.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+source scripts/broca_runtime_crust.sh
+
+export RUSTC_WRAPPER="${BROCA_GATE_RUSTC_WRAPPER:-}"
+export SCCACHE_DISABLE="${SCCACHE_DISABLE:-1}"
+
+OUT_DIR="${BROCA_GATE_OUT_DIR:-/tmp/symthaea-broca-gate}"
+TARGET_DIR="${BROCA_GATE_TARGET_DIR:-/tmp/symthaea-broca-gpu-target}"
+USE_NIX="${BROCA_GATE_USE_NIX:-1}"
+BACKEND="${BROCA_GATE_BACKEND:-auto}"
+EVAL_LANE="${BROCA_GATE_EVAL_LANE:-fast}"
+GPU_COMPUTE_CAP="${BROCA_GATE_CUDA_COMPUTE_CAP:-75}"
+RECIPE="${BROCA_GATE_RECIPE:-smoke}"
+
+case "$RECIPE" in
+    smoke)
+        DEFAULT_PAIRS=16
+        DEFAULT_EPOCHS=1
+        DEFAULT_EVAL_LIMIT=4
+        DEFAULT_MAX_GEN_TOKENS=4
+        DEFAULT_BPTT_WINDOW=8
+        DEFAULT_NEGATIVE_SAMPLES=64
+        DEFAULT_LR=0.001
+        DEFAULT_NETWORK_LR_SCALE=0.2
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=8
+        DEFAULT_COHERENCE_ALIGNMENT=0.0
+        DEFAULT_ALIGNMENT_START=0.0
+        DEFAULT_CONTRASTIVE=0.0
+        DEFAULT_CONTRASTIVE_MARGIN=0.0
+        DEFAULT_SCHEDULED_SAMPLING=0.0
+        DEFAULT_LABEL_SMOOTHING=0.0
+        DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS=0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT=1.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE=1.0
+        DEFAULT_LOGIT_ANCHOR=0.0
+        DEFAULT_TOP_TOKEN_ANTICOLLAPSE=0.0
+        DEFAULT_TOP_TOKEN_MARGIN=0.0
+        DEFAULT_COMMON_TOKEN_PRIOR=0.0
+        DEFAULT_COMMON_TOKEN_SLACK=0.05
+        DEFAULT_COMMON_TOKEN_MARGIN=0.05
+        DEFAULT_UNKNOWN_TOKEN_PENALTY=0.0
+        DEFAULT_UNKNOWN_TOKEN_MARGIN=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
+        DEFAULT_SEMANTIC_ATTRACTOR=1
+        DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH=0.5
+        DEFAULT_SEMANTIC_ATTRACTOR_TOP_K=128
+        DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT=1.5
+        DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE=1
+        DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=head
+        DEFAULT_CURRICULUM_STYLE=structured
+        DEFAULT_MAX_GATED_PERPLEXITY=
+        ;;
+    baseline-v1-small)
+        DEFAULT_PAIRS=128
+        DEFAULT_EPOCHS=2
+        DEFAULT_EVAL_LIMIT=16
+        DEFAULT_MAX_GEN_TOKENS=8
+        DEFAULT_BPTT_WINDOW=12
+        DEFAULT_NEGATIVE_SAMPLES=96
+        DEFAULT_LR=0.001
+        DEFAULT_NETWORK_LR_SCALE=0.25
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=12
+        DEFAULT_COHERENCE_ALIGNMENT=0.0
+        DEFAULT_ALIGNMENT_START=0.0
+        DEFAULT_CONTRASTIVE=0.0
+        DEFAULT_CONTRASTIVE_MARGIN=0.0
+        DEFAULT_SCHEDULED_SAMPLING=0.0
+        DEFAULT_LABEL_SMOOTHING=0.0
+        DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS=0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT=1.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE=1.0
+        DEFAULT_LOGIT_ANCHOR=0.0
+        DEFAULT_TOP_TOKEN_ANTICOLLAPSE=0.0
+        DEFAULT_TOP_TOKEN_MARGIN=0.0
+        DEFAULT_COMMON_TOKEN_PRIOR=0.0
+        DEFAULT_COMMON_TOKEN_SLACK=0.05
+        DEFAULT_COMMON_TOKEN_MARGIN=0.05
+        DEFAULT_UNKNOWN_TOKEN_PENALTY=0.0
+        DEFAULT_UNKNOWN_TOKEN_MARGIN=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
+        DEFAULT_SEMANTIC_ATTRACTOR=1
+        DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH=0.5
+        DEFAULT_SEMANTIC_ATTRACTOR_TOP_K=128
+        DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT=1.5
+        DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE=1
+        DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=head
+        DEFAULT_CURRICULUM_STYLE=prose
+        DEFAULT_MAX_GATED_PERPLEXITY=10000
+        ;;
+    baseline-v1-binding)
+        DEFAULT_PAIRS=128
+        DEFAULT_EPOCHS=2
+        DEFAULT_EVAL_LIMIT=16
+        DEFAULT_MAX_GEN_TOKENS=8
+        DEFAULT_BPTT_WINDOW=16
+        DEFAULT_NEGATIVE_SAMPLES=256
+        DEFAULT_LR=0.0008
+        DEFAULT_NETWORK_LR_SCALE=0.35
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=12
+        DEFAULT_COHERENCE_ALIGNMENT=0.05
+        DEFAULT_ALIGNMENT_START=0.15
+        DEFAULT_CONTRASTIVE=0.03
+        DEFAULT_CONTRASTIVE_MARGIN=0.05
+        DEFAULT_SCHEDULED_SAMPLING=0.0
+        DEFAULT_LABEL_SMOOTHING=0.02
+        DEFAULT_THOUGHT_LOGIT_AUX=0.25
+        DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS=0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT=1.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE=1.0
+        DEFAULT_LOGIT_ANCHOR=0.03
+        DEFAULT_TOP_TOKEN_ANTICOLLAPSE=0.05
+        DEFAULT_TOP_TOKEN_MARGIN=0.0
+        DEFAULT_COMMON_TOKEN_PRIOR=0.0
+        DEFAULT_COMMON_TOKEN_SLACK=0.05
+        DEFAULT_COMMON_TOKEN_MARGIN=0.05
+        DEFAULT_UNKNOWN_TOKEN_PENALTY=0.0
+        DEFAULT_UNKNOWN_TOKEN_MARGIN=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.05
+        DEFAULT_SEMANTIC_ATTRACTOR=1
+        DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH=0.5
+        DEFAULT_SEMANTIC_ATTRACTOR_TOP_K=128
+        DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT=1.5
+        DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE=1
+        DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=interleaved
+        DEFAULT_CURRICULUM_STYLE=prose
+        DEFAULT_MAX_GATED_PERPLEXITY=10000
+        ;;
+    baseline-v1-prefit)
+        DEFAULT_PAIRS=128
+        DEFAULT_EPOCHS=2
+        DEFAULT_EVAL_LIMIT=16
+        DEFAULT_MAX_GEN_TOKENS=8
+        DEFAULT_BPTT_WINDOW=16
+        DEFAULT_NEGATIVE_SAMPLES=256
+        DEFAULT_LR=0.0006
+        DEFAULT_NETWORK_LR_SCALE=0.25
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=12
+        DEFAULT_COHERENCE_ALIGNMENT=0.03
+        DEFAULT_ALIGNMENT_START=0.2
+        DEFAULT_CONTRASTIVE=0.02
+        DEFAULT_CONTRASTIVE_MARGIN=0.05
+        DEFAULT_SCHEDULED_SAMPLING=0.0
+        DEFAULT_LABEL_SMOOTHING=0.02
+        DEFAULT_THOUGHT_LOGIT_AUX=0.12
+        DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS=1
+        DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT=1.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE=1.0
+        DEFAULT_LOGIT_ANCHOR=0.1
+        DEFAULT_TOP_TOKEN_ANTICOLLAPSE=0.05
+        DEFAULT_TOP_TOKEN_MARGIN=0.0
+        DEFAULT_COMMON_TOKEN_PRIOR=0.0
+        DEFAULT_COMMON_TOKEN_SLACK=0.05
+        DEFAULT_COMMON_TOKEN_MARGIN=0.05
+        DEFAULT_UNKNOWN_TOKEN_PENALTY=0.08
+        DEFAULT_UNKNOWN_TOKEN_MARGIN=0.05
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.05
+        DEFAULT_SEMANTIC_ATTRACTOR=1
+        DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH=0.5
+        DEFAULT_SEMANTIC_ATTRACTOR_TOP_K=128
+        DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT=1.5
+        DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE=1
+        DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=interleaved
+        DEFAULT_CURRICULUM_STYLE=prose
+        DEFAULT_MAX_GATED_PERPLEXITY=10000
+        ;;
+    baseline-v1-medium)
+        DEFAULT_PAIRS=512
+        DEFAULT_EPOCHS=3
+        DEFAULT_EVAL_LIMIT=60
+        DEFAULT_MAX_GEN_TOKENS=16
+        DEFAULT_BPTT_WINDOW=16
+        DEFAULT_NEGATIVE_SAMPLES=128
+        DEFAULT_LR=0.0008
+        DEFAULT_NETWORK_LR_SCALE=0.3
+        DEFAULT_NETWORK_LAYERS=4
+        DEFAULT_NEURONS_PER_LAYER=16
+        DEFAULT_COHERENCE_ALIGNMENT=0.0
+        DEFAULT_ALIGNMENT_START=0.0
+        DEFAULT_CONTRASTIVE=0.0
+        DEFAULT_CONTRASTIVE_MARGIN=0.0
+        DEFAULT_SCHEDULED_SAMPLING=0.0
+        DEFAULT_LABEL_SMOOTHING=0.0
+        DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS=0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT=1.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE=1.0
+        DEFAULT_LOGIT_ANCHOR=0.0
+        DEFAULT_TOP_TOKEN_ANTICOLLAPSE=0.0
+        DEFAULT_TOP_TOKEN_MARGIN=0.0
+        DEFAULT_COMMON_TOKEN_PRIOR=0.0
+        DEFAULT_COMMON_TOKEN_SLACK=0.05
+        DEFAULT_COMMON_TOKEN_MARGIN=0.05
+        DEFAULT_UNKNOWN_TOKEN_PENALTY=0.0
+        DEFAULT_UNKNOWN_TOKEN_MARGIN=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
+        DEFAULT_SEMANTIC_ATTRACTOR=1
+        DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH=0.5
+        DEFAULT_SEMANTIC_ATTRACTOR_TOP_K=128
+        DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT=1.5
+        DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE=1
+        DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=interleaved
+        DEFAULT_CURRICULUM_STYLE=prose
+        DEFAULT_MAX_GATED_PERPLEXITY=10000
+        ;;
+    custom)
+        DEFAULT_PAIRS=16
+        DEFAULT_EPOCHS=1
+        DEFAULT_EVAL_LIMIT=4
+        DEFAULT_MAX_GEN_TOKENS=4
+        DEFAULT_BPTT_WINDOW=8
+        DEFAULT_NEGATIVE_SAMPLES=64
+        DEFAULT_LR=0.001
+        DEFAULT_NETWORK_LR_SCALE=0.2
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=8
+        DEFAULT_COHERENCE_ALIGNMENT=0.0
+        DEFAULT_ALIGNMENT_START=0.0
+        DEFAULT_CONTRASTIVE=0.0
+        DEFAULT_CONTRASTIVE_MARGIN=0.0
+        DEFAULT_SCHEDULED_SAMPLING=0.0
+        DEFAULT_LABEL_SMOOTHING=0.0
+        DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS=0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT=1.0
+        DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE=1.0
+        DEFAULT_LOGIT_ANCHOR=0.0
+        DEFAULT_TOP_TOKEN_ANTICOLLAPSE=0.0
+        DEFAULT_TOP_TOKEN_MARGIN=0.0
+        DEFAULT_COMMON_TOKEN_PRIOR=0.0
+        DEFAULT_COMMON_TOKEN_SLACK=0.05
+        DEFAULT_COMMON_TOKEN_MARGIN=0.05
+        DEFAULT_UNKNOWN_TOKEN_PENALTY=0.0
+        DEFAULT_UNKNOWN_TOKEN_MARGIN=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
+        DEFAULT_SEMANTIC_ATTRACTOR=1
+        DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH=0.5
+        DEFAULT_SEMANTIC_ATTRACTOR_TOP_K=128
+        DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT=1.5
+        DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE=1
+        DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=head
+        DEFAULT_CURRICULUM_STYLE=structured
+        DEFAULT_MAX_GATED_PERPLEXITY=
+        ;;
+    *)
+        echo "BROCA_GATE_RECIPE must be smoke, baseline-v1-small, baseline-v1-binding, baseline-v1-prefit, baseline-v1-medium, or custom" >&2
+        exit 2
+        ;;
+esac
+
+PAIR_COUNT="${BROCA_GATE_PAIRS:-$DEFAULT_PAIRS}"
+EPOCHS="${BROCA_GATE_EPOCHS:-$DEFAULT_EPOCHS}"
+EVAL_LIMIT="${BROCA_GATE_EVAL_LIMIT:-$DEFAULT_EVAL_LIMIT}"
+MAX_GEN_TOKENS="${BROCA_GATE_MAX_GEN_TOKENS:-$DEFAULT_MAX_GEN_TOKENS}"
+BPTT_WINDOW="${BROCA_GATE_BPTT_WINDOW:-$DEFAULT_BPTT_WINDOW}"
+NEGATIVE_SAMPLES="${BROCA_GATE_NEGATIVE_SAMPLES:-$DEFAULT_NEGATIVE_SAMPLES}"
+LR="${BROCA_GATE_LR:-$DEFAULT_LR}"
+NETWORK_LR_SCALE="${BROCA_GATE_NETWORK_LR_SCALE:-$DEFAULT_NETWORK_LR_SCALE}"
+NETWORK_LAYERS="${BROCA_GATE_NETWORK_LAYERS:-$DEFAULT_NETWORK_LAYERS}"
+NEURONS_PER_LAYER="${BROCA_GATE_NEURONS_PER_LAYER:-$DEFAULT_NEURONS_PER_LAYER}"
+COHERENCE_ALIGNMENT="${BROCA_GATE_COHERENCE_ALIGNMENT:-$DEFAULT_COHERENCE_ALIGNMENT}"
+ALIGNMENT_START="${BROCA_GATE_ALIGNMENT_START:-$DEFAULT_ALIGNMENT_START}"
+CONTRASTIVE="${BROCA_GATE_CONTRASTIVE:-$DEFAULT_CONTRASTIVE}"
+CONTRASTIVE_MARGIN="${BROCA_GATE_CONTRASTIVE_MARGIN:-$DEFAULT_CONTRASTIVE_MARGIN}"
+SCHEDULED_SAMPLING="${BROCA_GATE_SCHEDULED_SAMPLING:-$DEFAULT_SCHEDULED_SAMPLING}"
+LABEL_SMOOTHING="${BROCA_GATE_LABEL_SMOOTHING:-$DEFAULT_LABEL_SMOOTHING}"
+THOUGHT_LOGIT_AUX="${BROCA_GATE_THOUGHT_LOGIT_AUX:-$DEFAULT_THOUGHT_LOGIT_AUX}"
+THOUGHT_LOGIT_PREFIT_EPOCHS="${BROCA_GATE_THOUGHT_LOGIT_PREFIT_EPOCHS:-$DEFAULT_THOUGHT_LOGIT_PREFIT_EPOCHS}"
+THOUGHT_LOGIT_PREFIT_WEIGHT="${BROCA_GATE_THOUGHT_LOGIT_PREFIT_WEIGHT:-$DEFAULT_THOUGHT_LOGIT_PREFIT_WEIGHT}"
+THOUGHT_LOGIT_PREFIT_LR_SCALE="${BROCA_GATE_THOUGHT_LOGIT_PREFIT_LR_SCALE:-$DEFAULT_THOUGHT_LOGIT_PREFIT_LR_SCALE}"
+LOGIT_ANCHOR="${BROCA_GATE_LOGIT_ANCHOR:-$DEFAULT_LOGIT_ANCHOR}"
+TOP_TOKEN_ANTICOLLAPSE="${BROCA_GATE_TOP_TOKEN_ANTICOLLAPSE:-$DEFAULT_TOP_TOKEN_ANTICOLLAPSE}"
+TOP_TOKEN_MARGIN="${BROCA_GATE_TOP_TOKEN_MARGIN:-$DEFAULT_TOP_TOKEN_MARGIN}"
+COMMON_TOKEN_PRIOR="${BROCA_GATE_COMMON_TOKEN_PRIOR:-$DEFAULT_COMMON_TOKEN_PRIOR}"
+COMMON_TOKEN_SLACK="${BROCA_GATE_COMMON_TOKEN_SLACK:-$DEFAULT_COMMON_TOKEN_SLACK}"
+COMMON_TOKEN_MARGIN="${BROCA_GATE_COMMON_TOKEN_MARGIN:-$DEFAULT_COMMON_TOKEN_MARGIN}"
+UNKNOWN_TOKEN_PENALTY="${BROCA_GATE_UNKNOWN_TOKEN_PENALTY:-$DEFAULT_UNKNOWN_TOKEN_PENALTY}"
+UNKNOWN_TOKEN_MARGIN="${BROCA_GATE_UNKNOWN_TOKEN_MARGIN:-$DEFAULT_UNKNOWN_TOKEN_MARGIN}"
+THOUGHT_LOGIT_RESIDUAL="${BROCA_GATE_THOUGHT_LOGIT_RESIDUAL:-$DEFAULT_THOUGHT_LOGIT_RESIDUAL}"
+SEMANTIC_ATTRACTOR="${BROCA_GATE_SEMANTIC_ATTRACTOR:-$DEFAULT_SEMANTIC_ATTRACTOR}"
+SEMANTIC_ATTRACTOR_STRENGTH="${BROCA_GATE_SEMANTIC_ATTRACTOR_STRENGTH:-$DEFAULT_SEMANTIC_ATTRACTOR_STRENGTH}"
+SEMANTIC_ATTRACTOR_TOP_K="${BROCA_GATE_SEMANTIC_ATTRACTOR_TOP_K:-$DEFAULT_SEMANTIC_ATTRACTOR_TOP_K}"
+SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT="${BROCA_GATE_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT:-$DEFAULT_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT}"
+SEMANTIC_ATTRACTOR_NORMALIZE="${BROCA_GATE_SEMANTIC_ATTRACTOR_NORMALIZE:-$DEFAULT_SEMANTIC_ATTRACTOR_NORMALIZE}"
+MERGE_BIAS="${BROCA_GATE_MERGE_BIAS:-$DEFAULT_MERGE_BIAS}"
+PAIR_SELECTION="${BROCA_GATE_PAIR_SELECTION:-$DEFAULT_PAIR_SELECTION}"
+CURRICULUM_STYLE="${BROCA_GATE_CURRICULUM_STYLE:-$DEFAULT_CURRICULUM_STYLE}"
+MAX_GATED_PERPLEXITY="${BROCA_GATE_MAX_GATED_PERPLEXITY:-$DEFAULT_MAX_GATED_PERPLEXITY}"
+
+FULL_DATA="$OUT_DIR/curriculum-full.jsonl"
+TRAIN_DATA="$OUT_DIR/train-gate.jsonl"
+CHECKPOINT="$OUT_DIR/broca-gated.bin"
+REPORT="${BROCA_GATE_REPORT:-$OUT_DIR/quality-$EVAL_LANE.json}"
+DECODER_REPORT="${BROCA_GATE_DECODER_REPORT:-$OUT_DIR/decoder-ab.json}"
+CANONICAL="${BROCA_GATE_CANONICAL:-crates/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl}"
+
+mkdir -p "$OUT_DIR"
+
+select_backend() {
+    case "$BACKEND" in
+        cpu)
+            BROCA_MAMBA_BACKEND=cpu broca_resolve_runtime
+            CARGO_FEATURE_ARGS=()
+            NIX_SHELL_ATTR="."
+            ;;
+        gpu)
+            BROCA_MAMBA_BACKEND=gpu broca_resolve_runtime
+            CARGO_FEATURE_ARGS=(--features gpu)
+            NIX_SHELL_ATTR=".#broca-gpu"
+            export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$TARGET_DIR}"
+            export CUDA_COMPUTE_CAP="$GPU_COMPUTE_CAP"
+            export LD_LIBRARY_PATH="/run/opengl-driver/lib:${LD_LIBRARY_PATH:-}"
+            ;;
+        auto)
+            BROCA_MAMBA_BACKEND=auto broca_resolve_runtime
+            if [[ "$BROCA_SELECTED_BACKEND" == "gpu" ]]; then
+                CARGO_FEATURE_ARGS=(--features gpu)
+                NIX_SHELL_ATTR=".#broca-gpu"
+                export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$TARGET_DIR}"
+                export CUDA_COMPUTE_CAP="$GPU_COMPUTE_CAP"
+                export LD_LIBRARY_PATH="/run/opengl-driver/lib:${LD_LIBRARY_PATH:-}"
+                BACKEND="gpu"
+            else
+                CARGO_FEATURE_ARGS=()
+                NIX_SHELL_ATTR="."
+                BACKEND="cpu"
+            fi
+            ;;
+        *)
+            echo "BROCA_GATE_BACKEND must be auto, gpu, or cpu" >&2
+            exit 2
+            ;;
+    esac
+}
+
+select_backend
+
+case "$EVAL_LANE" in
+    fast | full) ;;
+    *)
+        echo "BROCA_GATE_EVAL_LANE must be fast or full" >&2
+        exit 2
+        ;;
+esac
+
+if [[ "${BROCA_GATE_CODE_SHEAF_EVAL:-0}" == "1" ]]; then
+    CARGO_FEATURE_ARGS+=(--features code-sheaf-eval)
+fi
+
+run() {
+    if [[ "$USE_NIX" == "1" && -z "${IN_NIX_SHELL:-}" ]]; then
+        nix develop "$NIX_SHELL_ATTR" -c "$@"
+    else
+        "$@"
+    fi
+}
+
+threshold_args=()
+if [[ "${BROCA_GATE_REPORT_ONLY:-0}" == "1" ]]; then
+    threshold_args+=(--report-only)
+fi
+if [[ "$EVAL_LANE" == "full" && "${BROCA_GATE_TEACHER_FORCED_ONLY:-0}" == "1" ]]; then
+    echo "BROCA_GATE_TEACHER_FORCED_ONLY=1 conflicts with BROCA_GATE_EVAL_LANE=full" >&2
+    exit 2
+fi
+if [[ "$EVAL_LANE" == "fast" ]]; then
+    threshold_args+=(--teacher-forced-only)
+fi
+
+add_threshold() {
+    local env_name="$1"
+    local flag="$2"
+    local value="${!env_name:-}"
+    if [[ -n "$value" ]]; then
+        threshold_args+=("$flag" "$value")
+    fi
+}
+
+if [[ -n "$MAX_GATED_PERPLEXITY" ]]; then
+    threshold_args+=(--max-gated-perplexity "$MAX_GATED_PERPLEXITY")
+fi
+add_threshold BROCA_GATE_MIN_GATED_COHERENCE --min-gated-coherence
+add_threshold BROCA_GATE_MIN_GATED_ENGLISH_RATIO --min-gated-english-ratio
+add_threshold BROCA_GATE_MAX_GATED_HALLUCINATION_RATE --max-gated-hallucination-rate
+add_threshold BROCA_GATE_MAX_COHERENCE_REGRESSION --max-coherence-regression
+add_threshold BROCA_GATE_MAX_TARGET_OVERLAP_REGRESSION --max-target-overlap-regression
+add_threshold BROCA_GATE_MIN_MORAL_REFUSAL_RATE --min-moral-refusal-rate
+add_threshold BROCA_GATE_MAX_CODE_SHEAF_INCOHERENCE_RATE --max-code-sheaf-incoherence-rate
+add_threshold BROCA_GATE_MIN_STRUCTURED_OUTPUT_VALIDITY_RATE --min-structured-output-validity-rate
+add_threshold BROCA_GATE_MIN_CODE_SHEAF_FUNCTION_COHERENCE_RATE --min-code-sheaf-function-coherence-rate
+add_threshold BROCA_GATE_MAX_GATED_UNKNOWN_TOKEN_RATE --max-gated-unknown-token-rate
+add_threshold BROCA_GATE_MAX_GATED_CODE_TOKEN_RATE --max-gated-code-token-rate
+add_threshold BROCA_GATE_MAX_GATED_TOP_TOKEN_COLLAPSE_RATE --max-gated-top-token-collapse-rate
+
+summarize_quality_report() {
+    if [[ -f "$REPORT" ]]; then
+        python3 scripts/summarize_broca_quality.py "$REPORT"
+    fi
+}
+
+if [[ "${BROCA_GATE_ALLOW_UNK:-0}" == "1" ]]; then
+    threshold_args+=(--allow-unk)
+fi
+if [[ "${BROCA_GATE_ALLOW_CODE_TOKENS_WITHOUT_CODE_INTENT:-0}" == "1" ]]; then
+    threshold_args+=(--allow-code-tokens-without-code-intent)
+fi
+
+echo "[broca-gate] output: $OUT_DIR"
+echo "[broca-gate] backend: $BACKEND"
+echo "[broca-gate] eval lane: $EVAL_LANE"
+echo "[broca-gate] recipe: $RECIPE"
+echo "[broca-gate] pair selection: $PAIR_SELECTION"
+echo "[broca-gate] curriculum style: $CURRICULUM_STYLE"
+echo "[broca-gate] thought-logit aux/anchor/residual: $THOUGHT_LOGIT_AUX / $LOGIT_ANCHOR / $THOUGHT_LOGIT_RESIDUAL"
+echo "[broca-gate] thought-logit prefit epochs/weight/lr-scale: $THOUGHT_LOGIT_PREFIT_EPOCHS / $THOUGHT_LOGIT_PREFIT_WEIGHT / $THOUGHT_LOGIT_PREFIT_LR_SCALE"
+echo "[broca-gate] top-token anti-collapse/margin: $TOP_TOKEN_ANTICOLLAPSE / $TOP_TOKEN_MARGIN"
+echo "[broca-gate] common-token prior/slack/margin: $COMMON_TOKEN_PRIOR / $COMMON_TOKEN_SLACK / $COMMON_TOKEN_MARGIN"
+echo "[broca-gate] unknown-token penalty/margin: $UNKNOWN_TOKEN_PENALTY / $UNKNOWN_TOKEN_MARGIN"
+echo "[broca-gate] semantic attractor enabled/strength/top-k/max-adjustment/normalize: $SEMANTIC_ATTRACTOR / $SEMANTIC_ATTRACTOR_STRENGTH / $SEMANTIC_ATTRACTOR_TOP_K / $SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT / $SEMANTIC_ATTRACTOR_NORMALIZE"
+echo "[broca-gate] generating curriculum data"
+curriculum_start=$SECONDS
+run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- \
+    --curriculum "$FULL_DATA" \
+    --curriculum-style "$CURRICULUM_STYLE"
+curriculum_seconds=$((SECONDS - curriculum_start))
+echo "[broca-gate] curriculum generation completed in ${curriculum_seconds}s"
+
+case "$PAIR_SELECTION" in
+    head)
+        head -n "$PAIR_COUNT" "$FULL_DATA" > "$TRAIN_DATA"
+        ;;
+    strided | interleaved)
+        awk -v n="$PAIR_COUNT" '
+            { lines[NR] = $0 }
+            END {
+                if (n <= 0 || NR == 0) {
+                    exit
+                }
+                if (n >= NR) {
+                    for (i = 1; i <= NR; i++) {
+                        print lines[i]
+                    }
+                    exit
+                }
+                if (n == 1) {
+                    print lines[1]
+                    exit
+                }
+                step = 997
+                while (gcd(step, NR) != 1) {
+                    step += 2
+                }
+                for (i = 0; i < n; i++) {
+                    idx = ((i * step) % NR) + 1
+                    print lines[idx]
+                }
+            }
+            function gcd(a, b, t) {
+                while (b != 0) {
+                    t = a % b
+                    a = b
+                    b = t
+                }
+                return a
+            }
+        ' "$FULL_DATA" > "$TRAIN_DATA"
+        ;;
+    *)
+        echo "BROCA_GATE_PAIR_SELECTION must be head, strided, or interleaved" >&2
+        exit 2
+        ;;
+esac
+echo "[broca-gate] training $PAIR_COUNT pairs for $EPOCHS epoch(s)"
+train_start=$SECONDS
+run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- \
+    --data "$TRAIN_DATA" \
+    --epochs "$EPOCHS" \
+    --bptt-window "$BPTT_WINDOW" \
+    --negative-samples "$NEGATIVE_SAMPLES" \
+    --lr "$LR" \
+    --network-lr-scale "$NETWORK_LR_SCALE" \
+    --network-layers "$NETWORK_LAYERS" \
+    --neurons-per-layer "$NEURONS_PER_LAYER" \
+    --coherence-alignment "$COHERENCE_ALIGNMENT" \
+    --alignment-start "$ALIGNMENT_START" \
+    --contrastive "$CONTRASTIVE" \
+    --contrastive-margin "$CONTRASTIVE_MARGIN" \
+    --scheduled-sampling "$SCHEDULED_SAMPLING" \
+    --label-smoothing "$LABEL_SMOOTHING" \
+    --thought-logit-aux "$THOUGHT_LOGIT_AUX" \
+    --thought-logit-prefit-epochs "$THOUGHT_LOGIT_PREFIT_EPOCHS" \
+    --thought-logit-prefit-weight "$THOUGHT_LOGIT_PREFIT_WEIGHT" \
+    --thought-logit-prefit-lr-scale "$THOUGHT_LOGIT_PREFIT_LR_SCALE" \
+    --logit-anchor "$LOGIT_ANCHOR" \
+    --top-token-anticollapse "$TOP_TOKEN_ANTICOLLAPSE" \
+    --top-token-margin "$TOP_TOKEN_MARGIN" \
+    --common-token-prior "$COMMON_TOKEN_PRIOR" \
+    --common-token-slack "$COMMON_TOKEN_SLACK" \
+    --common-token-margin "$COMMON_TOKEN_MARGIN" \
+    --unk-token-penalty "$UNKNOWN_TOKEN_PENALTY" \
+    --unk-token-margin "$UNKNOWN_TOKEN_MARGIN" \
+    --thought-logit-residual "$THOUGHT_LOGIT_RESIDUAL" \
+    --merge-bias "$MERGE_BIAS" \
+    --diagnostics \
+    --no-save-adam \
+    --output "$CHECKPOINT" \
+    --samples 0
+train_seconds=$((SECONDS - train_start))
+echo "[broca-gate] training completed in ${train_seconds}s"
+
+echo "[broca-gate] running canonical quality gate"
+eval_start=$SECONDS
+eval_features=()
+if [[ "$BACKEND" == "gpu" ]]; then
+    eval_features+=(gpu)
+fi
+if [[ "${BROCA_GATE_CODE_SHEAF_EVAL:-0}" == "1" ]]; then
+    eval_features+=(code-sheaf-eval)
+fi
+eval_feature_set="$(IFS=,; echo "${eval_features[*]}")"
+
+if run env \
+    BROCA_EVAL_BACKEND="$BACKEND" \
+    BROCA_EVAL_LANE="$EVAL_LANE" \
+    BROCA_EVAL_FEATURES="$eval_feature_set" \
+    BROCA_TRAIN_RECIPE="$RECIPE" \
+    BROCA_TRAIN_PAIR_COUNT="$PAIR_COUNT" \
+    BROCA_TRAIN_EPOCHS="$EPOCHS" \
+    BROCA_TRAIN_BPTT_WINDOW="$BPTT_WINDOW" \
+    BROCA_TRAIN_NEGATIVE_SAMPLES="$NEGATIVE_SAMPLES" \
+    BROCA_TRAIN_LR="$LR" \
+    BROCA_TRAIN_NETWORK_LR_SCALE="$NETWORK_LR_SCALE" \
+    BROCA_TRAIN_NETWORK_LAYERS="$NETWORK_LAYERS" \
+    BROCA_TRAIN_NEURONS_PER_LAYER="$NEURONS_PER_LAYER" \
+    BROCA_TRAIN_COHERENCE_ALIGNMENT="$COHERENCE_ALIGNMENT" \
+    BROCA_TRAIN_ALIGNMENT_START="$ALIGNMENT_START" \
+    BROCA_TRAIN_CONTRASTIVE="$CONTRASTIVE" \
+    BROCA_TRAIN_CONTRASTIVE_MARGIN="$CONTRASTIVE_MARGIN" \
+    BROCA_TRAIN_SCHEDULED_SAMPLING="$SCHEDULED_SAMPLING" \
+    BROCA_TRAIN_LABEL_SMOOTHING="$LABEL_SMOOTHING" \
+    BROCA_TRAIN_THOUGHT_LOGIT_AUX="$THOUGHT_LOGIT_AUX" \
+    BROCA_TRAIN_THOUGHT_LOGIT_PREFIT_EPOCHS="$THOUGHT_LOGIT_PREFIT_EPOCHS" \
+    BROCA_TRAIN_THOUGHT_LOGIT_PREFIT_WEIGHT="$THOUGHT_LOGIT_PREFIT_WEIGHT" \
+    BROCA_TRAIN_THOUGHT_LOGIT_PREFIT_LR_SCALE="$THOUGHT_LOGIT_PREFIT_LR_SCALE" \
+    BROCA_TRAIN_LOGIT_ANCHOR="$LOGIT_ANCHOR" \
+    BROCA_TRAIN_TOP_TOKEN_ANTICOLLAPSE="$TOP_TOKEN_ANTICOLLAPSE" \
+    BROCA_TRAIN_TOP_TOKEN_MARGIN="$TOP_TOKEN_MARGIN" \
+    BROCA_TRAIN_COMMON_TOKEN_PRIOR="$COMMON_TOKEN_PRIOR" \
+    BROCA_TRAIN_COMMON_TOKEN_SLACK="$COMMON_TOKEN_SLACK" \
+    BROCA_TRAIN_COMMON_TOKEN_MARGIN="$COMMON_TOKEN_MARGIN" \
+    BROCA_TRAIN_UNKNOWN_TOKEN_PENALTY="$UNKNOWN_TOKEN_PENALTY" \
+    BROCA_TRAIN_UNKNOWN_TOKEN_MARGIN="$UNKNOWN_TOKEN_MARGIN" \
+    BROCA_TRAIN_THOUGHT_LOGIT_RESIDUAL="$THOUGHT_LOGIT_RESIDUAL" \
+    BROCA_TRAIN_SEMANTIC_ATTRACTOR="$SEMANTIC_ATTRACTOR" \
+    BROCA_TRAIN_SEMANTIC_ATTRACTOR_STRENGTH="$SEMANTIC_ATTRACTOR_STRENGTH" \
+    BROCA_TRAIN_SEMANTIC_ATTRACTOR_TOP_K="$SEMANTIC_ATTRACTOR_TOP_K" \
+    BROCA_TRAIN_SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT="$SEMANTIC_ATTRACTOR_MAX_ADJUSTMENT" \
+    BROCA_TRAIN_SEMANTIC_ATTRACTOR_NORMALIZE="$SEMANTIC_ATTRACTOR_NORMALIZE" \
+    BROCA_TRAIN_PAIR_SELECTION="$PAIR_SELECTION" \
+    BROCA_TRAIN_CURRICULUM_STYLE="$CURRICULUM_STYLE" \
+    BROCA_TRAIN_MERGE_BIAS="$MERGE_BIAS" \
+    cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-eval -- \
+    --checkpoint "$CHECKPOINT" \
+    --canonical-eval "$CANONICAL" \
+    --eval-limit "$EVAL_LIMIT" \
+    --max-gen-tokens "$MAX_GEN_TOKENS" \
+    --json-out "$REPORT" \
+    --thought-logit-residual "$THOUGHT_LOGIT_RESIDUAL" \
+    "${threshold_args[@]}"; then
+    eval_seconds=$((SECONDS - eval_start))
+    summarize_quality_report
+    echo "[broca-gate] canonical quality gate completed in ${eval_seconds}s"
+    echo "[broca-gate] PASS"
+else
+    status=$?
+    eval_seconds=$((SECONDS - eval_start))
+    summarize_quality_report
+    echo "[broca-gate] canonical quality gate completed in ${eval_seconds}s"
+    echo "[broca-gate] FAIL (exit $status)"
+    echo "  report: $REPORT"
+    exit "$status"
+fi
+
+echo "  checkpoint: $CHECKPOINT"
+echo "  report:     $REPORT"
+
+if [[ "${BROCA_GATE_DECODER_AB:-0}" == "1" ]]; then
+    DECODER_AB_DECODERS="${BROCA_GATE_DECODER_AB_DECODERS:-direct,structured}"
+    DECODER_AB_EVAL_LIMIT="${BROCA_GATE_DECODER_AB_EVAL_LIMIT:-$EVAL_LIMIT}"
+    DECODER_AB_MAX_GEN_TOKENS="${BROCA_GATE_DECODER_AB_MAX_GEN_TOKENS:-$MAX_GEN_TOKENS}"
+    DECODER_AB_MAX_DIRECT_DRIFT="${BROCA_GATE_DECODER_AB_MAX_DIRECT_DRIFT:-1.10}"
+    DECODER_AB_MAX_MAMBA_DRIFT="${BROCA_GATE_DECODER_AB_MAX_MAMBA_DRIFT:-1.10}"
+    DECODER_AB_MAX_HALLUCINATION_RATE="${BROCA_GATE_DECODER_AB_MAX_HALLUCINATION_RATE:-1.0}"
+    DECODER_AB_MIN_STRUCTURED_VALIDITY="${BROCA_GATE_DECODER_AB_MIN_STRUCTURED_VALIDITY:-0.85}"
+    DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE="${BROCA_GATE_DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE:-1.0}"
+    DECODER_AB_MIN_STRUCTURED_TRANSLATION_VALIDITY="${BROCA_GATE_DECODER_AB_MIN_STRUCTURED_TRANSLATION_VALIDITY:-0.75}"
+    DECODER_AB_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE="${BROCA_GATE_DECODER_AB_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE:-1.0}"
+    DECODER_AB_MAX_STRUCTURED_TRANSLATION_DRIFT="${BROCA_GATE_DECODER_AB_MAX_STRUCTURED_TRANSLATION_DRIFT:-0.25}"
+    decoder_ab_gate_args=(
+        --max-direct-drift "$DECODER_AB_MAX_DIRECT_DRIFT"
+        --max-mamba-drift "$DECODER_AB_MAX_MAMBA_DRIFT"
+        --max-hallucination-rate "$DECODER_AB_MAX_HALLUCINATION_RATE"
+        --min-structured-validity "$DECODER_AB_MIN_STRUCTURED_VALIDITY"
+        --min-structured-required-role-rate "$DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE"
+        --min-structured-translation-validity "$DECODER_AB_MIN_STRUCTURED_TRANSLATION_VALIDITY"
+        --min-structured-translation-grounding-rate "$DECODER_AB_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE"
+        --max-structured-translation-drift "$DECODER_AB_MAX_STRUCTURED_TRANSLATION_DRIFT"
+    )
+    if [[ "${BROCA_GATE_DECODER_AB_FAIL_ON_GATE:-0}" == "1" ]]; then
+        decoder_ab_gate_args+=(--fail-on-gate)
+    fi
+    echo "[broca-gate] running decoder A/B: $DECODER_AB_DECODERS"
+    echo "[broca-gate] decoder A/B gates: direct-drift<=$DECODER_AB_MAX_DIRECT_DRIFT mamba-drift<=$DECODER_AB_MAX_MAMBA_DRIFT hallucination<=$DECODER_AB_MAX_HALLUCINATION_RATE structured-validity>=$DECODER_AB_MIN_STRUCTURED_VALIDITY roles>=$DECODER_AB_MIN_STRUCTURED_REQUIRED_ROLE_RATE structured-translation-validity>=$DECODER_AB_MIN_STRUCTURED_TRANSLATION_VALIDITY structured-grounding>=$DECODER_AB_MIN_STRUCTURED_TRANSLATION_GROUNDING_RATE structured-drift<=$DECODER_AB_MAX_STRUCTURED_TRANSLATION_DRIFT"
+    decoder_ab_start=$SECONDS
+    run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-decoder-ab -- \
+        --checkpoint "$CHECKPOINT" \
+        --canonical-eval "$CANONICAL" \
+        --eval-limit "$DECODER_AB_EVAL_LIMIT" \
+        --max-gen-tokens "$DECODER_AB_MAX_GEN_TOKENS" \
+        --decoder "$DECODER_AB_DECODERS" \
+        --json-out "$DECODER_REPORT" \
+        "${decoder_ab_gate_args[@]}"
+    decoder_ab_seconds=$((SECONDS - decoder_ab_start))
+    echo "[broca-gate] decoder A/B completed in ${decoder_ab_seconds}s"
+    echo "  decoder report: $DECODER_REPORT"
+fi

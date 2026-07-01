@@ -47,7 +47,7 @@ fn trigger_background_retrain() {
     println!("\n[Flywheel] 🚀 Retrain threshold breached. Spawning background compiler...");
 
     // Spawn the training pass natively using a low-priority thread mask via 'nice'
-    let mut child = Command::new("nice")
+    let child = Command::new("nice")
         .args([
             "-n",
             "19",

@@ -306,7 +306,7 @@ fn encoding_hv16_cached_correct_size() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 1D: cycle_phase_output.rs — Output Phase
+// 1D: cycle_phase_output/ — Output Phase
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]

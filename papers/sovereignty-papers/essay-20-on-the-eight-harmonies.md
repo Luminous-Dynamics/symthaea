@@ -57,7 +57,7 @@ We call them the Eight Harmonies. They are not scientific claims. They cannot be
 
 *What it produces:* The entire diagnosis of the 1602 architecture (Essay No. 1) — the identification of feedback-loop severance as the core governance failure. The cognitive loop's surprise detection (Essay No. 5) — making invisible consequences visible through continuous monitoring. The cross-scale bridge governance (Essay No. 9) — detecting when local actions produce consequences at other scales.
 
-**Sixth Harmony: Mutual Reciprocity.** Relationships between governance participants must be mutual. Power exercised without accountability is not governance but extraction.
+**Sixth Harmony: Sacred Reciprocity.** Relationships between governance participants must be mutual. Power exercised without accountability is not governance but extraction.
 
 *What it produces:* The dual-speed reputation mechanism (Essay No. 11) — slow decay rewards sustained trustworthiness, fast slashing punishes betrayal, ensuring that reciprocal engagement dominates. The community attestation dimension (Essay No. 7) — governance power requires recognition from peers, not merely self-assessment. The 24-hour credential expiry — governance power must be continuously re-earned, never permanently claimed.
 

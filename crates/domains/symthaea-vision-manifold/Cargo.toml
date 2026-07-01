@@ -1,0 +1,35 @@
+[package]
+name = "symthaea-vision-manifold"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Patch-based HDC video encoding with CfC temporal manifold and surprise-driven attention"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["vision", "hdc", "cfc", "temporal-manifold", "video"]
+categories = ["science", "algorithms", "multimedia::video"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+uuid = { workspace = true, features = ["v4"] }
+serde = { workspace = true }
+tracing = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+v4l = { version = "0.14", optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+criterion = "0.5"
+
+[[bench]]
+name = "vision_pipeline"
+harness = false
+
+[features]
+default = []
+camera = ["dep:v4l"]
+serde = []

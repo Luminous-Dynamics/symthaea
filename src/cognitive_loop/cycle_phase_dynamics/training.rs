@@ -41,6 +41,8 @@ impl CognitiveLoopService {
         math_result: &DynMath,
         semantic_lr_factor: f32,
         module_timings: &mut super::super::ModuleTimings,
+        fep_surprise: f32,
+        fep_pragmatic_value: f32,
     ) -> super::TrainingPostResult {
         let neuromod_threshold =
             perception.encoding.effective_threshold * self.neuromod.bath.threshold_gate();
@@ -282,6 +284,8 @@ impl CognitiveLoopService {
             effective_lr,
             math_result,
             &perception.encoding.encoding_result.detected_primitives,
+            fep_surprise,
+            fep_pragmatic_value,
         );
 
         // ── BrocaLite fallback: lightweight always-on language generation ────
@@ -304,6 +308,8 @@ impl CognitiveLoopService {
                     .encoding_result
                     .detected_primitives
                     .clone(),
+                fep_surprise,
+                fep_pragmatic_value,
                 ..Default::default()
             };
             if let Some(result) = self
@@ -535,6 +541,8 @@ impl CognitiveLoopService {
         effective_lr: f32,
         math_result: &DynMath,
         detected_primitives: &[String],
+        fep_surprise: f32,
+        fep_pragmatic_value: f32,
     ) {
         let broca_psi = self.unification_engine.psi as f32;
         let broca_novelty = prediction_error > self.config.learning_threshold || surprise_triggered;
@@ -786,6 +794,8 @@ impl CognitiveLoopService {
                 cube_h_value: self.carryover.quality.last_cube_h_value,
                 cube_quality: self.carryover.quality.last_cube_quality,
                 code_channels: self.language_comm.broca_code_channels.take(),
+                fep_surprise,
+                fep_pragmatic_value,
             };
 
             // ── Epistemic: Sacred Stillness modulates confidence ──

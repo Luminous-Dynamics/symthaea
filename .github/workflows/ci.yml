@@ -1,0 +1,1158 @@
+# Symthaea HLB CI Workflow
+#
+# Runs on push to main, pull requests, and weekly schedule (psych-bench regression)
+# Jobs: format check, clippy, tests (default and all-features), psych-bench regression, security audit
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly psych-bench regression run: Sundays at 04:00 UTC
+    - cron: '0 4 * * 0'
+
+concurrency:
+  # Group by workflow + branch so that only the latest push per branch runs.
+  # Older pushes to the same branch are cancelled, avoiding runner queue backlog.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  governance:
+    name: Governance Check (Class A/B Changes)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for safety-critical changes
+        run: bash symthaea/scripts/check-class-a-changes.sh --ci
+
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  doc-tests:
+    name: Documentation Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-doctests-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-doctests-
+
+      - name: Run doc tests
+        run: cargo test --doc
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-clippy-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev \
+            cmake
+
+      - name: Run clippy (CI-safe features)
+        run: |
+          # All features EXCEPT those requiring GPU (CUDA/WGPU), MuJoCo, V4L2,
+          # audio hardware (cpal), or I2C hardware.
+          # Excluded: embeddings-gpu, neural-bridge-cuda, neural-vocoder-gpu,
+          #   vision-manifold-camera, foveation-perception, humanoid-mujoco,
+          #   humanoid-viewer, flight-mujoco, flight-mujoco-renderer,
+          #   flight-swarm, live-voice, ssm-power-hal, gui, full
+          CI_FEATURES="parallel,service,shell,demo,api_module,\
+          voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
+          embeddings,vision,perception,vision-manifold,foveation,\
+          integrity,semantic-encoder,neural-bridge,webcam,\
+          mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
+          nix-mind,identity,physics,physics-bridge,\
+          flight,humanoid,hal,ssm-power,ssm_language,\
+          lancedb-backend,multi_agent,full_consciousness,full_perception,\
+          full_language,magi_loop,reasoning_engine,code_generation,\
+          wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
+          integration_module,observability_module,support,web_research_module,\
+          genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
+          genesis-missions,fusion-twin,safety-agents,lab-controller,\
+          materials,nuclear-forensics,water-prediction,physics-unification,\
+          grid-scaling,fission-reactor,accelerator,threat-assessment,\
+          datacenter,experiment-planner,strategic-materials,critical-minerals,\
+          advanced-manufacturing,building-systems,design-production,\
+          mycelix,unstable-examples"
+          cargo clippy -p symthaea --lib --bins --features "$CI_FEATURES" -- -D warnings
+
+  test:
+    name: Test (default features)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run tests
+        run: cargo test -p symthaea --lib
+
+  test-hardened-lib:
+    name: Hardened Lib Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-hardened-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hardened-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run focused lib regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_remote_command_capability --lib
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_shell_metacharacters_blocked --lib
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_execute_timeout --lib
+          CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_real_execution_handles_large_stdout --lib
+
+  test-hardened-daemon:
+    name: Hardened Daemon Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-hardened-daemon-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hardened-daemon-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run daemon protocol regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-daemon cargo test -p symthaea --bin symthaea --features service protocol_tests -- --nocapture
+
+      - name: Run daemon binary regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-daemon cargo test -p symthaea --test binary_service --features service -- --nocapture
+
+  test-hardened-api:
+    name: Hardened API Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-hardened-api-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hardened-api-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run API route-policy regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --lib route_policy_marks_public_get_routes --features api_module -- --nocapture
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --lib protected_routes_require_auth_when_configured --features api_module -- --nocapture
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --lib authenticated_submit_is_not_rejected_by_middleware --features api_module -- --nocapture
+
+      - name: Run API integration regressions
+        run: |
+          CARGO_TARGET_DIR=target/hardened-api cargo test -p symthaea --test api_integration --features api_module -- --nocapture
+
+  test-hardened-nix:
+    name: Hardened Nix Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Run Nix evaluation checks
+        run: |
+          nix build .#checks.x86_64-linux.eval-api-security
+          nix build .#checks.x86_64-linux.eval-service-module
+          nix build .#checks.x86_64-linux.service-module-smoke
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-integration-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run integration tests
+        run: cargo test --test '*' -- --nocapture 2>&1 | tee integration-test-output.txt
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-${{ github.sha }}
+          path: integration-test-output.txt
+          retention-days: 30
+
+  test-all-features:
+    name: Test CI-safe (${{ matrix.group }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Split into 7 groups to stay under runner preemption thresholds.
+          # Each group targets ~10 min wall-clock.
+          - group: core-infra
+            features: >-
+              parallel,service,shell,demo,api_module,
+              integrity,semantic-encoder,webcam,
+              nix-mind,identity,notifications
+          - group: core-media
+            features: >-
+              voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
+              embeddings,vision,perception,vision-manifold,foveation
+          - group: science-ai-core
+            features: >-
+              multi_agent,full_consciousness,full_perception,
+              full_language,magi_loop
+          - group: science-ai-extended
+            features: >-
+              reasoning_engine,code_generation,
+              wasm-sandbox,school_learning
+          - group: science-benchmarks
+            features: >-
+              benchmarks,all_benchmarks
+          - group: science-infra
+            features: >-
+              physics,physics-bridge,flight,humanoid,hal,
+              ssm-power,ssm_language,lancedb-backend,
+              integration_module,observability_module,support,web_research_module
+          - group: genesis
+            features: >-
+              genomics,cell-foundry,ectogenesis,nurture,population,
+              genesis,genesis-missions,fusion-twin,safety-agents,lab-controller,
+              materials,nuclear-forensics,water-prediction,physics-unification,
+              grid-scaling,fission-reactor,accelerator,threat-assessment,
+              datacenter,experiment-planner,strategic-materials,critical-minerals,
+              advanced-manufacturing,building-systems,design-production,
+              mycelix,unstable-examples
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-all-${{ matrix.group }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-all-${{ matrix.group }}-
+            ${{ runner.os }}-cargo-test-all-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev \
+            cmake
+
+      - name: Run tests (${{ matrix.group }})
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 60
+          max_attempts: 2
+          command: |
+            FEATURES="${{ matrix.features }}"
+            # Remove whitespace from YAML multiline
+            FEATURES=$(echo "$FEATURES" | tr -d '[:space:]' | sed 's/,,*/,/g; s/^,//; s/,$//')
+            cargo test -p symthaea --lib --features "$FEATURES"
+
+  test-feature-matrix-critical:
+    name: Test Feature Matrix (core/web_research/pathology)
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            cmd: cargo test -p symthaea --lib
+          - name: web_research
+            cmd: cargo test -p symthaea --lib --features "web_research_module school_learning"
+          - name: pathology_resilience
+            cmd: cargo test --test pathology_resilience -- --nocapture
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-matrix-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-matrix-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run ${{ matrix.name }} tests
+        run: ${{ matrix.cmd }}
+
+  test-feature-matrix:
+    name: Test Feature Combinations
+    runs-on: ubuntu-latest
+    timeout-minutes: 420
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - "default-mind"
+          - "shell"
+          - "service"
+          - "full_consciousness"
+          - "reasoning_engine"
+          - "voice-tts"
+          - "humanoid"
+          - "school_learning"
+          - "lancedb-backend"
+          - "physics"
+          - "code_generation"
+          - "flight"
+          - "mesh"
+          - "swarm"
+          - "ssm_language"
+          - "multi_agent"
+          - "full_perception"
+          - "identity"
+          - "all_benchmarks"
+          - "genesis-missions"
+          - "genesis"
+          - "wasm-sandbox"
+          - "integrity"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-feature-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-feature-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev \
+            cmake
+
+      - name: Test with feature ${{ matrix.features }}
+        continue-on-error: ${{ matrix.features == 'school_learning' }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            FEATURES="${{ matrix.features }}"
+            if [ "$FEATURES" = "school_learning" ]; then
+              # school_learning is very slow on free-tier runners — limit parallelism
+              # to reduce memory pressure and avoid 6h timeout
+              cargo test --lib --features "$FEATURES" -- --test-threads=1
+            else
+              cargo test --lib --features "$FEATURES"
+            fi
+
+  psych-bench:
+    name: Psych-Bench Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: test
+    # Run on: weekly schedule, OR pushes to main touching cognitive_loop/psych-bench, OR manual
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main'
+      ) ||
+      github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if psych-bench relevant files changed
+        id: changes
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            psych_relevant:
+              - 'src/cognitive_loop/**'
+              - 'crates/symthaea-psych-bench/**'
+              - 'symthaea-core/src/hdc/**'
+
+      - name: Decide whether to run
+        id: should_run
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.changes.outputs.psych_relevant }}" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping psych-bench: no relevant files changed"
+          fi
+
+      - name: Install Rust toolchain
+        if: steps.should_run.outputs.run == 'true'
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        if: steps.should_run.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-psych-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-psych-
+
+      - name: Install system dependencies
+        if: steps.should_run.outputs.run == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run psych-bench full battery (release)
+        if: steps.should_run.outputs.run == 'true'
+        run: |
+          cargo test --test full_battery --release -p symthaea-psych-bench -- --nocapture 2>&1 | tee psych-bench-output.txt
+
+      - name: Upload psych-bench results
+        if: steps.should_run.outputs.run == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: psych-bench-results-${{ github.sha }}
+          path: psych-bench-output.txt
+          retention-days: 90
+
+  feature-interactions:
+    name: Feature Interactions
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - "school_learning,reasoning_engine"
+          - "code_generation,reasoning_engine"
+          - "identity,reasoning_engine"
+          - "lancedb-backend,reasoning_engine"
+          - "physics,reasoning_engine"
+          - "full_consciousness,reasoning_engine"
+          - "flight,humanoid"
+          - "mesh,full_consciousness"
+          - "swarm,full_consciousness"
+          - "ssm_language,reasoning_engine"
+          - "multi_agent,reasoning_engine"
+          - "full_perception,reasoning_engine"
+          - "consciousness_full,school_learning"
+          - "all_benchmarks,reasoning_engine"
+          - "genesis,reasoning_engine"
+          - "vision-manifold,full_perception"
+          - "vocal-tract,voice-tts"
+          - "embeddings,reasoning_engine"
+          - "mesh-encryption,swarm"
+          - "api_module,full_consciousness"
+          - "neural-bridge,reasoning_engine"
+          - "web_research_module,reasoning_engine"
+          - "nix-mind,reasoning_engine"
+          - "vision-manifold-camera,full_perception"
+          - "wasm-sandbox,reasoning_engine"
+          - "integrity,full_consciousness"
+          # Safety-critical interaction pairs (added 2026-03-23)
+          - "safety-agents,reasoning_engine"
+          - "safety-agents,ssm_language"
+          - "mycelix,reasoning_engine"
+          - "therapeutic,reasoning_engine"
+          - "mesh,safety-agents"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}-${{ strategy.job-index }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-combo-${{ hashFiles('**/Cargo.lock') }}-${{ strategy.job-index }}
+            ${{ runner.os }}-cargo-combo-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev \
+            cmake \
+            libv4l-dev
+
+      - name: Check feature combination ${{ matrix.features }}
+        run: cargo check --features "${{ matrix.features }}"
+
+  wasm-compat:
+    name: WASM Compatibility (Spore)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + wasm32 target
+        uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+
+      - name: Install wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --version 0.2.114
+
+      - name: Install wasm-opt (binaryen)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
+      - name: Build Spore WASM (release)
+        run: cargo build --release --target wasm32-unknown-unknown --features wasm -p symthaea-spore
+
+      - name: Optimize with wasm-opt
+        run: |
+          wasm-opt \
+            --enable-bulk-memory \
+            --enable-nontrapping-float-to-int \
+            --enable-sign-ext \
+            -O2 \
+            target/wasm32-unknown-unknown/release/symthaea_spore.wasm \
+            -o /tmp/symthaea_spore.wasm
+
+      - name: Generate JS bindings
+        run: |
+          mkdir -p crates/symthaea-spore/www/pkg
+          wasm-bindgen --target web --out-dir crates/symthaea-spore/www/pkg /tmp/symthaea_spore.wasm
+
+      - name: Size budget check
+        run: |
+          WASM_SIZE=$(stat -c%s crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm)
+          echo "WASM size: $((WASM_SIZE / 1024))KB ($WASM_SIZE bytes)"
+          GZIP_SIZE=$(gzip -c crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm | wc -c)
+          echo "WASM gzip: $((GZIP_SIZE / 1024))KB ($GZIP_SIZE bytes)"
+          if [ "$WASM_SIZE" -gt 512000 ]; then
+            echo "ERROR: WASM binary exceeds 500KB budget"
+            exit 1
+          fi
+
+      - name: Smoke test (export verification)
+        run: node crates/symthaea-spore/www/smoke-test.mjs
+
+      - name: E2E test (consciousness cycles + experiments)
+        run: node crates/symthaea-spore/www/e2e-test.mjs
+
+  deny:
+    name: Dependency Audit (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses bans sources
+          arguments: --all-features
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-audit-
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked 2>/dev/null || true
+
+      - name: Run security audit
+        run: |
+          # Run cargo audit, failing only on CRITICAL and HIGH severity
+          # --ignore-source allows unmaintained crate warnings
+          # --deny only for high severity issues
+          cargo audit --deny warnings --ignore unmaintained || {
+            # If it fails, re-run to show output and check severity
+            echo "Checking for CRITICAL/HIGH vulnerabilities..."
+            cargo audit 2>&1 | tee audit-output.txt
+
+            # Fail only if CRITICAL or HIGH found
+            if grep -qE "^(CRITICAL|HIGH):" audit-output.txt 2>/dev/null || \
+               grep -qE "Severity: (critical|high)" audit-output.txt 2>/dev/null; then
+              echo "::error::CRITICAL or HIGH severity vulnerabilities found!"
+              exit 1
+            else
+              echo "::warning::Only low/medium severity or unmaintained warnings found. Allowing."
+              exit 0
+            fi
+          }
+
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx
+      - name: Generate SBOM
+        run: |
+          cargo cyclonedx --format json
+          # cargo-cyclonedx writes bom.json or bom.cdx.json next to Cargo.toml
+          ls -la bom*.json 2>/dev/null || true
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: bom*.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  test-subcrates:
+    name: Test Sub-Crates
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - symthaea-core
+          - symthaea-psych-bench
+          - symthaea-fep
+          - symthaea-dream
+          - symthaea-causal-reasoning
+          - symthaea-broca
+          - symthaea-physics
+          - symthaea-cell-foundry
+          - symthaea-genomics
+          - symthaea-population
+          - symthaea-ectogenesis
+          - symthaea-nurture
+          - symthaea-materials
+          - symthaea-nuclear-forensics
+          - symthaea-neuromodulators
+          - symthaea-memory
+          - symthaea-vocal-tract
+          - symthaea-wisdom
+          - symthaea-vision-manifold
+          - symthaea-narrative-self
+          - symthaea-consciousness-equation
+          - symthaea-embeddings
+          - symthaea-harmonies
+          - symthaea-observability
+          - symthaea-nix
+          - symthaea-stt
+          - symthaea-flight
+          - symthaea-hal
+          - symthaea-humanoid
+          - symthaea-vehicle
+          - symthaea-fabrication-kernel
+          - symthaea-perception
+          - symthaea-phi-search
+          - symthaea-sentinel
+          - symthaea-support
+          - symthaea-hodge
+          - symthaea-field-dynamics
+          - symthaea-enactive
+          - symthaea-sensorimotor
+          - symthaea-factor-graph
+          - symthaea-exploration
+          - symthaea-spore
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-subcrate-${{ matrix.crate }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-subcrate-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Test ${{ matrix.crate }}
+        run: cargo test -p ${{ matrix.crate }}
+
+  genesis-benchmarks:
+    name: Genesis Mission Benchmarks
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fusion
+            features: fusion-twin
+          - name: safety
+            features: safety-agents
+          - name: lab
+            features: lab-controller
+          - name: materials
+            features: materials
+          - name: nuclear
+            features: nuclear-forensics
+          - name: water
+            features: water-prediction
+          - name: multiscale
+            features: physics-unification
+          - name: temporal_unified
+            features: genesis-missions
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-genesis-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-genesis-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run genesis ${{ matrix.name }} benchmark
+        run: |
+          output=$(cargo run --example benchmark_genesis_${{ matrix.name }} --features "${{ matrix.features }}" --release 2>&1)
+          echo "$output"
+          echo "$output" | grep -q "PASS" || { echo "::error::Benchmark did not print PASS"; exit 1; }
+
+  stress-tests:
+    name: Stress Tests (nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Run on: weekly schedule (same as psych-bench), or manual dispatch
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-stress-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stress-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run proptest stress battery
+        env:
+          PROPTEST_CASES: 500
+        run: |
+          cargo test --test proptest_cognitive_loop --release -- --nocapture 2>&1 | tee proptest-cognitive.txt
+          cargo test --test proptest_feedback_stability --release -- --nocapture 2>&1 | tee proptest-feedback.txt
+
+      - name: Upload stress test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-results-${{ github.sha }}
+          path: proptest-*.txt
+          retention-days: 30
+
+  compliance-safety-ethics:
+    name: Compliance (Safety & Ethics)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-compliance-safety-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-compliance-safety-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Safety Agent (unit tests)
+        run: cargo test --lib --features "safety-agents" -- safety::agent --nocapture
+
+      - name: Safety Agent (escalation soak)
+        run: cargo test --test safety_agent_escalation_soak --features "safety-agents" -- --nocapture
+
+      - name: Safety Audit Report
+        run: cargo test --lib --features "safety-agents" -- safety::audit --nocapture
+
+      - name: Adversarial Moral Algebra
+        run: cargo test --test adversarial_moral_algebra -- --nocapture
+
+      - name: Moral Algebra (unit tests)
+        run: cargo test --lib -- hdc::moral_algebra --nocapture
+
+      - name: Ethics Engine
+        run: cargo test --lib -- cognitive_loop::ethics_engine --nocapture
+
+  compliance-consciousness:
+    name: Compliance (Consciousness & Substrate)
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-compliance-consc-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-compliance-consc-
+            ${{ runner.os }}-cargo-test-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Substrate Independence
+        run: cargo test -p symthaea-core --lib -- substrate_independence --nocapture
+
+      - name: Substrate Validation
+        run: cargo test -p symthaea-core --lib -- substrate_validation --nocapture
+
+      - name: Consciousness Engine
+        run: cargo test --lib -- consciousness_engine --nocapture
+
+      - name: Calibration E2E
+        run: cargo test --test calibration_e2e -- --nocapture
+
+      - name: Substrate Simulation
+        run: cargo test --test substrate_simulation -- --nocapture
+
+  compliance-robustness:
+    name: Compliance (Robustness & Governance)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-compliance-robust-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-compliance-robust-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Proptest Feedback Stability
+        run: cargo test --test proptest_feedback_stability --release -- --nocapture
+
+      - name: Proptest Threshold Sensitivity
+        run: cargo test --test proptest_threshold_sensitivity --release -- --nocapture
+
+      - name: Compliance Documentation Check
+        run: |
+          echo "Checking compliance documentation..."
+          test -f COMPLIANCE.md || test -f docs/COMPLIANCE.md || echo "::warning::No COMPLIANCE.md found"
+          echo "Documentation check complete"
+
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz
+          sudo mv gitleaks /usr/local/bin/
+      - name: Run gitleaks
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1

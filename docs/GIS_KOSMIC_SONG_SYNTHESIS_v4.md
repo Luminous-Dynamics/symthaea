@@ -42,7 +42,7 @@ Each Harmony becomes an epistemic lens through which knowledge is perceived:
 | **Integral Wisdom** | Truth-Knowing | "What is verifiable?" | 0.15 |
 | **Infinite Play** | Creative-Knowing | "What possibilities exist?" | 0.10 |
 | **Universal Interconnectedness** | Relational-Knowing | "What connections exist?" | 0.15 |
-| **Mutual Reciprocity** | Exchange-Knowing | "What flows back?" | 0.10 |
+| **Sacred Reciprocity** | Exchange-Knowing | "What flows back?" | 0.10 |
 | **Evolutionary Progression** | Developmental-Knowing | "What is emerging?" | 0.10 |
 
 ### 2. The H-Dimension: Harmonic Epistemic Extension

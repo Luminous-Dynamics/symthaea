@@ -1,0 +1,70 @@
+[package]
+name = "sentinels"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics"]
+description = "Consciousness state detection from biosignals"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea-hlb"
+keywords = ["eeg", "consciousness", "biosignal", "emotion", "sleep"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+# Numerical computing
+ndarray = "0.16"
+rustfft = "6.2"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+# Optional: Python bindings
+pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
+
+# Optional: WASM bindings
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", features = ["console"], optional = true }
+
+# Optional: Real hardware support
+serialport = { version = "4.5", optional = true }
+btleplug = { version = "0.11", optional = true }
+tokio = { version = "1.41", features = ["rt", "sync", "time"], optional = true }
+futures = { version = "0.3", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = "0.8"
+approx = "0.5"
+
+[features]
+default = ["std"]
+std = []
+python = ["pyo3"]
+wasm = ["wasm-bindgen", "js-sys", "web-sys"]
+# Real hardware support
+hardware = ["serialport", "btleplug", "tokio", "futures"]
+openbci = ["serialport"]
+muse-ble = ["btleplug", "tokio", "futures"]
+
+[lib]
+name = "sentinels"
+crate-type = ["cdylib", "rlib"]
+
+[[bench]]
+name = "analysis_benchmark"
+harness = false
+
+[[example]]
+name = "basic_usage"
+
+[[example]]
+name = "streaming"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

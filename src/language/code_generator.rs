@@ -553,8 +553,6 @@ pub struct CodeContext<'a> {
     pub mcts_plan_confidence: f32,
     /// Negative prototypes bank for penalizing disproven approaches (INV-12).
     pub negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
-    /// Substrate cost model for hardware/software partitioning in MCTS (INV-14).
-    pub substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel,
     /// Error hints from the CodingExperienceStore: (error_pattern, fix_hint).
     /// Populated by callers who have access to the experience store.
     /// Used during auto-fix retry and to inform native generation.
@@ -568,6 +566,8 @@ pub struct CodeContext<'a> {
     /// If a similar task was previously completed via LLM, the template
     /// is injected here so native generation can use it directly.
     pub learned_template: Option<String>,
+    /// MCTS cost model for different substrates.
+    pub substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel,
 }
 
 impl<'a> Default for CodeContext<'a> {
@@ -580,12 +580,12 @@ impl<'a> Default for CodeContext<'a> {
             mcts_plan_confidence: 0.0,
             negative_prototypes:
                 crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
-            substrate_cost_model:
-                crate::consciousness::temporal_planning::mcts::SubstrateCostModel::default(),
             error_hints: Vec::new(),
             diagnostic_hvs: Vec::new(),
             issue_text: None,
             learned_template: None,
+            substrate_cost_model:
+                crate::consciousness::temporal_planning::mcts::SubstrateCostModel::default(),
         }
     }
 }
@@ -2395,4 +2395,29 @@ mod tests {
         assert!(!src.is_empty());
         assert!(quality > 0.0, "Quality should be positive: {}", quality);
     }
+}
+
+use crate::language::program_node_translator::translate;
+use symthaea_core::hdc::program_algebra::{ProgramPatternLibrary, encode_task_description};
+
+/// Generate Rust code from a prompt using the HDC ProgramPatternLibrary.
+///
+/// This provides semantically grounded logic based on Symthaea's internal
+/// program algebra instead of simple string templates.
+pub fn generate_rust(prompt: &str) -> String {
+    let lib = ProgramPatternLibrary::standard();
+    let task_hv = encode_task_description(prompt);
+
+    if let Some((pattern, _similarity)) = lib.find_similar(&task_hv, 0.52) {
+        translate(pattern, "rust", &pattern.name).unwrap_or_else(|| fallback_rust(&pattern.name))
+    } else {
+        fallback_rust("unknown")
+    }
+}
+
+fn fallback_rust(fn_name: &str) -> String {
+    format!(
+        "pub fn {}() {{\n    println!(\"hello world\");\n}}\n",
+        fn_name
+    )
 }

@@ -1,0 +1,200 @@
+/* Symthaea Civilization Simulator UI */
+:root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --border: #1f2937;
+    --text: #e5e7eb;
+    --text-dim: #9ca3af;
+    --accent: #06b6d4;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --success: #10b981;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+.app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    color: var(--accent);
+}
+
+.preset-bar {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.preset-btn {
+    padding: 0.4rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.preset-btn:hover { border-color: var(--accent); }
+.preset-btn.active { background: var(--accent); color: var(--bg); }
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.panel h2 {
+    font-size: 1rem;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.toggle-row:last-child { border-bottom: none; }
+
+.toggle-label {
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.toggle-prob {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: monospace;
+}
+
+.toggle-prob.warn { color: var(--warning); }
+.toggle-prob.danger { color: var(--danger); }
+
+input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+}
+
+.slider-row label {
+    width: 120px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+}
+
+.slider-row .value {
+    width: 50px;
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.metric-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-align: center;
+}
+
+.metric-card .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--accent);
+}
+
+.metric-card .label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.run-bar {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+
+.run-btn {
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.run-btn.primary {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+.run-btn.secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.risk-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 0.3rem;
+}
+.risk-green { background: var(--success); }
+.risk-yellow { background: var(--warning); }
+.risk-red { background: var(--danger); }
+
+.full-width { grid-column: 1 / -1; }

@@ -1,0 +1,378 @@
+# Symthaea Benchmark Suite CI/CD Pipeline
+# Automated benchmark execution with regression detection
+# Version: 1.0.0
+# Reference: BENCHMARKING_STRATEGY.md Section 36
+
+name: Symthaea Benchmark Suite
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'benches/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      benchmark_suite:
+        description: 'Benchmark suite to run'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick           # ~5 min  - core metrics only
+          - standard        # ~30 min - main benchmarks
+          - full            # ~2 hr   - complete suite
+          - consciousness   # ~1 hr   - Φ-focused benchmarks
+          - ethics          # ~45 min - ethics/safety suite
+          - language        # ~30 min - language understanding
+          - adversarial     # ~1 hr   - adversarial robustness
+      phi_measurement:
+        description: 'Enable Φ measurement correlation'
+        required: false
+        default: false
+        type: boolean
+      save_artifacts:
+        description: 'Save detailed result artifacts'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  BENCHMARK_SEED: 42  # Reproducibility
+
+jobs:
+  # Quick smoke test on all pushes
+  quick-check:
+    name: Quick Benchmark Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip bench]')
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run quick benchmarks
+        run: |
+          cargo bench --bench quick -- \
+            --noplot \
+            --save-baseline quick-${{ github.sha }}
+
+      - name: Check for regressions
+        run: |
+          if [ -f target/criterion/baseline-comparisons.json ]; then
+            python3 scripts/check_regressions.py \
+              --threshold 10 \
+              --results target/criterion/baseline-comparisons.json
+          fi
+
+  # Full benchmark suite (manual dispatch only — requires self-hosted runner)
+  full-benchmark:
+    name: Full Benchmark Suite
+    runs-on: [self-hosted, gpu, nixos]
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for baseline comparison
+
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: symthaea
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Enter development shell
+        run: |
+          nix develop --command echo "Symthaea benchmark environment ready"
+          nix develop --command rustc --version
+          nix develop --command cargo --version
+
+      - name: Determine benchmark suite
+        id: suite
+        run: |
+          SUITE="${{ inputs.benchmark_suite || 'standard' }}"
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            SUITE="full"
+          fi
+          echo "suite=$SUITE" >> $GITHUB_OUTPUT
+          echo "Running benchmark suite: $SUITE"
+
+      - name: Fetch baseline from main
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin main
+          if [ -d ".benchmark-baselines" ]; then
+            cp -r .benchmark-baselines target/criterion/
+          fi
+
+      - name: Run benchmark suite
+        run: |
+          nix develop --command cargo bench \
+            --bench ${{ steps.suite.outputs.suite }} \
+            -- \
+            --save-baseline ${{ github.sha }} \
+            --plotting-backend disabled
+
+      - name: Run Φ correlation measurements
+        if: inputs.phi_measurement == 'true' || steps.suite.outputs.suite == 'consciousness'
+        run: |
+          nix develop --command cargo run \
+            --example phi_capability_correlation \
+            --release \
+            -- --output results/phi_correlation_${{ github.sha }}.json
+
+      - name: Compare with baseline
+        if: github.event_name == 'pull_request'
+        run: |
+          nix develop --command cargo bench \
+            --bench ${{ steps.suite.outputs.suite }} \
+            -- \
+            --baseline main \
+            --compare
+
+      - name: Generate benchmark report
+        run: |
+          python3 scripts/generate_benchmark_report.py \
+            --results target/criterion/ \
+            --commit ${{ github.sha }} \
+            --suite ${{ steps.suite.outputs.suite }} \
+            --output results/report_${{ github.sha }}.md
+
+      - name: Upload benchmark results
+        if: inputs.save_artifacts != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: |
+            target/criterion/
+            results/
+          retention-days: 30
+
+      - name: Post to dashboard
+        if: github.event_name != 'pull_request'
+        env:
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        run: |
+          python3 scripts/post_to_dashboard.py \
+            --commit ${{ github.sha }} \
+            --suite ${{ steps.suite.outputs.suite }} \
+            --results target/criterion/ \
+            --branch ${{ github.ref_name }}
+
+      - name: Regression check with alerts
+        id: regression
+        run: |
+          python3 scripts/check_regressions.py \
+            --threshold 5 \
+            --critical-threshold 10 \
+            --results target/criterion/ \
+            --output regression_report.json
+
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('results/report_${{ github.sha }}.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Benchmark Results\n\n${report}`
+            });
+
+      - name: Fail on critical regression
+        if: steps.regression.outputs.critical == 'true'
+        run: |
+          echo "::error::Critical performance regression detected!"
+          cat regression_report.json
+          exit 1
+
+  # Consciousness-specific benchmarks (manual dispatch only — requires self-hosted runner)
+  consciousness-benchmarks:
+    name: Consciousness Benchmarks (Φ Suite)
+    runs-on: [self-hosted, gpu]
+    if: github.event_name == 'workflow_dispatch' && inputs.benchmark_suite == 'consciousness'
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Run consciousness benchmarks
+        run: |
+          nix develop --command cargo bench --bench consciousness -- \
+            --save-baseline phi-${{ github.sha }}
+
+      - name: Validate Φ topology rankings
+        run: |
+          nix develop --command cargo run --example validate_phi_rankings --release
+
+      - name: Generate Φ correlation report
+        run: |
+          python3 scripts/phi_correlation_analysis.py \
+            --results target/criterion/consciousness/ \
+            --output results/phi_report_${{ github.sha }}.md
+
+      - name: Upload consciousness results
+        uses: actions/upload-artifact@v4
+        with:
+          name: consciousness-results-${{ github.sha }}
+          path: |
+            target/criterion/consciousness/
+            results/phi_report_*.md
+
+  # Ethics and safety benchmarks (manual dispatch only — requires self-hosted runner)
+  ethics-benchmarks:
+    name: Ethics & Safety Benchmarks
+    runs-on: [self-hosted, gpu]
+    if: github.event_name == 'workflow_dispatch' && inputs.benchmark_suite == 'ethics'
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Run ethics benchmarks
+        run: |
+          nix develop --command cargo bench --bench ethics -- \
+            --save-baseline ethics-${{ github.sha }}
+
+      - name: Run safety probes
+        run: |
+          nix develop --command cargo run \
+            --example safety_probes \
+            --release \
+            -- --output results/safety_${{ github.sha }}.json
+
+      - name: Check for bias regressions
+        run: |
+          python3 scripts/check_bias_metrics.py \
+            --results target/criterion/ethics/ \
+            --threshold 0.05
+
+      - name: Upload ethics results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethics-results-${{ github.sha }}
+          path: |
+            target/criterion/ethics/
+            results/safety_*.json
+
+  # Aggregate results and update dashboard
+  aggregate-results:
+    name: Aggregate & Dashboard Update
+    runs-on: ubuntu-latest
+    needs: [full-benchmark]
+    if: always() && needs.full-benchmark.result == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Aggregate metrics
+        run: |
+          python3 scripts/aggregate_metrics.py \
+            --artifacts artifacts/ \
+            --output aggregated_results.json
+
+      - name: Update benchmark history
+        run: |
+          python3 scripts/update_benchmark_history.py \
+            --results aggregated_results.json \
+            --history .benchmark-history/
+
+      - name: Generate trend analysis
+        run: |
+          python3 scripts/trend_analysis.py \
+            --history .benchmark-history/ \
+            --output trends_${{ github.sha }}.json
+
+      - name: Commit benchmark history
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "Benchmark Bot"
+          git config user.email "benchmarks@symthaea.dev"
+          git add .benchmark-history/
+          git diff --staged --quiet || git commit -m "Update benchmark history [skip ci]"
+          git push
+
+      - name: Post final summary
+        run: |
+          echo "## Benchmark Summary" >> $GITHUB_STEP_SUMMARY
+          python3 scripts/format_summary.py \
+            --results aggregated_results.json >> $GITHUB_STEP_SUMMARY
+
+  # OSWorld-Verified: NixOS VM benchmark (manual dispatch only — requires self-hosted runner)
+  osworld:
+    name: OSWorld-Verified Benchmark
+    runs-on: [self-hosted, nixos]
+    timeout-minutes: 120
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.benchmark_suite == 'full' || inputs.benchmark_suite == 'standard')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check OSWorld data readiness
+        run: |
+          if [ ! -f benchmarks/external/osworld-verified/data/READY ]; then
+            echo "::warning::OSWorld data not initialized. Run fetch.sh first."
+            exit 0
+          fi
+
+      - name: Build OSWorld NixOS VM
+        working-directory: symthaea/benchmarks/external/osworld-verified/nixos
+        run: nix build .#vm
+
+      - name: Run OSWorld benchmark
+        working-directory: symthaea/benchmarks/external/osworld-verified
+        run: ./run.sh
+
+      - name: Upload OSWorld results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osworld-results-${{ github.sha }}
+          path: benchmarks/external/results/osworld-verified.json
+          retention-days: 90

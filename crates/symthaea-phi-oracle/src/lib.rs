@@ -69,5 +69,5 @@ mod window;
 pub use encoder::{CovarianceEncoder, SystemEncoder, TimeSeriesEncoder};
 pub use error::OracleError;
 pub use oracle::{IntegrationOracle, OracleConfig};
-pub use result::{HierarchicalReport, IntegrationReport, TemporalCoherence};
+pub use result::{HierarchicalReport, IntegrationReport, PersistentCycle, TemporalCoherence};
 pub use trend::{CoherenceTrend, TrendPoint};

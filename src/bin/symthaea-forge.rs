@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{Read, Write};
 use std::process::Command;
 use std::thread;
@@ -31,7 +31,7 @@ fn compile_workspace() -> bool {
 
 fn auto_discover_parameters() -> Vec<DiscoveredParam> {
     let mut params = Vec::new();
-    let mut files = vec![TARGET_FILE, DOMOTIC_FILE];
+    let files = vec![TARGET_FILE, DOMOTIC_FILE];
 
     for path in files {
         let mut content = String::new();
@@ -63,7 +63,7 @@ fn auto_discover_parameters() -> Vec<DiscoveredParam> {
 
 fn profile_target_tri_objective() -> Option<(Duration, f64, f64)> {
     let mut runs = Vec::with_capacity(PROFILING_RUNS);
-    let mut captured_surprise = 1.0f64;
+    let captured_surprise = 1.0f64;
     let mut filter_error = 0.5f64;
 
     for pass in 0..PROFILING_RUNS {

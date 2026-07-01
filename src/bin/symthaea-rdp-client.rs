@@ -22,9 +22,7 @@ use anyhow::Result;
 use tracing::info;
 
 use symthaea::swarm::rdp_client::{ClientInbound, RdpClientHandle};
-use symthaea::swarm::rdp_protocol::{
-    ControlMessage, FullFrame, QuantizedPatch, RdpFrame, RdpSessionConfig,
-};
+use symthaea::swarm::rdp_protocol::{FullFrame, QuantizedPatch, RdpFrame, RdpSessionConfig};
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()

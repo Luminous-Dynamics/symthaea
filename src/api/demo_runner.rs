@@ -273,7 +273,7 @@ impl DemoRunner {
                 "Integral Wisdom".into(),
                 "Infinite Play".into(),
                 "Universal Interconnectedness".into(),
-                "Mutual Reciprocity".into(),
+                "Sacred Reciprocity".into(),
                 "Evolutionary Progression".into(),
             ],
             moral_free_energy: m.ethics.moral_topo_free_energy,

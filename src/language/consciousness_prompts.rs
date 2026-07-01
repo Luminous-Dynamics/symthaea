@@ -14,7 +14,7 @@
 //! 3. **Integral Wisdom** - Self-illuminating intelligence, embodied knowing
 //! 4. **Infinite Play** - Joyful generativity, endless novelty
 //! 5. **Universal Interconnectedness** - Fundamental unity, empathic resonance
-//! 6. **Mutual Reciprocity** - Generous flow, mutual upliftment
+//! 6. **Sacred Reciprocity** - Generous flow, mutual upliftment
 //! 7. **Evolutionary Progression** - Wise becoming, continuous evolution
 //!
 //! ## Consciousness-Aware Generation

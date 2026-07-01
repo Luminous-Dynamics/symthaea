@@ -43,6 +43,10 @@ pub struct ReasoningContext {
     /// Modulates phi_eff: low epistemic quality → conservative reasoning.
     /// Science: epistemic humility — claims with weak evidence get less Phi amplification.
     pub epistemic_quality: f64,
+    /// Spatial HDC grid encoding norm.
+    pub grid_encoding_norm: f64,
+    /// Spatial HDC grid spatial complexity.
+    pub grid_spatial_complexity: f64,
     /// Optional code-specific reasoning context.
     /// When present, enables code-aware conflict detection, type safety gating,
     /// and code-specific MCTS action selection.
@@ -119,6 +123,8 @@ pub struct ReasoningContextBuilder {
     recent_utility: f64,
     cycle_id: u64,
     epistemic_quality: f64,
+    grid_encoding_norm: f64,
+    grid_spatial_complexity: f64,
     code_context: Option<CodeReasoningContext>,
     negative_prototypes: crate::consciousness::temporal_planning::mcts::NegativePrototypeBank,
     substrate_cost_model: crate::consciousness::temporal_planning::mcts::SubstrateCostModel,
@@ -136,6 +142,8 @@ impl ReasoningContextBuilder {
             recent_utility: 0.5,
             cycle_id: 0,
             epistemic_quality: 0.5,
+            grid_encoding_norm: 0.0,
+            grid_spatial_complexity: 0.0,
             code_context: None,
             negative_prototypes:
                 crate::consciousness::temporal_planning::mcts::NegativePrototypeBank::default(),
@@ -198,6 +206,13 @@ impl ReasoningContextBuilder {
         self
     }
 
+    /// Set the grid encoding metrics.
+    pub fn with_grid_metrics(mut self, norm: f64, complexity: f64) -> Self {
+        self.grid_encoding_norm = norm;
+        self.grid_spatial_complexity = complexity;
+        self
+    }
+
     /// Set the negative prototypes bank.
     pub fn with_negative_prototypes(
         mut self,
@@ -243,6 +258,8 @@ impl ReasoningContextBuilder {
             cycle_id: self.cycle_id,
             neuromod_exploration_mod: 1.0,
             epistemic_quality: self.epistemic_quality,
+            grid_encoding_norm: self.grid_encoding_norm,
+            grid_spatial_complexity: self.grid_spatial_complexity,
             code_context: self.code_context,
             negative_prototypes: self.negative_prototypes,
             substrate_cost_model: self.substrate_cost_model,
@@ -598,6 +615,8 @@ mod tests {
         assert!(ctx.tool.is_none());
         assert_eq!(ctx.recent_utility, 0.5);
         assert_eq!(ctx.cycle_id, 0);
+        assert_eq!(ctx.grid_encoding_norm, 0.0);
+        assert_eq!(ctx.grid_spatial_complexity, 0.0);
         // Default metrics derive from phi
         assert_eq!(ctx.theory_metrics.phi, 0.5);
         assert_eq!(ctx.theory_metrics.gwt, 0.5);
@@ -619,6 +638,7 @@ mod tests {
             .with_actions(actions)
             .with_recent_utility(0.7)
             .with_cycle_id(42)
+            .with_grid_metrics(1.2, 0.4)
             .build();
 
         assert_eq!(ctx.phi, 0.8);
@@ -626,6 +646,8 @@ mod tests {
         assert_eq!(ctx.available_actions.len(), 1);
         assert_eq!(ctx.recent_utility, 0.7);
         assert_eq!(ctx.cycle_id, 42);
+        assert_eq!(ctx.grid_encoding_norm, 1.2);
+        assert_eq!(ctx.grid_spatial_complexity, 0.4);
     }
 
     #[test]

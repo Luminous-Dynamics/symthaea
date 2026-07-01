@@ -85,7 +85,7 @@ This means: 2 canary failures + 1 attestation failure across 3 consecutive ticks
 | 0.5 | Warning-level anomalies | Consciousness halved |
 | 0.1 | Critical anomalies | Consciousness reduced to 10% |
 
-Applied in `cycle_phase_output.rs`: `metadata.consciousness_level *= integrity_confidence`
+Applied in `cycle_phase_output/`: `metadata.consciousness_level *= integrity_confidence`
 
 Flows to `SafetyMetrics.integrity_critical` for NRC-level safety escalation.
 

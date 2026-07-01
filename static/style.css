@@ -1,0 +1,318 @@
+:root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #1a2332;
+    --text-primary: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --accent-cyan: #06b6d4;
+    --accent-purple: #a855f7;
+    --accent-green: #22c55e;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --border: #374151;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+header {
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+}
+
+.status-dot.disconnected { background: var(--accent-rose); animation: none; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 1rem;
+    padding: 1rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.card h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.chart-container {
+    height: 180px;
+    position: relative;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.metric {
+    text-align: center;
+}
+
+.metric .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.metric .label {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.metric.cyan .value { color: var(--accent-cyan); }
+.metric.purple .value { color: var(--accent-purple); }
+.metric.green .value { color: var(--accent-green); }
+.metric.amber .value { color: var(--accent-amber); }
+.metric.rose .value { color: var(--accent-rose); }
+
+.input-section {
+    grid-column: 1 / -1;
+}
+
+.input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.input-row input {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.input-row input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+}
+
+.input-row button {
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-send {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+}
+
+.btn-pause {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border) !important;
+    color: var(--text-secondary);
+}
+
+.btn-reset {
+    background: var(--accent-rose);
+    color: white;
+}
+
+.state-panel {
+    grid-column: 1 / -1;
+}
+
+.state-flags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.flag {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.flag.active {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.cycle-info {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+}
+
+/* --- Moral Topology --- */
+
+.moral-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.betti-row {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.betti-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    justify-content: center;
+}
+
+.betti-badge.cyan { border-color: var(--accent-cyan); }
+.betti-badge.purple { border-color: var(--accent-purple); }
+.betti-badge.green { border-color: var(--accent-green); }
+
+.betti-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.betti-badge.cyan .betti-value { color: var(--accent-cyan); }
+.betti-badge.purple .betti-value { color: var(--accent-purple); }
+.betti-badge.green .betti-value { color: var(--accent-green); }
+
+.betti-label {
+    font-size: 0.5rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.anomaly-row {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.flag.anomaly-flash {
+    animation: anomalyPulse 0.6s ease-in-out 3;
+}
+
+@keyframes anomalyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Anomaly severity colors */
+#flagInversion.active {
+    border-color: var(--accent-rose);
+    color: var(--accent-rose);
+    background: rgba(244, 63, 94, 0.15);
+}
+
+#flagFESpike.active {
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.15);
+}
+
+#flagDrift.active {
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.topo-info {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.topo-info strong {
+    color: var(--text-primary);
+}
+
+/* --- Sparkline --- */
+
+.sparkline-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+#sparklineDrift {
+    width: 120px;
+    height: 40px;
+    vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+    .dashboard { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .betti-row { gap: 0.5rem; }
+    .betti-badge { width: 60px; height: 60px; }
+    .betti-value { font-size: 1rem; }
+}

@@ -16,7 +16,7 @@
 //! ## The Solution
 //!
 //! With contextual weighting:
-//! - Voting: Higher weight on truth (Integral Wisdom), fairness (Mutual Reciprocity)
+//! - Voting: Higher weight on truth (Integral Wisdom), fairness (Sacred Reciprocity)
 //! - Financial: Higher weight on fairness, do-no-harm (Pan-Sentient Flourishing)
 //! - Creative: Higher weight on play (Infinite Play), coherence (Resonant Coherence)
 //!

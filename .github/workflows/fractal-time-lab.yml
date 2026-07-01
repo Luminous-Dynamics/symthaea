@@ -1,0 +1,29 @@
+name: Symthaea Fractal Time Lab CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'crates/symthaea-fractal-time-lab/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'crates/symthaea-fractal-time-lab/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --component clippy
+          rustup default stable
+      - name: Run unit tests
+        run: cargo test -p symthaea-fractal-time-lab --lib
+      - name: Run sanity tests
+        run: cargo test -p symthaea-fractal-time-lab --test benchmark_sanity
+      - name: Run benchmark example (dry run)
+        run: cargo run -p symthaea-fractal-time-lab --example run_experiments -- --seed 42 --trials 4
+      - name: Run clippy
+        run: cargo clippy -p symthaea-fractal-time-lab -- -D warnings

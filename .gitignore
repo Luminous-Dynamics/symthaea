@@ -1,0 +1,160 @@
+# Build artifacts
+target/
+target-test/
+symthaea-core/target/
+
+# JS/TS build output and deps (for standalone-repo cleanliness;
+# the parent monorepo already gitignores node_modules globally, but
+# sync-to-standalone ships symthaea/ without the parent gitignore).
+node_modules/
+*/node_modules/
+dist/
+.next/
+
+# Python cache
+__pycache__/
+__pyphi_cache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.secrets/
+.venv/
+**/.venv/
+
+# Benchmark intermediate files (keep history)
+# .benchmark-history/
+
+# Large datasets (keep small ones)
+datasets/*.parquet
+datasets/*.csv
+datasets/*.json
+
+# Nix build
+result
+result-*
+.direnv/
+.cuda_cache/
+
+# Rust specific
+**/*.rs.bk
+Cargo.lock.bak
+
+# Editor backups
+*.backup
+*.bak
+*.orig
+
+# Archives (old code - preserved locally)
+.archive/
+archive/
+
+# Large data directories (use ** so negation patterns work for tracked assets)
+**/data/**
+!**/data/
+!crates/symthaea-broca/data/broca-vocab-*.json
+!crates/symthaea-spore/data/broca-pipeline-distilled.bin
+!crates/symthaea-stt/data/mini_cmudict.txt
+!src/voice/data/cmudict.dict
+!data/benchmarks/
+!data/benchmarks/humaneval/
+!data/benchmarks/humaneval/README.md
+!data/benchmarks/humaneval/rust_smoke.jsonl
+models/
+results/
+zenodo-dataset/
+studies/
+sentinel-demo/
+benchmarks/external/**/data/
+
+# Datasets subdirectory (large files)
+datasets/
+symthaea-hlb/benchmarks/ai_benchmarks/data/
+
+# TLA+ model checking state files (large binary)
+tla/states/
+tla/*.jar
+
+# HuggingFace cache
+.hf_cache/
+**/.hf_cache/
+
+# Audio test data (large wav files)
+crates/symthaea-sentinel/test-data/
+
+# Large data files
+LibriSpeech-Alignments.zip
+*.rlib
+
+# Benchmark output
+*_output.txt
+benchmark_output/
+build_audit.json
+metadata.json
+time_waterfall_export.json
+rust-logic-pairs*.jsonl
+target_test/
+tda_test
+
+# LaTeX byproducts
+papers/latex/*.aux
+papers/latex/*.bbl
+papers/latex/*.blg
+papers/latex/*.out
+papers/latex/*.toc
+papers/latex/*.lof
+papers/latex/*.lot
+
+# Example run artifacts (copies live in papers/figures/)
+efe_ablation.csv
+multi_scenario.csv
+
+# Telemetry output
+*_telemetry.csv
+output/
+
+# Audio output from vocal tract demo
+audio_output/
+
+# Video output from MuJoCo demos
+video_output/
+mujoco-*/
+
+# Runtime logs
+MUJOCO_LOG.TXT
+
+# Generated HTML visualizations
+pulse.html
+benchmarks/external/**/helm-repo/
+benchmarks/external/**/.git/
+symthaea/
+data/midi/
+data/samples/
+data/mot-sample/
+
+# Local archive / handoff trees
+disabled-crates/
+disabled-hdc-zkp-bench/
+final_handover_artifacts/
+pillars/
+
+# Standalone demo experiments
+demos/infin-love/

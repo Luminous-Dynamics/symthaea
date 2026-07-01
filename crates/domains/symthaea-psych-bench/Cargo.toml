@@ -1,0 +1,53 @@
+[package]
+name = "symthaea-psych-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Psychological benchmark suite for Symthaea — WorM, CogBench, Butlin indicators, ToMBench, MemoryAgentBench"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["psychology", "benchmarks", "consciousness", "neuroscience", "cognitive-science"]
+categories = ["science", "algorithms"]
+
+[features]
+default = []
+symthaea-backend = ["symthaea-core/ctc_wiring"]
+neuroevolution = ["dep:symthaea-neuroevolution"]
+neural_validation = ["symthaea-core/neural_validation"]  # TRIBE v2 fMRI comparison benchmark
+nuclear-benchmarks = ["dep:symthaea-nuclear"]            # Nuclear physics science benchmarks
+materials-benchmarks = ["dep:symthaea-materials"]        # Materials design science benchmarks
+science-benchmarks = ["nuclear-benchmarks", "materials-benchmarks"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-ssm = { path = "../symthaea-ssm" }
+symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
+symthaea-neuroevolution = { path = "../symthaea-neuroevolution", optional = true }
+symthaea-nuclear = { path = "../symthaea-nuclear", optional = true }
+symthaea-materials = { path = "../symthaea-materials", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+csv = "1.3"
+chrono = { workspace = true }
+rayon = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1"
+
+[[bin]]
+name = "calibration_battery"
+path = "src/bin/calibration_battery.rs"
+
+[[bin]]
+name = "math_battery"
+path = "src/bin/math_battery.rs"
+
+[[bench]]
+name = "psych_bench_overhead"
+harness = false

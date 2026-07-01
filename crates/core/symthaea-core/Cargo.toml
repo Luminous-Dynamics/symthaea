@@ -1,0 +1,195 @@
+[package]
+name = "symthaea-core"
+version = "0.5.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Core primitives for Symthaea: 16,384D hyperdimensional computing, Phi engine, LTC neural dynamics, and consciousness structures. The foundation for 85+ symthaea crates."
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+keywords = ["hdc", "phi", "neuroscience", "simulation", "consciousness"]
+categories = ["science", "simulation", "algorithms"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[bench]]
+name = "eml_derivation_speed"
+harness = false
+
+[[bench]]
+name = "abstract_thought_reflect"
+harness = false
+required-features = ["abstract_thought"]
+
+[dependencies]
+faer.workspace = true
+wgpu = { workspace = true, features = ["spirv"] }
+bytemuck = { version = "1", features = ["derive"] }
+
+
+ndarray = { workspace = true }
+rand = { workspace = true }
+rand_distr = "0.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+bincode = { workspace = true }
+rayon = { workspace = true, optional = true }
+anyhow = { workspace = true }
+blake3 = { workspace = true }
+sha3 = "0.10"
+ordered-float = "4.2"
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+nalgebra = { workspace = true }
+num-complex = "0.4"
+bumpalo = "3.16"
+chrono = { workspace = true }
+
+# Geometric Algebra (optional — provides bivectors, rotors, N-dimensional transforms)
+symtropy-math = { version = "0.1", optional = true }
+
+# Multi-Database Consciousness Architecture (optional dependencies)
+# Qdrant: Sensory Cortex - ultra-fast vector similarity for perception
+qdrant-client = { version = "1.16", optional = true }
+# CozoDB: Prefrontal Cortex - recursive Datalog for causal reasoning
+# Disabled: cozo sqlite3-src conflicts with rusqlite libsqlite3-sys (links = "sqlite3")
+# cozo = { version = "0.7", optional = true }
+# LanceDB: Long-Term Memory - multimodal embeddings storage
+# Disabled: lancedb jumped from 0.4 to 0.23+ with breaking API changes; re-enable when needed
+# lancedb = { version = "0.23", optional = true }
+# DuckDB: Epistemic Auditor - analytical queries for self-reflection
+# Note: duckdb does NOT conflict with rusqlite (libduckdb-sys has no links="sqlite3")
+duckdb = { version = "1.1", features = ["bundled"], optional = true }
+# Tokio async runtime (required for async database operations)
+tokio = { version = "1.35", features = ["rt", "sync", "time"], optional = true }
+
+# ONNX Runtime for semantic encoder (requires `embeddings` feature)
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # Pinned RC; upgrade to 2.0.0 stable when released
+tokenizers = { version = "0.21", optional = true }
+hf-hub = { version = "0.4", optional = true }
+libc = "0.2.186"
+
+[dev-dependencies]
+proptest = "1.4"
+criterion = "0.5"
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }  # For async tests
+
+[[example]]
+name = "primitive_showcase"
+path = "examples/primitive_showcase.rs"
+
+[[example]]
+name = "abstract_thought_demo"
+path = "examples/abstract_thought_demo.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "macro_acceleration_benchmark"
+path = "examples/macro_acceleration_benchmark.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "real_discovery_report"
+path = "examples/real_discovery_report.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "compounding_benchmark"
+path = "examples/compounding_benchmark.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "cross_domain_query"
+path = "examples/cross_domain_query.rs"
+
+# scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
+[[example]]
+name = "scaling_study_demo"
+path = "examples/scaling_study_demo.rs"
+required-features = ["_scaling_study"]
+
+[[bench]]
+name = "hdc_benchmarks"
+harness = false
+
+[[bench]]
+name = "hdc_simd_compare"
+harness = false
+
+[[bench]]
+name = "hdc_ltc_learning"
+harness = false
+
+[[bench]]
+name = "hdc_improvements"
+harness = false
+
+[[bench]]
+name = "simd_continuous"
+harness = false
+
+[[bench]]
+name = "primitive_system_bench"
+harness = false
+
+[[bench]]
+name = "entropy_methods"
+harness = false
+
+[[bench]]
+name = "bridge_integration"
+harness = false
+
+[[bench]]
+name = "physics_benchmarks"
+harness = false
+
+[[bench]]
+name = "consciousness_benchmarks"
+harness = false
+
+[[bench]]
+name = "spectral_mip"
+harness = false
+
+[[bench]]
+name = "encoder_optimization"
+harness = false
+
+[[bench]]
+name = "orthogonal_init_bench"
+harness = false
+
+[[bench]]
+name = "cantor_cleanup_bench"
+harness = false
+
+[features]
+default = ["simd", "parallel"]
+embeddings = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]  # Enable ONNX embedding model integration
+thread_local_cache = []  # Enable thread-local caching in Phi engine
+parallel = ["dep:rayon"]  # Enable parallel computation with rayon
+simd = []             # Enable SIMD-accelerated continuous HV operations (4x+ speedup)
+ctc_wiring = []       # Communication Through Coherence: binding gates GWT entry (Fries 2015)
+iit4 = []             # IIT 4.0: concept structures, cause-effect power (Albantakis 2023)
+
+# Multi-Database Consciousness Architecture features
+# Each database maps to a "brain region" with specialized computational role
+qdrant = ["dep:qdrant-client", "dep:tokio"]  # Sensory Cortex: vector similarity (<10ms)
+datalog = []                                 # Prefrontal Cortex: recursive reasoning (cozo dep pending fix)
+lance = ["dep:tokio"]                         # Long-Term Memory: multimodal storage (lancedb dep pending upgrade)
+duck = ["dep:duckdb"]                        # Epistemic Auditor: analytics/Phi stats
+complex_cfc = []                             # Complex-valued CfC neuron with native oscillation
+geometric-algebra = ["dep:symtropy-math"]     # N-dimensional geometric algebra: bivectors, rotors, transforms
+_scaling_study = []                          # Gate for scaling_study_demo example
+epistemic = []                               # Epistemic substrate profiles and knowledge validation
+abstract_thought = []                        # Meta-HDC concept vectors, dynamic grammar generation, category theory discovery
+neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
+synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
+cantor-hdc = []                              # Hierarchical Cantor Hypervectors (RHN)
+
+# full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)
+

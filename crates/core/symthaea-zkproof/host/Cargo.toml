@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-zkproof-host"
+version = "0.1.0"
+edition = "2024"
+description = "RISC Zero host-side prover for Symthaea ZK proofs"
+
+[dependencies]
+anyhow = "1.0"
+risc0-zkvm = "3.0"
+symthaea-zkproof-core = { path = "../core" }
+symthaea-zkproof-methods = { path = "../methods" }

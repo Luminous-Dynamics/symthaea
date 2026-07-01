@@ -84,17 +84,36 @@ impl BrocaLiteManager {
             channels.inject_intent(text);
         }
 
+        // T1.6: Consciousness-scaled max_tokens
+        self.max_tokens = match signals.consciousness_level {
+            c if c >= 0.7 => 64,
+            c if c >= 0.5 => 48,
+            c if c >= 0.2 => 32,
+            _ => 16,
+        };
+
         let result = self.generator.generate(&channels, self.max_tokens);
 
         if result.text.is_empty() {
             return None;
         }
 
+        // T1.4: Honest coherence from type-token ratio
+        let ttr = {
+            let words: Vec<&str> = result.text.split_whitespace().collect();
+            if words.is_empty() {
+                1.0
+            } else {
+                let unique: std::collections::HashSet<_> = words.iter().collect();
+                (unique.len() as f32 / words.len() as f32).clamp(0.1, 1.0)
+            }
+        };
+
         Some(LiteGenerationResult {
             text: result.text,
             num_tokens: result.num_tokens,
             eos_terminated: result.eos_terminated,
-            coherence: 1.0, // Structured generation is always coherent by construction
+            coherence: ttr,
         })
     }
 }
@@ -120,7 +139,7 @@ fn signals_to_lite_channels(
     };
 
     // Intent channels (set neutral defaults — could be enriched from detected_primitives)
-    channels.channels[0] = 0.3; // curiosity (moderate default)
+    channels.channels[0] = (1.0 - signals.epistemic_confidence).clamp(0.1, 0.85); // curiosity from epistemic uncertainty
     channels.channels[1] = ((signals.emotional_valence + 1.0) / 2.0).clamp(0.0, 1.0); // valence [-1,1] → [0,1]
     channels.channels[2] = if signals.knowledge_grounding > 0.5 {
         0.5
