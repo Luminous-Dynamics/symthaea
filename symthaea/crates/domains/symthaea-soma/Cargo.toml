@@ -21,6 +21,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
 ed25519-dalek = { workspace = true, optional = true }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+getrandom = "0.2"
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
 # positioning = { path = "../../../../mycelix-workspace/mycelix-position/lib/positioning", optional = true }

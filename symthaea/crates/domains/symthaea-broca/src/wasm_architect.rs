@@ -22,6 +22,14 @@ pub struct SignedArtifact {
     pub bytes: Vec<u8>,
     pub signature: Vec<u8>,
     pub public_key: Vec<u8>,
+    /// Hash of the compiling `wasmtime::Engine`'s
+    /// `precompile_compatibility_hash()` at signing time. `bytes` is only
+    /// safe to pass to the unsafe `Module::deserialize` path when this
+    /// matches the *executing* engine's hash -- otherwise `bytes` may not
+    /// actually be a valid precompiled artifact for the current
+    /// wasmtime version/target, and `Module::deserialize` on such input is
+    /// undefined behavior (not merely "untrusted wasm").
+    pub compat_hash: u64,
 }
 
 /// Manages the compilation and execution of WASM plugins.
@@ -118,6 +126,32 @@ impl WasmArchitect {
         }
     }
 
+    /// Build a wasmtime `Engine` configured for sandboxed execution: fuel
+    /// metering enabled so any loaded module (however it was obtained) is
+    /// time-bounded rather than able to spin or hang forever. Must be used
+    /// consistently at both precompile time and execute time -- a mismatch
+    /// changes the engine's `precompile_compatibility_hash()`, which
+    /// [`Self::execute_plugin`]/[`Self::execute_with_hypervector`] already
+    /// check for before attempting the unsafe deserialize path.
+    #[cfg(feature = "wasm-sandbox")]
+    fn sandboxed_engine() -> Result<wasmtime::Engine> {
+        let mut config = wasmtime::Config::new();
+        config.consume_fuel(true);
+        wasmtime::Engine::new(&config)
+            .map_err(|e| anyhow::anyhow!("failed to initialize sandboxed wasmtime engine: {e}"))
+    }
+
+    /// Hash of `engine.precompile_compatibility_hash()`, used to detect
+    /// whether a precompiled artifact was produced by an engine with the
+    /// same wasmtime version/target/`Config` as the one about to load it.
+    #[cfg(feature = "wasm-sandbox")]
+    fn engine_compat_hash(engine: &wasmtime::Engine) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        engine.precompile_compatibility_hash().hash(&mut hasher);
+        hasher.finish()
+    }
+
     /// Compute a simple hash for code indexing.
     fn compute_hash(code: &str) -> String {
         use std::collections::hash_map::DefaultHasher;
@@ -201,8 +235,7 @@ impl WasmArchitect {
         // 4. Pre-compile and Sign for AOT
         #[cfg(feature = "wasm-sandbox")]
         {
-            use wasmtime::*;
-            let engine = Engine::default();
+            let engine = Self::sandboxed_engine()?;
             if let Ok(serialized) = engine.precompile_module(&wasm_bytes) {
                 // --- IMPROVEMENT: DID Cryptographic Signing Layer ---
                 // Sign the artifact to bulletproof the unsafe loading boundary.
@@ -215,6 +248,7 @@ impl WasmArchitect {
                     bytes: serialized.clone(),
                     signature,
                     public_key: self.keypair.public_key().to_vec(),
+                    compat_hash: Self::engine_compat_hash(&engine),
                 };
 
                 let encoded = bincode::serialize(&signed_artifact)?;
@@ -239,34 +273,82 @@ impl WasmArchitect {
         Ok(wasm_bytes)
     }
 
+    /// Amount of wasmtime "fuel" granted per sandboxed execution -- a
+    /// coarse, roughly instruction-proportional bound that prevents a
+    /// loaded module from spinning or hanging the host forever.
+    #[cfg(feature = "wasm-sandbox")]
+    const WASM_FUEL_BUDGET: u64 = 50_000_000;
+
+    /// Maximum linear memory (bytes) a sandboxed module may grow to.
+    #[cfg(feature = "wasm-sandbox")]
+    const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
+
+    /// Verify an artifact's DID signature and load it into `engine` as a
+    /// `Module`, using the unsafe precompiled-deserialize path only when
+    /// the artifact's recorded `compat_hash` matches this engine's -- see
+    /// [`SignedArtifact::compat_hash`] for why that check is required for
+    /// soundness. Refuses to load anything that isn't a validly-signed
+    /// [`SignedArtifact`]: there is no unauthenticated fallback.
+    #[cfg(feature = "wasm-sandbox")]
+    fn load_verified_module(
+        engine: &wasmtime::Engine,
+        artifact: &[u8],
+    ) -> Result<wasmtime::Module> {
+        use wasmtime::Module;
+
+        let signed: SignedArtifact = bincode::deserialize(artifact).map_err(|_| {
+            anyhow::anyhow!("Refusing to execute: artifact is not a recognized signed format")
+        })?;
+        let valid = verify_signature(&signed.bytes, &signed.signature, &signed.public_key)
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {:?}", e))?;
+        if !valid {
+            return Err(anyhow::anyhow!(
+                "Artifact signature INVALID: refusing to execute."
+            ));
+        }
+
+        if signed.compat_hash == Self::engine_compat_hash(engine) {
+            if let Ok(module) = unsafe { Module::deserialize(engine, &signed.bytes) } {
+                return Ok(module);
+            }
+            // Compat hash matched but deserialize still failed (e.g. corrupted
+            // cache entry) -- fall through to the safe compile-from-source path.
+        }
+        Ok(Module::new(engine, &signed.bytes)?)
+    }
+
+    /// Build a `Store` with fuel metering and a memory/instance limiter
+    /// applied, so a successfully-loaded module still cannot exhaust host
+    /// resources or run unboundedly.
+    #[cfg(feature = "wasm-sandbox")]
+    fn sandboxed_store(
+        engine: &wasmtime::Engine,
+    ) -> Result<wasmtime::Store<wasmtime::StoreLimits>> {
+        use wasmtime::{Store, StoreLimitsBuilder};
+
+        let limits = StoreLimitsBuilder::new()
+            .memory_size(Self::WASM_MEMORY_LIMIT_BYTES)
+            .instances(1)
+            .tables(4)
+            .memories(1)
+            .trap_on_grow_failure(true)
+            .build();
+        let mut store = Store::new(engine, limits);
+        store.limiter(|s| s);
+        store
+            .set_fuel(Self::WASM_FUEL_BUDGET)
+            .map_err(|e| anyhow::anyhow!("failed to set wasm fuel budget: {e}"))?;
+        Ok(store)
+    }
+
     /// Execute a WASM plugin in a sandboxed environment.
     #[cfg(feature = "wasm-sandbox")]
     pub fn execute_plugin(&self, artifact: &[u8], func_name: &str) -> Result<()> {
         use wasmtime::*;
 
-        let engine = Engine::default();
-
-        // 1. Unpack and Verify Signature if it's a SignedArtifact
-        let bytes_to_load = if let Ok(signed) = bincode::deserialize::<SignedArtifact>(artifact) {
-            // Validate her own DID signature before passing to unsafe deserializer.
-            let valid = verify_signature(&signed.bytes, &signed.signature, &signed.public_key)
-                .map_err(|e| anyhow::anyhow!("Signature verification failed: {:?}", e))?;
-
-            if !valid {
-                return Err(anyhow::anyhow!(
-                    "Artifact signature INVALID: blocking unsafe deserialization."
-                ));
-            }
-            signed.bytes
-        } else {
-            artifact.to_vec()
-        };
-
-        // 2. Safely Deserialize
-        let module = unsafe { Module::deserialize(&engine, &bytes_to_load) }
-            .or_else(|_| Module::new(&engine, &bytes_to_load))?;
-
-        let mut store = Store::new(&engine, ());
+        let engine = Self::sandboxed_engine()?;
+        let module = Self::load_verified_module(&engine, artifact)?;
+        let mut store = Self::sandboxed_store(&engine)?;
         let instance = Instance::new(&mut store, &module, &[])?;
 
         let func = instance.get_typed_func::<(), ()>(&mut store, func_name)?;
@@ -287,26 +369,9 @@ impl WasmArchitect {
     ) -> Result<()> {
         use wasmtime::*;
 
-        let engine = Engine::default();
-
-        // 1. Unpack and Verify
-        let bytes_to_load = if let Ok(signed) = bincode::deserialize::<SignedArtifact>(artifact) {
-            let valid = verify_signature(&signed.bytes, &signed.signature, &signed.public_key)
-                .map_err(|e| anyhow::anyhow!("Signature verification failed: {:?}", e))?;
-            if !valid {
-                return Err(anyhow::anyhow!(
-                    "Artifact signature INVALID: blocking unsafe deserialization."
-                ));
-            }
-            signed.bytes
-        } else {
-            artifact.to_vec()
-        };
-
-        let module = unsafe { Module::deserialize(&engine, &bytes_to_load) }
-            .or_else(|_| Module::new(&engine, &bytes_to_load))?;
-
-        let mut store = Store::new(&engine, ());
+        let engine = Self::sandboxed_engine()?;
+        let module = Self::load_verified_module(&engine, artifact)?;
+        let mut store = Self::sandboxed_store(&engine)?;
         let instance = Instance::new(&mut store, &module, &[])?;
 
         // 1. Locate the plugin's exported linear memory allocation

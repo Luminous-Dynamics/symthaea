@@ -609,8 +609,10 @@ pub fn generate_lanzaboote_nix(config: &LanzabooteConfig) -> String {
 /// Generate a human-memorable MOK enrollment password.
 ///
 /// Produces 6 words separated by dashes, drawn from a curated word list of
-/// common, unambiguous English words. The resulting password has approximately
-/// 62 bits of entropy (6 * log2(256) ~ 48, adjusted for list size).
+/// common, unambiguous English words, with each word chosen from the OS
+/// entropy source (see [`secure_random_index`]). The resulting password has
+/// approximately 62 bits of entropy (6 * log2(256) ~ 48, adjusted for list
+/// size).
 ///
 /// Example: `"cedar-bright-ocean-gentle-river-dawn"`
 pub fn generate_mok_password() -> String {
@@ -620,14 +622,10 @@ pub fn generate_mok_password() -> String {
     // - Visually distinct from each other
     let words = mok_word_list();
 
-    // Use a simple PRNG seeded from available entropy sources.
-    // In production WASM this would use crypto.getRandomValues();
-    // here we use a basic xorshift seeded from address hashing.
-    let mut seed = generate_seed();
+    // Each word index is drawn independently from the OS entropy source.
     let mut selected = Vec::with_capacity(6);
     for _ in 0..6 {
-        seed = xorshift64(seed);
-        let idx = (seed as usize) % words.len();
+        let idx = secure_random_index(words.len());
         selected.push(words[idx]);
     }
     selected.join("-")
@@ -1154,37 +1152,26 @@ impl SecureBootOrchestration {
 // Internal utilities
 // ============================================================================
 
-/// Simple xorshift64 PRNG.
-fn xorshift64(mut state: u64) -> u64 {
-    state ^= state << 13;
-    state ^= state >> 7;
-    state ^= state << 17;
-    state
+/// Fill `buf` from the OS entropy source: a real CSPRNG syscall on native
+/// targets, or `crypto.getRandomValues()` (via the `js` feature) on wasm32.
+fn os_random_bytes(buf: &mut [u8]) {
+    getrandom02::getrandom(buf).expect("OS entropy source unavailable");
 }
 
-/// Generate a seed from available entropy.
-/// In WASM, this would use `crypto.getRandomValues()` via js-sys.
-/// For native builds, we use a combination of stack address and
-/// a monotonic counter to provide non-deterministic seeds.
-fn generate_seed() -> u64 {
-    // Use the address of a stack variable as entropy source.
-    // This is intentionally non-cryptographic — the MOK password
-    // only needs to be unpredictable to an observer who doesn't
-    // have access to the installation session.
-    let stack_var: u64 = 0;
-    let addr = &stack_var as *const u64 as u64;
-
-    // Mix with a counter to ensure different calls produce different seeds
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-    let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
-    // Combine entropy sources
-    let mut seed = addr.wrapping_mul(6364136223846793005).wrapping_add(count);
-    seed = xorshift64(seed);
-    if seed == 0 {
-        seed = 0xdeadbeef_cafebabe;
-    }
-    seed
+/// Draw a cryptographically random `usize` in `[0, bound)` from the OS
+/// entropy source.
+///
+/// The MOK enrollment password gates enrolling a signing key into the
+/// machine's UEFI trust store during an active install session, so it must
+/// actually be unpredictable, not merely "unpredictable to an observer who
+/// doesn't have access to the session" -- a predictable seed (e.g. derived
+/// from a stack address and a monotonic counter) is guessable by anything
+/// with local access during that window.
+fn secure_random_index(bound: usize) -> usize {
+    debug_assert!(bound > 0, "secure_random_index bound must be non-zero");
+    let mut buf = [0u8; 8];
+    os_random_bytes(&mut buf);
+    (u64::from_le_bytes(buf) as usize) % bound
 }
 
 /// Curated word list for MOK password generation.

@@ -80,6 +80,13 @@ use super::binary_hv::BinaryHV;
 /// MAC computation is a single permute + XOR: **O(D/W)** where W is SIMD width.
 /// At D = 16,384 with AVX2 (W = 256): ~2 iterations of 256-bit XOR ≈ **5-10 ns**.
 /// Compare: BLAKE3 MAC ≈ 50-100 ns, HMAC-SHA256 ≈ 200-400 ns.
+///
+/// # Key requirement
+///
+/// `key` must come from a true entropy source ([`BinaryHV::secure_random`])
+/// or an equivalent proper key-derivation path (e.g. [`HdcContextKey`]).
+/// A key produced by [`BinaryHV::random(seed)`] is a public, deterministic
+/// function of `seed` and lets anyone who knows the seed forge MACs.
 pub struct HdcMac;
 
 /// Default permutation offset for MAC key derivation.
@@ -156,6 +163,12 @@ impl HdcMac {
 /// - XOR with uniform mask produces uniform output regardless of secret
 /// - Without k shares to bundle, majority vote cannot recover the secret
 ///
+/// **This only holds when masks come from [`BinaryHV::secure_random`].**
+/// [`HdcThresholdSharing::split`] derives masks deterministically from a
+/// `u64` seed via [`BinaryHV::random`] and provides no real secrecy -- it
+/// exists for reproducible tests only. Use
+/// [`HdcThresholdSharing::split_secure`] for any real secret-sharing use.
+///
 /// **Recovery accuracy**: With k shares, majority vote recovers each bit correctly
 /// with probability P(correct) = Σ_{j=⌈k/2⌉}^{k} C(k,j) × 0.5^k (for random noise).
 /// But since each unbound share equals the secret exactly (mask cancels), the
@@ -184,7 +197,14 @@ pub struct HdcShare {
 }
 
 impl HdcThresholdSharing {
-    /// Split a secret BinaryHV into n shares requiring k to recover.
+    /// Split a secret BinaryHV into n shares requiring k to recover, using a
+    /// deterministic seed for mask generation.
+    ///
+    /// **Not secure.** Masks are derived from `seed` via [`BinaryHV::random`],
+    /// so anyone who knows or brute-forces `seed` can reconstruct every mask
+    /// and recover the secret from a single share. This exists for
+    /// reproducible tests only -- use [`Self::split_secure`] for any real
+    /// secret-sharing use case.
     ///
     /// # Panics
     ///
@@ -198,6 +218,34 @@ impl HdcThresholdSharing {
             .map(|i| {
                 // Deterministic mask from seed + index (reproducible shares)
                 let mask = BinaryHV::random(seed.wrapping_add(i as u64));
+                let share = secret.bind(&mask);
+                HdcShare {
+                    index: i,
+                    share,
+                    mask,
+                }
+            })
+            .collect()
+    }
+
+    /// Split a secret BinaryHV into n shares requiring k to recover, using
+    /// OS-entropy-backed masks.
+    ///
+    /// This is the secure entry point: each mask comes from
+    /// [`BinaryHV::secure_random`], so the information-theoretic security
+    /// claimed for this scheme actually holds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if k > n, k == 0, or k is even.
+    pub fn split_secure(secret: &BinaryHV, k: usize, n: usize) -> Vec<HdcShare> {
+        assert!(k >= 1, "k must be at least 1");
+        assert!(k <= n, "k must be <= n");
+        assert!(k % 2 == 1, "k must be odd for deterministic majority vote");
+
+        (0..n)
+            .map(|i| {
+                let mask = BinaryHV::secure_random();
                 let share = secret.bind(&mask);
                 HdcShare {
                     index: i,
@@ -481,6 +529,37 @@ mod tests {
             recovered, secret,
             "k < n recovery should be exact when all k shares are valid"
         );
+    }
+
+    #[test]
+    fn test_threshold_split_secure_recover() {
+        let secret = BinaryHV::random(42);
+        let shares = HdcThresholdSharing::split_secure(&secret, 3, 5);
+        assert_eq!(shares.len(), 5);
+
+        let recovered = HdcThresholdSharing::recover(&shares[..3]);
+        assert_eq!(
+            recovered, secret,
+            "secure split/recover should round-trip exactly"
+        );
+    }
+
+    #[test]
+    fn test_threshold_split_secure_masks_are_unpredictable() {
+        let secret = BinaryHV::random(42);
+        let shares_a = HdcThresholdSharing::split_secure(&secret, 1, 1);
+        let shares_b = HdcThresholdSharing::split_secure(&secret, 1, 1);
+        assert_ne!(
+            shares_a[0].mask, shares_b[0].mask,
+            "secure masks must not repeat across calls"
+        );
+    }
+
+    #[test]
+    fn test_binary_hv_secure_random_is_not_deterministic() {
+        let a = BinaryHV::secure_random();
+        let b = BinaryHV::secure_random();
+        assert_ne!(a, b, "two secure-random draws should not collide");
     }
 
     #[test]

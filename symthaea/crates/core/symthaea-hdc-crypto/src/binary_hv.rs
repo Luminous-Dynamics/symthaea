@@ -63,6 +63,17 @@ impl BinaryHV {
     /// Uses BLAKE3 XOF (extendable output function) to fill the 2048 bytes
     /// deterministically from the seed. Same seed always produces the same vector.
     ///
+    /// # Security warning
+    ///
+    /// This is **not cryptographically secure**. The output is a public,
+    /// deterministic function of `seed`; anyone who knows or brute-forces the
+    /// seed (a 64-bit space, often far smaller in practice) recomputes the
+    /// exact same vector. **Never use this to generate a mask/key for
+    /// [`crate::crypto::HdcMac`], [`crate::fhe::EncryptedHV`], or
+    /// [`crate::crypto::HdcThresholdSharing`]** — use [`Self::new_secure_random`]
+    /// for any of those. This constructor exists for deterministic HDC
+    /// encoding and reproducible tests only.
+    ///
     /// # Examples
     ///
     /// ```
@@ -78,6 +89,26 @@ impl BinaryHV {
         let mut bytes = [0u8; HDC_BYTES];
         let mut reader = hasher.finalize_xof();
         reader.fill(&mut bytes);
+        Self(bytes)
+    }
+
+    /// Create a cryptographically secure random hypervector.
+    ///
+    /// Fills all 2048 bytes directly from the OS entropy source (via
+    /// `getrandom`). Unlike [`Self::new_random`], the result is unpredictable
+    /// and cannot be recomputed from a known/guessable input. **Use this to
+    /// generate any mask or key for [`crate::crypto::HdcMac`],
+    /// [`crate::fhe::EncryptedHV`], or [`crate::crypto::HdcThresholdSharing`]**
+    /// — those primitives' claimed information-theoretic security properties
+    /// only hold when keys/masks come from a true entropy source.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS entropy source is unavailable (`getrandom` fails).
+    /// This should not happen on any supported platform.
+    pub fn new_secure_random() -> Self {
+        let mut bytes = [0u8; HDC_BYTES];
+        getrandom::getrandom(&mut bytes).expect("OS entropy source unavailable");
         Self(bytes)
     }
 
@@ -383,5 +414,28 @@ mod tests {
         let json = serde_json::to_string(&v).unwrap();
         let recovered: BinaryHV = serde_json::from_str(&json).unwrap();
         assert_eq!(v, recovered);
+    }
+
+    #[test]
+    fn test_secure_random_is_not_deterministic() {
+        let a = BinaryHV::new_secure_random();
+        let b = BinaryHV::new_secure_random();
+        assert_ne!(a, b, "two secure-random draws should not collide");
+        // Should look like an unstructured random vector (~0.5 similarity).
+        let sim = a.similarity(&b);
+        assert!(
+            (sim - 0.5).abs() < 0.05,
+            "secure_random output should be ~0.5 similar to another draw, got {sim}"
+        );
+    }
+
+    #[test]
+    fn test_secure_random_density_is_balanced() {
+        let v = BinaryHV::new_secure_random();
+        let density = v.density();
+        assert!(
+            (density - 0.5).abs() < 0.05,
+            "secure_random bit density should be ~0.5, got {density}"
+        );
     }
 }

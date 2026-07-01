@@ -78,14 +78,19 @@ impl SimulationBackend for OpenFoamBridge {
             .arg(".")
             .arg("-parallel");
 
-        let _output = cmd.execute()?;
+        let output = cmd.execute()?;
 
-        // In a real implementation, we would parse OpenFOAM logs here.
-        Ok(SimulationResult::converged(&request.id, 0.7).with_metric(
-            "drag_coefficient",
-            0.30,
-            "dimensionless",
-        ))
+        // TODO(#solver-output-parsing): CommandSolver::execute now genuinely
+        // spawns OpenFOAM, but this adapter does not yet parse its logs to
+        // determine real convergence/drag metrics. Returning a fabricated
+        // "converged" result would let a caller make a decision against
+        // numbers that were never actually verified.
+        Err(SimulationError::Adapter(format!(
+            "OpenFOAM ran successfully but real-output parsing is not yet \
+             implemented; cannot report convergence/drag metrics without \
+             parsing solver logs. Raw stdout ({} bytes) was discarded.",
+            output.len()
+        )))
     }
 }
 

@@ -8,8 +8,14 @@
 //!
 //! ## Dual-Mode Crypto
 //!
-//! - **With `pairing` feature**: Real Ed25519 signatures via `ed25519-dalek`
-//! - **Without `pairing` feature**: BLAKE3 keyed MAC fallback (symmetric)
+//! - **With `pairing` feature**: Real Ed25519 signatures via `ed25519-dalek`.
+//! - **Without `pairing` feature**: X25519 Diffie-Hellman key agreement
+//!   (`x25519-dalek`) derives a per-peer-pair shared secret, which then keys
+//!   a BLAKE3 MAC over the challenge nonce. The exchanged `pubkey` values are
+//!   genuine Diffie-Hellman public keys -- unlike a naive symmetric fallback,
+//!   an eavesdropper who observes both public keys and the resulting MAC
+//!   cannot derive the shared secret (discrete-log hardness), so they cannot
+//!   forge MACs for other nonces or peers.
 
 use serde::{Deserialize, Serialize};
 use symthaea_spore::config::PairingMode;
@@ -34,7 +40,16 @@ const MAX_PENDING: usize = 16;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PairingOutbound {
     /// Challenge nonce sent to a peer requesting pairing.
-    Challenge { peer_id: u64, nonce: Vec<u8> },
+    ///
+    /// `initiator_pubkey` is the challenger's own public key (Ed25519
+    /// verifying key or X25519 DH public key, depending on build).
+    /// In the non-`pairing` (X25519) build, the responder needs this to
+    /// compute the shared secret used to MAC the nonce.
+    Challenge {
+        peer_id: u64,
+        nonce: Vec<u8>,
+        initiator_pubkey: Vec<u8>,
+    },
     /// Signed response to a received challenge.
     Response {
         peer_id: u64,
@@ -50,8 +65,13 @@ pub enum PairingOutbound {
 /// Inbound pairing messages received from BLE.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PairingInbound {
-    /// Peer requests pairing — contains their nonce for us to sign.
-    Challenge { peer_id: u64, nonce: Vec<u8> },
+    /// Peer requests pairing — contains their nonce for us to sign, and
+    /// their public key (see [`PairingOutbound::Challenge`]).
+    Challenge {
+        peer_id: u64,
+        nonce: Vec<u8>,
+        initiator_pubkey: Vec<u8>,
+    },
     /// Peer's signed response to our challenge.
     Response {
         peer_id: u64,
@@ -123,25 +143,26 @@ impl PairingManager {
     }
 
     /// Generate a new keypair and store the seed.
+    ///
+    /// The seed is drawn from the OS entropy source (`getrandom`), not from
+    /// any predictable state like the cycle counter. A predictable seed
+    /// would let an observer who can estimate device uptime reconstruct the
+    /// signing/DH key and impersonate the device.
     pub fn generate_keypair(&mut self) {
         let mut seed = [0u8; 32];
-        use symthaea_core::hdc::ContinuousHV;
-        // Use random HV to generate entropy without pulling in rand directly
-        let hv = ContinuousHV::random(8, self.cycle);
-        for (i, chunk) in hv.values.chunks(1).enumerate().take(32) {
-            seed[i] = (chunk[0].to_bits() & 0xFF) as u8;
-        }
-        // Mix with cycle count for additional entropy
-        let cycle_bytes = self.cycle.to_le_bytes();
-        for i in 0..8 {
-            seed[i] ^= cycle_bytes[i];
-        }
+        getrandom::getrandom(&mut seed).expect("OS entropy source unavailable");
         self.keypair_seed = Some(seed);
     }
 
     /// Get the public key as bytes (32 bytes).
     ///
     /// Returns `None` if no keypair has been generated.
+    ///
+    /// In the `pairing` (Ed25519) build this is a genuine verifying key. In
+    /// the fallback build this is a genuine X25519 Diffie-Hellman public
+    /// key -- **not** a hash of the secret -- so it is safe to transmit in
+    /// the clear; it never functions as the MAC key itself (see
+    /// [`Self::derive_shared_mac_key`]).
     pub fn get_pubkey(&self) -> Option<[u8; 32]> {
         let seed = self.keypair_seed.as_ref()?;
 
@@ -154,16 +175,35 @@ impl PairingManager {
 
         #[cfg(not(feature = "pairing"))]
         {
-            // BLAKE3 hash of seed as "public key" (symmetric fallback)
-            let hash = blake3::hash(seed);
-            Some(*hash.as_bytes())
+            use x25519_dalek::{PublicKey, StaticSecret};
+            let secret = StaticSecret::from(*seed);
+            Some(PublicKey::from(&secret).to_bytes())
         }
+    }
+
+    /// Derive the shared MAC key for the fallback (non-`pairing`) build via
+    /// X25519 Diffie-Hellman: `DH(my_secret, their_pubkey)`.
+    ///
+    /// By ECDH commutativity, both peers independently compute the same
+    /// 32-byte shared secret from their own private key and the other
+    /// party's public key -- the secret itself is never transmitted, so an
+    /// eavesdropper who observes both public keys and the resulting MAC
+    /// cannot reconstruct it (discrete-log hardness).
+    #[cfg(not(feature = "pairing"))]
+    fn derive_shared_mac_key(&self, their_pubkey: &[u8]) -> Option<[u8; 32]> {
+        use x25519_dalek::{PublicKey, StaticSecret};
+        let seed = self.keypair_seed?;
+        let their_pubkey: [u8; 32] = their_pubkey.try_into().ok()?;
+        let secret = StaticSecret::from(seed);
+        let shared = secret.diffie_hellman(&PublicKey::from(their_pubkey));
+        Some(*shared.as_bytes())
     }
 
     /// Initiate pairing with a remote peer.
     ///
     /// Creates a challenge nonce and queues it for sending.
-    /// Returns `false` if mode is Off, device cap reached, or already pending.
+    /// Returns `false` if mode is Off, no keypair, device cap reached, or
+    /// already pending.
     pub fn initiate_pairing(&mut self, peer_id: u64) -> bool {
         if self.mode == PairingMode::Off {
             return false;
@@ -177,6 +217,10 @@ impl PairingManager {
         if self.pending_challenges.iter().any(|(id, _)| *id == peer_id) {
             return false;
         }
+        let initiator_pubkey = match self.get_pubkey() {
+            Some(pk) => pk.to_vec(),
+            None => return false,
+        };
 
         // Generate nonce
         let nonce = self.generate_nonce();
@@ -189,15 +233,26 @@ impl PairingManager {
             },
         ));
 
-        self.enqueue(PairingOutbound::Challenge { peer_id, nonce });
+        self.enqueue(PairingOutbound::Challenge {
+            peer_id,
+            nonce,
+            initiator_pubkey,
+        });
         true
     }
 
     /// Handle an inbound challenge from a peer.
     ///
-    /// Signs the nonce and queues the response.
-    /// Returns `false` if mode is Off or no keypair.
-    pub fn receive_challenge(&mut self, peer_id: u64, nonce: &[u8]) -> bool {
+    /// Signs (or, in the fallback build, MACs via an X25519-derived shared
+    /// key) the nonce and queues the response.
+    /// Returns `false` if mode is Off, no keypair, or (fallback build only)
+    /// `initiator_pubkey` is not a valid X25519 public key.
+    pub fn receive_challenge(
+        &mut self,
+        peer_id: u64,
+        nonce: &[u8],
+        initiator_pubkey: &[u8],
+    ) -> bool {
         if self.mode == PairingMode::Off {
             return false;
         }
@@ -206,7 +261,10 @@ impl PairingManager {
             None => return false,
         };
 
-        let signature = self.sign_nonce(nonce, &seed);
+        let signature = match self.sign_nonce(nonce, &seed, initiator_pubkey) {
+            Some(sig) => sig,
+            None => return false,
+        };
         let pubkey = match self.get_pubkey() {
             Some(pk) => pk.to_vec(),
             None => return false,
@@ -321,8 +379,12 @@ impl PairingManager {
     /// Process an inbound pairing message.
     pub fn receive_inbound(&mut self, msg: PairingInbound) {
         match msg {
-            PairingInbound::Challenge { peer_id, nonce } => {
-                self.receive_challenge(peer_id, &nonce);
+            PairingInbound::Challenge {
+                peer_id,
+                nonce,
+                initiator_pubkey,
+            } => {
+                self.receive_challenge(peer_id, &nonce, &initiator_pubkey);
             }
             PairingInbound::Response {
                 peer_id,
@@ -384,19 +446,31 @@ impl PairingManager {
     }
 
     #[cfg(feature = "pairing")]
-    fn sign_nonce(&self, nonce: &[u8], seed: &[u8; 32]) -> Vec<u8> {
+    fn sign_nonce(
+        &self,
+        nonce: &[u8],
+        seed: &[u8; 32],
+        _initiator_pubkey: &[u8],
+    ) -> Option<Vec<u8>> {
         use ed25519_dalek::{Signer, SigningKey};
         let sk = SigningKey::from_bytes(seed);
         let sig = sk.sign(nonce);
-        sig.to_bytes().to_vec()
+        Some(sig.to_bytes().to_vec())
     }
 
+    /// MAC the nonce using the X25519-derived shared secret between us and
+    /// `initiator_pubkey`. Returns `None` if `initiator_pubkey` is not a
+    /// well-formed 32-byte public key.
     #[cfg(not(feature = "pairing"))]
-    fn sign_nonce(&self, nonce: &[u8], seed: &[u8; 32]) -> Vec<u8> {
-        // BLAKE3 keyed MAC
-        let key = blake3::hash(seed);
-        let mac = blake3::keyed_hash(key.as_bytes(), nonce);
-        mac.as_bytes().to_vec()
+    fn sign_nonce(
+        &self,
+        nonce: &[u8],
+        _seed: &[u8; 32],
+        initiator_pubkey: &[u8],
+    ) -> Option<Vec<u8>> {
+        let shared = self.derive_shared_mac_key(initiator_pubkey)?;
+        let mac = blake3::keyed_hash(&shared, nonce);
+        Some(mac.as_bytes().to_vec())
     }
 
     #[cfg(feature = "pairing")]
@@ -422,15 +496,20 @@ impl PairingManager {
         vk.verify(nonce, &sig).is_ok()
     }
 
+    /// Verify the responder's MAC by independently deriving the same
+    /// X25519 shared secret (`DH(our_secret, responder_pubkey)`) and
+    /// recomputing the expected MAC -- the shared secret itself is never
+    /// transmitted, so this cannot be forged from `pubkey`/`signature` alone.
     #[cfg(not(feature = "pairing"))]
     fn verify_signature(&self, nonce: &[u8], signature: &[u8], pubkey: &[u8]) -> bool {
         if signature.len() != 32 || pubkey.len() != 32 {
             return false;
         }
-        // Reconstruct MAC from pubkey (which is hash of seed in BLAKE3 mode)
-        // In BLAKE3 fallback, the "pubkey" IS the key material — symmetric.
-        let pk_array: &[u8; 32] = pubkey.try_into().unwrap();
-        let mac = blake3::keyed_hash(pk_array, nonce);
+        let shared = match self.derive_shared_mac_key(pubkey) {
+            Some(s) => s,
+            None => return false,
+        };
+        let mac = blake3::keyed_hash(&shared, nonce);
         // Constant-time comparison
         let mut diff = 0u8;
         for (a, b) in signature.iter().zip(mac.as_bytes().iter()) {
@@ -458,7 +537,7 @@ mod tests {
     fn test_off_mode_ignores_everything() {
         let mut pm = PairingManager::new(PairingMode::Off);
         assert!(!pm.initiate_pairing(42));
-        assert!(!pm.receive_challenge(42, &[1, 2, 3]));
+        assert!(!pm.receive_challenge(42, &[1, 2, 3], &[0u8; 32]));
         assert!(pm.drain_outbound().is_empty());
     }
 
@@ -486,14 +565,18 @@ mod tests {
         let msgs = alice.drain_outbound();
         assert_eq!(msgs.len(), 1);
 
-        // Extract challenge nonce
-        let nonce = match &msgs[0] {
-            PairingOutbound::Challenge { nonce, .. } => nonce.clone(),
+        // Extract challenge nonce + Alice's pubkey
+        let (nonce, alice_pubkey) = match &msgs[0] {
+            PairingOutbound::Challenge {
+                nonce,
+                initiator_pubkey,
+                ..
+            } => (nonce.clone(), initiator_pubkey.clone()),
             other => panic!("Expected Challenge, got {:?}", other),
         };
 
         // Bob receives challenge and responds
-        assert!(bob.receive_challenge(1, &nonce));
+        assert!(bob.receive_challenge(1, &nonce, &alice_pubkey));
         let bob_msgs = bob.drain_outbound();
         assert_eq!(bob_msgs.len(), 1);
 
@@ -616,5 +699,78 @@ mod tests {
 
         assert!(pm.initiate_pairing(42));
         assert!(!pm.initiate_pairing(42)); // duplicate
+    }
+
+    #[test]
+    fn test_generate_keypair_is_not_deterministic() {
+        // Two managers "born" at the same cycle must not derive the same
+        // key material -- a predictable (e.g. cycle-seeded) generator would
+        // let an attacker who estimates uptime reconstruct the key.
+        let mut a = PairingManager::new(PairingMode::Discoverable);
+        let mut b = PairingManager::new(PairingMode::Discoverable);
+        a.tick(0);
+        b.tick(0);
+        a.generate_keypair();
+        b.generate_keypair();
+        assert_ne!(
+            a.get_pubkey(),
+            b.get_pubkey(),
+            "two independently generated keypairs at the same cycle must differ"
+        );
+    }
+
+    #[test]
+    fn test_eavesdropper_cannot_forge_mac_from_public_values() {
+        // Regression test for the pubkey-doubles-as-MAC-key flaw: an
+        // observer who only ever sees the two public keys, the nonce, and
+        // the resulting MAC must not be able to recompute that MAC using
+        // only those public values (i.e. the "pubkey" must not itself be
+        // usable as the keyed-hash key).
+        let mut alice = PairingManager::new(PairingMode::Discoverable);
+        let mut bob = PairingManager::new(PairingMode::Discoverable);
+        alice.generate_keypair();
+        bob.generate_keypair();
+        alice.tick(1);
+        bob.tick(1);
+
+        assert!(alice.initiate_pairing(2));
+        let msgs = alice.drain_outbound();
+        let (nonce, alice_pubkey) = match &msgs[0] {
+            PairingOutbound::Challenge {
+                nonce,
+                initiator_pubkey,
+                ..
+            } => (nonce.clone(), initiator_pubkey.clone()),
+            other => panic!("Expected Challenge, got {:?}", other),
+        };
+
+        assert!(bob.receive_challenge(1, &nonce, &alice_pubkey));
+        let bob_msgs = bob.drain_outbound();
+        let (mac, bob_pubkey) = match &bob_msgs[0] {
+            PairingOutbound::Response {
+                signature, pubkey, ..
+            } => (signature.clone(), pubkey.clone()),
+            other => panic!("Expected Response, got {:?}", other),
+        };
+
+        // An eavesdropper who naively tries "keyed_hash(bob_pubkey, nonce)"
+        // -- the old (broken) scheme, where the transmitted pubkey WAS the
+        // MAC key -- must NOT reproduce the real MAC.
+        let forged = blake3::keyed_hash(bob_pubkey[..32].try_into().unwrap(), &nonce);
+        assert_ne!(
+            forged.as_bytes().to_vec(),
+            mac,
+            "MAC must not be derivable from the transmitted pubkey alone"
+        );
+        // Likewise using alice's transmitted pubkey as a naive MAC key.
+        let forged_alice = blake3::keyed_hash(alice_pubkey[..32].try_into().unwrap(), &nonce);
+        assert_ne!(
+            forged_alice.as_bytes().to_vec(),
+            mac,
+            "MAC must not be derivable from the initiator's transmitted pubkey alone"
+        );
+
+        // But Alice, who holds her own private key, CAN verify it (sanity).
+        assert!(alice.verify_response(2, &mac, &bob_pubkey));
     }
 }

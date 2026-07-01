@@ -19182,6 +19182,7 @@ name = "symthaea-hdc-crypto"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "getrandom 0.2.17",
  "serde",
  "serde_json",
 ]
@@ -19950,6 +19951,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "ed25519-dalek 2.1.0",
+ "getrandom 0.2.17",
  "hex",
  "proptest",
  "serde",
@@ -19965,6 +19967,7 @@ dependencies = [
  "symthaea-vision-manifold",
  "tracing",
  "tracing-subscriber",
+ "x25519-dalek",
 ]
 
 [[package]]

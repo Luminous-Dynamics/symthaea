@@ -80,7 +80,18 @@ impl<P: InputPin> GpioEstop<P> {
 
     /// Poll the GPIO pin and update the e-stop flag.
     ///
-    /// Returns `true` if e-stop is now active.
+    /// Returns `true` if *this poll* observed the physical button pressed
+    /// (or a pin read error).
+    ///
+    /// Only ever *sets* the shared e-stop flag on this poller's own
+    /// trigger condition -- it never clears it. The flag is shared with
+    /// [`SafetyInterlock`](crate::SafetyInterlock), which may also set it
+    /// via `trigger_estop()` from an unrelated source (e.g. a software or
+    /// remote e-stop); if `poll()` cleared the flag whenever the physical
+    /// button merely isn't being held down, it would silently undo any
+    /// e-stop triggered by that other source on the very next poll.
+    /// Clearing an e-stop (physical or otherwise) is the deliberate
+    /// responsibility of [`SafetyInterlock::release_estop`](crate::SafetyInterlock::release_estop).
     pub fn poll(&mut self) -> bool {
         let triggered = match self.pin.is_low() {
             Ok(low) => {
@@ -97,7 +108,9 @@ impl<P: InputPin> GpioEstop<P> {
             }
         };
 
-        *self.estop.lock() = triggered;
+        if triggered {
+            *self.estop.lock() = true;
+        }
         triggered
     }
 
@@ -168,5 +181,54 @@ mod tests {
 
         gpio.poll();
         assert!(interlock.is_estopped());
+    }
+
+    #[test]
+    fn test_gpio_estop_poll_does_not_clear_software_triggered_estop() {
+        // Regression test: a software/remote e-stop (trigger_estop()) must
+        // survive a poll() where the physical button simply isn't pressed --
+        // poll() must never clear an e-stop it didn't itself trigger.
+        let interlock = crate::SafetyInterlock::new();
+        let handle = interlock.estop_handle();
+
+        interlock.trigger_estop();
+        assert!(interlock.is_estopped());
+
+        let pin = MockInputPin::new(false); // NOT pressed
+        let mut gpio = GpioEstop::new(pin, handle);
+
+        let triggered = gpio.poll();
+        assert!(
+            !triggered,
+            "this poll's own reading should be 'not pressed'"
+        );
+        assert!(
+            interlock.is_estopped(),
+            "poll() must not silently clear an e-stop triggered by another source"
+        );
+    }
+
+    #[test]
+    fn test_gpio_estop_release_still_works_after_button_released() {
+        // The physical button being released does NOT auto-clear the estop;
+        // release_estop() is what actually clears it.
+        let estop = Arc::new(Mutex::new(false));
+        let pin = MockInputPin::new(true); // pressed
+        let mut gpio = GpioEstop::new(pin, Arc::clone(&estop));
+        gpio.poll();
+        assert!(gpio.is_triggered());
+
+        // Physical button released -- flag should remain set.
+        gpio.pin = MockInputPin::new(false);
+        let triggered = gpio.poll();
+        assert!(!triggered);
+        assert!(
+            gpio.is_triggered(),
+            "flag must stay latched until explicitly released"
+        );
+
+        // Explicit release.
+        *estop.lock() = false;
+        assert!(!gpio.is_triggered());
     }
 }

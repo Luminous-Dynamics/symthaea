@@ -28,7 +28,22 @@ impl SelfOptimizationEngine {
     }
 
     /// Mutate a specific core file and run benchmarks to see if it improved.
+    ///
+    /// # Safety boundary
+    ///
+    /// This mutates a file on disk and then *compiles and runs it*
+    /// (`cargo check`/`cargo run --bin broca-eval`), which is arbitrary
+    /// code execution with this process's privileges. The only content
+    /// gate is [`compute_moral_safety`] -- a regex blocklist over literal
+    /// source-text patterns, which is a coarse pre-filter, **not a
+    /// security boundary** (it does not catch semantically-equivalent
+    /// alternate APIs). The one guarantee this function does enforce is
+    /// that `file_path` must resolve inside [`Self::project_root`]: an
+    /// absolute path or `..` traversal outside the project tree is
+    /// rejected before any read, mutation, or compilation happens.
     pub fn evolve_file(&self, file_path: &Path) -> anyhow::Result<EvolutionResult> {
+        self.require_path_within_project_root(file_path)?;
+
         let source = std::fs::read_to_string(file_path)?;
         let mut rng = rand::thread_rng();
 
@@ -81,6 +96,32 @@ impl SelfOptimizationEngine {
             std::fs::write(file_path, &source)?;
             anyhow::bail!("Evolution rejected: mutation did not improve score");
         }
+    }
+
+    /// Reject any `path` that does not canonicalize to somewhere inside
+    /// `self.project_root` -- blocks absolute paths, `..` traversal, and
+    /// symlink escapes from mutating/compiling/executing files outside the
+    /// project's own source tree.
+    fn require_path_within_project_root(&self, path: &Path) -> anyhow::Result<()> {
+        let canonical_root = self.project_root.canonicalize().map_err(|e| {
+            anyhow::anyhow!(
+                "failed to canonicalize project_root {:?}: {e}",
+                self.project_root
+            )
+        })?;
+        let canonical_path = path
+            .canonicalize()
+            .map_err(|e| anyhow::anyhow!("failed to canonicalize {path:?}: {e}"))?;
+
+        if !canonical_path.starts_with(&canonical_root) {
+            anyhow::bail!(
+                "Evolution rejected: {file:?} resolves outside project_root {root:?} \
+                 (self-modification is confined to the project's own source tree)",
+                file = canonical_path,
+                root = canonical_root,
+            );
+        }
+        Ok(())
     }
 
     fn run_baseline_benchmark(&self) -> anyhow::Result<f32> {
@@ -142,5 +183,110 @@ impl SelfOptimizationEngine {
             .status()
             .map(|s| s.success())
             .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_inside_project_root_is_accepted() {
+        let dir =
+            std::env::temp_dir().join(format!("symthaea-selfopt-test-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        let file = dir.join("src").join("lib.rs");
+        std::fs::write(&file, "// test file").unwrap();
+
+        let engine = SelfOptimizationEngine::new(dir.clone());
+        assert!(engine.require_path_within_project_root(&file).is_ok());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn path_outside_project_root_is_rejected() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-selfopt-test-inside-{}",
+            std::process::id()
+        ));
+        let outside = std::env::temp_dir().join(format!(
+            "symthaea-selfopt-test-outside-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let outside_file = outside.join("passwd_or_whatever.rs");
+        std::fs::write(&outside_file, "// not part of the project").unwrap();
+
+        let engine = SelfOptimizationEngine::new(dir.clone());
+        let err = engine
+            .require_path_within_project_root(&outside_file)
+            .unwrap_err();
+        assert!(err.to_string().contains("outside project_root"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn traversal_escaping_project_root_via_dotdot_is_rejected() {
+        let base = std::env::temp_dir().join(format!(
+            "symthaea-selfopt-test-traversal-{}",
+            std::process::id()
+        ));
+        let project_root = base.join("project");
+        let sibling = base.join("sibling");
+        std::fs::create_dir_all(project_root.join("src")).unwrap();
+        std::fs::create_dir_all(&sibling).unwrap();
+        let sibling_file = sibling.join("target.rs");
+        std::fs::write(&sibling_file, "// outside the project").unwrap();
+
+        // A path that stays textually "inside" project_root/src but walks
+        // back out to the sibling directory via `..`.
+        let traversal_path = project_root
+            .join("src")
+            .join("..")
+            .join("..")
+            .join("sibling")
+            .join("target.rs");
+
+        let engine = SelfOptimizationEngine::new(project_root.clone());
+        let err = engine
+            .require_path_within_project_root(&traversal_path)
+            .unwrap_err();
+        assert!(err.to_string().contains("outside project_root"));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn evolve_file_rejects_before_touching_disk_for_outside_path() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-selfopt-test-evolve-{}",
+            std::process::id()
+        ));
+        let outside = std::env::temp_dir().join(format!(
+            "symthaea-selfopt-test-evolve-outside-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let outside_file = outside.join("target.rs");
+        std::fs::write(&outside_file, "const X: f32 = 1.0;\n").unwrap();
+        let original_contents = std::fs::read_to_string(&outside_file).unwrap();
+
+        let engine = SelfOptimizationEngine::new(dir.clone());
+        let result = engine.evolve_file(&outside_file);
+        assert!(result.is_err());
+        // The file must be completely untouched -- rejection happens before
+        // any mutation, benchmark, or build step runs.
+        assert_eq!(
+            std::fs::read_to_string(&outside_file).unwrap(),
+            original_contents
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
     }
 }

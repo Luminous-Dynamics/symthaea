@@ -54,7 +54,11 @@ pub mod holon_bridge;
 pub mod metabolism;
 pub mod sensor_bridge;
 
-#[cfg(feature = "pairing")]
+// Always compiled: pairing.rs internally selects real Ed25519 signatures
+// (`pairing` feature) vs. an X25519-DH-backed fallback (feature off) --
+// gating the whole module on `pairing` would make the documented fallback
+// path permanently dead code and leave non-`pairing` builds with no device
+// pairing at all.
 pub mod pairing;
 
 // Screen embodiment (Phase 3)

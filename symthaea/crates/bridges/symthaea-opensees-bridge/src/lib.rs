@@ -72,13 +72,21 @@ impl SimulationBackend for OpenSeesBridge {
         // Real path: execute command
         let cmd = CommandSolver::new(&self.solver_cmd).arg("model.tcl");
 
-        let _output = cmd.execute()?;
+        let output = cmd.execute()?;
 
-        Ok(SimulationResult::converged(&request.id, 0.85).with_metric(
-            "max_drift_ratio",
-            0.010,
-            "ratio",
-        ))
+        // TODO(#solver-output-parsing): CommandSolver::execute now genuinely
+        // spawns OpenSees, but this adapter does not yet parse its output
+        // (typically Tcl-scripted recorder files, not stdout) to determine
+        // real convergence/drift metrics. Returning a fabricated "converged"
+        // result here would be worse than an honest error -- a caller making
+        // a safety decision (e.g. drift-ratio check) must not receive
+        // numbers that were never actually verified against solver output.
+        Err(SimulationError::Adapter(format!(
+            "OpenSees ran successfully but real-output parsing is not yet \
+             implemented; cannot report convergence/drift metrics without \
+             parsing recorder output. Raw stdout ({} bytes) was discarded.",
+            output.len()
+        )))
     }
 }
 

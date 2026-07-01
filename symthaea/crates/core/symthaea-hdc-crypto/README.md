@@ -6,9 +6,9 @@ Traditional FHE (fully homomorphic encryption) schemes based on lattice problems
 
 ## Security Model
 
-- **Perfect secrecy** (Shannon 1949): One-time pad encryption with D = 16,384 bit masks. Ciphertext is statistically independent of plaintext.
+- **Perfect secrecy** (Shannon 1949): One-time pad encryption with D = 16,384 bit masks -- **only when masks are generated with `BinaryHV::new_secure_random()`** (OS entropy). Masks generated with `BinaryHV::new_random(seed)` are a deterministic, brute-forceable function of `seed` and provide no real secrecy; that constructor exists for reproducible tests and non-security HDC encoding only.
 - **Zero collision probability**: XOR binding is a bijection -- distinct inputs always yield distinct MACs.
-- **Information-theoretic threshold sharing**: (k,n) secret splitting where fewer than k shares reveal zero bits about the secret.
+- **Information-theoretic threshold sharing**: (k,n) secret splitting where fewer than k shares reveal zero bits about the secret, when using `HdcThresholdSharing::split_secure`.
 - **Noise-tolerant verification**: HDC-MAC supports lossy channels (LoRa, BLE) with configurable similarity thresholds and false-positive rate ~ 2^{-4700}.
 
 ## Quick Example
@@ -16,14 +16,16 @@ Traditional FHE (fully homomorphic encryption) schemes based on lattice problems
 ```rust
 use symthaea_hdc_crypto::{BinaryHV, EncryptedHV, HdcMac, HdcThresholdSharing};
 
-// Encrypt
+// Plaintext data can be deterministic; keys/masks must NOT be.
 let plaintext = BinaryHV::new_random(42);
-let mask = BinaryHV::new_random(99);
+let other = BinaryHV::new_random(7);
+
+// Encrypt -- masks come from the OS entropy source, never from a seed.
+let mask = BinaryHV::new_secure_random();
 let encrypted = EncryptedHV::encrypt(&plaintext, &mask);
 
 // Homomorphic bind (works on encrypted data!)
-let other = BinaryHV::new_random(7);
-let other_mask = BinaryHV::new_random(88);
+let other_mask = BinaryHV::new_secure_random();
 let enc_other = EncryptedHV::encrypt(&other, &other_mask);
 let enc_bound = encrypted.hom_bind(&enc_other);
 
@@ -32,13 +34,13 @@ let combined_mask = mask.bind(&other_mask);
 let result = enc_bound.decrypt(&combined_mask);
 assert_eq!(result, plaintext.bind(&other));
 
-// Authenticate
-let key = BinaryHV::new_random(55);
+// Authenticate -- MAC key must also come from a secure source.
+let key = BinaryHV::new_secure_random();
 let mac = HdcMac::compute(&plaintext, &key);
 assert!(HdcMac::verify(&plaintext, &key, &mac));
 
-// Threshold secret sharing (3-of-5)
-let shares = HdcThresholdSharing::split(&plaintext, 3, 5, 1000);
+// Threshold secret sharing (3-of-5), secure entropy source for masks.
+let shares = HdcThresholdSharing::split_secure(&plaintext, 3, 5);
 let recovered = HdcThresholdSharing::recover(&shares[..3]);
 assert_eq!(recovered, plaintext);
 ```
@@ -49,7 +51,8 @@ assert_eq!(recovered, plaintext);
 
 | Method | Description |
 |--------|-------------|
-| `new_random(seed)` | Deterministic random vector (BLAKE3 XOF) |
+| `new_random(seed)` | Deterministic random vector (BLAKE3 XOF). **Not secure** -- tests/encoding only, never for keys or masks. |
+| `new_secure_random()` | Cryptographically secure random vector (OS entropy via `getrandom`). Use for all keys/masks. |
 | `zero()` | All-zero vector |
 | `bind(&other)` | XOR binding (commutative, self-inverse) |
 | `bundle(&[vectors])` | Majority-vote bundling |
@@ -87,7 +90,8 @@ assert_eq!(recovered, plaintext);
 
 | Method | Description |
 |--------|-------------|
-| `split(secret, k, n, seed)` | Split into n shares requiring k |
+| `split(secret, k, n, seed)` | Split into n shares requiring k. **Not secure** -- deterministic masks, tests only. |
+| `split_secure(secret, k, n)` | Split into n shares requiring k, using OS-entropy masks. Use this in real use cases. |
 | `recover(&shares)` | Reconstruct from k+ shares |
 | `recovery_quality(&shares)` | Check reconstruction fidelity |
 

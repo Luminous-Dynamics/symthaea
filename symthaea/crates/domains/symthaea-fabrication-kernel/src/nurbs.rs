@@ -111,11 +111,19 @@ impl NurbsCurve {
         let p = self.degree as usize;
         let last = n; // n = number of control points, last valid span index
 
+        // Malformed/short knot vector (e.g. parsed from an untrusted CAD
+        // file with a truncated knot group) -- there's no valid span to
+        // report; return a safe in-bounds default rather than indexing out
+        // of range below.
+        if self.knots.len() <= last {
+            return last.saturating_sub(1);
+        }
+
         // Clamp to domain
         if t >= self.knots[last] {
             return last - 1;
         }
-        if t <= self.knots[p] {
+        if p < self.knots.len() && t <= self.knots[p] {
             return p;
         }
 
@@ -164,13 +172,20 @@ impl NurbsCurve {
         if num_points == 0 || self.control_points.is_empty() {
             return Vec::new();
         }
+
+        // Same defensive `.get()`/fallback pattern as `NurbsSurface::tessellate`
+        // -- a malformed/short knot vector (e.g. from an untrusted CAD file)
+        // must not panic here.
+        let t_start = self.knots.get(self.degree as usize).copied().unwrap_or(0.0);
+        let t_end = self
+            .knots
+            .get(self.control_points.len())
+            .copied()
+            .unwrap_or_else(|| self.knots.last().copied().unwrap_or(1.0));
+
         if num_points == 1 {
-            let t_start = self.knots[self.degree as usize];
             return vec![self.evaluate(t_start)];
         }
-
-        let t_start = self.knots[self.degree as usize];
-        let t_end = self.knots[self.control_points.len()];
 
         (0..num_points)
             .map(|i| {
@@ -567,5 +582,46 @@ mod tests {
                 p[0]
             );
         }
+    }
+
+    /// Regression test: a curve with non-empty control points but an empty
+    /// knot vector (e.g. `step_import.rs` parsing a STEP file with a
+    /// truncated/malformed knot group via
+    /// `knots: knots.last().cloned().unwrap_or_default()`) must not panic
+    /// when tessellated or when `find_knot_span` is queried.
+    #[test]
+    fn tessellate_with_empty_knots_does_not_panic() {
+        let curve = NurbsCurve {
+            degree: 3,
+            control_points: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+            weights: vec![1.0, 1.0, 1.0],
+            knots: vec![],
+        };
+        let pts = curve.tessellate(5);
+        assert_eq!(pts.len(), 5);
+        let span = curve.find_knot_span(0.5);
+        assert!(span < curve.control_points.len());
+    }
+
+    /// Same as above, but with a knot vector that's non-empty yet shorter
+    /// than `control_points.len()` (a partially-truncated parse, rather
+    /// than a fully empty one).
+    #[test]
+    fn tessellate_with_short_knots_does_not_panic() {
+        let curve = NurbsCurve {
+            degree: 2,
+            control_points: vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [3.0, 0.0, 0.0],
+            ],
+            weights: vec![1.0; 4],
+            knots: vec![0.0, 0.0, 0.0], // too short for 4 control points
+        };
+        let pts = curve.tessellate(5);
+        assert_eq!(pts.len(), 5);
+        let span = curve.find_knot_span(0.5);
+        assert!(span < curve.control_points.len());
     }
 }

@@ -70,7 +70,12 @@ impl BinaryHV {
 
     /// Create random hypervector from seed (deterministic!)
     ///
-    /// Uses BLAKE3 hash for cryptographic randomness
+    /// Uses a BLAKE3 XOF keyed by `seed` -- this is a deterministic pseudo-random
+    /// generator, **not a cryptographically secure one**: anyone who knows or
+    /// guesses `seed` recomputes the exact same vector. Suitable for
+    /// reproducible HDC encoding (concept vectors, basis vectors, test data),
+    /// but **never for cryptographic keys or masks** (HDC-MAC keys, one-time-pad
+    /// masks, secret-sharing masks) -- use [`Self::secure_random`] for those.
     ///
     /// # Example
     /// ```
@@ -89,6 +94,23 @@ impl BinaryHV {
         let mut xof = hasher.finalize_xof();
         xof.fill(&mut result);
 
+        Self(result)
+    }
+
+    /// Create a cryptographically secure random hypervector.
+    ///
+    /// Fills all 2048 bytes from the OS entropy source (`rand::rngs::OsRng`).
+    /// Unlike [`Self::random`], the result is unpredictable and cannot be
+    /// recomputed from a known input. **Use this to generate any HDC-MAC
+    /// key, one-time-pad mask, or secret-sharing mask** -- those primitives'
+    /// claimed information-theoretic security only holds when keys/masks
+    /// come from a true entropy source, not a deterministic seed.
+    pub fn secure_random() -> Self {
+        use rand::RngCore;
+        use rand::rngs::OsRng;
+
+        let mut result = [0u8; 2048];
+        OsRng.fill_bytes(&mut result);
         Self(result)
     }
 

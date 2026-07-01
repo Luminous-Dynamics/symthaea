@@ -179,8 +179,24 @@ impl SafetyInterlock {
             1.0
         };
 
+        // This interlock's per-joint limits (`self.config.max_torque`) are a
+        // fixed-size [f32; NUM_ACTUATORS] array, so it has no defined safety
+        // bound for any actuator beyond NUM_ACTUATORS. A command built for a
+        // larger morphology (Dexterous53/FullSpine) must be refused rather
+        // than silently clamping only the first NUM_ACTUATORS and passing
+        // the rest through unbounded.
+        if command.torques.len() > NUM_ACTUATORS {
+            self.trip("command has more actuators than this interlock's torque limits cover");
+            return Err(HalError::Safety(format!(
+                "command has {} torques but this interlock only has safety limits for {} \
+                 actuators (morphology mismatch) -- refusing to pass unclamped torques through",
+                command.torques.len(),
+                NUM_ACTUATORS,
+            )));
+        }
+
         let mut safe = command.clone();
-        for i in 0..NUM_ACTUATORS {
+        for i in 0..NUM_ACTUATORS.min(safe.torques.len()) {
             safe.torques[i] =
                 safe.torques[i].clamp(-self.config.max_torque[i], self.config.max_torque[i]);
             safe.torques[i] *= gain;

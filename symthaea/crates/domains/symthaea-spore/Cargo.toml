@@ -26,6 +26,12 @@ serde_json = { workspace = true }
 bincode = { workspace = true }
 rmp-serde = { workspace = true }
 blake3 = { workspace = true }
+# OS-entropy source for secure_boot.rs's MOK enrollment password, used on
+# every target (native and wasm32 via the "js" feature). Reuses the same
+# aliased name as the wasm32-only getrandom02 below since Cargo forbids
+# depending on the same crate under two different names in one manifest,
+# even across mutually-exclusive target cfgs.
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 # WASM bindings (optional — rlib builds skip this)
 wasm-bindgen = { version = "=0.2.108", optional = true }
@@ -45,11 +51,10 @@ tower-http = { version = "0.5", features = ["cors"], optional = true }
 futures-util = { version = "0.3", optional = true }
 
 # WASM support — getrandom needs "js"/"wasm_js" and uuid needs "rng-getrandom" on wasm32
-# getrandom 0.2 (used by rand 0.8/symthaea-core) uses feature "js"
+# getrandom 0.2 (used by rand 0.8/symthaea-core, and getrandom02 above) uses feature "js"
 # getrandom 0.3 (used by rand_core/quinn-proto/tokenizers) uses feature "wasm_js"
 # getrandom 0.4 (used by uuid via rand 0.10) uses feature "wasm_js"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 uuid = { version = "1.6", features = ["rng-getrandom"] }

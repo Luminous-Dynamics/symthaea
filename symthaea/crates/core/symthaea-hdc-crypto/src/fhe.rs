@@ -15,13 +15,18 @@
 //!
 //! [`EncryptedHV`] uses a one-time pad (XOR with random mask):
 //! - **Perfect secrecy** (Shannon 1949): ciphertext reveals zero information
-//!   about the plaintext when the mask is truly random and used only once.
+//!   about the plaintext **only when the mask comes from a true entropy
+//!   source and is used exactly once**. Generate masks with
+//!   [`crate::binary_hv::BinaryHV::new_secure_random`] -- a mask derived from
+//!   [`crate::binary_hv::BinaryHV::new_random`] (a deterministic function of
+//!   a `u64` seed) provides no real secrecy, since the seed can be guessed
+//!   or brute-forced.
 //! - **Key size**: D = 16,384 bits (mask is same size as message).
 //! - **Homomorphic property**: XOR binding distributes over XOR encryption.
 //!
 //! ## Limitations
 //!
-//! - Masks must never be reused (OTP constraint).
+//! - Masks must come from a genuine entropy source and must never be reused (OTP constraint).
 //! - Majority-vote bundling on encrypted vectors is approximate, not exact.
 //! - This is NOT a general-purpose FHE scheme (supports only HDC algebra).
 //!
@@ -44,7 +49,10 @@ use crate::crypto::HdcThresholdSharing;
 ///
 /// Perfect secrecy (Shannon 1949): when the mask is uniformly random over
 /// {0,1}^D and used only once, the ciphertext is statistically independent
-/// of the plaintext.
+/// of the plaintext. **This requires the mask to be generated with
+/// [`crate::binary_hv::BinaryHV::new_secure_random`]** (or another CSPRNG) --
+/// a mask from [`crate::binary_hv::BinaryHV::new_random(seed)`] is
+/// deterministic and does not provide this guarantee.
 ///
 /// # Homomorphic Properties
 ///
@@ -61,7 +69,11 @@ impl EncryptedHV {
     /// Encrypt a BinaryHV with a random mask (one-time pad).
     ///
     /// The mask must be retained by the encryptor for later decryption.
-    /// **Never reuse a mask** -- OTP security requires fresh masks.
+    /// **Never reuse a mask** -- OTP security requires fresh masks. **The
+    /// mask must come from [`crate::binary_hv::BinaryHV::new_secure_random`]**
+    /// (or another CSPRNG) -- passing a mask derived from
+    /// `BinaryHV::new_random(seed)` reduces security to the guessability of
+    /// `seed`, not information-theoretic secrecy.
     #[inline]
     pub fn encrypt(plaintext: &BinaryHV, mask: &BinaryHV) -> Self {
         Self {

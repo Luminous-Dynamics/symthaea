@@ -72,8 +72,9 @@ pub struct SomaEngine {
     pub(crate) ble_mesh: BleMesh,
     /// Desktop ↔ phone sync bridge.
     pub(crate) holon_bridge: HolonBridge,
-    /// Ed25519 device pairing.
-    #[cfg(feature = "pairing")]
+    /// Device pairing (Ed25519 when the `pairing` feature is enabled,
+    /// X25519-DH-backed fallback otherwise -- always compiled, see
+    /// `pairing` module docs).
     pub(crate) pairing: crate::pairing::PairingManager,
     /// Sharing configuration.
     sharing: SharingConfig,
@@ -127,7 +128,6 @@ impl SomaEngine {
             metabolism: Metabolism::new(),
             ble_mesh: BleMesh::new(sharing.ble_mode),
             holon_bridge: HolonBridge::new(sharing.holon_mode),
-            #[cfg(feature = "pairing")]
             pairing: crate::pairing::PairingManager::new(sharing.pairing_mode),
             sharing,
             #[cfg(feature = "screen-vision")]
@@ -247,7 +247,6 @@ impl SomaEngine {
         self.ble_mesh.tick(cycle_count);
 
         // Pairing tick + drain → holon bridge
-        #[cfg(feature = "pairing")]
         {
             self.pairing.tick(cycle_count);
             for msg in self.pairing.drain_outbound() {
@@ -407,7 +406,6 @@ impl SomaEngine {
         self.holon_bridge.set_mode(config.holon_mode);
         self.ble_mesh.set_mode(config.ble_mode);
         self.haptic.set_enabled(config.haptic_enabled);
-        #[cfg(feature = "pairing")]
         self.pairing.set_mode(config.pairing_mode);
     }
 

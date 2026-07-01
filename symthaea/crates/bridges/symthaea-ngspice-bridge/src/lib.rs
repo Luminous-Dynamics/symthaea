@@ -74,9 +74,19 @@ impl SimulationBackend for NgspiceBridge {
             .arg("-b") // Batch mode
             .arg("input.sp");
 
-        let _output = cmd.execute()?;
+        let output = cmd.execute()?;
 
-        Ok(SimulationResult::converged(&request.id, 0.8).with_metric("peak_voltage", 12.0, "V"))
+        // TODO(#solver-output-parsing): CommandSolver::execute now genuinely
+        // spawns ngspice, but this adapter does not yet parse its rawfile/
+        // stdout output to determine real convergence/voltage metrics.
+        // Returning a fabricated "converged" result would let a caller make
+        // a decision against numbers that were never actually verified.
+        Err(SimulationError::Adapter(format!(
+            "ngspice ran successfully but real-output parsing is not yet \
+             implemented; cannot report convergence/voltage metrics without \
+             parsing rawfile output. Raw stdout ({} bytes) was discarded.",
+            output.len()
+        )))
     }
 }
 

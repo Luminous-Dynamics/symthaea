@@ -517,11 +517,34 @@ impl CommandSolver {
         self
     }
 
-    /// Execute the solver and capture output (mocked for now).
+    /// Execute the solver, spawning `cmd` with `args`/`env`, and return its
+    /// captured stdout.
+    ///
+    /// Returns `SimulationError::Adapter` if the process cannot be spawned
+    /// (e.g. the solver binary is not installed) or exits with a non-zero
+    /// status. Callers must not assume a successful exit means the solver's
+    /// results are convergent -- that determination requires parsing the
+    /// returned stdout, which is solver-specific and is the caller's
+    /// responsibility.
     pub fn execute(&self) -> Result<String, SimulationError> {
-        // In a real implementation, use std::process::Command.
-        // For now, return a placeholder that the adapter can parse.
-        Ok("CONVERGED: true\nMETRIC: result=42.0\n".to_string())
+        let output = std::process::Command::new(&self.cmd)
+            .args(&self.args)
+            .envs(&self.env)
+            .output()
+            .map_err(|e| {
+                SimulationError::Adapter(format!("failed to spawn '{}': {e}", self.cmd))
+            })?;
+
+        if !output.status.success() {
+            return Err(SimulationError::Adapter(format!(
+                "'{}' exited with {}: {}",
+                self.cmd,
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 }
 
@@ -734,5 +757,30 @@ mod tests {
 
         assert_eq!(request.stages.len(), 2);
         assert_eq!(request.coupling, CouplingMode::Iterative);
+    }
+
+    #[test]
+    fn command_solver_actually_spawns_and_captures_stdout() {
+        let solver = CommandSolver::new("echo").arg("hello-from-solver");
+        let output = solver.execute().expect("echo should always succeed");
+        assert!(
+            output.contains("hello-from-solver"),
+            "expected real echo output, got: {output:?}"
+        );
+    }
+
+    #[test]
+    fn command_solver_errors_on_missing_binary() {
+        let solver = CommandSolver::new("symthaea-nonexistent-solver-binary-xyz");
+        let err = solver.execute().unwrap_err();
+        assert!(matches!(err, SimulationError::Adapter(_)));
+    }
+
+    #[test]
+    fn command_solver_errors_on_nonzero_exit() {
+        // `false` is a standard POSIX utility that always exits non-zero.
+        let solver = CommandSolver::new("false");
+        let err = solver.execute().unwrap_err();
+        assert!(matches!(err, SimulationError::Adapter(_)));
     }
 }

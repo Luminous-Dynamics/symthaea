@@ -91,14 +91,20 @@ impl SimulationBackend for MuJoCoBridge {
         // 2. Real path: execute command with model specification parameters
         let cmd = CommandSolver::new(&self.solver_cmd).arg(&xml_path);
 
-        // Execute (ignoring output for now, as we're focusing on the bridge structure)
-        let _output = cmd.execute()?;
+        let output = cmd.execute()?;
 
-        Ok(SimulationResult::converged(&request.id, 0.98).with_metric(
-            "trajectory_feasibility",
-            0.985,
-            "ratio",
-        ))
+        // TODO(#solver-output-parsing): CommandSolver::execute now genuinely
+        // spawns MuJoCo, but this adapter does not yet parse its output to
+        // determine real trajectory-feasibility/contact metrics. Returning a
+        // fabricated "converged" result would let a caller make a decision
+        // against numbers that were never actually verified.
+        Err(SimulationError::Adapter(format!(
+            "MuJoCo ran successfully on {xml_path} but real-output parsing \
+             is not yet implemented; cannot report trajectory-feasibility \
+             metrics without parsing simulator output. Raw stdout ({} bytes) \
+             was discarded.",
+            output.len()
+        )))
     }
 }
 
