@@ -130,6 +130,12 @@ RSYNC_EXCLUDE=(
     --exclude='node_modules/'
     --exclude='.next/'
     --exclude='dist/'
+    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
+    # that was never part of git, so it can't build from a fresh clone.
+    # Excluding it from Cargo.toml's `exclude = [...]` list alone isn't
+    # sufficient -- `default-members`'s `crates/core/*` glob still picks it
+    # up -- so skip syncing the directory entirely instead.
+    --exclude='crates/core/hdc-zkp-bench/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -146,6 +152,11 @@ SOURCE_DIRS=(
     tests
     examples
     benches
+    xtask
+    # Vendored cudarc CUDA 12.9 patch -- referenced by an unconditional
+    # [patch.crates-io] entry in Cargo.toml, so cargo needs to resolve it
+    # even when GPU features aren't active.
+    vendor
 )
 
 # Directories that contain supporting files needed by CI or the project
@@ -186,6 +197,36 @@ sync_dir() {
 info "=== Syncing source directories ==="
 for dir in "${SOURCE_DIRS[@]}"; do
     sync_dir "$dir"
+done
+
+echo
+info "=== Syncing referenced patches/ subdirectories ==="
+# patches/ is ~373MB total (mostly .git history from vendored forks) but
+# only these six subdirectories are actually referenced by Cargo.toml's
+# [patch.crates-io] section (patches/cudarc-0.13.9 and
+# patches/ed25519-dalek-3.0.0-pre.1 are unreferenced/stale). Sync just the
+# referenced crate sources, never the .git directories, to avoid bloating
+# the standalone repo ~100x for no reason.
+PATCH_SUBDIRS=(
+    "ed25519-dalek/curve25519-dalek"
+    "ed25519-dalek/curve25519-dalek-derive"
+    "ed25519-dalek/ed25519-dalek"
+    "iroh/iroh"
+    "iroh/iroh-base"
+    "iroh/iroh-relay"
+)
+for subdir in "${PATCH_SUBDIRS[@]}"; do
+    if [ ! -d "${SYMTHAEA_DIR}/patches/${subdir}" ]; then
+        warn "Skipping patches/${subdir}/ (not found in monorepo)"
+        continue
+    fi
+    info "Syncing patches/${subdir}/"
+    if ! $DRY_RUN; then
+        mkdir -p "$(dirname "${STANDALONE_REPO}/patches/${subdir}")"
+        rsync "${RSYNC_OPTS[@]}" --exclude='.git/' \
+            "${SYMTHAEA_DIR}/patches/${subdir}/" \
+            "${STANDALONE_REPO}/patches/${subdir}/"
+    fi
 done
 
 echo
@@ -284,6 +325,47 @@ if ! $DRY_RUN; then
 
     sed -i 's|^\(mycelix-crypto\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-crypto"|' \
         "${STANDALONE_REPO}/Cargo.toml"
+
+    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
+    # that was never part of git (local-only dev setup, not synced by this
+    # script), so it cannot build from a fresh standalone clone. This is a
+    # standalone-only exclusion -- the crate remains a normal workspace
+    # member in the monorepo, where some dev environments do have
+    # .deps/binius64 set up.
+    sed -i '/^\s*"crates\/domains\/symthaea-lab",/a\    "crates/core/hdc-zkp-bench",' \
+        "${STANDALONE_REPO}/Cargo.toml"
+
+    # mycelix-zkp-core and symtropy-robotics-bridge-core are inherited via
+    # `{ workspace = true, ... }` in [dependencies], but the monorepo's own
+    # [workspace.dependencies] entries for them point at private sibling
+    # directories (../mycelix-workspace, ../symtropy) that don't exist in
+    # the standalone repo. Add real standalone-owned entries right after the
+    # [workspace.dependencies] header so `workspace = true` inheritance
+    # resolves. The actual stub crates (real, self-contained ports of the
+    # subset symthaea uses -- not fakes) live in stubs/mycelix-zkp-core/ and
+    # stubs/symtropy-robotics-bridge-core/, maintained in the standalone
+    # repo itself (see stubs/ note above).
+    sed -i '/^\[workspace\.dependencies\]/a mycelix-zkp-core = { path = "stubs/mycelix-zkp-core" }\nsymtropy-robotics-bridge-core = { path = "stubs/symtropy-robotics-bridge-core" }' \
+        "${STANDALONE_REPO}/Cargo.toml"
+
+    # Sub-crates that depend on symtropy-robotics-bridge-core directly via
+    # a private path (rather than `workspace = true`) need the same
+    # workspace-inherited stub substitution.
+    find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
+        sed -i 's|^symtropy-robotics-bridge-core\s*=\s*{\s*path\s*=\s*"[^"]*"\s*}|symtropy-robotics-bridge-core = { workspace = true }|' {} \;
+
+    # symtropy-math / symtropy-physics / symtropy-consciousness-physics are
+    # published on crates.io (see CLAUDE.md's published-crates table), so
+    # sub-crates that depend on them via a private ../../../../symtropy/...
+    # path can just use the published version instead of being stripped.
+    # Handle both `dep = { path = "..." }` (inline) and
+    # `[dependencies.dep]\npath = "..."` (table) forms.
+    for symtropy_dep in symtropy-math symtropy-physics symtropy-consciousness-physics; do
+        find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
+            sed -i "s|^${symtropy_dep}\\s*=\\s*{\\s*path\\s*=\\s*\"[^\"]*\"\\s*}|${symtropy_dep} = \"0.1.0\"|" {} \;
+        find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
+            sed -i "s|^path = \"\\.\\./\\.\\./\\.\\./\\.\\./symtropy/crates/[a-z]*/${symtropy_dep}\"|version = \"0.1.0\"|" {} \;
+    done
 
     # Strip external deps that escape the workspace (prism, positioning)
     # and their feature flags. These are optional and not needed for CI.
