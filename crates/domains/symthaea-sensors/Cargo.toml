@@ -6,7 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Shared sensor simulation for Symthaea robotics — force/torque, joint encoders, IMU"
 
 [dependencies]
-# [standalone-stripped] symtropy-physics = { path = "../../../../symtropy/crates/core/symtropy-physics" }
-# [standalone-stripped] symtropy-math = { path = "../../../../symtropy/crates/core/symtropy-math" }
+symtropy-physics = "0.1.0"
+symtropy-math = "0.1.0"
 nalgebra = "0.34"
 rand = { workspace = true }

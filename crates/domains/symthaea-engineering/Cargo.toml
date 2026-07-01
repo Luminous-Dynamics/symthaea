@@ -32,6 +32,6 @@ symthaea-harmonies = { path = "../symthaea-harmonies" }
 symthaea-swarm = { path = "../symthaea-swarm" }
 symthaea-workspace = { path = "../../core/symthaea-workspace" }
 symthaea-types = { path = "../../core/symthaea-types" }
-# [standalone-stripped] symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
+symtropy-robotics-bridge-core = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

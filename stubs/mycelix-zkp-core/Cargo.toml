@@ -1,0 +1,17 @@
+[package]
+name = "mycelix-zkp-core"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone build of mycelix-zkp-core: DASTARK types, PoGQ simulation, and Dilithium5 PQ signatures (self-contained subset; full RISC0/Winterfell/Miden backends live in the private mycelix-workspace)"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+thiserror = "2.0"
+pqcrypto-dilithium = { version = "0.5", optional = true }
+pqcrypto-traits = { version = "0.3", optional = true }
+
+[features]
+default = []
+dilithium = ["dep:pqcrypto-dilithium", "dep:pqcrypto-traits"]

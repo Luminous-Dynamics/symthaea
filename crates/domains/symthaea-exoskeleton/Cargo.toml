@@ -15,11 +15,11 @@ rand = { workspace = true }
 proptest = "1"
 
 [dependencies.symtropy-physics]
-# [standalone-stripped] path = "../../../../symtropy/crates/core/symtropy-physics"
+version = "0.1.0"
 optional = true
 
 [dependencies.symtropy-math]
-# [standalone-stripped] path = "../../../../symtropy/crates/core/symtropy-math"
+version = "0.1.0"
 optional = true
 
 [dependencies.nalgebra]

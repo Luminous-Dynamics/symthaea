@@ -10,7 +10,7 @@ license = "AGPL-3.0-or-later"
 yrs.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-runtime = { path = "../../core/symthaea-runtime" }
-# [standalone-stripped] symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
+symtropy-robotics-bridge-core = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

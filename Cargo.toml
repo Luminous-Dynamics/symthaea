@@ -10,6 +10,10 @@ members = [
 exclude = [
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
+    # that was never part of git (local-only dev setup), so it cannot build
+    # from a fresh clone -- standalone-only exclusion, not a monorepo issue.
+    "crates/core/hdc-zkp-bench",
 ]
 default-members = [
     "xtask",
@@ -39,7 +43,29 @@ engineering = [
     "symthaea-ros-bridge",
 ]
 
+[workspace.lints.clippy]
+# Restriction lints: prevent debugging artifacts in production code
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+# Correctness lints (already deny-by-default, listed explicitly for documentation)
+eq_op = "deny"
+erasing_op = "deny"
+invalid_regex = "deny"
+self_assignment = "deny"
+cast_ptr_alignment = "deny"
+nonsensical_open_options = "deny"
+unused_io_amount = "deny"
+
 [workspace.dependencies]
+# Standalone-build stub: real, self-contained subset of mycelix-zkp-core
+# (DASTARK types, PoGQ simulation, Dilithium5 signing) without the private
+# proofs-config/proofs-commitment or RISC0/Winterfell/Miden backend deps.
+mycelix-zkp-core = { path = "stubs/mycelix-zkp-core" }
+# Standalone-build stub: PlatformType + JointSafetyAuthority only (the full
+# crate's RoboticAgent/HapticOracle/MotorPlanner + Bevy integration live in
+# the private symtropy monorepo).
+symtropy-robotics-bridge-core = { path = "stubs/symtropy-robotics-bridge-core" }
 log = "0.4"
 url = "2.5"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
@@ -118,7 +144,6 @@ homepage = "https://luminousdynamics.org"
 documentation = "https://docs.rs/symthaea"
 keywords = ["consciousness", "ai", "hdc", "integrated-information", "neuroscience"]
 categories = ["science", "algorithms", "data-structures"]
-
 
 [dependencies]
 axum = { workspace = true }

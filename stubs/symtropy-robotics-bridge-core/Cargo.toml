@@ -1,0 +1,10 @@
+[package]
+name = "symtropy-robotics-bridge-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Standalone build of symtropy-robotics-bridge-core: PlatformType and JointSafetyAuthority (self-contained subset; the full crate's agent/haptic/motor + Bevy integration live in the private symtropy monorepo)"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+symtropy-consciousness-physics = "0.1.0"
