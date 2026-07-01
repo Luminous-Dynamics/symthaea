@@ -172,3 +172,34 @@ Use this rule for future movement:
 That means quantum-comp stays in `crates/domains/*` for now, storage/runtime
 improvements stay in top-level `src`, and only mature HDC/phase primitives should
 be considered for `symthaea-core` later.
+
+## Canonical API boundary
+
+The top-level `symthaea::hdc` module is a facade. Its core HDC names must remain
+re-exports of `symthaea_core::hdc`, not parallel implementations:
+
+```text
+symthaea::hdc::BinaryHV      == symthaea_core::hdc::binary_hv::BinaryHV
+symthaea::hdc::ContinuousHV  == symthaea_core::hdc::unified_hv::ContinuousHV
+symthaea::hdc::HDC_DIMENSION == symthaea_core::hdc::unified_hv::HDC_DIMENSION
+symthaea::hdc::PhiEngine     == symthaea_core::phi_engine::PhiEngine
+```
+
+Top-level `src/hdc` may contain application-facing extensions that need the
+integrated Symthaea crate, such as moral topology, narrative algebra,
+code-generation encoders, diagnostic encoders, and API compatibility shims. It
+should not define replacement HDC vector primitives, replacement Phi engines, or
+replacement low-level similarity kernels.
+
+Promotion rule:
+
+- promote into `symthaea-core` when the code is deterministic,
+  dependency-light, runtime-independent, and reusable by other crates
+- keep in top-level `src` when the code depends on cognitive-loop state,
+  persistence, IO, operator workflows, feature-heavy integrations, or app-level
+  telemetry
+- keep in `crates/domains/*` when the code is an experimental or domain-specific
+  research package whose API may still change
+
+The `core_facade_boundary` integration test protects this by asserting that the
+public facade still resolves to the canonical core types.

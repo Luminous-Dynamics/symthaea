@@ -1100,6 +1100,8 @@ required-features = ["code_generation"]
 [[test]]
 name = "time_waterfall_regression"
 
+[[test]]
+name = "core_facade_boundary"
 
 [[example]]
 name = "helicopter_phi_benchmark"
