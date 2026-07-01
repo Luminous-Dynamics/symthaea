@@ -362,6 +362,49 @@ mod tests {
     }
 
     #[test]
+    fn storage_runtime_try_send_reports_full_without_blocking() {
+        let (tx, _rx) = mpsc::channel(1);
+        let runtime = StorageRuntimeHandle { tx };
+
+        runtime.try_store_memory(record("queued", 8)).unwrap();
+        let err = runtime.try_store_memory(record("overflow", 9)).unwrap_err();
+
+        assert!(
+            matches!(err, StorageRuntimeError::Full),
+            "second try_send should report a full queue"
+        );
+    }
+
+    #[test]
+    fn storage_runtime_try_send_reports_closed_worker() {
+        let (tx, rx) = mpsc::channel(1);
+        drop(rx);
+        let runtime = StorageRuntimeHandle { tx };
+
+        let err = runtime.try_store_memory(record("closed", 10)).unwrap_err();
+
+        assert!(
+            matches!(err, StorageRuntimeError::Closed),
+            "try_send should report a closed worker"
+        );
+    }
+
+    #[test]
+    fn empty_batch_writes_do_not_consume_queue_capacity() {
+        let (tx, _rx) = mpsc::channel(1);
+        let runtime = StorageRuntimeHandle { tx };
+        let guard = Arc::new(AtomicBool::new(true));
+
+        runtime.try_store_memory_batch(Vec::new()).unwrap();
+        runtime
+            .try_store_memory_batch_guarded(Vec::new(), guard.clone())
+            .unwrap();
+
+        assert!(!guard.load(Ordering::Relaxed));
+        runtime.try_store_memory(record("after-empty", 11)).unwrap();
+    }
+
+    #[test]
     fn threaded_storage_runtime_flushes_batch_writes() {
         let db = Arc::new(SqliteMemory::in_memory().unwrap());
         let backend: Arc<dyn ConsciousnessDatabase> = db.clone();
