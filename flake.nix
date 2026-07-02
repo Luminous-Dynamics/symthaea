@@ -214,7 +214,7 @@
             }
 
             lum_check_commons() {
-              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-commons/apps/leptos/Cargo.toml" "$@"
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-workspace/mycelix-commons/apps/leptos/Cargo.toml" "$@"
             }
 
             lum_check_health() {
