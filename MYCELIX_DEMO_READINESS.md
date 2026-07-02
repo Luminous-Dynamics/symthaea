@@ -1,5 +1,17 @@
 # Mycelix Demo Readiness — Substrate of a Type 1 Civilization
 
+> **STALE — 2026-07-02.** Written 2026-04-18. All Mycelix clusters have
+> since moved from top-level `/srv/luminous-dynamics/mycelix-*` into
+> `mycelix-workspace/mycelix-*` — every path reference below is wrong.
+> The finance regression this doc calls "resolved" and the marketplace/
+> supplychain security gaps flagged as investment targets in the companion
+> `MYCELIX_TIER_3_4_PRODUCT_GATE.md` were independently re-audited and
+> fixed (differently) in a July 2 security review — see
+> `mycelix-workspace/MYCELIX_REVIEW.md` for current status. The design
+> system and demo-narrative content (Parts 1-2, 5) is still a reasonable
+> product-vision reference; the readiness/gap tables (Part 3-4, 6-7) are not
+> current.
+
 **Goal**: A live demo that doesn't feel like "a cool distributed-systems project" but like **the operating system a planetary-scale civilization actually runs on**.
 
 **Distinguishing mark**: the viewer leaves thinking *"this is infrastructure,"* not *"this is an app."*

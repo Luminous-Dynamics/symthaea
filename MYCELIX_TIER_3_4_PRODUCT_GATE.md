@@ -1,5 +1,18 @@
 # Mycelix Tier-3/4 Product Gate
 
+> **STALE — 2026-07-02.** Written 2026-04-18, all clusters have since moved
+> into `mycelix-workspace/mycelix-*` (path references below are wrong), and
+> the marketplace/supplychain security gaps this doc flags as "invest —
+> tests first" targets were independently found and fixed in a July 2
+> security review: marketplace's arbitration was structurally dead (fixed —
+> real arbitrator pool + self-dealing check now enforced), supplychain had
+> forgeable provenance events and an unguarded escrow release (fixed). See
+> `mycelix-workspace/MYCELIX_REVIEW.md` for current status. The keep/kill
+> reasoning and per-cluster verdicts are still useful context; the evidence
+> matrix (LOC/test counts, "last activity") is not current — re-verify
+> before trusting any number here. The marketplace freeze-or-retire
+> decision is still open and unresolved.
+
 **Date**: 2026-04-18
 **Purpose**: Decide keep/kill/defer for each of the six Tier-3/4 clusters so downstream decisions (bridge wiring, test investment, dep bumps) have a clear answer.
 **Output**: per-cluster evidence, verdict, and a concrete improvement path for the keepers.

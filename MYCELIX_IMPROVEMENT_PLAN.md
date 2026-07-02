@@ -2,6 +2,16 @@
 
 *Drafted 2026-04-17. Revised after verified `cargo check --workspace` across all 26 Rust clusters. Updated with fix progress 2026-04-17.*
 
+> **STALE — 2026-07-02.** This doc predates two major changes: (1) all Mycelix
+> clusters were consolidated from top-level `/srv/luminous-dynamics/mycelix-*`
+> into `mycelix-workspace/mycelix-*` — every path reference below is now
+> wrong; (2) several of the compile blockers and security gaps described here
+> were independently found and fixed in a July 2 security review (finance
+> wire-types, identity, supplychain, marketplace, desci — see
+> `mycelix-workspace/MYCELIX_REVIEW.md`, which is the current source of truth
+> for what's actually fixed vs. still open. Treat this doc as historical
+> context for *why* things are the way they are, not as a live task list.
+
 ## Session Progress (2026-04-17)
 
 Committed fixes:

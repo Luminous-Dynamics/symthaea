@@ -2,6 +2,13 @@
 
 **Last Updated**: 2026-02-08
 
+> **Per-cluster status table below is STALE** (Feb 2026, superseded within
+> days by `HAPP_PORTFOLIO_STRATEGY.md`, and again by everything since). Keep
+> the Status Definitions and criteria below as a reusable checklist/template
+> for future promotions; do not trust the percentages/tier assignments as
+> current. See `mycelix-workspace/ECOSYSTEM_STATUS.md` for current status,
+> or `MYCELIX_REVIEW.md` for the most recent (2026-07-02) audit.
+
 This document defines the criteria for promoting a Mycelix hApp from **scaffold** to **beta** status.
 
 ---
