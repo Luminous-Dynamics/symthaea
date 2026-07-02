@@ -1286,13 +1286,15 @@ impl ExplainabilityRegistry {
         let most_common_positive = positive_vec
             .iter()
             .take(5)
-            .map(|(&ft, &count)| (ft, count))
+            .copied()
+            .map(|(ft, count)| (*ft, *count))
             .collect();
 
         let most_common_negative = negative_vec
             .iter()
             .take(5)
-            .map(|(&ft, &count)| (ft, count))
+            .copied()
+            .map(|(ft, count)| (*ft, *count))
             .collect();
 
         let avg_factors = if self.stats.explanations_generated > 0 {
