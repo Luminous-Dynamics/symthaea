@@ -1,6 +1,0 @@
-{
-  "git": {
-    "sha1": "c1f36b10fa50fdc110244c6b81bc44692786146e"
-  },
-  "path_in_vcs": "crates/holochain_secure_primitive"
-}
