@@ -169,12 +169,14 @@ CLUSTERS=(
 sync_dir() {
     local src="$1"
     local dst="$2"
+    shift 2
+    local extra_excludes=("$@")
     if [ ! -d "$src" ]; then
         warn "Skipping $(basename "$src")/ (not found in monorepo)"
         return
     fi
     info "Syncing $(basename "$dst")/"
-    rsync "${RSYNC_OPTS[@]}" "$src/" "$dst/"
+    rsync "${RSYNC_OPTS[@]}" "${extra_excludes[@]}" "$src/" "$dst/"
 }
 
 info "=== Syncing cluster directories ==="
@@ -214,9 +216,39 @@ sync_dir \
 echo
 
 # --- Sync mycelix-workspace (SDKs, happs, scripts, etc.) --------------------
-
+#
+# mycelix-workspace/ also contains mycelix-workspace/mycelix-<cluster>/
+# subdirectories left over from an earlier consolidation attempt — stale,
+# partial (sometimes empty) duplicates of the real top-level cluster
+# directories already synced above. Excluded here so this wholesale sync
+# doesn't ship dead duplicate code to the public repo alongside the real
+# copies. mycelix-pulse is the one cluster that genuinely lives inside
+# mycelix-workspace and is NOT excluded.
 info "=== Syncing mycelix-workspace ==="
-sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace"
+sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
+    --exclude='/mycelix-commons/' \
+    --exclude='/mycelix-civic/' \
+    --exclude='/mycelix-hearth/' \
+    --exclude='/mycelix-finance/' \
+    --exclude='/mycelix-governance/' \
+    --exclude='/mycelix-identity/' \
+    --exclude='/mycelix-personal/' \
+    --exclude='/mycelix-attribution/' \
+    --exclude='/mycelix-praxis/' \
+    --exclude='/mycelix-craft/' \
+    --exclude='/mycelix-knowledge/' \
+    --exclude='/mycelix-music/' \
+    --exclude='/mycelix-energy/' \
+    --exclude='/mycelix-climate/' \
+    --exclude='/mycelix-core/' \
+    --exclude='/mycelix-marketplace/' \
+    --exclude='/mycelix-supplychain/' \
+    --exclude='/mycelix-desci/'
+    # Note: mycelix-prism is NOT excluded — it has no top-level counterpart
+    # and no dedicated sync script; this wholesale sync is its only current
+    # path to the public repo. mycelix-health is also not excluded here;
+    # it's an empty/absent directory in this tree today (real content is
+    # the top-level submodule), so there's nothing for this line to ship.
 echo
 
 # --- Rewrite path dependencies for standalone layout -------------------------
