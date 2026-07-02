@@ -45,7 +45,7 @@ pub fn trigger_search(query: &str) {
 /// More permissive than ammonia::clean() — allows structural and formatting
 /// tags needed for readable content, while stripping scripts and event handlers.
 /// Resolves relative URLs against the source page's base URL.
-fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
+pub(crate) fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
     let mut builder = ammonia::Builder::new();
 
     // Allow inline styles on all elements for better page rendering.
@@ -115,7 +115,6 @@ fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
             "header",
             "footer",
             "aside",
-            "style",
         ])
         .add_generic_attributes(generic_attrs)
         .add_tag_attributes("a", &["href", "title"])

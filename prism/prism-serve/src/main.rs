@@ -18,68 +18,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 const MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
-// ═══════════════════════════════════════════════════════════════
-// SSRF PROTECTION
-// ═══════════════════════════════════════════════════════════════
-
-fn is_private_ipv4(ip: &std::net::Ipv4Addr) -> bool {
-    ip.is_loopback()
-        || ip.is_private()
-        || ip.is_link_local()
-        || ip.is_broadcast()
-        || ip.is_unspecified()
-        || (ip.octets()[0] == 169 && ip.octets()[1] == 254)
-}
-
-fn validate_proxy_url(raw: &str) -> Result<url::Url, &'static str> {
-    let parsed = url::Url::parse(raw).map_err(|_| "Invalid URL")?;
-    match parsed.scheme() {
-        "http" | "https" => {}
-        _ => return Err("Only http and https URLs are allowed"),
-    }
-    let host_str = parsed.host_str().unwrap_or("");
-    if host_str == "localhost" || host_str == "metadata.google.internal" {
-        return Err("Access to internal addresses is forbidden");
-    }
-    match parsed.host() {
-        Some(url::Host::Ipv4(ip)) => {
-            if is_private_ipv4(&ip) {
-                return Err("Access to private/reserved IP addresses is forbidden");
-            }
-        }
-        Some(url::Host::Ipv6(ip)) => {
-            if ip.is_loopback() || ip.is_unspecified() {
-                return Err("Access to private/reserved IP addresses is forbidden");
-            }
-            let seg = ip.segments();
-            if seg[0] == 0
-                && seg[1] == 0
-                && seg[2] == 0
-                && seg[3] == 0
-                && seg[4] == 0
-                && seg[5] == 0xffff
-            {
-                let mapped = std::net::Ipv4Addr::new(
-                    (seg[6] >> 8) as u8,
-                    seg[6] as u8,
-                    (seg[7] >> 8) as u8,
-                    seg[7] as u8,
-                );
-                if is_private_ipv4(&mapped) {
-                    return Err("Access to private/reserved IP addresses is forbidden");
-                }
-            }
-            if (seg[0] & 0xffc0) == 0xfe80 {
-                return Err("Access to private/reserved IP addresses is forbidden");
-            }
-            if (seg[0] & 0xfe00) == 0xfc00 {
-                return Err("Access to private/reserved IP addresses is forbidden");
-            }
-        }
-        _ => {}
-    }
-    Ok(parsed)
-}
+use prism_common::ssrf::validate_proxy_url;
 
 // ═══════════════════════════════════════════════════════════════
 // HTTP CLIENT

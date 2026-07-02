@@ -8,6 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod ssrf;
+
 /// Privacy zone classification for web content.
 ///
 /// Default is `Local`. Content must be explicitly upgraded to `Public`

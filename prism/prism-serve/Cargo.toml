@@ -15,6 +15,7 @@ url = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
+prism-common = { path = "../prism-common" }
 
 [dev-dependencies]
 tempfile = "3"

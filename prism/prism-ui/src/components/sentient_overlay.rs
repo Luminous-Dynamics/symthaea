@@ -38,18 +38,29 @@ struct SporeAnnotation {
 pub fn annotate_html(html: &str, engine: &SearchEngine) -> String {
     let text = strip_tags(html);
     if text.len() < 50 {
-        return html.to_string();
+        return crate::engine::sanitize_html(html, None);
     }
 
     let sentences = split_sentences(&text);
     let annotations = collect_hdc_annotations(&sentences, engine);
 
     if annotations.is_empty() {
-        return html.to_string();
+        return crate::engine::sanitize_html(html, None);
     }
 
     let overlay_html = render_annotations(&annotations, None);
-    format!("{}\n{}", html, overlay_html)
+    crate::engine::sanitize_html(&format!("{}\n{}", html, overlay_html), None)
+}
+
+/// Escape HTML-significant characters in untrusted text before interpolating
+/// it into a raw HTML string. Defense in depth alongside the sanitize_html
+/// pass applied to the overall output.
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 /// Collect HDC-matched annotations from the search engine (fast, synchronous).
@@ -157,9 +168,9 @@ fn render_annotations(
             e_label = e_label,
             sim_pct = sim_pct,
             spore_note = spore_note,
-            sentence_short = &sentence[..sentence.len().min(100)],
-            claim = result.content,
-            source = source,
+            sentence_short = escape_html(&sentence[..sentence.len().min(100)]),
+            claim = escape_html(&result.content),
+            source = escape_html(source),
         ));
     }
 

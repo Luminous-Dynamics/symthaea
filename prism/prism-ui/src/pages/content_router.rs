@@ -39,10 +39,10 @@ pub fn ContentRouter() -> impl IntoView {
                 let annotated = if overlay_enabled {
                     search_engine.with_value(|e| match e {
                         Some(eng) => sentient_overlay::annotate_html(&html, eng),
-                        None => html.clone(),
+                        None => crate::engine::sanitize_html(&html, None),
                     })
                 } else {
-                    html.clone()
+                    crate::engine::sanitize_html(&html, None)
                 };
                 view! {
                     <div class="reader-content" inner_html=annotated></div>
