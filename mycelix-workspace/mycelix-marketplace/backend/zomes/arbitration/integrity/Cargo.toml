@@ -1,0 +1,17 @@
+[package]
+name = "arbitration_integrity"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "arbitration_integrity"
+
+[dependencies]
+hdi.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+holochain_serialized_bytes.workspace = true
+
+[dev-dependencies]
+serde_json = "1"
