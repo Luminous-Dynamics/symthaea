@@ -98,6 +98,7 @@ members = [
     "crates/bridges/symtropy-foundry",
     "crates/bridges/symtropy-sim-bridge",
     "crates/domains/symtropy-terrain",
+    "crates/domains/symtropy-world",
     "crates/domains/symtropy-lightyear",
     "crates/apps/symtropy-multiplayer-demo",
     "crates/symtropy-mesh",
