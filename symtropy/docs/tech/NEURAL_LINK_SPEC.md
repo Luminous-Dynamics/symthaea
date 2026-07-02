@@ -1,6 +1,6 @@
 # Symtropy Foundry Neural-Link (LLM Integration)
 
-> **Code status (2026-07-02 review):** No corresponding implementation found in `symtropy/crates` or `symtropy/src`. Design/vision document only.
+> **Code status (2026-07-02 review, corrected 2026-07-02):** Original review of this doc only checked `symtropy/crates` and `symtropy/src` (Rust) and missed `tools/symtropy_assets/neural_link.py` — a real, wired-in `generate_world_blueprint()` function called from `cli.py`. Corrected verdict: PARTIAL, not vision-only. It does not call an LLM yet — the docstring says "Simulates calling an LLM" and the body just emits a hardcoded template blueprint — but the interface, the YAML output shape, and the CLI wiring are real.
 
 ## Overview
 The Neural-Link connects high-level creative prompts to the Foundry Orchestrator. It acts as a generative layer that turns natural language intent into structured `world_blueprint.yaml` files and `manifest.yaml` definitions for new assets.
