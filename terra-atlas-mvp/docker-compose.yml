@@ -59,7 +59,7 @@ services:
   # Energy projects, investments, carbon credits, consciousness scores.
   desci-api:
     build:
-      context: ../mycelix-desci
+      context: ../mycelix-workspace/mycelix-desci
       dockerfile: Dockerfile
     container_name: terra-atlas-api
     restart: unless-stopped

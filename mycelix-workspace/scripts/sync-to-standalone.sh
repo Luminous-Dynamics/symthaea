@@ -164,9 +164,11 @@ CLUSTERS=(
     # note here was stale, same as the now-deleted mycelix-praxis
     # sync-to-standalone.sh that referenced a nonexistent repo).
     mycelix-marketplace
+    # Same "no active dedicated sync script found" situation as
+    # marketplace above — the "own repo" note was stale.
+    mycelix-desci
     # Note: clusters WITH their own standalone public repos intentionally NOT
     # synced here (to avoid duplicating code):
-    #   mycelix-desci       → Luminous-Dynamics/mycelix-desci
     #   mycelix-supplychain → Luminous-Dynamics/mycelix-supplychain
     #   mycelix-space       → Luminous-Dynamics/mycelix-space
     #   mycelix-observatory → Luminous-Dynamics/mycelix-observatory
@@ -180,19 +182,20 @@ CLUSTERS=(
 # (see MYCELIX_REVIEW.md P0 #1 and the July 2 migration commits). Clusters
 # already moved read from their new mycelix-workspace/<cluster> location;
 # clusters not yet moved still read from top-level until they migrate too.
-# Remaining as of 2026-07-02: desci (blocked on mycelix-multiworld-sim
-# settling). praxis, core, health, and marketplace have since moved
-# (health via submodule surgery, has its own standalone repo — see the
-# wholesale sync exclude below; marketplace frozen but kept, see its
-# STATUS.md). Once every cluster in CLUSTERS has moved, this whole loop
-# collapses into the wholesale mycelix-workspace sync below and can be
-# deleted.
+# Remaining as of 2026-07-02: none — praxis, core, health, marketplace,
+# and desci have all moved (health via submodule surgery, has its own
+# standalone repo — see the wholesale sync exclude below; marketplace
+# frozen but kept, see its STATUS.md; desci's multiworld-sim blocker
+# settled — verified idle 2.5h+, clean tree, zero active sessions).
+# This loop can now collapse into the wholesale mycelix-workspace sync
+# below — left as-is for now since CLUSTERS still serves the top-level
+# <cluster>/ backward-compat paths in the standalone repo.
 MOVED_TO_WORKSPACE=(
     mycelix-commons mycelix-civic mycelix-hearth mycelix-finance
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
     mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
     mycelix-climate mycelix-manufacturing mycelix-lawful-identity mycelix-core
-    mycelix-praxis mycelix-marketplace
+    mycelix-praxis mycelix-marketplace mycelix-desci
 )
 
 cluster_source_dir() {
@@ -319,14 +322,13 @@ echo
 info "=== Syncing mycelix-workspace ==="
 sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
     --exclude='/mycelix-supplychain/' \
-    --exclude='/mycelix-desci/' \
     --exclude='/mycelix-health/'
     # mycelix-core's and mycelix-praxis's excludes removed 2026-07-02 — both moved here with real
     # tracked content (was previously excluded to hide an untracked stub).
-    # mycelix-marketplace's exclude also removed 2026-07-02 — migrated,
-    # frozen but kept (STATUS.md), no active dedicated standalone repo
-    # found for it, so it's treated like core/praxis rather than like
-    # desci/supplychain/health.
+    # mycelix-marketplace's and mycelix-desci's excludes also removed
+    # 2026-07-02 — both migrated, neither has an active dedicated
+    # standalone-repo sync mechanism found, so both are treated like
+    # core/praxis rather than like supplychain/health.
     # Note: mycelix-prism is NOT excluded — it has no top-level counterpart
     # and no dedicated sync script; this wholesale sync is its only current
     # path to the public repo. mycelix-health IS now excluded (added

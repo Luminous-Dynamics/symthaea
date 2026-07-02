@@ -14,7 +14,7 @@ petgraph = { version = "0.7", features = ["serde-1"] }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common", default-features = false, features = ["model-governance", "interplanetary"] }
 luminous-sim-core = { path = "../crates/luminous-sim-core" }
 anyhow = "1.0"
-mycelix-desci-core = { path = "../mycelix-desci/src/core" }
+mycelix-desci-core = { path = "../mycelix-workspace/mycelix-desci/src/core" }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.35", features = ["full"] }

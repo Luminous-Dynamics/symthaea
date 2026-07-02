@@ -363,8 +363,6 @@ exclude = [
     "mycelix-core/zomes/pogq_validation",
     "mycelix-core/zomes/pogq_validation/coordinator",
     "mycelix-core/zomes/pogq_validation/integrity",
-    "mycelix-desci/zomes/desci_claim/coordinator",
-    "mycelix-desci/zomes/desci_claim/integrity",
     "mycelix-emergency/tests",
     "mycelix-energy/crates/energy-leptos-types",
     "mycelix-energy/tests",
@@ -471,6 +469,8 @@ exclude = [
     "mycelix-identity/crates/mycelix-crypto/src/pqc",
     "mycelix-identity/crates/mycelix-crypto/tests",
     "mycelix-identity/crates/mycelix-trust-registry",
+    "mycelix-desci/zomes/desci_claim/coordinator",
+    "mycelix-desci/zomes/desci_claim/integrity",
     "mycelix-identity/zomes/bridge/coordinator",
     "mycelix-identity/zomes/bridge/integrity",
     "mycelix-identity/zomes/credential_schema/coordinator",
@@ -694,7 +694,7 @@ members = [
     "mycelix-commons/crates/*",
     # "mycelix-commons/apps/leptos", # own [workspace] - cannot be a member of another workspace (task #35)
     "mycelix-craft/apps/leptos",
-    # "mycelix-desci/apps/leptos", # pre-staged for task #40 — not yet migrated, dir doesn't exist here
+    "mycelix-desci/apps/leptos",
     "mycelix-hearth/crates/*",
     # "mycelix-hearth/apps/leptos", # own [workspace] - cannot be a member of another workspace (task #35)
     # "mycelix-legacy/crates/*", # legacy-types has no src/lib.rs — manifests-only scaffold, would break cargo check --workspace (task #43)
@@ -728,7 +728,7 @@ members = [
     "mycelix-civic/zomes/*/*",
     "mycelix-personal/zomes/*/*",
     # "mycelix-legacy/zomes/*/*", # manifests-only scaffold, no src/lib.rs anywhere in the cluster — would break cargo check --workspace until real implementation lands (task #43)
-    # "mycelix-desci/zomes/*/*", # pre-staged for task #40 — not yet migrated
+    "mycelix-desci/zomes/*/*",
 
     "happs/consensus/*",
     "happs/consensus/*/*",
