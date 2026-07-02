@@ -574,3 +574,50 @@ Net result: 1 file fixed (governance), 1 new higher-priority finding surfaced
 (music cross-cluster dispatch), and the "55 advisory warnings" figure is now
 understood to be almost entirely Pattern B (no mechanical fix applicable) or
 noise, not evidence of widespread drift.
+
+## Update — 2026-07-02 (music-bridge fix + a second duplicate-tree discovery)
+
+The music cross-cluster gap above is now fixed. `cross_cluster_dispatch`
+parses `target_role` into `CrossClusterRole` and calls
+`routing_registry::is_allowed(CrossClusterRole::Music, target, &input.target_zome)`,
+replacing the old role-only check (which also incorrectly listed
+`"commons_land"`/`"commons_care"` as allowed targets — not valid hApp role
+names). One real route was added to the registry, `MUSIC_TO_CIVIC =
+["civic_bridge", "media_publication"]`, matching the only verified caller
+(`sdk-ts/src/integrations/music/index.ts`'s `createArtMetadata()`).
+Identity/Finance/Governance — mentioned in the coordinator's own doc comments
+as aspirational — now correctly deny until a real caller and route exist.
+
+**While making this fix, a second instance of today's duplicate-tree pattern
+was found**, this time in `crates/mycelix-bridge-common` — the shared crate
+every cluster's bridge coordinator depends on for cross-cluster allowlisting.
+`mycelix-workspace/crates/mycelix-bridge-common/` (the path all migrated
+clusters' `Cargo.toml` files actually resolve to) turned out to be
+**completely untracked by git**. It diverges from the tracked top-level
+`crates/mycelix-bridge-common/` (last real commit 2026-05-26, currently
+clean/unmodified) across 9 files: `Cargo.toml`, 2 fuzz targets, and
+`src/{consciousness_profile,constitutional_envelope,lib,offline_credential,
+sovereign_gate,sub_passport}.rs`. These read as real feature work (not
+formatting drift) that was apparently only ever applied to the untracked
+copy and never committed anywhere — meaning it currently has no git history
+and no backup.
+
+This was surfaced to the user via AskUserQuestion mid-fix; no response came
+back in time, so the safest available option was taken: `routing_registry.rs`
+(the one file this task needed to touch) was kept in sync across both
+copies and `mycelix-workspace/crates/mycelix-bridge-common/routing_registry.rs`
+was added to git tracking for the first time. **The other 8 diverging files
+were left completely untouched** — reconciling them requires understanding
+which side is authoritative, which is not something to decide unilaterally
+mid-task. Tracked as its own task (#33) for a dedicated follow-up session.
+
+Also worth noting for whoever picks up #33: while committing, staging a
+single file in the top-level `crates/mycelix-bridge-common/` briefly pulled
+in an unrelated, pre-existing **staged deletion of 306 files (~62,000 lines)
+across `symtropy/crates/*`** from what looks like another concurrent
+session's in-progress refactor (171 new untracked files and 92 modified
+files exist alongside it, suggesting a real restructure rather than data
+loss). It was not committed — `git reset` (index-only, non-destructive) was
+used to unstage before proceeding file-by-file. Flagging this so it isn't
+mistaken for something this session did, and as a reminder of just how much
+concurrent uncommitted state exists in this repo right now.
