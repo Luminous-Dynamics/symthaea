@@ -80,10 +80,14 @@ Hardcoded `1.0` now only remains in:
 - `src/consciousness/measurement/consciousness_equation_v2.rs:194` (default-constructor helper)
 - `examples/evolve_consciousness_equation.rs:155` (example script)
 
-Optional enrichment (not yet wired): `crates/symthaea-quantum-chemistry/WIRING_INSTRUCTIONS.md`
-describes a `quantum-consciousness` feature that would replace the category-based
-feasibility with molecular-physics-derived values (already declared in Cargo.toml,
-bridge crate ready, integration deferred).
+Optional enrichment, **already wired** (this note previously said "integration deferred" —
+corrected 2026-07-02, verified against `src/cognitive_loop/substrate_manager.rs:265-278`):
+the `quantum-consciousness` feature (`crates/domains/symthaea-quantum-chemistry/`,
+`WIRING_INSTRUCTIONS.md`) blends an ab initio multi-theory physics score
+(`cognitive_loop_bridge::substrate_feasibility_from_physics`, water at 310K as the
+reference substrate) 50/50 into `effective_feasibility` inside
+`SubstrateManager::recompute_effective_feasibility`. It's off by default (not in the
+default feature set) but is real, feature-gated production code, not a stub.
 
 See `THE_SUBSTRATE_ROADMAP.md` for the full status across Phases 1–5.
 
