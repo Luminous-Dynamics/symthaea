@@ -419,16 +419,79 @@ for this kind of validation:
    resolved — GNOME's is a hard rendering dependency that no amount of
    retrying fixes).
 
-**What would actually clear this**: give the guest a real render node —
-either QEMU-side 3D-accelerated virtio-gpu (`virtio-gpu-gl`/virgl, needing
-a `-display ...,gl=on` or `egl-headless` backend and a host DRM render
-node, both of which this host has: `/dev/dri/renderD128`/`renderD129`
-exist) or confirm/force a genuinely software-only EGL path for the
-portal's picker. Neither was attempted — this is real, scoped follow-up
-work (GPU-accelerated headless QEMU display config, not a quick fix), not
-something to force through speculatively. **Conclusion: this is a real
-gap in the GNOME test VM's environment, not a defect in xenia-capture or
-xenia-peer.** The KDE-Wayland validation above stands as the one
-completed real-hardware/real-desktop pass for the ScapCapture backend;
-GNOME-Wayland remains unvalidated pending either the render-node fix above
-or an operator with a real GNOME-Wayland desktop.
+### Follow-up (2026-07-03): gave the guest a real render node — got further, still blocked
+
+Pursued the "what would actually clear this" note above: added a real
+GL-accelerated virtio-gpu to `xenia-test-vm-gnome` via
+`virtualisation.qemu.options`, rendering through the host's Intel iGPU
+(confirmed via `/dev/dri/by-path` that `renderD128` = i915 @ PCI
+`0000:00:02.0`, deliberately *not* `renderD129` = the NVIDIA RTX 2070 @
+`01:00.0` — i915 has much more mature virgl/`egl-headless` support than
+the proprietary NVIDIA driver):
+
+```nix
+virtualisation.qemu.options = [
+  "-vga none"
+  "-device virtio-vga-gl,blob=true,hostmem=256M"
+  "-object memory-backend-memfd,id=mem0,size=4096M,share=on"
+  "-machine memory-backend=mem0"
+  "-display egl-headless,rendernode=/dev/dri/renderD128"
+];
+```
+
+**Attempt 1** (`virtio-vga-gl` + `egl-headless`, no blob resources): guest
+now has a real `/dev/dri/renderD128` (confirmed via `ls -la /dev/dri/`,
+previously only `card0` existed). `sudo dmesg` showed virgl negotiating
+but **not** blob/host-visible resources: `[drm] features: +virgl +edid
+-resource_blob -host_visible`. `capture_bench` failed identically to the
+pre-GPU-passthrough run: `VERDICT: FAIL`, 0 frames, same `Failed to
+associate portal window with parent window` / `ZINK: failed to choose
+pdev` / `LinCapError { msg: "Did not get response" }` chain.
+
+**Attempt 2** (added `blob=true,hostmem=256M` on the device plus a
+memfd-backed `memory-backend-memfd` object, the standard recipe for
+virtio-gpu blob resources): `dmesg` now showed `[drm] features: +virgl
++edid +resource_blob +host_visible` — blob resources genuinely
+negotiated this time, a real change from attempt 1. **The failure mode
+changed but did not resolve.** This run's `journalctl --user -u
+xdg-desktop-portal-gnome` showed a *different* error chain than every
+previous attempt: instead of Intel's `anv` driver failing to open a
+(nonexistent, in-VM) real Intel GPU device, Mesa now tried **`radv`**
+(AMD's Vulkan driver) via `vdrm_device_connect` (Mesa's "virtio-gpu
+native context" passthrough path) and failed: `MESA: error:
+vdrm_device_connect failed`, `radv/amdgpu: failed to initialize device`,
+`Vulkan: ... failed to initialize winsys (VK_ERROR_INITIALIZATION_FAILED)`.
+`capture_bench` still ended identically: `VERDICT: FAIL`, 0 frames,
+`LinCapError { msg: "Did not get response" }` after all 5 retries.
+
+That RADV-instead-of-ANV shift is genuine evidence the blob-resource fix
+changed something real in how the guest's Mesa negotiates a GPU context —
+but it landed on the *wrong* vendor-specific "native context" path (AMD,
+on a host with an Intel iGPU + NVIDIA discrete GPU, neither of which is
+AMD). This now looks like a virglrenderer/Mesa native-context
+negotiation mismatch specific to this exact QEMU/virglrenderer/kernel
+version combination, not something fixable by another `qemu.options`
+tweak — it would need either a different QEMU/virglrenderer build, a
+different `-device` variant (`virtio-gpu-rutabaga`? explicit
+`venus=true` generic-Vulkan-passthrough instead of vendor-native
+contexts?), or a host-side change (a reboot could plausibly pick up an
+updated virglrenderer/mesa/kernel-module state if one is pending, or
+clear some stale DRM/EGL context left by earlier attempts in this same
+session — untested, since testing that requires actually rebooting the
+host, which is the operator's call, not something to do autonomously).
+**Stopping here rather than guessing further** — two real, well-targeted
+config attempts changed the failure mode twice but didn't clear it, and
+a third speculative attempt isn't a good use of further host-config
+guesswork without being able to inspect virglrenderer's own
+negotiation logic directly.
+
+**Conclusion, updated**: this is still a real gap in the GNOME test VM's
+environment, not a defect in xenia-capture or xenia-peer — now narrowed
+from "no render node at all" to "a render node exists and blob resources
+negotiate, but Mesa's native-context vendor selection picks the wrong
+GPU vendor path for this host's hardware." The KDE-Wayland validation
+above remains the one completed real-hardware/real-desktop pass for the
+ScapCapture backend. GNOME-Wayland validation is on hold pending either
+a host reboot (which may or may not resolve the native-context mismatch
+— genuinely unknown until tried) or an operator with a real
+GNOME-Wayland desktop to test against directly instead of a VM.
