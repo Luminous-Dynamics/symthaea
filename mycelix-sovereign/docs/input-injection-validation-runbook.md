@@ -34,27 +34,20 @@ Session negotiation (`CreateSession` → `SelectDevices` → `Start`) and
 every `NotifyPointerMotion`/`NotifyPointerButton`/`NotifyKeyboardKeycode`/
 `NotifyTouchDown`/`NotifyTouchMotion`/`NotifyTouchUp` call succeeded.
 
-**Open finding, not resolved:** the whole run completed in under two
-seconds with no visible pause for an interactive consent dialog, unlike
-the capture (`ScreenCast.Start`) validation earlier the same day, which
-clearly blocked on the operator's click. `journalctl` for
-`plasma-xdg-desktop-portal-kde` around the run shows:
-
-```
-MegaAuth: Failed to lookup permissions: "No entry for remote-desktop"
-Only stream input
-```
-
-This suggests KDE's portal implementation may take a lighter-weight (or
-non-modal) path for input-only `RemoteDesktop` sessions specifically
-(no paired `ScreenCast` stream), but this is not confirmed — the operator
-was asked directly whether a dialog appeared and did not respond in time
-to confirm either way. **Do not treat this as proof the session was
-properly consent-gated** until someone watches the screen during a run
-and confirms what actually happens. If it turns out no prompt appears at
-all for unsandboxed native binaries requesting input-only access, that's
-a real finding worth its own investigation (portal consent bypass for a
-class of requests), not just a validation footnote.
+**Resolved 2026-07-02 (second run):** the operator watched the screen
+during a repeat run and confirmed a real consent dialog does appear —
+the session genuinely is gated on an interactive Allow/Deny prompt, not
+silently granted. The dialog is just fast to click through (the whole
+harness, including the click, completes in well under the operator's
+perception of a "long pause"), which is why the first run's timing alone
+looked ambiguous from the process side. `journalctl`'s `"MegaAuth: Failed
+to lookup permissions"` / `"Only stream input"` lines were a red herring —
+they describe KDE's internal permission-cache lookup finding no prior
+grant (expected on a fresh session, not evidence of a skipped prompt).
+No further action needed here; do keep this in mind for future sessions
+though — timing alone (a run "completing too fast") is not reliable
+evidence that a consent step was skipped without directly watching the
+screen or authoritatively inspecting portal internals.
 
 ### `ashpd` vs. `scap`'s hand-rolled `dbus` approach
 
