@@ -3,7 +3,7 @@
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 [package]
-name = "mycelix-civic-ui"
+name = "mycelix-civic-cluster-ui"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
