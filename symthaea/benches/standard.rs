@@ -140,7 +140,7 @@ fn bench_scalability(c: &mut Criterion) {
                     let max_sim = corpus
                         .iter()
                         .map(|hv| query.similarity(hv))
-                        .max_by(|a, b| a.partial_cmp(b).unwrap());
+                        .max_by(|a, b| a.total_cmp(b));
                     black_box(max_sim)
                 })
             },

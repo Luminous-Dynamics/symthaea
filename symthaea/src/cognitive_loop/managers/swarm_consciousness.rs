@@ -70,7 +70,7 @@ impl SwarmConsciousness {
         // Find strongest coalition by collective_phi
         let strongest = coalitions
             .iter()
-            .max_by(|a, b| a.collective_phi().partial_cmp(&b.collective_phi()).unwrap())
+            .max_by(|a, b| a.collective_phi().total_cmp(&b.collective_phi()))
             .unwrap();
 
         let phi_swarm = strongest.collective_phi();

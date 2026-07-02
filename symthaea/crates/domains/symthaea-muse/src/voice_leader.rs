@@ -115,11 +115,7 @@ pub fn bass_note(
             let idx = bass_scale
                 .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| {
-                    ((**a - prev).abs())
-                        .partial_cmp(&((**b - prev).abs()))
-                        .unwrap()
-                })
+                .min_by(|(_, a), (_, b)| ((**a - prev).abs()).total_cmp(&((**b - prev).abs())))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             // Walk toward root
@@ -153,9 +149,7 @@ pub fn harmony_note(lead_freq: f32, chord_tones: &[f32], state: &mut VoiceState)
         .collect();
 
     if let Some(&best) = candidates.iter().min_by(|a, b| {
-        ((**a - lead_freq * 0.75).abs())
-            .partial_cmp(&((**b - lead_freq * 0.75).abs()))
-            .unwrap()
+        ((**a - lead_freq * 0.75).abs()).total_cmp(&((**b - lead_freq * 0.75).abs()))
     }) {
         best
     } else {

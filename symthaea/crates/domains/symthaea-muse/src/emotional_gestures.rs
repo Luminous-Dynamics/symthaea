@@ -178,11 +178,7 @@ pub fn apply_gesture_to_pitch(
     let base_idx = scale
         .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| {
-            ((**a - base_freq).abs())
-                .partial_cmp(&((**b - base_freq).abs()))
-                .unwrap()
-        })
+        .min_by(|(_, a), (_, b)| ((**a - base_freq).abs()).total_cmp(&((**b - base_freq).abs())))
         .map(|(i, _)| i)
         .unwrap_or(0);
 

@@ -223,11 +223,7 @@ pub fn scan_novel_rtg_candidates(predictor: &MlMassPredictor) -> Vec<RtgCandidat
     }
 
     // Sort by specific power descending
-    candidates.sort_by(|a, b| {
-        b.specific_power_wg
-            .partial_cmp(&a.specific_power_wg)
-            .unwrap()
-    });
+    candidates.sort_by(|a, b| b.specific_power_wg.total_cmp(&a.specific_power_wg));
     candidates
 }
 
@@ -583,11 +579,7 @@ pub fn evaluate_activation_products(
     }
 
     // Sort by activity descending (most concerning first)
-    products.sort_by(|a, b| {
-        b.activity_relative
-            .partial_cmp(&a.activity_relative)
-            .unwrap()
-    });
+    products.sort_by(|a, b| b.activity_relative.total_cmp(&a.activity_relative));
     products
 }
 
@@ -611,11 +603,7 @@ pub fn generate_space_nuclear_report(
     mission_years: f64,
 ) -> SpaceNuclearReport {
     let mut rtg_known = known_rtg_fuels(predictor);
-    rtg_known.sort_by(|a, b| {
-        b.specific_power_wg
-            .partial_cmp(&a.specific_power_wg)
-            .unwrap()
-    });
+    rtg_known.sort_by(|a, b| b.specific_power_wg.total_cmp(&a.specific_power_wg));
 
     let rtg_novel = scan_novel_rtg_candidates(predictor);
     let shielding = evaluate_shielding_materials();

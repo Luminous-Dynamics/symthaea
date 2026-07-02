@@ -44,7 +44,7 @@ fn diagnostic_subtree_matching() {
             (entry.name.clone(), structural, name_based)
         })
         .collect();
-    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    results.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     for (name, structural, name_based) in results.iter().take(10) {
         let marker = if *structural > 0.7 { " ← GOOD" } else { "" };

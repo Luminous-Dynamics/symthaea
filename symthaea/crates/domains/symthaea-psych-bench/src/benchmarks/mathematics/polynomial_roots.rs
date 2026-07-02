@@ -144,7 +144,7 @@ impl PolynomialRootsBenchmark {
 
             // Sort known roots for bracketing.
             let mut sorted_roots = [r1, r2, r3];
-            sorted_roots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sorted_roots.sort_by(|a, b| a.total_cmp(b));
 
             let lo = sorted_roots[0] - 1.0;
             let hi = sorted_roots[2] + 1.0;

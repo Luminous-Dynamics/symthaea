@@ -509,15 +509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "array-util"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e509844de8f09b90a2c3444684a2b6695f4071360e13d2fda0af9f749cc2ed6"
-dependencies = [
- "arrayvec",
-]
-
-[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1366,17 +1357,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "quote-use",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "auto_impl"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffdcb70bdbc4d478427380519163274ac86e52916e10f0a8889adf0f96d3fee7"
-dependencies = [
- "proc-macro2",
- "quote",
  "syn 2.0.117",
 ]
 
@@ -2878,217 +2858,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "binius-core"
-version = "0.1.0"
-dependencies = [
- "binius-utils",
- "bytemuck",
- "bytes",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "binius-field"
-version = "0.1.0"
-dependencies = [
- "binius-utils",
- "bytemuck",
- "cfg-if",
- "derive_more 0.99.20",
- "rand 0.9.4",
- "seq-macro",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "binius-frontend"
-version = "0.1.0"
-dependencies = [
- "binius-core",
- "cranelift-entity 0.121.2",
- "hex-literal",
- "num-bigint",
- "petgraph 0.8.3",
- "rand 0.9.4",
- "rustc-hash 2.1.2",
- "serde",
- "serde_json",
- "smallvec 1.15.2",
-]
-
-[[package]]
-name = "binius-hash"
-version = "0.1.0"
-dependencies = [
- "binius-field",
- "binius-math",
- "binius-transcript",
- "binius-utils",
- "bytemuck",
- "bytes",
- "digest 0.10.7",
- "itertools 0.14.0",
- "sha2 0.10.9",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "binius-iop"
-version = "0.1.0"
-dependencies = [
- "binius-field",
- "binius-hash",
- "binius-ip",
- "binius-math",
- "binius-transcript",
- "binius-utils",
- "bytes",
- "digest 0.10.7",
- "getset",
- "itertools 0.14.0",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "binius-iop-prover"
-version = "0.1.0"
-dependencies = [
- "binius-field",
- "binius-hash",
- "binius-iop",
- "binius-ip",
- "binius-ip-prover",
- "binius-math",
- "binius-transcript",
- "binius-utils",
- "bytes",
- "derive_more 0.99.20",
- "digest 0.10.7",
- "getset",
- "itertools 0.14.0",
- "rand 0.9.4",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "binius-ip"
-version = "0.1.0"
-dependencies = [
- "binius-field",
- "binius-math",
- "binius-transcript",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "binius-ip-prover"
-version = "0.1.0"
-dependencies = [
- "binius-field",
- "binius-ip",
- "binius-math",
- "binius-transcript",
- "binius-utils",
- "either",
- "itertools 0.14.0",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "binius-math"
-version = "0.1.0"
-dependencies = [
- "binius-field",
- "binius-utils",
- "bytemuck",
- "getset",
- "itertools 0.14.0",
- "rand 0.9.4",
- "thiserror 2.0.18",
- "tracing",
- "uninit",
-]
-
-[[package]]
-name = "binius-prover"
-version = "0.1.0"
-dependencies = [
- "binius-core",
- "binius-field",
- "binius-hash",
- "binius-iop-prover",
- "binius-ip-prover",
- "binius-math",
- "binius-transcript",
- "binius-utils",
- "binius-verifier",
- "bytemuck",
- "bytes",
- "derive_more 0.99.20",
- "digest 0.10.7",
- "either",
- "getset",
- "itertools 0.14.0",
- "rand 0.9.4",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "binius-transcript"
-version = "0.1.0"
-dependencies = [
- "auto_impl",
- "binius-field",
- "binius-utils",
- "bytes",
- "digest 0.10.7",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "binius-utils"
-version = "0.1.0"
-dependencies = [
- "array-util",
- "bytemuck",
- "bytes",
- "cfg-if",
- "generic-array",
- "itertools 0.14.0",
- "rand 0.9.4",
- "rayon",
- "thiserror 2.0.18",
- "trait-set",
-]
-
-[[package]]
-name = "binius-verifier"
-version = "0.1.0"
-dependencies = [
- "binius-core",
- "binius-field",
- "binius-hash",
- "binius-iop",
- "binius-ip",
- "binius-math",
- "binius-transcript",
- "binius-utils",
- "bytemuck",
- "bytes",
- "digest 0.10.7",
- "getset",
- "itertools 0.14.0",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4417,12 +4186,6 @@ dependencies = [
 
 [[package]]
 name = "convert_case"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
-
-[[package]]
-name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
@@ -4695,15 +4458,9 @@ version = "0.131.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d535b489159ea63e3c40dfbe8d0e12bfb71f2a14845ef2407353e06c5a697c"
 dependencies = [
- "cranelift-entity 0.131.3",
+ "cranelift-entity",
  "wasmtime-internal-core",
 ]
-
-[[package]]
-name = "cranelift-bitset"
-version = "0.121.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebb6f5d0df5bd0d02c63ec48e8f2e38a176b123f59e084f22caf89a0d0593e7e"
 
 [[package]]
 name = "cranelift-bitset"
@@ -4725,11 +4482,11 @@ dependencies = [
  "bumpalo",
  "cranelift-assembler-x64",
  "cranelift-bforest",
- "cranelift-bitset 0.131.3",
+ "cranelift-bitset",
  "cranelift-codegen-meta",
  "cranelift-codegen-shared",
  "cranelift-control",
- "cranelift-entity 0.131.3",
+ "cranelift-entity",
  "cranelift-isle",
  "gimli",
  "hashbrown 0.16.1",
@@ -4774,20 +4531,11 @@ dependencies = [
 
 [[package]]
 name = "cranelift-entity"
-version = "0.121.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee832f8329fa87c5df6c1d64a8506a58031e6f8a190d9b21b1900272a4dbb47d"
-dependencies = [
- "cranelift-bitset 0.121.2",
-]
-
-[[package]]
-name = "cranelift-entity"
 version = "0.131.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9aa2846b239a046217ecf95cfed0e31be4e86843785d07438ad33f456871e888"
 dependencies = [
- "cranelift-bitset 0.131.3",
+ "cranelift-bitset",
  "serde",
  "serde_derive",
  "wasmtime-internal-core",
@@ -6338,19 +6086,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
 dependencies = [
  "derive_builder_core",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "derive_more"
-version = "0.99.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6edb4b64a43d977b8e99788fe3a04d483834fba1215a7e02caa415b626497f7f"
-dependencies = [
- "convert_case 0.4.0",
- "proc-macro2",
- "quote",
- "rustc_version",
  "syn 2.0.117",
 ]
 
@@ -8637,17 +8372,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "getset"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cf442baaabe4213ce7d1239afc26c039180b6456da2cededa316ae2c8a77a77"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "ghash"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9268,24 +8992,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hdc-zkp-bench"
-version = "0.1.0"
-dependencies = [
- "binius-core",
- "binius-frontend",
- "binius-hash",
- "binius-prover",
- "binius-transcript",
- "binius-verifier",
- "rand 0.9.4",
- "serde_json",
- "sha2 0.10.9",
- "winter-crypto",
- "winter-math",
- "winterfell",
-]
-
-[[package]]
 name = "heapless"
 version = "0.7.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9344,12 +9050,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hex-literal"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e712f64ec3850b98572bffac52e2c6f282b29fe6c5fa6d42334b30be438d95c1"
 
 [[package]]
 name = "hexasphere"
@@ -15328,7 +15028,7 @@ version = "44.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34dff5fd3d9ac4845939fcb4597cd413cb244bc530448ed4766d11b1725e53d0"
 dependencies = [
- "cranelift-bitset 0.131.3",
+ "cranelift-bitset",
  "log",
  "pulley-macros",
  "wasmtime-internal-core",
@@ -21460,17 +21160,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "trait-set"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b79e2e9c9ab44c6d7c20d5976961b47e8f49ac199154daa514b77cd1ab536625"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "trajectory_msgs"
 version = "4.9.1"
 dependencies = [
@@ -21922,12 +21611,6 @@ name = "unicode_categories"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
-
-[[package]]
-name = "uninit"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "359fdaaabedff944f100847f2e0ea88918d8012fe64baf5b54c191ad010168c9"
 
 [[package]]
 name = "universal-hash"
@@ -22591,8 +22274,8 @@ dependencies = [
  "anyhow",
  "cpp_demangle",
  "cranelift-bforest",
- "cranelift-bitset 0.131.3",
- "cranelift-entity 0.131.3",
+ "cranelift-bitset",
+ "cranelift-entity",
  "gimli",
  "hashbrown 0.16.1",
  "indexmap 2.14.0",
@@ -22675,7 +22358,7 @@ dependencies = [
  "cfg-if",
  "cranelift-codegen",
  "cranelift-control",
- "cranelift-entity 0.131.3",
+ "cranelift-entity",
  "cranelift-frontend",
  "cranelift-native",
  "gimli",
@@ -24347,106 +24030,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "winter-air"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef01227f23c7c331710f43b877a8333f5f8d539631eea763600f1a74bf018c7c"
-dependencies = [
- "libm",
- "winter-crypto",
- "winter-fri",
- "winter-math",
- "winter-utils",
-]
-
-[[package]]
-name = "winter-crypto"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cdb247bc142438798edb04067ab72a22cf815f57abbd7b78a6fa986fc101db8"
-dependencies = [
- "blake3",
- "sha3",
- "winter-math",
- "winter-utils",
-]
-
-[[package]]
-name = "winter-fri"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd592b943f9d65545683868aaf1b601eb66e52bfd67175347362efff09101d3a"
-dependencies = [
- "winter-crypto",
- "winter-math",
- "winter-utils",
-]
-
-[[package]]
-name = "winter-math"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7aecfb48ee6a8b4746392c8ff31e33e62df8528a3b5628c5af27b92b14aef1ea"
-dependencies = [
- "winter-utils",
-]
-
-[[package]]
-name = "winter-maybe-async"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d31a19dae58475d019850e25b0170e94b16d382fbf6afee9c0e80fdc935e73e"
-dependencies = [
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "winter-prover"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84cc631ed56cd39b78ef932c1ec4060cc6a44d114474291216c32f56655b3048"
-dependencies = [
- "tracing",
- "winter-air",
- "winter-crypto",
- "winter-fri",
- "winter-math",
- "winter-maybe-async",
- "winter-utils",
-]
-
-[[package]]
-name = "winter-utils"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9951263ef5317740cd0f49e618db00c72fabb70b75756ea26c4d5efe462c04dd"
-
-[[package]]
-name = "winter-verifier"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0425ea81f8f703a1021810216da12003175c7974a584660856224df04b2e2fdb"
-dependencies = [
- "winter-air",
- "winter-crypto",
- "winter-fri",
- "winter-math",
- "winter-utils",
-]
-
-[[package]]
-name = "winterfell"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f824ddd5aec8ca6a54307f20c115485a8a919ea94dd26d496d856ca6185f4f"
-dependencies = [
- "winter-air",
- "winter-prover",
- "winter-verifier",
 ]
 
 [[package]]

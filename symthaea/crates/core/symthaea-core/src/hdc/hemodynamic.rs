@@ -267,7 +267,7 @@ mod tests {
             .samples
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
         let peak_time = peak_idx as f64 / 100.0;
@@ -349,7 +349,7 @@ mod tests {
                 let t = i as f64 * 0.01;
                 (i, gamma_pdf(t, 6.0, 1.0))
             })
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(&b.1))
             .unwrap()
             .0 as f64
             * 0.01;

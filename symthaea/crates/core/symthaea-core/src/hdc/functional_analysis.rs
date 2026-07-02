@@ -302,8 +302,7 @@ fn leading_minor_det(matrix: &[Vec<f64>], k: usize) -> f64 {
     let mut det = 1.0;
     for col in 0..k {
         // find pivot
-        let pivot_row =
-            (col..k).max_by(|&a, &b| m[a][col].abs().partial_cmp(&m[b][col].abs()).unwrap());
+        let pivot_row = (col..k).max_by(|&a, &b| m[a][col].abs().total_cmp(&m[b][col].abs()));
         if let Some(pr) = pivot_row {
             if m[pr][col].abs() < 1e-15 {
                 return 0.0;
@@ -419,7 +418,7 @@ pub fn spectral_decompose(op: &BoundedOperator) -> Result<SpectralDecomposition,
 
     // Sort by eigenvalue ascending
     let mut pairs: Vec<(f64, L2Vec)> = eigenvalues.into_iter().zip(eigenvectors).collect();
-    pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
     let (eigenvalues, eigenvectors) = pairs.into_iter().unzip();
 
     Ok(SpectralDecomposition {
@@ -786,7 +785,7 @@ fn smallest_eigenvector(m: &[Vec<f64>], iterations: usize) -> (Vec<f64>, f64) {
             .eigenvalues
             .iter()
             .enumerate()
-            .min_by(|a, b| a.1.abs().partial_cmp(&b.1.abs()).unwrap())
+            .min_by(|a, b| a.1.abs().total_cmp(&b.1.abs()))
             .unwrap_or((0, &0.0));
         return (decomp.eigenvectors[min_idx].components.clone(), min_ev);
     }
@@ -937,7 +936,7 @@ mod tests {
         ]);
         let decomp = spectral_decompose(&diag).unwrap();
         let mut evs = decomp.eigenvalues.clone();
-        evs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        evs.sort_by(|a, b| a.total_cmp(b));
         assert!(close(evs[0], 1.0, 1e-10));
         assert!(close(evs[1], 2.0, 1e-10));
         assert!(close(evs[2], 3.0, 1e-10));
@@ -968,7 +967,7 @@ mod tests {
         let decomp = spectral_decompose(&op).unwrap();
         // eigenvalues should be 2 and 4
         let mut evs = decomp.eigenvalues.clone();
-        evs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        evs.sort_by(|a, b| a.total_cmp(b));
         assert!(close(evs[0], 2.0, 1e-8));
         assert!(close(evs[1], 4.0, 1e-8));
     }

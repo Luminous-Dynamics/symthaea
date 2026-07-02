@@ -148,11 +148,7 @@ impl MelodyPredictor {
 
         scale_tones
             .iter()
-            .min_by(|a, b| {
-                ((**a - target).abs())
-                    .partial_cmp(&((**b - target).abs()))
-                    .unwrap()
-            })
+            .min_by(|a, b| ((**a - target).abs()).total_cmp(&((**b - target).abs())))
             .copied()
             .unwrap_or(target)
     }

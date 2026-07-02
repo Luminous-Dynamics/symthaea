@@ -282,7 +282,7 @@ pub fn effective_dimensionality(corr: &[[f64; N_THEORIES]; N_THEORIES]) -> (usiz
             }
         }
     }
-    eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    eigenvalues.sort_by(|a, b| b.total_cmp(a));
     let total: f64 = eigenvalues.iter().sum();
     let threshold = 0.05 * total;
     let n_eff = eigenvalues.iter().filter(|&&e| e > threshold).count();

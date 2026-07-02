@@ -227,8 +227,7 @@ fn det_nxn(m: &[Vec<f64>]) -> f64 {
     let mut a: Vec<Vec<f64>> = m.to_vec();
     let mut det = 1.0;
     for col in 0..n {
-        let pivot_row =
-            (col..n).max_by(|&r1, &r2| a[r1][col].abs().partial_cmp(&a[r2][col].abs()).unwrap());
+        let pivot_row = (col..n).max_by(|&r1, &r2| a[r1][col].abs().total_cmp(&a[r2][col].abs()));
         if let Some(pr) = pivot_row {
             if a[pr][col].abs() < 1e-14 {
                 return 0.0;

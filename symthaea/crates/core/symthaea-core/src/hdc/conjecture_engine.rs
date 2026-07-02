@@ -3309,11 +3309,7 @@ mod tests {
     fn test_nuclear_binding_energy_peak() {
         let seq = observe_nuclear_binding_energy(100);
         // B/A should peak around A=56 (iron) at ~8.5-9 MeV/nucleon
-        let (peak_a, peak_ba) = seq
-            .data
-            .iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .unwrap();
+        let (peak_a, peak_ba) = seq.data.iter().max_by(|a, b| a.1.total_cmp(&b.1)).unwrap();
         assert!(
             *peak_a > 40.0 && *peak_a < 80.0,
             "B/A peak should be near Fe-56, got A={}",

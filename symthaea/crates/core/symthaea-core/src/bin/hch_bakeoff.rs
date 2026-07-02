@@ -839,7 +839,7 @@ mod app {
         let best_non_oracle = results
             .iter()
             .filter(|result| !result.router.starts_with("Oracle"))
-            .max_by(|a, b| a.top1.partial_cmp(&b.top1).unwrap());
+            .max_by(|a, b| a.top1.total_cmp(&b.top1));
 
         let Some(best) = best_non_oracle else {
             return "missing non-oracle routers; diagnosis unavailable".into();

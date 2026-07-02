@@ -57,7 +57,7 @@ impl GlobalWorkspace {
             .competition_queue
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.magnitude.partial_cmp(&b.magnitude).unwrap())
+            .max_by(|(_, a), (_, b)| a.magnitude.total_cmp(&b.magnitude))
             .map(|(i, _)| i)?;
 
         let winner = self.competition_queue.remove(winner_idx)?;

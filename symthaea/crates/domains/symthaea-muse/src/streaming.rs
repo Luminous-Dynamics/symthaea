@@ -1324,8 +1324,7 @@ impl StreamingSynth {
                         .enumerate()
                         .min_by(|(_, a), (_, b)| {
                             ((**a - note.frequency).abs())
-                                .partial_cmp(&((**b - note.frequency).abs()))
-                                .unwrap()
+                                .total_cmp(&((**b - note.frequency).abs()))
                         })
                         .map(|(i, _)| i)
                     {

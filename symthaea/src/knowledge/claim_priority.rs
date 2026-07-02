@@ -156,7 +156,7 @@ impl ClaimPrioritizer {
             .filter(|p| p.priority >= self.config.min_priority_threshold)
             .collect();
 
-        prioritized.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
+        prioritized.sort_by(|a, b| b.priority.total_cmp(&a.priority));
         prioritized.truncate(self.config.max_per_cycle);
         prioritized
     }

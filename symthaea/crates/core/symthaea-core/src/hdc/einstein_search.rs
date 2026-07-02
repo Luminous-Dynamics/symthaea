@@ -283,7 +283,7 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
             .enumerate()
             .map(|(i, s)| (s.einstein_defect(), i, false))
             .collect();
-        scored.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        scored.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         let best_defect = scored[0].0;
         convergence_history.push(best_defect);
@@ -384,7 +384,7 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
 
     // ── Build final result ────────────────────────────────────────────────
     // Deduplicate and sort candidates
-    all_found.sort_by(|a, b| a.einstein_defect.partial_cmp(&b.einstein_defect).unwrap());
+    all_found.sort_by(|a, b| a.einstein_defect.total_cmp(&b.einstein_defect));
     all_found.dedup_by(|a, b| (a.einstein_defect - b.einstein_defect).abs() < 1e-10);
 
     let best = if all_found.is_empty() {

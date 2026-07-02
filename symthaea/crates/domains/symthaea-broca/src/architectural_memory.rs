@@ -160,7 +160,7 @@ impl ArchitecturalMemory {
             }
         }
 
-        results.sort_by(|a, b| b.success_score.partial_cmp(&a.success_score).unwrap());
+        results.sort_by(|a, b| b.success_score.total_cmp(&a.success_score));
         results.truncate(self.top_k);
 
         Ok(results)

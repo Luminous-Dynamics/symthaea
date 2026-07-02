@@ -263,7 +263,7 @@ impl RandomForest {
 
             // Collect and sort unique values for this feature
             let mut values: Vec<f64> = features.iter().map(|row| row[f_idx]).collect();
-            values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            values.sort_by(|a, b| a.total_cmp(b));
             values.dedup();
 
             // Try ~10 candidate thresholds evenly spaced

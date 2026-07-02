@@ -203,7 +203,7 @@ pub fn coupling_sweep(
 pub fn find_optimal_coupling(points: &[TradeoffPoint]) -> (f64, f64) {
     points
         .iter()
-        .max_by(|a, b| a.id_product.partial_cmp(&b.id_product).unwrap())
+        .max_by(|a, b| a.id_product.total_cmp(&b.id_product))
         .map(|p| (p.coupling, p.id_product))
         .unwrap_or((0.0, 0.0))
 }

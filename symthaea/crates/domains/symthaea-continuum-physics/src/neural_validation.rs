@@ -174,7 +174,7 @@ fn symmetric_eigenvalues(matrix: &[f64], n: usize) -> Vec<f64> {
     }
 
     let mut eigenvalues: Vec<f64> = (0..n).map(|i| a[i * n + i].abs()).collect();
-    eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    eigenvalues.sort_by(|a, b| b.total_cmp(a));
     eigenvalues
 }
 

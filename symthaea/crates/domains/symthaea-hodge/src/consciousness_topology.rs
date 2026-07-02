@@ -709,7 +709,7 @@ mod tests {
         let m = vec![vec![3.0, 0.0], vec![0.0, 1.0]];
         let (eigenvalues, _) = symmetric_eigen(&m);
         let mut sorted = eigenvalues.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
         assert!((sorted[0] - 1.0).abs() < 1e-8);
         assert!((sorted[1] - 3.0).abs() < 1e-8);
     }

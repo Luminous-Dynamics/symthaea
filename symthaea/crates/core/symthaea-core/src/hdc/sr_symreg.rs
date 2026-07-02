@@ -482,10 +482,7 @@ mod tests {
         let baseline = summary[0];
         // Two "best" notions: by convergence rate, by mean MSE
         let best_conv = summary.iter().max_by(|a, b| a.1.cmp(&b.1)).unwrap();
-        let best_mse = summary
-            .iter()
-            .min_by(|a, b| a.3.partial_cmp(&b.3).unwrap())
-            .unwrap();
+        let best_mse = summary.iter().min_by(|a, b| a.3.total_cmp(&b.3)).unwrap();
 
         eprintln!(
             "\n  BASELINE (σ=0):  {}/{} converged, mean MSE {:.3e}",

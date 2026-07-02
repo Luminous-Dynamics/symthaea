@@ -627,7 +627,7 @@ impl EngineeringManager {
             if let Some((_, prob)) = [0, 1]
                 .iter()
                 .filter_map(|&v| Some((v, self.predict_intervention(variable, v, "safety")?)))
-                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .max_by(|a, b| a.1.total_cmp(&b.1))
             {
                 if prob > 0.5 { /* apply reinforcement */ }
             }

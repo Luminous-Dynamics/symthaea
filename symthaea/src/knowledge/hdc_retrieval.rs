@@ -158,7 +158,7 @@ impl HdcKnowledgeIndex {
             .filter(|r| r.similarity >= MIN_RETRIEVAL_SIMILARITY)
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
         results.truncate(k);
         results
     }
@@ -190,7 +190,7 @@ impl HdcKnowledgeIndex {
             .filter(|r| r.similarity >= MIN_RETRIEVAL_SIMILARITY)
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
         results.truncate(k);
         results
     }

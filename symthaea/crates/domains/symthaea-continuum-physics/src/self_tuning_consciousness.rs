@@ -311,7 +311,7 @@ pub fn compare_self_tuning_vs_fixed(
 
     let best_fixed = fixed_results
         .iter()
-        .max_by(|a, b| a.3.partial_cmp(&b.3).unwrap())
+        .max_by(|a, b| a.3.total_cmp(&b.3))
         .cloned()
         .unwrap_or((0.0, 0.0, 0.0, 0.0));
 

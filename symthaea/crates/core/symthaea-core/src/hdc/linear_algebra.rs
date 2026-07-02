@@ -1936,7 +1936,7 @@ mod tests {
         let a = HdcMatrix::from_rows(&[&[4.0, 0.0, 0.0], &[0.0, 2.0, 0.0], &[0.0, 0.0, 7.0]]);
         let (eigenvalues, _) = a.eigenvalues_symmetric();
         let mut ev = eigenvalues.clone();
-        ev.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        ev.sort_by(|a, b| b.total_cmp(a));
         assert!((ev[0] - 7.0).abs() < 1e-6);
         assert!((ev[1] - 4.0).abs() < 1e-6);
         assert!((ev[2] - 2.0).abs() < 1e-6);
@@ -2001,7 +2001,7 @@ mod tests {
     fn test_svd_diagonal() {
         let a = HdcMatrix::from_rows(&[&[3.0, 0.0], &[0.0, 5.0]]);
         let (mut sv, _, _, _) = a.svd();
-        sv.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        sv.sort_by(|a, b| b.total_cmp(a));
         assert!((sv[0] - 5.0).abs() < 1e-6);
         assert!((sv[1] - 3.0).abs() < 1e-6);
     }
@@ -2333,7 +2333,7 @@ mod tests {
         // Eigenvalues should be 0 and 1
         let (ev, _) = p.eigenvalues_symmetric();
         let mut ev_sorted = ev.clone();
-        ev_sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        ev_sorted.sort_by(|a, b| b.total_cmp(a));
         assert!((ev_sorted[0] - 1.0).abs() < 1e-6);
         assert!(ev_sorted[1].abs() < 1e-6);
     }
@@ -2795,7 +2795,7 @@ mod tests {
         let mut engine = LinearAlgebraEngine::new();
         let a = HdcMatrix::from_rows(&[&[3.0, 0.0], &[0.0, 4.0]]);
         let (mut sv, _, _, _) = engine.svd(&a);
-        sv.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        sv.sort_by(|a, b| b.total_cmp(a));
         assert!((sv[0] - 4.0).abs() < 1e-6);
         assert!((sv[1] - 3.0).abs() < 1e-6);
         assert_eq!(engine.stats().factorizations, 1);

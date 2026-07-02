@@ -354,7 +354,7 @@ fn consciousness_behavior_coupling_validation() {
 
     // Split into above-median and below-median consciousness groups
     let mut sorted_c: Vec<f64> = pairs.iter().map(|p| p.0).collect();
-    sorted_c.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted_c.sort_by(|a, b| a.total_cmp(b));
     let median_c = sorted_c[sorted_c.len() / 2];
 
     let (mut high_c_pe_sum, mut high_c_count) = (0.0_f64, 0_usize);

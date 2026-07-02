@@ -273,7 +273,7 @@ fn bench_semantic_operations(c: &mut Criterion) {
                 .iter()
                 .map(|hv| query.similarity(hv))
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
         })
     });
 
@@ -286,7 +286,7 @@ fn bench_semantic_operations(c: &mut Criterion) {
                     .map(|hv| query.similarity(hv))
                     .enumerate()
                     .collect();
-                similarities.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
+                similarities.sort_by(|(_, a), (_, b)| b.total_cmp(a));
                 similarities.truncate(k);
                 black_box(similarities)
             })

@@ -150,12 +150,8 @@ fn gram_det(m: &[Vec<f64>]) -> f64 {
     let mut a: Vec<Vec<f64>> = m.to_vec();
     let mut det = 1.0;
     for col in 0..n {
-        let pivot_row = (col..n).max_by(|&a_idx, &b_idx| {
-            a[a_idx][col]
-                .abs()
-                .partial_cmp(&a[b_idx][col].abs())
-                .unwrap()
-        });
+        let pivot_row =
+            (col..n).max_by(|&a_idx, &b_idx| a[a_idx][col].abs().total_cmp(&a[b_idx][col].abs()));
         if let Some(pr) = pivot_row {
             if a[pr][col].abs() < 1e-15 {
                 return 0.0;
@@ -498,7 +494,7 @@ impl RootSystem {
             .max_by(|a, b| {
                 let sa: f64 = a.iter().sum();
                 let sb: f64 = b.iter().sum();
-                sa.partial_cmp(&sb).unwrap()
+                sa.total_cmp(&sb)
             })
             .unwrap_or_default()
     }
