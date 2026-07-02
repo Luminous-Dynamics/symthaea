@@ -234,7 +234,7 @@ fn best_n<const D: usize>(
     // 1. Deepest point
     let i0 = (0..candidates.len())
         .max_by(|&a, &b| candidates[a].1.total_cmp(&candidates[b].1))
-        .unwrap();
+        .expect("candidates non-empty: checked above");
     push_cand!(i0);
 
     if n <= 1 || candidates.len() <= 1 {
@@ -250,7 +250,7 @@ fn best_n<const D: usize>(
                 .norm_squared()
                 .total_cmp(&(candidates[b].0 - p0).norm_squared())
         })
-        .unwrap();
+        .expect("candidates.len() >= 2: checked above, filter removes exactly 1 (i0)");
     push_cand!(i1);
 
     if n <= 2 || candidates.len() <= 2 {
@@ -272,7 +272,7 @@ fn best_n<const D: usize>(
                 edge_len_sq,
             ))
         })
-        .unwrap();
+        .expect("candidates.len() >= 3: checked above, filter removes exactly 2 (i0, i1)");
     push_cand!(i2);
 
     if n <= 3 || candidates.len() <= 3 {
