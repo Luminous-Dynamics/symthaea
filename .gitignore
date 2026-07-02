@@ -322,6 +322,14 @@ configs/
 /xenia/xenia-wire/
 /xenia/xenia-server/
 /xenia/xenia-peer/
+
+# Externally-prepared Xenia patch trains land at repo root as scratch
+# files, get applied into xenia/xenia-wire or xenia/xenia-peer, then
+# should be deleted — not left as clutter (2026-07 cleanup removed
+# ~23GB of archived build-artifact snapshots plus 20 stale/applied
+# root-level .patch files; see xenia/XENIA_COMPREHENSIVE_REVIEW_2026-07.md).
+/xenia-*.patch
+/_patchwork/
 .aider*
 
 # === Monorepo Scratch & Tool Cleanup ===
