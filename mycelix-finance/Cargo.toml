@@ -21,6 +21,14 @@ members = [
     "zomes/currency-mint/coordinator",
     "zomes/price-oracle/integrity",
     "zomes/price-oracle/coordinator",
+    "zomes/cgc/integrity",
+    "zomes/cgc/coordinator",
+    "zomes/credit_scoring/integrity",
+    "zomes/credit_scoring/coordinator",
+    "zomes/hearth/integrity",
+    "zomes/hearth/coordinator",
+    "zomes/lending/integrity",
+    "zomes/lending/coordinator",
 ]
 exclude = ["tests"]
 

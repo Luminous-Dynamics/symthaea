@@ -1,0 +1,17 @@
+[package]
+name = "hearth"
+version = "0.1.0"
+edition = "2024"
+description = "HEARTH Commons Pool coordinator zome - Commons Charter Article I"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "hearth"
+
+[dependencies]
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+hearth_integrity = { path = "../integrity" }

@@ -1,0 +1,17 @@
+[package]
+name = "lending"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "lending"
+
+[dependencies]
+getrandom = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+lending_integrity = { path = "../integrity" }
+mycelix_finance_shared = { path = "../../shared" }
