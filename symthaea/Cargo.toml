@@ -65,7 +65,7 @@ log = "0.4"
 url = "2.5"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 getrandom = "0.2"
-mycelix-zkp-core = { path = "../mycelix-workspace/crates/mycelix-zkp-core", features = ["dilithium"] }
+mycelix-zkp-core = { path = "../crates/mycelix-zkp-core", features = ["dilithium"] }
 no-panic = "0.1"
 parry3d = "0.17"
 uom = { version = "0.36", features = ["f64", "si"] }
