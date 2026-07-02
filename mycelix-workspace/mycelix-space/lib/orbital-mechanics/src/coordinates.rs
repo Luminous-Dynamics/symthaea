@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Coordinate Transformations
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Coordinate Transformations
 //!
 //! Converts between different reference frames:
 //! - TEME: True Equator Mean Equinox (SGP4 native output)
@@ -351,7 +352,7 @@ mod tests {
         let station = GeodeticCoord::new(0.0, 0.0, 0.0);
         let satellite = station.to_ecef() + Vector3::new(400.0, 0.0, 0.0);
 
-        let (az, el, range) = look_angles(&station, &satellite);
+        let (_az, el, range) = look_angles(&station, &satellite);
 
         // Elevation should be ~90 degrees (directly overhead)
         // Range should be ~400 km

@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Conjunctions Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Conjunctions Integrity Zome
 //!
 //! Defines entry types for conjunction events (close approaches)
 //! and Conjunction Data Messages (CDMs).
@@ -10,6 +11,7 @@ use mycelix_space_shared::{ConjunctionDataMessage, SpaceTimestamp};
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
+#[allow(clippy::large_enum_variant)]
 pub enum EntryTypes {
     /// Conjunction event between two objects
     ConjunctionEvent(ConjunctionEvent),
@@ -156,13 +158,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, .. } => match app_entry {
-                EntryTypes::ConjunctionEvent(event) => validate_event(&event),
-                EntryTypes::Cdm(cdm) => validate_cdm(&cdm),
-                EntryTypes::AvoidanceManeuver(maneuver) => validate_maneuver(&maneuver),
-            },
-            _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::ConjunctionEvent(event) => validate_event(&event),
+            EntryTypes::Cdm(cdm) => validate_cdm(&cdm),
+            EntryTypes::AvoidanceManeuver(maneuver) => validate_maneuver(&maneuver),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }

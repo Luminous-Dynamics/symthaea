@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Orbital Objects Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Orbital Objects Integrity Zome
 //!
 //! Defines the entry types and validation rules for the orbital object catalog.
 //! This is the foundational data structure - a decentralized registry of all

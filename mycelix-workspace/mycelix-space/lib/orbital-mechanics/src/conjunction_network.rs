@@ -249,7 +249,11 @@ impl ConjunctionNetwork {
     /// [`SpaceObject`] with [`ScreeningPriority::Medium`].
     pub fn load_catalog_from_tle_lines(&mut self, lines: &[&str]) {
         // Collect non-empty, non-whitespace-only lines
-        let cleaned: Vec<&str> = lines.iter().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+        let cleaned: Vec<&str> = lines
+            .iter()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
         let mut i = 0;
         while i < cleaned.len() {
             let parsed = if i + 2 < cleaned.len()
@@ -361,8 +365,16 @@ impl ConjunctionNetwork {
             let eps = 1.0; // 1-second finite-diff
             let pp1 = propagate_keplerian(&primary.orbital_elements, best_t + eps);
             let ps1 = propagate_keplerian(&secondary.orbital_elements, best_t + eps);
-            let vp = [(pp1[0] - best_pos_p[0]) / eps, (pp1[1] - best_pos_p[1]) / eps, (pp1[2] - best_pos_p[2]) / eps];
-            let vs = [(ps1[0] - best_pos_s[0]) / eps, (ps1[1] - best_pos_s[1]) / eps, (ps1[2] - best_pos_s[2]) / eps];
+            let vp = [
+                (pp1[0] - best_pos_p[0]) / eps,
+                (pp1[1] - best_pos_p[1]) / eps,
+                (pp1[2] - best_pos_p[2]) / eps,
+            ];
+            let vs = [
+                (ps1[0] - best_pos_s[0]) / eps,
+                (ps1[1] - best_pos_s[1]) / eps,
+                (ps1[2] - best_pos_s[2]) / eps,
+            ];
             let dv = [vp[0] - vs[0], vp[1] - vs[1], vp[2] - vs[2]];
             best_vel_rel = (dv[0] * dv[0] + dv[1] * dv[1] + dv[2] * dv[2]).sqrt();
 
@@ -377,7 +389,16 @@ impl ConjunctionNetwork {
                 primary.norad_id, secondary.norad_id, best_t
             );
 
-            let cdm = generate_cdm(primary, secondary, best_t, min_dist, best_vel_rel, pc, &best_pos_p, &best_pos_s);
+            let cdm = generate_cdm(
+                primary,
+                secondary,
+                best_t,
+                min_dist,
+                best_vel_rel,
+                pc,
+                &best_pos_p,
+                &best_pos_s,
+            );
 
             Some(ConjunctionEvent {
                 id,
@@ -571,7 +592,10 @@ fn generate_cdm(
     ConjunctionDataMessage {
         creation_date: chrono::Utc::now().to_rfc3339(),
         originator: "mycelix-space-conjunction-network".to_string(),
-        message_for: primary.operator.clone().unwrap_or_else(|| "ALL".to_string()),
+        message_for: primary
+            .operator
+            .clone()
+            .unwrap_or_else(|| "ALL".to_string()),
         object1_name: primary.name.clone(),
         object1_id: primary.norad_id,
         object2_name: secondary.name.clone(),
@@ -599,7 +623,10 @@ pub fn space_object_from_tle(tle: &TwoLineElement) -> SpaceObject {
     };
     SpaceObject {
         norad_id: tle.norad_id,
-        name: tle.name.clone().unwrap_or_else(|| format!("NORAD-{}", tle.norad_id)),
+        name: tle
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("NORAD-{}", tle.norad_id)),
         object_type: ObjectType::Unknown,
         orbital_elements: elements,
         tle_epoch: 0.0, // Caller should set from tle.epoch if Julian date needed
@@ -639,7 +666,12 @@ mod tests {
     }
 
     /// Helper: build a SpaceObject from elements.
-    fn make_object(id: u32, name: &str, elems: OrbitalElements, priority: ScreeningPriority) -> SpaceObject {
+    fn make_object(
+        id: u32,
+        name: &str,
+        elems: OrbitalElements,
+        priority: ScreeningPriority,
+    ) -> SpaceObject {
         SpaceObject {
             norad_id: id,
             name: name.to_string(),
@@ -662,7 +694,7 @@ mod tests {
         let period_s = 2.0 * PI / n;
         let elems = OrbitalElements {
             semi_major_axis_km: a,
-            eccentricity: 0.001, // near-circular
+            eccentricity: 0.001,   // near-circular
             inclination_deg: 51.6, // ISS-like
             raan_deg: 0.0,
             arg_perigee_deg: 0.0,
@@ -712,7 +744,10 @@ mod tests {
         net.add_object(leo);
         net.add_object(geo);
         let events = net.screen_all();
-        assert!(events.is_empty(), "LEO-GEO pair should not produce conjunction");
+        assert!(
+            events.is_empty(),
+            "LEO-GEO pair should not produce conjunction"
+        );
     }
 
     // 4. Close-approach objects produce conjunction event
@@ -732,7 +767,10 @@ mod tests {
         net.add_object(obj1);
         net.add_object(obj2);
         let events = net.screen_all();
-        assert!(!events.is_empty(), "Nearby objects should produce at least one conjunction");
+        assert!(
+            !events.is_empty(),
+            "Nearby objects should produce at least one conjunction"
+        );
     }
 
     // 5. Collision probability > 0 for close approach

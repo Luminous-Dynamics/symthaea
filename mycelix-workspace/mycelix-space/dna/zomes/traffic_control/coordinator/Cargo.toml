@@ -2,6 +2,7 @@
 name = "traffic_control"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
 description = "Coordinator zome for automated space traffic coordination"
 
 [lib]
@@ -15,4 +16,5 @@ holochain_serialized_bytes = { workspace = true }
 traffic_control_integrity = { path = "../integrity" }
 mycelix-space-shared = { path = "../../../../zomes/shared" }
 orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
-getrandom = { workspace = true }
+chrono = { workspace = true }
+nalgebra = { workspace = true }

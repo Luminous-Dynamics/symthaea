@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Tests for conjunction analysis
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Tests for conjunction analysis
 //!
 //! Tests close approach detection, collision probability calculation,
 //! and risk assessment.
@@ -262,7 +263,8 @@ fn test_assessment_fields() {
     let secondary = OrbitalState::new(
         49863,
         now,
-        StateVector::new(7000.2, 0.0, 0.0, 0.0, 7.5, 0.0),
+        // Slightly different velocity to create realistic encounter geometry
+        StateVector::new(7000.2, 0.0, 0.0, 0.0, 7.499, 0.01),
         DataSource::SpaceTrack,
     )
     .with_covariance(CovarianceMatrix::diagonal([
@@ -301,7 +303,8 @@ fn test_very_close_approach() {
     let secondary = OrbitalState::new(
         99999,
         now,
-        StateVector::new(7000.1, 0.0, 0.0, 0.0, 7.5, 0.0),
+        // Slightly different velocity for realistic encounter geometry
+        StateVector::new(7000.1, 0.0, 0.0, 0.0, 7.499, 0.005),
         DataSource::SpaceTrack,
     )
     .with_covariance(CovarianceMatrix::diagonal([

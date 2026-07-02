@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Orbital State Vectors
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Orbital State Vectors
 //!
 //! Represents the complete state of an orbital object: position, velocity,
 //! and uncertainty (covariance matrix).
@@ -11,9 +12,10 @@ use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 
 /// Reference frame for state vectors
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum ReferenceFrame {
     /// True Equator Mean Equinox (J2000)
+    #[default]
     TEME,
     /// Earth-Centered Inertial (J2000)
     ECI,
@@ -21,12 +23,6 @@ pub enum ReferenceFrame {
     ECEF,
     /// International Celestial Reference Frame
     ICRF,
-}
-
-impl Default for ReferenceFrame {
-    fn default() -> Self {
-        ReferenceFrame::TEME // SGP4 native frame
-    }
 }
 
 /// 6-element state vector (position + velocity)

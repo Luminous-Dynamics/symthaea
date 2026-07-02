@@ -25,7 +25,7 @@ use crate::covariance::CovarianceMatrix;
 use crate::fusion::{FusionPipeline, SensorMeasurement};
 use crate::lambert::solve_lambert;
 use crate::orbit_determination::{
-    batch_least_squares, gauss_iod, ObservationRecord, ObservationType,
+    ObservationRecord, ObservationType, batch_least_squares, gauss_iod,
 };
 use crate::state::{DataSource, SensorType, StateVector};
 

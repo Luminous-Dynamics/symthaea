@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Tests for the orbital-mechanics library
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Tests for the orbital-mechanics library
 //!
 //! Tests TLE parsing, orbital parameters, and basic operations.
 

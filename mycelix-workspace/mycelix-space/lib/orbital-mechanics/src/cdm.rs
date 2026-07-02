@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Conjunction Data Message (CDM) Generator
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Conjunction Data Message (CDM) Generator
 //!
 //! Implements CCSDS 508.0-B-1 Conjunction Data Message format for
 //! space situational awareness data exchange.
@@ -13,6 +14,73 @@ use serde::{Deserialize, Serialize};
 
 /// CCSDS CDM Version
 pub const CDM_VERSION: &str = "1.0";
+
+/// Default combined hard-body radius (meters) per CCSDS 508.0-B-1 recommendation
+/// when no operator-provided value is available. 20m is a conservative combined
+/// radius suitable for LEO payload-vs-debris screening.
+pub const DEFAULT_HARD_BODY_RADIUS_M: f64 = 20.0;
+
+/// Collision probability computation method.
+///
+/// CCSDS 508.0-B-1 requires identification of the method used to compute Pc.
+/// Known methods are enumerated; unknown methods are accepted via `Other`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PcMethod {
+    /// Alfano maximum probability method (Alfano 2005)
+    Alfano2005,
+    /// Foster short-encounter Pc (Foster 1992)
+    Foster1992,
+    /// Patera general-geometry method (Patera 2001)
+    Patera2001,
+    /// McKinley 2-D Pc (McKinley 2006)
+    McKinley2006,
+    /// Chan general method (Chan 2008)
+    Chan2008,
+    /// Monte Carlo simulation
+    MonteCarlo,
+    /// Other/unrecognized method (preserved as-is)
+    Other(String),
+}
+
+impl PcMethod {
+    /// Parse a method string into a `PcMethod`, accepting known CCSDS method names
+    /// and falling back to `Other` for unrecognized strings.
+    pub fn from_str_permissive(s: &str) -> Self {
+        match s.to_uppercase().replace(' ', "-").as_str() {
+            "ALFANO-2005" => PcMethod::Alfano2005,
+            "FOSTER-1992" => PcMethod::Foster1992,
+            "PATERA-2001" => PcMethod::Patera2001,
+            "MCKINLEY-2006" => PcMethod::McKinley2006,
+            "CHAN-2008" => PcMethod::Chan2008,
+            "MONTE-CARLO" | "MONTECARLO" => PcMethod::MonteCarlo,
+            _ => PcMethod::Other(s.to_string()),
+        }
+    }
+
+    /// List of known/recognized CCSDS method names for validation diagnostics.
+    pub const KNOWN_METHODS: &[&str] = &[
+        "ALFANO-2005",
+        "FOSTER-1992",
+        "PATERA-2001",
+        "MCKINLEY-2006",
+        "CHAN-2008",
+        "MONTE-CARLO",
+    ];
+}
+
+impl std::fmt::Display for PcMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PcMethod::Alfano2005 => write!(f, "ALFANO-2005"),
+            PcMethod::Foster1992 => write!(f, "FOSTER-1992"),
+            PcMethod::Patera2001 => write!(f, "PATERA-2001"),
+            PcMethod::McKinley2006 => write!(f, "MCKINLEY-2006"),
+            PcMethod::Chan2008 => write!(f, "CHAN-2008"),
+            PcMethod::MonteCarlo => write!(f, "MONTE-CARLO"),
+            PcMethod::Other(s) => write!(f, "{}", s),
+        }
+    }
+}
 
 /// CDM Message Type
 pub const CDM_MSG_TYPE: &str = "CDM";
@@ -231,7 +299,7 @@ pub struct ConjunctionDataMessage {
     /// Collision probability
     pub collision_probability: f64,
     /// Collision probability method (e.g., "FOSTER-1992", "ALFANO-2005")
-    pub collision_probability_method: String,
+    pub collision_probability_method: PcMethod,
 
     // --- Object Data ---
     /// Object 1 (typically the "protected" or "primary" object)
@@ -254,6 +322,11 @@ impl ConjunctionDataMessage {
         CdmBuilder::new()
     }
 
+    /// Return the hard-body radius if set, or the CCSDS default (20m combined).
+    pub fn hard_body_radius_or_default(&self) -> f64 {
+        self.hard_body_radius.unwrap_or(DEFAULT_HARD_BODY_RADIUS_M)
+    }
+
     /// Format CDM as CCSDS KVN (Key-Value Notation) format
     pub fn to_kvn(&self) -> String {
         let mut kvn = String::new();
@@ -266,7 +339,7 @@ impl ConjunctionDataMessage {
         ));
         kvn.push_str(&format!("ORIGINATOR = {}\n", self.originator));
         kvn.push_str(&format!("MESSAGE_ID = {}\n", self.message_id));
-        kvn.push_str("\n");
+        kvn.push('\n');
 
         // Relative Metadata
         kvn.push_str(&format!(
@@ -302,7 +375,7 @@ impl ConjunctionDataMessage {
             "RELATIVE_VELOCITY_N = {:.6} [m/s]\n",
             self.relative_velocity_n
         ));
-        kvn.push_str("\n");
+        kvn.push('\n');
 
         // Collision Probability
         kvn.push_str(&format!(
@@ -313,12 +386,12 @@ impl ConjunctionDataMessage {
             "COLLISION_PROBABILITY_METHOD = {}\n",
             self.collision_probability_method
         ));
-        kvn.push_str("\n");
+        kvn.push('\n');
 
         // Object 1
         kvn.push_str("COMMENT Object 1 (Primary)\n");
         kvn.push_str(&self.format_object_kvn(&self.object1, "OBJECT1"));
-        kvn.push_str("\n");
+        kvn.push('\n');
 
         // Object 2
         kvn.push_str("COMMENT Object 2 (Secondary)\n");
@@ -385,7 +458,7 @@ impl ConjunctionDataMessage {
             prefix, obj.state_vector.z_dot
         ));
 
-        // Covariance (if present)
+        // Covariance (if present) — all 21 lower-triangular elements per CCSDS 508.0-B-1
         if let Some(cov) = &obj.covariance {
             kvn.push_str(&format!("{}_CR_R = {:.10e} [km**2]\n", prefix, cov.cr_r));
             kvn.push_str(&format!("{}_CT_R = {:.10e} [km**2]\n", prefix, cov.ct_r));
@@ -393,7 +466,66 @@ impl ConjunctionDataMessage {
             kvn.push_str(&format!("{}_CN_R = {:.10e} [km**2]\n", prefix, cov.cn_r));
             kvn.push_str(&format!("{}_CN_T = {:.10e} [km**2]\n", prefix, cov.cn_t));
             kvn.push_str(&format!("{}_CN_N = {:.10e} [km**2]\n", prefix, cov.cn_n));
-            // ... additional covariance terms would follow
+            kvn.push_str(&format!(
+                "{}_CRDOT_R = {:.10e} [km**2/s]\n",
+                prefix, cov.crdot_r
+            ));
+            kvn.push_str(&format!(
+                "{}_CRDOT_T = {:.10e} [km**2/s]\n",
+                prefix, cov.crdot_t
+            ));
+            kvn.push_str(&format!(
+                "{}_CRDOT_N = {:.10e} [km**2/s]\n",
+                prefix, cov.crdot_n
+            ));
+            kvn.push_str(&format!(
+                "{}_CRDOT_RDOT = {:.10e} [(km/s)**2]\n",
+                prefix, cov.crdot_rdot
+            ));
+            kvn.push_str(&format!(
+                "{}_CTDOT_R = {:.10e} [km**2/s]\n",
+                prefix, cov.ctdot_r
+            ));
+            kvn.push_str(&format!(
+                "{}_CTDOT_T = {:.10e} [km**2/s]\n",
+                prefix, cov.ctdot_t
+            ));
+            kvn.push_str(&format!(
+                "{}_CTDOT_N = {:.10e} [km**2/s]\n",
+                prefix, cov.ctdot_n
+            ));
+            kvn.push_str(&format!(
+                "{}_CTDOT_RDOT = {:.10e} [(km/s)**2]\n",
+                prefix, cov.ctdot_rdot
+            ));
+            kvn.push_str(&format!(
+                "{}_CTDOT_TDOT = {:.10e} [(km/s)**2]\n",
+                prefix, cov.ctdot_tdot
+            ));
+            kvn.push_str(&format!(
+                "{}_CNDOT_R = {:.10e} [km**2/s]\n",
+                prefix, cov.cndot_r
+            ));
+            kvn.push_str(&format!(
+                "{}_CNDOT_T = {:.10e} [km**2/s]\n",
+                prefix, cov.cndot_t
+            ));
+            kvn.push_str(&format!(
+                "{}_CNDOT_N = {:.10e} [km**2/s]\n",
+                prefix, cov.cndot_n
+            ));
+            kvn.push_str(&format!(
+                "{}_CNDOT_RDOT = {:.10e} [(km/s)**2]\n",
+                prefix, cov.cndot_rdot
+            ));
+            kvn.push_str(&format!(
+                "{}_CNDOT_TDOT = {:.10e} [(km/s)**2]\n",
+                prefix, cov.cndot_tdot
+            ));
+            kvn.push_str(&format!(
+                "{}_CNDOT_NDOT = {:.10e} [(km/s)**2]\n",
+                prefix, cov.cndot_ndot
+            ));
         }
 
         kvn
@@ -425,7 +557,7 @@ pub struct CdmBuilder {
     relative_position_rtn: [f64; 3],
     relative_velocity_rtn: [f64; 3],
     collision_probability: f64,
-    pc_method: String,
+    pc_method: PcMethod,
     object1: Option<CdmObjectData>,
     object2: Option<CdmObjectData>,
     hard_body_radius: Option<f64>,
@@ -442,7 +574,7 @@ impl CdmBuilder {
             relative_position_rtn: [0.0, 0.0, 0.0],
             relative_velocity_rtn: [0.0, 0.0, 0.0],
             collision_probability: 0.0,
-            pc_method: "ALFANO-2005".to_string(),
+            pc_method: PcMethod::Alfano2005,
             object1: None,
             object2: None,
             hard_body_radius: None,
@@ -489,8 +621,14 @@ impl CdmBuilder {
         self
     }
 
-    pub fn pc_method(mut self, method: impl Into<String>) -> Self {
-        self.pc_method = method.into();
+    pub fn pc_method(mut self, method: PcMethod) -> Self {
+        self.pc_method = method;
+        self
+    }
+
+    /// Set Pc method from a string (permissive parsing with `Other` fallback).
+    pub fn pc_method_str(mut self, method: &str) -> Self {
+        self.pc_method = PcMethod::from_str_permissive(method);
         self
     }
 

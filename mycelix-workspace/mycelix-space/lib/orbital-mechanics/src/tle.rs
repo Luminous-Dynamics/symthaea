@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Two-Line Element (TLE) Parsing
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Two-Line Element (TLE) Parsing
 //!
 //! TLE is the standard format for orbital elements used by NORAD/Space-Track.
 //! This module parses TLE strings into structured data for SGP4 propagation.
@@ -296,7 +297,7 @@ impl TwoLineElement {
         }
 
         // Find the sign of the exponent
-        let exp_sign_pos = s.rfind(|c| c == '-' || c == '+');
+        let exp_sign_pos = s.rfind(['-', '+']);
 
         if let Some(pos) = exp_sign_pos {
             if pos == 0 {

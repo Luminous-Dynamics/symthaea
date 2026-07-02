@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Conjunction Analysis and Collision Probability
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Conjunction Analysis and Collision Probability
 //!
 //! Implements algorithms for:
 //! - Close approach detection (screening)
@@ -146,7 +147,7 @@ pub struct ConjunctionAnalyzer {
     screening_threshold_km: f64,
 
     /// Time step for TCA refinement (seconds)
-    tca_refinement_step_s: f64,
+    _tca_refinement_step_s: f64,
 }
 
 impl Default for ConjunctionAnalyzer {
@@ -154,7 +155,7 @@ impl Default for ConjunctionAnalyzer {
         Self {
             default_hbr_m: 20.0,         // 20 meters combined radius
             screening_threshold_km: 5.0, // Screen for approaches within 5 km
-            tca_refinement_step_s: 1.0,  // 1-second refinement
+            _tca_refinement_step_s: 1.0, // 1-second refinement
         }
     }
 }
@@ -293,7 +294,17 @@ impl ConjunctionAnalyzer {
         cov_3d: nalgebra::Matrix3<f64>,
     ) -> (nalgebra::Vector2<f64>, Matrix2<f64>) {
         // Build encounter frame basis
-        let v_hat = rel_velocity.normalize();
+        // Guard against zero relative velocity (co-moving objects)
+        let v_hat = if rel_velocity.norm() < 1e-10 {
+            // Fall back to miss vector direction, or arbitrary axis
+            if miss_vector.norm() < 1e-10 {
+                Vector3::new(0.0, 0.0, 1.0)
+            } else {
+                miss_vector.normalize()
+            }
+        } else {
+            rel_velocity.normalize()
+        };
 
         // Choose arbitrary perpendicular vector
         let temp = if v_hat.x.abs() < 0.9 {
@@ -351,7 +362,7 @@ impl ConjunctionAnalyzer {
         // Pc ≈ (π * r²) / (2π * σ1 * σ2) * exp(-d²/2)
         let pc = (r_norm * r_norm) * (-d_squared / 2.0).exp() / 2.0;
 
-        pc.min(1.0).max(0.0)
+        pc.clamp(0.0, 1.0)
     }
 }
 

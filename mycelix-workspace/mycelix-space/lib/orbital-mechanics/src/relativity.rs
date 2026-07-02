@@ -39,15 +39,23 @@ pub const G: f64 = 6.674_30e-11;
 /// Lorentz factor γ = 1/√(1 - v²/c²).
 pub fn lorentz_gamma(velocity_ms: f64) -> f64 {
     let beta_sq = (velocity_ms * velocity_ms) / C_SQ;
-    if beta_sq >= 1.0 { return f64::INFINITY; }
-    if beta_sq < 1e-20 { return 1.0; }
+    if beta_sq >= 1.0 {
+        return f64::INFINITY;
+    }
+    if beta_sq < 1e-20 {
+        return 1.0;
+    }
     1.0 / (1.0 - beta_sq).sqrt()
 }
 
 /// Lorentz gamma from velocity as fraction of c.
 pub fn lorentz_gamma_beta(beta: f64) -> f64 {
-    if beta >= 1.0 { return f64::INFINITY; }
-    if beta <= 0.0 { return 1.0; }
+    if beta >= 1.0 {
+        return f64::INFINITY;
+    }
+    if beta <= 0.0 {
+        return 1.0;
+    }
     1.0 / (1.0 - beta * beta).sqrt()
 }
 
@@ -92,7 +100,9 @@ pub fn velocity_addition(u_ms: f64, v_ms: f64) -> f64 {
 /// f_observed = f_source × √((1+β)/(1-β))
 pub fn doppler_factor(velocity_ms: f64) -> f64 {
     let beta = velocity_ms / C;
-    if beta.abs() >= 1.0 { return f64::INFINITY; }
+    if beta.abs() >= 1.0 {
+        return f64::INFINITY;
+    }
     ((1.0 + beta) / (1.0 - beta)).sqrt()
 }
 
@@ -111,7 +121,9 @@ pub fn schwarzschild_radius(mass_kg: f64) -> f64 {
 /// Clocks closer to a massive body run slower.
 pub fn gravitational_time_dilation(mass_kg: f64, radius_m: f64) -> f64 {
     let rs = schwarzschild_radius(mass_kg);
-    if radius_m <= rs { return 0.0; } // Inside event horizon
+    if radius_m <= rs {
+        return 0.0;
+    } // Inside event horizon
     (1.0 - rs / radius_m).sqrt()
 }
 
@@ -316,13 +328,14 @@ mod tests {
         let orbital_r = EARTH.radius_m + 20_200_000.0;
         let orbital_v = 3_870.0; // m/s
 
-        let result = orbital_time_dilation(
-            EARTH.mass_kg, orbital_r, orbital_v, EARTH.radius_m,
-        );
+        let result = orbital_time_dilation(EARTH.mass_kg, orbital_r, orbital_v, EARTH.radius_m);
 
         // Expected: ~+38 μs/day (net positive: GR dominates SR)
-        assert!(result.drift_per_day_us > 30.0 && result.drift_per_day_us < 50.0,
-            "GPS drift should be ~38 μs/day: {:.1} μs/day", result.drift_per_day_us);
+        assert!(
+            result.drift_per_day_us > 30.0 && result.drift_per_day_us < 50.0,
+            "GPS drift should be ~38 μs/day: {:.1} μs/day",
+            result.drift_per_day_us
+        );
         assert!(result.gr_factor > 1.0, "GR should make orbit clock faster");
         assert!(result.sr_factor < 1.0, "SR should make orbit clock slower");
     }
@@ -333,15 +346,15 @@ mod tests {
         let orbital_r = EARTH.radius_m + 408_000.0;
         let orbital_v = 7_660.0;
 
-        let result = orbital_time_dilation(
-            EARTH.mass_kg, orbital_r, orbital_v, EARTH.radius_m,
-        );
+        let result = orbital_time_dilation(EARTH.mass_kg, orbital_r, orbital_v, EARTH.radius_m);
 
         // ISS: SR dominates (faster velocity), net negative drift
         // Astronauts age slightly slower than people on ground
-        assert!(result.drift_per_day_us < 0.0,
+        assert!(
+            result.drift_per_day_us < 0.0,
             "ISS should have negative drift (SR dominates): {:.1} μs/day",
-            result.drift_per_day_us);
+            result.drift_per_day_us
+        );
     }
 
     #[test]
@@ -355,17 +368,23 @@ mod tests {
     #[test]
     fn frame_dragging_earth() {
         let omega = frame_dragging_rate(
-            EARTH.mass_kg, EARTH.angular_momentum_kgm2s, EARTH.radius_m + 642_000.0,
+            EARTH.mass_kg,
+            EARTH.angular_momentum_kgm2s,
+            EARTH.radius_m + 642_000.0,
         );
         // Gravity Probe B measured ~39.2 milliarcsec/yr at 642 km altitude
         // Convert: rad/s → milliarcsec/yr
-        let mas_per_yr = omega * (180.0 / std::f64::consts::PI) * 3600.0 * 1000.0 * 365.25 * 86400.0;
+        let mas_per_yr =
+            omega * (180.0 / std::f64::consts::PI) * 3600.0 * 1000.0 * 365.25 * 86400.0;
         // Our formula gives ~198 mas/yr — Gravity Probe B measured 39.2.
         // The discrepancy is because the full GR formula includes a factor of
         // (1 - 3cos²θ)/2 for the geodetic precession component.
         // For order-of-magnitude validation: should be within 10× of measurement.
-        assert!(mas_per_yr > 10.0 && mas_per_yr < 500.0,
-            "Frame dragging: {:.1} mas/yr (order-of-magnitude check)", mas_per_yr);
+        assert!(
+            mas_per_yr > 10.0 && mas_per_yr < 500.0,
+            "Frame dragging: {:.1} mas/yr (order-of-magnitude check)",
+            mas_per_yr
+        );
     }
 
     #[test]
@@ -386,7 +405,11 @@ mod tests {
         let m = 1.0;
         let ke_rel = relativistic_kinetic_energy(m, v);
         let ke_classical = 0.5 * m * v * v;
-        assert!((ke_rel - ke_classical).abs() / ke_classical < 0.01,
-            "At low speed, relativistic KE ≈ classical (< 1%): {} vs {}", ke_rel, ke_classical);
+        assert!(
+            (ke_rel - ke_classical).abs() / ke_classical < 0.01,
+            "At low speed, relativistic KE ≈ classical (< 1%): {} vs {}",
+            ke_rel,
+            ke_classical
+        );
     }
 }

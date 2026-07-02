@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Debris Bounties Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Debris Bounties Integrity Zome
 //!
 //! Implements the "Kessler Cleanup Market" - a decentralized bounty system
 //! for debris removal. Organizations can post bounties on specific debris
@@ -45,6 +46,8 @@ pub enum LinkTypes {
     ActiveBounties,
     /// Bounties by contributor
     ContributorBounties,
+    /// Verifications for a claim
+    ClaimVerifications,
 }
 
 /// A bounty for debris removal
@@ -248,14 +251,11 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, .. } => match app_entry {
-                EntryTypes::DebrisBounty(bounty) => validate_bounty(&bounty),
-                EntryTypes::BountyContribution(contrib) => validate_contribution(&contrib),
-                EntryTypes::RemovalClaim(claim) => validate_claim(&claim),
-                EntryTypes::RemovalVerification(verif) => validate_verification(&verif),
-            },
-            _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::DebrisBounty(bounty) => validate_bounty(&bounty),
+            EntryTypes::BountyContribution(contrib) => validate_contribution(&contrib),
+            EntryTypes::RemovalClaim(claim) => validate_claim(&claim),
+            EntryTypes::RemovalVerification(verif) => validate_verification(&verif),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -312,7 +312,37 @@ fn validate_claim(claim: &RemovalClaim) -> ExternResult<ValidateCallbackResult> 
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_verification(_verif: &RemovalVerification) -> ExternResult<ValidateCallbackResult> {
-    // Basic validation - more complex verification logic in coordinator
+fn validate_verification(verif: &RemovalVerification) -> ExternResult<ValidateCallbackResult> {
+    // Evidence notes must not be empty
+    if verif.evidence.notes.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Verification evidence notes cannot be empty".to_string(),
+        ));
+    }
+
+    // At least one form of evidence must be present
+    let has_observation = verif.evidence.last_observed.is_some();
+    let has_reentry = verif.evidence.predicted_reentry.is_some();
+    let has_sensor_loss = verif.evidence.sensors_lost_track > 0;
+    let has_data = verif.evidence.data_hash.is_some();
+
+    if !has_observation && !has_reentry && !has_sensor_loss && !has_data {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Verification must include at least one form of evidence (observation, reentry prediction, sensor loss, or data hash)".to_string()
+        ));
+    }
+
+    // If reentry is predicted, it should be after last observation
+    if let (Some(last_obs), Some(reentry)) = (
+        &verif.evidence.last_observed,
+        &verif.evidence.predicted_reentry,
+    ) {
+        if reentry.micros < last_obs.micros {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Predicted reentry cannot be before last observation".to_string(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }

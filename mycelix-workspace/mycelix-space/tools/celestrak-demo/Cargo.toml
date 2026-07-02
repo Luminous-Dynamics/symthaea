@@ -2,6 +2,7 @@
 name = "celestrak-demo"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
 description = "Demo tool for fetching real TLEs from CelesTrak and running conjunction analysis"
 
 [[bin]]
@@ -30,6 +31,3 @@ colored = "2.1"
 
 # Error handling
 anyhow = "1.0"
-
-# Async runtime (for Holochain client)
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

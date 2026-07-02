@@ -2,6 +2,7 @@
 name = "orbital_objects_integrity"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
 description = "Integrity zome for orbital object catalog"
 
 [lib]
@@ -14,4 +15,3 @@ serde = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 mycelix-space-shared = { path = "../../../../zomes/shared" }
 orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
-getrandom = { workspace = true }

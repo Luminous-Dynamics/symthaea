@@ -1,6 +1,7 @@
 # Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root{
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+{
   description = "Mycelix Space - Decentralized Space Domain Awareness Network";
 
   inputs = {
@@ -44,6 +45,9 @@
               # Additional tools
               cargo-watch
               cargo-expand
+              # Required for sweettest/bindgen (datachannel-sys)
+              llvmPackages.libclang
+              llvmPackages.clang
             ];
             shellHook = ''
               echo "=== Mycelix Space Development Environment ==="
@@ -60,6 +64,7 @@
               echo "  cargo test --workspace   - Run tests"
               echo ""
             '';
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           }
         else
           # Fallback shell without holochain tools
@@ -70,6 +75,9 @@
               cargo-expand
               pkg-config
               openssl
+              # Required for holochain's bindgen (integration tests)
+              llvmPackages.libclang
+              llvmPackages.clang
             ];
             shellHook = ''
               echo "=== Mycelix Space Development Environment (No Holochain) ==="
@@ -85,6 +93,7 @@
               echo ""
             '';
             RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           };
 
         # Alternative shell using holochain's holonix directly
@@ -105,6 +114,9 @@
             cargo-expand
             pkg-config
             openssl
+            # Required for holochain's bindgen (integration tests)
+            llvmPackages.libclang
+            llvmPackages.clang
           ];
           shellHook = ''
             echo "=== Mycelix Space Rust Development ==="
@@ -112,6 +124,7 @@
             echo ""
           '';
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         };
 
         # Package the orbital-mechanics library (non-Holochain, can be used standalone)

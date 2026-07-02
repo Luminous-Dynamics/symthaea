@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Orbital Propagator
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Orbital Propagator
 //!
 //! Wraps SGP4/SDP4 for propagating TLE orbits forward/backward in time.
 //! SGP4 is the standard NORAD algorithm for near-Earth objects.
@@ -155,7 +156,7 @@ impl Propagator {
 
         while current <= end {
             results.push(self.propagate_to(current));
-            current = current + Duration::seconds(step_seconds);
+            current += Duration::seconds(step_seconds);
         }
 
         results

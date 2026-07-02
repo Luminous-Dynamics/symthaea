@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Shared Types and Utilities for Mycelix Space
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Shared Types and Utilities for Mycelix Space
 //!
 //! Common definitions used across all DNA zomes:
 //! - Orbital object identifiers and entries
@@ -62,7 +63,7 @@ impl SpaceTimestamp {
     }
 
     pub fn to_datetime(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp_micros(self.micros).unwrap_or_else(|| Utc::now())
+        DateTime::from_timestamp_micros(self.micros).unwrap_or_else(Utc::now)
     }
 
     /// Age in seconds from now
@@ -100,6 +101,98 @@ impl Default for QualityScore {
     }
 }
 
+// =============================================================================
+// TLE Staleness Detection
+// =============================================================================
+
+/// Default staleness threshold: 30 days in seconds.
+pub const TLE_STALE_THRESHOLD_SECS: i64 = 30 * 24 * 3600;
+
+/// Configuration for TLE staleness checks.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StalenessConfig {
+    /// Seconds after which a TLE is considered stale (default: 30 days)
+    pub stale_threshold_secs: i64,
+    /// Quality score below which a TLE is rejected (default: 20)
+    pub min_quality: u8,
+}
+
+impl Default for StalenessConfig {
+    fn default() -> Self {
+        Self {
+            stale_threshold_secs: TLE_STALE_THRESHOLD_SECS,
+            min_quality: 20,
+        }
+    }
+}
+
+/// Staleness assessment result for a TLE.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct TleStaleness {
+    /// Age of the TLE epoch in seconds
+    pub age_secs: i64,
+    /// Whether the TLE exceeds the staleness threshold
+    pub is_stale: bool,
+    /// Original quality score (as submitted)
+    pub original_quality: QualityScore,
+    /// Effective quality after age-based degradation
+    pub effective_quality: QualityScore,
+    /// Confidence multiplier for Pc calculations (1.0 = full, 0.0 = no confidence)
+    pub confidence: f64,
+}
+
+/// Compute age-degraded quality and confidence for a TLE.
+///
+/// Quality degrades linearly: loses ~1 point per day after 7 days.
+/// Confidence drops from 1.0 at epoch to 0.3 at the stale threshold,
+/// and continues to 0.1 at 2x the threshold.
+pub fn compute_staleness(
+    epoch: &SpaceTimestamp,
+    quality: &QualityScore,
+    config: &StalenessConfig,
+) -> TleStaleness {
+    let age_secs = epoch.age_seconds();
+
+    // Quality degrades: ~1 point per day after 7 days of age
+    let grace_period_secs: i64 = 7 * 24 * 3600;
+    let days_past_grace = ((age_secs - grace_period_secs).max(0) as f64) / 86400.0;
+    let degraded = (quality.value() as f64 - days_past_grace).max(0.0) as u8;
+    let effective_quality = QualityScore::new(degraded);
+
+    // Confidence: 1.0 for fresh TLEs, decays towards 0.1 for very old ones
+    let threshold = config.stale_threshold_secs as f64;
+    let age_f = age_secs.max(0) as f64;
+    let confidence = if threshold <= 0.0 {
+        1.0
+    } else {
+        (1.0 - 0.7 * (age_f / threshold).min(2.0) / 2.0).max(0.1)
+    };
+
+    let is_stale = age_secs > config.stale_threshold_secs;
+
+    TleStaleness {
+        age_secs,
+        is_stale,
+        original_quality: *quality,
+        effective_quality,
+        confidence,
+    }
+}
+
+/// TLE data with full metadata (epoch, quality, staleness).
+/// Used by staleness-aware query endpoints.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TleWithMetadata {
+    pub norad_id: u32,
+    pub line1: String,
+    pub line2: String,
+    pub epoch: SpaceTimestamp,
+    pub quality: QualityScore,
+    pub source: DataSourceType,
+    pub submitted_at: SpaceTimestamp,
+    pub staleness: TleStaleness,
+}
+
 /// Source of orbital data
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum DataSourceType {
@@ -135,9 +228,10 @@ pub struct GroundLocation {
 }
 
 /// Trust level for an agent in the network
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum TrustLevel {
     /// New/unknown agent
+    #[default]
     Unverified,
     /// Agent has some history but limited track record
     BasicTrust,
@@ -158,12 +252,6 @@ impl TrustLevel {
             TrustLevel::Verified => 0.9,
             TrustLevel::FoundingMember => 1.0,
         }
-    }
-}
-
-impl Default for TrustLevel {
-    fn default() -> Self {
-        TrustLevel::Unverified
     }
 }
 
@@ -432,6 +520,23 @@ pub struct ConjunctionAssessment {
     pub risk_level: RiskLevel,
     pub hard_body_radius_m: f64,
     pub screening_volume_km: f64,
+}
+
+/// Staleness-enriched conjunction assessment.
+/// Wraps a standard ConjunctionAssessment with TLE quality metadata.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StalenessAwareAssessment {
+    /// The conjunction assessment (miss distance, Pc, risk level, etc.)
+    pub assessment: ConjunctionAssessment,
+    /// Staleness of the primary object's TLE
+    pub primary_staleness: TleStaleness,
+    /// Staleness of the secondary object's TLE
+    pub secondary_staleness: TleStaleness,
+    /// Combined confidence (product of both TLE confidences).
+    /// Values below 0.5 mean at least one TLE is significantly stale.
+    pub combined_confidence: f64,
+    /// Whether either TLE is stale (convenience flag)
+    pub has_stale_data: bool,
 }
 
 // =============================================================================
@@ -771,6 +876,55 @@ impl SpaceSignal {
 // Helper Functions
 // =============================================================================
 
+/// Validate a string field: non-empty and within max length.
+pub fn validate_string_field(
+    value: &str,
+    field_name: &str,
+    max_len: usize,
+) -> Result<(), SpaceError> {
+    if value.is_empty() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("{} must not be empty", field_name),
+        ));
+    }
+    if value.len() > max_len {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!(
+                "{} exceeds maximum length of {} characters",
+                field_name, max_len
+            ),
+        )
+        .with_context(format!("length: {}", value.len())));
+    }
+    Ok(())
+}
+
+/// Validate a geographic latitude (-90 to 90).
+pub fn validate_latitude(lat: f64) -> Result<(), SpaceError> {
+    if !(-90.0..=90.0).contains(&lat) || lat.is_nan() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidLocation,
+            "Latitude must be between -90 and 90 degrees",
+        )
+        .with_context(format!("got: {}", lat)));
+    }
+    Ok(())
+}
+
+/// Validate a geographic longitude (-180 to 180).
+pub fn validate_longitude(lon: f64) -> Result<(), SpaceError> {
+    if !(-180.0..=180.0).contains(&lon) || lon.is_nan() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidLocation,
+            "Longitude must be between -180 and 180 degrees",
+        )
+        .with_context(format!("got: {}", lon)));
+    }
+    Ok(())
+}
+
 /// Validate that a vector is a unit vector (within tolerance)
 pub fn is_unit_vector(v: &[f64; 3], tolerance: f64) -> bool {
     let magnitude = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
@@ -949,5 +1103,646 @@ mod tests {
         let parsed: BountyEntry = serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(parsed.debris_norad_id, 49863);
         assert_eq!(parsed.bounty_amount, 100000);
+    }
+}
+
+// =============================================================================
+// Zero-Knowledge Orbit Proofs
+// =============================================================================
+
+/// Hash commitment to orbital data.
+///
+/// An operator commits to their orbital state by publishing a hash of their
+/// ephemeris data + a random nonce. Later, they can reveal the data and nonce
+/// to prove the commitment, or provide ZK proofs about properties of the
+/// committed orbit without revealing the data itself.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct OrbitCommitment {
+    /// SHA3-256 hash of (ephemeris_data || nonce)
+    pub commitment: [u8; 32],
+    /// Object this commitment is for
+    pub norad_id: u32,
+    /// Epoch of the committed orbital state
+    pub epoch: SpaceTimestamp,
+    /// Agent who created the commitment
+    pub committer: AgentPubKey,
+    /// When this commitment was published
+    pub created_at: SpaceTimestamp,
+    /// Optional expiration (commitments become stale)
+    pub expires_at: Option<SpaceTimestamp>,
+}
+
+/// Proof that an orbit satisfies certain properties without revealing the orbit.
+///
+/// This is the on-chain attestation structure. The actual ZK proof blob is
+/// opaque to Holochain — it gets verified by calling `verify_orbit_proof`
+/// which checks the proof against the commitment.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrbitProof {
+    /// Which commitment this proof refers to
+    pub commitment: [u8; 32],
+    /// What property is being proven
+    pub claim: OrbitClaim,
+    /// The opaque proof blob (format depends on `proof_system`)
+    pub proof_data: Vec<u8>,
+    /// Which proof system generated this proof
+    pub proof_system: ProofSystem,
+    /// Agent who generated the proof
+    pub prover: AgentPubKey,
+    /// When the proof was generated
+    pub created_at: SpaceTimestamp,
+}
+
+/// Claims that can be proven about an orbit without revealing the orbit.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum OrbitClaim {
+    /// Prove altitude is within a range (km) at a given time.
+    /// Does NOT reveal the exact altitude.
+    AltitudeRange {
+        min_km: f64,
+        max_km: f64,
+        at_time: SpaceTimestamp,
+    },
+
+    /// Prove inclination is within a range (degrees).
+    InclinationRange { min_deg: f64, max_deg: f64 },
+
+    /// Prove minimum miss distance from another object exceeds a threshold.
+    /// The core use case: "I won't come closer than X km to object Y."
+    CollisionFreedom {
+        other_norad_id: u32,
+        /// Other object's commitment (so we can verify both sides)
+        other_commitment: Option<[u8; 32]>,
+        min_miss_distance_km: f64,
+        window_start: SpaceTimestamp,
+        window_end: SpaceTimestamp,
+    },
+
+    /// Prove the orbit will decay below a threshold altitude by a deadline.
+    /// Used for post-mission disposal compliance.
+    DisposalCompliance {
+        max_altitude_km: f64,
+        by_time: SpaceTimestamp,
+    },
+
+    /// Prove the orbit is within a licensed orbital slot (GEO operators).
+    SlotCompliance {
+        longitude_deg: f64,
+        tolerance_deg: f64,
+    },
+
+    /// Prove the orbit avoids a protected zone (e.g., ISS corridor).
+    ZoneAvoidance {
+        zone_id: String,
+        min_altitude_km: f64,
+        max_altitude_km: f64,
+        min_inclination_deg: f64,
+        max_inclination_deg: f64,
+        window_start: SpaceTimestamp,
+        window_end: SpaceTimestamp,
+    },
+}
+
+/// Supported zero-knowledge proof systems.
+///
+/// The actual proof generation/verification is off-chain. These tags tell
+/// verifiers which library to use for checking the proof blob.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProofSystem {
+    /// Hash-based commitment reveal (not truly ZK, but useful for bootstrapping)
+    HashReveal,
+    /// Bulletproofs range proofs (good for altitude/distance bounds)
+    Bulletproofs,
+    /// Groth16 SNARKs (succinct, constant-size proofs)
+    Groth16,
+    /// PLONK (universal trusted setup)
+    Plonk,
+}
+
+/// Result of verifying an orbit proof.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProofVerification {
+    /// Proof is valid — the claim holds
+    Valid,
+    /// Proof is invalid — either the math doesn't check out or it doesn't
+    /// match the commitment
+    Invalid { reason: String },
+    /// The proof system is not supported by this verifier
+    UnsupportedSystem,
+    /// The commitment has expired
+    CommitmentExpired,
+}
+
+/// A collision-freedom certificate: a verified proof that two objects
+/// will not collide within a time window.
+///
+/// This is the "receipt" that traffic coordination can use to skip
+/// full conjunction screening between two objects whose operators have
+/// both provided valid collision-freedom proofs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CollisionFreedomCertificate {
+    /// Primary object
+    pub primary_norad_id: u32,
+    /// Secondary object
+    pub secondary_norad_id: u32,
+    /// Primary operator's commitment
+    pub primary_commitment: [u8; 32],
+    /// Secondary operator's commitment
+    pub secondary_commitment: [u8; 32],
+    /// Minimum guaranteed miss distance (km)
+    pub min_miss_distance_km: f64,
+    /// Time window this certificate covers
+    pub window_start: SpaceTimestamp,
+    pub window_end: SpaceTimestamp,
+    /// Hash of the proof that was verified
+    pub proof_hash: [u8; 32],
+    /// Who verified this certificate
+    pub verifier: AgentPubKey,
+    /// Verification timestamp
+    pub verified_at: SpaceTimestamp,
+    /// Verification result
+    pub status: ProofVerification,
+}
+
+/// Input for creating an orbit commitment on-chain.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateCommitmentInput {
+    /// The orbital data being committed to (will be hashed, NOT stored)
+    pub ephemeris_data: Vec<u8>,
+    /// Random nonce for the commitment
+    pub nonce: [u8; 32],
+    /// Object this commitment is for
+    pub norad_id: u32,
+    /// Epoch of the orbital state
+    pub epoch: SpaceTimestamp,
+    /// Optional expiration
+    pub expires_at: Option<SpaceTimestamp>,
+}
+
+impl CreateCommitmentInput {
+    /// Compute the commitment hash: SHA3-256(ephemeris_data || nonce)
+    pub fn compute_commitment(&self) -> [u8; 32] {
+        let mut data = self.ephemeris_data.clone();
+        data.extend_from_slice(&self.nonce);
+        hash_data(&data)
+    }
+}
+
+/// Input for submitting an orbit proof on-chain.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubmitProofInput {
+    /// The commitment this proof is for
+    pub commitment_hash: ActionHash,
+    /// What is being claimed
+    pub claim: OrbitClaim,
+    /// The proof blob
+    pub proof_data: Vec<u8>,
+    /// Which proof system
+    pub proof_system: ProofSystem,
+}
+
+/// Input for verifying a collision-freedom proof.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VerifyCollisionFreedomInput {
+    /// Primary object's proof hash
+    pub primary_proof_hash: ActionHash,
+    /// Secondary object's proof hash
+    pub secondary_proof_hash: ActionHash,
+}
+
+// =============================================================================
+// Structured Error Types
+// =============================================================================
+
+/// Machine-readable error codes for mycelix-space coordinator zomes.
+///
+/// Clients can match on the `code` field of the JSON-serialized error to
+/// handle specific failure modes without parsing human-readable messages.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SpaceError {
+    /// Machine-readable error code (e.g. "INVALID_NORAD_ID")
+    pub code: SpaceErrorCode,
+    /// Human-readable description
+    pub message: String,
+    /// Optional context (field name, value, etc.)
+    pub context: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SpaceErrorCode {
+    // --- General ---
+    NotFound,
+    Unauthorized,
+    InvalidInput,
+
+    // --- Orbital Objects ---
+    InvalidNoradId,
+    InvalidDesignator,
+    TleParseError,
+    DuplicateObject,
+
+    // --- Observations ---
+    InvalidMeasurement,
+    InvalidLocation,
+    InvalidSensorConfig,
+    SensorNotFound,
+
+    // --- Conjunctions ---
+    SelfConjunction,
+    InvalidProbability,
+    InvalidMissDistance,
+    EventNotFound,
+
+    // --- Debris Bounties ---
+    InvalidBountyAmount,
+    InvalidStateTransition,
+    BountyNotFound,
+    BountyNotOpen,
+    AlreadyClaimed,
+
+    // --- Traffic Control ---
+    SessionNotFound,
+    InvalidProposal,
+    AlreadySigned,
+    SameSignerError,
+    ConjunctionNotVerified,
+
+    // --- Rate Limiting ---
+    RateLimited,
+}
+
+impl SpaceError {
+    pub fn new(code: SpaceErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            context: None,
+        }
+    }
+
+    pub fn with_context(mut self, ctx: impl Into<String>) -> Self {
+        self.context = Some(ctx.into());
+        self
+    }
+
+    /// Convert to a Holochain WasmError for use in coordinator externs.
+    pub fn into_wasm_error(self) -> WasmError {
+        let json = serde_json::to_string(&self).unwrap_or_else(|_| self.message.clone());
+        wasm_error!(WasmErrorInner::Guest(json))
+    }
+
+    /// Convert to a ValidateCallbackResult::Invalid for use in integrity validation.
+    pub fn into_invalid(self) -> ValidateCallbackResult {
+        ValidateCallbackResult::Invalid(
+            serde_json::to_string(&self).unwrap_or_else(|_| self.message.clone()),
+        )
+    }
+}
+
+impl std::fmt::Display for SpaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{:?}] {}", self.code, self.message)?;
+        if let Some(ref ctx) = self.context {
+            write!(f, " ({})", ctx)?;
+        }
+        Ok(())
+    }
+}
+
+// =============================================================================
+// Pagination primitives
+// =============================================================================
+
+/// Pagination parameters for link-based queries.
+///
+/// Holochain `get_links` returns all links at once. Pagination is applied
+/// after fetching links but *before* resolving individual entries, so we
+/// avoid unnecessary DHT gets for pages we don't need.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PaginationParams {
+    /// Maximum number of entries to return (default: 50)
+    pub limit: Option<u32>,
+    /// Number of links to skip before collecting results
+    pub offset: Option<u32>,
+}
+
+impl PaginationParams {
+    pub fn effective_limit(&self) -> usize {
+        self.limit.unwrap_or(50).min(500) as usize
+    }
+
+    pub fn effective_offset(&self) -> usize {
+        self.offset.unwrap_or(0) as usize
+    }
+}
+
+/// Paginated response wrapper.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedResponse<T> {
+    /// The page of results
+    pub items: Vec<T>,
+    /// Total number of links available (before pagination)
+    pub total: u32,
+    /// Offset used for this page
+    pub offset: u32,
+    /// Limit used for this page
+    pub limit: u32,
+    /// Whether there are more results after this page
+    pub has_more: bool,
+}
+
+// =============================================================================
+// Universal Trust Fabric — Space-Domain Requirements
+// =============================================================================
+
+pub use mycelix_bridge_common::sovereign_gate::{CivicRequirement, CivicTier, SovereignDimension};
+
+/// Observer — anyone can submit TLEs (more data = better catalog)
+pub fn requirement_for_tle_submission() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Observer,
+        min_dimensions: vec![],
+    }
+}
+
+/// Observer — low bar for sensor data, chi-square gating handles quality
+pub fn requirement_for_observation() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Observer,
+        min_dimensions: vec![],
+    }
+}
+
+/// Participant — conjunction events affect operational decisions
+pub fn requirement_for_conjunction_creation() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Participant,
+        min_dimensions: vec![(SovereignDimension::EpistemicIntegrity, 0.25)],
+    }
+}
+
+/// Citizen — risk updates influence maneuver decisions
+pub fn requirement_for_risk_update() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Citizen,
+        min_dimensions: vec![],
+    }
+}
+
+/// Citizen — fusion results affect downstream screening
+pub fn requirement_for_fusion() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Citizen,
+        min_dimensions: vec![],
+    }
+}
+
+/// Steward — financial commitment requires verified identity
+pub fn requirement_for_bounty_creation() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Steward,
+        min_dimensions: vec![
+            (SovereignDimension::EpistemicIntegrity, 0.5),
+            (SovereignDimension::CivicParticipation, 0.3),
+        ],
+    }
+}
+
+/// Citizen — claiming a bounty requires operational capability
+pub fn requirement_for_bounty_claim() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Citizen,
+        min_dimensions: vec![(SovereignDimension::EpistemicIntegrity, 0.3)],
+    }
+}
+
+/// Steward — verification evidence integrity is critical
+pub fn requirement_for_bounty_verification() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Steward,
+        min_dimensions: vec![
+            (SovereignDimension::EpistemicIntegrity, 0.5),
+            (SovereignDimension::CivicParticipation, 0.2),
+        ],
+    }
+}
+
+/// Citizen — initiating negotiation requires coordination authority
+pub fn requirement_for_negotiation() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Citizen,
+        min_dimensions: vec![
+            (SovereignDimension::EpistemicIntegrity, 0.3),
+            (SovereignDimension::CivicParticipation, 0.2),
+        ],
+    }
+}
+
+/// Steward — cosigning is a binding operational agreement
+pub fn requirement_for_agreement_signing() -> CivicRequirement {
+    CivicRequirement {
+        min_tier: CivicTier::Steward,
+        min_dimensions: vec![
+            (SovereignDimension::EpistemicIntegrity, 0.5),
+            (SovereignDimension::CivicParticipation, 0.3),
+        ],
+    }
+}
+
+// =============================================================================
+// Space consciousness gate (bootstrap-aware)
+// =============================================================================
+
+/// Best-effort civic gate for space operations.
+///
+/// Attempts a cross-role call to the identity cluster to fetch a
+/// `SovereignCredential` (8D). Falls back to bootstrap mode if the identity
+/// cluster is unavailable (standalone space hApp or network bootstrap).
+pub fn gate_space_operation(
+    requirement: &CivicRequirement,
+    action_name: &str,
+) -> hdk::prelude::ExternResult<()> {
+    use hdk::prelude::*;
+    use mycelix_bridge_common::sovereign_gate::{DimensionWeights, SovereignCredential};
+
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    // Try cross-role call to identity cluster's bridge zome
+    match call(
+        CallTargetCell::OtherRole("identity".into()),
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("issue_sovereign_credential"),
+        None,
+        did,
+    ) {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            match extern_io.decode::<SovereignCredential>() {
+                Ok(cred) => {
+                    let weights = DimensionWeights::governance();
+                    if !cred.profile.meets_requirement(requirement, &weights) {
+                        let tier = cred.profile.tier(&weights);
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Civic gate denied for action '{}': requires {:?} tier, \
+                             agent has {:?}",
+                            action_name, requirement.min_tier, tier
+                        ))));
+                    }
+                    Ok(())
+                }
+                Err(_) => {
+                    // Credential decode failed — bootstrap mode
+                    debug!(
+                        "Space civic gate: credential decode failed, \
+                         bootstrap mode for: {}",
+                        action_name
+                    );
+                    Ok(())
+                }
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => {
+            // Identity cluster unreachable — allow in bootstrap mode
+            debug!(
+                "Space civic gate: identity cluster unreachable ({}), \
+                 bootstrap mode for: {}",
+                e, action_name
+            );
+            Ok(())
+        }
+        Ok(_) => {
+            // Unexpected response variant — allow in bootstrap mode
+            debug!(
+                "Space civic gate: unexpected response, \
+                 bootstrap mode for: {}",
+                action_name
+            );
+            Ok(())
+        }
+        Err(_) => {
+            // Zome not found — standalone space hApp without identity cluster
+            debug!(
+                "Space consciousness gate: no identity cluster, \
+                 bootstrap mode for: {}",
+                action_name
+            );
+            Ok(())
+        }
+    }
+}
+
+// =============================================================================
+// Trust Fabric Tests
+// =============================================================================
+
+#[cfg(test)]
+mod trust_fabric_tests {
+    use super::*;
+
+    #[test]
+    fn test_requirement_tiers_are_ordered() {
+        // Verify tier progression: Observer < Participant < Citizen < Steward
+        assert!(
+            (requirement_for_tle_submission().min_tier as u8)
+                <= (requirement_for_conjunction_creation().min_tier as u8)
+        );
+        assert!(
+            (requirement_for_conjunction_creation().min_tier as u8)
+                <= (requirement_for_risk_update().min_tier as u8)
+        );
+        assert!(
+            (requirement_for_risk_update().min_tier as u8)
+                <= (requirement_for_bounty_creation().min_tier as u8)
+        );
+    }
+
+    #[test]
+    fn test_observer_requirements_have_no_minimums() {
+        let req = requirement_for_tle_submission();
+        assert_eq!(req.min_tier, CivicTier::Observer);
+        assert!(req.min_dimensions.is_empty());
+
+        let req = requirement_for_observation();
+        assert_eq!(req.min_tier, CivicTier::Observer);
+        assert!(req.min_dimensions.is_empty());
+    }
+
+    #[test]
+    fn test_steward_requirements_have_dimension_minimums() {
+        let req = requirement_for_bounty_creation();
+        assert_eq!(req.min_tier, CivicTier::Steward);
+        assert_eq!(req.min_dimensions.len(), 2);
+
+        let req = requirement_for_agreement_signing();
+        assert_eq!(req.min_tier, CivicTier::Steward);
+        assert_eq!(req.min_dimensions.len(), 2);
+
+        let req = requirement_for_bounty_verification();
+        assert_eq!(req.min_tier, CivicTier::Steward);
+        assert_eq!(req.min_dimensions.len(), 2);
+    }
+
+    #[test]
+    fn test_citizen_requirements() {
+        let req = requirement_for_risk_update();
+        assert_eq!(req.min_tier, CivicTier::Citizen);
+
+        let req = requirement_for_fusion();
+        assert_eq!(req.min_tier, CivicTier::Citizen);
+
+        let req = requirement_for_bounty_claim();
+        assert_eq!(req.min_tier, CivicTier::Citizen);
+        assert_eq!(req.min_dimensions.len(), 1);
+
+        let req = requirement_for_negotiation();
+        assert_eq!(req.min_tier, CivicTier::Citizen);
+        assert_eq!(req.min_dimensions.len(), 2);
+    }
+
+    #[test]
+    fn test_participant_conjunction_creation() {
+        let req = requirement_for_conjunction_creation();
+        assert_eq!(req.min_tier, CivicTier::Participant);
+        assert_eq!(req.min_dimensions.len(), 1);
+        assert_eq!(
+            req.min_dimensions[0],
+            (SovereignDimension::EpistemicIntegrity, 0.25)
+        );
+    }
+
+    #[test]
+    fn test_bounty_creation_is_stricter_than_claim() {
+        let create = requirement_for_bounty_creation();
+        let claim = requirement_for_bounty_claim();
+        assert!(create.min_tier >= claim.min_tier);
+        assert!(create.min_dimensions.len() >= claim.min_dimensions.len());
+    }
+
+    #[test]
+    fn test_agreement_signing_is_stricter_than_negotiation() {
+        let sign = requirement_for_agreement_signing();
+        let negotiate = requirement_for_negotiation();
+        assert!(sign.min_tier >= negotiate.min_tier);
+    }
+
+    #[test]
+    fn test_all_dimension_scores_bounded() {
+        let all_reqs = vec![
+            requirement_for_tle_submission(),
+            requirement_for_observation(),
+            requirement_for_conjunction_creation(),
+            requirement_for_risk_update(),
+            requirement_for_fusion(),
+            requirement_for_bounty_creation(),
+            requirement_for_bounty_claim(),
+            requirement_for_bounty_verification(),
+            requirement_for_negotiation(),
+            requirement_for_agreement_signing(),
+        ];
+        for req in &all_reqs {
+            for &(dim, val) in &req.min_dimensions {
+                assert!(val >= 0.0 && val <= 1.0, "{:?} out of bounds: {}", dim, val);
+            }
+        }
     }
 }

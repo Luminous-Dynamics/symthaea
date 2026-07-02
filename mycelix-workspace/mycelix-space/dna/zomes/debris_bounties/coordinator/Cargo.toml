@@ -2,6 +2,7 @@
 name = "debris_bounties"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
 description = "Coordinator zome for Kessler cleanup bounty system"
 
 [lib]
@@ -15,4 +16,3 @@ holochain_serialized_bytes = { workspace = true }
 debris_bounties_integrity = { path = "../integrity" }
 mycelix-space-shared = { path = "../../../../zomes/shared" }
 orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
-getrandom = { workspace = true }

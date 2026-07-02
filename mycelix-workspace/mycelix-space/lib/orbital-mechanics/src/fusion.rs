@@ -692,9 +692,17 @@ mod tests {
         let m_high = test_measurement(7000.0, 0.1, "good-sensor", 0.95);
         let m_low = test_measurement(7010.0, 10.0, "bad-sensor", 0.5);
 
-        let fused_x = FusionPipeline::new().fuse(&[m_high, m_low]).unwrap().state.state.x;
-        assert!((fused_x - 7000.0).abs() < (fused_x - 7010.0).abs(),
-            "Fused ({}) should be closer to high-quality (7000)", fused_x);
+        let fused_x = FusionPipeline::new()
+            .fuse(&[m_high, m_low])
+            .unwrap()
+            .state
+            .state
+            .x;
+        assert!(
+            (fused_x - 7000.0).abs() < (fused_x - 7010.0).abs(),
+            "Fused ({}) should be closer to high-quality (7000)",
+            fused_x
+        );
     }
 
     #[test]
@@ -712,7 +720,10 @@ mod tests {
         let m_good = test_measurement(7000.0, 1.0, "good", 0.9);
         let m_bad = test_measurement(7000.0, 1.0, "bad", 0.01);
 
-        let result = FusionPipeline::new().with_min_quality(0.1).fuse(&[m_good, m_bad]).unwrap();
+        let result = FusionPipeline::new()
+            .with_min_quality(0.1)
+            .fuse(&[m_good, m_bad])
+            .unwrap();
         assert_eq!(result.contributing_sensors, vec!["good"]);
     }
 
@@ -721,7 +732,8 @@ mod tests {
         let s = StateVector::new(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0);
         let c = CovarianceMatrix::diagonal([1.0, 1.0, 1.0, 0.001, 0.001, 0.001]);
 
-        let (_, ci_cov) = covariance_intersection(&[(s.clone(), c.clone()), (s, c.clone())]).unwrap();
+        let (_, ci_cov) =
+            covariance_intersection(&[(s.clone(), c.clone()), (s, c.clone())]).unwrap();
         let iv_cov = c.fuse(&c).unwrap();
         // CI should be at least as conservative as inverse-variance
         assert!(ci_cov.position_sigma() >= iv_cov.position_sigma() * 0.95);
@@ -733,7 +745,10 @@ mod tests {
         let m2 = test_measurement(7002.0, 2.0, "sensor-2", 0.7);
 
         let x = weighted_least_squares(&[m1, m2]).unwrap().state.state.x;
-        assert!((x - 7000.0).abs() < (x - 7002.0).abs(), "WLS should weight lower uncertainty");
+        assert!(
+            (x - 7000.0).abs() < (x - 7002.0).abs(),
+            "WLS should weight lower uncertainty"
+        );
     }
 
     #[test]
@@ -941,7 +956,10 @@ mod tests {
             fused_x
         );
         // Quality should reflect trust weighting
-        assert!(result.fused_quality < 0.95, "Quality should be reduced by trust");
+        assert!(
+            result.fused_quality < 0.95,
+            "Quality should be reduced by trust"
+        );
     }
 
     #[test]
@@ -981,7 +999,9 @@ mod tests {
         let m_out3 = test_measurement(7400.0, 1.0, "outlier-3", 0.9);
 
         let pipeline = FusionPipeline::new().with_gating_threshold(9.21);
-        let result = pipeline.fuse(&[m_seed, m_ok, m_out1, m_out2, m_out3]).unwrap();
+        let result = pipeline
+            .fuse(&[m_seed, m_ok, m_out1, m_out2, m_out3])
+            .unwrap();
 
         // 3 out of 4 non-seed measurements gated = 75% rejection rate
         assert!(
@@ -1082,8 +1102,14 @@ mod tests {
         let pipeline = FusionPipeline::new();
         let result = pipeline.fuse(&[m]).unwrap();
 
-        assert!(result.bias_estimates.is_empty(), "Single sensor has no bias estimates");
-        assert!(result.trust_updates.is_empty(), "Single sensor has no trust updates");
+        assert!(
+            result.bias_estimates.is_empty(),
+            "Single sensor has no bias estimates"
+        );
+        assert!(
+            result.trust_updates.is_empty(),
+            "Single sensor has no trust updates"
+        );
         assert_eq!(result.gated_count, 0);
         assert_eq!(result.covariance_inflation_factor, 1.0);
     }
@@ -1103,7 +1129,10 @@ mod tests {
 
         // All sensors get floor trust, effective quality = 0.9 * 0.1 = 0.09
         // min_quality default is 0.1, so all should be filtered out
-        assert!(result.is_err(), "All untrusted sensors should be filtered out");
+        assert!(
+            result.is_err(),
+            "All untrusted sensors should be filtered out"
+        );
     }
 
     #[test]
@@ -1159,7 +1188,10 @@ mod tests {
         let pipeline = FusionPipeline::new();
         let result = pipeline.fuse(&[m1, m2, m3]).unwrap();
 
-        assert_eq!(result.total_filtered, 3, "3 measurements passed quality filter");
+        assert_eq!(
+            result.total_filtered, 3,
+            "3 measurements passed quality filter"
+        );
         // outlier should be gated
         assert!(
             result.gated_count >= 1,

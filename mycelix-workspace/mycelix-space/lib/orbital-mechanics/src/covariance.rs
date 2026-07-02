@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Covariance Matrix Handling
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Covariance Matrix Handling
 //!
 //! The 6x6 covariance matrix represents uncertainty in orbital state.
 //! This is CRITICAL for all advanced features:
@@ -44,20 +45,15 @@ pub struct CovarianceMatrix {
 }
 
 /// Reference frame for covariance
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum CovarianceFrame {
     /// Earth-Centered Inertial (most common for conjunction)
+    #[default]
     ECI,
     /// Radial-Transverse-Normal (along-track frame)
     RTN,
     /// UVW frame (similar to RTN but different convention)
     UVW,
-}
-
-impl Default for CovarianceFrame {
-    fn default() -> Self {
-        CovarianceFrame::ECI
-    }
 }
 
 /// Source of covariance data
@@ -215,7 +211,7 @@ impl CovarianceMatrix {
         rot6.fixed_view_mut::<3, 3>(3, 3).copy_from(&rot);
 
         // Transform: C_rtn = R * C_eci * R^T
-        let new_data = &rot6 * &self.data * rot6.transpose();
+        let new_data = rot6 * self.data * rot6.transpose();
 
         Self {
             data: new_data,
@@ -237,7 +233,7 @@ impl CovarianceMatrix {
         phi[(2, 5)] = dt_seconds;
 
         // Transform: C(t+dt) = Phi * C(t) * Phi^T
-        let new_data = &phi * &self.data * phi.transpose();
+        let new_data = phi * self.data * phi.transpose();
 
         Self {
             data: new_data,

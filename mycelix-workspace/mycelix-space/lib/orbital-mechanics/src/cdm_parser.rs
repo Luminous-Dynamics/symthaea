@@ -38,15 +38,9 @@ pub enum CdmParseError {
     #[error("Empty input")]
     EmptyInput,
     #[error("Incomplete covariance for {object}: CR_R present but missing elements: {missing}")]
-    IncompleteCovariance {
-        object: String,
-        missing: String,
-    },
+    IncompleteCovariance { object: String, missing: String },
     #[error("CREATION_DATE ({creation}) is after TCA ({tca}) — CDM is malformed")]
-    CreationAfterTca {
-        creation: String,
-        tca: String,
-    },
+    CreationAfterTca { creation: String, tca: String },
 }
 
 /// Parse a CCSDS CDM in KVN (Keyword-Value Notation) format.
@@ -128,7 +122,8 @@ pub fn parse_cdm_kvn(input: &str) -> Result<ConjunctionDataMessage, CdmParseErro
     // --- Probability ---
     let collision_probability = get_f64("COLLISION_PROBABILITY")?;
     let collision_probability_method_str = get("COLLISION_PROBABILITY_METHOD")?;
-    let collision_probability_method = PcMethod::from_str_permissive(&collision_probability_method_str);
+    let collision_probability_method =
+        PcMethod::from_str_permissive(&collision_probability_method_str);
 
     // --- Object Data ---
     let object1 = parse_object_block(&lines, "OBJECT1")?;
@@ -219,10 +214,27 @@ fn parse_object_block(
     let covariance = if get_opt_f64("CR_R").is_some() {
         // All 21 lower-triangular covariance elements
         const COV_ELEMENTS: &[&str] = &[
-            "CR_R", "CT_R", "CT_T", "CN_R", "CN_T", "CN_N",
-            "CRDOT_R", "CRDOT_T", "CRDOT_N", "CRDOT_RDOT",
-            "CTDOT_R", "CTDOT_T", "CTDOT_N", "CTDOT_RDOT", "CTDOT_TDOT",
-            "CNDOT_R", "CNDOT_T", "CNDOT_N", "CNDOT_RDOT", "CNDOT_TDOT", "CNDOT_NDOT",
+            "CR_R",
+            "CT_R",
+            "CT_T",
+            "CN_R",
+            "CN_T",
+            "CN_N",
+            "CRDOT_R",
+            "CRDOT_T",
+            "CRDOT_N",
+            "CRDOT_RDOT",
+            "CTDOT_R",
+            "CTDOT_T",
+            "CTDOT_N",
+            "CTDOT_RDOT",
+            "CTDOT_TDOT",
+            "CNDOT_R",
+            "CNDOT_T",
+            "CNDOT_N",
+            "CNDOT_RDOT",
+            "CNDOT_TDOT",
+            "CNDOT_NDOT",
         ];
 
         let missing: Vec<&str> = COV_ELEMENTS
@@ -675,13 +687,34 @@ OBJECT2_Z_DOT = 0.0 [km/s]
 
     #[test]
     fn test_pc_method_known_variants() {
-        assert_eq!(PcMethod::from_str_permissive("ALFANO-2005"), PcMethod::Alfano2005);
-        assert_eq!(PcMethod::from_str_permissive("FOSTER-1992"), PcMethod::Foster1992);
-        assert_eq!(PcMethod::from_str_permissive("PATERA-2001"), PcMethod::Patera2001);
-        assert_eq!(PcMethod::from_str_permissive("MCKINLEY-2006"), PcMethod::McKinley2006);
-        assert_eq!(PcMethod::from_str_permissive("CHAN-2008"), PcMethod::Chan2008);
-        assert_eq!(PcMethod::from_str_permissive("MONTE-CARLO"), PcMethod::MonteCarlo);
-        assert_eq!(PcMethod::from_str_permissive("MonteCarlo"), PcMethod::MonteCarlo);
+        assert_eq!(
+            PcMethod::from_str_permissive("ALFANO-2005"),
+            PcMethod::Alfano2005
+        );
+        assert_eq!(
+            PcMethod::from_str_permissive("FOSTER-1992"),
+            PcMethod::Foster1992
+        );
+        assert_eq!(
+            PcMethod::from_str_permissive("PATERA-2001"),
+            PcMethod::Patera2001
+        );
+        assert_eq!(
+            PcMethod::from_str_permissive("MCKINLEY-2006"),
+            PcMethod::McKinley2006
+        );
+        assert_eq!(
+            PcMethod::from_str_permissive("CHAN-2008"),
+            PcMethod::Chan2008
+        );
+        assert_eq!(
+            PcMethod::from_str_permissive("MONTE-CARLO"),
+            PcMethod::MonteCarlo
+        );
+        assert_eq!(
+            PcMethod::from_str_permissive("MonteCarlo"),
+            PcMethod::MonteCarlo
+        );
     }
 
     #[test]

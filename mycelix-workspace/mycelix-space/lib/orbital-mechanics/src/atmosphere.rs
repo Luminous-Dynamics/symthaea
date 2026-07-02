@@ -176,11 +176,7 @@ pub fn drag_acceleration(state: &StateVector, config: &DragConfig) -> [f64; 3] {
 
     let mag = 0.5 * bc * rho_km * speed * speed;
 
-    [
-        -mag * v_hat.x,
-        -mag * v_hat.y,
-        -mag * v_hat.z,
-    ]
+    [-mag * v_hat.x, -mag * v_hat.y, -mag * v_hat.z]
 }
 
 /// Estimate orbital lifetime (time to reentry) for a circular or
@@ -249,7 +245,9 @@ pub fn estimate_lifetime(
             // Approximate fraction of orbit where significant drag occurs
             // Scale height relative to orbit size
             let h_scale = scale_height_at(perigee_alt);
-            (2.0 * std::f64::consts::PI * h_scale / semi_major).sqrt().min(1.0)
+            (2.0 * std::f64::consts::PI * h_scale / semi_major)
+                .sqrt()
+                .min(1.0)
         };
 
         // Energy loss per orbit from drag at perigee:
@@ -393,14 +391,7 @@ mod tests {
 
     #[test]
     fn test_drag_acceleration_opposes_velocity() {
-        let state = StateVector::new(
-            EARTH_RADIUS_KM + 400.0,
-            0.0,
-            0.0,
-            0.0,
-            7.66,
-            0.0,
-        );
+        let state = StateVector::new(EARTH_RADIUS_KM + 400.0, 0.0, 0.0, 0.0, 7.66, 0.0);
         let config = DragConfig::default();
         let accel = drag_acceleration(&state, &config);
 
@@ -426,7 +417,8 @@ mod tests {
         let accel_high = drag_acceleration(&state_high, &config);
         let accel_low = drag_acceleration(&state_low, &config);
 
-        let mag_high = (accel_high[0].powi(2) + accel_high[1].powi(2) + accel_high[2].powi(2)).sqrt();
+        let mag_high =
+            (accel_high[0].powi(2) + accel_high[1].powi(2) + accel_high[2].powi(2)).sqrt();
         let mag_low = (accel_low[0].powi(2) + accel_low[1].powi(2) + accel_low[2].powi(2)).sqrt();
 
         assert!(

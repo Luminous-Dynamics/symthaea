@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Edge Case and Error Handling Tests
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Edge Case and Error Handling Tests
 //!
 //! Tests for error paths, boundary conditions, and validation logic
 //! as specified in the improvement plan:
@@ -379,98 +380,92 @@ fn test_trust_level_default() {
 }
 
 // =============================================================================
-// MycelixError Tests
+// SpaceError Tests
 // =============================================================================
 
-/// Test MycelixError message generation
+/// Test SpaceError Display output contains expected substrings
 #[test]
-fn test_mycelix_error_messages() {
-    let errors = vec![
-        (MycelixError::ObjectNotFound { norad_id: 25544 }, "25544"),
-        (MycelixError::InvalidNoradId { id: 0 }, "0"),
+fn test_space_error_messages() {
+    let errors: Vec<(SpaceError, &str)> = vec![
         (
-            MycelixError::InvalidTle {
-                reason: "bad checksum".to_string(),
-            },
+            SpaceError::new(SpaceErrorCode::NotFound, "Object not found")
+                .with_context("norad_id: 25544"),
+            "25544",
+        ),
+        (
+            SpaceError::new(SpaceErrorCode::InvalidNoradId, "Invalid NORAD ID: 0"),
+            "0",
+        ),
+        (
+            SpaceError::new(SpaceErrorCode::TleParseError, "bad checksum"),
             "bad checksum",
         ),
         (
-            MycelixError::TleChecksumMismatch {
-                line: 1,
-                expected: 5,
-                actual: 3,
-            },
-            "checksum",
-        ),
-        (
-            MycelixError::EntryNotFound {
-                entry_type: "Bounty".to_string(),
-                hash: "abc123".to_string(),
-            },
+            SpaceError::new(SpaceErrorCode::BountyNotFound, "Bounty not found")
+                .with_context("hash: abc123"),
             "Bounty",
         ),
         (
-            MycelixError::Unauthorized {
-                operation: "delete".to_string(),
-                reason: "not owner".to_string(),
-            },
+            SpaceError::new(SpaceErrorCode::Unauthorized, "Not authorized to delete"),
             "delete",
         ),
         (
-            MycelixError::DuplicateEntry {
-                entry_type: "Object".to_string(),
-                identifier: "25544".to_string(),
-            },
+            SpaceError::new(SpaceErrorCode::DuplicateObject, "Duplicate object 25544"),
             "Duplicate",
         ),
     ];
 
     for (error, expected_substring) in errors {
-        let message = error.message();
+        let message = format!("{}", error);
         assert!(
             message.contains(expected_substring),
-            "Error message '{}' should contain '{}'",
+            "Error display '{}' should contain '{}'",
             message,
             expected_substring
         );
     }
 }
 
-/// Test MycelixError code uniqueness
+/// Test SpaceErrorCode Debug output variants
 #[test]
-fn test_mycelix_error_codes_are_screaming_snake_case() {
-    let errors = vec![
-        MycelixError::ObjectNotFound { norad_id: 0 },
-        MycelixError::InvalidNoradId { id: 0 },
-        MycelixError::DuplicateEntry {
-            entry_type: String::new(),
-            identifier: String::new(),
-        },
+fn test_space_error_code_variants() {
+    let codes = vec![
+        SpaceErrorCode::NotFound,
+        SpaceErrorCode::InvalidNoradId,
+        SpaceErrorCode::DuplicateObject,
+        SpaceErrorCode::Unauthorized,
+        SpaceErrorCode::TleParseError,
+        SpaceErrorCode::BountyNotFound,
+        SpaceErrorCode::RateLimited,
     ];
 
-    for error in errors {
-        let code = error.code();
-        // Code should be SCREAMING_SNAKE_CASE
-        assert!(
-            code.chars().all(|c| c.is_uppercase() || c == '_'),
-            "Error code '{}' should be SCREAMING_SNAKE_CASE",
-            code
-        );
+    // Each code should have a distinct Debug representation
+    let debug_strs: Vec<String> = codes.iter().map(|c| format!("{:?}", c)).collect();
+    for (i, a) in debug_strs.iter().enumerate() {
+        for (j, b) in debug_strs.iter().enumerate() {
+            if i != j {
+                assert_ne!(
+                    a, b,
+                    "Error codes at indices {} and {} should be distinct",
+                    i, j
+                );
+            }
+        }
     }
 }
 
-/// Test MycelixError serialization roundtrip
+/// Test SpaceError JSON serialization roundtrip
 #[test]
-fn test_mycelix_error_serialization_roundtrip() {
-    let original = MycelixError::BountyError {
-        bounty_id: "BOUNTY-001".to_string(),
-        reason: "Already claimed".to_string(),
-    };
+fn test_space_error_serialization_roundtrip() {
+    let original = SpaceError::new(SpaceErrorCode::AlreadyClaimed, "Already claimed")
+        .with_context("bounty_id: BOUNTY-001");
 
     let json = serde_json::to_string(&original).expect("Failed to serialize");
-    let parsed: MycelixError = serde_json::from_str(&json).expect("Failed to deserialize");
+    let parsed: SpaceError = serde_json::from_str(&json).expect("Failed to deserialize");
 
-    assert_eq!(original, parsed);
+    assert_eq!(format!("{:?}", original.code), format!("{:?}", parsed.code));
+    assert_eq!(original.message, parsed.message);
+    assert_eq!(original.context, parsed.context);
 }
 
 // =============================================================================
