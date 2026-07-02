@@ -206,7 +206,7 @@ networking = ["symthaea-swarm/networking"]
 # WASM sandboxing support via wasmtime
 wasm-sandbox = ["dep:wasmtime"]
 # Mamba CPU-only: base Mamba SSM support without CUDA (for CI / non-GPU machines)
-mamba-cpu = ["dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
+mamba-cpu = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
 # Mamba with CUDA GPU acceleration (default for local dev)
 mamba = ["mamba-cpu", "candle-core/cuda"]
 # GPU-accelerated logit computation and training (candle-core matmul)

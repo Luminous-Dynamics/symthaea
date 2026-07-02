@@ -43,6 +43,7 @@ JSON
   echo "created_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "git_rev=$(git rev-parse HEAD 2>/dev/null || true)"
   echo "git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  echo "broca_checkpoint_path=${BROCA_CHECKPOINT_PATH:-}"
   echo "broca_eval_limit=${BROCA_EVAL_LIMIT:-8}"
   echo "broca_max_direct_drift=${BROCA_MAX_DIRECT_DRIFT:-1.10}"
   echo "broca_max_mamba_drift=${BROCA_MAX_MAMBA_DRIFT:-1.10}"
@@ -67,7 +68,7 @@ JSON
 
 decoder_cmd=(
   cargo run "${cargo_locked_args[@]}" -p symthaea-broca --features "$BROCA_DECODER_FEATURES" --bin broca-decoder-ab --
-  --decoder structured
+  --decoder "${BROCA_CHECKPOINT_PATH:+direct,}structured"
   --eval-limit "${BROCA_EVAL_LIMIT:-8}"
   --max-direct-drift "${BROCA_MAX_DIRECT_DRIFT:-1.10}"
   --max-mamba-drift "${BROCA_MAX_MAMBA_DRIFT:-1.10}"
@@ -82,7 +83,14 @@ decoder_cmd=(
 if [[ "${BROCA_INCLUDE_STRUCTURED_MOLECULE:-0}" == "1" ]]; then
   decoder_cmd+=(--include-structured-molecule)
 fi
+if [[ -n "${BROCA_CHECKPOINT_PATH:-}" ]]; then
+  decoder_cmd+=(--checkpoint "$BROCA_CHECKPOINT_PATH")
+fi
 "${decoder_cmd[@]}"
+
+if [[ -n "${BROCA_CHECKPOINT_PATH:-}" ]]; then
+  echo "[broca] NOTE: exercism-bench drives the separate Liquid-Mamba fusion pathway, not the checkpoint at \$BROCA_CHECKPOINT_PATH — its results below are informational only, not a promotion signal for that checkpoint."
+fi
 
 if [[ "${BROCA_SKIP_EXERCISM:-0}" == "1" ]]; then
   cat > "$OUT_DIR/exercism-bench.json" <<'JSON'
