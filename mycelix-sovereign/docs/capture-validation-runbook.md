@@ -233,8 +233,42 @@ From ADR 0001 §Known upstream issues:
 | Task | Status |
 |---|---|
 | Harness shipped | ✅ `xenia-peer/crates/xenia-capture/examples/capture_bench.rs` |
-| Linux local (dev box) | ⬜ pending PR #183 merge (upstream broken on Linux) |
+| Linux local (dev box) | 🟡 ran for the first time 2026-07-02 on KDE-Wayland (see below); GNOME/wlroots still pending |
 | macOS | ⬜ needs operator with Mac 14+ |
 | Windows 11 | ⬜ needs operator with Win 11 |
-| GNOME-Wayland | ⬜ pending #183 merge |
-| KDE-Wayland | ⬜ pending #183 merge |
+| GNOME-Wayland | ⬜ pending an operator |
+| KDE-Wayland | 🟡 **first real run 2026-07-02** — capture works, fps target not met (see below) |
+
+### KDE-Wayland results (2026-07-02, `scap` fork branch `fix/linux-engine-two-level-frame-enum`)
+
+Before this run, `cargo build -p xenia-capture --features scap-backend` failed
+outright (`FrameData` unresolved in `scap_backend.rs`, 6 sites — fixed in
+`70e7267`). This is the first time this feature has ever actually been
+compiled with a real toolchain, let alone run against a live display.
+
+Two runs of `capture_bench` after the fix:
+
+| Run | Frames | Elapsed | Effective fps | Dims | Bytes/frame | First-frame latency | Errors |
+|---|---|---|---|---|---|---|---|
+| 1 | 77 | 30.0s | 2.57 | 1920×1080 | 8,294,400 | 7.63s | 0 |
+| 2 | 30 | 30.0s | 1.00 | 1920×1080 | 8,294,400 | 3.76s | 0 |
+
+**Capture itself works**: correct native resolution, zero decode/backend
+errors both runs. **Performance does not meet the ≥15fps acceptance bar** —
+effective fps is 1–2.6, roughly 6–15× below target, with several seconds of
+first-frame latency. Root cause not yet investigated; candidates include
+PipeWire negotiation overhead in this specific portal/compositor
+combination, or a per-frame retrieval bottleneck in scap's Linux engine.
+Needs profiling before this can be called validated in the runbook's sense.
+
+One earlier attempt (before the two runs above) failed completely with a
+panic — `scap::capturer::engine::linux::LinuxCapturer::new` calls
+`.expect()` on the ScreenCast `create_session` D-Bus call, which returned
+`LinCapError { msg: "Did not get response" }` after scap's own 10s timeout
+for that step. This is notable because `create_session` is a session
+handshake that precedes the interactive source-picker dialog (which scap
+gives 2 minutes for) — so this wasn't a human-reaction-time issue, it read
+as a cold-start D-Bus/portal hiccup. It did not recur on the next two
+attempts. Also worth flagging upstream: scap panicking here instead of
+returning `Result` cleanly is itself a robustness gap — a transient portal
+hiccup shouldn't crash the capture worker thread.

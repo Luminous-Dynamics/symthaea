@@ -88,6 +88,17 @@ Before this ADR is locked in implementation, measure on real hardware:
 
 If (1) fails to clear 15 FPS at 1080p on any target OS, escalate: evaluate whether it is a scap bug (patch upstream), an xcap opportunity (fallback), or a genuine hardware limit (reduce resolution default in Xenia admin console).
 
+**KDE-Wayland, 2026-07-02 — first real measurement, item (1) fails.** Two
+`capture_bench` runs (after fixing a `FrameData` import bug that had blocked
+this feature from compiling at all — see runbook) captured real 1920×1080
+frames with zero decode/backend errors, but at 1.00 and 2.57 effective fps
+respectively — well short of the 15 FPS bar, with 3.8–7.6s first-frame
+latency. Per the escalation rule above: this needs investigation (scap bug
+vs. PipeWire negotiation overhead vs. this specific portal/compositor
+combination) before it can be called validated. Full detail in
+`capture-validation-runbook.md`'s KDE-Wayland results section. GNOME-Wayland,
+macOS, and Windows 11 are still unmeasured.
+
 ## Upstream blocker — scap 0.1.0-beta.1 does not compile on Linux (2026-04-19)
 
 When the scap scaffold was wired into `xenia-peer/crates/xenia-capture` and `cargo check --features scap-backend` was run inside `nix develop` (providing `pipewire`, `dbus`, `wayland`, `libspa` system libs), scap itself failed to compile with 8 errors in `scap/src/capturer/engine/linux/mod.rs`:
