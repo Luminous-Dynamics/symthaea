@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 
 use crate::components::{Player, Tile};
-use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase, TileGrid};
+use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase};
 
 /// The Eight Harmonies — mathematical attractors of consciousness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

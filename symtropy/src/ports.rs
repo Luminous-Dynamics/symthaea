@@ -3,7 +3,6 @@
 //! Ports and adapters for governance, cognition, and chronicle persistence.
 
 use bevy::prelude::*;
-use std::sync::{Arc, Mutex};
 
 // ============================================================================
 // 1. Governance Port

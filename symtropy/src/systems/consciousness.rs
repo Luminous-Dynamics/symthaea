@@ -12,7 +12,7 @@
 use bevy::prelude::*;
 use symthaea_consciousness_equation::{ConsciousnessInputs, MasterConsciousnessEquation};
 
-use crate::components::{CrewNpc, Player};
+use crate::components::CrewNpc;
 use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase};
 
 /// NPC consciousness state computed by the Master Equation.

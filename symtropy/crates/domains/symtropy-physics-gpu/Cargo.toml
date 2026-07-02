@@ -1,0 +1,21 @@
+[package]
+name = "symtropy-physics-gpu"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "GPU-accelerated broadphase and spatial partitioning for Symtropy."
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_render", "bevy_asset", "bevy_gizmos", "bevy_pbr"] }
+bevy_pbr = "0.18"
+bevy_mesh = "0.18"
+symtropy-bevy-core = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-bevy-core" }
+symtropy-physics = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-physics" }
+symtropy-math = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-math" }
+symthaea-bevy-brain = { path = "/srv/luminous-dynamics/symtropy/crates/bridges/symthaea-bevy-brain" }
+nalgebra = { version = "0.34", features = ["serde-serialize"] }
+bytemuck = { version = "1.21", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+
+[features]
+default = []

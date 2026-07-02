@@ -10,6 +10,18 @@ authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 license = "AGPL-3.0-or-later"
 publish = false
 
+[features]
+default = []
+# Physicalized cryptography / governance systems (see systems/mod.rs).
+# Enabled via `cargo build --features mycelix`. NOT verified by this
+# workspace's default `cargo check` — symtropy-sim-bridge (used in
+# plugin.rs's mycelix block) isn't wired as a dependency here yet.
+mycelix = []
+# Sol Atlas globe view. NOT verified by this workspace's default
+# `cargo check` — sol-atlas-bevy isn't a dependency of this crate at
+# all yet, so `--features atlas` will not currently build.
+atlas = []
+
 [dependencies]
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset", "bevy_core_pipeline", "bevy_render",

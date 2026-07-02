@@ -1,0 +1,35 @@
+[package]
+name = "symtropy-foundry"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Engine-side smart ingestion for Symtropy Asset Foundry assets."
+
+[features]
+default = []
+# Quarantined research-prototype modules (bio_feedback, cognition,
+# evolution, fitness, ghost_memory, mesh_synthesis) — see lib.rs and
+# docs/status/FOUNDRY_VERIFICATION_2026_06_18.md. Declared here purely
+# so cargo check's default build doesn't warn about the unknown cfg
+# name; NOT a claim that `--features experimental` builds cleanly.
+experimental = []
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_asset", "bevy_scene", "bevy_pbr", "bevy_render", "bevy_ui", "bevy_text"] }
+bevy_render = { version = "0.18" }
+wgpu-types = "23.0"
+bevy_camera = { version = "0.18" }
+symtropy-physics = { path = "../../core/symtropy-physics" }
+symtropy-bevy-core = { path = "../../core/symtropy-bevy-core" }
+symtropy-math = { path = "../../core/symtropy-math" }
+symtropy-consciousness-physics = { path = "../../domains/symtropy-consciousness-physics" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+notify = "8.0"
+rusqlite = { version = "0.37", features = ["bundled"] }
+rand = "0.8"
+uuid = { version = "1.0", features = ["v4"] }
+
+[dev-dependencies]
+symtropy-launcher = { path = "../../../" }

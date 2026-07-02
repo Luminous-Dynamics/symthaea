@@ -352,7 +352,7 @@ pub fn hud_system(
     mut hud: Query<(&mut Text, &mut TextColor), With<HudText>>,
     time: Res<Time>,
     mut timer: ResMut<TelemetryTimer>,
-    gov_log: Res<GovernanceLog>,
+    _gov_log: Res<GovernanceLog>,
     explored: Res<crate::systems::minimap::ExploredTiles>,
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
     collected: Res<crate::systems::scavenge::CollectedPrimitives>,
@@ -374,7 +374,7 @@ pub fn hud_system(
         .next()
         .map(|c| c.extraction_progress)
         .unwrap_or(0.0);
-    let (player_pos, player_handle) = player
+    let (_player_pos, player_handle) = player
         .iter()
         .next()
         .map(|(t, pb)| (t.translation.truncate(), Some(pb.handle)))

@@ -57,7 +57,7 @@ pub fn hydrate_gpu_telemetry_system(
     let mut entity_to_index: HashMap<Entity, u32> = HashMap::new();
 
     // 1. Populate Player Node
-    for (entity, tf, body, consciousness) in &player_query {
+    for (entity, tf, body, _consciousness) in &player_query {
         let (prediction_error, phi) = physics
             .consciousness
             .entities
@@ -96,7 +96,7 @@ pub fn hydrate_gpu_telemetry_system(
     }
 
     // 2. Populate Crew NPC Nodes
-    for (entity, tf, body, npc, consciousness) in &npc_query {
+    for (entity, tf, body, _npc, consciousness) in &npc_query {
         let (prediction_error, phi) = physics
             .consciousness
             .entities
@@ -137,7 +137,7 @@ pub fn hydrate_gpu_telemetry_system(
     }
 
     // 3. Populate Rogue Null Drone Nodes (Untrusted chaos cloud)
-    for (entity, tf, body, drone) in &drone_query {
+    for (entity, tf, body, _drone) in &drone_query {
         let last_impulse = physics
             .world
             .collision_events
@@ -169,7 +169,7 @@ pub fn hydrate_gpu_telemetry_system(
     }
 
     // 4. Populate Water Pump Nodes
-    for (entity, tf, body, pump) in &pump_query {
+    for (entity, tf, _body, pump) in &pump_query {
         let efficiency = pump.efficiency;
         let is_running = pump.is_running;
         let is_sabotaged = pump.is_sabotaged;
@@ -199,7 +199,7 @@ pub fn hydrate_gpu_telemetry_system(
     }
 
     // 5. Populate Power Junction Nodes
-    for (entity, tf, body, junction) in &junction_query {
+    for (entity, tf, _body, junction) in &junction_query {
         let is_damaged = junction.is_damaged;
         let output = junction.output;
 

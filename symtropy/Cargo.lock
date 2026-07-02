@@ -3367,24 +3367,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "chacha20"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f8d983286843e49675a4b7a2d174efe136dc93a18d69130dd18198a6c167601"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.3.0",
- "rand_core 0.10.1",
-]
-
-[[package]]
 name = "chacha20poly1305"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10cd79432192d1c0f4e1a0fef9527696cc039165d729fb41b3f4f4f354c2dc35"
 dependencies = [
  "aead",
- "chacha20 0.9.1",
+ "chacha20",
  "cipher",
  "poly1305",
  "zeroize",
@@ -5452,7 +5441,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi 6.0.0",
- "rand_core 0.10.1",
  "wasip2",
  "wasip3",
 ]
@@ -7444,7 +7432,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
-name = "luminous-sim-core-symthaea"
+name = "luminous-sim-core"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -7742,7 +7730,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "luminous-sim-core-symthaea",
+ "luminous-sim-core",
  "mycelix-bridge-common",
  "mycelix-desci-core",
  "petgraph 0.7.1",
@@ -7768,6 +7756,9 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.18",
+ "winter-crypto",
+ "winter-math",
+ "winterfell",
 ]
 
 [[package]]
@@ -9634,17 +9625,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e8e8bcc7961af1fdac401278c6a831614941f6164ee3bf4ce61b7edb162207"
-dependencies = [
- "chacha20 0.10.0",
- "getrandom 0.4.2",
- "rand_core 0.10.1",
-]
-
-[[package]]
 name = "rand_chacha"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9681,12 +9661,6 @@ checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
 dependencies = [
  "getrandom 0.3.4",
 ]
-
-[[package]]
-name = "rand_core"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
 name = "rand_distr"
@@ -10964,7 +10938,7 @@ dependencies = [
 
 [[package]]
 name = "sovereign-profile"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "serde",
 ]
@@ -11684,7 +11658,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "symtropy-holochain-relay"
+name = "symtropy-holochain-relay-bridge"
 version = "0.1.0"
 dependencies = [
  "futures-util",
@@ -11831,7 +11805,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
- "symtropy-holochain-relay",
+ "symtropy-holochain-relay-bridge",
  "symtropy-math",
  "symtropy-net-core",
  "symtropy-physics",
@@ -12946,19 +12920,8 @@ checksum = "144d6b123cef80b301b8f72a9e2ca4370ddec21950d0a103dd22c437006d2db7"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
- "rand 0.10.1",
  "serde_core",
- "uuid-rng-internal",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "uuid-rng-internal"
-version = "1.23.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7150d9f2ad44ac625d243aec4e6692320f818241f3f30e653630d1f729163bac"
-dependencies = [
- "rand 0.10.1",
 ]
 
 [[package]]

@@ -304,7 +304,7 @@ pub fn dialogue_system(
 
     if let Some((npc_entity, _, text)) = closest {
         // Find NPC position for bubble placement
-        if let Ok((_, npc_tf, _, _, _)) = npcs.get(npc_entity) {
+        if let Ok((_, _npc_tf, _, _, _)) = npcs.get(npc_entity) {
             commands.spawn((
                 Text::new(text),
                 TextFont {

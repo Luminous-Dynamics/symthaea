@@ -60,10 +60,6 @@ impl BspNode {
         }
     }
 
-    fn split(&mut self, rng: &mut impl Rng, depth: usize) {
-        self.split_with_params(rng, depth, DEFAULT_MIN_ROOM_SIZE, DEFAULT_MIN_SPLIT_SIZE);
-    }
-
     fn split_with_params(
         &mut self,
         rng: &mut impl Rng,
@@ -288,7 +284,7 @@ fn generate_dungeon_with_config(
     bsp_depth: usize,
     min_room: usize,
     min_split: usize,
-    corridor_width: usize,
+    _corridor_width: usize,
 ) -> Dungeon {
     let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
     let mut tiles = vec![vec![0u8; width]; height]; // all walls

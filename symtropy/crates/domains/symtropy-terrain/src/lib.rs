@@ -13,7 +13,7 @@ use symtropy_rapier3d_bridge::{
     RapierRigidBodySet,
 };
 
-use symtropy_physics_gpu::{GpuFluidVoxel, HybridFluidManager, HybridFluidPlugin};
+use symtropy_physics_gpu::HybridFluidPlugin;
 
 pub const CHUNK_SIZE: usize = 16;
 

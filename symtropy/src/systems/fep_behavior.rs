@@ -572,7 +572,7 @@ pub fn npc_action_system(
                     drone.integrity -= 0.5 * dt;
 
                     // Gunfire stress: increase stress of nearby crew members
-                    for (other_ent, other_npc, other_tf) in &actors {
+                    for (other_ent, _other_npc, other_tf) in &actors {
                         if other_ent != actor_entity {
                             let dist = other_tf.translation.truncate().distance(npc_pos);
                             if dist < 150.0 {
@@ -611,7 +611,7 @@ pub fn npc_action_system(
 
 /// Apply NPC movement intent to physics bodies.
 pub fn npc_movement_system(
-    mut query: Query<
+    query: Query<
         (
             &Transform,
             &MoveTarget,

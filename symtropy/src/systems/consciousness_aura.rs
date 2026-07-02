@@ -138,7 +138,7 @@ pub fn aura_update_system(
         };
 
         // Get consciousness metrics from physics engine or NPC consciousness
-        let (energy_frac, phi, prediction_error) = if let Some(body) = body {
+        let (energy_frac, _phi, prediction_error) = if let Some(body) = body {
             physics
                 .consciousness
                 .entities

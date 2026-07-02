@@ -7,7 +7,6 @@
 //! tactile claims about their physical environment using joint-level
 //! enclaves (ARM TrustZone / ATECC608A).
 
-use crate::platform::PlatformType;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

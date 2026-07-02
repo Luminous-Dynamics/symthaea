@@ -131,7 +131,7 @@ pub fn ai_player_system(
     };
 
     // 6. Direction to fusion core
-    let core_dir = core_query
+    let _core_dir = core_query
         .iter()
         .next()
         .map(|tf| {
@@ -158,7 +158,7 @@ pub fn ai_player_system(
     );
 
     let _perception = ai.agent.perceive(&obs);
-    let action = ai.agent.select_action();
+    let _action = ai.agent.select_action();
     ai.decisions += 1;
 
     // === FREE ENERGY GRADIENT — same algorithm that proved 80% tighter clustering ===

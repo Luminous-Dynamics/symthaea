@@ -19,7 +19,7 @@ pub fn null_drone_ai_system(
     >,
     time: Res<Time>,
 ) {
-    for (drone_entity, mut drone, mut drone_tf) in &mut drones {
+    for (_drone_entity, mut drone, mut drone_tf) in &mut drones {
         // 1. Pick a target machine if we don't have one
         if drone.target_machine.is_none() {
             // Prefer damaging junctions first to cut power

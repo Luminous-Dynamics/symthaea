@@ -8,11 +8,11 @@ use crate::systems::psychology::PsychologicalNeeds;
 use bevy::prelude::*;
 
 pub fn tutorial_scenario_system(
-    mut tutorial: Option<ResMut<TutorialScenarioRes>>,
+    tutorial: Option<ResMut<TutorialScenarioRes>>,
     mut water_pumps: Query<(Entity, &Transform, &mut WaterPump)>,
     npcs: Query<(Entity, &CrewNpc, &Transform)>,
     mut needs_query: Query<&mut PsychologicalNeeds>,
-    mut action_writer: MessageWriter<NpcActionEvent>,
+    _action_writer: MessageWriter<NpcActionEvent>,
     mut feedback_writer: MessageWriter<WorldFeedbackEvent>,
     mut settlement_metrics: Option<ResMut<SettlementMetrics>>,
 ) {
