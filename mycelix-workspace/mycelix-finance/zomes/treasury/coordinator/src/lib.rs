@@ -71,6 +71,17 @@ pub struct CreateTreasuryInput {
 
 #[hdk_extern]
 pub fn contribute(input: ContributeInput) -> ExternResult<Record> {
+    // Caller must be the DID they claim to be contributing as — prevents an
+    // agent from crediting contributions (and the resulting treasury balance
+    // increase) to an identity they do not control.
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if caller_did != input.contributor_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller does not match contributor_did".into()
+        )));
+    }
+
     let now = sys_time()?;
     let contribution = Contribution {
         id: format!("contrib:{}:{}", input.contributor_did, now.as_micros()),
@@ -112,6 +123,11 @@ pub struct ContributeInput {
     pub contribution_type: ContributionType,
 }
 
+/// Internal helper — not exposed as `#[hdk_extern]`. Caller-identity
+/// verification is the responsibility of the public entry points that call
+/// this (`contribute` checks `contributor_did`; `execute_allocation` only
+/// runs on allocations that already passed `approve_allocation`'s manager
+/// check), so no additional `agent_info()` check is needed here.
 fn update_treasury_balance(treasury_id: &str, delta: f64) -> ExternResult<()> {
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
