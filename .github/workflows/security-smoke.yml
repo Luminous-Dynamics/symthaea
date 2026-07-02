@@ -10,7 +10,7 @@ on:
       - "mycelix-core/gun-p2p-server.js"
       - "mycelix-core/signaling-server.js"
       - "mycelix-core/websocket-bridge.js"
-      - "mycelix-finance/sidecar/**"
+      - "mycelix-workspace/mycelix-finance/sidecar/**"
   push:
     branches: ["main"]
     paths:
@@ -21,7 +21,7 @@ on:
       - "mycelix-core/gun-p2p-server.js"
       - "mycelix-core/signaling-server.js"
       - "mycelix-core/websocket-bridge.js"
-      - "mycelix-finance/sidecar/**"
+      - "mycelix-workspace/mycelix-finance/sidecar/**"
   workflow_dispatch: {}
 
 permissions:

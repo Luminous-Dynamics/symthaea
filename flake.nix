@@ -222,7 +222,7 @@
             }
 
             lum_check_finance() {
-              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-finance/Cargo.toml" "$@"
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-workspace/mycelix-finance/Cargo.toml" "$@"
             }
 
             lum_check_knowledge() {
