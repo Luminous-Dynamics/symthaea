@@ -43,7 +43,7 @@
 
 use symthaea_core::embodiment::EmbodimentBridge;
 use symthaea_core::hdc::ContinuousHV;
-use symtropy_robotics_bridge::MotorPlanner;
+use symtropy_robotics_bridge_core::motor::MotorPlanner;
 
 /// Default simulation timestep fed to `EmbodimentBridge::step` (60 Hz).
 pub const DEFAULT_DT: f32 = 1.0 / 60.0;
@@ -142,8 +142,7 @@ pub fn encode_observation(obs: &[f64], hv_dim: usize) -> ContinuousHV {
 mod tests {
     use super::*;
     use symthaea_core::embodiment::{
-        AgentIdentity, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry,
-        MotorSafetyLevel,
+        AgentIdentity, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
     };
 
     /// Minimal EmbodimentBridge for testing the adapter without pulling a
@@ -178,12 +177,7 @@ mod tests {
     impl EmbodimentBridge for MockBridge {
         fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
             self.step_count += 1;
-            self.last_thought_norm = thought_hv
-                .values
-                .iter()
-                .map(|v| v * v)
-                .sum::<f32>()
-                .sqrt();
+            self.last_thought_norm = thought_hv.values.iter().map(|v| v * v).sum::<f32>().sqrt();
             self.last_dt = dt;
             self.last_phi = phi;
             EmbodimentResult {
@@ -282,10 +276,7 @@ mod tests {
         // 0.42).
         let cmds = p.plan(&[0.5], 0.42, 4);
         for c in &cmds {
-            assert!(
-                *c <= 0.42 + 1e-12,
-                "gain cap violated: {c} > 0.42"
-            );
+            assert!(*c <= 0.42 + 1e-12, "gain cap violated: {c} > 0.42");
         }
     }
 

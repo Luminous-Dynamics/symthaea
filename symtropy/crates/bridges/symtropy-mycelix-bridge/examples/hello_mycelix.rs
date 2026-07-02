@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Milestone 1 smoke test — send one `GetActiveProposals` request from a
 //! Bevy system and log the response.
 //!

@@ -14,11 +14,12 @@ categories = ["simulation", "science"]
 # matrix into that workspace's build.
 
 [dependencies]
-symtropy-robotics-bridge = { version = "0.1.0", path = "../symtropy/crates/symtropy-robotics-bridge" }
-symthaea-core = { version = "0.5.0", path = "../symthaea/symthaea-core" }
+symtropy-robotics-bridge-core = { version = "0.1.0", path = "../symtropy-robotics-bridge-core" }
+symthaea-core = { version = "0.5.0", path = "../../../../symthaea/crates/core/symthaea-core" }
+
 
 [dev-dependencies]
 # Integration tests exercise the adapter against a real EmbodimentBridge.
 # Orbital is the minimal choice: default features pull only symthaea-core +
 # symthaea-fep, no MuJoCo, no optional runtime deps.
-symthaea-orbital = { version = "0.1.0", path = "../symthaea/crates/symthaea-orbital" }
+symthaea-orbital = { version = "0.1.0", path = "../../../../symthaea/crates/domains/symthaea-orbital" }
