@@ -644,13 +644,13 @@ pub fn degree_heuristic(
         }
         // Check if any constraint involves both var_idx and other
         // We can't enumerate constraints by variable easily with the fn interface,
-        // so we count the number of constraint fns (proxy for degree)
+        // so we probe with dummy values (0,0) and count `other` once if any
+        // constraint fn is triggered between them.
         for c in constraints {
-            // Probe with dummy values; if constraint is defined between them,
-            // count it once. We use 0,0 as dummy values.
-            let _ = c(var_idx, 0, other, 0);
-            degree += 1;
-            break; // count this variable as constrained
+            if c(var_idx, 0, other, 0) {
+                degree += 1;
+                break; // count this variable as constrained, don't double-count
+            }
         }
     }
     degree

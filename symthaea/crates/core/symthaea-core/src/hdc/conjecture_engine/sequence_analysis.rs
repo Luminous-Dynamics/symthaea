@@ -329,7 +329,7 @@ pub(crate) fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
                 BinOp::Mul,
                 Box::new(Expr::Func(
                     UnaryFn::Sqrt,
-                    Box::new(Expr::BinOp(BinOp::Mul, c(6.28), n())),
+                    Box::new(Expr::BinOp(BinOp::Mul, c(std::f64::consts::TAU), n())),
                 )),
                 Box::new(Expr::BinOp(
                     BinOp::Pow,
