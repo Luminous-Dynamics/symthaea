@@ -511,7 +511,7 @@ pub struct RequestRevocationInput {
 #[hdk_extern]
 pub fn request_academic_revocation(input: RequestRevocationInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
-    let requester_did = format!("did:key:{}", agent_info.agent_initial_pubkey);
+    let requester_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
     let request = AcademicRevocationRequest {
         credential_id: input.credential_id.clone(),
@@ -586,11 +586,22 @@ fn generate_credential_id(issuer_did: &str, subject_did: &str) -> ExternResult<S
     // Use first 16 bytes as UUID-like identifier
     Ok(format!(
         "urn:uuid:{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        hash[0], hash[1], hash[2], hash[3],
-        hash[4], hash[5],
-        hash[6], hash[7],
-        hash[8], hash[9],
-        hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
+        hash[0],
+        hash[1],
+        hash[2],
+        hash[3],
+        hash[4],
+        hash[5],
+        hash[6],
+        hash[7],
+        hash[8],
+        hash[9],
+        hash[10],
+        hash[11],
+        hash[12],
+        hash[13],
+        hash[14],
+        hash[15]
     ))
 }
 
