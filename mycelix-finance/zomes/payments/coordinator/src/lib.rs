@@ -9,15 +9,15 @@ use finance_wire_types::{
 };
 use hdk::prelude::*;
 use mycelix_finance_shared::{
-    anchor_hash, follow_update_chain, links_to_records, rate_limit_anchor_key, validate_did_format,
-    validate_id, verify_caller_is_did, verify_citizen_tier, verify_participant_tier,
-    DEFAULT_RATE_LIMIT_PER_MINUTE,
+    DEFAULT_RATE_LIMIT_PER_MINUTE, anchor_hash, follow_update_chain, links_to_records,
+    rate_limit_anchor_key, validate_did_format, validate_id, verify_caller_is_did,
+    verify_citizen_tier, verify_participant_tier,
 };
 use mycelix_finance_types::{
-    compute_demurrage_deduction, CompostPoolTier, FeeTier, PendingCompost, SapMintCapCounter,
-    SapMintSource, SuccessionPreference, COMPOST_LOCAL_PCT, COMPOST_MAX_RETRIES,
-    COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, SAP_MINT_ANNUAL_MAX,
-    SAP_MINT_PER_PROPOSAL_MAX,
+    COMPOST_LOCAL_PCT, COMPOST_MAX_RETRIES, COMPOST_REGIONAL_PCT, CompostPoolTier,
+    DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE, FeeTier, PendingCompost, SAP_MINT_ANNUAL_MAX,
+    SAP_MINT_PER_PROPOSAL_MAX, SapMintCapCounter, SapMintSource, SuccessionPreference,
+    compute_demurrage_deduction,
 };
 use payments_integrity::*;
 
@@ -304,7 +304,10 @@ fn drain_pending_compost_inner() -> ExternResult<u32> {
         } else {
             debug!(
                 "Pending compost still undeliverable: {} micro-SAP to pool {} from {} (queued at {})",
-                pending.amount, pending.commons_pool_id, pending.source_member_did, pending.created_at_micros
+                pending.amount,
+                pending.commons_pool_id,
+                pending.source_member_did,
+                pending.created_at_micros
             );
         }
     }
@@ -934,7 +937,10 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
             FeeTier::from_mycel(mycel_score).base_fee_rate()
         }
         Err(e) => {
-            debug!("compute_sap_fee: bridge unreachable for {}: {:?}, falling back to direct recognition", sender_did, e);
+            debug!(
+                "compute_sap_fee: bridge unreachable for {}: {:?}, falling back to direct recognition",
+                sender_did, e
+            );
             // Bridge unavailable — fall back to direct recognition call
             let mycel_score = match call(
                 CallTargetCell::Local,
@@ -961,7 +967,10 @@ fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
                     0.0
                 }
                 Err(e2) => {
-                    debug!("compute_sap_fee: recognition also unreachable for {}: {:?}, defaulting to 0.0", sender_did, e2);
+                    debug!(
+                        "compute_sap_fee: recognition also unreachable for {}: {:?}, defaulting to 0.0",
+                        sender_did, e2
+                    );
                     0.0
                 }
             };
@@ -1279,6 +1288,16 @@ fn get_payment_record(payment_id: &str) -> ExternResult<(Record, Payment)> {
 #[hdk_extern]
 pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
     let (record, channel) = get_channel_record(&input.channel_id)?;
+
+    // Caller must be a participant in this channel — otherwise any agent
+    // could move funds between two other parties' channels.
+    let caller_did = format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey);
+    if caller_did != channel.party_a && caller_did != channel.party_b {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller is not a participant in this payment channel".into()
+        )));
+    }
+
     let now = sys_time()?;
     let (new_a, new_b) = if input.from_a {
         (
@@ -2199,12 +2218,18 @@ fn verify_hearth_membership(caller_did: &str, hearth_did: &str) -> ExternResult<
         Ok(other) => {
             // SECURITY NOTE: Hearth cluster unreachable/unauthorized — allow in standalone mode.
             // In production with a running hearth cluster, this path should not be reached.
-            debug!("verify_hearth_membership: hearth_bridge returned {:?} for {}@{}, allowing (standalone mode)", other, caller_did, hearth_did);
+            debug!(
+                "verify_hearth_membership: hearth_bridge returned {:?} for {}@{}, allowing (standalone mode)",
+                other, caller_did, hearth_did
+            );
             Ok(())
         }
         Err(e) => {
             // SECURITY NOTE: Hearth cluster unreachable — allow in standalone mode.
-            debug!("verify_hearth_membership: hearth_bridge unreachable for {}@{}: {:?}, allowing (standalone mode)", caller_did, hearth_did, e);
+            debug!(
+                "verify_hearth_membership: hearth_bridge unreachable for {}@{}: {:?}, allowing (standalone mode)",
+                caller_did, hearth_did, e
+            );
             Ok(())
         }
     }

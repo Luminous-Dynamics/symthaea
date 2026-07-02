@@ -12,8 +12,8 @@
 
 use hdk::prelude::*;
 use mycelix_finance_shared::{
-    anchor_hash, follow_update_chain, links_to_records, verify_caller_is_did,
-    verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
+    GOVERNANCE_AGENTS_ANCHOR, anchor_hash, follow_update_chain, links_to_records,
+    verify_caller_is_did, verify_governance_or_bootstrap_from_links,
 };
 use mycelix_zome_helpers as _;
 use staking_integrity::*;
@@ -231,6 +231,9 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
     let now = sys_time()?;
     let (stake, record) = find_stake_by_id(&stake_id)?;
 
+    // Only the staker who owns this stake may withdraw it.
+    verify_caller_is_did(&stake.staker_did)?;
+
     if stake.status != StakeStatus::Unbonding {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Stake {} is {:?}, expected Unbonding for withdrawal",
@@ -334,7 +337,10 @@ fn fetch_verified_mycel_score(staker_did: &str) -> ExternResult<f32> {
             Ok(0.0)
         }
         Err(e) => {
-            debug!("fetch_verified_mycel_score: recognition unreachable for {}: {:?}, defaulting to 0.0", staker_did, e);
+            debug!(
+                "fetch_verified_mycel_score: recognition unreachable for {}: {:?}, defaulting to 0.0",
+                staker_did, e
+            );
             Ok(0.0) // Recognition unreachable → minimum weight
         }
     }
