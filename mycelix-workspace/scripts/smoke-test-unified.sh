@@ -45,22 +45,25 @@ echo ""
 # 2. Check each DNA bundle exists and is non-empty
 echo "--- DNA Bundles ---"
 DNA_DIRS=(
-    "../mycelix-commons/dna/mycelix_commons.dna"
-    "../mycelix-civic/dna/mycelix_civic.dna"
-    "../mycelix-identity/dna"
-    "../mycelix-governance/dna"
-    "../mycelix-finance/dna"
-    "../mycelix-hearth/dna"
-    "../mycelix-personal/dna"
-    "../mycelix-attribution/dna"
+    # Moved into mycelix-workspace/ (July 2 consolidation) — no ../ prefix,
+    # this script already cd's into mycelix-workspace/ above.
+    "mycelix-commons/dna/mycelix_commons.dna"
+    "mycelix-civic/dna/mycelix_civic.dna"
+    "mycelix-identity/dna"
+    "mycelix-governance/dna"
+    "mycelix-finance/dna"
+    "mycelix-hearth/dna"
+    "mycelix-personal/dna"
+    "mycelix-attribution/dna"
+    "mycelix-music/dnas"
+    "mycelix-energy/dna"
+    "mycelix-knowledge/dna"
+    "mycelix-climate/dnas/climate"
+    "mycelix-supplychain/holochain/dna"
+    "mycelix-manufacturing/dna"
+    # Not yet moved (deferred follow-up pass) — still top-level.
     "../mycelix-health/dna"
-    "../mycelix-music/dnas"
-    "../mycelix-energy/dna"
-    "../mycelix-knowledge/dna"
-    "../mycelix-climate/dnas/climate"
     "../mycelix-edunet/dna"
-    "../mycelix-supplychain/holochain/dna"
-    "../mycelix-manufacturing/dna"
 )
 
 for dna_path in "${DNA_DIRS[@]}"; do
