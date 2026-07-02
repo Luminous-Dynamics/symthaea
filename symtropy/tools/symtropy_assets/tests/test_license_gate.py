@@ -5,7 +5,7 @@ import yaml
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from license_gate import validate_manifest
-from sources.adapter import KenneyAdapter, PolyHavenAdapter
+from sources.adapter import KenneyAdapter, PolyHavenAdapter, QuaterniusAdapter, AmbientCGAdapter
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -90,3 +90,59 @@ def test_polyhaven_adapter_rejects_invalid_asset_type(tmp_path):
 
     with pytest.raises(ValueError):
         adapter.fetch_manifest("ClassicNightstand_01", asset_type="not_a_real_type")
+
+
+def test_quaternius_adapter_generates_cc0_manifest(tmp_path):
+    # Real pack, confirmed CC0 by fetching the actual pack page.
+    adapter = QuaterniusAdapter(str(tmp_path))
+    manifest = adapter.fetch_manifest("Downtown City MegaKit")
+    manifest_path = tmp_path / "quaternius.yaml"
+    manifest_path.write_text(yaml.dump(manifest))
+
+    status, reason = validate_manifest(str(manifest_path))
+
+    assert status == "APPROVED_CC0", reason
+    assert manifest["id"] == "quaternius.downtowncitymegakit"
+    assert manifest["source"]["source_name"] == "Quaternius"
+    assert manifest["source"]["source_url"] == "https://quaternius.com/packs/downtowncitymegakit.html"
+    assert manifest["title"] == "Downtown City MegaKit"
+    assert manifest["license"]["id"] == "CC0-1.0"
+
+
+def test_quaternius_adapter_normalizes_already_concatenated_id(tmp_path):
+    adapter = QuaterniusAdapter(str(tmp_path))
+    # Passing the bare site identifier directly should work identically.
+    manifest = adapter.fetch_manifest("downtowncitymegakit")
+    assert manifest["id"] == "quaternius.downtowncitymegakit"
+    assert manifest["source"]["source_url"] == "https://quaternius.com/packs/downtowncitymegakit.html"
+
+
+def test_quaternius_adapter_rejects_empty_identifier(tmp_path):
+    adapter = QuaterniusAdapter(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        adapter.fetch_manifest(" !!! ")
+
+
+def test_ambientcg_adapter_generates_cc0_manifest(tmp_path):
+    # Real asset ID, confirmed CC0 by fetching the actual asset page.
+    adapter = AmbientCGAdapter(str(tmp_path))
+    manifest = adapter.fetch_manifest("Tiles141")
+    manifest_path = tmp_path / "ambientcg.yaml"
+    manifest_path.write_text(yaml.dump(manifest))
+
+    status, reason = validate_manifest(str(manifest_path))
+
+    assert status == "APPROVED_CC0", reason
+    assert manifest["id"] == "ambientcg.Tiles141"
+    assert manifest["source"]["source_name"] == "ambientCG"
+    assert manifest["source"]["source_url"] == "https://ambientcg.com/a/Tiles141"
+    assert manifest["type"] == "material"
+    assert manifest["license"]["id"] == "CC0-1.0"
+
+
+def test_ambientcg_adapter_rejects_invalid_identifier(tmp_path):
+    adapter = AmbientCGAdapter(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        adapter.fetch_manifest("Tiles 141")  # spaces not allowed, only exact-case alphanumeric
