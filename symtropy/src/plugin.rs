@@ -184,6 +184,7 @@ impl Plugin for SymtropyPlugin {
                 .init_resource::<systems::atlas::OverlayManager>()
                 .init_resource::<sol_atlas_bevy::frame_capture::FrameCaptureConfig>()
                 .init_resource::<systems::demo_director::DemoDirector>()
+                .init_resource::<sol_atlas_bevy::h3_grid::HoveredCell>()
                 .add_systems(
                     Update,
                     systems::atlas::atlas_toggle_system.run_if(in_state(GamePhase::Playing)),
@@ -242,6 +243,19 @@ impl Plugin for SymtropyPlugin {
                         sol_atlas_bevy::frame_capture::frame_capture_system,
                         systems::demo_director::demo_director_system,
                     )
+                        .run_if(in_state(GamePhase::GlobeView)),
+                )
+                // H3 hex grid — Step 1 of the H3 Earth / telemetry solar
+                // system / procedural galaxy plan. Cell indexing + hover
+                // picking + boundary rendering only; entering a cell to
+                // load a walkable scene is a later step.
+                .add_systems(
+                    Update,
+                    (
+                        sol_atlas_bevy::h3_grid::hover_cell_system,
+                        sol_atlas_bevy::h3_grid::draw_hovered_cell_system,
+                    )
+                        .chain()
                         .run_if(in_state(GamePhase::GlobeView)),
                 )
                 .add_systems(

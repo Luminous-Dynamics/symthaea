@@ -17,10 +17,7 @@ default = []
 # workspace's default `cargo check` — symtropy-sim-bridge (used in
 # plugin.rs's mycelix block) isn't wired as a dependency here yet.
 mycelix = []
-# Sol Atlas globe view. NOT verified by this workspace's default
-# `cargo check` — sol-atlas-bevy isn't a dependency of this crate at
-# all yet, so `--features atlas` will not currently build.
-atlas = []
+atlas = ["dep:sol-atlas-bevy", "dep:sol-atlas-core"]
 
 [dependencies]
 bevy = { version = "0.18", default-features = false, features = [
@@ -51,6 +48,8 @@ symtropy-render-bridge = { path = "crates/bridges/symtropy-render-bridge" }
 symthaea-bevy-brain = { path = "crates/bridges/symthaea-bevy-brain", optional = true }
 symtropy-symthaea-adapter = { path = "crates/bridges/symtropy-symthaea-adapter", optional = true }
 symtropy-mycelix-bridge = { path = "crates/bridges/symtropy-mycelix-bridge", optional = true }
+sol-atlas-bevy = { path = "../sol-atlas-bevy", optional = true }
+sol-atlas-core = { path = "../sol-atlas-core", optional = true }
 
 symthaea-fep = { path = "../symthaea/crates/core/symthaea-fep" }
 
