@@ -95,7 +95,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3", default-features = false, features = ["custom"] }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../crates/mycelix-zome-helpers" }
 
 [profile.release]
 opt-level = 'z'

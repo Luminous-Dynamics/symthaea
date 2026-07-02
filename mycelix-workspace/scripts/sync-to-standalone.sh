@@ -184,6 +184,7 @@ MOVED_TO_WORKSPACE=(
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
     mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
     mycelix-climate mycelix-manufacturing mycelix-lawful-identity mycelix-core
+    mycelix-praxis
 )
 
 cluster_source_dir() {
@@ -309,11 +310,10 @@ echo
 # mycelix-workspace and is NOT excluded.
 info "=== Syncing mycelix-workspace ==="
 sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
-    --exclude='/mycelix-praxis/' \
     --exclude='/mycelix-marketplace/' \
     --exclude='/mycelix-supplychain/' \
     --exclude='/mycelix-desci/'
-    # mycelix-core's exclude removed 2026-07-02 — it moved here with real
+    # mycelix-core's and mycelix-praxis's excludes removed 2026-07-02 — both moved here with real
     # tracked content (was previously excluded to hide an untracked stub).
     # Note: mycelix-prism is NOT excluded — it has no top-level counterpart
     # and no dedicated sync script; this wholesale sync is its only current
