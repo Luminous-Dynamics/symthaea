@@ -284,10 +284,14 @@ pub struct FulfillmentPaymentInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FulfillmentPaymentResult {
     /// "escrow_released" | "payment_created" | "already_paid" | "po_not_received"
+    /// | "settlement_failed"
     pub action: String,
     pub payment_hash: Option<ActionHash>,
     pub amount: u64,
     pub currency: String,
+    /// Populated only when action == "settlement_failed": why the finance
+    /// cluster settlement was not confirmed.
+    pub settlement_error: Option<String>,
 }
 
 #[hdk_extern]
@@ -342,6 +346,7 @@ pub fn process_fulfillment_payment(
                 payment_hash: None,
                 amount: 0,
                 currency: "USD".to_string(),
+                settlement_error: None,
             });
         }
         v => v,
@@ -384,6 +389,7 @@ pub fn process_fulfillment_payment(
             payment_hash: None,
             amount: total_amount,
             currency,
+            settlement_error: None,
         });
     }
 
@@ -395,10 +401,19 @@ pub fn process_fulfillment_payment(
             payment_hash: None,
             amount: total_amount,
             currency,
+            settlement_error: None,
         });
     }
 
-    // Step 4: Check for funded escrow and release it
+    // Step 4: Check for funded escrow and release it.
+    //
+    // NOTE: escrow release here is local-only and does not attempt finance
+    // settlement (unlike Step 5-6 below). Escrow amounts/currencies are
+    // PO-defined (frequently non-SAP, e.g. "USD"), and finance's
+    // process_payment currently only accepts SAP — so there's no settlement
+    // call to gate on yet. Extending real settlement to escrow release needs
+    // either restricting supplychain escrow to SAP-only or adding
+    // multi-currency support to finance first; out of scope for this pass.
     if let Some(escrow_record) = get_po_escrow(input.po_hash.clone())? {
         if let Some(escrow) = escrow_record
             .entry()
@@ -413,12 +428,13 @@ pub fn process_fulfillment_payment(
                     payment_hash: Some(escrow_hash),
                     amount: escrow.amount,
                     currency: escrow.currency,
+                    settlement_error: None,
                 });
             }
         }
     }
 
-    // Step 5: Create and confirm a direct payment
+    // Step 5: Create a direct payment (starts Pending — NOT confirmed yet).
     let remaining = total_amount.saturating_sub(total_paid);
     let payment_input = CreatePaymentInput {
         po_hash: input.po_hash.clone(),
@@ -429,16 +445,35 @@ pub fn process_fulfillment_payment(
         reference: format!("Auto-payment for PO {}", po_number),
     };
     let payment_hash = create_payment(payment_input)?;
-    confirm_payment(payment_hash.clone())?;
 
-    // Step 6: Best-effort settlement in the finance cluster
-    let _ = settle_in_finance(payment_hash.clone());
+    // Step 6: Settlement in the finance cluster is now a precondition for
+    // confirming the payment, not a best-effort afterthought. Previously
+    // this called confirm_payment() first and then discarded the
+    // settle_in_finance() result (`let _ = ...`) — meaning the local record
+    // was marked Completed, and process_fulfillment_payment reported
+    // "payment_created" success, regardless of whether the finance cluster
+    // was reachable or whether the settlement call was rejected. Goods could
+    // ship on a payment that never actually moved any SAP. See
+    // MYCELIX_REVIEW.md P1 #4.
+    let settlement = settle_in_finance(payment_hash.clone())?;
+    if !settlement.settled {
+        update_payment_status((payment_hash.clone(), PaymentStatus::Failed))?;
+        return Ok(FulfillmentPaymentResult {
+            action: "settlement_failed".to_string(),
+            payment_hash: Some(payment_hash),
+            amount: remaining,
+            currency,
+            settlement_error: settlement.error,
+        });
+    }
+    confirm_payment(payment_hash.clone())?;
 
     Ok(FulfillmentPaymentResult {
         action: "payment_created".to_string(),
         payment_hash: Some(payment_hash),
         amount: remaining,
         currency,
+        settlement_error: None,
     })
 }
 
@@ -487,12 +522,18 @@ pub fn settle_in_finance(payment_hash: ActionHash) -> ExternResult<FinanceSettle
     // Build a finance-compatible cross-hApp payment payload.
     // Finance bridge `process_payment` expects: source_happ, from_did (payer),
     // to_did (payee), amount, currency, reference.
-    // We derive DIDs from the agent pub keys using a simple base64 encoding
-    // that is consistent with how other clusters express DIDs for agent keys.
+    //
+    // DID format MUST be "did:mycelix:{agent_pubkey}" — finance's
+    // verify_caller_is_did compares this string against
+    // format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey)
+    // (mycelix-finance/zomes/shared/src/lib.rs). This previously used
+    // "did:key:{...}", a different prefix that could never match — every
+    // settlement attempt was guaranteed to fail auth regardless of whether
+    // the underlying agent keys lined up. See MYCELIX_REVIEW.md P1 #4.
     let payload = serde_json::json!({
         "source_happ": "mycelix-supplychain",
-        "from_did": format!("did:key:{}", payment.payer),
-        "to_did": format!("did:key:{}", payment.payee),
+        "from_did": format!("did:mycelix:{}", payment.payer),
+        "to_did": format!("did:mycelix:{}", payment.payee),
         "amount": payment.amount,
         "currency": payment.currency,
         "reference": payment.reference,
@@ -563,6 +604,7 @@ mod tests {
             payment_hash: Some(ActionHash::from_raw_36(vec![6u8; 36])),
             amount: 50_000,
             currency: "USD".to_string(),
+            settlement_error: None,
         };
         let json = serde_json::to_string(&result).unwrap();
         let back: FulfillmentPaymentResult = serde_json::from_str(&json).unwrap();
@@ -577,6 +619,7 @@ mod tests {
             payment_hash: None,
             amount: 0,
             currency: "EUR".to_string(),
+            settlement_error: None,
         };
         let json2 = serde_json::to_string(&result2).unwrap();
         let back2: FulfillmentPaymentResult = serde_json::from_str(&json2).unwrap();

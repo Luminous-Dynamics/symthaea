@@ -691,6 +691,9 @@ const MAIL_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry", "trust_cr
 /// Finance-side zomes that marketplace transactions are allowed to call cross-cluster (payment settlement).
 const MARKETPLACE_TO_FINANCE: &[&str] = &["finance_bridge", "payments"];
 
+/// Finance-side zomes that supplychain payments is allowed to call cross-cluster (payment settlement).
+const SUPPLYCHAIN_TO_FINANCE: &[&str] = &["finance_bridge", "payments"];
+
 /// Identity-side zomes that space observations is allowed to call cross-cluster (trust lookups).
 const SPACE_TO_IDENTITY: &[&str] = &["identity_bridge", "trust_credential"];
 
@@ -854,6 +857,9 @@ pub const fn get_allowed_zomes(
 
         // Marketplace outbound
         (CrossClusterRole::Marketplace, CrossClusterRole::Finance) => MARKETPLACE_TO_FINANCE,
+
+        // Supplychain outbound
+        (CrossClusterRole::Supplychain, CrossClusterRole::Finance) => SUPPLYCHAIN_TO_FINANCE,
 
         // Space outbound
         (CrossClusterRole::Space, CrossClusterRole::Identity) => SPACE_TO_IDENTITY,
@@ -1318,6 +1324,7 @@ mod tests {
             ("SPACE_LOCAL_ZOMES", SPACE_LOCAL_ZOMES),
             ("MAIL_TO_IDENTITY", MAIL_TO_IDENTITY),
             ("MARKETPLACE_TO_FINANCE", MARKETPLACE_TO_FINANCE),
+            ("SUPPLYCHAIN_TO_FINANCE", SUPPLYCHAIN_TO_FINANCE),
             ("SPACE_TO_IDENTITY", SPACE_TO_IDENTITY),
             ("ATTRIBUTION_TO_IDENTITY", ATTRIBUTION_TO_IDENTITY),
             ("ATTRIBUTION_TO_FINANCE", ATTRIBUTION_TO_FINANCE),
@@ -1721,7 +1728,7 @@ mod tests {
                 }
             }
         }
-        // 62 registered directional routes:
+        // 63 registered directional routes:
         //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
         //   + 2 additional routes added for Health↔Identity and Praxis
@@ -1732,6 +1739,9 @@ mod tests {
         //     Climate→Praxis
         //   + 1 Music→Civic (2026-07-02, closes music-bridge's unguarded
         //     cross_cluster_dispatch — see MYCELIX_REVIEW.md addendum)
-        assert_eq!(count, 62, "Expected 62 registered cross-cluster routes");
+        //   + 1 Supplychain→Finance (2026-07-02, was previously called
+        //     ad hoc without going through routing_registry at all — see
+        //     P1 #4 value-moving-ledger consolidation)
+        assert_eq!(count, 63, "Expected 63 registered cross-cluster routes");
     }
 }
