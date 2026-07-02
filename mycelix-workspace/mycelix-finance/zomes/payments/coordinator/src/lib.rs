@@ -1421,6 +1421,16 @@ pub fn close_payment_channel(channel_id: String) -> ExternResult<Record> {
     validate_id(&channel_id, "channel_id")?;
     let (record, channel) = get_channel_record(&channel_id)?;
 
+    // Caller must be a participant in this channel — otherwise any agent
+    // could unilaterally close and settle two other parties' channel.
+    // Same check as channel_transfer above.
+    let caller_did = format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey);
+    if caller_did != channel.party_a && caller_did != channel.party_b {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller is not a participant in this payment channel".into()
+        )));
+    }
+
     if channel.closed.is_some() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Channel already closed".into()
@@ -1741,10 +1751,18 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
     )))
 }
 
-/// Release escrow to recipient
+/// Release escrow to recipient.
+///
+/// Only the depositor (`from_did`, the party who funded the escrow) can
+/// release it — mirrors standard escrow semantics ("buyer confirms and
+/// releases payment to seller"). Finance's escrow model has no separate
+/// arbiter field (unlike mycelix-supplychain's EscrowAccount); adding
+/// third-party/arbiter release is a feature addition, not part of this fix.
 #[hdk_extern]
 pub fn release_escrow(payment_id: String) -> ExternResult<Record> {
     let (record, payment) = get_payment_record(&payment_id)?;
+
+    verify_caller_is_did(&payment.from_did)?;
 
     if !matches!(payment.payment_type, PaymentType::Escrow(_)) {
         return Err(wasm_error!(WasmErrorInner::Guest(

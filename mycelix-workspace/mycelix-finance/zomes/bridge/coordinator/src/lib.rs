@@ -93,7 +93,23 @@ pub fn process_payment_remote(input: ProcessPaymentInput) -> ExternResult<Record
     process_payment(input)
 }
 
-/// Process a cross-hApp payment
+/// Process a cross-hApp payment.
+///
+/// Actually moves SAP: debits `from_did` and credits `to_did` via cross-zome
+/// calls into `payments::debit_sap`/`credit_sap` before recording the
+/// CrossHappPayment as Completed. Previously this function only wrote an
+/// audit-trail entry and never touched a real balance — any caller (e.g.
+/// mycelix-supplychain's or mycelix-marketplace's settlement bridge) that
+/// treated a successful response here as "payment settled" was wrong; no
+/// SAP ever moved. See MYCELIX_REVIEW.md P1 #4.
+///
+/// Debit happens before credit (same ordering as `payments::send_payment`):
+/// if the debit fails (e.g. insufficient balance), nothing is created and
+/// the caller gets a real error instead of a false-positive Processing
+/// record. If credit fails after a successful debit, the sender's SAP is
+/// already gone — this narrow window exists in `send_payment` too and is a
+/// pre-existing, not newly introduced, limitation of not having atomic
+/// multi-entry transactions on the DHT.
 #[hdk_extern]
 pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
     verify_participant_tier()?;
@@ -104,6 +120,69 @@ pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
         )));
     }
     let now = sys_time()?;
+
+    #[derive(Serialize, Debug)]
+    struct SapAdjustmentPayload {
+        member_did: String,
+        amount: u64,
+        reason: String,
+    }
+    let reason = format!(
+        "Cross-hApp payment via {} ({})",
+        input.source_happ, input.reference
+    );
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("payments"),
+        FunctionName::from("debit_sap"),
+        None,
+        SapAdjustmentPayload {
+            member_did: input.from_did.clone(),
+            amount: input.amount,
+            reason: reason.clone(),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(_)) => {}
+        Ok(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to debit SAP for cross-happ payment: unexpected response {:?}",
+                other
+            ))));
+        }
+        Err(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to debit SAP for cross-happ payment: {:?}",
+                e
+            ))));
+        }
+    }
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("payments"),
+        FunctionName::from("credit_sap"),
+        None,
+        SapAdjustmentPayload {
+            member_did: input.to_did.clone(),
+            amount: input.amount,
+            reason,
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(_)) => {}
+        Ok(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Debited {} but failed to credit {}: unexpected response {:?}. SAP is in an \
+                 inconsistent state and needs manual reconciliation.",
+                input.from_did, input.to_did, other
+            ))));
+        }
+        Err(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Debited {} but failed to credit {}: {:?}. SAP is in an inconsistent state and \
+                 needs manual reconciliation.",
+                input.from_did, input.to_did, e
+            ))));
+        }
+    }
 
     let payment = CrossHappPayment {
         id: format!(
@@ -118,9 +197,9 @@ pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
         amount: input.amount,
         currency: input.currency.clone(),
         reference: input.reference.clone(),
-        status: PaymentStatus::Processing,
+        status: PaymentStatus::Completed,
         created_at: now,
-        completed_at: None,
+        completed_at: Some(now),
     };
 
     let hash = create_entry(&EntryTypes::CrossHappPayment(payment))?;
@@ -778,7 +857,10 @@ fn fetch_oracle_vitality() -> u32 {
             50
         }
         Err(e) => {
-            debug!("fetch_oracle_vitality: tend zome unreachable: {:?}, defaulting to 50 (Normal tier)", e);
+            debug!(
+                "fetch_oracle_vitality: tend zome unreachable: {:?}, defaulting to 50 (Normal tier)",
+                e
+            );
             50
         }
     }
@@ -820,7 +902,10 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
                     dao_did, other
                 ))));
             }
-            debug!("get_community_member_count: governance returned {:?} for {}, defaulting to 0 (permissive)", other, dao_did);
+            debug!(
+                "get_community_member_count: governance returned {:?} for {}, defaulting to 0 (permissive)",
+                other, dao_did
+            );
             Ok(0)
         }
         Err(e) => {
@@ -832,7 +917,10 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
                     dao_did, e
                 ))));
             }
-            debug!("get_community_member_count: governance unreachable for {}: {:?}, defaulting to 0 (permissive)", dao_did, e);
+            debug!(
+                "get_community_member_count: governance unreachable for {}: {:?}, defaulting to 0 (permissive)",
+                dao_did, e
+            );
             Ok(0)
         }
     }
