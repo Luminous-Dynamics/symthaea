@@ -157,7 +157,7 @@ impl TimbreManifold {
                 (i, (dv * dv + da * da).sqrt())
             })
             .collect();
-        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        distances.sort_by(|a, b| a.1.total_cmp(&b.1));
 
         let top3: Vec<(usize, f32)> = distances.into_iter().take(3).collect();
         let total_weight: f32 = top3.iter().map(|(_, d)| 1.0 / (d + 0.01)).sum();
@@ -190,7 +190,7 @@ impl TimbreManifold {
             .min_by(|a, b| {
                 let da = (a.valence - valence).powi(2) + (a.arousal - arousal).powi(2);
                 let db = (b.valence - valence).powi(2) + (b.arousal - arousal).powi(2);
-                da.partial_cmp(&db).unwrap()
+                da.total_cmp(&db)
             })
             .map(|p| p.label.as_str())
             .unwrap_or("unknown")

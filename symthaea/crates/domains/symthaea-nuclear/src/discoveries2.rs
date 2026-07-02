@@ -113,7 +113,7 @@ mod tests {
             }
         }
 
-        candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+        candidates.sort_by(|a, b| b.2.total_cmp(&a.2));
 
         eprintln!(
             "{:>4} {:>4} {:>4}  {:>10}  {}",
@@ -161,7 +161,7 @@ mod tests {
             }
         }
 
-        all_sn.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+        all_sn.sort_by(|a, b| b.2.total_cmp(&a.2));
 
         eprintln!("── Top 20 HIGHEST S_n (most bound neutrons) ──");
         eprintln!("{:>4} {:>4} {:>4}  {:>10}", "Z", "N", "A", "S_n(MeV)");
@@ -559,7 +559,7 @@ mod tests {
             .min_by(|(x, _), (x2, _)| {
                 let d1 = (x - 1.0 / 208.0_f64.powf(1.0 / 3.0)).abs();
                 let d2 = (x2 - 1.0 / 208.0_f64.powf(1.0 / 3.0)).abs();
-                d1.partial_cmp(&d2).unwrap()
+                d1.total_cmp(&d2)
             })
             .map(|(_, v)| *v)
             .unwrap_or(23.0);

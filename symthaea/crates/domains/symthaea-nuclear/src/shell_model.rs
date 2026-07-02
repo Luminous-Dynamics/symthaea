@@ -315,7 +315,7 @@ impl ShellModel {
             }
         }
 
-        levels.sort_by(|a, b| a.energy_mev.partial_cmp(&b.energy_mev).unwrap());
+        levels.sort_by(|a, b| a.energy_mev.total_cmp(&b.energy_mev));
         levels
     }
 

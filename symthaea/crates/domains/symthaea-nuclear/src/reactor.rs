@@ -811,7 +811,7 @@ mod tests {
 
         // Find the two highest-yield fragments
         let mut sorted = result.fragments.clone();
-        sorted.sort_by(|a, b| b.yield_fraction.partial_cmp(&a.yield_fraction).unwrap());
+        sorted.sort_by(|a, b| b.yield_fraction.total_cmp(&a.yield_fraction));
 
         let top1 = &sorted[0];
         let top2 = &sorted[1];

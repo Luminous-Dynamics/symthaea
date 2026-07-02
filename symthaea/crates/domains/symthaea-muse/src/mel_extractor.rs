@@ -244,7 +244,7 @@ mod tests {
 
         let frame = &frames[frames.len() / 2]; // middle frame
         let max_bin = (0..config.n_mels)
-            .max_by(|&a, &b| frame[a].partial_cmp(&frame[b]).unwrap())
+            .max_by(|&a, &b| frame[a].total_cmp(&frame[b]))
             .unwrap();
 
         // Allow ±3 bins tolerance for mel filter spread

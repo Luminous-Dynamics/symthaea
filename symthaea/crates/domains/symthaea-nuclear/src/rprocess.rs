@@ -539,7 +539,7 @@ impl RProcessNetwork {
                 if let Some((&peak_nuc, _)) = abundances
                     .iter()
                     .filter(|&(_, &y)| y > ABUNDANCE_FLOOR)
-                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .max_by(|a, b| a.1.total_cmp(b.1))
                 {
                     if path.last() != Some(&peak_nuc) {
                         path.push(peak_nuc);
@@ -608,7 +608,7 @@ impl RProcessNetwork {
         // Identify peaks
         let peak_a = mass_abundances
             .iter()
-            .max_by(|a, b| a.abundance.partial_cmp(&b.abundance).unwrap())
+            .max_by(|a, b| a.abundance.total_cmp(&b.abundance))
             .map(|m| m.a)
             .unwrap_or(56);
 

@@ -227,7 +227,7 @@ impl CreativeJournal {
                     .gems
                     .iter()
                     .enumerate()
-                    .min_by(|(_, a), (_, b)| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
+                    .min_by(|(_, a), (_, b)| a.beauty_score.total_cmp(&b.beauty_score))
                     .map(|(i, _)| i)
                 {
                     self.gems.remove(min_idx);
@@ -254,8 +254,7 @@ impl CreativeJournal {
         self.candidates.push((notes, score));
         if self.candidates.len() > MAX_CANDIDATES {
             // Drop lowest-scored
-            self.candidates
-                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            self.candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
             self.candidates.truncate(MAX_CANDIDATES);
         }
     }
@@ -265,8 +264,7 @@ impl CreativeJournal {
         if self.candidates.is_empty() {
             return None;
         }
-        self.candidates
-            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        self.candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
         let best = self.candidates.remove(0);
         self.candidates.clear();
         Some(best.0)
@@ -276,7 +274,7 @@ impl CreativeJournal {
     pub fn best_gem(&self) -> Option<&RatedPhrase> {
         self.gems
             .iter()
-            .max_by(|a, b| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
+            .max_by(|a, b| a.beauty_score.total_cmp(&b.beauty_score))
     }
 
     /// Get a gem matching the current emotional quality (for contextual performance).
@@ -287,7 +285,7 @@ impl CreativeJournal {
         self.gems
             .iter()
             .filter(|g| g.intended_emotion == emotion)
-            .max_by(|a, b| a.beauty_score.partial_cmp(&b.beauty_score).unwrap())
+            .max_by(|a, b| a.beauty_score.total_cmp(&b.beauty_score))
     }
 
     /// Online taste learning: shift weights toward dimensions that correlate with high beauty.

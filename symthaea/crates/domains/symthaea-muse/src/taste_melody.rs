@@ -336,7 +336,7 @@ pub fn build_scale_with(
         }
     }
 
-    tones.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    tones.sort_by(|a, b| a.total_cmp(b));
     tones.dedup_by(|a, b| (*a - *b).abs() < 1.0);
     tones
 }

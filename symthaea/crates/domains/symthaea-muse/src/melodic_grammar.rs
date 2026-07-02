@@ -222,7 +222,7 @@ fn nearest_step(from: f32, targets: &[f32], _scale: &[f32]) -> Option<f32> {
         .min_by(|a, b| {
             let da = semitone_distance(from, **a).abs();
             let db = semitone_distance(from, **b).abs();
-            da.partial_cmp(&db).unwrap()
+            da.total_cmp(&db)
         })
         .copied()
 }

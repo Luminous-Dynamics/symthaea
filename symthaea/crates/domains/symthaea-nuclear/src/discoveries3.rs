@@ -153,7 +153,7 @@ mod tests {
             }
         }
 
-        candidates.sort_by(|a, b| b.q_value.partial_cmp(&a.q_value).unwrap());
+        candidates.sort_by(|a, b| b.q_value.total_cmp(&a.q_value));
 
         eprintln!("Found {} candidates with Q > 0\n", candidates.len());
         eprintln!(
@@ -326,7 +326,7 @@ mod tests {
         sorted_by_improvement.sort_by(|a, b| {
             let improve_a = a.dz_err.abs() - a.rf_err.abs();
             let improve_b = b.dz_err.abs() - b.rf_err.abs();
-            improve_b.partial_cmp(&improve_a).unwrap()
+            improve_b.total_cmp(&improve_a)
         });
 
         eprintln!("\n── Top 10 where RF helps MOST ──");
@@ -463,7 +463,7 @@ mod tests {
                 .iter()
                 .map(|&(z, n, ly)| (z, n, (ly - log_norm).exp()))
                 .collect();
-            normed.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+            normed.sort_by(|a, b| b.2.total_cmp(&a.2));
 
             eprintln!("\n── T = {} GK (kT = {:.3} MeV) ──", t_gk, kt);
             eprintln!("{:>4} {:>4} {:>4}  {:>12}", "Z", "N", "A", "Y (fraction)");

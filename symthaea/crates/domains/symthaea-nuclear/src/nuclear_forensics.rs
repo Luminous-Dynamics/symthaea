@@ -558,7 +558,7 @@ pub fn fission_fragments(predictor: &MlMassPredictor, z: u16, n: u16) -> Fissile
     }
 
     // Sort by yield descending
-    fragment_pairs.sort_by(|a, b| b.relative_yield.partial_cmp(&a.relative_yield).unwrap());
+    fragment_pairs.sort_by(|a, b| b.relative_yield.total_cmp(&a.relative_yield));
 
     FissileMaterial {
         name,
