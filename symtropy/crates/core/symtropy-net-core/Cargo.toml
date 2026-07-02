@@ -9,7 +9,7 @@ keywords = ["physics", "networking", "simulation", "bevy"]
 categories = ["science", "simulation", "game-engines"]
 
 [dependencies]
-symtropy-math = { version = "0.2.1", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-math" }
-symtropy-physics = { version = "0.2.1", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-physics" }
+symtropy-math = { version = "0.2.1", path = "../symtropy-math" }
+symtropy-physics = { version = "0.2.1", path = "../symtropy-physics" }
 nalgebra = "0.34"
 serde = { version = "1.0", features = ["derive"] }
