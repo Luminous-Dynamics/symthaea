@@ -368,7 +368,10 @@ mod tests {
         transaction.status = TransactionStatus::Completed;
         transaction.epistemic.materiality = MaterialityLevel::M2Persistent;
         assert_eq!(transaction.status, TransactionStatus::Completed);
-        assert_eq!(transaction.epistemic.materiality, MaterialityLevel::M2Persistent);
+        assert_eq!(
+            transaction.epistemic.materiality,
+            MaterialityLevel::M2Persistent
+        );
     }
 
     #[test]
@@ -428,9 +431,7 @@ mod tests {
         // settled = true variant
         let result = TransactionSettlementResult {
             settled: true,
-            finance_reference: Some(
-                "payment:mycelix-marketplace:did:key:buyer:123456".to_string(),
-            ),
+            finance_reference: Some("payment:mycelix-marketplace:did:key:buyer:123456".to_string()),
             error: None,
         };
         let json = serde_json::to_string(&result).unwrap();

@@ -90,7 +90,7 @@ mod tests {
                 vote: ArbitrationVote {
                     dispute_hash: ActionHash::from_raw_36(vec![1u8; 36]),
                     arbitrator: AgentPubKey::from_raw_36(vec![1u8; 36]),
-                    favor_buyer: true,  // Vote for buyer
+                    favor_buyer: true, // Vote for buyer
                     reasoning: "Evidence supports buyer".to_string(),
                     arbitrator_matl_score: 0.9, // High trust arbitrator
                     voted_at: Timestamp::from_micros(1000000),
@@ -114,7 +114,11 @@ mod tests {
         let mut total_weight = 0.0;
 
         for vote_output in &votes {
-            let vote_value = if vote_output.vote.favor_buyer { 1.0 } else { 0.0 };
+            let vote_value = if vote_output.vote.favor_buyer {
+                1.0
+            } else {
+                0.0
+            };
             weighted_sum += vote_value * vote_output.vote.arbitrator_matl_score;
             total_weight += vote_output.vote.arbitrator_matl_score;
         }
@@ -125,8 +129,11 @@ mod tests {
         // total_weight = 0.9 + 0.5 = 1.4
         // weighted_vote = 0.9 / 1.4 = 0.643
 
-        assert!((weighted_vote - 0.643).abs() < 0.01,
-            "Weighted vote should be ~0.643, got {}", weighted_vote);
+        assert!(
+            (weighted_vote - 0.643).abs() < 0.01,
+            "Weighted vote should be ~0.643, got {}",
+            weighted_vote
+        );
 
         // Since 0.643 < 0.66 threshold, seller would win
         assert!(weighted_vote < 0.66);
@@ -191,7 +198,11 @@ mod tests {
         let mut total_weight = 0.0;
 
         for vote_output in &votes {
-            let vote_value = if vote_output.vote.favor_buyer { 1.0 } else { 0.0 };
+            let vote_value = if vote_output.vote.favor_buyer {
+                1.0
+            } else {
+                0.0
+            };
             weighted_sum += vote_value * vote_output.vote.arbitrator_matl_score;
             total_weight += vote_output.vote.arbitrator_matl_score;
         }
@@ -387,7 +398,11 @@ mod tests {
         let mut total_weight = 0.0;
 
         for vote_output in &votes {
-            let vote_value = if vote_output.vote.favor_buyer { 1.0 } else { 0.0 };
+            let vote_value = if vote_output.vote.favor_buyer {
+                1.0
+            } else {
+                0.0
+            };
             weighted_sum += vote_value * vote_output.vote.arbitrator_matl_score;
             total_weight += vote_output.vote.arbitrator_matl_score;
         }
