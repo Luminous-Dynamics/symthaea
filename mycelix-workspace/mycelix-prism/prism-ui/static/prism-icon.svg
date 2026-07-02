@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111116" />
+      <stop offset="100%" stop-color="#050507" />
+    </linearGradient>
+
+    <linearGradient id="entropy-beam" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.0" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.4" />
+    </linearGradient>
+
+    <linearGradient id="ray-cyan" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#2DD4BF" stop-opacity="0.0" />
+    </linearGradient>
+
+    <linearGradient id="ray-teal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0F766E" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0F766E" stop-opacity="0.0" />
+    </linearGradient>
+
+    <linearGradient id="prism-glass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.3" />
+      <stop offset="50%" stop-color="#0F766E" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#050507" stop-opacity="0.6" />
+    </linearGradient>
+
+    <radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#2DD4BF" stop-opacity="0.0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="115" fill="url(#bg-gradient)" stroke="#1A1C23" stroke-width="4"/>
+
+  <g stroke="#ffffff" stroke-opacity="0.03" stroke-width="1">
+    <line x1="128" y1="0" x2="128" y2="512" />
+    <line x1="256" y1="0" x2="256" y2="512" />
+    <line x1="384" y1="0" x2="384" y2="512" />
+    <line x1="0" y1="128" x2="512" y2="128" />
+    <line x1="0" y1="256" x2="512" y2="256" />
+    <line x1="0" y1="384" x2="512" y2="384" />
+  </g>
+
+  <polygon points="0,220 180,240 180,272 0,292" fill="url(#entropy-beam)" />
+
+  <polygon points="332,240 512,140 512,180 332,260" fill="url(#ray-cyan)" />
+  <polygon points="332,256 512,256 512,280 332,272" fill="url(#ray-teal)" />
+  <polygon points="332,268 512,380 512,340 332,250" fill="url(#ray-cyan)" opacity="0.7"/>
+
+  <g transform="translate(0, -10)">
+    <circle cx="256" cy="266" r="80" fill="url(#core-glow)" />
+
+    <polygon points="256,120 360,340 152,340" fill="url(#prism-glass)" stroke="#2DD4BF" stroke-width="2" stroke-opacity="0.8"/>
+    <polygon points="256,120 360,340 256,380" fill="#000000" fill-opacity="0.4" stroke="#0F766E" stroke-width="1.5"/>
+    <polygon points="256,120 152,340 256,380" fill="#2DD4BF" fill-opacity="0.1" stroke="#0F766E" stroke-width="1.5"/>
+
+    <line x1="256" y1="120" x2="256" y2="380" stroke="#2DD4BF" stroke-width="2" stroke-opacity="0.9"/>
+  </g>
+
+  <circle cx="256" cy="440" r="4" fill="#2DD4BF" opacity="0.8"/>
+</svg>

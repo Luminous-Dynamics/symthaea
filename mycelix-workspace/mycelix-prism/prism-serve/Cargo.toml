@@ -1,0 +1,22 @@
+[package]
+name = "prism-serve"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Static file server for Prism (production deployment)"
+
+[dependencies]
+prism-common = { path = "../prism-common" }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["fs", "compression-gzip", "set-header", "cors"] }
+tower = { version = "0.5", features = ["limit"] }
+tokio = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "brotli"] }
+url = { workspace = true }
+serde = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }

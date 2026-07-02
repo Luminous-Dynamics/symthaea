@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mycelix Prism</title>
+    <meta name="description" content="Prism — epistemic search browser. Pure Rust. Zero C++. Every result is epistemically classified." />
+    <meta name="theme-color" content="#0d1a24" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Mycelix Prism" />
+    <meta property="og:description" content="Epistemic search powered by 16,384-bit hyperdimensional computing. Every result carries an evidence level." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/static/prism-og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- App icons -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/prism-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Prism" />
+    <link rel="manifest" href="/static/manifest.json" />
+
+    <link data-trunk rel="css" href="style/prism.css" />
+    <link data-trunk rel="copy-dir" href="static" />
+
+    <script>
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+L / Cmd+L: focus search bar
+        if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+            e.preventDefault();
+            var input = document.querySelector('.search-input');
+            if (input) { input.focus(); input.select(); }
+        }
+        // Ctrl+F / Cmd+F: find in page
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            var bar = document.getElementById('prism-find-bar');
+            if (bar) {
+                bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+                if (bar.style.display === 'flex') {
+                    bar.querySelector('input').focus();
+                }
+            } else {
+                // Create find bar
+                bar = document.createElement('div');
+                bar.id = 'prism-find-bar';
+                bar.className = 'find-bar';
+                bar.innerHTML = '<input type="text" placeholder="Find in page..." class="find-input" />'
+                    + '<button class="find-btn" data-dir="next" title="Next">&#9660;</button>'
+                    + '<button class="find-btn" data-dir="prev" title="Previous">&#9650;</button>'
+                    + '<span class="find-count"></span>'
+                    + '<button class="find-close" title="Close">&times;</button>';
+                document.body.prepend(bar);
+                var finput = bar.querySelector('input');
+                var fcount = bar.querySelector('.find-count');
+                finput.focus();
+
+                finput.addEventListener('input', function() {
+                    if (window.CSS && CSS.highlights) {
+                        CSS.highlights.clear();
+                    }
+                    if (finput.value.length >= 2) {
+                        var found = window.find(finput.value, false, false, true);
+                        fcount.textContent = found ? '' : 'No matches';
+                    } else {
+                        fcount.textContent = '';
+                    }
+                });
+                finput.addEventListener('keydown', function(ev) {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        window.find(finput.value, false, ev.shiftKey, true);
+                    }
+                    if (ev.key === 'Escape') {
+                        bar.style.display = 'none';
+                        window.getSelection().removeAllRanges();
+                    }
+                });
+                bar.querySelector('[data-dir="next"]').addEventListener('click', function() {
+                    window.find(finput.value, false, false, true);
+                });
+                bar.querySelector('[data-dir="prev"]').addEventListener('click', function() {
+                    window.find(finput.value, false, true, true);
+                });
+                bar.querySelector('.find-close').addEventListener('click', function() {
+                    bar.style.display = 'none';
+                    window.getSelection().removeAllRanges();
+                });
+            }
+        }
+    });
+
+    // PWA install prompt — delayed 30s to avoid covering content on first load
+    var deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        setTimeout(function() {
+            if (!deferredPrompt) return;
+            var banner = document.createElement('div');
+            banner.className = 'pwa-install-banner';
+            banner.innerHTML = '<span>Install Prism for the best experience</span>'
+                + '<button class="pwa-install-btn">Install</button>'
+                + '<button class="pwa-dismiss-btn">&times;</button>';
+            document.body.appendChild(banner);
+            banner.querySelector('.pwa-install-btn').addEventListener('click', function() {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function() { banner.remove(); });
+                deferredPrompt = null;
+            });
+            banner.querySelector('.pwa-dismiss-btn').addEventListener('click', function() {
+                banner.remove();
+                deferredPrompt = null;
+            });
+        }, 30000);
+    });
+
+    // Service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js')
+            .then(function() { console.log('[Prism] Service worker registered'); })
+            .catch(function(e) { console.log('[Prism] SW registration failed:', e); });
+    }
+    </script>
+</head>
+<body>
+</body>
+</html>
