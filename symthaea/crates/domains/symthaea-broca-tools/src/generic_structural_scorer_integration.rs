@@ -5,7 +5,7 @@
 
 use crate::go_walker::GoWalker;
 use crate::python_walker::PythonWalker;
-use crate::rust_walker::{LanguageWalker, RustWalker, StructuralElement};
+use symthaea_broca::rust_walker::{LanguageWalker, RustWalker, StructuralElement};
 use std::collections::HashSet;
 
 pub struct GenericStructuralScorer {

@@ -6,7 +6,7 @@
 //! Autonomous generation of solver configuration files (XML, netlists, dictionaries)
 //! from high-level engineering requirements and HDC intent.
 
-use crate::generator::BrocaGenerator;
+use symthaea_broca::generator::BrocaGenerator;
 use symthaea_sim_bridge::SolverKind;
 
 /// High-level architect for simulation environments.

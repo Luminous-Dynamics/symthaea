@@ -7,7 +7,7 @@
 //! are grounded in visual perception.
 
 #[cfg(feature = "mamba-cpu")]
-use crate::liquid_mamba::LiquidMambaGenerator;
+use symthaea_broca::liquid_mamba::LiquidMambaGenerator;
 use symthaea_vision_manifold::bridge::VisionBridge;
 
 /// Orchestrates cross-modal alignment between vision and language.

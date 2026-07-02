@@ -1,0 +1,55 @@
+[package]
+name = "symthaea-broca-tools"
+version = "0.1.0"
+edition = "2024"
+description = "Nix/code-analysis/self-repair toolkit split out of symthaea-broca (2026-07-02)"
+license = "AGPL-3.0-or-later"
+autobins = false
+
+[dependencies]
+symthaea-broca = { path = "../symthaea-broca" }
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-geodesic = { path = "../symthaea-geodesic", optional = true }
+symthaea-hdc-store = { path = "../symthaea-hdc-store" }
+symthaea-sim-bridge = { path = "../../bridges/symthaea-sim-bridge" }
+symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
+symthaea-runtime = { path = "../../core/symthaea-runtime" }
+symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
+symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/bridges/symtropy-robotics-bridge-core" }
+mycelix-zkp-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+anyhow = { workspace = true }
+parking_lot = { workspace = true }
+lru.workspace = true
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tree-sitter.workspace = true
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-go = "0.23"
+syn = { version = "2.0", features = ["full", "visit"], optional = true }
+ureq = { version = "2.9" }
+bincode = { workspace = true }
+md5 = "0.7"
+wasmtime = { version = "44.0.1", optional = true }
+
+[[bin]]
+name = "broca-self-architect"
+path = "src/bin/broca_self_architect.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval"]
+
+[[bin]]
+name = "broca-sovereign-node"
+path = "src/bin/broca_sovereign_node.rs"
+required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
+
+[features]
+default = []
+# Forwards to symthaea-broca/mamba-cpu — cross_modal_bridge.rs references
+# symthaea_broca::liquid_mamba, which only exists when that feature is on.
+mamba-cpu = ["symthaea-broca/mamba-cpu"]
+networking = ["symthaea-broca/networking"]
+code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
+wasm-sandbox = ["dep:wasmtime"]
