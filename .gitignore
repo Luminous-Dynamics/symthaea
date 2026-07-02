@@ -308,16 +308,20 @@ configs/
 .symthaea/
 .claude/targets/
 
-# === External public sibling repos (Apr 2026) ===
-# xenia-wire, xenia-server, xenia-peer are public standalone repos
-# cloned as siblings of the monorepo's existing subprojects for
+# === External public sibling repos (Apr 2026, moved under xenia/ Jun 2026) ===
+# xenia-wire and xenia-peer are public standalone repos, nested under
+# xenia/ as siblings of the monorepo's existing subprojects for
 # convenience. They have their own git history — DO NOT commit
-# them into the monorepo. See memory/xenia_*_shipped.md for context.
+# them into the monorepo.
 # (xenia-server was renamed to xenia-peer per the M0 release; keep
-# both ignores so neither state resurfaces as untracked noise.)
-/xenia-wire/
-/xenia-server/
-/xenia-peer/
+# both ignores so neither state resurfaces as untracked noise. The
+# repos used to live at monorepo root — hence the old /xenia-wire/,
+# /xenia-server/, /xenia-peer/ rules — but moved under xenia/ and the
+# rules were never updated, which is why `git status` showed the
+# whole xenia/ tree as untracked until this fix.)
+/xenia/xenia-wire/
+/xenia/xenia-server/
+/xenia/xenia-peer/
 .aider*
 
 # === Monorepo Scratch & Tool Cleanup ===

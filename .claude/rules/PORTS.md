@@ -81,7 +81,7 @@ Alphabetical by cluster short name. Port = 81XX.
 | 8131 | prism-proxy | (internal CORS proxy) | **LIVE** |
 | 8132 | mycelix-tax-export (extends observatory) | — | Reserved |
 | 8133 | mycelix-lawful-identity | lawful.mycelix.net | Reserved |
-| 8134 | **xenia-admin** (Mycelix Sovereign admin console, Leptos CSR) | admin.sovereign.mycelix.net | **Scaffold** |
+| 8134 | **xenia-admin** (operator console for the Xenia remote-support product — `xenia/xenia-peer/apps/sovereign-admin/`, Leptos CSR — part of the separate Mycelix Sovereign Suite, not a Mycelix governance-cluster frontend) | admin.sovereign.mycelix.net | **Scaffold + live ledger demo** |
 | 8135-8139 | (spare) | Future clusters | Reserved |
 | 8140 | **infin-love** | **infin.love** | **LIVE** |
 | 8141-8149 | (spare) | Future clusters | Reserved |
