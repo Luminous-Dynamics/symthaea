@@ -8,6 +8,17 @@
 use hdk::prelude::*;
 use recovery_integrity::*;
 
+/// Resolve a `did:mycelix:<AgentPubKey>` string to the agent pubkey it encodes.
+/// Mirrors `did_registry::resolve_did`'s parsing — DIDs in this codebase are
+/// self-certifying key material, so this doubles as a proof-of-key-ownership check.
+fn did_to_agent_pubkey(did: &str) -> ExternResult<AgentPubKey> {
+    let agent_str = did
+        .strip_prefix("did:mycelix:")
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid DID format".into())))?;
+    AgentPubKey::try_from(agent_str)
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into())))
+}
+
 /// Create a deterministic entry hash from a string identifier
 /// This is used for link bases when we need to link from string IDs
 fn string_to_entry_hash(s: &str) -> EntryHash {
@@ -160,6 +171,16 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
     if !config.trustees.contains(&input.initiator_did) {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only trustees can initiate recovery".into()
+        )));
+    }
+
+    // Verify the caller actually owns the initiator_did they claim (prevents
+    // any agent who merely knows a trustee's DID string from initiating
+    // recovery as that trustee).
+    let initiator_pubkey = did_to_agent_pubkey(&input.initiator_did)?;
+    if initiator_pubkey != agent_info()?.agent_initial_pubkey {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller does not own the initiator DID".into()
         )));
     }
 
