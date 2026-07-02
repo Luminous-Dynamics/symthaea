@@ -1,0 +1,13 @@
+[package]
+name = "mycelix-mock-data"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Shared mock data for Mycelix cluster frontends — offline-first fallback"
+
+[dependencies]
+climate-leptos-types = { path = "../../mycelix-climate/crates/climate-leptos-types" }
+energy-leptos-types = { path = "../../mycelix-energy/crates/energy-leptos-types" }
+knowledge-leptos-types = { path = "../../mycelix-knowledge/crates/knowledge-leptos-types" }
+finance-leptos-types = { path = "../../mycelix-finance/crates/finance-leptos-types" }
+

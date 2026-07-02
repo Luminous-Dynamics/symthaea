@@ -1,0 +1,33 @@
+[package]
+name = "mycelix-leptos-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Shared Leptos components for the Mycelix ecosystem"
+
+[dependencies]
+leptos = { version = "0.8" }
+leptos_router = { version = "0.8" }
+serde = { version = "1", features = ["derive"] }
+mycelix-leptos-client = { path = "../mycelix-leptos-client" }
+serde_json = "1"
+personal-leptos-types = { path = "../../mycelix-personal/crates/personal-leptos-types" }
+sovereign-profile = { path = "../../../crates/sovereign-profile" }
+mycelix-leptos-ui = { path = "../mycelix-leptos-ui" }
+send_wrapper = "0.6"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console",
+    "Window",
+    "Document",
+    "Navigator",
+    "Storage",
+    "Crypto",
+    "CssStyleDeclaration",
+    "HtmlElement",
+    "Element",
+    "BatteryManager",
+] }
+gloo-timers = { version = "0.3", features = ["futures"] }
