@@ -61,8 +61,8 @@ DNA_DIRS=(
     "mycelix-climate/dnas/climate"
     "mycelix-supplychain/holochain/dna"
     "mycelix-manufacturing/dna"
+    "mycelix-health/dna"
     # Not yet moved (deferred follow-up pass) — still top-level.
-    "../mycelix-health/dna"
     "../mycelix-edunet/dna"
 )
 

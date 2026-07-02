@@ -2,5 +2,5 @@
 	path = 11-meta-consciousness/luminous-nix
 	url = https://github.com/Luminous-Dynamics/luminous-nix.git
 [submodule "mycelix-health"]
-	path = mycelix-health
+	path = mycelix-workspace/mycelix-health
 	url = https://github.com/Luminous-Dynamics/mycelix-health.git

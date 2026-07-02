@@ -174,11 +174,13 @@ CLUSTERS=(
 # All Mycelix cluster work is being consolidated into mycelix-workspace/
 # (see MYCELIX_REVIEW.md P0 #1 and the July 2 migration commits). Clusters
 # already moved read from their new mycelix-workspace/<cluster> location;
-# clusters not yet moved (large/live/special-case ones, deferred to a
-# follow-up pass: praxis, marketplace, desci, core, space, health) still
-# read from top-level until they migrate too. Once every cluster in
-# CLUSTERS has moved, this whole loop collapses into the wholesale
-# mycelix-workspace sync below and can be deleted.
+# clusters not yet moved still read from top-level until they migrate too.
+# Remaining as of 2026-07-02: marketplace (blocked on freeze/retire
+# decision), desci (blocked on mycelix-multiworld-sim settling). praxis,
+# core, and health have since moved (health via submodule surgery, has
+# its own standalone repo — see the wholesale sync exclude below). Once
+# every cluster in CLUSTERS has moved, this whole loop collapses into the
+# wholesale mycelix-workspace sync below and can be deleted.
 MOVED_TO_WORKSPACE=(
     mycelix-commons mycelix-civic mycelix-hearth mycelix-finance
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
@@ -312,14 +314,17 @@ info "=== Syncing mycelix-workspace ==="
 sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
     --exclude='/mycelix-marketplace/' \
     --exclude='/mycelix-supplychain/' \
-    --exclude='/mycelix-desci/'
+    --exclude='/mycelix-desci/' \
+    --exclude='/mycelix-health/'
     # mycelix-core's and mycelix-praxis's excludes removed 2026-07-02 — both moved here with real
     # tracked content (was previously excluded to hide an untracked stub).
     # Note: mycelix-prism is NOT excluded — it has no top-level counterpart
     # and no dedicated sync script; this wholesale sync is its only current
-    # path to the public repo. mycelix-health is also not excluded here;
-    # it's an empty/absent directory in this tree today (real content is
-    # the top-level submodule), so there's nothing for this line to ship.
+    # path to the public repo. mycelix-health IS now excluded (added
+    # 2026-07-02 when it moved here via submodule surgery) — it has its own
+    # standalone repo (Luminous-Dynamics/mycelix-health) and git archive
+    # doesn't recurse into submodule content anyway, so shipping it here
+    # would be redundant at best.
 echo
 
 # --- Rewrite path dependencies for standalone layout -------------------------

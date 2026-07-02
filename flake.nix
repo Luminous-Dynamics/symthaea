@@ -218,7 +218,7 @@
             }
 
             lum_check_health() {
-              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-health/Cargo.toml" "$@"
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-workspace/mycelix-health/Cargo.toml" "$@"
             }
 
             lum_check_finance() {

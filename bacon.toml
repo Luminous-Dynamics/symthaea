@@ -5,23 +5,23 @@ command = ["cargo", "check", "--manifest-path", "mycelix-sensorium/Cargo.toml"]
 need_stdout = false
 
 [jobs.check-personal]
-command = ["cargo", "check", "--manifest-path", "mycelix-personal/apps/leptos/Cargo.toml"]
+command = ["cargo", "check", "--manifest-path", "mycelix-workspace/mycelix-personal/apps/leptos/Cargo.toml"]
 need_stdout = false
 
 [jobs.check-commons]
-command = ["cargo", "check", "--manifest-path", "mycelix-commons/apps/leptos/Cargo.toml"]
+command = ["cargo", "check", "--manifest-path", "mycelix-workspace/mycelix-commons/apps/leptos/Cargo.toml"]
 need_stdout = false
 
 [jobs.check-health]
-command = ["cargo", "check", "--manifest-path", "mycelix-health/Cargo.toml"]
+command = ["cargo", "check", "--manifest-path", "mycelix-workspace/mycelix-health/Cargo.toml"]
 need_stdout = false
 
 [jobs.check-finance]
-command = ["cargo", "check", "--manifest-path", "mycelix-finance/Cargo.toml"]
+command = ["cargo", "check", "--manifest-path", "mycelix-workspace/mycelix-finance/Cargo.toml"]
 need_stdout = false
 
 [jobs.check-knowledge]
-command = ["cargo", "check", "--manifest-path", "mycelix-knowledge/Cargo.toml"]
+command = ["cargo", "check", "--manifest-path", "mycelix-workspace/mycelix-knowledge/Cargo.toml"]
 need_stdout = false
 
 [jobs.check-pulse]
@@ -33,15 +33,15 @@ command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-sensorium/Carg
 need_stdout = true
 
 [jobs.test-health]
-command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-health/Cargo.toml"]
+command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-workspace/mycelix-health/Cargo.toml"]
 need_stdout = true
 
 [jobs.test-finance]
-command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-finance/Cargo.toml"]
+command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-workspace/mycelix-finance/Cargo.toml"]
 need_stdout = true
 
 [jobs.test-knowledge]
-command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-knowledge/Cargo.toml"]
+command = ["cargo", "nextest", "run", "--manifest-path", "mycelix-workspace/mycelix-knowledge/Cargo.toml"]
 need_stdout = true
 
 [jobs.test-pulse]

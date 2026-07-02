@@ -582,18 +582,18 @@ build-wasm-all:
 
     declare -A HAPPS
     # Cluster DNAs (replace property, housing, care, mutualaid, water, justice, emergency, media)
-    HAPPS[commons]="/srv/luminous-dynamics/mycelix-commons"
-    HAPPS[civic]="/srv/luminous-dynamics/mycelix-civic"
+    HAPPS[commons]="/srv/luminous-dynamics/mycelix-workspace/mycelix-commons"
+    HAPPS[civic]="/srv/luminous-dynamics/mycelix-workspace/mycelix-civic"
     # Standalone hApps
-    HAPPS[core]="/srv/luminous-dynamics/mycelix-core"
+    HAPPS[core]="/srv/luminous-dynamics/mycelix-workspace/mycelix-core"
     HAPPS[epistemic-markets]="/srv/luminous-dynamics/mycelix-workspace/happs/epistemic-markets"
-    HAPPS[health]="/srv/luminous-dynamics/mycelix-health"
-    HAPPS[energy]="/srv/luminous-dynamics/mycelix-energy"
-    HAPPS[identity]="/srv/luminous-dynamics/mycelix-identity"
-    HAPPS[governance]="/srv/luminous-dynamics/mycelix-governance"
-    HAPPS[finance]="/srv/luminous-dynamics/mycelix-finance"
-    HAPPS[climate]="/srv/luminous-dynamics/mycelix-climate"
-    HAPPS[space]="/srv/luminous-dynamics/mycelix-space"
+    HAPPS[health]="/srv/luminous-dynamics/mycelix-workspace/mycelix-health"
+    HAPPS[energy]="/srv/luminous-dynamics/mycelix-workspace/mycelix-energy"
+    HAPPS[identity]="/srv/luminous-dynamics/mycelix-workspace/mycelix-identity"
+    HAPPS[governance]="/srv/luminous-dynamics/mycelix-workspace/mycelix-governance"
+    HAPPS[finance]="/srv/luminous-dynamics/mycelix-workspace/mycelix-finance"
+    HAPPS[climate]="/srv/luminous-dynamics/mycelix-workspace/mycelix-climate"
+    HAPPS[space]="/srv/luminous-dynamics/mycelix-workspace/mycelix-space"
     HAPPS[consensus]="/srv/luminous-dynamics/mycelix-workspace/happs/consensus"
     HAPPS[fabrication]="/srv/luminous-dynamics/mycelix-workspace/happs/fabrication"
 
