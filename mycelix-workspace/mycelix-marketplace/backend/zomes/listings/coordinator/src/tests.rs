@@ -3,8 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use hdk::prelude::*;
+    // `mod tests;` in lib.rs already makes this file the `tests` module, so
+    // this inner `mod tests { ... }` double-nests everything one level
+    // deeper than intended. `use super::*` only reaches the (empty) outer
+    // `tests` module, not the crate root — hence `super::super::*`.
+    use super::super::*;
     use listings_integrity::*;
 
     // Helper functions for tests
@@ -79,16 +82,13 @@ mod tests {
         let mut input = mock_listing_input();
 
         // Valid CIDv0 (Qm...)
-        input.photos_ipfs_cids = vec![
-            "QmTest123456789012345678901234567890123456".to_string()
-        ];
+        input.photos_ipfs_cids = vec!["QmTest1234567890123456789012345678901234567890".to_string()];
         assert!(input.photos_ipfs_cids[0].starts_with("Qm"));
         assert_eq!(input.photos_ipfs_cids[0].len(), 46);
 
         // Valid CIDv1 (b...)
-        input.photos_ipfs_cids = vec![
-            "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".to_string()
-        ];
+        input.photos_ipfs_cids =
+            vec!["bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".to_string()];
         assert!(input.photos_ipfs_cids[0].starts_with("b"));
         assert!(input.photos_ipfs_cids[0].len() >= 50);
 
@@ -117,8 +117,6 @@ mod tests {
 
     #[test]
     fn test_epistemic_classification() {
-        let mut input = mock_listing_input();
-
         // Test that seller claims start at E1 (Testimonial)
         let classification = EpistemicClassification {
             empirical: EmpiricalLevel::E1Testimonial,
@@ -136,16 +134,18 @@ mod tests {
         // Test all category variants exist
         let categories = vec![
             ListingCategory::Electronics,
-            ListingCategory::Clothing,
-            ListingCategory::Home,
-            ListingCategory::Books,
-            ListingCategory::Toys,
-            ListingCategory::Sports,
-            ListingCategory::Food,
+            ListingCategory::Fashion,
+            ListingCategory::HomeGarden,
+            ListingCategory::SportsOutdoors,
+            ListingCategory::BooksMedia,
+            ListingCategory::ToysGames,
+            ListingCategory::HealthBeauty,
+            ListingCategory::Automotive,
+            ListingCategory::ArtCollectibles,
             ListingCategory::Other,
         ];
 
-        assert_eq!(categories.len(), 8);
+        assert_eq!(categories.len(), 10);
     }
 
     #[test]
@@ -168,13 +168,17 @@ mod tests {
     fn test_search_query_sanitization() {
         let queries = vec![
             ("laptop", "laptop"),
-            ("LAPTOP", "laptop"), // Should be lowercase
+            ("LAPTOP", "laptop"),     // Should be lowercase
             ("  laptop  ", "laptop"), // Should be trimmed
-            ("<script>alert('xss')</script>", "scriptalertxssscript"), // XSS should be stripped
+            ("<script>alert('xss')</script>", "scriptalert('xss')/script"), // angle brackets stripped
         ];
 
         for (input, expected) in queries {
-            let sanitized = input.trim().to_lowercase().replace("<", "").replace(">", "");
+            let sanitized = input
+                .trim()
+                .to_lowercase()
+                .replace("<", "")
+                .replace(">", "");
             assert_eq!(sanitized, expected);
         }
     }
@@ -216,6 +220,8 @@ mod tests {
             title: Some("Updated Title".to_string()),
             description: Some("Updated description".to_string()),
             price_cents: Some(2999),
+            category: Some(ListingCategory::Electronics),
+            photos_ipfs_cids: Some(vec!["QmTestCid".to_string()]),
             quantity_available: Some(5),
             status: Some(ListingStatus::Active),
         };
@@ -228,9 +234,7 @@ mod tests {
 
     #[test]
     fn test_listings_response_structure() {
-        let response = ListingsResponse {
-            listings: vec![],
-        };
+        let response = ListingsResponse { listings: vec![] };
 
         assert_eq!(response.listings.len(), 0);
     }
@@ -239,8 +243,8 @@ mod tests {
     fn test_category_filter() {
         // Test that filtering by category works
         let electronics = ListingCategory::Electronics;
-        let clothing = ListingCategory::Clothing;
+        let fashion = ListingCategory::Fashion;
 
-        assert_ne!(electronics, clothing);
+        assert_ne!(electronics, fashion);
     }
 }

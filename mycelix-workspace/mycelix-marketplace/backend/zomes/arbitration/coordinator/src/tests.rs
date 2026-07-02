@@ -3,7 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // `mod tests;` in lib.rs already makes this file the `tests` module, so
+    // this inner `mod tests { ... }` double-nests everything one level
+    // deeper than intended. `use super::*` only reaches the (empty) outer
+    // `tests` module, not the crate root — hence `super::super::*`.
+    use super::super::*;
     use arbitration_integrity::*;
 
     // Helper functions for tests

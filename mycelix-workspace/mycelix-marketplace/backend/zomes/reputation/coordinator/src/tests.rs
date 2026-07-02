@@ -3,7 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // `mod tests;` in lib.rs already makes this file the `tests` module, so
+    // this inner `mod tests { ... }` double-nests everything one level
+    // deeper than intended. `use super::*` only reaches the (empty) outer
+    // `tests` module, not the crate root — hence `super::super::*`.
+    use super::super::*;
     use reputation_integrity::*;
 
     // Helper functions for tests
@@ -48,7 +52,11 @@ mod tests {
         // composite = 0.4 * 0.8 + 0.3 * 0.7 + 0.3 * 0.75
         // composite = 0.32 + 0.21 + 0.225 = 0.755
 
-        assert!((composite - 0.755).abs() < 0.01, "Composite score should be ~0.755, got {}", composite);
+        assert!(
+            (composite - 0.755).abs() < 0.01,
+            "Composite score should be ~0.755, got {}",
+            composite
+        );
     }
 
     #[test]
@@ -59,7 +67,10 @@ mod tests {
         const W_REPUTATION: f64 = 0.3;
 
         let total_weight = W_QUALITY + W_CONSISTENCY + W_REPUTATION;
-        assert!((total_weight - 1.0).abs() < 0.001, "Weights should sum to 1.0");
+        assert!(
+            (total_weight - 1.0).abs() < 0.001,
+            "Weights should sum to 1.0"
+        );
     }
 
     #[test]
@@ -99,7 +110,10 @@ mod tests {
         };
 
         let composite = compute_composite_score(&pogq, new_agent_reputation);
-        assert!((composite - 0.5).abs() < 0.01, "New agent composite should be ~0.5");
+        assert!(
+            (composite - 0.5).abs() < 0.01,
+            "New agent composite should be ~0.5"
+        );
     }
 
     // ===== Byzantine Detection Tests =====
@@ -124,7 +138,7 @@ mod tests {
     #[test]
     fn test_high_risk_score_calculation() {
         // Test risk score accumulation
-        let mut risk = 0.0;
+        let mut risk: f64 = 0.0;
 
         // Cartel detected
         risk += 0.4;
@@ -135,7 +149,7 @@ mod tests {
 
         let total_risk = risk.min(1.0);
 
-        assert_eq!(total_risk, 0.7);
+        assert!((total_risk - 0.7).abs() < 1e-9);
         assert!(total_risk > 0.5); // Above Byzantine threshold
     }
 
@@ -145,7 +159,7 @@ mod tests {
         let pogq_volatile = ProofOfGradientQuality {
             quality: 0.8,
             consistency: 0.3, // Low consistency
-            entropy: 0.9,      // High entropy = erratic behavior
+            entropy: 0.9,     // High entropy = erratic behavior
             timestamp: Timestamp::from_micros(1000000),
         };
 
@@ -156,7 +170,7 @@ mod tests {
     fn test_sybil_detection_heuristic() {
         // New agent with suspiciously high score
         let transaction_count = 2; // Very few transactions
-        let composite = 0.9;       // Very high score
+        let composite = 0.9; // Very high score
 
         let sybil_suspected = transaction_count < 3 && composite > 0.8;
         assert!(sybil_suspected);
@@ -223,14 +237,14 @@ mod tests {
         let malicious_agents = 4;
 
         // New malicious agents start with low reputation (0.5)
-        let malicious_reputation = 0.5;
+        let malicious_reputation: f64 = 0.5;
 
         // Byzantine power
         let byzantine_power = (malicious_agents as f64) * malicious_reputation.powi(2);
         // byzantine_power = 4 * 0.25 = 1.0
 
         // Honest power (assuming average reputation of 0.8)
-        let honest_reputation = 0.8;
+        let honest_reputation: f64 = 0.8;
         let honest_power = (honest_agents as f64) * honest_reputation.powi(2);
         // honest_power = 6 * 0.64 = 3.84
 
@@ -238,9 +252,12 @@ mod tests {
         let threshold = honest_power / 3.0;
         // threshold = 3.84 / 3 = 1.28
 
-        assert!(byzantine_power < threshold,
+        assert!(
+            byzantine_power < threshold,
             "Byzantine power ({}) should be less than threshold ({})",
-            byzantine_power, threshold);
+            byzantine_power,
+            threshold
+        );
 
         // This proves 40% malicious agents can be tolerated!
     }
@@ -253,18 +270,20 @@ mod tests {
         let honest_agents = 55;
 
         // Malicious agents start with neutral reputation
-        let malicious_rep = 0.5;
+        let malicious_rep: f64 = 0.5;
         let byzantine_power = (malicious_agents as f64) * malicious_rep.powi(2);
 
         // Honest agents have good reputation
-        let honest_rep = 0.8;
+        let honest_rep: f64 = 0.8;
         let honest_power = (honest_agents as f64) * honest_rep.powi(2);
 
         let threshold = honest_power / 3.0;
 
         // At 45%, system should still be safe
-        assert!(byzantine_power < threshold,
-            "System should tolerate 45% Byzantine agents");
+        assert!(
+            byzantine_power < threshold,
+            "System should tolerate 45% Byzantine agents"
+        );
     }
 
     #[test]
@@ -282,8 +301,10 @@ mod tests {
         let malicious_count_classical = 33;
         let malicious_count_matl = 45;
 
-        assert!(malicious_count_matl > malicious_count_classical,
-            "MATL should tolerate more malicious agents than classical BFT");
+        assert!(
+            malicious_count_matl > malicious_count_classical,
+            "MATL should tolerate more malicious agents than classical BFT"
+        );
     }
 
     // ===== Review System Tests =====
@@ -333,9 +354,9 @@ mod tests {
     #[test]
     fn test_exponential_moving_average() {
         // Test EMA formula: new = α * transaction + (1-α) * old
-        let alpha = 0.3;
-        let old_reputation = 0.7;
-        let transaction_quality = 1.0; // Successful
+        let alpha: f64 = 0.3;
+        let old_reputation: f64 = 0.7;
+        let transaction_quality: f64 = 1.0; // Successful
 
         let new_reputation = alpha * transaction_quality + (1.0 - alpha) * old_reputation;
         // new_reputation = 0.3 * 1.0 + 0.7 * 0.7 = 0.3 + 0.49 = 0.79
@@ -346,9 +367,9 @@ mod tests {
 
     #[test]
     fn test_failed_transaction_impact() {
-        let alpha = 0.3;
-        let old_reputation = 0.7;
-        let transaction_quality = 0.0; // Failed
+        let alpha: f64 = 0.3;
+        let old_reputation: f64 = 0.7;
+        let transaction_quality: f64 = 0.0; // Failed
 
         let new_reputation = alpha * transaction_quality + (1.0 - alpha) * old_reputation;
         // new_reputation = 0.3 * 0.0 + 0.7 * 0.7 = 0.49

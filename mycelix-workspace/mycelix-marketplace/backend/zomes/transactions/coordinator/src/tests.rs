@@ -3,8 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use transactions_integrity::*;
+    // `mod tests;` in lib.rs already makes this file the `tests` module, so
+    // this inner `mod tests { ... }` double-nests everything one level
+    // deeper than intended. `use super::*` only reaches the (empty) outer
+    // `tests` module, not the crate root — hence `super::super::*` to reach
+    // the actual crate root where CreateTransactionInput, AgentPubKey (via
+    // hdk::prelude), etc. are in scope.
+    use super::super::*;
 
     // Helper functions for tests
     fn mock_transaction() -> Transaction {
