@@ -144,7 +144,7 @@ impl RbBftConsensus {
 
     /// Check if we are the leader for the current round
     pub fn are_we_leader(&self) -> bool {
-        if let (Some(ref our_id), Some(round)) = (&self.our_id, self.rounds.active_round()) {
+        if let (Some(our_id), Some(round)) = (&self.our_id, self.rounds.active_round()) {
             &round.leader == our_id
         } else {
             false
