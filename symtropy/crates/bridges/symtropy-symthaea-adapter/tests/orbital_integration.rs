@@ -9,7 +9,7 @@
 use symthaea_core::embodiment::MotorSafetyLevel;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_orbital::embodiment::OrbitalEmbodiment;
-use symtropy_robotics_bridge::MotorPlanner;
+use symtropy_robotics_bridge_core::MotorPlanner;
 use symtropy_symthaea_adapter::EmbodimentPlanner;
 
 /// Orbital's `NUM_ACTUATORS` constant is crate-private; mirror it here so
