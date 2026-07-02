@@ -504,3 +504,73 @@ remaining clusters, CI enforcement for the ZKP/registry-adoption rules,
 ledger consolidation across finance/supplychain/marketplace, further
 cleanup, and the marketplace freeze-or-retire decision that's been pending
 since April).
+
+## Update — 2026-07-02 (task #9: routing_registry migration)
+
+The CI advisory job (`routing-registry-adoption` in
+`.github/workflows/security-checks.yml`) grep found 55 files calling
+`CallTargetCell::OtherRole` without referencing `routing_registry`. Reading
+each of the ~26 real coordinator files directly (after excluding test
+files, SDK clients, out-of-scope hApps, and stale archives already
+identified by the earlier grep) found they are **not** one uniform bug —
+three distinct shapes:
+
+- **Pattern A — duplicated/drifted allowlist** (the original finding). A
+  coordinator exposes a generic relay taking caller-supplied `zome_name` and
+  gates it with a *local* `const ALLOWED_X_ZOMES` instead of
+  `routing_registry::get_allowed_zomes()`. Only one file actually matched
+  this: `mycelix-governance/zomes/bridge/coordinator/src/cross_cluster.rs`
+  (5 hardcoded lists — Personal, Identity, Commons, Civic, Finance). **Fixed**
+  — all 5 consts now source from `routing_registry`; content was verified
+  byte-identical before the swap, so this is a pure architecture fix with no
+  behavior change. Reference pattern followed:
+  `mycelix-personal/zomes/personal-bridge/coordinator/src/lib.rs`.
+
+- **Pattern B — no gate at all, but no injection surface either.** The
+  overwhelming majority (23 of the ~26 files) make hardcoded,
+  compile-time-fixed `OtherRole` calls — the target zome/function are Rust
+  literals, never derived from caller input. There is nothing to swap for a
+  registry lookup because there's no local allowlist duplicating one; the
+  "gate" question doesn't really apply since the caller can't steer the
+  target at all. Confirmed across: `mycelix-hearth/hearth-kinship`,
+  `mycelix-governance/restorative-justice`, `mycelix-manufacturing/bridge`,
+  `mycelix-manufacturing/planning`, `mycelix-energy/bridge`,
+  `mycelix-energy/regenerative`, `mycelix-commons/boundary-contracts`,
+  `mycelix-commons/care-circles`, `mycelix-identity/bridge`,
+  `mycelix-identity/reputation-aggregator`, `mycelix-finance/bridge`,
+  `mycelix-finance/payments`, `mycelix-finance/price-oracle`,
+  `mycelix-finance/treasury`, `mycelix-knowledge/markets_integration`,
+  `mycelix-climate/bridge`, `mycelix-supplychain/payments`,
+  `mycelix-space/observations`, `mycelix-pulse/mail-bridge`. Not fixed —
+  there's no mechanical fix; closing this would mean deciding whether every
+  fixed-target cross-cluster call site should defensively call
+  `routing_registry::is_allowed()` before calling, which is a design
+  question (does a fixed compile-time target even need runtime gating?),
+  not a drift fix. Left as a separate, open question for a future session.
+
+- **False positives.** 2 files the grep matched that don't actually dispatch
+  `OtherRole` at all: `mycelix-supplychain/holochain/zomes/inventory/coordinator`
+  (only `CallTargetCell::Local`) and `mycelix-identity/zomes/trust_credential/coordinator`
+  (zero `OtherRole` calls — the only mention is a doc comment describing how
+  *other* clusters call *into* this zome, not calls it makes outward).
+
+- **New finding — not in the original review, more severe than Pattern A.**
+  `mycelix-music/dnas/mycelix-music/zomes/music-bridge/coordinator/src/lib.rs`'s
+  `cross_cluster_dispatch` function takes `target_role`, `target_zome`, AND
+  `fn_name` **all as caller-supplied input**. It validates `target_role`
+  against a local hardcoded array (`allowed_targets`), but **never validates
+  `target_zome` or `fn_name` against anything** — any zome/function within an
+  allowed cluster (identity, finance, governance, civic, commons_land,
+  commons_care) can be invoked by any Citizen+ tier agent. This is a real gap,
+  not just drift risk. Not fixed here: the correct fix needs new logic (parse
+  `target_role: String` into a `CrossClusterRole`, then call
+  `routing_registry::is_allowed(CrossClusterRole::Music, target, &input.target_zome)`
+  before dispatching) rather than a mechanical const swap, which is outside
+  this pass's approved scope. **Recommend prioritizing this over the
+  Pattern-B design question above** — it's an active gap, not a hypothetical
+  one.
+
+Net result: 1 file fixed (governance), 1 new higher-priority finding surfaced
+(music cross-cluster dispatch), and the "55 advisory warnings" figure is now
+understood to be almost entirely Pattern B (no mechanical fix applicable) or
+noise, not evidence of widespread drift.
