@@ -1,16 +1,33 @@
 import json
+import os
 import sqlite3
 from datetime import datetime
 
 import yaml
 
 import paths
+from migration_manager import bootstrap_schema
+
+def _connect():
+    """Open the registry DB, creating its directory and base schema on first use.
+
+    Without this, a fresh asset root (new contributor, CI, rebuilt asset
+    root) fails with "unable to open database file" (missing registry/
+    directory) or "no such table: registry_meta" (empty file, schema never
+    created) the first time any command runs before `registry migrate`.
+    """
+    registry_path = paths.get_registry_path()
+    os.makedirs(os.path.dirname(registry_path), exist_ok=True)
+    conn = sqlite3.connect(registry_path)
+    bootstrap_schema(conn.cursor())
+    conn.commit()
+    return conn
 
 def ingest_manifest(manifest_path, status):
     with open(manifest_path, 'r') as f:
         manifest = yaml.safe_load(f)
 
-    conn = sqlite3.connect(paths.get_registry_path())
+    conn = _connect()
     cursor = conn.cursor()
 
     # Store asset
@@ -88,7 +105,7 @@ def ingest_manifest(manifest_path, status):
     return asset_id
 
 def register_file(asset_id, role, path, sha256=None, size_bytes=None, mime_type=None):
-    conn = sqlite3.connect(paths.get_registry_path())
+    conn = _connect()
     cursor = conn.cursor()
 
     # Check if file with this role already exists for the asset
@@ -110,7 +127,7 @@ def register_file(asset_id, role, path, sha256=None, size_bytes=None, mime_type=
     conn.close()
 
 def get_asset(asset_id):
-    conn = sqlite3.connect(paths.get_registry_path())
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM assets WHERE id = ?", (asset_id,))
     columns = [column[0] for column in cursor.description]
@@ -121,7 +138,7 @@ def get_asset(asset_id):
     return None
 
 def update_asset_audit_status(asset_id, tech_status=None, style_status=None):
-    conn = sqlite3.connect(paths.get_registry_path())
+    conn = _connect()
     cursor = conn.cursor()
     if tech_status:
         cursor.execute("UPDATE assets SET technical_status = ?, updated_at = ? WHERE id = ?",
@@ -133,7 +150,7 @@ def update_asset_audit_status(asset_id, tech_status=None, style_status=None):
     conn.close()
 
 def get_assets_needing_conversion():
-    conn = sqlite3.connect(paths.get_registry_path())
+    conn = _connect()
     cursor = conn.cursor()
     # Assets that have a source file but no optimized file, or technical_status is pending
     cursor.execute("""
@@ -149,7 +166,7 @@ def get_assets_needing_conversion():
     return results
 
 def get_assets_by_biome(biome):
-    conn = sqlite3.connect(paths.get_registry_path())
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT a.id FROM assets a
