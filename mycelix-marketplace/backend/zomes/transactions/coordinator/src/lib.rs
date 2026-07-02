@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
-use transactions_integrity::*;
 use mycelix_common::{bridge, error_handling, link_queries, remote_calls, time};
+use transactions_integrity::*;
 
 /// Application ID for Bridge reputation reporting
 const APP_ID: &str = "mycelix-marketplace";
@@ -66,7 +66,10 @@ pub fn create_transaction(input: CreateTransactionInput) -> ExternResult<Transac
         monitoring::MetricType::TransactionCreated,
         transaction.total_price_cents as f64,
         Some(transaction.buyer.clone()),
-        Some(format!("seller:{:?},quantity:{}", transaction.seller, transaction.quantity)),
+        Some(format!(
+            "seller:{:?},quantity:{}",
+            transaction.seller, transaction.quantity
+        )),
     )?;
 
     Ok(TransactionOutput {
@@ -77,9 +80,7 @@ pub fn create_transaction(input: CreateTransactionInput) -> ExternResult<Transac
 
 /// Get a transaction by hash
 #[hdk_extern]
-pub fn get_transaction(
-    transaction_hash: ActionHash,
-) -> ExternResult<Option<TransactionOutput>> {
+pub fn get_transaction(transaction_hash: ActionHash) -> ExternResult<Option<TransactionOutput>> {
     let record = get(transaction_hash.clone(), GetOptions::default())?;
 
     match record {
@@ -124,7 +125,10 @@ pub fn get_my_transactions(_: ()) -> ExternResult<TransactionsResponse> {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(output) = get_transaction(action_hash)? {
                 // Avoid duplicates (in case same agent is buyer and seller)
-                if !transactions.iter().any(|t| t.transaction_hash == output.transaction_hash) {
+                if !transactions
+                    .iter()
+                    .any(|t| t.transaction_hash == output.transaction_hash)
+                {
                     transactions.push(output);
                 }
             }
@@ -144,6 +148,7 @@ pub fn confirm_transaction(transaction_hash: ActionHash) -> ExternResult<Transac
         TransactionStatus::Confirmed,
         None,
         vec![TransactionStatus::Pending],
+        RequiredParty::Seller,
     )
 }
 
@@ -157,6 +162,7 @@ pub fn mark_shipped(input: MarkShippedInput) -> ExternResult<TransactionOutput> 
         TransactionStatus::Shipped,
         input.tracking_info,
         vec![TransactionStatus::Confirmed],
+        RequiredParty::Seller,
     )
 }
 
@@ -170,6 +176,7 @@ pub fn confirm_delivery(transaction_hash: ActionHash) -> ExternResult<Transactio
         TransactionStatus::Delivered,
         None,
         vec![TransactionStatus::Shipped],
+        RequiredParty::Buyer,
     )
 }
 
@@ -181,10 +188,9 @@ pub fn confirm_delivery(transaction_hash: ActionHash) -> ExternResult<Transactio
 #[hdk_extern]
 pub fn complete_transaction(transaction_hash: ActionHash) -> ExternResult<TransactionOutput> {
     // Get current transaction
-    let current = get_transaction(transaction_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Transaction not found".into()
-        )))?;
+    let current = get_transaction(transaction_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Transaction not found".into())
+    ))?;
 
     // Verify state transition is valid
     if current.transaction.status != TransactionStatus::Delivered {
@@ -223,10 +229,7 @@ pub fn complete_transaction(transaction_hash: ActionHash) -> ExternResult<Transa
         positive: true,
         value_cents: updated_transaction.total_price_cents,
         app_id: APP_ID.to_string(),
-        context: Some(format!(
-            "marketplace_transaction:{}",
-            new_action_hash
-        )),
+        context: Some(format!("marketplace_transaction:{}", new_action_hash)),
     };
 
     // Report seller reputation (gracefully handle Bridge unavailability)
@@ -282,14 +285,11 @@ pub fn complete_transaction(transaction_hash: ActionHash) -> ExternResult<Transa
 /// State transition: Any (except Completed/Cancelled) → Disputed
 /// Reports negative reputation signal to Bridge (pending arbitration outcome).
 #[hdk_extern]
-pub fn dispute_transaction(
-    input: DisputeTransactionInput,
-) -> ExternResult<TransactionOutput> {
+pub fn dispute_transaction(input: DisputeTransactionInput) -> ExternResult<TransactionOutput> {
     // Get current transaction
-    let current = get_transaction(input.transaction_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Transaction not found".into()
-        )))?;
+    let current = get_transaction(input.transaction_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Transaction not found".into())
+    ))?;
 
     let agent_info = agent_info()?;
     let caller = agent_info.agent_initial_pubkey;
@@ -356,7 +356,10 @@ pub fn dispute_transaction(
         monitoring::MetricType::TransactionDisputed,
         updated_transaction.total_price_cents as f64,
         Some(caller),
-        Some(format!("buyer:{:?},seller:{:?}", updated_transaction.buyer, updated_transaction.seller)),
+        Some(format!(
+            "buyer:{:?},seller:{:?}",
+            updated_transaction.buyer, updated_transaction.seller
+        )),
     )?;
 
     Ok(TransactionOutput {
@@ -371,10 +374,9 @@ pub fn dispute_transaction(
 #[hdk_extern]
 pub fn cancel_transaction(transaction_hash: ActionHash) -> ExternResult<TransactionOutput> {
     // Get current transaction
-    let current = get_transaction(transaction_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Transaction not found".into()
-        )))?;
+    let current = get_transaction(transaction_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Transaction not found".into())
+    ))?;
 
     let agent_info = agent_info()?;
     let caller = agent_info.agent_initial_pubkey;
@@ -393,7 +395,7 @@ pub fn cancel_transaction(transaction_hash: ActionHash) -> ExternResult<Transact
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Cannot cancel transaction from status {:?}",
                 current.transaction.status
-            ))))
+            ))));
         }
     }
 
@@ -412,9 +414,7 @@ pub fn cancel_transaction(transaction_hash: ActionHash) -> ExternResult<Transact
 
 /// Get transactions for a specific listing
 #[hdk_extern]
-pub fn get_listing_transactions(
-    listing_hash: ActionHash,
-) -> ExternResult<TransactionsResponse> {
+pub fn get_listing_transactions(listing_hash: ActionHash) -> ExternResult<TransactionsResponse> {
     // Use shared utility for get_links
     let links = link_queries::get_links_local(listing_hash, LinkTypes::ListingToTransactions)?;
 
@@ -476,8 +476,8 @@ pub fn settle_transaction_in_finance(
         "reference": format!("marketplace_tx:{}", transaction_hash),
     });
 
-    let encoded = ExternIO::encode(payload)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+    let encoded =
+        ExternIO::encode(payload).map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
 
     match call(
         CallTargetCell::OtherRole("finance".into()),
@@ -502,10 +502,7 @@ pub fn settle_transaction_in_finance(
         Ok(other) => Ok(TransactionSettlementResult {
             settled: false,
             finance_reference: None,
-            error: Some(format!(
-                "Finance cluster rejected settlement: {:?}",
-                other
-            )),
+            error: Some(format!("Finance cluster rejected settlement: {:?}", other)),
         }),
         Err(_) => Ok(TransactionSettlementResult {
             settled: false,
@@ -518,17 +515,42 @@ pub fn settle_transaction_in_finance(
 // ===== Helper Functions =====
 
 /// Update transaction status with validation
+/// Which party in the transaction is required to be the caller for a
+/// given state transition.
+enum RequiredParty {
+    Buyer,
+    Seller,
+}
+
 fn update_transaction_status(
     transaction_hash: ActionHash,
     new_status: TransactionStatus,
     tracking_info: Option<String>,
     allowed_from_states: Vec<TransactionStatus>,
+    required_caller: RequiredParty,
 ) -> ExternResult<TransactionOutput> {
     // Get current transaction
-    let current = get_transaction(transaction_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Transaction not found".into()
-        )))?;
+    let current = get_transaction(transaction_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Transaction not found".into())
+    ))?;
+
+    // Verify caller is the party authorized for this transition — mirrors
+    // the buyer/seller check already used correctly by dispute_transaction
+    // and cancel_transaction.
+    let caller = agent_info()?.agent_initial_pubkey;
+    let expected = match required_caller {
+        RequiredParty::Buyer => &current.transaction.buyer,
+        RequiredParty::Seller => &current.transaction.seller,
+    };
+    if caller != *expected {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Only the {} may perform this transition",
+            match required_caller {
+                RequiredParty::Buyer => "buyer",
+                RequiredParty::Seller => "seller",
+            }
+        ))));
+    }
 
     // Verify state transition is valid
     if !allowed_from_states.contains(&current.transaction.status) {
@@ -595,7 +617,6 @@ pub struct UpdateMatlInput {
     pub successful: bool,
     pub transaction_value_cents: u64,
 }
-
 
 // ===== Tests =====
 #[cfg(test)]

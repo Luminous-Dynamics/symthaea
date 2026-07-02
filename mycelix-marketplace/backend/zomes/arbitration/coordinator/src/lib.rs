@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-use hdk::prelude::*;
 use arbitration_integrity::*;
+use hdk::prelude::*;
 use mycelix_common::{error_handling, link_queries, remote_calls, time};
 
 /// File a dispute for a transaction
@@ -75,7 +75,10 @@ pub fn file_dispute(input: FileDisputeInput) -> ExternResult<DisputeOutput> {
         monitoring::MetricType::ArbitrationInitiated,
         1.0,
         Some(dispute_with_arbitrators.filed_by.clone()),
-        Some(format!("buyer:{:?},seller:{:?}", dispute_with_arbitrators.buyer, dispute_with_arbitrators.seller)),
+        Some(format!(
+            "buyer:{:?},seller:{:?}",
+            dispute_with_arbitrators.buyer, dispute_with_arbitrators.seller
+        )),
     )?;
 
     Ok(DisputeOutput {
@@ -84,33 +87,73 @@ pub fn file_dispute(input: FileDisputeInput) -> ExternResult<DisputeOutput> {
     })
 }
 
+/// Anchor path for the arbitrator self-registration pool.
+fn arbitrator_pool_path() -> Path {
+    Path::from("all_arbitrators")
+}
+
+/// Register the calling agent as available to be assigned as an arbitrator.
+///
+/// There is no existing arbitrator/authority registry in this codebase, and
+/// per project convention (no global "all X" DHT lists without an anchor),
+/// this uses a Path-anchored link, matching the idiom already used by
+/// listings/security. Real eligibility (MATL score) is re-checked live at
+/// assignment time in assign_arbitrators_internal, not trusted from
+/// registration time.
+#[hdk_extern]
+pub fn register_as_arbitrator(_: ()) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    create_link(
+        arbitrator_pool_path().path_entry_hash()?,
+        agent,
+        LinkTypes::AllArbitrators,
+        (),
+    )?;
+    Ok(())
+}
+
 /// Assign arbitrators to a dispute (internal helper)
 ///
-/// This selects agents with high MATL scores (>0.7) to vote.
-/// Excludes buyer, seller, and the filer.
+/// Selects agents with high MATL scores (>0.7) to vote, drawn from the
+/// self-registration pool (register_as_arbitrator), excluding buyer,
+/// seller, and the filer.
 fn assign_arbitrators_internal(
     dispute_hash: ActionHash,
     mut dispute: Dispute,
 ) -> ExternResult<Dispute> {
-    // In a real implementation, this would:
-    // 1. Query the network for agents with MATL score > 0.7
-    // 2. Exclude buyer, seller, and filer
-    // 3. Select 3-5 arbitrators randomly from high-scoring agents
-    //
-    // For now, we'll create a placeholder implementation
-    // that would be filled in with actual network queries
+    let pool_links = get_links(
+        LinkQuery::try_new(
+            arbitrator_pool_path().path_entry_hash()?,
+            LinkTypes::AllArbitrators,
+        )?,
+        GetStrategy::default(),
+    )?;
 
-    // Placeholder: In production, query for high-MATL agents
-    let high_matl_agents: Vec<AgentPubKey> = Vec::new();
-
-    // Filter out parties to the dispute
-    let eligible_arbitrators: Vec<AgentPubKey> = high_matl_agents
-        .into_iter()
-        .filter(|agent| {
-            agent != &dispute.buyer && agent != &dispute.seller && agent != &dispute.filed_by
-        })
-        .take(3) // Select 3 arbitrators
-        .collect();
+    let mut eligible_arbitrators: Vec<AgentPubKey> = Vec::new();
+    for link in pool_links {
+        let Ok(candidate) = AgentPubKey::try_from(link.target) else {
+            continue;
+        };
+        if candidate == dispute.buyer
+            || candidate == dispute.seller
+            || candidate == dispute.filed_by
+        {
+            continue;
+        }
+        if eligible_arbitrators.contains(&candidate) {
+            continue;
+        }
+        // Live MATL score check — don't trust a stored value.
+        let score: ExternResult<f64> =
+            remote_calls::call_zome("reputation", "get_agent_matl_score", candidate.clone());
+        let score = score.unwrap_or(0.5); // unscored agents default to neutral, not auto-eligible-high
+        if score > 0.7 {
+            eligible_arbitrators.push(candidate);
+        }
+        if eligible_arbitrators.len() >= 3 {
+            break;
+        }
+    }
 
     dispute.arbitrators = eligible_arbitrators.clone();
     dispute.status = DisputeStatus::UnderReview;
@@ -155,11 +198,8 @@ pub fn submit_arbitration_vote(
 
     // Get arbitrator's MATL score
     // Use shared utility for remote calls
-    let matl_score: f64 = remote_calls::call_zome(
-        "reputation",
-        "get_agent_matl_score",
-        arbitrator.clone(),
-    )?;
+    let matl_score: f64 =
+        remote_calls::call_zome("reputation", "get_agent_matl_score", arbitrator.clone())?;
 
     // Create vote entry
     let vote = ArbitrationVote {
@@ -269,16 +309,15 @@ pub fn finalize_arbitration(dispute_hash: ActionHash) -> ExternResult<Arbitratio
     };
 
     let compensation_multiplier = if consensus_strength >= 0.85 {
-        1.0  // Strong consensus: full compensation
+        1.0 // Strong consensus: full compensation
     } else if consensus_strength >= 0.75 {
         0.75 // Moderate consensus: 75% compensation
     } else {
         0.50 // Weak consensus: 50% compensation
     };
 
-    let compensation_cents = Some(
-        (transaction.transaction_value_cents as f64 * compensation_multiplier) as u64
-    );
+    let compensation_cents =
+        Some((transaction.transaction_value_cents as f64 * compensation_multiplier) as u64);
 
     // Create result entry
     let result = ArbitrationResult {
@@ -343,10 +382,8 @@ pub fn get_arbitration_opportunities(_: ()) -> ExternResult<DisputesResponse> {
     let agent = agent_info.agent_initial_pubkey;
 
     // Use shared utility for get_links
-    let links = link_queries::get_links_local(
-        agent.clone(),
-        LinkTypes::AgentToArbitrationOpportunities,
-    )?;
+    let links =
+        link_queries::get_links_local(agent.clone(), LinkTypes::AgentToArbitrationOpportunities)?;
 
     let mut disputes = Vec::new();
 
@@ -393,9 +430,7 @@ pub fn get_dispute(dispute_hash: ActionHash) -> ExternResult<Option<DisputeOutpu
 ///
 /// Formula: Σ(vote * matl_score) / Σ(matl_scores)
 /// Returns (weighted_vote, total_weight)
-fn calculate_weighted_vote(
-    votes: &[ArbitrationVoteOutput],
-) -> ExternResult<(f64, f64)> {
+fn calculate_weighted_vote(votes: &[ArbitrationVoteOutput]) -> ExternResult<(f64, f64)> {
     let mut weighted_sum = 0.0;
     let mut total_weight = 0.0;
 
@@ -508,7 +543,6 @@ pub struct UpdateMatlInput {
     pub successful: bool,
     pub transaction_value_cents: u64,
 }
-
 
 // ===== Tests =====
 #[cfg(test)]

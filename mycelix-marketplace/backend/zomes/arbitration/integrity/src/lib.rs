@@ -132,6 +132,9 @@ pub enum LinkTypes {
 
     /// All Disputes (for browsing)
     AllDisputes,
+
+    /// Anchor -> registered arbitrator pool member
+    AllArbitrators,
 }
 
 #[hdk_entry_types]
@@ -200,6 +203,26 @@ fn validate_dispute(dispute: &Dispute) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_vote(vote: &ArbitrationVote) -> ExternResult<ValidateCallbackResult> {
+    // An arbitrator must not be a party to the dispute they're voting on
+    // (buyer, seller, or the agent who filed it). Enforced here, not just
+    // in coordinator code, so it can't be bypassed by a direct entry write.
+    let dispute_record = must_get_valid_record(vote.dispute_hash.clone())?;
+    let dispute: Dispute = dispute_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Dispute entry missing for vote".into()
+        )))?;
+    if vote.arbitrator == dispute.buyer
+        || vote.arbitrator == dispute.seller
+        || vote.arbitrator == dispute.filed_by
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Arbitrator cannot be a party to the dispute (self-dealing)".into(),
+        ));
+    }
+
     // Reasoning must not be empty
     if vote.reasoning.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -313,42 +336,62 @@ mod tests {
 
     #[test]
     fn test_validate_dispute_empty_reason() {
-        let dispute = Dispute { reason: String::new(), ..valid_dispute() };
+        let dispute = Dispute {
+            reason: String::new(),
+            ..valid_dispute()
+        };
         let result = validate_dispute(&dispute).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_dispute_whitespace_only_reason() {
-        let dispute = Dispute { reason: "   \t\n  ".to_string(), ..valid_dispute() };
+        let dispute = Dispute {
+            reason: "   \t\n  ".to_string(),
+            ..valid_dispute()
+        };
         let result = validate_dispute(&dispute).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_dispute_reason_too_long() {
-        let dispute = Dispute { reason: "x".repeat(5001), ..valid_dispute() };
+        let dispute = Dispute {
+            reason: "x".repeat(5001),
+            ..valid_dispute()
+        };
         let result = validate_dispute(&dispute).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_dispute_filer_not_party() {
-        let dispute = Dispute { filed_by: mock_agent(99), ..valid_dispute() };
+        let dispute = Dispute {
+            filed_by: mock_agent(99),
+            ..valid_dispute()
+        };
         let result = validate_dispute(&dispute).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_dispute_buyer_equals_seller() {
-        let dispute = Dispute { buyer: mock_agent(3), seller: mock_agent(3), filed_by: mock_agent(3), ..valid_dispute() };
+        let dispute = Dispute {
+            buyer: mock_agent(3),
+            seller: mock_agent(3),
+            filed_by: mock_agent(3),
+            ..valid_dispute()
+        };
         let result = validate_dispute(&dispute).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_dispute_seller_files() {
-        let dispute = Dispute { filed_by: mock_agent(3), ..valid_dispute() };
+        let dispute = Dispute {
+            filed_by: mock_agent(3),
+            ..valid_dispute()
+        };
         let result = validate_dispute(&dispute).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
@@ -364,49 +407,70 @@ mod tests {
 
     #[test]
     fn test_validate_vote_empty_reasoning() {
-        let vote = ArbitrationVote { reasoning: String::new(), ..valid_vote() };
+        let vote = ArbitrationVote {
+            reasoning: String::new(),
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_vote_whitespace_reasoning() {
-        let vote = ArbitrationVote { reasoning: "  \t ".to_string(), ..valid_vote() };
+        let vote = ArbitrationVote {
+            reasoning: "  \t ".to_string(),
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_vote_reasoning_too_long() {
-        let vote = ArbitrationVote { reasoning: "x".repeat(2001), ..valid_vote() };
+        let vote = ArbitrationVote {
+            reasoning: "x".repeat(2001),
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_vote_matl_below_zero() {
-        let vote = ArbitrationVote { arbitrator_matl_score: -0.1, ..valid_vote() };
+        let vote = ArbitrationVote {
+            arbitrator_matl_score: -0.1,
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_vote_matl_above_one() {
-        let vote = ArbitrationVote { arbitrator_matl_score: 1.1, ..valid_vote() };
+        let vote = ArbitrationVote {
+            arbitrator_matl_score: 1.1,
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_vote_matl_boundary_zero() {
-        let vote = ArbitrationVote { arbitrator_matl_score: 0.0, ..valid_vote() };
+        let vote = ArbitrationVote {
+            arbitrator_matl_score: 0.0,
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_validate_vote_matl_boundary_one() {
-        let vote = ArbitrationVote { arbitrator_matl_score: 1.0, ..valid_vote() };
+        let vote = ArbitrationVote {
+            arbitrator_matl_score: 1.0,
+            ..valid_vote()
+        };
         let result = validate_vote(&vote).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
@@ -422,21 +486,30 @@ mod tests {
 
     #[test]
     fn test_validate_result_weighted_vote_below_zero() {
-        let res = ArbitrationResult { weighted_vote: -0.1, ..valid_result() };
+        let res = ArbitrationResult {
+            weighted_vote: -0.1,
+            ..valid_result()
+        };
         let result = validate_result(&res).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_result_weighted_vote_above_one() {
-        let res = ArbitrationResult { weighted_vote: 1.1, ..valid_result() };
+        let res = ArbitrationResult {
+            weighted_vote: 1.1,
+            ..valid_result()
+        };
         let result = validate_result(&res).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_validate_result_zero_votes() {
-        let res = ArbitrationResult { total_votes: 0, ..valid_result() };
+        let res = ArbitrationResult {
+            total_votes: 0,
+            ..valid_result()
+        };
         let result = validate_result(&res).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
@@ -445,7 +518,9 @@ mod tests {
 
     #[test]
     fn test_ipfs_cid_valid_v0() {
-        assert!(is_valid_ipfs_cid("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"));
+        assert!(is_valid_ipfs_cid(
+            "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"
+        ));
     }
 
     #[test]
@@ -468,9 +543,12 @@ mod tests {
     #[test]
     fn test_all_dispute_statuses() {
         let statuses = vec![
-            DisputeStatus::Filed, DisputeStatus::UnderReview,
-            DisputeStatus::Voting, DisputeStatus::ResolvedBuyer,
-            DisputeStatus::ResolvedSeller, DisputeStatus::Withdrawn,
+            DisputeStatus::Filed,
+            DisputeStatus::UnderReview,
+            DisputeStatus::Voting,
+            DisputeStatus::ResolvedBuyer,
+            DisputeStatus::ResolvedSeller,
+            DisputeStatus::Withdrawn,
         ];
         assert_eq!(statuses.len(), 6);
     }
