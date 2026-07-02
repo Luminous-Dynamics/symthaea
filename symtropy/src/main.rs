@@ -49,6 +49,14 @@ fn main() {
     // CLI flags
     let autostart = std::env::args().any(|a| a == "--autostart");
     let ai_player = std::env::args().any(|a| a == "--ai-player");
+    // --experience <id>: select a specific ExperienceRegistry entry before
+    // autostarting (e.g. "waterworks-3d" for the 3D FPS layer, vs. the
+    // default "the-room" 2.5D experience). No-op without --autostart.
+    let experience_id: Option<String> = std::env::args()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .find(|w| w[0] == "--experience")
+        .map(|w| w[1].clone());
     #[cfg(feature = "atlas")]
     let globe_mode = std::env::args().any(|a| a == "--globe");
     #[cfg(feature = "atlas")]
@@ -78,7 +86,25 @@ fn main() {
     )
     // MSAA: Bevy 0.18 defaults to Sample4 via Msaa enum (set per-camera if needed)
     .add_plugins(SymtropyPlugin)
+    // Env-gated no-op unless SYMTROPY_DEMO_CAPTURE_DIR is set — see
+    // symtropy-demo-capture's doc comment for the schedule (t=1.5/4.0/7.0s,
+    // exit at t=8.5s).
+    .add_plugins(symtropy_demo_capture::CapturePlugin::new("symtropy"))
     .add_systems(Startup, log_renderer_info);
+
+    if let Some(id) = experience_id.clone() {
+        eprintln!("[symtropy] --experience {id}: selecting before autostart");
+        app.add_systems(
+            Startup,
+            move |mut registry: ResMut<symtropy_launcher::experience::ExperienceRegistry>| {
+                if let Some(idx) = registry.experiences.iter().position(|e| e.id == id) {
+                    registry.selected = idx;
+                } else {
+                    eprintln!("[symtropy] --experience {id}: no such experience id, ignoring");
+                }
+            },
+        );
+    }
 
     if autostart || ai_player {
         eprintln!("[symtropy] --autostart: skipping menu, starting game immediately");

@@ -45,6 +45,7 @@ symtropy-core = { path = "crates/core/symtropy-core" }
 symtropy-math = { path = "crates/core/symtropy-math" }
 symtropy-mycelix-village = { path = "crates/apps/symtropy-mycelix-village" }
 symtropy-terrain = { path = "crates/domains/symtropy-terrain" }
+symtropy-demo-capture = { path = "crates/apps/symtropy-demo-capture" }
 symtropy-consciousness-physics = { path = "crates/domains/symtropy-consciousness-physics" }
 symtropy-render-bridge = { path = "crates/bridges/symtropy-render-bridge" }
 symthaea-bevy-brain = { path = "crates/bridges/symthaea-bevy-brain", optional = true }
