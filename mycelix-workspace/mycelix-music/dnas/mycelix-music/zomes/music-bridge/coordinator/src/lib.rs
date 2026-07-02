@@ -14,20 +14,15 @@
 use hdk::prelude::*;
 use music_bridge_integrity::*;
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, BridgeHealth, DispatchInput, DispatchResult,
-    GateAuditInput, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
+    self as bridge, BridgeHealth, CrossClusterRole, DispatchInput, DispatchResult, GateAuditInput,
+    RATE_LIMIT_WINDOW_SECS, ResolveQueryInput, check_rate_limit_count, routing_registry,
 };
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
 // ============================================================================
 
-const ALLOWED_ZOMES: &[&str] = &[
-    "catalog",
-    "plays",
-    "balances",
-    "trust",
-];
+const ALLOWED_ZOMES: &[&str] = &["catalog", "plays", "balances", "trust"];
 
 // ============================================================================
 // Helpers
@@ -436,22 +431,22 @@ fn derive_musical_params(trigger: &ConsciousnessTrigger) -> (f32, String, u32, f
 
     let scale_name = if valence < -0.3 {
         match dominant_harmony {
-            2 => "phrygian".to_string(),       // IntegralWisdom → ancient depth
-            4 => "maqam_hijaz".to_string(),    // EthicalPresence → Middle Eastern tension
+            2 => "phrygian".to_string(),    // IntegralWisdom → ancient depth
+            4 => "maqam_hijaz".to_string(), // EthicalPresence → Middle Eastern tension
             _ => "minor".to_string(),
         }
     } else if valence > 0.3 {
         match dominant_harmony {
-            0 => "lydian".to_string(),         // InfinitePlay → bright, floating
-            1 => "major".to_string(),          // UniversalInterconnectedness → grounded joy
-            6 => "raga_yaman".to_string(),     // RegenerativeHarmony → flourishing
+            0 => "lydian".to_string(),     // InfinitePlay → bright, floating
+            1 => "major".to_string(),      // UniversalInterconnectedness → grounded joy
+            6 => "raga_yaman".to_string(), // RegenerativeHarmony → flourishing
             _ => "major".to_string(),
         }
     } else {
         match dominant_harmony {
-            3 => "dorian".to_string(),         // SovereignPresence → modal, balanced
-            5 => "mixolydian".to_string(),     // CollectiveWisdom → folk-like
-            7 => "gamelan_slendro".to_string(),// SacredStillness → meditative
+            3 => "dorian".to_string(),          // SovereignPresence → modal, balanced
+            5 => "mixolydian".to_string(),      // CollectiveWisdom → folk-like
+            7 => "gamelan_slendro".to_string(), // SacredStillness → meditative
             _ => "dorian".to_string(),
         }
     };
@@ -464,8 +459,8 @@ fn derive_musical_params(trigger: &ConsciousnessTrigger) -> (f32, String, u32, f
     // Quality: composite heuristic from phi, harmony breadth, va balance
     let harmony_sum: f32 = ha.iter().sum::<f32>() / 8.0;
     let va_balance = 1.0 - (valence.abs() * 0.3 + (arousal - 0.5).abs() * 0.3);
-    let quality_score = (trigger.phi_score * 0.4 + harmony_sum * 0.3 + va_balance * 0.3)
-        .clamp(0.0, 1.0);
+    let quality_score =
+        (trigger.phi_score * 0.4 + harmony_sum * 0.3 + va_balance * 0.3).clamp(0.0, 1.0);
 
     (tempo_bpm, scale_name, note_count.max(4), quality_score)
 }
@@ -651,8 +646,10 @@ pub struct CrossClusterInput {
 
 /// Dispatch a call to another cluster via CallTargetCell::OtherRole.
 ///
-/// Enables Music -> Identity (DID verification), Music -> Finance (royalty
-/// settlement via SAP/TEND), Music -> Governance (artist proposals).
+/// Currently only Music -> Civic (media_publication, for art metadata) has a
+/// verified caller and a registered route. Identity/Finance/Governance
+/// dispatch is aspirational — it stays denied until a real caller shows up
+/// and a route is added to routing_registry.
 ///
 /// Requires Citizen+ consciousness tier.
 #[hdk_extern]
@@ -663,12 +660,27 @@ pub fn cross_cluster_dispatch(input: CrossClusterInput) -> ExternResult<Dispatch
         "cross_cluster_dispatch",
     )?;
 
-    // Validate target role
-    let allowed_targets = ["identity", "finance", "governance", "civic", "commons_land", "commons_care"];
-    if !allowed_targets.contains(&input.target_role.as_str()) {
+    // Resolve the target role and validate both the role AND the specific
+    // target zome against the shared routing_registry allowlist. Previously
+    // only the role was checked (against a local hardcoded list that also
+    // included "commons_land"/"commons_care", which aren't valid hApp role
+    // names), leaving target_zome/fn_name completely unchecked — any zome or
+    // function on an allowed cluster was callable. See MYCELIX_REVIEW.md
+    // 2026-07-02 addendum.
+    let target_role: CrossClusterRole = serde_json::from_value(serde_json::Value::String(
+        input.target_role.clone(),
+    ))
+    .map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Unknown cross-cluster target '{}'",
+            input.target_role
+        )))
+    })?;
+
+    if !routing_registry::is_allowed(CrossClusterRole::Music, target_role, &input.target_zome) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-cluster dispatch to '{}' not allowed from music. Allowed: {:?}",
-            input.target_role, allowed_targets
+            "Zome '{}' on cluster '{}' not allowed from music",
+            input.target_zome, input.target_role
         ))));
     }
 
