@@ -1,0 +1,120 @@
+name: Mycelix Security Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  # ── ZKP backend policy: STARK-family only (DASTARK), never SNARK ──────────
+  #
+  # Project convention: consciousness ZKP proofs use STARK-family backends
+  # (RISC0, Winterfell, Miden VM) exclusively. arkworks/halo2/groth16/bellman
+  # (SNARK-family, trusted-setup-dependent) are banned. This check was manual
+  # (a repo-wide grep) as of the 2026-07-02 security review; this job makes
+  # it automatic so it can't silently regress.
+  zkp-banned-crates:
+    name: ZKP backend policy (no SNARK crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for banned SNARK-family dependencies
+        run: |
+          set -euo pipefail
+          BANNED_PATTERN='arkworks|halo2|groth16|bellman'
+          # Search Cargo.toml dependency declarations only (not doc comments,
+          # not algorithm-name mentions like "Bellman-Ford" in unrelated code).
+          HITS=$(grep -rniE "^\s*(ark-[a-z0-9_-]+|halo2[a-z0-9_-]*|groth16|bellman)\s*=" \
+            --include='Cargo.toml' . 2>/dev/null | grep -v '/target/' | grep -v '/.cargo/registry/' || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::Found banned SNARK-family crate dependencies (project policy: STARK-family only, see memory/feedback_dastark_no_snark.md):"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "No banned SNARK-family dependencies found."
+
+  # ── routing_registry adoption: cross-cluster dispatch must be gated ───────
+  #
+  # Bridge coordinators dispatching CallTargetCell::OtherRole should route
+  # through crates/mycelix-bridge-common's routing_registry::is_allowed /
+  # get_allowed_zomes, not a locally-hardcoded ALLOWED_*_ZOMES allowlist (the
+  # exact drift pattern the 2026-07-02 review found in mycelix-governance's
+  # cross_cluster.rs). This is an advisory check (warns, doesn't fail the
+  # build) since migrating existing dispatch code is its own tracked task —
+  # the goal here is visibility into new drift, not blocking unrelated PRs.
+  routing-registry-adoption:
+    name: routing_registry adoption (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for local allowlist drift
+        run: |
+          set -uo pipefail
+          # Files that dispatch OtherRole but don't reference routing_registry
+          # anywhere in the same file are candidates for drift.
+          DRIFT=""
+          for f in $(grep -rl 'CallTargetCell::OtherRole' --include='*.rs' . 2>/dev/null | grep -v '/target/'); do
+            if ! grep -q 'routing_registry' "$f"; then
+              DRIFT="${DRIFT}${f}\n"
+            fi
+          done
+          if [ -n "$DRIFT" ]; then
+            echo "::warning::Files dispatching CallTargetCell::OtherRole without referencing routing_registry (verify they aren't a hardcoded local allowlist):"
+            printf "%b" "$DRIFT"
+          else
+            echo "All OtherRole dispatch sites reference routing_registry."
+          fi
+
+  # ── cargo audit gate ───────────────────────────────────────────────────────
+  #
+  # Required by BETA_PROMOTION_CRITERIA.md's own promotion checklist, but as
+  # of the 2026-07-02 review had never actually been run/recorded anywhere.
+  # Runs per top-level cluster workspace (each Mycelix cluster is its own
+  # independent Cargo workspace, not members of one giant root workspace).
+  cargo-audit:
+    name: cargo audit (${{ matrix.cluster }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster:
+          - mycelix-commons
+          - mycelix-civic
+          - mycelix-hearth
+          - mycelix-governance
+          - mycelix-identity
+          - mycelix-personal
+          - mycelix-attribution
+          - mycelix-craft
+          - mycelix-knowledge
+          - mycelix-finance
+          - mycelix-climate
+          - mycelix-energy
+          - mycelix-manufacturing
+          - mycelix-supplychain
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        working-directory: ${{ matrix.cluster }}
+        run: |
+          if [ -f Cargo.lock ]; then
+            # Fails on actual vulnerabilities (default cargo-audit behavior);
+            # does not fail on "unmaintained crate" warnings, which are
+            # common and mostly unavoidable in this dependency tree (see
+            # mycelix-space/deny.toml's advisories.ignore list for examples
+            # already triaged as no-security-impact transitive deps).
+            cargo audit
+          else
+            echo "No Cargo.lock in ${{ matrix.cluster }}, skipping."
+          fi
