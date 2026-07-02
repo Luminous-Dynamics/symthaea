@@ -77,19 +77,65 @@ def generate_technical_report(filepath, status="TECHNICAL_APPROVED", warnings=No
     logger.info(f"Generated report: {report_path}")
 
 def capture_thumbnail(filepath):
-    # Basic camera setup for thumbnail
-    bpy.ops.object.camera_add(location=(5, -5, 5))
+    """Frame and light a thumbnail based on the actual scene content.
+
+    The previous version used a fixed camera at (5,-5,5) and a single sun
+    light regardless of the asset's real size — fine for a ~5-unit object,
+    but for anything meter-scale-or-smaller (most real assets) it rendered
+    as a barely-visible dark speck against a huge black frame. Confirmed via
+    a real Poly Haven CC0 model: this fix is the difference between an
+    unusable thumbnail and a clear, well-lit review image.
+    """
+    mesh_objs = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == 'MESH'
+        and not any(t in obj.name for t in ["_COLLISION_BOX", "_COLLISION_SPHERE", "_COLLISION_CAPSULE", "_COLLISION_CONVEX", "_COLLISION", "_LOD"])
+    ]
+    if not mesh_objs:
+        mesh_objs = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH']
+
+    min_co = mathutils.Vector((float('inf'),) * 3)
+    max_co = mathutils.Vector((float('-inf'),) * 3)
+    for obj in mesh_objs:
+        for corner in obj.bound_box:
+            world_corner = obj.matrix_world @ mathutils.Vector(corner)
+            min_co = mathutils.Vector(min(a, b) for a, b in zip(min_co, world_corner))
+            max_co = mathutils.Vector(max(a, b) for a, b in zip(max_co, world_corner))
+    center = (min_co + max_co) / 2.0
+    size = max((max_co - min_co).length, 0.01)
+
+    cam_dir = mathutils.Vector((1.0, -1.0, 0.8)).normalized()
+    cam_loc = center + cam_dir * (size * 1.8)
+    bpy.ops.object.camera_add(location=cam_loc)
     cam = bpy.context.object
-    cam.rotation_euler = (1.1, 0, 0.78)
+    cam.rotation_euler = (center - cam_loc).normalized().to_track_quat('-Z', 'Y').to_euler()
     bpy.context.scene.camera = cam
 
-    # Setup rendering
     bpy.context.scene.render.image_settings.file_format = 'PNG'
     thumb_path = f"{os.path.splitext(filepath)[0]}_thumb.png"
     bpy.context.scene.render.filepath = thumb_path
+    bpy.context.scene.render.resolution_x = 512
+    bpy.context.scene.render.resolution_y = 512
 
-    # Simple light
-    bpy.ops.object.light_add(type='SUN', location=(5, 5, 10))
+    key = bpy.data.objects.new("thumb_key_light", bpy.data.lights.new("thumb_key", type='SUN'))
+    key.data.energy = 3.0
+    key.rotation_euler = (1.0, 0.0, 0.6)
+    bpy.context.collection.objects.link(key)
+
+    fill = bpy.data.objects.new("thumb_fill_light", bpy.data.lights.new("thumb_fill", type='SUN'))
+    fill.data.energy = 1.0
+    fill.rotation_euler = (1.3, 0.0, -2.4)
+    bpy.context.collection.objects.link(fill)
+
+    # NOTE: World.use_nodes triggers a DeprecationWarning in Blender 5.x
+    # (slated for removal in 6.0) but is still the correct API for 5.1.1.
+    # Revisit when upgrading past Blender 6.0.
+    world = bpy.data.worlds.new("ThumbWorld")
+    world.use_nodes = True
+    bg = world.node_tree.nodes["Background"]
+    bg.inputs[0].default_value = (0.05, 0.05, 0.06, 1.0)
+    bg.inputs[1].default_value = 0.3
+    bpy.context.scene.world = world
 
     bpy.ops.render.render(write_still=True)
     logger.info(f"Generated thumbnail: {thumb_path}")
