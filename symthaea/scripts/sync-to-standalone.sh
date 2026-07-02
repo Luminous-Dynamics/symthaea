@@ -6,12 +6,16 @@
 # for mycelix dependencies).
 #
 # Usage:
-#   bash symthaea/scripts/sync-to-standalone.sh [--dry-run] [--skip-check] [--force]
+#   bash symthaea/scripts/sync-to-standalone.sh [--dry-run] [--skip-check] [--force] [--allow-check-failure]
 #
 # Options:
-#   --dry-run      Show what would change without modifying the standalone repo
-#   --skip-check   Skip the post-sync `cargo check` verification
-#   --force        Commit and push without interactive confirmation
+#   --dry-run              Show what would change without modifying the standalone repo
+#   --skip-check           Skip the post-sync `cargo check` verification entirely
+#   --force                Commit and push without interactive confirmation
+#   --allow-check-failure  Push even if the post-sync cargo fmt/check verification
+#                          fails (default: a failed check aborts before commit/push,
+#                          regardless of --force, since a broken push to the public
+#                          repo is worse than a delayed one)
 
 set -euo pipefail
 
@@ -25,11 +29,13 @@ STANDALONE_REMOTE="git@github.com:Luminous-Dynamics/symthaea.git"
 DRY_RUN=false
 SKIP_CHECK=false
 FORCE=false
+ALLOW_CHECK_FAILURE=false
 for arg in "$@"; do
     case "$arg" in
-        --dry-run)    DRY_RUN=true ;;
-        --skip-check) SKIP_CHECK=true ;;
-        --force)      FORCE=true ;;
+        --dry-run)              DRY_RUN=true ;;
+        --skip-check)           SKIP_CHECK=true ;;
+        --force)                FORCE=true ;;
+        --allow-check-failure)  ALLOW_CHECK_FAILURE=true ;;
     esac
 done
 
@@ -577,7 +583,7 @@ grid-scaling,fission-reactor,accelerator,threat-assessment,\
 datacenter,experiment-planner,strategic-materials,critical-minerals,\
 advanced-manufacturing,building-systems,design-production,\
 mycelix,unstable-examples"
-    if (cd "${STANDALONE_REPO}" && cargo check -p symthaea --features "$CI_FEATURES" 2>&1 | tail -10); then
+    if run_standalone_cargo "cargo check -p symthaea --features '$CI_FEATURES' 2>&1 | tail -40"; then
         ok "cargo check (CI features) passed"
     else
         warn "cargo check (CI features) failed — compilation errors will break CI"
@@ -585,9 +591,15 @@ mycelix,unstable-examples"
     fi
 
     if $SYNC_CHECK_FAILED; then
-        warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
-        echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
-        echo "  cd ${STANDALONE_REPO} && cargo check"
+        warn "Pre-push checks failed:"
+        echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo fmt --check"
+        echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo check"
+        if $ALLOW_CHECK_FAILURE; then
+            warn "--allow-check-failure set — proceeding to commit/push anyway"
+        else
+            git -C "${STANDALONE_REPO}" reset HEAD -- . >/dev/null 2>&1
+            error "Aborting before commit/push. Fix the above or re-run with --allow-check-failure to push anyway."
+        fi
     fi
     echo
 elif $SKIP_CHECK; then
