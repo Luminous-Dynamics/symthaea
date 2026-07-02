@@ -1,0 +1,16 @@
+/target
+.envrc
+profile.json
+Cargo.lock
+CLAUDE.local.md
+.claude/settings.local.json
+/.idea/
+**/.DS_Store
+/.vscode
+# Mobile directory
+mobile/
+# Perfetto traces from benchmarks
+perfetto_traces/
+*.perfetto-trace
+.last_perfetto_trace_path
+*.pending-snap

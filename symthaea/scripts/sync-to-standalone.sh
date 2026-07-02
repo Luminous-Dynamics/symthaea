@@ -136,16 +136,6 @@ RSYNC_EXCLUDE=(
     --exclude='node_modules/'
     --exclude='.next/'
     --exclude='dist/'
-    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
-    # that was never part of git, so it can't build from a fresh clone.
-    # Excluding it from Cargo.toml's `exclude = [...]` list alone isn't
-    # sufficient -- `default-members`'s `crates/core/*` glob still picks it
-    # up -- so skip syncing the directory entirely instead. Pattern is
-    # relative to each sync_dir() source root (e.g. ".../symthaea/crates/"
-    # for the "crates" SOURCE_DIRS entry), NOT the standalone repo root --
-    # a "crates/" prefix here would never match and silently let the
-    # directory back in on every sync.
-    --exclude='core/hdc-zkp-bench/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -336,14 +326,11 @@ if ! $DRY_RUN; then
     sed -i 's|^\(mycelix-crypto\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-crypto"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
-    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
-    # that was never part of git (local-only dev setup, not synced by this
-    # script), so it cannot build from a fresh standalone clone. This is a
-    # standalone-only exclusion -- the crate remains a normal workspace
-    # member in the monorepo, where some dev environments do have
-    # .deps/binius64 set up.
-    sed -i '/^\s*"crates\/domains\/symthaea-lab",/a\    "crates/core/hdc-zkp-bench",' \
-        "${STANDALONE_REPO}/Cargo.toml"
+    # hdc-zkp-bench lives at crates/hdc-zkp-bench/ (not crates/core/) and
+    # declares its own [workspace], so it's never a member of this
+    # workspace to begin with -- no exclusion needed. It path-depends on
+    # vendor/binius64/, which the existing "vendor" SOURCE_DIRS entry
+    # already syncs.
 
     # mycelix-zkp-core and symtropy-robotics-bridge-core are inherited via
     # `{ workspace = true, ... }` in [dependencies], but the monorepo's own
@@ -590,10 +577,24 @@ mycelix,unstable-examples"
         SYNC_CHECK_FAILED=true
     fi
 
+    # hdc-zkp-bench (crates/hdc-zkp-bench/) declares its own [workspace] and
+    # is deliberately excluded from the main one (see its Cargo.toml for
+    # why), so none of the three checks above ever touch it. Check it
+    # explicitly or a broken crate here would go unnoticed until someone
+    # tries to build it.
+    info "Running cargo check on crates/hdc-zkp-bench (separate workspace)..."
+    if run_standalone_cargo "cargo check --manifest-path crates/hdc-zkp-bench/Cargo.toml 2>&1 | tail -40"; then
+        ok "cargo check (hdc-zkp-bench) passed"
+    else
+        warn "cargo check (hdc-zkp-bench) failed"
+        SYNC_CHECK_FAILED=true
+    fi
+
     if $SYNC_CHECK_FAILED; then
         warn "Pre-push checks failed:"
         echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo fmt --check"
         echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo check"
+        echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo check --manifest-path crates/hdc-zkp-bench/Cargo.toml"
         if $ALLOW_CHECK_FAILURE; then
             warn "--allow-check-failure set — proceeding to commit/push anyway"
         else

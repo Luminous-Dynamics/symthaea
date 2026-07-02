@@ -1,0 +1,18 @@
+[package]
+name = "binius-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+binius-utils = { path = "../utils" }
+bytemuck = { workspace = true }
+bytes = { workspace = true }
+thiserror = "2.0"
+
+[dev-dependencies]
+proptest = "1.4"
+rand = { workspace = true }

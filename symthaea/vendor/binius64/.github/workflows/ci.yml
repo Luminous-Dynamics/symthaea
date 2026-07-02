@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+  merge_group:
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  format:
+    name: format
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check copyright
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: copyright --all-files
+      - name: Check typos
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: typos --all-files
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
+      - name: Install nightly toolchain for rustfmt
+        run: rustup toolchain install nightly-2026-01-01 --component rustfmt
+      - name: Check rustfmt
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: rustfmt --all-files
+
+  rust-checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - name: x86_64-portable
+            runner: ubuntu-24.04
+            rustflags: # portable
+          - name: x86_64
+            runner: ubuntu-24.04
+            rustflags: "-Ctarget-cpu=native"
+          - name: arm64
+            runner: ubuntu-24.04-arm
+            rustflags: "-Ctarget-cpu=native"
+    name: rust-checks-${{ matrix.arch.name }}
+    runs-on: ${{ matrix.arch.runner }}
+    env:
+      RUSTFLAGS: ${{ matrix.arch.rustflags }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Compile
+        run: cargo build --workspace --all-targets
+      - name: Run platform diagnostics
+        run: cargo test -p binius-utils --features platform-diagnostics test_platform_diagnostics -- --nocapture
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Run tests
+        run: cargo nextest run --workspace --no-fail-fast
+      # Must run doctests separately, see https://github.com/nextest-rs/nextest/issues/16
+      - name: Run doctests
+        run: cargo test --doc --workspace
+
+  # Build against wasm32-unknown-unknown target to test that our libraries compile to wasm.
+  wasm-vanilla-build:
+    name: wasm-vanilla-build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+      - name: Compile vanilla wasm32
+        run: cargo build -p binius-field --target wasm32-unknown-unknown
+
+  wasm-tests:
+    name: wasm-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-wasip1
+      - name: Set up Wasmer
+        uses: wasmerio/setup-wasmer@v2
+        with:
+          version: 'v6.0.1'
+      - name: Test on wasm32-wasip1
+        run: cargo test -p binius-math -p binius-field -p binius-prover -p binius-verifier --target wasm32-wasip1 --config "target.wasm32-wasip1.runner=['wasmer']"
+
+  rust-doc:
+    name: rust-doc
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Build documentation (including private items for CI checks)
+        run: cargo doc --document-private-items --no-deps
+
+  circuits-snapshot:
+    name: circuits-snapshot (${{ matrix.example }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [ethsign, zklogin, sha256, sha512, keccak, blake2s, hashsign]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Check ${{ matrix.example }} circuit statistics snapshot
+        run: cargo run --example ${{ matrix.example }} -- check-snapshot
+
+  # This job ensures all CI checks pass
+  ci-all-checks:
+    runs-on: ubuntu-latest
+    # Run if: dependencies succeeded OR it's a Graphite MQ PR (even with skipped deps)
+    # This ensures Graphite MQ can't merge with skipped tests
+    if: success() || startsWith(github.head_ref, 'gtmq_')
+    needs:
+      - format
+      - rust-checks
+      - wasm-vanilla-build
+      - wasm-tests
+      - rust-doc
+      - circuits-snapshot
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          set -e  # Exit immediately if any command fails
+
+          echo "Job results:"
+          echo "format: ${{ needs.format.result }}"
+          echo "rust-checks: ${{ needs.rust-checks.result }}"
+          echo "wasm-vanilla-build: ${{ needs.wasm-vanilla-build.result }}"
+          echo "wasm-tests: ${{ needs.wasm-tests.result }}"
+          echo "wasm-tests: ${{ needs.wasm-tests.result }}"
+          echo "rust-doc: ${{ needs.rust-doc.result }}"
+          echo "circuits-snapshot: ${{ needs.circuits-snapshot.result }}"
+          echo ""
+
+          echo "Job results (JSON):"
+          echo '${{ toJson(needs) }}' | jq .
+          echo ""
+
+          echo "Verifying all jobs actually ran and succeeded..."
+
+          # note:
+          # - 'all(...)' returns true only if the condition is true for ALL items
+          # - '--exit-status' makes jq exit with code 1 if the check fails (causing job to fail)
+          jq --exit-status 'all(.result == "success")' <<< '${{ toJson(needs) }}'
+
+          echo "✅ All CI checks passed successfully"
