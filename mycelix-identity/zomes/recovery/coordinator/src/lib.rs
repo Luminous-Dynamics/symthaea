@@ -146,7 +146,10 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            warn!("MFA countersigning error during factor enrollment: {} - recovery setup WITHOUT MFA", err);
+            warn!(
+                "MFA countersigning error during factor enrollment: {} - recovery setup WITHOUT MFA",
+                err
+            );
             Ok(())
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
@@ -390,6 +393,18 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
     if is_trustee == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only trustees can initiate recovery".into()
+        )));
+    }
+
+    // Verify the caller actually owns the initiator_did they claim (prevents
+    // any agent who merely knows a trustee's DID string from initiating
+    // recovery as that trustee). Mirrors the ownership check used by the
+    // vote-casting path above.
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.initiator_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller does not own the initiator DID".into()
         )));
     }
 
