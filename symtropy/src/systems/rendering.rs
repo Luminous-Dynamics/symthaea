@@ -35,16 +35,22 @@ pub fn setup_world(
     let exp = &registry.experiences[registry.selected];
     let is_3d = exp.id == "waterworks-3d";
 
+    // Bloom's Rg11b10Ufloat render-attachment texture isn't supported by
+    // software Vulkan (llvmpipe) — real GPUs are fine. Only relevant for
+    // headless/CI screenshot capture (see symtropy-demo-capture), never for
+    // real players, so gated on an explicit opt-out rather than touching
+    // the default path.
+    let bloom_disabled = std::env::var("SYMTROPY_DISABLE_BLOOM").is_ok();
+
     if !is_3d {
         // Camera with consciousness-driven post-processing
-        commands.spawn((
-            Camera2d,
-            Transform::from_xyz(0.0, 0.0, 999.0),
-            bevy::post_process::bloom::Bloom {
+        let mut camera = commands.spawn((Camera2d, Transform::from_xyz(0.0, 0.0, 999.0)));
+        if !bloom_disabled {
+            camera.insert(bevy::post_process::bloom::Bloom {
                 intensity: 0.15,
                 ..default()
-            },
-        ));
+            });
+        }
     }
 
     let map = &layout.tiles;
