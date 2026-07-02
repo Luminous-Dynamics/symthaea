@@ -365,7 +365,7 @@ impl WasmArchitect {
         artifact: &[u8],
         hv: &mut symthaea_core::hdc::ContinuousHV,
         func_name: &str,
-        projection: &crate::projection::HdcSsmProjection,
+        projection: &symthaea_broca::projection::HdcSsmProjection,
     ) -> Result<()> {
         use wasmtime::*;
 

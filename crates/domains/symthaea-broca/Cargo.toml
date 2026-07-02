@@ -179,16 +179,6 @@ path = "src/bin/broca_validator.rs"
 required-features = ["mamba-cpu"]
 
 [[bin]]
-name = "broca-self-architect"
-path = "src/bin/broca_self_architect.rs"
-required-features = ["mamba-cpu", "code-sheaf-eval"]
-
-[[bin]]
-name = "broca-sovereign-node"
-path = "src/bin/broca_sovereign_node.rs"
-required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
-
-[[bin]]
 name = "broca-exercism-bench"
 path = "src/bin/broca_exercism_bench.rs"
 required-features = ["mamba-cpu", "code-sheaf-eval"]

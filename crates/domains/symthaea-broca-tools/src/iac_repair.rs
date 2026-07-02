@@ -4,9 +4,11 @@
 // Supports: Terraform, Kubernetes, Ansible, CloudFormation, Pulumi, Docker Compose, HCL
 // In full integration: called from CodeGate or code_orchestrator after generation
 
-use crate::emotional_gating_integration::{apply_frustration_trigger, modulate_by_emotion};
-use crate::encoder::ThoughtChannels; // Assume exists
-use crate::language_gates::LanguageGateRegistry;
+use symthaea_broca::emotional_gating_integration::{
+    apply_frustration_trigger, modulate_by_emotion,
+};
+use symthaea_broca::encoder::ThoughtChannels; // Assume exists
+use symthaea_broca::language_gates::LanguageGateRegistry;
 
 /// Real IaC verifier using actual CLI tool calls via std::process::Command + output parsing.
 /// Falls back to heuristic if tool not available or for unsupported intents.
@@ -278,7 +280,7 @@ pub fn generate_iac_with_self_repair(
                 // Success → calm emotional state
                 apply_frustration_trigger(
                     channels,
-                    &crate::compiler_trainer::CompilerVerdict::Pass { eval_time_ms: 0 },
+                    &symthaea_broca::compiler_trainer::CompilerVerdict::Pass { eval_time_ms: 0 },
                     consecutive_failures,
                 );
                 break;
@@ -300,7 +302,7 @@ pub fn generate_iac_with_self_repair(
                 // Trigger frustration (updates valence/arousal)
                 apply_frustration_trigger(
                     channels,
-                    &crate::compiler_trainer::CompilerVerdict::Fail {
+                    &symthaea_broca::compiler_trainer::CompilerVerdict::Fail {
                         error: last_error.clone(),
                         stage: "iac_validation",
                     },
@@ -337,7 +339,7 @@ mod tests {
     #[test]
     fn test_iac_repair_kubernetes() {
         let mut channels = ThoughtChannels::default();
-        let tok = crate::tokenizer::BpeTokenizer::default_4k();
+        let tok = symthaea_broca::tokenizer::BpeTokenizer::default_4k();
         let registry = LanguageGateRegistry::new(&tok);
 
         let result = generate_iac_with_self_repair(

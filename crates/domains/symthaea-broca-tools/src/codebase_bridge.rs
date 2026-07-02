@@ -6,7 +6,7 @@
 //! Allows Broca to map her repository structure into a high-dimensional
 //! structural manifold for strategic refactoring.
 
-use crate::rust_walker::{LanguageWalker, RustWalker};
+use symthaea_broca::rust_walker::{LanguageWalker, RustWalker};
 use symthaea_core::hdc::ContinuousHV;
 
 /// A single entry in the codebase manifold.

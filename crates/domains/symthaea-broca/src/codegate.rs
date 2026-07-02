@@ -6,28 +6,33 @@
 
 use crate::emotional_gating_integration::modulate_by_emotion;
 use crate::encoder::ThoughtChannels; // Assumed: has language_intent(), prompt_contains_any(), valence(), arousal(), moral_score() etc.
+use crate::gating::EpistemicCubeGate;
 use crate::language_gates::LanguageGateRegistry; // for emotional modulation
+use crate::tokenizer::BpeTokenizer;
 
 pub struct CodeGate {
     language_gate_registry: LanguageGateRegistry,
+    epistemic_cube_gate: EpistemicCubeGate,
+    tokenizer: BpeTokenizer,
     base_temperature: f32,
     base_top_p: f32,
     current_temperature: f32,
     current_top_p: f32,
-    // TODO: add EpistemicCubeGate, error_handling_ids, algorithm_ids etc. from original design
-    // For now, focus on IaC + emotional + language gating
 }
 
 impl CodeGate {
     pub fn new(tokenizer: &crate::tokenizer::BpeTokenizer) -> Self {
         // assume tokenizer exists
         let language_gate_registry = LanguageGateRegistry::new(tokenizer);
+        let epistemic_cube_gate = EpistemicCubeGate::new(tokenizer);
         println!(
             "✅ CodeGate initialized with {} language/IaC gates registered",
             language_gate_registry.list_gates().len()
         );
         CodeGate {
             language_gate_registry,
+            epistemic_cube_gate,
+            tokenizer: tokenizer.clone(),
             base_temperature: 0.85,
             base_top_p: 0.88,
             current_temperature: 0.85,
@@ -80,9 +85,11 @@ impl CodeGate {
             );
         }
 
-        // 5. TODO: integrate EpistemicCubeGate, moral/narrative/idiomatic scores from channels
-        // e.g. if channels.moral_score() < 0.5 { dampen risky tokens }
-        // self.epistemic_cube_gate.apply_coding_modulation(logits, channels.moral_score(), ...);
+        // 5. Apply epistemic-certainty-based hallucination suppression on top of the
+        //    language/emotion gating above (penalizes speculative identifier-like
+        //    tokens when the E-axis signals low certainty).
+        self.epistemic_cube_gate
+            .apply_strict_code_gate(logits, channels, &self.tokenizer);
     }
 
     /// Visualization helper: ASCII bar chart of gate boosts (for debugging generation)

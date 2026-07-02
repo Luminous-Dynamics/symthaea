@@ -206,6 +206,13 @@ impl Default for BrocaConfig {
             sampling_seed: None,
             enable_auto_spacing: true,
             enable_epistemic_cube_gate: true,
+            // NSM grounding (NsmSemanticGate/NsmCoherenceTracker in gating.rs) is
+            // implemented and unit-tested in isolation (see nsm_tests in gating.rs),
+            // but has never been exercised through the full generation pipeline with
+            // these flags on — no integration test or eval run has measured its effect
+            // alongside the epistemic/emotional/coherence gates that already run.
+            // Default to off until that evaluation happens; flip on only after
+            // benchmarking generation quality with vs. without.
             enable_nsm_semantic: false,
             nsm_semantic_alpha: default_nsm_semantic_alpha(),
             enable_nsm_gate: false,

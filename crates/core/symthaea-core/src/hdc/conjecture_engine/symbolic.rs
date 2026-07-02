@@ -230,7 +230,10 @@ pub fn verify_conservation_symbolic(
     let test_points: Vec<Vec<(&str, f64)>> = vec![
         vec![("x", 1.0), ("v", 0.0)],
         vec![("x", 0.0), ("v", 1.0)],
-        vec![("x", 0.7071), ("v", 0.7071)],
+        vec![
+            ("x", std::f64::consts::FRAC_1_SQRT_2),
+            ("v", std::f64::consts::FRAC_1_SQRT_2),
+        ],
         vec![("x", -1.0), ("v", 0.5)],
         vec![("x", 0.3), ("v", -0.9)],
         vec![("x", 2.0), ("v", -1.5)],

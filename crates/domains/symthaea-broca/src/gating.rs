@@ -550,8 +550,11 @@ impl SpectralCoherenceGate {
 
 /// Epistemic gate: suppresses factual assertions when confidence is low.
 ///
-/// The system physically *cannot* hallucinate when epistemic status is Unknown —
-/// factual token logits are suppressed before sampling.
+/// When epistemic status is Unknown, factual-assertion token logits are biased
+/// down (temperature scaling + additive penalties) before sampling. This is a
+/// strong probabilistic deterrent, not a hard mask — it does not make
+/// hallucination physically impossible, since no `-inf`/hard suppression is
+/// applied (see `apply_temperature_gating`/`apply_additive_gating` below).
 #[derive(Clone)]
 pub struct EpistemicGate {
     config: GatingConfig,

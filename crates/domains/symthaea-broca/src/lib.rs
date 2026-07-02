@@ -13,11 +13,8 @@
 #![allow(clippy::unnecessary_map_or)]
 
 pub mod affective_sculpting;
-pub mod architect;
 pub mod architectural_memory;
 pub mod checkpoint;
-#[cfg(feature = "code-sheaf-eval")]
-pub mod code_analysis;
 pub mod cognitive_loop;
 pub mod compiler_trainer;
 pub mod consensus_engine;
@@ -32,8 +29,6 @@ pub mod evolutionary_scaffolder;
 pub mod formal_logic_scorer;
 pub mod gating;
 pub mod generator;
-pub mod generic_structural_scorer_integration;
-pub mod go_walker;
 #[cfg(feature = "gpu")]
 pub mod gpu_cfc;
 pub mod highway_projection;
@@ -46,7 +41,6 @@ pub mod narrative_maintainability_scorer;
 pub mod narrative_planner;
 pub mod nix_kg;
 pub mod physiological_scorer;
-pub mod python_walker;
 pub mod rust_walker;
 pub mod secure_dreaming;
 pub mod self_actualization;
@@ -65,8 +59,6 @@ pub mod zero_shot_substrate;
 // IaC Expansion
 pub mod codegate;
 pub mod emotional_gating_integration;
-pub mod iac_harvester;
-pub mod iac_repair;
 pub mod language_gates;
 pub mod memory_bridge;
 
@@ -91,14 +83,8 @@ pub mod projection;
 pub mod temporal_projection;
 
 pub use affective_sculpting::{AffectiveSculptor, AffectiveStyle};
-pub use architect::SimulationArchitect;
 pub use architectural_memory::ArchitecturalMemory;
 pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
-#[cfg(feature = "code-sheaf-eval")]
-pub use code_analysis::{
-    RustFunctionExtraction, categorize_code_sheaf_diagnostic, extract_rust_functions,
-    repair_hint_for_code_sheaf_category,
-};
 pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 pub use decoder::{
@@ -123,10 +109,6 @@ pub use gating::{
 pub use generator::{
     BrocaConfig, BrocaDecoderKind, BrocaGenerator, GenerationResult, SamplingStrategy,
 };
-pub use generic_structural_scorer_integration::{
-    GenericStructuralScorer, StructuralVerdict as GenericStructuralVerdict,
-};
-pub use go_walker::GoWalker;
 pub use highway_projection::BrocaHighwayProjection;
 pub use invariant_discovery::InvariantDiscovery;
 pub use inverse_harvester::{InverseHarvestPair, InverseHarvester};
@@ -137,7 +119,6 @@ pub use narrative_maintainability_scorer::compute_narrative_maintainability;
 pub use narrative_planner::{ArcStatus, ChangeArc, ChangeStep, NarrativePlanner};
 pub use nix_kg::NixKg;
 pub use physiological_scorer::{PhysiologicalProfile, PhysiologicalScorer};
-pub use python_walker::PythonWalker;
 pub use rust_walker::{LanguageWalker, RustWalker, StructuralElement};
 pub use secure_dreaming::{SecureDreamResult, SecureDreamingEngine};
 pub use self_actualization::ReflectionEngine;
@@ -174,22 +155,3 @@ pub use projection::{
 };
 #[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;
-pub mod codebase_bridge;
-pub mod cognitive_ledger;
-pub mod compiler_feedback_bridge;
-pub mod cross_modal_bridge;
-pub mod foraging_bridge;
-pub mod formal_bridge;
-pub mod geodesic_bridge;
-pub mod invariant_guard;
-pub mod memory_kernel;
-pub mod memory_ring;
-pub mod mission_tree;
-pub mod morphological_bridge;
-pub mod simulation_bridge;
-pub mod somatic_bridge;
-pub mod sovereign_law;
-pub mod sovereignty_bridge;
-pub mod substrate_rewriter;
-pub mod swarm_bridge;
-pub mod wasm_architect;
