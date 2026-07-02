@@ -121,5 +121,41 @@ skip the ceremony. Separately verified the real Approve/Deny path
 Confirms the M1 gate that protects both frame flow and input injection
 is real end-to-end, not just exercised via the pre-production shortcut.
 
+### Full-VM isolation test (2026-07-02)
+
+Same-machine testing (above) means the operator's real cursor and the
+injected cursor are literally the same pointer, which is awkward for
+anything beyond a one-shot smoke test. Set up a real, reusable NixOS
+VM (`/etc/nixos/hosts/xenia-test-vm`, KDE Plasma 6 + Wayland, SSH
+enabled, `/srv/luminous-dynamics/xenia` shared read-only via 9p so the
+already-built host binaries run as-is in the guest without a rebuild)
+and ran the daemon (`--input-backend xdg-portal`) inside the VM while
+the viewer stayed on the real host, connected over a forwarded
+WebSocket port.
+
+Result: real host cursor moved **only** from the operator's own hand;
+the injected input only ever moved the VM's own cursor, visible inside
+the QEMU window. Full isolation confirmed, with the strongest possible
+guarantee (separate kernel, not just a separate compositor process).
+
+Two caveats surfaced, both artifacts of this specific test setup, not
+xenia-peer bugs:
+
+- The daemon inside the VM used synthetic `TestCapture` (fixed
+  320×200), while `XdgPortalInjector` injects into the VM's real
+  ~1024×768 desktop -- these two are normally coupled (both derived
+  from the same real screen), so a normalized viewer position landed
+  at the wrong relative spot inside the VM. Fix for a coordinate-
+  accurate test: pass `--width`/`--height` matching the VM's real
+  resolution, or (more completely) build with the `scap` feature and
+  use real capture inside the VM so the viewer shows the actual VM
+  desktop and both sides agree on screen size.
+- `--transport auto`'s advertisement-based QUIC upgrade doesn't work
+  through the VM's single-port NAT forward (QEMU usermode networking
+  only forwards the one port you declare); use `--transport ws`
+  explicitly on both daemon and viewer for VM-based testing.
+
+The VM config is a reusable asset going forward, not a one-off.
+
 `WaylandInputInjector`/`UinputInjector` remain scaffold stubs — out of
 scope for this pass.
