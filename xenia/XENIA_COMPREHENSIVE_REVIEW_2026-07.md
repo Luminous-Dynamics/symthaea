@@ -1,10 +1,12 @@
 # Xenia: Comprehensive Review & Improvement Plan (2026-07-02)
 
-**Update 2026-07-02:** all P0 and P1 items below are done. See
-"Status: what actually happened" at the end of this document for exactly
-what was applied, what was found along the way, and what's still open (P2,
-plus one item — `_patchwork/`'s older v1–v7 series — deliberately left
-untouched pending review of the `sovereign-ops` repo it also touches).
+**Update 2026-07-02:** all P0 and P1 items below are done. A follow-up look
+at `sovereign-ops` (prompted by its uncommitted state discovered during the
+P1 patch-reconciliation pass) found and fixed a real broken-build regression
+sitting uncommitted there. See "Status: what actually happened" at the end
+of this document for exactly what was applied, what was found along the
+way, and what's still open (P2, plus the older `_patchwork/` v1–v7 series,
+now confirmed superseded but not yet deleted).
 
 Scope: everything under `/srv/luminous-dynamics/xenia/` (the `xenia-wire` protocol
 crate and `xenia-peer` application workspace, both vendored copies of standalone
@@ -284,13 +286,52 @@ issues in the code or its claims.
   forges an AEAD-valid envelope claiming a ~4 GiB uncompressed size and
   asserts it's rejected. Committed (`1edd928`).
 
+**Follow-up — `sovereign-ops` (found while investigating the item above, fixed):**
+`sovereign-ops` (`Luminous-Dynamics/sovereign-ops`, an incubator repo for
+cross-Xenia/Mycelix operational workflows, home to a `sovereign-admin`
+console — a different, older admin console than `xenia-admin`) had 6
+uncommitted modified files. `git diff` showed a mixed bag: root
+`Cargo.toml`'s `mycelix-crypto` path was missing a `mycelix-workspace/`
+prefix and pointed at a directory that doesn't exist on this host (a real
+bug, uncommitted fix already correct) — but the *opposite* regression sat
+uncommitted in four other manifests (`sovereign-admin`,
+`sovereign-attestation`, `sovereign-core`, `sovereign-policy`
+`Cargo.toml`s): their already-correct `mycelix-workspace/`-prefixed paths
+had been edited down to the same broken non-prefixed form. Confirmed via
+`git stash` + `cargo check --workspace` that HEAD builds clean and the
+uncommitted state does not (`No such file or directory` on
+`mycelix-governance/crates/sovereign-bridge`). Restored the 4 broken paths
+to match HEAD, kept the 2 genuine changes (root `Cargo.toml` fix +
+`STATUS.md` addition), and committed alongside two legitimate untracked
+files that were sitting next to the broken edits:
+`docs/integration/DEPENDENCY_CONTRACTS.md` (documents why each local path
+dependency exists and its exit requirement before pre-production) and
+`scripts/check-incubator-boundary.sh` (reports absolute-path deps,
+browser-stored admin secrets, placeholder-proof language; non-strict by
+default). `cargo check`/`test --workspace` pass; the new boundary script
+runs and reports exactly the incubator-stage debt `DEPENDENCY_CONTRACTS.md`
+already documents. Committed (`046d3b2`).
+
+Checked the older `_patchwork/xenia_patches_local_ready_v7*` series
+(already marked "closed" by its own June 27 closeout memo) against this
+now-fixed `sovereign-ops` state: its sovereign-ops-touching patches
+(0004, 0008, 0012) reference a different, differently-named set of
+scripts/docs (`check-incubator-guardrails.sh`, `check-source-hygiene.sh`,
+`docs/security/INCUBATOR_BOUNDARIES.md`) than what actually landed
+(`check-incubator-boundary.sh`, `DEPENDENCY_CONTRACTS.md`,
+`INCUBATOR_SECURITY_NOTES.md` — the latter already committed in
+`sovereign-ops` history before this session). Confirmed superseded/
+abandoned, not pending. Left `_patchwork/` itself undeleted (small, ~1.3MB,
+non-blocking) — a candidate for deletion now that this is confirmed, but
+not done automatically since it wasn't explicitly asked for.
+
 **P2 — still open, needs a decision, not urgent:**
 - Whether the external-patch-train workflow is still wanted going forward
   (it did produce real, good work this round — the wire chain — alongside
-  redundant work — the peer patches).
+  redundant/superseded work — the peer patches and the old v1-v7 series).
 - Continue ROADMAP.md's existing hard-blocker sequencing (unchanged by
   this review).
 - The "Mycelix Sovereign Suite vs 16-cluster Mycelix" naming clarification
   in CLAUDE.md.
-- A first look at `sovereign-ops`'s uncommitted state and the remaining
-  `_patchwork/` v1–v7 series, if that repo's churn is worth auditing next.
+- Whether to delete the now-confirmed-superseded `_patchwork/` v1-v7
+  series.
