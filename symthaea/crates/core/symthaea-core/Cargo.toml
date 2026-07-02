@@ -23,7 +23,6 @@ harness = false
 required-features = ["abstract_thought"]
 
 [dependencies]
-faer.workspace = true
 wgpu = { workspace = true, features = ["spirv"] }
 bytemuck = { version = "1", features = ["derive"] }
 

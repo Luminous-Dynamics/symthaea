@@ -560,11 +560,11 @@ full_language,magi_loop,reasoning_engine,code_generation,\
 wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
 integration_module,observability_module,support,web_research_module,\
 genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
-genesis-missions,fusion-twin,safety-agents,lab-controller,\
-materials,nuclear-forensics,water-prediction,physics-unification,\
+fusion-twin,safety-agents,\
+materials,nuclear-forensics,water-prediction,\
 grid-scaling,fission-reactor,accelerator,threat-assessment,\
 datacenter,experiment-planner,strategic-materials,critical-minerals,\
-advanced-manufacturing,building-systems,design-production,\
+advanced-manufacturing,\
 mycelix,unstable-examples"
     if run_standalone_cargo "cargo check -p symthaea --features '$CI_FEATURES' 2>&1 | tail -40"; then
         ok "cargo check (CI features) passed"

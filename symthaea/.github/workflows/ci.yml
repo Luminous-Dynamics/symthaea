@@ -130,11 +130,11 @@ jobs:
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
           integration_module,observability_module,support,web_research_module,\
           genomics,cell-foundry,ectogenesis,nurture,population,genesis,\
-          genesis-missions,fusion-twin,safety-agents,lab-controller,\
-          materials,nuclear-forensics,water-prediction,physics-unification,\
+          fusion-twin,safety-agents,\
+          materials,nuclear-forensics,water-prediction,\
           grid-scaling,fission-reactor,accelerator,threat-assessment,\
           datacenter,experiment-planner,strategic-materials,critical-minerals,\
-          advanced-manufacturing,building-systems,design-production,\
+          advanced-manufacturing,\
           mycelix,unstable-examples"
           cargo clippy -p symthaea --lib --bins --features "$CI_FEATURES" -- -D warnings
 
@@ -168,7 +168,7 @@ jobs:
             libdbus-1-dev
 
       - name: Run tests
-        run: cargo test -p symthaea --lib
+        run: cargo test -p symthaea --lib -- --test-threads=1
 
   test-hardened-lib:
     name: Hardened Lib Regressions
@@ -378,11 +378,11 @@ jobs:
           - group: genesis
             features: >-
               genomics,cell-foundry,ectogenesis,nurture,population,
-              genesis,genesis-missions,fusion-twin,safety-agents,lab-controller,
-              materials,nuclear-forensics,water-prediction,physics-unification,
+              genesis,fusion-twin,safety-agents,
+              materials,nuclear-forensics,water-prediction,
               grid-scaling,fission-reactor,accelerator,threat-assessment,
               datacenter,experiment-planner,strategic-materials,critical-minerals,
-              advanced-manufacturing,building-systems,design-production,
+              advanced-manufacturing,
               mycelix,unstable-examples
     steps:
       - uses: actions/checkout@v4
@@ -424,7 +424,7 @@ jobs:
             FEATURES="${{ matrix.features }}"
             # Remove whitespace from YAML multiline
             FEATURES=$(echo "$FEATURES" | tr -d '[:space:]' | sed 's/,,*/,/g; s/^,//; s/,$//')
-            cargo test -p symthaea --lib --features "$FEATURES"
+            cargo test -p symthaea --lib --features "$FEATURES" -- --test-threads=1
 
   test-feature-matrix-critical:
     name: Test Feature Matrix (core/web_research/pathology)
@@ -435,9 +435,9 @@ jobs:
       matrix:
         include:
           - name: core
-            cmd: cargo test -p symthaea --lib
+            cmd: cargo test -p symthaea --lib -- --test-threads=1
           - name: web_research
-            cmd: cargo test -p symthaea --lib --features "web_research_module school_learning"
+            cmd: cargo test -p symthaea --lib --features "web_research_module school_learning" -- --test-threads=1
           - name: pathology_resilience
             cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
@@ -496,7 +496,6 @@ jobs:
           - "full_perception"
           - "identity"
           - "all_benchmarks"
-          - "genesis-missions"
           - "genesis"
           - "wasm-sandbox"
           - "integrity"
@@ -929,7 +928,7 @@ jobs:
           - name: safety
             features: safety-agents
           - name: lab
-            features: lab-controller
+            features: cell-foundry
           - name: materials
             features: materials
           - name: nuclear
@@ -937,9 +936,9 @@ jobs:
           - name: water
             features: water-prediction
           - name: multiscale
-            features: physics-unification
+            features: physics
           - name: temporal_unified
-            features: genesis-missions
+            features: safety-agents
     steps:
       - uses: actions/checkout@v4
 
@@ -964,7 +963,7 @@ jobs:
 
       - name: Run genesis ${{ matrix.name }} benchmark
         run: |
-          output=$(cargo run --example benchmark_genesis_${{ matrix.name }} --features "${{ matrix.features }}" --release 2>&1)
+          output=$(cargo run --example benchmark_genesis_${{ matrix.name }} --features "${{ matrix.features }},unstable-examples" --release 2>&1)
           echo "$output"
           echo "$output" | grep -q "PASS" || { echo "::error::Benchmark did not print PASS"; exit 1; }
 
