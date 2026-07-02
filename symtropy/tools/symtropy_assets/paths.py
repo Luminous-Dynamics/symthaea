@@ -27,7 +27,17 @@ def find_project_root(start_path=None):
 def get_asset_root(project_root=None):
     if _OVERRIDE_ASSET_ROOT:
         return _OVERRIDE_ASSET_ROOT
-    root = project_root or os.getcwd() # Simplified for direct workspace usage
+    if project_root is None:
+        # Walk up from cwd to find the real project root, so commands work
+        # the same regardless of which subdirectory they're run from
+        # (previously resolved relative to cwd directly, silently pointing
+        # at the wrong/nonexistent registry when run from e.g.
+        # tools/symtropy_assets/ instead of the symtropy root).
+        try:
+            project_root = find_project_root()
+        except FileNotFoundError:
+            project_root = os.getcwd()
+    root = project_root
     legacy_root = os.path.join(root, 'symtropy-assets')
     if os.path.exists(legacy_root):
         return legacy_root

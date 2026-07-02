@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import urllib.error
 import urllib.request
@@ -9,6 +10,15 @@ from registry_manager import _connect
 
 OLLAMA_URL = os.environ.get("SYMTROPY_OLLAMA_URL", "http://localhost:11434")
 DEFAULT_MODEL = os.environ.get("SYMTROPY_NEURAL_LINK_MODEL", "gemma4:e2b")
+EMBED_MODEL = os.environ.get("SYMTROPY_NEURAL_LINK_EMBED_MODEL", "embeddinggemma:300m")
+
+# Calibrated 2026-07-02 against embeddinggemma:300m single-word cosine
+# similarities: near-synonyms ("network_hub" vs "network_node") scored ~0.73,
+# thematically-related-but-distinct terms ("mesh_relay") ~0.57, unrelated
+# terms ~0.37-0.47. 0.65 cleanly separates "same concept" from "just related".
+ROLE_SIMILARITY_THRESHOLD = float(
+    os.environ.get("SYMTROPY_NEURAL_LINK_ROLE_SIMILARITY_THRESHOLD", "0.65")
+)
 
 # Must match crates/bridges/symtropy-foundry/src/orchestrator.rs's Blueprint /
 # BiomeBlueprint / SamplingRule structs exactly — that's the runtime consumer.
@@ -117,6 +127,75 @@ def _validate_blueprint(data):
     return data
 
 
+def _embed(text):
+    payload = json.dumps({"model": EMBED_MODEL, "prompt": text}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{OLLAMA_URL}/api/embeddings",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))["embedding"]
+
+
+def _cosine_similarity(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _snap_roles_to_known(blueprint, known_roles):
+    """Semantically snaps model-invented sampling_rule roles onto existing
+    registry roles when they're close enough in meaning (e.g. "network_hub"
+    -> "network_node"), so generated worlds actually populate with real
+    assets instead of silently sampling zero for a near-miss role name.
+
+    Roles below the similarity threshold are left as-is — that's treated as
+    a genuine new role, not an error; sampling_rules just yield no assets
+    until something gets registered under it, same as before this feature.
+
+    Best-effort: if the embedding model is unreachable, blueprint is
+    returned unchanged (this must never block blueprint generation, which
+    already has its own independent fallback path).
+    """
+    if not known_roles:
+        return blueprint
+
+    try:
+        known_embeddings = {role: _embed(role) for role in known_roles}
+    except (urllib.error.URLError, TimeoutError, OSError, KeyError) as e:
+        print(f"Neural-Link: role-embedding unavailable ({e}); skipping semantic role snap.")
+        return blueprint
+
+    for biome in blueprint["biomes"]:
+        for rule in biome["sampling_rules"]:
+            role = rule["role"]
+            if role in known_roles:
+                continue
+            try:
+                role_embedding = _embed(role)
+            except (urllib.error.URLError, TimeoutError, OSError, KeyError):
+                continue
+
+            best_role, best_sim = None, 0.0
+            for known_role, known_embedding in known_embeddings.items():
+                sim = _cosine_similarity(role_embedding, known_embedding)
+                if sim > best_sim:
+                    best_role, best_sim = known_role, sim
+
+            if best_role is not None and best_sim >= ROLE_SIMILARITY_THRESHOLD:
+                print(
+                    f"Neural-Link: role '{role}' snapped to existing role "
+                    f"'{best_role}' (similarity {best_sim:.2f})"
+                )
+                rule["role"] = best_role
+
+    return blueprint
+
+
 def _fallback_blueprint():
     """Deterministic template used only when Ollama is unreachable or every
     generation attempt produced an invalid blueprint — never silent, always
@@ -170,6 +249,8 @@ def generate_world_blueprint(prompt: str, output_path: str, model: str = None):
     used_fallback = blueprint is None
     if used_fallback:
         blueprint = _fallback_blueprint()
+    else:
+        blueprint = _snap_roles_to_known(blueprint, roles)
 
     with open(output_path, "w") as f:
         yaml.dump(blueprint, f)
