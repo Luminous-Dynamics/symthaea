@@ -80,6 +80,7 @@
           python3
           python3Packages.pyyaml
           python3Packages.jsonschema
+          python3Packages.pytest
         ] ++ bevyDeps ++ wgpuDeps;
 
         # Ensure dynamic libraries are found at runtime (standard for Bevy on NixOS)
