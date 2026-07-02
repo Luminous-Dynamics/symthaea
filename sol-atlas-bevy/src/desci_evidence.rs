@@ -6,12 +6,11 @@
 //! Renders EvidencePackets as holographic markers on the globe,
 //! color-coded by Epistemic Domain (Sapphire/Crimson).
 
-use crate::holographic_material::HolographicMaterial;
+use crate::holographic_material::{HolographicExtension, HolographicMaterial};
 use bevy::prelude::*;
-use mycelix_desci_core::meta::EmpiricalAxis;
+use mycelix_desci_core::EmpiricalAxis;
 use mycelix_earth::EvidencePacket;
 use sol_atlas_core::geo;
-use sol_atlas_core::types::*;
 
 pub struct DeSciEvidencePlugin;
 
@@ -27,17 +26,24 @@ pub struct EvidenceMarker {
     pub packet_id: uuid::Uuid,
 }
 
+/// Bevy-side wrapper so `mycelix_earth::EvidencePacket` (a plain domain type
+/// with no Bevy dependency, correctly so — evidence/provenance logic
+/// shouldn't depend on a game engine) can be attached to an entity.
+#[derive(Component)]
+pub struct EvidencePacketComponent(pub EvidencePacket);
+
 /// Scan for new EvidencePackets and spawn holographic markers.
 pub fn spawn_evidence_markers(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<HolographicMaterial>>,
     // In production, this would be a Resource containing a stream of packets
-    new_packets: Query<(Entity, &EvidencePacket), Added<EvidencePacket>>,
+    new_packets: Query<(Entity, &EvidencePacketComponent), Added<EvidencePacketComponent>>,
 ) {
     let marker_mesh = meshes.add(Sphere::new(1.0).mesh().uv(16, 16));
 
-    for (_entity, packet) in &new_packets {
+    for (_entity, wrapped) in &new_packets {
+        let packet = &wrapped.0;
         // Mock coordinates for v0 (should be extracted from packet.aoi_hash)
         let lat = 45.0;
         let lon = 15.0;
@@ -54,16 +60,29 @@ pub fn spawn_evidence_markers(
             LinearRgba::new(0.0, 0.84, 0.78, 0.6) // Mycelix Cyan
         };
 
-        // Create Holographic Material
+        // Create Holographic Material. HolographicMaterial is
+        // ExtendedMaterial<StandardMaterial, HolographicExtension> — base
+        // color lives on `.base`, hologram-specific params on `.extension`.
+        // "glow_intensity"/"pulse_speed" don't exist as fields on
+        // HolographicExtension; mapped to the closest real equivalents
+        // (hologram_alpha for overall glow visibility, scanline_speed as
+        // the only animated-rate parameter available).
         let material = materials.add(HolographicMaterial {
-            base_color: color,
-            glow_intensity: 2.5,
-            pulse_speed: if packet.somatic_witnesses.len() > 0 {
-                2.0
-            } else {
-                0.5
+            base: StandardMaterial {
+                base_color: Color::LinearRgba(color),
+                unlit: true,
+                ..default()
             },
-            ..default()
+            extension: HolographicExtension {
+                fresnel_color: color,
+                hologram_alpha: 0.85,
+                scanline_speed: if packet.somatic_witnesses.len() > 0 {
+                    2.0
+                } else {
+                    0.5
+                },
+                ..default()
+            },
         });
 
         commands.spawn((

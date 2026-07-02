@@ -11,6 +11,8 @@ description = "Bevy 0.18 plugin for Sol Atlas globe rendering"
 sol-atlas-core = { path = "../sol-atlas-core" }
 mycelix-earth = { path = "../mycelix-earth" }
 mycelix-desci-core = { path = "../mycelix-workspace/mycelix-desci/src/core" }
+uuid = { version = "1", features = ["v4", "serde"] }
+h3o = "0.10"
 
 bevy_camera = "0.18"
 

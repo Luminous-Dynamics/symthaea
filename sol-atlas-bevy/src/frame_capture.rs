@@ -41,7 +41,7 @@ pub fn frame_capture_system(
     time: Res<Time>,
     mut config: ResMut<FrameCaptureConfig>,
     kb: Res<ButtonInput<KeyCode>>,
-    windows: Query<Entity, With<Window>>,
+    _windows: Query<Entity, With<Window>>,
 ) {
     if kb.just_pressed(KeyCode::F9) {
         config.active = !config.active;

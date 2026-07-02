@@ -68,6 +68,17 @@ impl MaterialExtension for HolographicExtension {
 /// Type alias for the combined material.
 pub type HolographicMaterial = ExtendedMaterial<StandardMaterial, HolographicExtension>;
 
+/// Registers the `HolographicMaterial` with Bevy's asset/render pipeline.
+/// Without this, `Assets<HolographicMaterial>` never exists as a resource —
+/// any system reading/writing it panics at runtime despite compiling fine.
+pub struct HolographicMaterialPlugin;
+
+impl Plugin for HolographicMaterialPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(bevy::pbr::MaterialPlugin::<HolographicMaterial>::default());
+    }
+}
+
 /// System to update the time uniform on holographic materials each frame.
 pub fn update_holographic_time(
     time: Res<Time>,
