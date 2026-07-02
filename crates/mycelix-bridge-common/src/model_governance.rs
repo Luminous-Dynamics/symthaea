@@ -20,7 +20,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::constitutional_envelope::{self, sanitize_score, ConstitutionalViolation};
+use crate::constitutional_envelope::{self, ConstitutionalViolation, sanitize_score};
 use crate::scoring_model::ModelDescriptor;
 
 // ============================================================================

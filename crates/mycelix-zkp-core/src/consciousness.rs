@@ -15,9 +15,12 @@
 //! Domain tag: `ZTML:Consciousness:TierProof:v1`
 
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "backend-winterfell")]
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "backend-winterfell")]
 use crate::domain::tag_consciousness_tier;
+#[cfg(feature = "backend-winterfell")]
 use crate::error::{ZkpError, ZkpResult};
 
 /// Well-known consciousness gate thresholds (from bridge-common).

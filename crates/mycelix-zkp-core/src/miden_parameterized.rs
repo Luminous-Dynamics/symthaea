@@ -31,7 +31,6 @@
 //! The score commitment includes the model_id to prevent cross-model
 //! proof reuse: `SHA-256(model_id || dims_concat || decay_m || domain_tag)`
 
-use crate::consciousness::CivicTier;
 use crate::error::ZkpError;
 use sha2::{Digest, Sha256};
 

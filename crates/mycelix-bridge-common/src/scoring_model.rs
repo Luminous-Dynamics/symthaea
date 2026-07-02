@@ -26,7 +26,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::constitutional_envelope::{
-    self, sanitize_score, ConstitutionalViolation, LAMBDA_MAX, LAMBDA_MIN,
+    self, ConstitutionalViolation, LAMBDA_MAX, LAMBDA_MIN, sanitize_score,
 };
 
 // ============================================================================

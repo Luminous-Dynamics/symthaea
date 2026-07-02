@@ -1,5 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#![allow(deprecated)]
 
 //! Sovereign civic gating — 8D replacement for consciousness gating.
 //!
@@ -15,14 +16,16 @@ pub use sovereign_profile::compat::{LegacyProfile, LegacyTier};
 pub use sovereign_profile::i18n;
 pub use sovereign_profile::weights::DimensionWeights;
 pub use sovereign_profile::{
+    CivicRequirement, CivicTier, SovereignCredential, SovereignDimension, SovereignProfile,
     civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
-    civic_requirement_proposal, civic_requirement_voting, CivicRequirement, CivicTier,
-    SovereignCredential, SovereignDimension, SovereignProfile,
+    civic_requirement_proposal, civic_requirement_voting,
 };
 
-#[allow(deprecated)] // Needed for backward-compatible fallback path
+// Needed for backward-compatible fallback path.
+#[cfg(any(feature = "hdk", test))]
+use crate::consciousness_profile::GovernanceEligibility;
 use crate::consciousness_profile::{
-    ConsciousnessCredential, ConsciousnessTier, GovernanceEligibility, GovernanceRequirement,
+    ConsciousnessCredential, ConsciousnessTier, GovernanceRequirement,
 };
 
 // ---------------------------------------------------------------------------
@@ -90,6 +93,7 @@ pub fn governance_requirement_from_civic(civic: &CivicRequirement) -> Governance
 // ---------------------------------------------------------------------------
 
 /// Map `CivicTier` to legacy `ConsciousnessTier` (1:1, same names).
+#[cfg(any(feature = "hdk", test))]
 fn civic_to_consciousness_tier(tier: CivicTier) -> ConsciousnessTier {
     match tier {
         CivicTier::Observer => ConsciousnessTier::Observer,
@@ -103,6 +107,7 @@ fn civic_to_consciousness_tier(tier: CivicTier) -> ConsciousnessTier {
 /// Evaluate a `SovereignCredential` against a `CivicRequirement`.
 ///
 /// Produces a `GovernanceEligibility` for backward compatibility.
+#[cfg(any(feature = "hdk", test))]
 fn evaluate_sovereign(
     cred: &SovereignCredential,
     requirement: &CivicRequirement,
@@ -158,6 +163,7 @@ fn evaluate_sovereign(
 }
 
 /// Convert `SovereignProfile` to legacy `ConsciousnessProfile` for backward compat.
+#[cfg(any(feature = "hdk", test))]
 fn sovereign_to_legacy_profile(
     profile: &SovereignProfile,
 ) -> crate::consciousness_profile::ConsciousnessProfile {
@@ -373,10 +379,12 @@ mod tests {
         };
         let result = evaluate_sovereign(&cred, &req, 1000);
         assert!(!result.eligible);
-        assert!(result
-            .reasons
-            .iter()
-            .any(|r| r.contains("EpistemicIntegrity")));
+        assert!(
+            result
+                .reasons
+                .iter()
+                .any(|r| r.contains("EpistemicIntegrity"))
+        );
     }
 
     #[test]

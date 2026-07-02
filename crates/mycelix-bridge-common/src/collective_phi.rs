@@ -447,7 +447,7 @@ mod tests {
     #[test]
     fn test_redteam_cartel_slash_excludes_from_collective_phi() {
         use super::super::consciousness_profile::{
-            apply_cartel_slash, ReputationState, CARTEL_MIN_SIZE, CARTEL_SLASH_MIN_CONFIDENCE,
+            CARTEL_MIN_SIZE, CARTEL_SLASH_MIN_CONFIDENCE, ReputationState, apply_cartel_slash,
         };
 
         // Setup: 5 honest agents + 3 cartel agents (all identical consciousness)
@@ -562,7 +562,7 @@ mod tests {
 
     #[test]
     fn test_redteam_below_threshold_cartel_not_slashed() {
-        use super::super::consciousness_profile::{apply_cartel_slash, ReputationState};
+        use super::super::consciousness_profile::{ReputationState, apply_cartel_slash};
 
         let mut rep_states: std::collections::HashMap<String, ReputationState> =
             std::collections::HashMap::new();
@@ -581,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_redteam_too_small_cartel_not_slashed() {
-        use super::super::consciousness_profile::{apply_cartel_slash, ReputationState};
+        use super::super::consciousness_profile::{ReputationState, apply_cartel_slash};
 
         let mut rep_states: std::collections::HashMap<String, ReputationState> =
             std::collections::HashMap::new();

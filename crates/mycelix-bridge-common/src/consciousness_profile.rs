@@ -1,6 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+#![allow(deprecated)]
+
 //! Multi-dimensional consciousness profile for governance gating.
 //!
 //! Replaces the single MATL score (40% MFA + 60% reputation) with a
@@ -26,6 +28,7 @@ use serde::{Deserialize, Serialize};
 
 // When HDK is not available, provide no-op logging macros
 #[cfg(not(feature = "hdk"))]
+#[allow(unused_macros)]
 macro_rules! debug {
     ($($arg:tt)*) => {};
 }
@@ -82,7 +85,10 @@ pub fn continuous_vote_weight(
         || !max_weight.is_finite()
         || max_weight < 0.0
     {
-        warn!("NaN/Inf fallback in continuous_vote_weight: score={}, threshold={}, temperature={}, max_weight={}", score, threshold, temperature, max_weight);
+        warn!(
+            "NaN/Inf fallback in continuous_vote_weight: score={}, threshold={}, temperature={}, max_weight={}",
+            score, threshold, temperature, max_weight
+        );
         return 0.0;
     }
     let exponent = -((score - threshold) / temperature);
@@ -368,6 +374,7 @@ pub struct ConsciousnessCredential {
 /// Using these constants prevents typo bugs and ensures consistency across
 /// producers and consumers. Unknown keys are allowed (forward-compatible)
 /// but known keys should always use these constants.
+#[allow(non_snake_case)]
 pub mod ExtensionKey {
     /// Substrate type identifier (u8-encoded `SubstrateType` variant).
     pub const SUBSTRATE_TYPE: &str = "substrate_type";
@@ -1977,10 +1984,12 @@ mod tests {
         );
         assert!(!result.eligible);
         // Should fail on tier AND community
-        assert!(result
-            .reasons
-            .iter()
-            .any(|r| r.contains("Community") || r.contains("Tier")));
+        assert!(
+            result
+                .reasons
+                .iter()
+                .any(|r| r.contains("Community") || r.contains("Tier"))
+        );
     }
 
     #[test]
@@ -2382,7 +2391,7 @@ mod tests {
         };
         let mut cred = fresh_credential(profile);
         cred.expires_at = NOW - 1; // recently expired
-                                   // Grace period does NOT apply to voting-tier operations
+        // Grace period does NOT apply to voting-tier operations
         let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons[0].contains("expired"));
@@ -2411,7 +2420,7 @@ mod tests {
         };
         let mut cred = fresh_credential(profile);
         cred.expires_at = NOW; // expires exactly at NOW
-                               // Grace period does NOT apply to voting-tier operations
+        // Grace period does NOT apply to voting-tier operations
         let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons[0].contains("expired"));

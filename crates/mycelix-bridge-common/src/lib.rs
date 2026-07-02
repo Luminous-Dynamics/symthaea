@@ -1,5 +1,11 @@
+#[cfg(not(feature = "hdk"))]
 pub type AgentPubKey = [u8; 32];
+#[cfg(feature = "hdk")]
+pub type AgentPubKey = hdk::prelude::AgentPubKey;
+#[cfg(not(feature = "hdk"))]
 pub type CapSecret = Vec<u8>;
+#[cfg(feature = "hdk")]
+pub type CapSecret = hdk::prelude::CapSecret;
 
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -34,18 +40,21 @@ pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
 pub mod consciousness_profile;
 // Pure Rust re-exports (always available)
+#[allow(deprecated)]
 pub use consciousness_profile::{
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, ExtensionKey,
+    GRACE_PERIOD_US, GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
+    GovernanceEligibility, GovernanceRequirement, REFRESH_WINDOW_US,
+    REPUTATION_BLACKLIST_THRESHOLD, REPUTATION_DECAY_PER_DAY, REPUTATION_MAX_SLASHES,
+    REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR, ReputationState,
     bootstrap_credential, decay_reputation, evaluate_bootstrap_governance, evaluate_governance,
     evaluate_governance_with_reputation, is_bootstrap_eligible, needs_refresh,
     requirement_for_basic, requirement_for_constitutional, requirement_for_guardian,
-    requirement_for_proposal, requirement_for_voting, ConsciousnessCredential,
-    ConsciousnessProfile, ConsciousnessTier, ExtensionKey, GateAuditInput, GovernanceAuditFilter,
-    GovernanceAuditResult, GovernanceEligibility, GovernanceRequirement, ReputationState,
-    GRACE_PERIOD_US, REFRESH_WINDOW_US, REPUTATION_BLACKLIST_THRESHOLD, REPUTATION_DECAY_PER_DAY,
-    REPUTATION_MAX_SLASHES, REPUTATION_RESTORATION_INTERACTIONS, REPUTATION_SLASH_FACTOR,
+    requirement_for_proposal, requirement_for_voting,
 };
 // HDK-dependent re-exports
 #[cfg(feature = "hdk")]
+#[allow(deprecated)]
 pub use consciousness_profile::gate_consciousness;
 
 // 8D Sovereign Profile — anti-tyranny civic identity (replacing 4D ConsciousnessProfile)
@@ -54,9 +63,9 @@ pub mod sovereign_gate;
 pub use sovereign_gate::gate_civic;
 pub use sovereign_profile::weights::DimensionWeights;
 pub use sovereign_profile::{
+    CivicRequirement, CivicTier, SovereignCredential, SovereignDimension, SovereignProfile,
     civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
-    civic_requirement_proposal, civic_requirement_voting, CivicRequirement, CivicTier,
-    SovereignCredential, SovereignDimension, SovereignProfile,
+    civic_requirement_proposal, civic_requirement_voting,
 };
 
 pub mod offline_credential;
@@ -89,13 +98,13 @@ pub use validation::{check_author_match, check_link_author_match};
 
 pub mod collective_phi;
 pub use collective_phi::{
-    AgentConsciousnessVector, CollectivePhiEngine, CollectivePhiResult, COLLECTIVE_PHI_MAX_SYNC,
+    AgentConsciousnessVector, COLLECTIVE_PHI_MAX_SYNC, CollectivePhiEngine, CollectivePhiResult,
 };
 
 pub mod routing;
 pub use routing::{
-    resolve_civic_zome, resolve_commons_zome, BridgeDomain, CivicZome, CommonsZome,
-    CrossClusterRole, CIVIC_DOMAINS, COMMONS_DOMAINS,
+    BridgeDomain, CIVIC_DOMAINS, COMMONS_DOMAINS, CivicZome, CommonsZome, CrossClusterRole,
+    resolve_civic_zome, resolve_commons_zome,
 };
 
 pub mod routing_registry;
@@ -275,6 +284,7 @@ pub const MAX_DISPATCH_PAYLOAD_BYTES: usize = 1_048_576;
 pub const MAX_DISPATCH_IDENTIFIER_BYTES: usize = 256;
 
 /// Validate dispatch input field sizes.
+#[cfg(any(feature = "hdk", test))]
 fn validate_dispatch_sizes(zome: &str, fn_name: &str, payload: &[u8]) -> Result<(), String> {
     if zome.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
         return Err(format!(

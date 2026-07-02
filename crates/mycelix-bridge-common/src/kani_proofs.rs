@@ -8,7 +8,7 @@
 #[cfg(kani)]
 mod kani_proofs {
     use crate::consciousness_profile::{
-        continuous_vote_weight, ConsciousnessProfile, ConsciousnessTier,
+        ConsciousnessProfile, ConsciousnessTier, continuous_vote_weight,
     };
 
     // ========================================================================
