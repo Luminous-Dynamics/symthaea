@@ -611,6 +611,17 @@ const CIVIC_TO_HEARTH: &[&str] = &["hearth_bridge", "hearth_care", "hearth_emerg
 /// Hearth-side zomes that commons-bridge is allowed to call cross-cluster.
 const COMMONS_TO_HEARTH: &[&str] = &["hearth_bridge", "hearth_care", "hearth_resources"];
 
+/// Civic-side zomes that music-bridge is allowed to call cross-cluster.
+///
+/// Verified real usage: `sdk-ts/src/integrations/music/index.ts`'s
+/// `createArtMetadata()` dispatches to civic's `media_publication` zome to
+/// attach visual-art metadata to a publication. No other music outbound
+/// route has a verified caller yet — identity/finance/governance dispatch
+/// from music (mentioned in music-bridge's own doc comments as aspirational)
+/// stays unregistered, so `routing_registry::is_allowed()` correctly denies
+/// them until a real route is defined.
+const MUSIC_TO_CIVIC: &[&str] = &["civic_bridge", "media_publication"];
+
 // --- Group C: Cross-domain integration routes ---
 
 /// Commons-side zomes that identity-bridge is allowed to call cross-cluster.
@@ -850,6 +861,9 @@ pub const fn get_allowed_zomes(
         // Attribution outbound
         (CrossClusterRole::Attribution, CrossClusterRole::Identity) => ATTRIBUTION_TO_IDENTITY,
         (CrossClusterRole::Attribution, CrossClusterRole::Finance) => ATTRIBUTION_TO_FINANCE,
+
+        // Music outbound
+        (CrossClusterRole::Music, CrossClusterRole::Civic) => MUSIC_TO_CIVIC,
 
         // No registered route (including self→self)
         _ => &[],
@@ -1628,6 +1642,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn music_to_civic_count() {
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Civic).len(),
+            2
+        );
+    }
+
     // ---- is_allowed positive tests for new cluster routes ----
 
     #[test]
@@ -1666,6 +1688,27 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn is_allowed_music_to_civic_media_publication() {
+        assert!(is_allowed(
+            CrossClusterRole::Music,
+            CrossClusterRole::Civic,
+            "media_publication"
+        ));
+    }
+
+    #[test]
+    fn music_to_identity_finance_governance_unregistered() {
+        // Aspirational routes mentioned in music-bridge's coordinator doc
+        // comments but with no verified caller yet — must stay denied until
+        // a real route is added (see MYCELIX_REVIEW.md 2026-07-02 addendum).
+        assert!(get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Identity).is_empty());
+        assert!(get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Finance).is_empty());
+        assert!(
+            get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Governance).is_empty()
+        );
+    }
+
     // ---- Total route count ----
 
     #[test]
@@ -1678,7 +1721,7 @@ mod tests {
                 }
             }
         }
-        // 60 registered directional routes:
+        // 62 registered directional routes:
         //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
         //   + 2 additional routes added for Health↔Identity and Praxis
@@ -1687,6 +1730,8 @@ mod tests {
         //     Identity→{Knowledge, Attribution, Energy, Core},
         //     Finance→{Energy, Hearth, Identity},
         //     Climate→Praxis
-        assert_eq!(count, 61, "Expected 61 registered cross-cluster routes");
+        //   + 1 Music→Civic (2026-07-02, closes music-bridge's unguarded
+        //     cross_cluster_dispatch — see MYCELIX_REVIEW.md addendum)
+        assert_eq!(count, 62, "Expected 62 registered cross-cluster routes");
     }
 }
