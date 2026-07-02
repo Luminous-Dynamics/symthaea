@@ -232,12 +232,12 @@ From ADR 0001 §Known upstream issues:
 
 | Task | Status |
 |---|---|
-| Harness shipped | ✅ `xenia-peer/crates/xenia-capture/examples/capture_bench.rs` |
+| Harness shipped | ✅ `xenia-peer/crates/xenia-capture/examples/capture_bench.rs` — now self-contained (generates its own on-screen activity, retries past a known upstream D-Bus race, measures steady-state fps) |
 | Linux local (dev box) | ✅ validated 2026-07-02 on KDE-Wayland (see below); GNOME/wlroots still pending |
 | macOS | ⬜ needs operator with Mac 14+ |
 | Windows 11 | ⬜ needs operator with Win 11 |
 | GNOME-Wayland | ⬜ pending an operator |
-| KDE-Wayland | ✅ **PASS 2026-07-02** — 16.76 fps, ≥15fps bar cleared (see below; earlier same-day runs under-measured due to a benchmark methodology gap, not a real deficiency) |
+| KDE-Wayland | ✅ **PASS 2026-07-02** — 22.97/23.10 fps fully unattended (two consecutive runs), ≥15fps bar cleared with no human interaction and no retries needed |
 
 ### KDE-Wayland results (2026-07-02, `scap` fork branch `fix/linux-engine-two-level-frame-enum`)
 
@@ -323,7 +323,43 @@ damage-driven capture), not a defect in xenia's code or a real performance
 ceiling. Anyone re-running this validation on another OS/compositor should
 keep the screen actively changing (mouse movement, a moving window, video
 playback) for a meaningful measurement — a static screen will
-under-report fps regardless of how fast the pipeline actually is. Worth
-a follow-up: `capture_bench` could generate synthetic on-screen activity
-itself (e.g., a moving window) so future runs don't depend on a human
-being present to interact.
+under-report fps regardless of how fast the pipeline actually is.
+
+### `capture_bench` hardened: fully self-contained, no human required
+
+Two follow-up fixes landed the same day, both in `capture_bench.rs` /
+`scap_backend.rs`:
+
+1. **Synthetic on-screen activity.** The harness now opens a small
+   override-redirect XWayland window and repaints it (~30Hz) for the
+   entire run, generating real compositor damage without depending on a
+   human moving the mouse. XWayland is effectively universal on Linux
+   desktops (KWin here runs with `--xwayland`), so this works even on a
+   pure-Wayland compositor as long as Xwayland is enabled; if no X11
+   connection is available it prints a warning and falls back to the old
+   "move the mouse yourself" behavior.
+2. **Retry past the `create_session` D-Bus race.** Root-caused (not just
+   worked around): `scap`'s `handle_req_response` (`portal.rs:274-308`)
+   sends the D-Bus method call and only registers the signal match for
+   the reply *afterward* — a classic TOCTOU race. If the portal replies
+   before the match is registered (plausible for `create_session`, which
+   needs no user interaction and should be near-instant), the reply is
+   silently missed and `LinuxCapturer::new` panics despite the portal
+   having actually succeeded. `scap_worker` now wraps the `Capturer::build`
+   call in `catch_unwind` and retries up to 5 times (200ms apart) before
+   giving up for real. Also surfaced why fps looked artificially low even
+   on otherwise-good runs: each failed attempt burns ~10s of scap's own
+   internal timeout, and the harness used to measure fps from process
+   start rather than from the first successful frame — a slow-but-
+   eventually-successful setup made a perfectly fine pipeline look slow.
+   Fixed: `DURATION_SECS` now measures a steady-state window starting at
+   first frame, with a separate 90s `setup_timeout` bounding the
+   pre-first-frame wait.
+
+Two fully unattended runs after both fixes: **22.97 fps** and **23.10
+fps** — `VERDICT: PASS` both times, no retries needed on either run, no
+mouse movement, no manual intervention. This exceeds even the best
+human-assisted result above (16.76 fps), consistent with the earlier
+finding that active, continuous on-screen change (not just occasional
+mouse movement) gives PipeWire the most consistent stream of damage
+events to work with.
