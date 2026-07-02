@@ -60,18 +60,46 @@ reintroducing that bug class in new code; no equivalent race was hit
 during this validation, consistent with `ashpd` being a more mature
 abstraction over the same underlying D-Bus request/response pattern.
 
-## What's NOT validated by this harness
+## Full end-to-end pipeline (all 3 layers, done 2026-07-02)
 
-Per xenia-peer's `ROADMAP.md`, `XdgPortalInjector` is layer 1 of three
-needed for input injection to work end-to-end from a real viewer:
+Per xenia-peer's `ROADMAP.md`, `XdgPortalInjector` was layer 1 of three
+needed for input injection to work end-to-end from a real viewer. All
+three are now done:
 
 1. ✅ **The backend itself** — this runbook.
-2. ❌ **Daemon receive-loop.** `apps/xenia-peer/src/main.rs` has no code
-   path that receives `RawInput` from a connected viewer during an
-   active session; `xenia-inject` isn't a dependency of `xenia-peer` at
-   all yet.
-3. ❌ **Viewer capture.** `apps/xenia-viewer/src/gui.rs` explicitly notes
-   real mouse/keyboard capture isn't wired ("that's M2").
+2. ✅ **Daemon receive-loop.** `apps/xenia-peer/src/main.rs` splits its
+   transport post-handshake and runs a dedicated recv task that opens
+   inbound envelopes via `LaneSession::open_input`, gates each decoded
+   `InputEvent` through `M1RuntimeSession::allow_input_flow`, and hands
+   it to the injector selected by `--input-backend {noop,log,xdg-portal}`
+   (default `noop`).
+3. ✅ **Viewer capture.** `apps/xenia-viewer/src/gui.rs` reads egui
+   pointer motion/buttons and a keymap covering letters/digits/nav/
+   F-keys, normalizes against the rendered image's actual on-screen
+   rect, and sends `InputEvent`s to the daemon over a split outbound
+   path alongside the existing frame-receive loop.
 
-This runbook only speaks to (1). A real end-to-end "move the mouse in
-the viewer, see it move on the host" proof needs (2) and (3) built first.
+### Live end-to-end proof (2026-07-02, KDE-Wayland, `--input-backend log`)
+
+Real `xenia-peer` daemon + real `xenia-viewer --gui` viewer, connected
+over TCP, operator moved the mouse and typed inside the actual GUI
+window. The daemon's `LoggingInjector` recorded:
+
+- **1,280** pointer-motion events (`Pointer { pressed: false, .. }`),
+  x/y varying continuously and staying within `[0.0, 1.0]`.
+- **27** button-press/release events (`button: 0` = left, matching the
+  `egui::PointerButton::Primary → 0` mapping).
+- **202** key press/release events, evdev codes matching what was
+  typed (e.g. `code: 30` = A, `code: 34` = G, `code: 37` = K).
+
+This is the concrete proof the whole path — egui capture → seal →
+transport → lane-envelope open → bincode decode → M1 consent gate →
+inject — works for real, without needing the `xdg-portal` backend (and
+its consent dialog) in the loop. The `xdg-portal` backend's own
+correctness was already proven separately above (8/8 checks); wiring
+it into this same live path (so the viewer's mouse actually moves the
+host's real cursor) is the natural next stretch validation, not yet
+run.
+
+`WaylandInputInjector`/`UinputInjector` remain scaffold stubs — out of
+scope for this pass.
