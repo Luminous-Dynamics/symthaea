@@ -71,7 +71,7 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 |------|-------|-------|-------|
 | **Core (0TML)** | 6 (agents, bridge, dkg, epistemic_storage, federated_learning, pogq_validation) | 62 verified | 45% BFT validated. REST API implemented (4 endpoints: /health, /status, /trust/{id}, /pogq/validate). Python coordinator + Rust zomes. |
 | **Mail** | 12 | Submodule tests | PQC encryption, decentralized email. Most complete hApp. |
-| **DeSci** | N/A (REST API) | 141 verified | Actix-web service, **not a Holochain hApp**. CLI + REST. |
+| **DeSci** | N/A (REST API) | 141 verified | Axum service, **not a Holochain hApp**. CLI + REST. |
 
 ### Beta
 
