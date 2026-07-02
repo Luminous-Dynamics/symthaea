@@ -27,7 +27,7 @@ cargo login <token>   # Already configured in ~/.cargo/credentials.toml
 | `symthaea-core` | 0.5.0 | [crates.io](https://crates.io/crates/symthaea-core) |
 | `symthaea-consciousness-equation` | 0.1.0 | [crates.io](https://crates.io/crates/symthaea-consciousness-equation) |
 | `symthaea-fep` | 0.1.0 | [crates.io](https://crates.io/crates/symthaea-fep) |
-| `sovereign-profile` | 0.1.0 | [crates.io](https://crates.io/crates/sovereign-profile) |
+| `sovereign-profile` | 0.1.2 | [crates.io](https://crates.io/crates/sovereign-profile) |
 | `mycelix-leptos-client` | 0.1.0 | [crates.io](https://crates.io/crates/mycelix-leptos-client) |
 
 **Publishing workflow:** Use `cargo-workspaces` for batch publishing (`cargo ws publish`). Rate limit: ~1 new crate per 10 minutes. Use `--publish-interval 600` for automated batches.

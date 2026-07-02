@@ -1,6 +1,6 @@
 [package]
 name = "sovereign-profile"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "8-dimensional Sovereign Profile — anti-tyranny civic identity for decentralized governance. Scores autonomy, dignity, participation, equity, transparency, sustainability, knowledge, and solidarity."

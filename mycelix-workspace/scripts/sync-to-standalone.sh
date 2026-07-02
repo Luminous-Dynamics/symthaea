@@ -260,11 +260,29 @@ echo
 info "=== Syncing shared crates ==="
 
 # Direct path crates (same location in both repos)
-for crate_name in mycelix-bridge-common mycelix-bridge-entry-types mycelix-leptos-core mycelix-leptos-client; do
+#
+# This list was found incomplete 2026-07-02: mycelix-zkp-core and
+# mycelix-bridge-proc were referenced by moved clusters via a direct
+# "../crates/<name>" path but never actually synced here — meaning every
+# cluster depending on them would fail to build in the standalone repo.
+# Found by testing `cargo check` against a real synced copy, not by
+# inspection — if a future crate hits the same failure mode, grep for it:
+#   grep -rhoE '[a-z0-9_-]+ = \{ path = "\.\./crates/[a-z0-9_-]+"' mycelix-workspace --include="Cargo.toml"
+for crate_name in mycelix-bridge-common mycelix-bridge-entry-types mycelix-leptos-core mycelix-leptos-client \
+                   mycelix-zkp-core mycelix-bridge-proc; do
     sync_dir \
         "${MONOREPO_ROOT}/crates/${crate_name}" \
         "${STANDALONE_REPO}/crates/${crate_name}"
 done
+
+# Direct path crates that only ever lived inside mycelix-workspace/crates/
+# (never had a top-level ancestor, unlike the ones above). mycelix-crypto
+# belongs here too but is skipped for now — it has zero git-tracked files
+# (see task #34), so there's nothing for git-archive-based sync_dir() to
+# export yet; add it once it's committed.
+sync_dir \
+    "${MONOREPO_ROOT}/mycelix-workspace/crates/mycelix-zome-helpers" \
+    "${STANDALONE_REPO}/crates/mycelix-zome-helpers"
 
 # Remapped crates (different paths in monorepo vs standalone)
 sync_dir \
@@ -305,6 +323,18 @@ echo
 # In the monorepo, some shared crates live at mycelix-core/libs/*.
 # In the standalone repo, they live at crates/*.
 # Clusters that depend on these need their Cargo.toml paths rewritten.
+#
+# sovereign-profile is different: it's a published crate (crates.io, v0.1.2 —
+# see root CLAUDE.md's published-crates table) that several clusters depend on
+# via a local `path` dependency, at a `../` depth tuned for wherever that
+# cluster happens to sit in the monorepo. That depth is wrong as soon as the
+# cluster's position relative to sovereign-profile's source changes — which it
+# does, every time, in the standalone repo's flatter layout (e.g.
+# mycelix-finance/crates/finance-wire-types sits one directory level shallower
+# in standalone than in the monorepo, where it's nested inside
+# mycelix-workspace/). Rather than chase a moving relative-path target,
+# rewrite it to depend on the published crate directly — the standalone repo
+# doesn't need or want a local copy of sovereign-profile's source at all.
 
 if ! $DRY_RUN; then
     info "=== Rewriting path dependencies for standalone layout ==="
@@ -312,11 +342,38 @@ if ! $DRY_RUN; then
     # Map: monorepo path → standalone path (relative from cluster root)
     # ../mycelix-core/libs/mycelix-core-types → ../crates/mycelix-core-types
     # ../mycelix-core/libs/feldman-dkg        → ../crates/feldman-dkg
+    # sovereign-profile path dep              → sovereign-profile = "0.1.2" (crates.io —
+    #   0.1.2 specifically: 0.1.1's published feature set lacked
+    #   `default = ["serde"]`, which the local source has, so path deps that
+    #   omit an explicit `features = ["serde"]` (like finance-wire-types')
+    #   would silently lose the Deserialize impl if 0.1.1 got resolved)
+    # mycelix-zome-helpers's own mycelix-bridge-common ref → ../mycelix-bridge-common
+    #   (mycelix-zome-helpers is synced from mycelix-workspace/crates/ where it
+    #   needs 3 "../" to reach the top-level crates/mycelix-bridge-common; in
+    #   the standalone it lands as a sibling under crates/ where 1 "../"
+    #   is correct — same depth-mismatch shape as sovereign-profile above, but
+    #   this dependency isn't a published crate, so it gets a path rewrite
+    #   instead of a version rewrite.)
     while IFS= read -r toml_file; do
         if grep -q 'mycelix-core/libs/' "$toml_file" 2>/dev/null; then
             sed -i 's|mycelix-core/libs/mycelix-core-types|crates/mycelix-core-types|g' "$toml_file"
             sed -i 's|mycelix-core/libs/feldman-dkg|crates/feldman-dkg|g' "$toml_file"
             ok "Rewrote paths in $(basename "$(dirname "$(dirname "$toml_file")")")/...Cargo.toml"
+        fi
+        if grep -q 'sovereign-profile = { path = "[^"]*"' "$toml_file" 2>/dev/null; then
+            # Broad match on purpose: sovereign-profile's relative path varies
+            # by how deep the referencing crate sits (e.g. "../sovereign-profile"
+            # from crates/mycelix-bridge-common itself vs.
+            # "../../../crates/sovereign-profile" from a nested cluster crate) —
+            # every variant needs the same published-crate rewrite, not just
+            # ones that happen to spell out "crates/" in the path text.
+            sed -i 's|sovereign-profile = { path = "[^"]*"|sovereign-profile = { version = "0.1.2"|' "$toml_file"
+            ok "Rewrote sovereign-profile to published crate in $(basename "$(dirname "$toml_file")")/Cargo.toml"
+        fi
+        if [[ "$toml_file" == "${STANDALONE_REPO}/crates/mycelix-zome-helpers/Cargo.toml" ]] \
+            && grep -q 'mycelix-bridge-common = { path = "[^"]*"' "$toml_file" 2>/dev/null; then
+            sed -i 's|mycelix-bridge-common = { path = "[^"]*"|mycelix-bridge-common = { path = "../mycelix-bridge-common"|' "$toml_file"
+            ok "Rewrote mycelix-zome-helpers's mycelix-bridge-common path for standalone layout"
         fi
     done < <(find "${STANDALONE_REPO}" -name "Cargo.toml" -not -path "*/target/*" 2>/dev/null)
 fi
