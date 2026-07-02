@@ -14,7 +14,7 @@ logging = []
 symtropy-net-core = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-net-core" }
 symtropy-math = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-math" }
 symtropy-physics = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-physics" }
-symtropy-holochain-relay = { path = "/srv/luminous-dynamics/symtropy/crates/bridges/symtropy-holochain-relay" }
+symtropy-holochain-relay = { package = "symtropy-holochain-relay-bridge", path = "/srv/luminous-dynamics/symtropy/crates/bridges/symtropy-holochain-relay" }
 nalgebra = "0.34"
 serde = { version = "1.0", features = ["derive"] }
 rmp-serde = "1.3"
