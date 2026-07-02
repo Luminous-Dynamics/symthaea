@@ -6,7 +6,7 @@
 use currency_mint_integrity::*;
 use hdk::prelude::*;
 use mycelix_finance_shared::{anchor_hash, verify_citizen_tier};
-use mycelix_finance_types::{compute_minted_demurrage, CurrencyStatus};
+use mycelix_finance_types::{CurrencyStatus, compute_minted_demurrage};
 
 use crate::helpers::*;
 use crate::{ActivateCurrencyInput, AmendCurrencyParamsInput, CreateCurrencyInput};

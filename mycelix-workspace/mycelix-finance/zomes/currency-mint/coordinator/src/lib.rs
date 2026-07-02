@@ -62,6 +62,7 @@
 //! ### Governance (1)
 //! - `amend_currency_params(AmendCurrencyParamsInput) -> CurrencyDefinition`
 
+use currency_mint_integrity::*;
 use hdk::prelude::*;
 use mycelix_finance_types::{CurrencyStatus, MintedCurrencyParams};
 use mycelix_zome_helpers as _;
@@ -122,19 +123,43 @@ pub fn mint_genesis_sap(input: MintGenesisSapInput) -> ExternResult<ActionHash> 
 
     // 2. MINT TO COMMONS (Economic Law 1)
     // Genesis SAP belongs to the collective, not the individual.
+    //
+    // Credits payments::SapBalance directly (the authoritative SAP ledger —
+    // see MYCELIX_REVIEW.md P1 #4) instead of writing a currency-mint
+    // MintedBalance entry under currency_id="SAP". MintedBalance was a
+    // second, disconnected SAP ledger: nothing in payments (send_payment,
+    // escrow, channels, or the cross-cluster settlement wired up for
+    // supplychain/marketplace) ever reads it, and the finance frontend's
+    // SAP balance display already reads payments::get_sap_balance
+    // exclusively. Minting into MintedBalance alone stranded every
+    // thermodynamic-genesis SAP credit somewhere no spending path could
+    // ever reach it.
     let commons_did = format!("did:mycelix:hearth:local"); // Anchor to Local Commons
-    let currency_id = "SAP"; // Canonical Circulation Medium
 
     // We mint 1 SAP per kWh of thermodynamic yield
     let amount = input.claim.yield_kwh;
+    let sap_amount = amount.max(0.0).round() as u64;
 
-    update_minted_balance(&commons_did, currency_id, amount, true)?;
+    call(
+        CallTargetCell::Local,
+        "payments",
+        "credit_sap".into(),
+        None,
+        serde_json::json!({
+            "member_did": commons_did,
+            "amount": sap_amount,
+            "reason": format!(
+                "Thermodynamic genesis mint: {} kWh yield (sensor {})",
+                amount, input.claim.sensor_id
+            ),
+        }),
+    )?;
 
     // 3. RECOGNIZE STEWARDSHIP (Vector 3: Recognition)
     // The steward earns MYCEL (Soulbound Reputation), not SAP.
     call(
         CallTargetCell::Local,
-        "recognition".into(),
+        "recognition",
         "record_stewardship_signal".into(),
         None,
         serde_json::json!({
@@ -144,8 +169,14 @@ pub fn mint_genesis_sap(input: MintGenesisSapInput) -> ExternResult<ActionHash> 
         }),
     )?;
 
-    // Record the genesis event for the HUD
-    let action_hash = create_entry(EntryTypes::ThermodynamicGenesis(input.claim))?;
+    // Record the genesis event for the HUD (audit trail — the actual SAP
+    // credit already landed in payments::SapBalance above)
+    let action_hash = create_entry(EntryTypes::ThermodynamicGenesis(ThermodynamicGenesis {
+        sensor_id: input.claim.sensor_id,
+        yield_kwh: input.claim.yield_kwh,
+        timestamp: input.claim.timestamp,
+        location_h3: input.claim.location_h3,
+    }))?;
 
     Ok(action_hash)
 }

@@ -13,7 +13,7 @@
 //! The physics are enforced here at the integrity level — no coordinator can bypass them.
 
 use hdi::prelude::*;
-use mycelix_finance_types::{CurrencyStatus, MintedCurrencyParams, MINTED_CREDIT_LIMIT_MAX};
+use mycelix_finance_types::{CurrencyStatus, MINTED_CREDIT_LIMIT_MAX, MintedCurrencyParams};
 
 // String length limits — prevent DHT bloat attacks
 const MAX_DID_LEN: usize = 256;
@@ -44,6 +44,25 @@ pub struct CurrencyDefinition {
     pub status: CurrencyStatus,
     /// When this currency was created
     pub created_at: Timestamp,
+}
+
+/// An audit record of a Thermodynamic Genesis SAP mint event.
+///
+/// Created alongside (not instead of) the real balance credit into
+/// payments::SapBalance — this entry is the append-only audit trail
+/// ("what yield claim justified this SAP creation"), not the balance
+/// itself. See `mint_genesis_sap` in the coordinator zome.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ThermodynamicGenesis {
+    /// Identifier of the sensor that reported the yield
+    pub sensor_id: String,
+    /// Solar/ecological yield in kWh — 1:1 with SAP minted
+    pub yield_kwh: f32,
+    /// Unix timestamp of the claim (as reported by the sensor)
+    pub timestamp: i64,
+    /// H3 geospatial index anchoring the claim to a location
+    pub location_h3: String,
 }
 
 /// A member's balance in a community-minted currency.
@@ -180,6 +199,7 @@ pub enum EntryTypes {
     MintedExchangeConfirmation(MintedExchangeConfirmation),
     MintedDispute(MintedDispute),
     PendingMintedAdjustment(PendingMintedAdjustment),
+    ThermodynamicGenesis(ThermodynamicGenesis),
     Anchor(Anchor),
 }
 
@@ -227,6 +247,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PendingMintedAdjustment(adj) => {
                     validate_create_pending_minted_adjustment(adj)
                 }
+                EntryTypes::ThermodynamicGenesis(genesis) => {
+                    validate_thermodynamic_genesis(&genesis)
+                }
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry {
@@ -257,6 +280,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                             Ok(ValidateCallbackResult::Valid)
                         }
                     }
+                    EntryTypes::ThermodynamicGenesis(_) => Ok(ValidateCallbackResult::Invalid(
+                        "Thermodynamic genesis records are an immutable audit trail and cannot \
+                         be updated"
+                            .into(),
+                    )),
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
                         "Anchors cannot be updated".into(),
                     )),
@@ -583,6 +611,31 @@ fn validate_create_pending_minted_adjustment(
     if !adj.receiver_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Receiver must be a valid DID".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_thermodynamic_genesis(
+    genesis: &ThermodynamicGenesis,
+) -> ExternResult<ValidateCallbackResult> {
+    // Yield must be finite and positive — this amount is minted 1:1 into SAP
+    if !genesis.yield_kwh.is_finite() || genesis.yield_kwh <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ThermodynamicGenesis yield_kwh must be finite and positive".into(),
+        ));
+    }
+
+    if genesis.sensor_id.is_empty() || genesis.sensor_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ThermodynamicGenesis sensor_id must be non-empty and within length limits".into(),
+        ));
+    }
+
+    if genesis.location_h3.is_empty() || genesis.location_h3.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ThermodynamicGenesis location_h3 must be non-empty and within length limits".into(),
         ));
     }
 
