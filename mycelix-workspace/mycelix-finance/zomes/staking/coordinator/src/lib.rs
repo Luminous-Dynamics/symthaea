@@ -39,27 +39,15 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     Ok(EntryHash::from_raw_32(result.to_vec()))
 }
 
-/// Compute a 32-byte hash from arbitrary bytes
+/// Compute a 32-byte cryptographic hash from arbitrary bytes.
+///
+/// Used to produce the `evidence_hash` recorded on `SlashingEvent` as
+/// tamper-evident proof of the slashing evidence. Must be a real
+/// cryptographic hash (collision- and preimage-resistant) — `DefaultHasher`
+/// (SipHash) is explicitly documented as non-cryptographic and unstable
+/// across Rust versions, so it cannot serve as "cryptographic evidence".
 fn compute_bytes_hash(data: &[u8]) -> Vec<u8> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    let mut hasher = DefaultHasher::new();
-    data.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
-
-    let mut result = Vec::with_capacity(32);
-    result.extend_from_slice(&h1.to_le_bytes());
-    result.extend_from_slice(&h2.to_le_bytes());
-    result.extend_from_slice(&h3.to_le_bytes());
-    result.extend_from_slice(&h4.to_le_bytes());
-    result
+    blake3::hash(data).as_bytes().to_vec()
 }
 
 // =============================================================================
@@ -192,6 +180,9 @@ pub fn begin_unbonding(stake_id: String) -> ExternResult<Record> {
 /// Complete withdrawal after unbonding period
 #[hdk_extern]
 pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
     let now = sys_time()?;
 
     let filter = ChainQueryFilter::new()
@@ -208,6 +199,12 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
             .flatten()
         {
             if stake.id == stake_id && stake.status == StakeStatus::Unbonding {
+                // Only the staker who owns this stake can withdraw it.
+                if stake.staker_did != caller_did {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only the staker can withdraw their own stake".into()
+                    )));
+                }
                 // Check if unbonding period is complete
                 if let Some(unbonding_until) = stake.unbonding_until {
                     if (now.as_micros() as i64) < unbonding_until.as_micros() {
@@ -239,8 +236,22 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
 }
 
 /// Update stake K-Vector trust score
+///
+/// K-Vector trust scores are computed by the network's reputation/consensus
+/// system, not self-reported by the staker (their `stake_weight` multiplier
+/// — and therefore their share of rewards — is directly derived from this
+/// score, so letting a staker set their own score would be trivial
+/// self-dealing). This zome does not yet have a wired authority/oracle
+/// registry to verify "is this caller the trust-scoring system", so as a
+/// floor we at minimum reject the one case we CAN detect without an
+/// authority list: the staker updating their own score. A follow-up should
+/// replace this with a real allowlisted-updater check once the K-Vector
+/// oracle/authority is wired to this zome.
 #[hdk_extern]
 pub fn update_stake_trust(input: UpdateTrustInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::TriAssetStake,
@@ -255,6 +266,12 @@ pub fn update_stake_trust(input: UpdateTrustInput) -> ExternResult<Record> {
             .flatten()
         {
             if stake.id == input.stake_id && stake.status == StakeStatus::Active {
+                // A staker cannot set their own trust score.
+                if stake.staker_did == caller_did {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Stakers cannot update their own K-Vector trust score".into()
+                    )));
+                }
                 let new_weight = 1.0 + input.new_trust_score;
                 let updated = TriAssetStake {
                     kvector_trust_score: input.new_trust_score,
@@ -299,8 +316,26 @@ pub struct SlashStakeInput {
 }
 
 /// Slash a stake with cryptographic evidence
+///
+/// Slashing is an authority action: someone (a validator/governance process)
+/// penalizes a *different* agent's stake. It must never be something a
+/// staker can invoke against their own stake — self-slashing would let a
+/// staker manufacture fake "evidence" and controllably reduce their own
+/// exposure, or grief the accounting without real misbehavior.
+///
+/// This zome does not yet have a wired validator/slasher authority registry
+/// (no allowlist entry type, no cross-zome call to a governance/consensus
+/// zome — `staking` isn't even included in the currently-packed
+/// `mycelix_finance.dna`). As a floor until that authority list exists, we
+/// reject the one case we CAN detect without an allowlist: the stake owner
+/// slashing themselves. A follow-up should add a real slasher allowlist
+/// (e.g. mirroring `currency-mint`'s `verify_governance_agent` cross-zome
+/// call pattern once `staking` is wired into a DNA alongside `tend`/governance).
 #[hdk_extern]
 pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
     let now = sys_time()?;
 
     // Serialize and hash evidence
@@ -322,6 +357,12 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
             .flatten()
         {
             if stake.id == input.stake_id {
+                // A staker cannot slash their own stake.
+                if stake.staker_did == caller_did {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Stakers cannot slash their own stake".into()
+                    )));
+                }
                 let slash_pct = input
                     .custom_slash_percentage
                     .unwrap_or_else(|| input.reason.default_slash_percentage());

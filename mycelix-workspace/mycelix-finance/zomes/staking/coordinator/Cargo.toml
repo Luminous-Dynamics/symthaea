@@ -13,6 +13,7 @@ staking_integrity = { path = "../integrity" }
 holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+blake3 = "1.5"
 
 [features]
 default = []
