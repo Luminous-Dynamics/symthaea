@@ -246,29 +246,42 @@ outright (`FrameData` unresolved in `scap_backend.rs`, 6 sites — fixed in
 `70e7267`). This is the first time this feature has ever actually been
 compiled with a real toolchain, let alone run against a live display.
 
-Two runs of `capture_bench` after the fix:
+Six runs of `capture_bench` total after the fix (2 debug, 4 release —
+`opt-level` changed from `"z"` to `3` for the release profile partway
+through, see workspace `Cargo.toml`):
 
-| Run | Frames | Elapsed | Effective fps | Dims | Bytes/frame | First-frame latency | Errors |
-|---|---|---|---|---|---|---|---|
-| 1 | 77 | 30.0s | 2.57 | 1920×1080 | 8,294,400 | 7.63s | 0 |
-| 2 | 30 | 30.0s | 1.00 | 1920×1080 | 8,294,400 | 3.76s | 0 |
+| Run | Profile | Frames | Elapsed | Effective fps | Dims | Bytes/frame | First-frame latency | Errors |
+|---|---|---|---|---|---|---|---|---|
+| 1 | debug | 77 | 30.0s | 2.57 | 1920×1080 | 8,294,400 | 7.63s | 0 |
+| 2 | debug | 30 | 30.0s | 1.00 | 1920×1080 | 8,294,400 | 3.76s | 0 |
+| 3 | release (`opt-level=z`) | 261 | 30.0s | 8.70 | 1920×1080 | 8,294,400 | 3.55s | 0 |
+| 4 | release (`opt-level=3`) | 0 | 10.1s | — | — | — | — | 11 (panic, see below) |
+| 5 | release (`opt-level=3`) | 0 | 10.1s | — | — | — | — | 11 (panic, see below) |
+| 6 | release (`opt-level=3`) | 10 | 30.0s | 0.33 | 1920×1080 | 8,294,400 | 2.79s | 0 |
 
 **Capture itself works**: correct native resolution, zero decode/backend
-errors both runs. **Performance does not meet the ≥15fps acceptance bar** —
-effective fps is 1–2.6, roughly 6–15× below target, with several seconds of
-first-frame latency. Root cause not yet investigated; candidates include
-PipeWire negotiation overhead in this specific portal/compositor
-combination, or a per-frame retrieval bottleneck in scap's Linux engine.
-Needs profiling before this can be called validated in the runbook's sense.
+errors on every run that got past session creation. **Performance does not
+meet the ≥15fps acceptance bar on any run**, but the run-to-run variance
+(0.33–8.70 fps) is far larger than any effect attributable to the debug/
+release or `opt-level` change — **these numbers should not be trusted as a
+measurement of xenia's real capture ceiling.** `ps`/`uptime` during runs 4–6
+showed load average 16–26 on a 12-core machine, with ~10 concurrent `rustc`
+jobs (other sessions building bevy/symtropy/symthaea) and 3 other active
+Claude Code sessions competing for the same CPU — `scap`'s worker thread and
+the compositor itself were almost certainly starved intermittently. Redo
+this measurement on an idle machine before drawing any conclusion from the
+fps numbers; `opt-level = 3` is kept regardless since it's the correct
+choice for a CPU-bound per-frame hot path independent of this noisy data.
 
-One earlier attempt (before the two runs above) failed completely with a
-panic — `scap::capturer::engine::linux::LinuxCapturer::new` calls
-`.expect()` on the ScreenCast `create_session` D-Bus call, which returned
-`LinCapError { msg: "Did not get response" }` after scap's own 10s timeout
-for that step. This is notable because `create_session` is a session
-handshake that precedes the interactive source-picker dialog (which scap
-gives 2 minutes for) — so this wasn't a human-reaction-time issue, it read
-as a cold-start D-Bus/portal hiccup. It did not recur on the next two
-attempts. Also worth flagging upstream: scap panicking here instead of
-returning `Result` cleanly is itself a robustness gap — a transient portal
-hiccup shouldn't crash the capture worker thread.
+Two of the six runs failed completely before producing any frames,
+independent of `opt-level`: `LinuxCapturer::new` panicked on
+`create_session` with `LinCapError { msg: "Did not get response" }` — this
+step precedes the interactive source-picker (which scap gives 2 minutes
+for), so it isn't a human-reaction-time issue. Recurred 2 of 6 total
+attempts across this session; root cause not diagnosed (a D-Bus
+request/response race in scap's synchronous polling loop is one plausible
+candidate, unrelated to system load). Needs profiling on an idle machine
+before this can be called validated in the runbook's sense. Also worth
+flagging upstream: scap panicking here instead of returning `Result`
+cleanly is itself a robustness gap — a transient portal hiccup shouldn't
+crash the capture worker thread.
