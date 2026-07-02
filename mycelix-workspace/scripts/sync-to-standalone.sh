@@ -183,7 +183,7 @@ MOVED_TO_WORKSPACE=(
     mycelix-commons mycelix-civic mycelix-hearth mycelix-finance
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
     mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
-    mycelix-climate mycelix-manufacturing mycelix-lawful-identity
+    mycelix-climate mycelix-manufacturing mycelix-lawful-identity mycelix-core
 )
 
 cluster_source_dir() {
@@ -287,12 +287,13 @@ sync_dir \
     "${STANDALONE_REPO}/crates/mycelix-zome-helpers"
 
 # Remapped crates (different paths in monorepo vs standalone)
+# mycelix-core moved into mycelix-workspace/ 2026-07-02 — source paths updated.
 sync_dir \
-    "${MONOREPO_ROOT}/mycelix-core/libs/mycelix-core-types" \
+    "${MONOREPO_ROOT}/mycelix-workspace/mycelix-core/libs/mycelix-core-types" \
     "${STANDALONE_REPO}/crates/mycelix-core-types"
 
 sync_dir \
-    "${MONOREPO_ROOT}/mycelix-core/libs/feldman-dkg" \
+    "${MONOREPO_ROOT}/mycelix-workspace/mycelix-core/libs/feldman-dkg" \
     "${STANDALONE_REPO}/crates/feldman-dkg"
 
 echo
@@ -309,10 +310,11 @@ echo
 info "=== Syncing mycelix-workspace ==="
 sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
     --exclude='/mycelix-praxis/' \
-    --exclude='/mycelix-core/' \
     --exclude='/mycelix-marketplace/' \
     --exclude='/mycelix-supplychain/' \
     --exclude='/mycelix-desci/'
+    # mycelix-core's exclude removed 2026-07-02 — it moved here with real
+    # tracked content (was previously excluded to hide an untracked stub).
     # Note: mycelix-prism is NOT excluded — it has no top-level counterpart
     # and no dedicated sync script; this wholesale sync is its only current
     # path to the public repo. mycelix-health is also not excluded here;

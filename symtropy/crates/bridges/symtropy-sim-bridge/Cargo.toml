@@ -14,11 +14,11 @@ mycelix = []
 # Mycelix pure-Rust crates (no Holochain dependency)
 mycelix-multiworld-sim = { path = "../../../../mycelix-multiworld-sim" }
 mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common", default-features = false }
-mycelix-core-types = { path = "../../../../mycelix-core/libs/mycelix-core-types", default-features = false }
+mycelix-core-types = { path = "../../../../mycelix-workspace/mycelix-core/libs/mycelix-core-types", default-features = false }
 mycelix-fl = { path = "../../../../mycelix-workspace/crates/mycelix-fl", default-features = false }
-rb-bft-consensus = { path = "../../../../mycelix-core/libs/rb-bft-consensus", default-features = false, features = ["std"] }
-feldman-dkg = { path = "../../../../mycelix-core/libs/feldman-dkg" }
-kvector-zkp = { path = "../../../../mycelix-core/libs/kvector-zkp", default-features = false }
+rb-bft-consensus = { path = "../../../../mycelix-workspace/mycelix-core/libs/rb-bft-consensus", default-features = false, features = ["std"] }
+feldman-dkg = { path = "../../../../mycelix-workspace/mycelix-core/libs/feldman-dkg" }
+kvector-zkp = { path = "../../../../mycelix-workspace/mycelix-core/libs/kvector-zkp", default-features = false }
 # TODO: mycelix-differential-privacy needs rand API fix (random() → gen())
 # mycelix-differential-privacy = { path = "../../../../../mycelix-core/libs/differential-privacy" }
 

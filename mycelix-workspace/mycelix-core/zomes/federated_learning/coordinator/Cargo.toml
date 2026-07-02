@@ -37,10 +37,10 @@ uuid = { version = "1.0", features = ["v4", "rng-getrandom"] }
 federated_learning_integrity = { path = "../integrity" }
 
 # Mycelix SDK for MATL, Epistemic, and Bridge protocols
-mycelix-sdk = { path = "../../../../mycelix-workspace/sdk" }
+mycelix-sdk = { path = "../../../../sdk" }
 
 # Mycelix FL for decentralized aggregation pipeline
-mycelix-fl = { path = "../../../../mycelix-workspace/crates/mycelix-fl", features = ["shapley", "replay", "pogq", "phi-series"] }
+mycelix-fl = { path = "../../../../crates/mycelix-fl", features = ["shapley", "replay", "pogq", "phi-series"] }
 
 [features]
 default = []

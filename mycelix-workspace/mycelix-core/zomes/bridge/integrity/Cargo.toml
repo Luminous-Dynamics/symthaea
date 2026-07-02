@@ -33,7 +33,7 @@ rmp-serde = "=1.3.0"
 indexmap = "=2.2.6"
 
 # Mycelix SDK for Bridge types
-mycelix-sdk = { path = "../../../../mycelix-workspace/sdk" }
+mycelix-sdk = { path = "../../../../sdk" }
 
 [profile.release]
 opt-level = 'z'
