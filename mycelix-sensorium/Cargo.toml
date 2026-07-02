@@ -62,8 +62,8 @@ hmac = "0.12"
 sensorium-domain-trait = { path = "crates/sensorium-domain-trait" }
 sensorium-viz = { path = "crates/sensorium-viz" }
 sensorium-games = { path = "crates/sensorium-games" }
-personal-leptos-types = { path = "../mycelix-personal/crates/personal-leptos-types" }
-governance-leptos-types = { path = "../mycelix-governance/crates/governance-leptos-types" }
+personal-leptos-types = { path = "../mycelix-workspace/mycelix-personal/crates/personal-leptos-types" }
+governance-leptos-types = { path = "../mycelix-workspace/mycelix-governance/crates/governance-leptos-types" }
 domain-personal = { path = "crates/domain-personal", optional = true }
 domain-health = { path = "crates/domain-health", optional = true }
 domain-governance = { path = "crates/domain-governance", optional = true }

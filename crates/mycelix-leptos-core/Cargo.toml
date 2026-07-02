@@ -11,7 +11,7 @@ leptos_router = { version = "0.8" }
 serde = { version = "1", features = ["derive"] }
 mycelix-leptos-client = { path = "../mycelix-leptos-client" }
 serde_json = "1"
-personal-leptos-types = { path = "../../mycelix-personal/crates/personal-leptos-types" }
+personal-leptos-types = { path = "../../mycelix-workspace/mycelix-personal/crates/personal-leptos-types" }
 sovereign-profile = { path = "../sovereign-profile" }
 mycelix-leptos-ui = { path = "../mycelix-leptos-ui" }
 send_wrapper = "0.6"
