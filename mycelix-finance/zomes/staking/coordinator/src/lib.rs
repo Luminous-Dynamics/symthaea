@@ -201,6 +201,10 @@ pub fn begin_unbonding(stake_id: String) -> ExternResult<Record> {
 
     let (stake, record) = find_stake_by_id(&stake_id)?;
 
+    // Only the staker who owns this stake may begin unbonding it — otherwise
+    // any agent could force another agent's stake into unbonding.
+    verify_caller_is_did(&stake.staker_did)?;
+
     if stake.status != StakeStatus::Active {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Stake {} is {:?}, expected Active for unbonding",
