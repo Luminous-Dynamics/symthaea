@@ -1,5 +1,11 @@
 # Xenia: Comprehensive Review & Improvement Plan (2026-07-02)
 
+**Update 2026-07-02:** all P0 and P1 items below are done. See
+"Status: what actually happened" at the end of this document for exactly
+what was applied, what was found along the way, and what's still open (P2,
+plus one item — `_patchwork/`'s older v1–v7 series — deliberately left
+untouched pending review of the `sovereign-ops` repo it also touches).
+
 Scope: everything under `/srv/luminous-dynamics/xenia/` (the `xenia-wire` protocol
 crate and `xenia-peer` application workspace, both vendored copies of standalone
 public GitHub repos), the `sovereign-admin` (`xenia-admin`) Leptos console inside
@@ -232,3 +238,59 @@ docs (ROADMAP.md, LEDGER_VERIFICATION_BOUNDARY.md) actively under-claim rather
 than over-claim in places. The issues found are entirely process/hygiene
 (disk waste, stale doc paths, one mislabeled registry entry) — not integrity
 issues in the code or its claims.
+
+## Status: what actually happened
+
+**P0 — all applied and committed:**
+- Outer monorepo: `.gitignore` re-anchored to `/xenia/xenia-wire/` etc.;
+  CLAUDE.md + PORTS.md port-8134 entry reworded per Finding D.
+- `xenia-wire`: PQC-wording pass committed (`3fc8161`); README fixture
+  count fixed; `xenia-viewer-web/target` untracked + ignored.
+- `xenia-peer`: stale `crates/xenia-admin` paths fixed in
+  `apps/sovereign-admin/README.md`; `xenia-ledger/README.md` status line
+  refreshed to actual LOC/test counts.
+
+**P1 — all applied and committed, with one finding that changed the plan:**
+- Deleted 23GB (not the estimated ~19GB — turned out larger) of archived
+  `target/` build output and superseded validation-clone snapshots under
+  `_archive/xenia-*`.
+- Root-level `.patch` reconciliation turned out more interesting than
+  "stale vs pending" sorting: `git apply --check` showed all 13
+  `xenia-peer` patches (plus the large consolidated
+  `xenia-real-ml-dsa-evidence-chain-v12.patch`) were already superseded —
+  spot-checked several by grepping for their distinctive symbols/fixtures
+  in current `xenia-peer` source and confirming presence. Deleted all 14.
+  The 6 `xenia-wire` patches, by contrast, turned out to be one clean
+  *sequential chain* that had simply never been applied: each patch
+  unlocked the next once applied (tightening → casefold → negative-ci →
+  negative-matrix → operator-boundary → real-pqc-boundary-note). Applied
+  the full chain, ran the resulting `scripts/check-pqc-boundary.sh` and
+  `cargo test --workspace` (all green), and committed (`cf4fbb3`). Deleted
+  `apply-xenia-pqc-patch-train.sh` (its job is done — wire chain applied,
+  peer patches superseded) and all 20 root `.patch` files. Added a root
+  `.gitignore` rule (`/xenia-*.patch`, `/_patchwork/`) so this doesn't
+  silently reaccumulate.
+- **Deliberately not touched**: `_patchwork/xenia_patches_local_ready_v7*`
+  (~1.3MB, an older June 27 patch series already marked "closed" by its
+  own closeout memo). Unlike the root-level patches, several of these also
+  touch `sovereign-ops` — a separate repo not in this review's scope, which
+  currently has its own uncommitted changes (`Cargo.toml`, `STATUS.md`,
+  `crates/sovereign-admin/Cargo.toml`). Deleting or reconciling this
+  deserves its own look at `sovereign-ops` first rather than a guess made
+  in passing here.
+- `xenia-wire`: capped `open_frame_lz4`'s decompressed-size allocation at
+  64 MiB, reading the LZ4 size prefix via `lz4_flex::block::uncompressed_size`
+  before calling `decompress_size_prepended`. Added a regression test that
+  forges an AEAD-valid envelope claiming a ~4 GiB uncompressed size and
+  asserts it's rejected. Committed (`1edd928`).
+
+**P2 — still open, needs a decision, not urgent:**
+- Whether the external-patch-train workflow is still wanted going forward
+  (it did produce real, good work this round — the wire chain — alongside
+  redundant work — the peer patches).
+- Continue ROADMAP.md's existing hard-blocker sequencing (unchanged by
+  this review).
+- The "Mycelix Sovereign Suite vs 16-cluster Mycelix" naming clarification
+  in CLAUDE.md.
+- A first look at `sovereign-ops`'s uncommitted state and the remaining
+  `_patchwork/` v1–v7 series, if that repo's churn is worth auditing next.
