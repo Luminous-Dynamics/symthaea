@@ -27,7 +27,6 @@ exclude = [
     "mycelix-mutualaid/zomes/resources",
     "mycelix-mutualaid/zomes/timebank",
     "mycelix-supplychain/rust/*",
-    "crates/binius-zome-verifier",
     "crates/mycelix-bevy",
     "crates/mycelix-bridge-codegen",
     "crates/mycelix-bridge-common/examples",
@@ -48,7 +47,6 @@ exclude = [
     "crates/mycelix-bridge-proc",
     "crates/mycelix-claim-types",
     "crates/mycelix-cluster-manifest",
-    "crates/mycelix-dev-utils",
     "crates/mycelix-fl-core/benches",
     "crates/mycelix-fl-core/examples",
     "crates/mycelix-fl-core/fixtures",
@@ -66,7 +64,6 @@ exclude = [
     "crates/mycelix-leptos-i18n",
     "crates/mycelix-leptos-ui",
     "crates/mycelix-mock-data",
-    "crates/mycelix-music-types",
     "crates/mycelix-zkp-core/benches",
     "crates/mycelix-zkp-core",
     "crates/mycelix-zkp-core/src/circuits",
@@ -868,7 +865,6 @@ mycelix-fl-core = { path = "crates/mycelix-fl-core" }
 mycelix-bridge-common = { path = "crates/mycelix-bridge-common" }
 mycelix-claim-types = { path = "crates/mycelix-claim-types" }
 mycelix-zome-helpers = { path = "crates/mycelix-zome-helpers" }
-mycelix-music-types = { path = "crates/mycelix-music-types" }
 mycelix-zkp-core = { path = "crates/mycelix-zkp-core" }
 sweettest-harness = { path = "crates/sweettest-harness" }
 mycelix-bridge-entry-types = { path = "crates/mycelix-bridge-entry-types" }
