@@ -34,7 +34,7 @@ holochain_integrity_types = "0.6.0"
 holochain_serialized_bytes = "0.0.56"
 
 # Mycelix Core Types for collective sensing integration
-mycelix-core-types = { path = "../mycelix-core/libs/mycelix-core-types", features = ["serde"] }
+mycelix-core-types = { path = "../../mycelix-core/libs/mycelix-core-types", features = ["serde"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -54,10 +54,10 @@ thiserror = "1.0"
 # which is incompatible with Holochain's WASM runtime.
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../crates/mycelix-zome-helpers" }
 
 # Feldman DKG for threshold signing (WASM-compatible, no getrandom 0.2)
-feldman-dkg = { path = "../mycelix-core/libs/feldman-dkg", features = ["ml-kem-768", "ml-dsa-65"] }
+feldman-dkg = { path = "../../mycelix-core/libs/feldman-dkg", features = ["ml-kem-768", "ml-dsa-65"] }
 
 # ECDSA signature verification (secp256k1)
 k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
