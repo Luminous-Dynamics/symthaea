@@ -25,7 +25,7 @@ x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 getrandom = "0.2"
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
-# positioning = { path = "../../../../mycelix-workspace/mycelix-position/lib/positioning", optional = true }
+# positioning = { path = "../../../../mycelix-position/lib/positioning", optional = true }
 # mycelix-prism-common = { path = "../../../../prism/mycelix-prism-common", optional = true }
 # prism-search = { path = "../../../../prism/prism-search", optional = true }
 tracing = { workspace = true }

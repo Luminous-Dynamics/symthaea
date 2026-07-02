@@ -170,7 +170,7 @@ symthaea-causal-reasoning = { path = "crates/core/symthaea-causal-reasoning", de
 symthaea-fep = { path = "crates/core/symthaea-fep" }
 
 # Shared positioning and peer-fusion primitives
-positioning = { path = "../mycelix-workspace/mycelix-position/lib/positioning" }
+positioning = { path = "../mycelix-position/lib/positioning" }
 
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/domains/symthaea-dream" }
@@ -216,7 +216,7 @@ mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", option
 symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor", optional = true }
 
 # Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
-mycelix-crypto = { path = "../mycelix-workspace/mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
+mycelix-crypto = { path = "../mycelix-identity/crates/mycelix-crypto", optional = true, features = ["native"] }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/core/symthaea-stt", optional = true }
