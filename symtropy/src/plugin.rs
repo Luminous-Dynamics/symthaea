@@ -21,6 +21,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<crate::resources::SettlementMetrics>()
             .init_resource::<crate::resources::GovernanceVote>()
             .init_resource::<GovernanceLog>()
+            .insert_resource(crate::ports::ActivePorts::local_mock())
             .init_resource::<systems::consciousness::PlayerConsciousness>()
             .init_resource::<systems::rendering::TelemetryTimer>()
             .init_resource::<systems::rendering::FieldDeckConfig>()
