@@ -8,6 +8,7 @@
 //! `terra-atlas-core` shared types.
 
 pub mod camera;
+pub mod cell_entry;
 pub mod data;
 pub mod desci_evidence;
 pub mod frame_capture;
@@ -27,6 +28,7 @@ impl Plugin for TerraAtlasPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<camera::OrbitalCameraConfig>()
             .init_resource::<h3_grid::HoveredCell>()
+            .init_resource::<cell_entry::CellZoomTransition>()
             .add_plugins(holographic_material::HolographicMaterialPlugin)
             .add_plugins(desci_evidence::DeSciEvidencePlugin)
             .add_systems(Startup, (globe::spawn_globe, camera::spawn_camera))
@@ -36,6 +38,9 @@ impl Plugin for TerraAtlasPlugin {
                     camera::orbital_camera_system,
                     h3_grid::hover_cell_system,
                     h3_grid::draw_hovered_cell_system,
+                    cell_entry::trigger_cell_zoom_system,
+                    cell_entry::cancel_zoom_on_manual_input,
+                    cell_entry::cell_zoom_transition_system,
                 )
                     .chain(),
             );
