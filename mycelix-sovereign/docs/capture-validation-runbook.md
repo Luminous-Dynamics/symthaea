@@ -233,10 +233,10 @@ From ADR 0001 §Known upstream issues:
 | Task | Status |
 |---|---|
 | Harness shipped | ✅ `xenia-peer/crates/xenia-capture/examples/capture_bench.rs` — now self-contained (generates its own on-screen activity, retries past a known upstream D-Bus race, measures steady-state fps) |
-| Linux local (dev box) | ✅ validated 2026-07-02 on KDE-Wayland (see below); GNOME/wlroots still pending |
+| Linux local (dev box) | ✅ validated 2026-07-02 on KDE-Wayland (see below); GNOME attempted 2026-07-02/03, blocked on a real environmental gap (see below), not yet passing |
 | macOS | ⬜ needs operator with Mac 14+ |
 | Windows 11 | ⬜ needs operator with Win 11 |
-| GNOME-Wayland | ⬜ pending an operator |
+| GNOME-Wayland | 🟡 **BLOCKED 2026-07-03** — genuine environmental gap in the disposable NixOS test VM, not a code defect. `capture_bench` fails identically on repeated runs: `VERDICT: FAIL`, 0 frames, 11 errors, `scap capturer build panicked after 5 attempts (known upstream D-Bus request/response race): LinCapError { msg: "Did not get response" }`. See below for root cause and what's needed to actually clear this. |
 | KDE-Wayland | ✅ **PASS 2026-07-02** — 22.97/23.10 fps fully unattended (two consecutive runs), ≥15fps bar cleared with no human interaction and no retries needed |
 
 ### KDE-Wayland results (2026-07-02, `scap` fork branch `fix/linux-engine-two-level-frame-enum`)
@@ -363,3 +363,72 @@ human-assisted result above (16.76 fps), consistent with the earlier
 finding that active, continuous on-screen change (not just occasional
 mouse movement) gives PipeWire the most consistent stream of damage
 events to work with.
+
+### GNOME-Wayland attempt (2026-07-02/03): blocked, not a code defect
+
+The host's real desktop is KDE (already validated above), so GNOME
+required a dedicated VM — a new `xenia-test-vm-gnome` NixOS host
+(`/etc/nixos/hosts/xenia-test-vm-gnome/default.nix` in the operator's
+personal system flake, separate repo from this monorepo), mirroring the
+existing `xenia-test-vm` (KDE) VM but with `services.desktopManager.gnome`
+instead of `plasma6`. Building and booting it surfaced three real,
+non-obvious infrastructure issues before capture_bench could even run —
+worth recording since they'll bite anyone else building a NixOS test VM
+for this kind of validation:
+
+1. **QEMU SLIRP's built-in DNS proxy silently drops EDNS0 queries.**
+   `cargo`/`nix` fetches inside the guest intermittently hung for 5s per
+   lookup then failed with "Name or service not known", even though ICMP
+   to the proxy (`10.0.2.3`) was fine and the *very first* lookup after
+   boot sometimes succeeded. Root cause: glibc's resolver defaults to
+   `options edns0`, and QEMU's usermode DNS proxy doesn't reliably answer
+   EDNS0-flagged queries. Fixed with
+   `networking.resolvconf.extraOptions = [ "no-edns0" ];` — confirmed via
+   five back-to-back `getent hosts` calls with `no-edns0` vs. reliably
+   failing without it.
+2. **The qemu-vm module's default writable-store overlay is tmpfs-backed
+   and capped at half of `virtualisation.memorySize`.** With
+   `memorySize = 4096`, that's a 2G `/nix/.rw-store` — nowhere near enough
+   for `nix develop`'s full GNOME devShell fetch (ffmpeg/gstreamer/gtk/
+   pipewire/mesa/etc.), which failed partway through with "No space left
+   on device" even though the VM's actual 16G disk was 98% empty. Fixed
+   with `virtualisation.writableStoreUseTmpfs = false;`, which backs the
+   overlay by the real disk instead of RAM.
+3. **GNOME's ScreenCast picker needs a working GBM/EGL path, which this
+   VM's virtio-gpu doesn't provide.** Even after both fixes above,
+   `capture_bench` failed identically on two separate runs:
+   `VERDICT: FAIL`, 0 frames, `LinCapError { msg: "Did not get response" }`
+   after all 5 of `scap`'s built-in D-Bus race retries. `journalctl --user
+   -u xdg-desktop-portal-gnome` showed the real cause: `Failed to
+   associate portal window with parent window`, `Vulkan: ... Unable to
+   open device ... VK_ERROR_INCOMPATIBLE_DRIVER`, `MESA: error: ZINK:
+   failed to choose pdev`. `xdg-desktop-portal-gnome`'s picker dialog
+   renders via GTK4's GL path (Zink, GL-over-Vulkan), which in turn needs
+   a GBM device — and GBM needs a DRM **render** node. This VM's guest
+   only exposes `/dev/dri/card0` (a plain KMS/modesetting device, from
+   virtio-gpu's default 2D-only mode); there is no `renderD*` node at all.
+   `hardware.graphics.enable = true` was already on by default (verified:
+   adding it explicitly produced a byte-identical build, i.e. a no-op) and
+   the guest does have a full set of Vulkan ICDs registered including
+   `lvp_icd.x86_64.json` (lavapipe, software Vulkan) — but GTK4's EGL/GBM
+   initialization path doesn't fall through to a pure-software route
+   automatically, so the picker window never renders and the D-Bus call
+   that depends on it never gets a response. This is a genuinely different
+   failure mode from KDE's (KDE's picker worked fine on the same class of
+   VM, and KDE's own D-Bus race was purely a timing issue that retries
+   resolved — GNOME's is a hard rendering dependency that no amount of
+   retrying fixes).
+
+**What would actually clear this**: give the guest a real render node —
+either QEMU-side 3D-accelerated virtio-gpu (`virtio-gpu-gl`/virgl, needing
+a `-display ...,gl=on` or `egl-headless` backend and a host DRM render
+node, both of which this host has: `/dev/dri/renderD128`/`renderD129`
+exist) or confirm/force a genuinely software-only EGL path for the
+portal's picker. Neither was attempted — this is real, scoped follow-up
+work (GPU-accelerated headless QEMU display config, not a quick fix), not
+something to force through speculatively. **Conclusion: this is a real
+gap in the GNOME test VM's environment, not a defect in xenia-capture or
+xenia-peer.** The KDE-Wayland validation above stands as the one
+completed real-hardware/real-desktop pass for the ScapCapture backend;
+GNOME-Wayland remains unvalidated pending either the render-node fix above
+or an operator with a real GNOME-Wayland desktop.
