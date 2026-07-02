@@ -10,6 +10,6 @@ hdk = "0.6.0"
 holo_hash = "0.6.0"
 serde = { version = "1.0", features = ["derive"] }
 getrandom = { version = "0.2", features = ["custom"] }
-mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common" }
+mycelix-bridge-common = { path = "../mycelix-bridge-common" }
 
 [dev-dependencies]

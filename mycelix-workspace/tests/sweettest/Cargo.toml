@@ -28,7 +28,7 @@ rmp-serde = "1.3"
 serial_test = "3"
 
 # PQC crypto for constructing test data off-chain
-mycelix-crypto = { path = "../../../mycelix-identity/crates/mycelix-crypto", features = ["native"] }
+mycelix-crypto = { path = "../../mycelix-identity/crates/mycelix-crypto", features = ["native"] }
 
 # Needed for SerializedBytes derive macro (proc macro references crate by name)
 holochain_serialized_bytes = "0.0.56"

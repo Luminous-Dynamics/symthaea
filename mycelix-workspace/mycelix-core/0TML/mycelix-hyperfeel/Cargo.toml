@@ -15,11 +15,15 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = { version = "0.3", features = ["macros"] }
 
-[dependencies.symthaea]
-path = "../../../11-meta-consciousness/luminous-nix/symthaea-hlb"
-optional = true
-default-features = false
+# [dependencies.symthaea]
+# path = "../../../11-meta-consciousness/luminous-nix/symthaea-hlb"
+# optional = true
+# default-features = false
+# Orphaned pre-existing reference (predates today's mycelix-core migration) —
+# target dir no longer exists anywhere in the repo. Disabled rather than
+# guess-wired to the unrelated top-level symthaea/ crate. Needs investigation
+# if symthaea-hv is actually needed.
 
 [features]
 default = []
-symthaea-hv = ["symthaea"]
+symthaea-hv = []

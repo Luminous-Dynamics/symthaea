@@ -11,7 +11,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 rand = { version = "0.8", default-features = false, features = ["alloc", "small_rng", "std_rng"] }
 thiserror = "1"
-mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common", default-features = false }
+mycelix-bridge-common = { path = "../mycelix-bridge-common", default-features = false }
 sha2 = { version = "0.10", optional = true }
 
 [features]

@@ -42,7 +42,7 @@ console_error_panic_hook = "0.1"
 gloo-timers = { version = "0.3", features = ["futures"] }
 
 # Real consciousness-driven synthesis engine
-symthaea-muse = { path = "../../../symthaea/crates/symthaea-muse", default-features = false }
+symthaea-muse = { path = "../../../../symthaea/crates/domains/symthaea-muse", default-features = false }
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { version = "1", features = ["js"] }
 
