@@ -640,7 +640,7 @@ impl GraphicMatroid {
             "weights length must match edges length"
         );
         let mut indexed: Vec<usize> = (0..self.edges.len()).collect();
-        indexed.sort_by(|&a, &b| weights[b].partial_cmp(&weights[a]).unwrap());
+        indexed.sort_by(|&a, &b| weights[b].total_cmp(&weights[a]));
 
         let mut uf = UnionFind::new(self.num_vertices);
         let mut basis = vec![];

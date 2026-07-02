@@ -1072,7 +1072,7 @@ mod tests {
         // Report the BEST sigma for telemetry purposes (not an assertion).
         let best = points
             .iter()
-            .min_by(|a, b| a.mean_attempts.partial_cmp(&b.mean_attempts).unwrap())
+            .min_by(|a, b| a.mean_attempts.total_cmp(&b.mean_attempts))
             .unwrap();
         eprintln!(
             "\n  BEST σ: {:.3} (mean attempts = {:.3})",
@@ -1156,11 +1156,11 @@ mod tests {
         // tail even when the median improves.
         let best_mean = points
             .iter()
-            .min_by(|a, b| a.mean_attempts.partial_cmp(&b.mean_attempts).unwrap())
+            .min_by(|a, b| a.mean_attempts.total_cmp(&b.mean_attempts))
             .unwrap();
         let best_rate = points
             .iter()
-            .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+            .max_by(|a, b| a.solve_rate.total_cmp(&b.solve_rate))
             .unwrap();
 
         eprintln!(
@@ -1359,7 +1359,7 @@ mod tests {
                 .collect();
             let best = cells
                 .iter()
-                .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+                .max_by(|a, b| a.solve_rate.total_cmp(&b.solve_rate))
                 .unwrap();
             let baseline = cells.iter().find(|p| p.sigma.abs() < 1e-6).unwrap();
             let delta = (best.solve_rate - baseline.solve_rate) * 100.0;
@@ -1433,7 +1433,7 @@ mod tests {
             let baseline = &points[0];
             let best = points
                 .iter()
-                .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+                .max_by(|a, b| a.solve_rate.total_cmp(&b.solve_rate))
                 .unwrap();
             let delta_pp = (best.solve_rate - baseline.solve_rate) * 100.0;
             summary.push((
@@ -1535,7 +1535,7 @@ mod tests {
         let baseline = &points[0];
         let best = points
             .iter()
-            .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+            .max_by(|a, b| a.solve_rate.total_cmp(&b.solve_rate))
             .unwrap();
         let delta_pp = (best.solve_rate - baseline.solve_rate) * 100.0;
 
@@ -1809,7 +1809,7 @@ mod tests {
             let fixed_strong = sigma_sweep(problems, &[0.00, 0.10, 0.20, 0.30, 0.40], trials, 42);
             let best_strong = fixed_strong
                 .iter()
-                .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+                .max_by(|a, b| a.solve_rate.total_cmp(&b.solve_rate))
                 .unwrap();
             let cascade_strong = adaptive_sweep(problems, trials, 42);
             let delta_strong = (cascade_strong.solve_rate - best_strong.solve_rate) * 100.0;
@@ -1835,7 +1835,7 @@ mod tests {
                 sigma_sweep_weak(problems, &[0.00, 0.10, 0.20, 0.30, 0.40], trials, 42);
             let best_weak = fixed_weak
                 .iter()
-                .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
+                .max_by(|a, b| a.solve_rate.total_cmp(&b.solve_rate))
                 .unwrap();
             let cascade_weak = adaptive_sweep_weak(problems, trials, 42);
             let delta_weak = (cascade_weak.solve_rate - best_weak.solve_rate) * 100.0;

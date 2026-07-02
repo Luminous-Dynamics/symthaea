@@ -897,7 +897,7 @@ mod tests {
 
         // PanSentientFlourishing (idx 1) should be in top 2
         let mut sorted: Vec<(usize, f64)> = coords.iter().copied().enumerate().collect();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
         let top_2: Vec<usize> = sorted.iter().take(2).map(|(i, _)| *i).collect();
         assert!(
             top_2.contains(&1),

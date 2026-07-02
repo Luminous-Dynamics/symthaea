@@ -129,7 +129,7 @@ pub fn nearest_subterranean_anchor(
             let dist = (dx * dx + dy * dy + dz * dz).sqrt();
             (a, dist)
         })
-        .min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
+        .min_by(|(_, d1), (_, d2)| d1.total_cmp(d2))
 }
 
 #[cfg(test)]

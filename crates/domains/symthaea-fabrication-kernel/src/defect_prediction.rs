@@ -288,11 +288,7 @@ impl DefectPredictor {
         }
 
         // Sort by expected improvement descending
-        adjustments.sort_by(|a, b| {
-            b.expected_improvement
-                .partial_cmp(&a.expected_improvement)
-                .unwrap()
-        });
+        adjustments.sort_by(|a, b| b.expected_improvement.total_cmp(&a.expected_improvement));
 
         adjustments
     }

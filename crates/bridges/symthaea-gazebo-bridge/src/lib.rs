@@ -63,15 +63,25 @@ impl SimulationBackend for GazeboBridge {
                 .with_metric("trajectory_feasibility", 1.0, "ratio")
                 .with_metric("contact_events", 0.0, "count"));
         }
-        self.prepare_asset_dir()?;
-        // Spawn the continuous Gazebo simulator in the background.
-        let _child = self
-            .spawn_gazebo()
-            .map_err(|e| SimulationError::Adapter(e.to_string()))?;
-        Ok(SimulationResult::converged(&request.id, 0.98).with_metric(
-            "trajectory_feasibility",
-            0.985,
-            "ratio",
+        // TODO(#solver-output-parsing): unlike the batch solvers (ngspice,
+        // MuJoCo, OpenFOAM), `gz sim -r` is a continuous, non-terminating
+        // simulator -- there is no single exit-code/stdout snapshot to
+        // parse, so this adapter cannot yet extract real convergence or
+        // trajectory-feasibility metrics from a live run. The previous
+        // version of this function spawned a detached Gazebo process via
+        // `spawn_gazebo()` (leaking it -- the child handle was dropped
+        // without `wait()`/`kill()`) and then returned a hardcoded
+        // "converged: 0.98" result that had no relationship to what the
+        // simulator actually did. Use `spawn_daemon()` to launch Gazebo and
+        // own the process handle instead; `run()` cannot honestly report
+        // results until this adapter can query a running instance or parse
+        // a results file it writes.
+        Err(SimulationError::Adapter(
+            "gazebo live-run result extraction is not yet implemented; use \
+             spawn_daemon() to launch the simulator and own its process \
+             handle, or dry_run() for orchestration testing with placeholder \
+             metrics"
+                .into(),
         ))
     }
     fn spawn_daemon(

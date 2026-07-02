@@ -751,7 +751,7 @@ mod tests {
         assert!(roots.len() >= 3, "expected 3 roots, found {}", roots.len());
 
         let mut found: Vec<f64> = roots.iter().map(|r| r.root).collect();
-        found.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        found.sort_by(|a, b| a.total_cmp(b));
         assert!(
             (found[0] - (-1.0)).abs() < 1e-6,
             "expected -1, got {}",

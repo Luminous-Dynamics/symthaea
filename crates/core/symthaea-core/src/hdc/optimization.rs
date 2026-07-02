@@ -1039,8 +1039,8 @@ impl LevenbergMarquardt {
 
         for col in 0..n {
             // Partial pivoting
-            let max_row = (col..n)
-                .max_by(|&r1, &r2| aug[r1][col].abs().partial_cmp(&aug[r2][col].abs()).unwrap())?;
+            let max_row =
+                (col..n).max_by(|&r1, &r2| aug[r1][col].abs().total_cmp(&aug[r2][col].abs()))?;
             aug.swap(col, max_row);
             if aug[col][col].abs() < 1e-14 {
                 return None;

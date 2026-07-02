@@ -63,10 +63,7 @@ fn test_embodiment_weight_sweep() {
     }
 
     // Find optimal weight (highest mean Phi)
-    let best = results
-        .iter()
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-        .unwrap();
+    let best = results.iter().max_by(|a, b| a.1.total_cmp(&b.1)).unwrap();
     eprintln!("\nOPTIMAL: weight={:.1} → mean Phi={:.4}", best.0, best.1);
 
     // All values must be finite

@@ -202,7 +202,7 @@ fn nearest_centroid_classify(
             centroids
                 .iter()
                 .map(|(label, centroid)| (*label, cosine(emb, centroid)))
-                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .max_by(|a, b| a.1.total_cmp(&b.1))
                 .map(|(label, _)| label.to_string())
                 .unwrap_or_default()
         })
@@ -256,7 +256,7 @@ fn test_retrieval_pipeline_simulated() {
             .enumerate()
             .map(|(i, doc_emb)| (i, cosine(&query_emb, doc_emb)))
             .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let ranked_relevance: Vec<bool> = scored
             .iter()
@@ -371,7 +371,7 @@ fn test_retrieval_real_model() {
             .enumerate()
             .map(|(i, doc_emb)| (i, cosine(&query_emb, doc_emb)))
             .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let ranked_relevance: Vec<bool> = scored
             .iter()

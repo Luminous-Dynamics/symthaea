@@ -89,8 +89,7 @@ fn solve_linear(a: &mut Vec<Vec<f64>>, b: &[f64]) -> Option<Vec<f64>> {
 
     for col in 0..n {
         // Partial pivoting
-        let pivot =
-            (col..n).max_by(|&r1, &r2| a[r1][col].abs().partial_cmp(&a[r2][col].abs()).unwrap());
+        let pivot = (col..n).max_by(|&r1, &r2| a[r1][col].abs().total_cmp(&a[r2][col].abs()));
         let pivot = pivot?;
         if a[pivot][col].abs() < 1e-14 {
             return None;

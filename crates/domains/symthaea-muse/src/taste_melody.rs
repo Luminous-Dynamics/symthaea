@@ -186,11 +186,10 @@ impl TasteMelody {
 
         // Chord tone attraction on strong beats
         if prefer_chord {
-            if let Some(&nearest_chord) = chord_tones.iter().min_by(|a, b| {
-                ((**a - freq).abs())
-                    .partial_cmp(&((**b - freq).abs()))
-                    .unwrap()
-            }) {
+            if let Some(&nearest_chord) = chord_tones
+                .iter()
+                .min_by(|a, b| ((**a - freq).abs()).total_cmp(&((**b - freq).abs())))
+            {
                 // Only snap if within a third (4 semitones)
                 let distance = ((nearest_chord / freq).log2() * 12.0).abs();
                 if distance < 4.0 {
@@ -200,9 +199,7 @@ impl TasteMelody {
                         .iter()
                         .enumerate()
                         .min_by(|(_, a), (_, b)| {
-                            ((**a - freq).abs())
-                                .partial_cmp(&((**b - freq).abs()))
-                                .unwrap()
+                            ((**a - freq).abs()).total_cmp(&((**b - freq).abs()))
                         })
                         .map(|(i, _)| i)
                     {

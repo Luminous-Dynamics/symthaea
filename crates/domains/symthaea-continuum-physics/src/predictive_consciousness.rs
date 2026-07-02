@@ -174,7 +174,7 @@ impl PredictiveNetwork {
         sorted.sort_by(|a, b| {
             let id_a = a.1 * a.2;
             let id_b = b.1 * b.2;
-            id_b.partial_cmp(&id_a).unwrap()
+            id_b.total_cmp(&id_a)
         });
 
         if sorted.len() >= 2 {

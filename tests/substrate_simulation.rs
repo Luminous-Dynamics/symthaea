@@ -104,7 +104,7 @@ fn biological_substrate_has_highest_feasibility() {
         })
         .collect();
 
-    feasibilities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    feasibilities.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     // Biological should be at or near the top
     assert_eq!(

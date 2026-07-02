@@ -56,8 +56,7 @@ impl ReactionConsciousnessProfile {
             .max_by(|a, b| {
                 a.scores
                     .composite_score
-                    .partial_cmp(&b.scores.composite_score)
-                    .unwrap()
+                    .total_cmp(&b.scores.composite_score)
             })
             .map(|p| (p.coordinate, p.scores.composite_score))
             .unwrap_or((0.0, 0.0))
@@ -67,11 +66,7 @@ impl ReactionConsciousnessProfile {
     pub fn iit_maximum(&self) -> (f64, f64) {
         self.points
             .iter()
-            .max_by(|a, b| {
-                a.scores.normalized[0]
-                    .partial_cmp(&b.scores.normalized[0])
-                    .unwrap()
-            })
+            .max_by(|a, b| a.scores.normalized[0].total_cmp(&b.scores.normalized[0]))
             .map(|p| (p.coordinate, p.scores.normalized[0]))
             .unwrap_or((0.0, 0.0))
     }
@@ -91,8 +86,7 @@ impl ReactionConsciousnessProfile {
             .min_by(|a, b| {
                 (a.coordinate - eq_coord)
                     .abs()
-                    .partial_cmp(&(b.coordinate - eq_coord).abs())
-                    .unwrap()
+                    .total_cmp(&(b.coordinate - eq_coord).abs())
             })
             .map(|p| p.scores.composite_score)
             .unwrap_or(0.0);

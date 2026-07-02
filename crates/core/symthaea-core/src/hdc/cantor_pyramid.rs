@@ -290,12 +290,7 @@ impl CantorRouter for PrototypeRouter {
             .iter()
             .take(branching)
             .enumerate()
-            .max_by(|(_, a), (_, b)| {
-                query
-                    .similarity(a)
-                    .partial_cmp(&query.similarity(b))
-                    .unwrap()
-            })
+            .max_by(|(_, a), (_, b)| query.similarity(a).total_cmp(&query.similarity(b)))
             .map(|(idx, _)| idx)
             .unwrap_or(0)
     }
@@ -363,8 +358,7 @@ impl CantorRouter for SmallWorldRouter {
             .max_by(|a, b| {
                 query
                     .similarity(&self.leaf_keys[*a])
-                    .partial_cmp(&query.similarity(&self.leaf_keys[*b]))
-                    .unwrap()
+                    .total_cmp(&query.similarity(&self.leaf_keys[*b]))
             })
             .unwrap_or(base)
     }
@@ -797,7 +791,7 @@ impl PyramidCantorVector {
             .enumerate()
             .filter(|(_, score)| score.is_finite())
             .collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        results.sort_by(|a, b| b.1.total_cmp(&a.1));
         results
     }
 
@@ -919,7 +913,7 @@ impl PyramidCantorVector {
             .enumerate()
             .filter(|(_, score)| score.is_finite())
             .collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        results.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         RhnRetrievalReport {
             fanout: searched_nodes.len(),

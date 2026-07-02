@@ -128,10 +128,7 @@ impl PsychBenchmark for EncryptedBindingBenchmark {
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| {
-                        extracted
-                            .similarity(a)
-                            .partial_cmp(&extracted.similarity(b))
-                            .unwrap()
+                        extracted.similarity(a).total_cmp(&extracted.similarity(b))
                     })
                     .map(|(idx, _)| idx)
                     .unwrap_or(usize::MAX);

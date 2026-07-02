@@ -188,7 +188,7 @@ impl RandomForestClassifier {
             let f_idx = (*rng >> 33) as usize % N_FEATURES;
 
             let mut values: Vec<f64> = features.iter().map(|row| row[f_idx]).collect();
-            values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            values.sort_by(|a, b| a.total_cmp(b));
             values.dedup();
 
             let step = (values.len() / 10).max(1);

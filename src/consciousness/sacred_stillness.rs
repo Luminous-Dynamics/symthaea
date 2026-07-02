@@ -105,7 +105,7 @@ impl KnownUnknowns {
                 if let Some(min_key) = self
                     .unknowns
                     .iter()
-                    .min_by(|a, b| a.1.importance.partial_cmp(&b.1.importance).unwrap())
+                    .min_by(|a, b| a.1.importance.total_cmp(&b.1.importance))
                     .map(|(k, _)| k.clone())
                 {
                     self.unknowns.remove(&min_key);

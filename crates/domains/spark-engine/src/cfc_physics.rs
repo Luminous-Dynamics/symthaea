@@ -396,7 +396,7 @@ pub fn analyze_with_cfc(dynamics: &ScreeningDynamics) -> CfCAnalysisResult {
         .collect();
 
     let mut sorted_tau = learned_tau.clone();
-    sorted_tau.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted_tau.sort_by(|a, b| a.total_cmp(b));
     let dominant_time_scale = sorted_tau[sorted_tau.len() / 2];
 
     CfCAnalysisResult {
@@ -637,7 +637,7 @@ fn compute_correlations(results: &[CfCAnalysisResult]) -> CfCCorrelations {
 
     let median_tau = {
         let mut sorted = taus.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
         sorted[sorted.len() / 2]
     };
 
@@ -727,11 +727,10 @@ fn generate_insights(results: &[CfCAnalysisResult], corr: &CfCCorrelations) -> V
     }
 
     // Find anomalies
-    if let Some(highest) = results.iter().max_by(|a, b| {
-        a.enhancement_ratio
-            .partial_cmp(&b.enhancement_ratio)
-            .unwrap()
-    }) {
+    if let Some(highest) = results
+        .iter()
+        .max_by(|a, b| a.enhancement_ratio.total_cmp(&b.enhancement_ratio))
+    {
         insights.push(format!(
             "{} shows highest enhancement ({:.1}×) with tau = {:.2e} s. \
              Its temporal signature may hold the key to understanding LCF.",

@@ -90,7 +90,7 @@ fn main() {
             .surprise_curve
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap();
 
         println!(
@@ -146,7 +146,7 @@ fn main() {
                             (hv_frame.similarity(&synced_hv), idx)
                         })
                         .collect();
-                    distances.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                    distances.sort_by(|a, b| b.0.total_cmp(&a.0));
 
                     let (sim1, idx1) = distances[0];
                     let img1 = &visual_dictionary[idx1].1;

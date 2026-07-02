@@ -845,7 +845,7 @@ fn score_composition(comp: &Composition, snap: &CognitiveSnapshot) -> AestheticS
         .iter()
         .map(|n| (n.frequency * 10.0).round())
         .collect();
-    unique_pitches.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    unique_pitches.sort_by(|a, b| a.total_cmp(b));
     unique_pitches.dedup();
     let complexity = if comp.notes.is_empty() {
         0.1

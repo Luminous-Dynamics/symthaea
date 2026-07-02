@@ -148,11 +148,7 @@ fn nearest(target: f32, primary: &[f32], fallback: &[f32]) -> f32 {
         primary
     };
     pool.iter()
-        .min_by(|a, b| {
-            ((**a - target).abs())
-                .partial_cmp(&((**b - target).abs()))
-                .unwrap()
-        })
+        .min_by(|a, b| ((**a - target).abs()).total_cmp(&((**b - target).abs())))
         .copied()
         .unwrap_or(target)
 }
@@ -177,11 +173,7 @@ fn step_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
     let idx = scale
         .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| {
-            ((**a - freq).abs())
-                .partial_cmp(&((**b - freq).abs()))
-                .unwrap()
-        })
+        .min_by(|(_, a), (_, b)| ((**a - freq).abs()).total_cmp(&((**b - freq).abs())))
         .map(|(i, _)| i)?;
 
     let target_idx = (idx as i32 + direction).max(0) as usize;
@@ -196,11 +188,7 @@ fn skip_from(freq: f32, direction: i32, scale: &[f32]) -> Option<f32> {
     let idx = scale
         .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| {
-            ((**a - freq).abs())
-                .partial_cmp(&((**b - freq).abs()))
-                .unwrap()
-        })
+        .min_by(|(_, a), (_, b)| ((**a - freq).abs()).total_cmp(&((**b - freq).abs())))
         .map(|(i, _)| i)?;
 
     let target_idx = (idx as i32 + direction * 2).max(0) as usize; // skip one scale degree

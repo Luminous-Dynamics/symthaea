@@ -193,10 +193,7 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| {
-                        test_item
-                            .similarity(a)
-                            .partial_cmp(&test_item.similarity(b))
-                            .unwrap()
+                        test_item.similarity(a).total_cmp(&test_item.similarity(b))
                     })
                     .map(|(i, _)| i)
                     .unwrap_or(0);
@@ -205,10 +202,7 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| {
-                        test_item
-                            .similarity(a)
-                            .partial_cmp(&test_item.similarity(b))
-                            .unwrap()
+                        test_item.similarity(a).total_cmp(&test_item.similarity(b))
                     })
                     .map(|(i, _)| i)
                     .unwrap_or(0);

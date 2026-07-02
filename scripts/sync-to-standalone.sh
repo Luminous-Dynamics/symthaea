@@ -577,10 +577,24 @@ mycelix,unstable-examples"
         SYNC_CHECK_FAILED=true
     fi
 
+    # hdc-zkp-bench (crates/hdc-zkp-bench/) declares its own [workspace] and
+    # is deliberately excluded from the main one (see its Cargo.toml for
+    # why), so none of the three checks above ever touch it. Check it
+    # explicitly or a broken crate here would go unnoticed until someone
+    # tries to build it.
+    info "Running cargo check on crates/hdc-zkp-bench (separate workspace)..."
+    if run_standalone_cargo "cargo check --manifest-path crates/hdc-zkp-bench/Cargo.toml 2>&1 | tail -40"; then
+        ok "cargo check (hdc-zkp-bench) passed"
+    else
+        warn "cargo check (hdc-zkp-bench) failed"
+        SYNC_CHECK_FAILED=true
+    fi
+
     if $SYNC_CHECK_FAILED; then
         warn "Pre-push checks failed:"
         echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo fmt --check"
         echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo check"
+        echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo check --manifest-path crates/hdc-zkp-bench/Cargo.toml"
         if $ALLOW_CHECK_FAILURE; then
             warn "--allow-check-failure set — proceeding to commit/push anyway"
         else

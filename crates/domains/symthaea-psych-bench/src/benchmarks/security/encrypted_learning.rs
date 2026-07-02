@@ -162,10 +162,7 @@ impl PsychBenchmark for EncryptedLearningBenchmark {
                         .iter()
                         .enumerate()
                         .max_by(|(_, a), (_, b)| {
-                            test_item
-                                .similarity(a)
-                                .partial_cmp(&test_item.similarity(b))
-                                .unwrap()
+                            test_item.similarity(a).total_cmp(&test_item.similarity(b))
                         })
                         .map(|(i, _)| i)
                         .unwrap_or(0);
@@ -178,8 +175,7 @@ impl PsychBenchmark for EncryptedLearningBenchmark {
                         .max_by(|(_, a), (_, b)| {
                             enc_test
                                 .encrypted_similarity(a)
-                                .partial_cmp(&enc_test.encrypted_similarity(b))
-                                .unwrap()
+                                .total_cmp(&enc_test.encrypted_similarity(b))
                         })
                         .map(|(i, _)| i)
                         .unwrap_or(0);
