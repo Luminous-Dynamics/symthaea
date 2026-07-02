@@ -9,9 +9,31 @@ use crate::systems::psychology::PsychologicalNeeds;
 use crate::systems::rendering::LeviathanSprite;
 use crate::systems::rendering::TILE_SIZE;
 use bevy::core_pipeline::core_3d::graph::Core3d;
+use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::CameraRenderGraph;
 use bevy::render::view::NoIndirectDrawing;
+use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
+
+/// Accumulated first-person look state (radians). Yaw turns around the
+/// world's up axis (Z, per this level's Z-up convention); pitch tilts the
+/// view up/down from horizontal. Only driven by mouse input outside the
+/// automated capture/render-gate camera mode (see
+/// `waterworks_render_gate_camera_enabled`), so headless screenshots stay
+/// deterministic.
+#[derive(Resource, Default)]
+pub struct FirstPersonLook {
+    pub yaw: f32,
+    pub pitch: f32,
+}
+
+/// Eye height above the player's feet — placed just above the head sphere
+/// (spawned at local z=9.0, radius 2.0, so its top is at z=11.0) to avoid the
+/// first-person camera clipping into the player's own head geometry.
+const FPS_EYE_HEIGHT: f32 = 12.0;
+const FPS_MOUSE_SENSITIVITY: f32 = 0.0025;
+const FPS_PITCH_LIMIT: f32 = 1.45; // ~83 degrees, just short of straight up/down
 
 /// Player marker for 3D physics and movement.
 #[derive(Component)]
@@ -154,6 +176,48 @@ fn waterworks_camera_up() -> Vec3 {
     }
 }
 
+/// Accumulates mouse motion into yaw/pitch for the first-person camera.
+/// No-ops under the automated render-gate camera so headless captures never
+/// depend on mouse input (there isn't any under Xvfb, but be explicit).
+pub fn fps_mouse_look_system(
+    mut motion: MessageReader<MouseMotion>,
+    mut look: ResMut<FirstPersonLook>,
+) {
+    if waterworks_render_gate_camera_enabled() {
+        motion.clear();
+        return;
+    }
+
+    for event in motion.read() {
+        look.yaw -= event.delta.x * FPS_MOUSE_SENSITIVITY;
+        look.pitch = (look.pitch - event.delta.y * FPS_MOUSE_SENSITIVITY)
+            .clamp(-FPS_PITCH_LIMIT, FPS_PITCH_LIMIT);
+    }
+}
+
+/// Grabs and hides the cursor for first-person mouse look. Skipped under the
+/// render-gate camera (automated capture has no interactive window focus to
+/// grab against).
+pub fn fps_cursor_grab_system(mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>) {
+    if waterworks_render_gate_camera_enabled() {
+        return;
+    }
+    let Ok(mut cursor) = windows.single_mut() else {
+        return;
+    };
+    cursor.grab_mode = CursorGrabMode::Locked;
+    cursor.visible = false;
+}
+
+/// Releases the cursor when leaving the 3D experience.
+pub fn fps_cursor_release_system(mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>) {
+    let Ok(mut cursor) = windows.single_mut() else {
+        return;
+    };
+    cursor.grab_mode = CursorGrabMode::None;
+    cursor.visible = true;
+}
+
 #[cfg(test)]
 fn is_magenta_like(color: Color) -> bool {
     let srgba = color.to_srgba();
@@ -171,12 +235,12 @@ pub fn setup_world_3d(
 ) {
     info!("Initializing Embodied 3D Layer: Old Waterworks");
 
-    let old_concrete_color = asset_server.load("textures/waterworks/old_concrete_color.jpg");
-    let old_concrete_normal = asset_server.load("textures/waterworks/old_concrete_normal.jpg");
-    let wet_concrete_color = asset_server.load("textures/waterworks/wet_concrete_color.jpg");
-    let wet_concrete_normal = asset_server.load("textures/waterworks/wet_concrete_normal.jpg");
-    let painted_steel_color = asset_server.load("textures/waterworks/painted_steel_color.jpg");
-    let painted_steel_normal = asset_server.load("textures/waterworks/painted_steel_normal.jpg");
+    let old_concrete_color = asset_server.load("textures/waterworks/old_concrete_color.png");
+    let old_concrete_normal = asset_server.load("textures/waterworks/old_concrete_normal.png");
+    let wet_concrete_color = asset_server.load("textures/waterworks/wet_concrete_color.png");
+    let wet_concrete_normal = asset_server.load("textures/waterworks/wet_concrete_normal.png");
+    let painted_steel_color = asset_server.load("textures/waterworks/painted_steel_color.png");
+    let painted_steel_normal = asset_server.load("textures/waterworks/painted_steel_normal.png");
 
     for entity in &old_cameras {
         commands.entity(entity).despawn();
@@ -189,6 +253,10 @@ pub fn setup_world_3d(
         Name::new("Old Waterworks 3D Camera"),
         CameraRenderGraph::new(Core3d),
         Camera3d::default(),
+        // Bevy's default TonyMcMapFace tonemapping needs the `tonemapping_luts`
+        // feature (not enabled in this workspace); without it every pixel
+        // renders as solid magenta. Use an analytic tonemapper instead.
+        Tonemapping::SomewhatBoringDisplayTransform,
         NoIndirectDrawing,
         Transform::from_translation(player_start_3d + camera_offset).looking_at(
             Vec3::new(layout.player_start.x, layout.player_start.y, 8.0),
@@ -1066,29 +1134,45 @@ fn can_occupy_position(tile_grid: &TileGrid, pos: Vec2, radius: f32) -> bool {
 }
 
 /// Simple 3D player controller matching 2D controls but operating on 3D physics transforms.
+///
+/// Under the render-gate camera, WASD maps to fixed world-space axes exactly
+/// as before (keeps automated captures deterministic). Otherwise movement is
+/// relative to the first-person camera's yaw (W = forward-facing, D =
+/// strafe-right), and the player's facing always tracks the view direction.
 pub fn player_movement_system_3d(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut query: Query<(&mut Transform, &symtropy_render_bridge::PhysicsBody), With<Player3D>>,
     mut physics_world: ResMut<PhysicsWorldRes>,
     tile_grid: Res<TileGrid>,
     time: Res<Time>,
+    look: Res<FirstPersonLook>,
 ) {
     let Ok((mut transform, body_ref)) = query.single_mut() else {
         return;
     };
-    let mut direction = Vec2::ZERO;
 
+    let is_fps = !waterworks_render_gate_camera_enabled();
+    let (forward, right) = if is_fps {
+        (
+            Vec2::new(look.yaw.cos(), look.yaw.sin()),
+            Vec2::new(-look.yaw.sin(), look.yaw.cos()),
+        )
+    } else {
+        (Vec2::Y, Vec2::X)
+    };
+
+    let mut direction = Vec2::ZERO;
     if keyboard_input.pressed(KeyCode::KeyW) || keyboard_input.pressed(KeyCode::ArrowUp) {
-        direction.y += 1.0;
+        direction += forward;
     }
     if keyboard_input.pressed(KeyCode::KeyS) || keyboard_input.pressed(KeyCode::ArrowDown) {
-        direction.y -= 1.0;
-    }
-    if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::ArrowLeft) {
-        direction.x -= 1.0;
+        direction -= forward;
     }
     if keyboard_input.pressed(KeyCode::KeyD) || keyboard_input.pressed(KeyCode::ArrowRight) {
-        direction.x += 1.0;
+        direction += right;
+    }
+    if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::ArrowLeft) {
+        direction -= right;
     }
 
     if direction != Vec2::ZERO {
@@ -1116,9 +1200,17 @@ pub fn player_movement_system_3d(
             transform.translation.y = next_pos.y;
         }
 
-        // Apply visual rotation to face movement direction
-        let angle = direction.y.atan2(direction.x) - std::f32::consts::FRAC_PI_2;
-        transform.rotation = Quat::from_rotation_z(angle);
+        if !is_fps {
+            // Apply visual rotation to face movement direction (render-gate mode only)
+            let angle = direction.y.atan2(direction.x) - std::f32::consts::FRAC_PI_2;
+            transform.rotation = Quat::from_rotation_z(angle);
+        }
+    }
+
+    if is_fps {
+        // First-person: body facing always tracks the view direction, even
+        // when standing still (e.g. strafing while looking at a target).
+        transform.rotation = Quat::from_rotation_z(look.yaw - std::f32::consts::FRAC_PI_2);
     }
 }
 
@@ -1419,9 +1511,15 @@ pub fn machine_state_visual_system_3d(
 }
 
 /// Perspective 3D camera follow system.
+///
+/// Under the automated render-gate camera this is the same stable
+/// third-person chase-cam it always was (deterministic for headless
+/// captures). Otherwise it's a true first-person camera: eye height above
+/// the player, looking in the direction accumulated by `fps_mouse_look_system`.
 pub fn camera_follow_system_3d(
     player_query: Query<&Transform, (With<Player3D>, Without<Camera3D>)>,
     mut camera_query: Query<&mut Transform, (With<Camera3D>, Without<Player3D>)>,
+    look: Res<FirstPersonLook>,
     time: Res<Time>,
 ) {
     let Ok(player_tf) = player_query.single() else {
@@ -1431,15 +1529,27 @@ pub fn camera_follow_system_3d(
         return;
     };
 
-    let target_pos = player_tf.translation + waterworks_camera_offset();
-    camera_tf.translation = camera_tf
-        .translation
-        .lerp(target_pos, 8.0 * time.delta_secs());
+    if waterworks_render_gate_camera_enabled() {
+        let target_pos = player_tf.translation + waterworks_camera_offset();
+        camera_tf.translation = camera_tf
+            .translation
+            .lerp(target_pos, 8.0 * time.delta_secs());
 
-    camera_tf.look_at(
-        player_tf.translation + Vec3::new(0.0, 0.0, 8.0),
-        waterworks_camera_up(),
+        camera_tf.look_at(
+            player_tf.translation + Vec3::new(0.0, 0.0, 8.0),
+            waterworks_camera_up(),
+        );
+        return;
+    }
+
+    let eye = player_tf.translation + Vec3::new(0.0, 0.0, FPS_EYE_HEIGHT);
+    let forward = Vec3::new(
+        look.yaw.cos() * look.pitch.cos(),
+        look.yaw.sin() * look.pitch.cos(),
+        look.pitch.sin(),
     );
+    camera_tf.translation = eye;
+    camera_tf.look_at(eye + forward, waterworks_camera_up());
 }
 
 /// Update 3D Leviathan material visibility and pulsing based on phase.

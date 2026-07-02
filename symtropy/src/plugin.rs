@@ -53,6 +53,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<systems::dimensional_leakage::LeakageTimer>()
             .init_resource::<symtropy_render_bridge::TelemetryBufferResource>()
             .add_plugins(symtropy_render_bridge::TelemetryMaterialPlugin)
+            .add_plugins(symtropy_render_bridge::NdSlicingPlugin)
             .add_message::<components::NpcActionEvent>()
             .add_message::<components::WorldFeedbackEvent>()
             // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
@@ -154,12 +155,19 @@ impl Plugin for SymtropyPlugin {
                 systems::dimensional_leakage::leakage_visual_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
             // Embodied 3D Layer systems (Milestone H1.5)
-            .add_systems(OnEnter(GamePhase::Playing3D), systems::rendering_3d::setup_world_3d)
+            .init_resource::<systems::rendering_3d::FirstPersonLook>()
+            .add_systems(OnEnter(GamePhase::Playing3D), (
+                systems::rendering_3d::setup_world_3d,
+                systems::rendering_3d::fps_cursor_grab_system,
+            ))
+            .add_systems(OnExit(GamePhase::Playing3D), systems::rendering_3d::fps_cursor_release_system)
             .add_systems(Update, (
+                systems::rendering_3d::fps_mouse_look_system,
                 systems::rendering_3d::player_movement_system_3d,
                 systems::rendering_3d::camera_follow_system_3d,
                 systems::rendering_3d::leviathan_visual_system_3d,
             ).chain().run_if(in_state(GamePhase::Playing3D)))
+            .add_systems(Update, fps_escape_to_menu.run_if(in_state(GamePhase::Playing3D)))
             // Mycelix physicalized cryptography (only when --features mycelix)
             ;
         // Sol Atlas globe view (only when --features atlas)
@@ -385,6 +393,14 @@ fn victory(
 
 fn in_playing_or_3d(state: Res<State<GamePhase>>) -> bool {
     *state.get() == GamePhase::Playing || *state.get() == GamePhase::Playing3D
+}
+
+/// Escape returns to the main menu from the 3D FPS layer — otherwise, once
+/// `fps_cursor_grab_system` locks the mouse, there's no way to leave.
+fn fps_escape_to_menu(kb: Res<ButtonInput<KeyCode>>, mut s: ResMut<NextState<GamePhase>>) {
+    if kb.just_pressed(KeyCode::Escape) {
+        s.set(GamePhase::MainMenu);
+    }
 }
 
 #[cfg(test)]
