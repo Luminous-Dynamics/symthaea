@@ -485,13 +485,34 @@ a third speculative attempt isn't a good use of further host-config
 guesswork without being able to inspect virglrenderer's own
 negotiation logic directly.
 
-**Conclusion, updated**: this is still a real gap in the GNOME test VM's
-environment, not a defect in xenia-capture or xenia-peer — now narrowed
-from "no render node at all" to "a render node exists and blob resources
-negotiate, but Mesa's native-context vendor selection picks the wrong
-GPU vendor path for this host's hardware." The KDE-Wayland validation
-above remains the one completed real-hardware/real-desktop pass for the
-ScapCapture backend. GNOME-Wayland validation is on hold pending either
-a host reboot (which may or may not resolve the native-context mismatch
-— genuinely unknown until tried) or an operator with a real
-GNOME-Wayland desktop to test against directly instead of a VM.
+### Host reboot (2026-07-03): confirmed not a stale-state issue
+
+The operator rebooted the host (fresh boot confirmed, `uptime` ~7min) and
+re-ran the identical VM/config. Result: **byte-for-byte identical
+failure.** `dmesg` showed the same `+virgl +edid +resource_blob
++host_visible` negotiation as before the reboot; `journalctl --user -u
+xdg-desktop-portal-gnome` showed the exact same chain — Mesa still tries
+`radv` (AMD) via `vdrm_device_connect`, still fails with
+`VK_ERROR_INITIALIZATION_FAILED`, `libvulkan_radeon.so` still the ICD
+that gets picked. `capture_bench`: `VERDICT: FAIL`, 0 frames, same
+`LinCapError { msg: "Did not get response" }`. This rules out "stale
+driver/kernel-module state from earlier attempts in the same boot" as
+the explanation — the RADV-vendor-mismatch is reproducible from a clean
+boot, so it's a deterministic property of this exact QEMU (11.0.1) +
+virglrenderer (1.3.0) + Mesa (26.1.3) + kernel (6.18.37) combination's
+native-context vendor selection, not transient host state.
+
+**Conclusion, final for this VM path**: this is a real gap in the GNOME
+test VM's environment, not a defect in xenia-capture or xenia-peer, and
+not something a reboot fixes. The KDE-Wayland validation above remains
+the one completed real-hardware/real-desktop pass for the ScapCapture
+backend. To actually clear GNOME-Wayland validation, the remaining
+options are: (a) an operator with a real GNOME-Wayland desktop (skips
+the whole virtio-gpu native-context problem entirely, same as how the
+KDE pass used the operator's real desktop, not a VM); or (b) further
+config-only attempts specifically targeting Venus (Mesa's
+vendor-neutral virtio-gpu Vulkan-passthrough protocol, distinct from the
+vendor-native `anv`/`radv` context path that's failing here) — untried,
+and scoped as new follow-up work rather than a continuation of this
+session's attempts, since it's a materially different mechanism, not
+another `qemu.options` guess in the same family as the last three.
