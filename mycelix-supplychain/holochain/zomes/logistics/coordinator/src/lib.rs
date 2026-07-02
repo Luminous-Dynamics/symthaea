@@ -145,13 +145,30 @@ pub fn add_tracking_event(input: AddTrackingEventInput) -> ExternResult<ActionHa
 
     // ... [Status validation logic preserved] ...
 
+    // Authorization: only the shipment's sender or recipient may post tracking
+    // events for it. Without this check, any agent on the network could post a
+    // fabricated status (e.g. "Delivered") for a shipment they have no
+    // relationship to, since `reported_by` was previously recorded but never
+    // checked against the shipment's known parties.
+    //
+    // `carrier` is intentionally excluded: it is a free-text `String` (not an
+    // `AgentPubKey`), so there is no identity to bind it to yet. If/when the
+    // carrier becomes a first-class agent on the shipment, this check should
+    // be extended to include it.
+    let caller = agent_info()?.agent_initial_pubkey;
+    if caller != shipment.sender && caller != shipment.recipient {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the shipment's sender or recipient may report tracking events".to_string()
+        )));
+    }
+
     let event = TrackingEvent {
         shipment_hash: input.shipment_hash.clone(),
         status: input.status.clone(),
         location: input.location.clone(),
         description: input.description.clone(),
         occurred_at: sys_time()?,
-        reported_by: agent_info()?.agent_initial_pubkey,
+        reported_by: caller,
     };
 
     let action_hash = create_entry(EntryTypes::TrackingEvent(event.clone()))?;
@@ -323,12 +340,12 @@ pub fn initiate_shipment_for_po(
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Network error fetching PO: {}",
                 e
-            ))))
+            ))));
         }
         _ => {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Failed to fetch purchase order".to_string()
-            )))
+            )));
         }
     };
 

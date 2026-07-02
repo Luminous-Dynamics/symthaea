@@ -16,19 +16,21 @@ use verification_integrity::*;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateVerificationInput {
     pub claim_hash: ActionHash,
-    pub verifier: String,
     pub status: VerificationStatus,
 }
 
 /// Create a new claim verification
+///
+/// Authorization: `verifier` is *not* a caller-supplied field. Historically this
+/// function accepted an arbitrary `verifier: String` in `CreateVerificationInput`,
+/// which meant any agent could attribute a verification to any other identity
+/// (unbound free text — see `verification/integrity/src/lib.rs`'s `ClaimVerification`
+/// entry, which only checks the string is non-empty, not that it corresponds to the
+/// calling agent). The verifier is now always derived from `agent_info()`, matching
+/// the pattern already used by `submit_proof` below.
 #[hdk_extern]
 pub fn create_verification(input: CreateVerificationInput) -> ExternResult<Record> {
-    // Input validation
-    if input.verifier.is_empty() || input.verifier.len() > 200 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Verifier must be 1-200 characters".to_string()
-        )));
-    }
+    let verifier = agent_info()?.agent_initial_pubkey.to_string();
 
     // Verify claim exists
     if get(input.claim_hash.clone(), GetOptions::default())?.is_none() {
@@ -41,7 +43,7 @@ pub fn create_verification(input: CreateVerificationInput) -> ExternResult<Recor
 
     let verification = ClaimVerification {
         claim_hash: input.claim_hash.clone(),
-        verifier: input.verifier.clone(),
+        verifier: verifier.clone(),
         status: input.status,
         verified_at: now.as_micros() as u64,
     };
@@ -49,7 +51,7 @@ pub fn create_verification(input: CreateVerificationInput) -> ExternResult<Recor
     let action_hash = create_entry(EntryTypes::ClaimVerification(verification.clone()))?;
 
     // Link from verifier to verification
-    let verifier_hash = hash_identifier(&input.verifier)?;
+    let verifier_hash = hash_identifier(&verifier)?;
     create_link(
         verifier_hash,
         action_hash.clone(),
@@ -194,11 +196,8 @@ pub fn submit_proof(input: (ActionHash, String)) -> ExternResult<ActionHash> {
         )));
     }
 
-    let verifier = agent_info()?.agent_initial_pubkey.to_string();
-
     let verification_input = CreateVerificationInput {
         claim_hash,
-        verifier,
         status: VerificationStatus::Verified,
     };
 

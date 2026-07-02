@@ -175,6 +175,25 @@ pub fn release_escrow(hash: ActionHash) -> ExternResult<ActionHash> {
             .to_app_option::<EscrowAccount>()
             .map_err(|e| wasm_error!(e))?
         {
+            // Authorization: only the buyer (whose funds are held in escrow) or a
+            // designated arbiter may release the escrow. Without this check, any
+            // agent — including the seller, who benefits from the release — could
+            // call `release_escrow` directly and drain funds without the buyer's
+            // consent. The seller is deliberately excluded: they are the
+            // beneficiary of the release, not an authorizer of it.
+            let caller = agent_info()?.agent_initial_pubkey;
+            let is_buyer = caller == escrow.buyer;
+            let is_arbiter = escrow
+                .arbiter
+                .as_ref()
+                .map(|a| *a == caller)
+                .unwrap_or(false);
+            if !is_buyer && !is_arbiter {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Only the escrow buyer or designated arbiter may release escrow".to_string()
+                )));
+            }
+
             if escrow.funded_at.is_none() {
                 return Err(wasm_error!(WasmErrorInner::Guest(
                     "Escrow not funded".into()
@@ -296,22 +315,22 @@ pub fn process_fulfillment_payment(
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Network error fetching PO: {}",
                 e
-            ))))
+            ))));
         }
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Unauthorized to fetch PO".to_string()
-            )))
+            )));
         }
         ZomeCallResponse::CountersigningSession(_) => {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Countersigning failed".to_string()
-            )))
+            )));
         }
         _ => {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Unexpected response fetching PO".to_string()
-            )))
+            )));
         }
     };
 
@@ -323,7 +342,7 @@ pub fn process_fulfillment_payment(
                 payment_hash: None,
                 amount: 0,
                 currency: "USD".to_string(),
-            })
+            });
         }
         v => v,
     };
@@ -348,7 +367,7 @@ pub fn process_fulfillment_payment(
         None => {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "PO missing supplier field".to_string()
-            )))
+            )));
         }
     };
 
