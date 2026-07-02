@@ -81,6 +81,14 @@
           python3Packages.pyyaml
           python3Packages.jsonschema
           python3Packages.pytest
+
+          # Headless/interactive runtime verification: synthetic X11 mouse
+          # and keyboard input (xdotool) plus a screenshot tool with real
+          # X11 support (scrot) — the system-wide ImageMagick build lacks
+          # X11 screen-grab support, forcing a full-desktop-capture-then-crop
+          # workaround via spectacle otherwise.
+          xdotool
+          scrot
         ] ++ bevyDeps ++ wgpuDeps;
 
         # Ensure dynamic libraries are found at runtime (standard for Bevy on NixOS)
