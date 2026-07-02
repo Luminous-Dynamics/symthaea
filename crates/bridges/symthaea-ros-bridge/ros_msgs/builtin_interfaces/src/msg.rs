@@ -1,8 +1,6 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-
-
 // Corresponds to builtin_interfaces__msg__Duration
 /// Duration defines a period between two time points.
 /// Messages of this datatype are of ROS Time following this design:
@@ -19,41 +17,37 @@ pub struct Duration {
     /// The duration -1.7 seconds is represented as {sec: -2, nanosec: 3e8}
     /// The duration 1.7 seconds is represented as {sec: 1, nanosec: 7e8}
     pub nanosec: u32,
-
 }
 
-
-
 impl Default for Duration {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Duration::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Duration::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for Duration {
-  type RmwMsg = super::msg::rmw::Duration;
+    type RmwMsg = super::msg::rmw::Duration;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        sec: msg.sec,
-        nanosec: msg.nanosec,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-      sec: msg.sec,
-      nanosec: msg.nanosec,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                sec: msg.sec,
+                nanosec: msg.nanosec,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                sec: msg.sec,
+                nanosec: msg.nanosec,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      sec: msg.sec,
-      nanosec: msg.nanosec,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            sec: msg.sec,
+            nanosec: msg.nanosec,
+        }
     }
-  }
 }
-
 
 // Corresponds to builtin_interfaces__msg__Time
 /// This message communicates ROS Time defined here:
@@ -70,39 +64,34 @@ pub struct Time {
     /// The time -1.7 seconds is represented as {sec: -2, nanosec: 3e8}
     /// The time 1.7 seconds is represented as {sec: 1, nanosec: 7e8}
     pub nanosec: u32,
-
 }
 
-
-
 impl Default for Time {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Time::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Time::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for Time {
-  type RmwMsg = super::msg::rmw::Time;
+    type RmwMsg = super::msg::rmw::Time;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        sec: msg.sec,
-        nanosec: msg.nanosec,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-      sec: msg.sec,
-      nanosec: msg.nanosec,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                sec: msg.sec,
+                nanosec: msg.nanosec,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                sec: msg.sec,
+                nanosec: msg.nanosec,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      sec: msg.sec,
-      nanosec: msg.nanosec,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            sec: msg.sec,
+            nanosec: msg.nanosec,
+        }
     }
-  }
 }
-
-

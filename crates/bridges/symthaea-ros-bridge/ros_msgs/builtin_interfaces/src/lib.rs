@@ -8,5 +8,3 @@ pub mod msg {
     pub use super::msg_idiomatic::*;
     pub mod rmw;
 }
-
-

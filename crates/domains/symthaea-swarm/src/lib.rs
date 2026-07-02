@@ -337,8 +337,21 @@ pub mod networking {
             while let Some(event) = receiver.next().await {
                 let event = event?;
                 if let iroh_gossip::api::Event::Received(msg) = event {
-                    if let Ok(swarm_msg) = bincode::deserialize::<SwarmMessage>(&msg.content) {
-                        let _ = self.inbound_tx.try_send(swarm_msg);
+                    // `bincode::deserialize` (bincode 1.x default config) has
+                    // no size limit: a malicious peer can craft a length
+                    // prefix on any Vec<u8>/Vec<f64> field (e.g. `kernel`,
+                    // `proof_bytes`, `residuals`) that causes an attempted
+                    // multi-gigabyte allocation before the actual byte
+                    // length is validated -- a memory-exhaustion DoS
+                    // reachable by any peer on the gossip topic. Use a
+                    // size-limited deserializer instead.
+                    match Self::deserialize_swarm_message(&msg.content) {
+                        Ok(swarm_msg) => {
+                            let _ = self.inbound_tx.try_send(swarm_msg);
+                        }
+                        Err(e) => {
+                            tracing::warn!("dropping malformed/oversized gossip message: {e}");
+                        }
                     }
                 }
             }
@@ -352,6 +365,95 @@ pub mod networking {
                 sender.broadcast(content.into()).await?;
             }
             Ok(())
+        }
+
+        /// Maximum size (bytes) bincode will allocate while deserializing a
+        /// single gossip message. Generous enough for a legitimate
+        /// `WeightUpdate` (compressed sparse kernel + ZKP proof bytes), far
+        /// below what would let a malicious peer trigger a multi-gigabyte
+        /// allocation via a crafted length-prefix.
+        const MAX_GOSSIP_MESSAGE_BYTES: u64 = 16 * 1024 * 1024;
+
+        /// Deserialize an inbound gossip payload with a hard size limit,
+        /// rather than `bincode::deserialize`'s unbounded default config.
+        /// Matches `bincode::deserialize`'s exact option chain (fixint
+        /// encoding + allow_trailing_bytes) other than the added limit, so
+        /// it stays wire-compatible with `broadcast`'s `bincode::serialize`.
+        fn deserialize_swarm_message(bytes: &[u8]) -> Result<SwarmMessage, bincode::Error> {
+            use bincode::Options;
+            bincode::DefaultOptions::new()
+                .with_fixint_encoding()
+                .allow_trailing_bytes()
+                .with_limit(Self::MAX_GOSSIP_MESSAGE_BYTES)
+                .deserialize(bytes)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn deserialize_roundtrip_matches_bincode_serialize() {
+            // Regression: the size-limited deserializer must stay wire-
+            // compatible with `broadcast`'s plain `bincode::serialize`.
+            let msg = SwarmMessage::WeightUpdate {
+                node_id: Uuid::nil(),
+                target: "test".to_string(),
+                kernel: vec![1, 2, 3, 4],
+                proof_bytes: vec![5, 6, 7],
+                timestamp: 42,
+            };
+            let bytes = bincode::serialize(&msg).unwrap();
+            let decoded = TelepathicSocket::deserialize_swarm_message(&bytes).unwrap();
+            match decoded {
+                SwarmMessage::WeightUpdate {
+                    node_id,
+                    target,
+                    kernel,
+                    proof_bytes,
+                    timestamp,
+                } => {
+                    assert_eq!(node_id, Uuid::nil());
+                    assert_eq!(target, "test");
+                    assert_eq!(kernel, vec![1, 2, 3, 4]);
+                    assert_eq!(proof_bytes, vec![5, 6, 7]);
+                    assert_eq!(timestamp, 42);
+                }
+                other => panic!("expected WeightUpdate, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn size_limited_options_reject_oversized_length_prefix() {
+            // Regression for the DoS finding, using the exact same Options
+            // chain as `deserialize_swarm_message` but against a plain
+            // Vec<u8> (whose bincode layout -- an 8-byte little-endian
+            // length prefix followed by content bytes -- is unambiguous),
+            // rather than depending on SwarmMessage's exact enum-variant
+            // encoding layout.
+            use bincode::Options;
+            let opts = || {
+                bincode::DefaultOptions::new()
+                    .with_fixint_encoding()
+                    .allow_trailing_bytes()
+                    .with_limit(TelepathicSocket::MAX_GOSSIP_MESSAGE_BYTES)
+            };
+
+            // A genuinely small Vec<u8> still deserializes fine.
+            let small = bincode::serialize(&vec![1u8, 2, 3]).unwrap();
+            assert!(opts().deserialize::<Vec<u8>>(&small).is_ok());
+
+            // Corrupt the 8-byte length prefix to claim an exabyte-scale
+            // payload while leaving the actual buffer tiny.
+            let mut malicious = small.clone();
+            let huge: u64 = u64::MAX / 2;
+            malicious[0..8].copy_from_slice(&huge.to_le_bytes());
+            let result = opts().deserialize::<Vec<u8>>(&malicious);
+            assert!(
+                result.is_err(),
+                "a claimed exabyte-scale Vec<u8> length must be rejected, not allocated"
+            );
         }
     }
 }

@@ -1,17 +1,13 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-
-
 // Corresponds to sensor_msgs__msg__BatteryState
 
 // This struct is not documented.
 #[allow(missing_docs)]
-
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct BatteryState {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::Header,
@@ -62,7 +58,6 @@ pub struct BatteryState {
 
     /// The best approximation of the battery serial number
     pub serial_number: std::string::String,
-
 }
 
 impl BatteryState {
@@ -73,21 +68,17 @@ impl BatteryState {
     /// Power supply status constants
     pub const POWER_SUPPLY_STATUS_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_STATUS_CHARGING: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_STATUS_DISCHARGING: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_STATUS_NOT_CHARGING: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
@@ -96,41 +87,33 @@ impl BatteryState {
     /// Power supply health constants
     pub const POWER_SUPPLY_HEALTH_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_GOOD: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_OVERHEAT: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_DEAD: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_OVERVOLTAGE: u8 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_UNSPEC_FAILURE: u8 = 5;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_COLD: u8 = 6;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE: u8 = 7;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
@@ -139,115 +122,110 @@ impl BatteryState {
     /// Power supply technology (chemistry) constants
     pub const POWER_SUPPLY_TECHNOLOGY_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_NIMH: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LION: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LIPO: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LIFE: u8 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_NICD: u8 = 5;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LIMN: u8 = 6;
-
 }
 
-
 impl Default for BatteryState {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::BatteryState::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::BatteryState::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for BatteryState {
-  type RmwMsg = super::msg::rmw::BatteryState;
+    type RmwMsg = super::msg::rmw::BatteryState;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        voltage: msg.voltage,
-        temperature: msg.temperature,
-        current: msg.current,
-        charge: msg.charge,
-        capacity: msg.capacity,
-        design_capacity: msg.design_capacity,
-        percentage: msg.percentage,
-        power_supply_status: msg.power_supply_status,
-        power_supply_health: msg.power_supply_health,
-        power_supply_technology: msg.power_supply_technology,
-        present: msg.present,
-        cell_voltage: msg.cell_voltage.into(),
-        cell_temperature: msg.cell_temperature.into(),
-        location: msg.location.as_str().into(),
-        serial_number: msg.serial_number.as_str().into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      voltage: msg.voltage,
-      temperature: msg.temperature,
-      current: msg.current,
-      charge: msg.charge,
-      capacity: msg.capacity,
-      design_capacity: msg.design_capacity,
-      percentage: msg.percentage,
-      power_supply_status: msg.power_supply_status,
-      power_supply_health: msg.power_supply_health,
-      power_supply_technology: msg.power_supply_technology,
-      present: msg.present,
-        cell_voltage: msg.cell_voltage.as_slice().into(),
-        cell_temperature: msg.cell_temperature.as_slice().into(),
-        location: msg.location.as_str().into(),
-        serial_number: msg.serial_number.as_str().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                voltage: msg.voltage,
+                temperature: msg.temperature,
+                current: msg.current,
+                charge: msg.charge,
+                capacity: msg.capacity,
+                design_capacity: msg.design_capacity,
+                percentage: msg.percentage,
+                power_supply_status: msg.power_supply_status,
+                power_supply_health: msg.power_supply_health,
+                power_supply_technology: msg.power_supply_technology,
+                present: msg.present,
+                cell_voltage: msg.cell_voltage.into(),
+                cell_temperature: msg.cell_temperature.into(),
+                location: msg.location.as_str().into(),
+                serial_number: msg.serial_number.as_str().into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                voltage: msg.voltage,
+                temperature: msg.temperature,
+                current: msg.current,
+                charge: msg.charge,
+                capacity: msg.capacity,
+                design_capacity: msg.design_capacity,
+                percentage: msg.percentage,
+                power_supply_status: msg.power_supply_status,
+                power_supply_health: msg.power_supply_health,
+                power_supply_technology: msg.power_supply_technology,
+                present: msg.present,
+                cell_voltage: msg.cell_voltage.as_slice().into(),
+                cell_temperature: msg.cell_temperature.as_slice().into(),
+                location: msg.location.as_str().into(),
+                serial_number: msg.serial_number.as_str().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      voltage: msg.voltage,
-      temperature: msg.temperature,
-      current: msg.current,
-      charge: msg.charge,
-      capacity: msg.capacity,
-      design_capacity: msg.design_capacity,
-      percentage: msg.percentage,
-      power_supply_status: msg.power_supply_status,
-      power_supply_health: msg.power_supply_health,
-      power_supply_technology: msg.power_supply_technology,
-      present: msg.present,
-      cell_voltage: msg.cell_voltage
-          .into_iter()
-          .collect(),
-      cell_temperature: msg.cell_temperature
-          .into_iter()
-          .collect(),
-      location: msg.location.to_string(),
-      serial_number: msg.serial_number.to_string(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            voltage: msg.voltage,
+            temperature: msg.temperature,
+            current: msg.current,
+            charge: msg.charge,
+            capacity: msg.capacity,
+            design_capacity: msg.design_capacity,
+            percentage: msg.percentage,
+            power_supply_status: msg.power_supply_status,
+            power_supply_health: msg.power_supply_health,
+            power_supply_technology: msg.power_supply_technology,
+            present: msg.present,
+            cell_voltage: msg.cell_voltage.into_iter().collect(),
+            cell_temperature: msg.cell_temperature.into_iter().collect(),
+            location: msg.location.to_string(),
+            serial_number: msg.serial_number.to_string(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__CameraInfo
 /// This message defines meta information for a camera. It should be in a
@@ -303,7 +281,6 @@ pub struct CameraInfo {
     /// The image dimensions with which the camera was calibrated.
     /// Normally this will be the full camera resolution in pixels.
     pub height: u32,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
@@ -376,7 +353,6 @@ pub struct CameraInfo {
     ///  as binning_x = binning_y = 1 (no subsampling).
     pub binning_x: u32,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub binning_y: u32,
@@ -388,70 +364,78 @@ pub struct CameraInfo {
     /// The default setting of roi (all values 0) is considered the same as
     ///  full resolution (roi.width = width, roi.height = height).
     pub roi: super::msg::RegionOfInterest,
-
 }
 
-
-
 impl Default for CameraInfo {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::CameraInfo::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::CameraInfo::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for CameraInfo {
-  type RmwMsg = super::msg::rmw::CameraInfo;
+    type RmwMsg = super::msg::rmw::CameraInfo;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        height: msg.height,
-        width: msg.width,
-        distortion_model: msg.distortion_model.as_str().into(),
-        d: msg.d.into(),
-        k: msg.k,
-        r: msg.r,
-        p: msg.p,
-        binning_x: msg.binning_x,
-        binning_y: msg.binning_y,
-        roi: super::msg::RegionOfInterest::into_rmw_message(std::borrow::Cow::Owned(msg.roi)).into_owned(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      height: msg.height,
-      width: msg.width,
-        distortion_model: msg.distortion_model.as_str().into(),
-        d: msg.d.as_slice().into(),
-        k: msg.k,
-        r: msg.r,
-        p: msg.p,
-      binning_x: msg.binning_x,
-      binning_y: msg.binning_y,
-        roi: super::msg::RegionOfInterest::into_rmw_message(std::borrow::Cow::Borrowed(&msg.roi)).into_owned(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                height: msg.height,
+                width: msg.width,
+                distortion_model: msg.distortion_model.as_str().into(),
+                d: msg.d.into(),
+                k: msg.k,
+                r: msg.r,
+                p: msg.p,
+                binning_x: msg.binning_x,
+                binning_y: msg.binning_y,
+                roi: super::msg::RegionOfInterest::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.roi,
+                ))
+                .into_owned(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                height: msg.height,
+                width: msg.width,
+                distortion_model: msg.distortion_model.as_str().into(),
+                d: msg.d.as_slice().into(),
+                k: msg.k,
+                r: msg.r,
+                p: msg.p,
+                binning_x: msg.binning_x,
+                binning_y: msg.binning_y,
+                roi: super::msg::RegionOfInterest::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.roi,
+                ))
+                .into_owned(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      height: msg.height,
-      width: msg.width,
-      distortion_model: msg.distortion_model.to_string(),
-      d: msg.d
-          .into_iter()
-          .collect(),
-      k: msg.k,
-      r: msg.r,
-      p: msg.p,
-      binning_x: msg.binning_x,
-      binning_y: msg.binning_y,
-      roi: super::msg::RegionOfInterest::from_rmw_message(msg.roi),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            height: msg.height,
+            width: msg.width,
+            distortion_model: msg.distortion_model.to_string(),
+            d: msg.d.into_iter().collect(),
+            k: msg.k,
+            r: msg.r,
+            p: msg.p,
+            binning_x: msg.binning_x,
+            binning_y: msg.binning_y,
+            roi: super::msg::RegionOfInterest::from_rmw_message(msg.roi),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__ChannelFloat32
 /// This message is used by the PointCloud message to hold optional data
@@ -481,43 +465,39 @@ pub struct ChannelFloat32 {
     /// The values array should be 1-1 with the elements of the associated
     /// PointCloud.
     pub values: Vec<f32>,
-
 }
 
-
-
 impl Default for ChannelFloat32 {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::ChannelFloat32::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::ChannelFloat32::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for ChannelFloat32 {
-  type RmwMsg = super::msg::rmw::ChannelFloat32;
+    type RmwMsg = super::msg::rmw::ChannelFloat32;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        name: msg.name.as_str().into(),
-        values: msg.values.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        name: msg.name.as_str().into(),
-        values: msg.values.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                name: msg.name.as_str().into(),
+                values: msg.values.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                name: msg.name.as_str().into(),
+                values: msg.values.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      name: msg.name.to_string(),
-      values: msg.values
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            name: msg.name.to_string(),
+            values: msg.values.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__CompressedImage
 /// This message contains a compressed image.
@@ -540,46 +520,48 @@ pub struct CompressedImage {
 
     /// Compressed image buffer
     pub data: Vec<u8>,
-
 }
 
-
-
 impl Default for CompressedImage {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::CompressedImage::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::CompressedImage::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for CompressedImage {
-  type RmwMsg = super::msg::rmw::CompressedImage;
+    type RmwMsg = super::msg::rmw::CompressedImage;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        format: msg.format.as_str().into(),
-        data: msg.data.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        format: msg.format.as_str().into(),
-        data: msg.data.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                format: msg.format.as_str().into(),
+                data: msg.data.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                format: msg.format.as_str().into(),
+                data: msg.data.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      format: msg.format.to_string(),
-      data: msg.data
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            format: msg.format.to_string(),
+            data: msg.data.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__FluidPressure
 /// Single pressure reading.  This message is appropriate for measuring the
@@ -600,44 +582,48 @@ pub struct FluidPressure {
 
     /// 0 is interpreted as variance unknown
     pub variance: f64,
-
 }
 
-
-
 impl Default for FluidPressure {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::FluidPressure::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::FluidPressure::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for FluidPressure {
-  type RmwMsg = super::msg::rmw::FluidPressure;
+    type RmwMsg = super::msg::rmw::FluidPressure;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        fluid_pressure: msg.fluid_pressure,
-        variance: msg.variance,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      fluid_pressure: msg.fluid_pressure,
-      variance: msg.variance,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                fluid_pressure: msg.fluid_pressure,
+                variance: msg.variance,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                fluid_pressure: msg.fluid_pressure,
+                variance: msg.variance,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      fluid_pressure: msg.fluid_pressure,
-      variance: msg.variance,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            fluid_pressure: msg.fluid_pressure,
+            variance: msg.variance,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__Illuminance
 /// Single photometric illuminance measurement.  Light should be assumed to be
@@ -666,44 +652,48 @@ pub struct Illuminance {
 
     /// 0 is interpreted as variance unknown
     pub variance: f64,
-
 }
 
-
-
 impl Default for Illuminance {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Illuminance::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::Illuminance::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for Illuminance {
-  type RmwMsg = super::msg::rmw::Illuminance;
+    type RmwMsg = super::msg::rmw::Illuminance;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        illuminance: msg.illuminance,
-        variance: msg.variance,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      illuminance: msg.illuminance,
-      variance: msg.variance,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                illuminance: msg.illuminance,
+                variance: msg.variance,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                illuminance: msg.illuminance,
+                variance: msg.variance,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      illuminance: msg.illuminance,
-      variance: msg.variance,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            illuminance: msg.illuminance,
+            variance: msg.variance,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__Image
 /// This message contains an uncompressed image
@@ -744,58 +734,58 @@ pub struct Image {
 
     /// actual matrix data, size is (step * rows)
     pub data: Vec<u8>,
-
 }
 
-
-
 impl Default for Image {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Image::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Image::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for Image {
-  type RmwMsg = super::msg::rmw::Image;
+    type RmwMsg = super::msg::rmw::Image;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        height: msg.height,
-        width: msg.width,
-        encoding: msg.encoding.as_str().into(),
-        is_bigendian: msg.is_bigendian,
-        step: msg.step,
-        data: msg.data.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      height: msg.height,
-      width: msg.width,
-        encoding: msg.encoding.as_str().into(),
-      is_bigendian: msg.is_bigendian,
-      step: msg.step,
-        data: msg.data.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                height: msg.height,
+                width: msg.width,
+                encoding: msg.encoding.as_str().into(),
+                is_bigendian: msg.is_bigendian,
+                step: msg.step,
+                data: msg.data.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                height: msg.height,
+                width: msg.width,
+                encoding: msg.encoding.as_str().into(),
+                is_bigendian: msg.is_bigendian,
+                step: msg.step,
+                data: msg.data.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      height: msg.height,
-      width: msg.width,
-      encoding: msg.encoding.to_string(),
-      is_bigendian: msg.is_bigendian,
-      step: msg.step,
-      data: msg.data
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            height: msg.height,
+            width: msg.width,
+            encoding: msg.encoding.to_string(),
+            is_bigendian: msg.is_bigendian,
+            step: msg.step,
+            data: msg.data.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__Imu
 /// This is a message to hold data from an IMU (Inertial Measurement Unit)
@@ -815,11 +805,9 @@ impl rosidl_runtime_rs::Message for Image {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Imu {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::Header,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
@@ -828,7 +816,6 @@ pub struct Imu {
     /// Row major about x, y, z axes
     pub orientation_covariance: [f64; 9],
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub angular_velocity: geometry_msgs::msg::Vector3,
@@ -836,63 +823,84 @@ pub struct Imu {
     /// Row major about x, y, z axes
     pub angular_velocity_covariance: [f64; 9],
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub linear_acceleration: geometry_msgs::msg::Vector3,
 
     /// Row major x, y z
     pub linear_acceleration_covariance: [f64; 9],
-
 }
 
-
-
 impl Default for Imu {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Imu::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Imu::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for Imu {
-  type RmwMsg = super::msg::rmw::Imu;
+    type RmwMsg = super::msg::rmw::Imu;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        orientation: geometry_msgs::msg::Quaternion::into_rmw_message(std::borrow::Cow::Owned(msg.orientation)).into_owned(),
-        orientation_covariance: msg.orientation_covariance,
-        angular_velocity: geometry_msgs::msg::Vector3::into_rmw_message(std::borrow::Cow::Owned(msg.angular_velocity)).into_owned(),
-        angular_velocity_covariance: msg.angular_velocity_covariance,
-        linear_acceleration: geometry_msgs::msg::Vector3::into_rmw_message(std::borrow::Cow::Owned(msg.linear_acceleration)).into_owned(),
-        linear_acceleration_covariance: msg.linear_acceleration_covariance,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        orientation: geometry_msgs::msg::Quaternion::into_rmw_message(std::borrow::Cow::Borrowed(&msg.orientation)).into_owned(),
-        orientation_covariance: msg.orientation_covariance,
-        angular_velocity: geometry_msgs::msg::Vector3::into_rmw_message(std::borrow::Cow::Borrowed(&msg.angular_velocity)).into_owned(),
-        angular_velocity_covariance: msg.angular_velocity_covariance,
-        linear_acceleration: geometry_msgs::msg::Vector3::into_rmw_message(std::borrow::Cow::Borrowed(&msg.linear_acceleration)).into_owned(),
-        linear_acceleration_covariance: msg.linear_acceleration_covariance,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                orientation: geometry_msgs::msg::Quaternion::into_rmw_message(
+                    std::borrow::Cow::Owned(msg.orientation),
+                )
+                .into_owned(),
+                orientation_covariance: msg.orientation_covariance,
+                angular_velocity: geometry_msgs::msg::Vector3::into_rmw_message(
+                    std::borrow::Cow::Owned(msg.angular_velocity),
+                )
+                .into_owned(),
+                angular_velocity_covariance: msg.angular_velocity_covariance,
+                linear_acceleration: geometry_msgs::msg::Vector3::into_rmw_message(
+                    std::borrow::Cow::Owned(msg.linear_acceleration),
+                )
+                .into_owned(),
+                linear_acceleration_covariance: msg.linear_acceleration_covariance,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                orientation: geometry_msgs::msg::Quaternion::into_rmw_message(
+                    std::borrow::Cow::Borrowed(&msg.orientation),
+                )
+                .into_owned(),
+                orientation_covariance: msg.orientation_covariance,
+                angular_velocity: geometry_msgs::msg::Vector3::into_rmw_message(
+                    std::borrow::Cow::Borrowed(&msg.angular_velocity),
+                )
+                .into_owned(),
+                angular_velocity_covariance: msg.angular_velocity_covariance,
+                linear_acceleration: geometry_msgs::msg::Vector3::into_rmw_message(
+                    std::borrow::Cow::Borrowed(&msg.linear_acceleration),
+                )
+                .into_owned(),
+                linear_acceleration_covariance: msg.linear_acceleration_covariance,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      orientation: geometry_msgs::msg::Quaternion::from_rmw_message(msg.orientation),
-      orientation_covariance: msg.orientation_covariance,
-      angular_velocity: geometry_msgs::msg::Vector3::from_rmw_message(msg.angular_velocity),
-      angular_velocity_covariance: msg.angular_velocity_covariance,
-      linear_acceleration: geometry_msgs::msg::Vector3::from_rmw_message(msg.linear_acceleration),
-      linear_acceleration_covariance: msg.linear_acceleration_covariance,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            orientation: geometry_msgs::msg::Quaternion::from_rmw_message(msg.orientation),
+            orientation_covariance: msg.orientation_covariance,
+            angular_velocity: geometry_msgs::msg::Vector3::from_rmw_message(msg.angular_velocity),
+            angular_velocity_covariance: msg.angular_velocity_covariance,
+            linear_acceleration: geometry_msgs::msg::Vector3::from_rmw_message(
+                msg.linear_acceleration,
+            ),
+            linear_acceleration_covariance: msg.linear_acceleration_covariance,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__JointState
 /// This is a message that holds data to describe the state of a set of torque controlled joints.
@@ -917,89 +925,77 @@ impl rosidl_runtime_rs::Message for Imu {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct JointState {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::Header,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub name: Vec<std::string::String>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub position: Vec<f64>,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub velocity: Vec<f64>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub effort: Vec<f64>,
-
 }
 
-
-
 impl Default for JointState {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::JointState::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::JointState::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for JointState {
-  type RmwMsg = super::msg::rmw::JointState;
+    type RmwMsg = super::msg::rmw::JointState;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        name: msg.name
-          .into_iter()
-          .map(|elem| elem.as_str().into())
-          .collect(),
-        position: msg.position.into(),
-        velocity: msg.velocity.into(),
-        effort: msg.effort.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        name: msg.name
-          .iter()
-          .map(|elem| elem.as_str().into())
-          .collect(),
-        position: msg.position.as_slice().into(),
-        velocity: msg.velocity.as_slice().into(),
-        effort: msg.effort.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                name: msg
+                    .name
+                    .into_iter()
+                    .map(|elem| elem.as_str().into())
+                    .collect(),
+                position: msg.position.into(),
+                velocity: msg.velocity.into(),
+                effort: msg.effort.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                name: msg.name.iter().map(|elem| elem.as_str().into()).collect(),
+                position: msg.position.as_slice().into(),
+                velocity: msg.velocity.as_slice().into(),
+                effort: msg.effort.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      name: msg.name
-          .into_iter()
-          .map(|elem| elem.to_string())
-          .collect(),
-      position: msg.position
-          .into_iter()
-          .collect(),
-      velocity: msg.velocity
-          .into_iter()
-          .collect(),
-      effort: msg.effort
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            name: msg.name.into_iter().map(|elem| elem.to_string()).collect(),
+            position: msg.position.into_iter().collect(),
+            velocity: msg.velocity.into_iter().collect(),
+            effort: msg.effort.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__Joy
 /// Reports the state of a joystick's axes and buttons.
@@ -1015,48 +1011,46 @@ pub struct Joy {
 
     /// The buttons measurements from a joystick.
     pub buttons: Vec<i32>,
-
 }
 
-
-
 impl Default for Joy {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Joy::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Joy::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for Joy {
-  type RmwMsg = super::msg::rmw::Joy;
+    type RmwMsg = super::msg::rmw::Joy;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        axes: msg.axes.into(),
-        buttons: msg.buttons.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        axes: msg.axes.as_slice().into(),
-        buttons: msg.buttons.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                axes: msg.axes.into(),
+                buttons: msg.buttons.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                axes: msg.axes.as_slice().into(),
+                buttons: msg.buttons.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      axes: msg.axes
-          .into_iter()
-          .collect(),
-      buttons: msg.buttons
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            axes: msg.axes.into_iter().collect(),
+            buttons: msg.buttons.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__JoyFeedback
 /// Declare of the type of feedback
@@ -1064,7 +1058,6 @@ impl rosidl_runtime_rs::Message for Joy {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct JoyFeedback {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub type_: u8,
@@ -1076,61 +1069,56 @@ pub struct JoyFeedback {
     /// Intensity of the feedback, from 0.0 to 1.0, inclusive.  If device is
     /// actually binary, driver should treat 0<=x<0.5 as off, 0.5<=x<=1 as on.
     pub intensity: f32,
-
 }
 
 impl JoyFeedback {
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const TYPE_LED: u8 = 0;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const TYPE_RUMBLE: u8 = 1;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const TYPE_BUZZER: u8 = 2;
-
 }
 
-
 impl Default for JoyFeedback {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::JoyFeedback::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::JoyFeedback::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for JoyFeedback {
-  type RmwMsg = super::msg::rmw::JoyFeedback;
+    type RmwMsg = super::msg::rmw::JoyFeedback;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        type_: msg.type_,
-        id: msg.id,
-        intensity: msg.intensity,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-      type_: msg.type_,
-      id: msg.id,
-      intensity: msg.intensity,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                type_: msg.type_,
+                id: msg.id,
+                intensity: msg.intensity,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                type_: msg.type_,
+                id: msg.id,
+                intensity: msg.intensity,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      type_: msg.type_,
-      id: msg.id,
-      intensity: msg.intensity,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            type_: msg.type_,
+            id: msg.id,
+            intensity: msg.intensity,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__JoyFeedbackArray
 /// This message publishes values for multiple feedback at once.
@@ -1138,51 +1126,57 @@ impl rosidl_runtime_rs::Message for JoyFeedback {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct JoyFeedbackArray {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub array: Vec<super::msg::JoyFeedback>,
-
 }
 
-
-
 impl Default for JoyFeedbackArray {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::JoyFeedbackArray::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::JoyFeedbackArray::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for JoyFeedbackArray {
-  type RmwMsg = super::msg::rmw::JoyFeedbackArray;
+    type RmwMsg = super::msg::rmw::JoyFeedbackArray;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        array: msg.array
-          .into_iter()
-          .map(|elem| super::msg::JoyFeedback::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        array: msg.array
-          .iter()
-          .map(|elem| super::msg::JoyFeedback::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                array: msg
+                    .array
+                    .into_iter()
+                    .map(|elem| {
+                        super::msg::JoyFeedback::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                array: msg
+                    .array
+                    .iter()
+                    .map(|elem| {
+                        super::msg::JoyFeedback::into_rmw_message(std::borrow::Cow::Borrowed(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      array: msg.array
-          .into_iter()
-          .map(super::msg::JoyFeedback::from_rmw_message)
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            array: msg
+                .array
+                .into_iter()
+                .map(super::msg::JoyFeedback::from_rmw_message)
+                .collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__LaserEcho
 /// This message is a submessage of MultiEchoLaserScan and is not intended
@@ -1194,40 +1188,34 @@ pub struct LaserEcho {
     /// Multiple values of ranges or intensities.
     /// Each array represents data from the same angle increment.
     pub echoes: Vec<f32>,
-
 }
 
-
-
 impl Default for LaserEcho {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::LaserEcho::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::LaserEcho::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for LaserEcho {
-  type RmwMsg = super::msg::rmw::LaserEcho;
+    type RmwMsg = super::msg::rmw::LaserEcho;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        echoes: msg.echoes.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        echoes: msg.echoes.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                echoes: msg.echoes.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                echoes: msg.echoes.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      echoes: msg.echoes
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            echoes: msg.echoes.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__LaserScan
 /// Single scan from a planar laser range-finder
@@ -1278,69 +1266,67 @@ pub struct LaserScan {
     /// device does not provide intensities, please leave
     /// the array empty.
     pub intensities: Vec<f32>,
-
 }
 
-
-
 impl Default for LaserScan {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::LaserScan::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::LaserScan::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for LaserScan {
-  type RmwMsg = super::msg::rmw::LaserScan;
+    type RmwMsg = super::msg::rmw::LaserScan;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        angle_min: msg.angle_min,
-        angle_max: msg.angle_max,
-        angle_increment: msg.angle_increment,
-        time_increment: msg.time_increment,
-        scan_time: msg.scan_time,
-        range_min: msg.range_min,
-        range_max: msg.range_max,
-        ranges: msg.ranges.into(),
-        intensities: msg.intensities.into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      angle_min: msg.angle_min,
-      angle_max: msg.angle_max,
-      angle_increment: msg.angle_increment,
-      time_increment: msg.time_increment,
-      scan_time: msg.scan_time,
-      range_min: msg.range_min,
-      range_max: msg.range_max,
-        ranges: msg.ranges.as_slice().into(),
-        intensities: msg.intensities.as_slice().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                angle_min: msg.angle_min,
+                angle_max: msg.angle_max,
+                angle_increment: msg.angle_increment,
+                time_increment: msg.time_increment,
+                scan_time: msg.scan_time,
+                range_min: msg.range_min,
+                range_max: msg.range_max,
+                ranges: msg.ranges.into(),
+                intensities: msg.intensities.into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                angle_min: msg.angle_min,
+                angle_max: msg.angle_max,
+                angle_increment: msg.angle_increment,
+                time_increment: msg.time_increment,
+                scan_time: msg.scan_time,
+                range_min: msg.range_min,
+                range_max: msg.range_max,
+                ranges: msg.ranges.as_slice().into(),
+                intensities: msg.intensities.as_slice().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      angle_min: msg.angle_min,
-      angle_max: msg.angle_max,
-      angle_increment: msg.angle_increment,
-      time_increment: msg.time_increment,
-      scan_time: msg.scan_time,
-      range_min: msg.range_min,
-      range_max: msg.range_max,
-      ranges: msg.ranges
-          .into_iter()
-          .collect(),
-      intensities: msg.intensities
-          .into_iter()
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            angle_min: msg.angle_min,
+            angle_max: msg.angle_max,
+            angle_increment: msg.angle_increment,
+            time_increment: msg.time_increment,
+            scan_time: msg.scan_time,
+            range_min: msg.range_min,
+            range_max: msg.range_max,
+            ranges: msg.ranges.into_iter().collect(),
+            intensities: msg.intensities.into_iter().collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__MagneticField
 /// Measurement of the Magnetic Field vector at a specific location.
@@ -1370,44 +1356,54 @@ pub struct MagneticField {
     /// Row major about x, y, z axes
     /// 0 is interpreted as variance unknown
     pub magnetic_field_covariance: [f64; 9],
-
 }
 
-
-
 impl Default for MagneticField {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::MagneticField::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::MagneticField::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for MagneticField {
-  type RmwMsg = super::msg::rmw::MagneticField;
+    type RmwMsg = super::msg::rmw::MagneticField;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        magnetic_field: geometry_msgs::msg::Vector3::into_rmw_message(std::borrow::Cow::Owned(msg.magnetic_field)).into_owned(),
-        magnetic_field_covariance: msg.magnetic_field_covariance,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        magnetic_field: geometry_msgs::msg::Vector3::into_rmw_message(std::borrow::Cow::Borrowed(&msg.magnetic_field)).into_owned(),
-        magnetic_field_covariance: msg.magnetic_field_covariance,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                magnetic_field: geometry_msgs::msg::Vector3::into_rmw_message(
+                    std::borrow::Cow::Owned(msg.magnetic_field),
+                )
+                .into_owned(),
+                magnetic_field_covariance: msg.magnetic_field_covariance,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                magnetic_field: geometry_msgs::msg::Vector3::into_rmw_message(
+                    std::borrow::Cow::Borrowed(&msg.magnetic_field),
+                )
+                .into_owned(),
+                magnetic_field_covariance: msg.magnetic_field_covariance,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      magnetic_field: geometry_msgs::msg::Vector3::from_rmw_message(msg.magnetic_field),
-      magnetic_field_covariance: msg.magnetic_field_covariance,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            magnetic_field: geometry_msgs::msg::Vector3::from_rmw_message(msg.magnetic_field),
+            magnetic_field_covariance: msg.magnetic_field_covariance,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__MultiDOFJointState
 /// Representation of state for joints with multiple degrees of freedom,
@@ -1433,110 +1429,147 @@ impl rosidl_runtime_rs::Message for MagneticField {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct MultiDOFJointState {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::Header,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub joint_names: Vec<std::string::String>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub transforms: Vec<geometry_msgs::msg::Transform>,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub twist: Vec<geometry_msgs::msg::Twist>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub wrench: Vec<geometry_msgs::msg::Wrench>,
-
 }
 
-
-
 impl Default for MultiDOFJointState {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::MultiDOFJointState::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::MultiDOFJointState::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for MultiDOFJointState {
-  type RmwMsg = super::msg::rmw::MultiDOFJointState;
+    type RmwMsg = super::msg::rmw::MultiDOFJointState;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        joint_names: msg.joint_names
-          .into_iter()
-          .map(|elem| elem.as_str().into())
-          .collect(),
-        transforms: msg.transforms
-          .into_iter()
-          .map(|elem| geometry_msgs::msg::Transform::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-        twist: msg.twist
-          .into_iter()
-          .map(|elem| geometry_msgs::msg::Twist::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-        wrench: msg.wrench
-          .into_iter()
-          .map(|elem| geometry_msgs::msg::Wrench::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        joint_names: msg.joint_names
-          .iter()
-          .map(|elem| elem.as_str().into())
-          .collect(),
-        transforms: msg.transforms
-          .iter()
-          .map(|elem| geometry_msgs::msg::Transform::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-        twist: msg.twist
-          .iter()
-          .map(|elem| geometry_msgs::msg::Twist::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-        wrench: msg.wrench
-          .iter()
-          .map(|elem| geometry_msgs::msg::Wrench::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                joint_names: msg
+                    .joint_names
+                    .into_iter()
+                    .map(|elem| elem.as_str().into())
+                    .collect(),
+                transforms: msg
+                    .transforms
+                    .into_iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Transform::into_rmw_message(std::borrow::Cow::Owned(
+                            elem,
+                        ))
+                        .into_owned()
+                    })
+                    .collect(),
+                twist: msg
+                    .twist
+                    .into_iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Twist::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+                wrench: msg
+                    .wrench
+                    .into_iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Wrench::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                joint_names: msg
+                    .joint_names
+                    .iter()
+                    .map(|elem| elem.as_str().into())
+                    .collect(),
+                transforms: msg
+                    .transforms
+                    .iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Transform::into_rmw_message(std::borrow::Cow::Borrowed(
+                            elem,
+                        ))
+                        .into_owned()
+                    })
+                    .collect(),
+                twist: msg
+                    .twist
+                    .iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Twist::into_rmw_message(std::borrow::Cow::Borrowed(
+                            elem,
+                        ))
+                        .into_owned()
+                    })
+                    .collect(),
+                wrench: msg
+                    .wrench
+                    .iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Wrench::into_rmw_message(std::borrow::Cow::Borrowed(
+                            elem,
+                        ))
+                        .into_owned()
+                    })
+                    .collect(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      joint_names: msg.joint_names
-          .into_iter()
-          .map(|elem| elem.to_string())
-          .collect(),
-      transforms: msg.transforms
-          .into_iter()
-          .map(geometry_msgs::msg::Transform::from_rmw_message)
-          .collect(),
-      twist: msg.twist
-          .into_iter()
-          .map(geometry_msgs::msg::Twist::from_rmw_message)
-          .collect(),
-      wrench: msg.wrench
-          .into_iter()
-          .map(geometry_msgs::msg::Wrench::from_rmw_message)
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            joint_names: msg
+                .joint_names
+                .into_iter()
+                .map(|elem| elem.to_string())
+                .collect(),
+            transforms: msg
+                .transforms
+                .into_iter()
+                .map(geometry_msgs::msg::Transform::from_rmw_message)
+                .collect(),
+            twist: msg
+                .twist
+                .into_iter()
+                .map(geometry_msgs::msg::Twist::from_rmw_message)
+                .collect(),
+            wrench: msg
+                .wrench
+                .into_iter()
+                .map(geometry_msgs::msg::Wrench::from_rmw_message)
+                .collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__MultiEchoLaserScan
 /// Single scan from a multi-echo planar laser range-finder
@@ -1589,83 +1622,105 @@ pub struct MultiEchoLaserScan {
     /// device does not provide intensities, please leave
     /// the array empty.
     pub intensities: Vec<super::msg::LaserEcho>,
-
 }
 
-
-
 impl Default for MultiEchoLaserScan {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::MultiEchoLaserScan::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::MultiEchoLaserScan::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for MultiEchoLaserScan {
-  type RmwMsg = super::msg::rmw::MultiEchoLaserScan;
+    type RmwMsg = super::msg::rmw::MultiEchoLaserScan;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        angle_min: msg.angle_min,
-        angle_max: msg.angle_max,
-        angle_increment: msg.angle_increment,
-        time_increment: msg.time_increment,
-        scan_time: msg.scan_time,
-        range_min: msg.range_min,
-        range_max: msg.range_max,
-        ranges: msg.ranges
-          .into_iter()
-          .map(|elem| super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-        intensities: msg.intensities
-          .into_iter()
-          .map(|elem| super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      angle_min: msg.angle_min,
-      angle_max: msg.angle_max,
-      angle_increment: msg.angle_increment,
-      time_increment: msg.time_increment,
-      scan_time: msg.scan_time,
-      range_min: msg.range_min,
-      range_max: msg.range_max,
-        ranges: msg.ranges
-          .iter()
-          .map(|elem| super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-        intensities: msg.intensities
-          .iter()
-          .map(|elem| super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                angle_min: msg.angle_min,
+                angle_max: msg.angle_max,
+                angle_increment: msg.angle_increment,
+                time_increment: msg.time_increment,
+                scan_time: msg.scan_time,
+                range_min: msg.range_min,
+                range_max: msg.range_max,
+                ranges: msg
+                    .ranges
+                    .into_iter()
+                    .map(|elem| {
+                        super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+                intensities: msg
+                    .intensities
+                    .into_iter()
+                    .map(|elem| {
+                        super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                angle_min: msg.angle_min,
+                angle_max: msg.angle_max,
+                angle_increment: msg.angle_increment,
+                time_increment: msg.time_increment,
+                scan_time: msg.scan_time,
+                range_min: msg.range_min,
+                range_max: msg.range_max,
+                ranges: msg
+                    .ranges
+                    .iter()
+                    .map(|elem| {
+                        super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Borrowed(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+                intensities: msg
+                    .intensities
+                    .iter()
+                    .map(|elem| {
+                        super::msg::LaserEcho::into_rmw_message(std::borrow::Cow::Borrowed(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      angle_min: msg.angle_min,
-      angle_max: msg.angle_max,
-      angle_increment: msg.angle_increment,
-      time_increment: msg.time_increment,
-      scan_time: msg.scan_time,
-      range_min: msg.range_min,
-      range_max: msg.range_max,
-      ranges: msg.ranges
-          .into_iter()
-          .map(super::msg::LaserEcho::from_rmw_message)
-          .collect(),
-      intensities: msg.intensities
-          .into_iter()
-          .map(super::msg::LaserEcho::from_rmw_message)
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            angle_min: msg.angle_min,
+            angle_max: msg.angle_max,
+            angle_increment: msg.angle_increment,
+            time_increment: msg.time_increment,
+            scan_time: msg.scan_time,
+            range_min: msg.range_min,
+            range_max: msg.range_max,
+            ranges: msg
+                .ranges
+                .into_iter()
+                .map(super::msg::LaserEcho::from_rmw_message)
+                .collect(),
+            intensities: msg
+                .intensities
+                .into_iter()
+                .map(super::msg::LaserEcho::from_rmw_message)
+                .collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__NavSatFix
 /// Navigation Satellite fix for any Global Navigation Satellite System
@@ -1705,11 +1760,9 @@ pub struct NavSatFix {
     /// Beware: this coordinate system exhibits singularities at the poles.
     pub position_covariance: [f64; 9],
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub position_covariance_type: u8,
-
 }
 
 impl NavSatFix {
@@ -1719,69 +1772,75 @@ impl NavSatFix {
     /// estimate an approximate covariance from that.
     pub const COVARIANCE_TYPE_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const COVARIANCE_TYPE_APPROXIMATED: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const COVARIANCE_TYPE_DIAGONAL_KNOWN: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const COVARIANCE_TYPE_KNOWN: u8 = 3;
-
 }
 
-
 impl Default for NavSatFix {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::NavSatFix::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::NavSatFix::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for NavSatFix {
-  type RmwMsg = super::msg::rmw::NavSatFix;
+    type RmwMsg = super::msg::rmw::NavSatFix;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        status: super::msg::NavSatStatus::into_rmw_message(std::borrow::Cow::Owned(msg.status)).into_owned(),
-        latitude: msg.latitude,
-        longitude: msg.longitude,
-        altitude: msg.altitude,
-        position_covariance: msg.position_covariance,
-        position_covariance_type: msg.position_covariance_type,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        status: super::msg::NavSatStatus::into_rmw_message(std::borrow::Cow::Borrowed(&msg.status)).into_owned(),
-      latitude: msg.latitude,
-      longitude: msg.longitude,
-      altitude: msg.altitude,
-        position_covariance: msg.position_covariance,
-      position_covariance_type: msg.position_covariance_type,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                status: super::msg::NavSatStatus::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.status,
+                ))
+                .into_owned(),
+                latitude: msg.latitude,
+                longitude: msg.longitude,
+                altitude: msg.altitude,
+                position_covariance: msg.position_covariance,
+                position_covariance_type: msg.position_covariance_type,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                status: super::msg::NavSatStatus::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.status,
+                ))
+                .into_owned(),
+                latitude: msg.latitude,
+                longitude: msg.longitude,
+                altitude: msg.altitude,
+                position_covariance: msg.position_covariance,
+                position_covariance_type: msg.position_covariance_type,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      status: super::msg::NavSatStatus::from_rmw_message(msg.status),
-      latitude: msg.latitude,
-      longitude: msg.longitude,
-      altitude: msg.altitude,
-      position_covariance: msg.position_covariance,
-      position_covariance_type: msg.position_covariance_type,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            status: super::msg::NavSatStatus::from_rmw_message(msg.status),
+            latitude: msg.latitude,
+            longitude: msg.longitude,
+            altitude: msg.altitude,
+            position_covariance: msg.position_covariance,
+            position_covariance_type: msg.position_covariance_type,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__NavSatStatus
 /// Navigation Satellite fix status for any Global Navigation Satellite System.
@@ -1793,16 +1852,13 @@ impl rosidl_runtime_rs::Message for NavSatFix {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct NavSatStatus {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub status: i8,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub service: u16,
-
 }
 
 impl NavSatStatus {
@@ -1822,7 +1878,6 @@ impl NavSatStatus {
     /// used by the receiver.
     pub const SERVICE_GPS: u16 = 1;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const SERVICE_GLONASS: u16 = 2;
@@ -1830,44 +1885,42 @@ impl NavSatStatus {
     /// includes BeiDou.
     pub const SERVICE_COMPASS: u16 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const SERVICE_GALILEO: u16 = 8;
-
 }
 
-
 impl Default for NavSatStatus {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::NavSatStatus::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::NavSatStatus::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for NavSatStatus {
-  type RmwMsg = super::msg::rmw::NavSatStatus;
+    type RmwMsg = super::msg::rmw::NavSatStatus;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        status: msg.status,
-        service: msg.service,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-      status: msg.status,
-      service: msg.service,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                status: msg.status,
+                service: msg.service,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                status: msg.status,
+                service: msg.service,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      status: msg.status,
-      service: msg.service,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            status: msg.status,
+            service: msg.service,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__PointCloud
 /// THIS MESSAGE IS DEPRECATED AS OF FOXY
@@ -1889,62 +1942,88 @@ pub struct PointCloud {
     /// and the data in each channel should correspond 1:1 with each point.
     /// Channel names in common practice are listed in ChannelFloat32.msg.
     pub channels: Vec<super::msg::ChannelFloat32>,
-
 }
 
-
-
 impl Default for PointCloud {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::PointCloud::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::PointCloud::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for PointCloud {
-  type RmwMsg = super::msg::rmw::PointCloud;
+    type RmwMsg = super::msg::rmw::PointCloud;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        points: msg.points
-          .into_iter()
-          .map(|elem| geometry_msgs::msg::Point32::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-        channels: msg.channels
-          .into_iter()
-          .map(|elem| super::msg::ChannelFloat32::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        points: msg.points
-          .iter()
-          .map(|elem| geometry_msgs::msg::Point32::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-        channels: msg.channels
-          .iter()
-          .map(|elem| super::msg::ChannelFloat32::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                points: msg
+                    .points
+                    .into_iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Point32::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+                channels: msg
+                    .channels
+                    .into_iter()
+                    .map(|elem| {
+                        super::msg::ChannelFloat32::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                points: msg
+                    .points
+                    .iter()
+                    .map(|elem| {
+                        geometry_msgs::msg::Point32::into_rmw_message(std::borrow::Cow::Borrowed(
+                            elem,
+                        ))
+                        .into_owned()
+                    })
+                    .collect(),
+                channels: msg
+                    .channels
+                    .iter()
+                    .map(|elem| {
+                        super::msg::ChannelFloat32::into_rmw_message(std::borrow::Cow::Borrowed(
+                            elem,
+                        ))
+                        .into_owned()
+                    })
+                    .collect(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      points: msg.points
-          .into_iter()
-          .map(geometry_msgs::msg::Point32::from_rmw_message)
-          .collect(),
-      channels: msg.channels
-          .into_iter()
-          .map(super::msg::ChannelFloat32::from_rmw_message)
-          .collect(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            points: msg
+                .points
+                .into_iter()
+                .map(geometry_msgs::msg::Point32::from_rmw_message)
+                .collect(),
+            channels: msg
+                .channels
+                .into_iter()
+                .map(super::msg::ChannelFloat32::from_rmw_message)
+                .collect(),
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__PointCloud2
 /// This message holds a collection of N-dimensional points, which may
@@ -1965,7 +2044,6 @@ pub struct PointCloud2 {
     /// 2D structure of the point cloud. If the cloud is unordered, height is
     /// 1 and width is the length of the point cloud.
     pub height: u32,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
@@ -1988,73 +2066,84 @@ pub struct PointCloud2 {
 
     /// True if there are no invalid points
     pub is_dense: bool,
-
 }
 
-
-
 impl Default for PointCloud2 {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::PointCloud2::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::PointCloud2::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for PointCloud2 {
-  type RmwMsg = super::msg::rmw::PointCloud2;
+    type RmwMsg = super::msg::rmw::PointCloud2;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        height: msg.height,
-        width: msg.width,
-        fields: msg.fields
-          .into_iter()
-          .map(|elem| super::msg::PointField::into_rmw_message(std::borrow::Cow::Owned(elem)).into_owned())
-          .collect(),
-        is_bigendian: msg.is_bigendian,
-        point_step: msg.point_step,
-        row_step: msg.row_step,
-        data: msg.data.into(),
-        is_dense: msg.is_dense,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      height: msg.height,
-      width: msg.width,
-        fields: msg.fields
-          .iter()
-          .map(|elem| super::msg::PointField::into_rmw_message(std::borrow::Cow::Borrowed(elem)).into_owned())
-          .collect(),
-      is_bigendian: msg.is_bigendian,
-      point_step: msg.point_step,
-      row_step: msg.row_step,
-        data: msg.data.as_slice().into(),
-      is_dense: msg.is_dense,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                height: msg.height,
+                width: msg.width,
+                fields: msg
+                    .fields
+                    .into_iter()
+                    .map(|elem| {
+                        super::msg::PointField::into_rmw_message(std::borrow::Cow::Owned(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+                is_bigendian: msg.is_bigendian,
+                point_step: msg.point_step,
+                row_step: msg.row_step,
+                data: msg.data.into(),
+                is_dense: msg.is_dense,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                height: msg.height,
+                width: msg.width,
+                fields: msg
+                    .fields
+                    .iter()
+                    .map(|elem| {
+                        super::msg::PointField::into_rmw_message(std::borrow::Cow::Borrowed(elem))
+                            .into_owned()
+                    })
+                    .collect(),
+                is_bigendian: msg.is_bigendian,
+                point_step: msg.point_step,
+                row_step: msg.row_step,
+                data: msg.data.as_slice().into(),
+                is_dense: msg.is_dense,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      height: msg.height,
-      width: msg.width,
-      fields: msg.fields
-          .into_iter()
-          .map(super::msg::PointField::from_rmw_message)
-          .collect(),
-      is_bigendian: msg.is_bigendian,
-      point_step: msg.point_step,
-      row_step: msg.row_step,
-      data: msg.data
-          .into_iter()
-          .collect(),
-      is_dense: msg.is_dense,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            height: msg.height,
+            width: msg.width,
+            fields: msg
+                .fields
+                .into_iter()
+                .map(super::msg::PointField::from_rmw_message)
+                .collect(),
+            is_bigendian: msg.is_bigendian,
+            point_step: msg.point_step,
+            row_step: msg.row_step,
+            data: msg.data.into_iter().collect(),
+            is_dense: msg.is_dense,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__PointField
 /// This message holds the description of one point entry in the
@@ -2075,89 +2164,79 @@ pub struct PointField {
 
     /// How many elements in the field
     pub count: u32,
-
 }
 
 impl PointField {
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INT8: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const UINT8: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INT16: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const UINT16: u8 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INT32: u8 = 5;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const UINT32: u8 = 6;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const FLOAT32: u8 = 7;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const FLOAT64: u8 = 8;
-
 }
 
-
 impl Default for PointField {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::PointField::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::PointField::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for PointField {
-  type RmwMsg = super::msg::rmw::PointField;
+    type RmwMsg = super::msg::rmw::PointField;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        name: msg.name.as_str().into(),
-        offset: msg.offset,
-        datatype: msg.datatype,
-        count: msg.count,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        name: msg.name.as_str().into(),
-      offset: msg.offset,
-      datatype: msg.datatype,
-      count: msg.count,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                name: msg.name.as_str().into(),
+                offset: msg.offset,
+                datatype: msg.datatype,
+                count: msg.count,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                name: msg.name.as_str().into(),
+                offset: msg.offset,
+                datatype: msg.datatype,
+                count: msg.count,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      name: msg.name.to_string(),
-      offset: msg.offset,
-      datatype: msg.datatype,
-      count: msg.count,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            name: msg.name.to_string(),
+            offset: msg.offset,
+            datatype: msg.datatype,
+            count: msg.count,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__Range
 /// Single range reading from an active ranger that emits energy and reports
@@ -2204,7 +2283,6 @@ pub struct Range {
     /// +Inf represents no detection within the fixed distance.
     /// (Object out of range)
     pub range: f32,
-
 }
 
 impl Range {
@@ -2212,56 +2290,58 @@ impl Range {
     /// If you want a value added to this list, send an email to the ros-users list
     pub const ULTRASOUND: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INFRARED: u8 = 1;
-
 }
 
-
 impl Default for Range {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Range::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Range::default())
+    }
 }
 
 impl rosidl_runtime_rs::Message for Range {
-  type RmwMsg = super::msg::rmw::Range;
+    type RmwMsg = super::msg::rmw::Range;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        radiation_type: msg.radiation_type,
-        field_of_view: msg.field_of_view,
-        min_range: msg.min_range,
-        max_range: msg.max_range,
-        range: msg.range,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      radiation_type: msg.radiation_type,
-      field_of_view: msg.field_of_view,
-      min_range: msg.min_range,
-      max_range: msg.max_range,
-      range: msg.range,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                radiation_type: msg.radiation_type,
+                field_of_view: msg.field_of_view,
+                min_range: msg.min_range,
+                max_range: msg.max_range,
+                range: msg.range,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                radiation_type: msg.radiation_type,
+                field_of_view: msg.field_of_view,
+                min_range: msg.min_range,
+                max_range: msg.max_range,
+                range: msg.range,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      radiation_type: msg.radiation_type,
-      field_of_view: msg.field_of_view,
-      min_range: msg.min_range,
-      max_range: msg.max_range,
-      range: msg.range,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            radiation_type: msg.radiation_type,
+            field_of_view: msg.field_of_view,
+            min_range: msg.min_range,
+            max_range: msg.max_range,
+            range: msg.range,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__RegionOfInterest
 /// This message is used to specify a region of interest within an image.
@@ -2293,50 +2373,48 @@ pub struct RegionOfInterest {
     /// is captured (ROI not used), and True if a subwindow is captured (ROI
     /// used).
     pub do_rectify: bool,
-
 }
 
-
-
 impl Default for RegionOfInterest {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::RegionOfInterest::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::RegionOfInterest::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for RegionOfInterest {
-  type RmwMsg = super::msg::rmw::RegionOfInterest;
+    type RmwMsg = super::msg::rmw::RegionOfInterest;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        x_offset: msg.x_offset,
-        y_offset: msg.y_offset,
-        height: msg.height,
-        width: msg.width,
-        do_rectify: msg.do_rectify,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-      x_offset: msg.x_offset,
-      y_offset: msg.y_offset,
-      height: msg.height,
-      width: msg.width,
-      do_rectify: msg.do_rectify,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                x_offset: msg.x_offset,
+                y_offset: msg.y_offset,
+                height: msg.height,
+                width: msg.width,
+                do_rectify: msg.do_rectify,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                x_offset: msg.x_offset,
+                y_offset: msg.y_offset,
+                height: msg.height,
+                width: msg.width,
+                do_rectify: msg.do_rectify,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      x_offset: msg.x_offset,
-      y_offset: msg.y_offset,
-      height: msg.height,
-      width: msg.width,
-      do_rectify: msg.do_rectify,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            x_offset: msg.x_offset,
+            y_offset: msg.y_offset,
+            height: msg.height,
+            width: msg.width,
+            do_rectify: msg.do_rectify,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__RelativeHumidity
 /// Single reading from a relative humidity sensor.
@@ -2358,44 +2436,48 @@ pub struct RelativeHumidity {
 
     /// 0 is interpreted as variance unknown
     pub variance: f64,
-
 }
 
-
-
 impl Default for RelativeHumidity {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::RelativeHumidity::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::RelativeHumidity::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for RelativeHumidity {
-  type RmwMsg = super::msg::rmw::RelativeHumidity;
+    type RmwMsg = super::msg::rmw::RelativeHumidity;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        relative_humidity: msg.relative_humidity,
-        variance: msg.variance,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      relative_humidity: msg.relative_humidity,
-      variance: msg.variance,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                relative_humidity: msg.relative_humidity,
+                variance: msg.variance,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                relative_humidity: msg.relative_humidity,
+                variance: msg.variance,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      relative_humidity: msg.relative_humidity,
-      variance: msg.variance,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            relative_humidity: msg.relative_humidity,
+            variance: msg.variance,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__Temperature
 /// Single temperature reading.
@@ -2412,44 +2494,48 @@ pub struct Temperature {
 
     /// 0 is interpreted as variance unknown.
     pub variance: f64,
-
 }
 
-
-
 impl Default for Temperature {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::Temperature::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::Temperature::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for Temperature {
-  type RmwMsg = super::msg::rmw::Temperature;
+    type RmwMsg = super::msg::rmw::Temperature;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        temperature: msg.temperature,
-        variance: msg.variance,
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-      temperature: msg.temperature,
-      variance: msg.variance,
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                temperature: msg.temperature,
+                variance: msg.variance,
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                temperature: msg.temperature,
+                variance: msg.variance,
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      temperature: msg.temperature,
-      variance: msg.variance,
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            temperature: msg.temperature,
+            variance: msg.variance,
+        }
     }
-  }
 }
-
 
 // Corresponds to sensor_msgs__msg__TimeReference
 /// Measurement from an external time source not actively synchronized with the system clock.
@@ -2466,42 +2552,51 @@ pub struct TimeReference {
 
     /// (optional) name of time source
     pub source: std::string::String,
-
 }
 
-
-
 impl Default for TimeReference {
-  fn default() -> Self {
-    <Self as rosidl_runtime_rs::Message>::from_rmw_message(super::msg::rmw::TimeReference::default())
-  }
+    fn default() -> Self {
+        <Self as rosidl_runtime_rs::Message>::from_rmw_message(
+            super::msg::rmw::TimeReference::default(),
+        )
+    }
 }
 
 impl rosidl_runtime_rs::Message for TimeReference {
-  type RmwMsg = super::msg::rmw::TimeReference;
+    type RmwMsg = super::msg::rmw::TimeReference;
 
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
-    match msg_cow {
-      std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(msg.header)).into_owned(),
-        time_ref: builtin_interfaces::msg::Time::into_rmw_message(std::borrow::Cow::Owned(msg.time_ref)).into_owned(),
-        source: msg.source.as_str().into(),
-      }),
-      std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
-        header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(&msg.header)).into_owned(),
-        time_ref: builtin_interfaces::msg::Time::into_rmw_message(std::borrow::Cow::Borrowed(&msg.time_ref)).into_owned(),
-        source: msg.source.as_str().into(),
-      })
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        match msg_cow {
+            std::borrow::Cow::Owned(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.header,
+                ))
+                .into_owned(),
+                time_ref: builtin_interfaces::msg::Time::into_rmw_message(std::borrow::Cow::Owned(
+                    msg.time_ref,
+                ))
+                .into_owned(),
+                source: msg.source.as_str().into(),
+            }),
+            std::borrow::Cow::Borrowed(msg) => std::borrow::Cow::Owned(Self::RmwMsg {
+                header: std_msgs::msg::Header::into_rmw_message(std::borrow::Cow::Borrowed(
+                    &msg.header,
+                ))
+                .into_owned(),
+                time_ref: builtin_interfaces::msg::Time::into_rmw_message(
+                    std::borrow::Cow::Borrowed(&msg.time_ref),
+                )
+                .into_owned(),
+                source: msg.source.as_str().into(),
+            }),
+        }
     }
-  }
 
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self {
-    Self {
-      header: std_msgs::msg::Header::from_rmw_message(msg.header),
-      time_ref: builtin_interfaces::msg::Time::from_rmw_message(msg.time_ref),
-      source: msg.source.to_string(),
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        Self {
+            header: std_msgs::msg::Header::from_rmw_message(msg.header),
+            time_ref: builtin_interfaces::msg::Time::from_rmw_message(msg.time_ref),
+            source: msg.source.to_string(),
+        }
     }
-  }
 }
-
-

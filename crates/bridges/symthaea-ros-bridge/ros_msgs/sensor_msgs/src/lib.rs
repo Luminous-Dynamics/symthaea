@@ -15,4 +15,3 @@ pub mod srv {
     pub use super::srv_idiomatic::*;
     pub mod rmw;
 }
-

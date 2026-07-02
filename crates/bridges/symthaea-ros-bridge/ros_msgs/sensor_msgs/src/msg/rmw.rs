@@ -1,31 +1,35 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__BatteryState() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__BatteryState(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__BatteryState__init(msg: *mut BatteryState) -> bool;
-    fn sensor_msgs__msg__BatteryState__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<BatteryState>, size: usize) -> bool;
-    fn sensor_msgs__msg__BatteryState__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<BatteryState>);
-    fn sensor_msgs__msg__BatteryState__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<BatteryState>, out_seq: *mut rosidl_runtime_rs::Sequence<BatteryState>) -> bool;
+    fn sensor_msgs__msg__BatteryState__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<BatteryState>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__BatteryState__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<BatteryState>,
+    );
+    fn sensor_msgs__msg__BatteryState__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<BatteryState>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<BatteryState>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__BatteryState
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-
-
 // This struct is not documented.
 #[allow(missing_docs)]
-
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct BatteryState {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::rmw::Header,
@@ -76,7 +80,6 @@ pub struct BatteryState {
 
     /// The best approximation of the battery serial number
     pub serial_number: rosidl_runtime_rs::String,
-
 }
 
 impl BatteryState {
@@ -87,21 +90,17 @@ impl BatteryState {
     /// Power supply status constants
     pub const POWER_SUPPLY_STATUS_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_STATUS_CHARGING: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_STATUS_DISCHARGING: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_STATUS_NOT_CHARGING: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
@@ -110,41 +109,33 @@ impl BatteryState {
     /// Power supply health constants
     pub const POWER_SUPPLY_HEALTH_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_GOOD: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_OVERHEAT: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_DEAD: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_OVERVOLTAGE: u8 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_UNSPEC_FAILURE: u8 = 5;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_COLD: u8 = 6;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE: u8 = 7;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
@@ -153,92 +144,104 @@ impl BatteryState {
     /// Power supply technology (chemistry) constants
     pub const POWER_SUPPLY_TECHNOLOGY_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_NIMH: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LION: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LIPO: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LIFE: u8 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_NICD: u8 = 5;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const POWER_SUPPLY_TECHNOLOGY_LIMN: u8 = 6;
-
 }
 
-
 impl Default for BatteryState {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__BatteryState__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__BatteryState__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__BatteryState__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__BatteryState__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for BatteryState {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__BatteryState__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__BatteryState__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__BatteryState__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__BatteryState__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__BatteryState__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__BatteryState__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for BatteryState {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for BatteryState where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/BatteryState";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__BatteryState() }
-  }
+impl rosidl_runtime_rs::RmwMessage for BatteryState
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/BatteryState";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__BatteryState()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CameraInfo() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CameraInfo(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__CameraInfo__init(msg: *mut CameraInfo) -> bool;
-    fn sensor_msgs__msg__CameraInfo__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<CameraInfo>, size: usize) -> bool;
-    fn sensor_msgs__msg__CameraInfo__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<CameraInfo>);
-    fn sensor_msgs__msg__CameraInfo__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<CameraInfo>, out_seq: *mut rosidl_runtime_rs::Sequence<CameraInfo>) -> bool;
+    fn sensor_msgs__msg__CameraInfo__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<CameraInfo>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__CameraInfo__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<CameraInfo>,
+    );
+    fn sensor_msgs__msg__CameraInfo__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<CameraInfo>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<CameraInfo>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__CameraInfo
@@ -297,7 +300,6 @@ pub struct CameraInfo {
     /// The image dimensions with which the camera was calibrated.
     /// Normally this will be the full camera resolution in pixels.
     pub height: u32,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
@@ -370,7 +372,6 @@ pub struct CameraInfo {
     ///  as binning_x = binning_y = 1 (no subsampling).
     pub binning_x: u32,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub binning_y: u32,
@@ -382,64 +383,81 @@ pub struct CameraInfo {
     /// The default setting of roi (all values 0) is considered the same as
     ///  full resolution (roi.width = width, roi.height = height).
     pub roi: super::super::msg::rmw::RegionOfInterest,
-
 }
 
-
-
 impl Default for CameraInfo {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__CameraInfo__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__CameraInfo__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__CameraInfo__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__CameraInfo__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for CameraInfo {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__CameraInfo__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__CameraInfo__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__CameraInfo__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__CameraInfo__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__CameraInfo__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__CameraInfo__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for CameraInfo {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for CameraInfo where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/CameraInfo";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CameraInfo() }
-  }
+impl rosidl_runtime_rs::RmwMessage for CameraInfo
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/CameraInfo";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CameraInfo()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__ChannelFloat32() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__ChannelFloat32(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__ChannelFloat32__init(msg: *mut ChannelFloat32) -> bool;
-    fn sensor_msgs__msg__ChannelFloat32__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<ChannelFloat32>, size: usize) -> bool;
-    fn sensor_msgs__msg__ChannelFloat32__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<ChannelFloat32>);
-    fn sensor_msgs__msg__ChannelFloat32__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<ChannelFloat32>, out_seq: *mut rosidl_runtime_rs::Sequence<ChannelFloat32>) -> bool;
+    fn sensor_msgs__msg__ChannelFloat32__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<ChannelFloat32>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__ChannelFloat32__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<ChannelFloat32>,
+    );
+    fn sensor_msgs__msg__ChannelFloat32__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<ChannelFloat32>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<ChannelFloat32>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__ChannelFloat32
@@ -472,64 +490,82 @@ pub struct ChannelFloat32 {
     /// The values array should be 1-1 with the elements of the associated
     /// PointCloud.
     pub values: rosidl_runtime_rs::Sequence<f32>,
-
 }
 
-
-
 impl Default for ChannelFloat32 {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__ChannelFloat32__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__ChannelFloat32__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__ChannelFloat32__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__ChannelFloat32__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for ChannelFloat32 {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__ChannelFloat32__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__ChannelFloat32__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__ChannelFloat32__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__ChannelFloat32__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__ChannelFloat32__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__ChannelFloat32__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for ChannelFloat32 {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for ChannelFloat32 where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/ChannelFloat32";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__ChannelFloat32() }
-  }
+impl rosidl_runtime_rs::RmwMessage for ChannelFloat32
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/ChannelFloat32";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__ChannelFloat32(
+            )
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CompressedImage() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CompressedImage(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__CompressedImage__init(msg: *mut CompressedImage) -> bool;
-    fn sensor_msgs__msg__CompressedImage__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<CompressedImage>, size: usize) -> bool;
-    fn sensor_msgs__msg__CompressedImage__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<CompressedImage>);
-    fn sensor_msgs__msg__CompressedImage__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<CompressedImage>, out_seq: *mut rosidl_runtime_rs::Sequence<CompressedImage>) -> bool;
+    fn sensor_msgs__msg__CompressedImage__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<CompressedImage>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__CompressedImage__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<CompressedImage>,
+    );
+    fn sensor_msgs__msg__CompressedImage__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<CompressedImage>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<CompressedImage>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__CompressedImage
@@ -555,64 +591,82 @@ pub struct CompressedImage {
 
     /// Compressed image buffer
     pub data: rosidl_runtime_rs::Sequence<u8>,
-
 }
 
-
-
 impl Default for CompressedImage {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__CompressedImage__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__CompressedImage__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__CompressedImage__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__CompressedImage__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for CompressedImage {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__CompressedImage__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__CompressedImage__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__CompressedImage__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__CompressedImage__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__CompressedImage__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__CompressedImage__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for CompressedImage {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for CompressedImage where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/CompressedImage";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CompressedImage() }
-  }
+impl rosidl_runtime_rs::RmwMessage for CompressedImage
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/CompressedImage";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__CompressedImage(
+            )
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__FluidPressure() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__FluidPressure(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__FluidPressure__init(msg: *mut FluidPressure) -> bool;
-    fn sensor_msgs__msg__FluidPressure__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<FluidPressure>, size: usize) -> bool;
-    fn sensor_msgs__msg__FluidPressure__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<FluidPressure>);
-    fn sensor_msgs__msg__FluidPressure__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<FluidPressure>, out_seq: *mut rosidl_runtime_rs::Sequence<FluidPressure>) -> bool;
+    fn sensor_msgs__msg__FluidPressure__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<FluidPressure>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__FluidPressure__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<FluidPressure>,
+    );
+    fn sensor_msgs__msg__FluidPressure__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<FluidPressure>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<FluidPressure>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__FluidPressure
@@ -636,64 +690,81 @@ pub struct FluidPressure {
 
     /// 0 is interpreted as variance unknown
     pub variance: f64,
-
 }
 
-
-
 impl Default for FluidPressure {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__FluidPressure__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__FluidPressure__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__FluidPressure__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__FluidPressure__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for FluidPressure {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__FluidPressure__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__FluidPressure__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__FluidPressure__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__FluidPressure__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__FluidPressure__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__FluidPressure__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for FluidPressure {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for FluidPressure where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/FluidPressure";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__FluidPressure() }
-  }
+impl rosidl_runtime_rs::RmwMessage for FluidPressure
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/FluidPressure";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__FluidPressure()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Illuminance() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Illuminance(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__Illuminance__init(msg: *mut Illuminance) -> bool;
-    fn sensor_msgs__msg__Illuminance__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<Illuminance>, size: usize) -> bool;
-    fn sensor_msgs__msg__Illuminance__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<Illuminance>);
-    fn sensor_msgs__msg__Illuminance__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<Illuminance>, out_seq: *mut rosidl_runtime_rs::Sequence<Illuminance>) -> bool;
+    fn sensor_msgs__msg__Illuminance__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<Illuminance>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__Illuminance__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<Illuminance>,
+    );
+    fn sensor_msgs__msg__Illuminance__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Illuminance>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<Illuminance>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__Illuminance
@@ -725,64 +796,79 @@ pub struct Illuminance {
 
     /// 0 is interpreted as variance unknown
     pub variance: f64,
-
 }
 
-
-
 impl Default for Illuminance {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__Illuminance__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__Illuminance__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__Illuminance__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__Illuminance__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for Illuminance {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Illuminance__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Illuminance__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Illuminance__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Illuminance__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Illuminance__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Illuminance__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for Illuminance {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for Illuminance where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/Illuminance";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Illuminance() }
-  }
+impl rosidl_runtime_rs::RmwMessage for Illuminance
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/Illuminance";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Illuminance()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Image() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Image(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__Image__init(msg: *mut Image) -> bool;
-    fn sensor_msgs__msg__Image__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<Image>, size: usize) -> bool;
+    fn sensor_msgs__msg__Image__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<Image>,
+        size: usize,
+    ) -> bool;
     fn sensor_msgs__msg__Image__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<Image>);
-    fn sensor_msgs__msg__Image__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<Image>, out_seq: *mut rosidl_runtime_rs::Sequence<Image>) -> bool;
+    fn sensor_msgs__msg__Image__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Image>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<Image>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__Image
@@ -826,64 +912,77 @@ pub struct Image {
 
     /// actual matrix data, size is (step * rows)
     pub data: rosidl_runtime_rs::Sequence<u8>,
-
 }
 
-
-
 impl Default for Image {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__Image__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__Image__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__Image__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__Image__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for Image {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Image__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Image__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Image__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Image__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Image__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Image__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for Image {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for Image where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/Image";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Image() }
-  }
+impl rosidl_runtime_rs::RmwMessage for Image
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/Image";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Image() }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Imu() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Imu(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__Imu__init(msg: *mut Imu) -> bool;
-    fn sensor_msgs__msg__Imu__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<Imu>, size: usize) -> bool;
+    fn sensor_msgs__msg__Imu__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<Imu>,
+        size: usize,
+    ) -> bool;
     fn sensor_msgs__msg__Imu__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<Imu>);
-    fn sensor_msgs__msg__Imu__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<Imu>, out_seq: *mut rosidl_runtime_rs::Sequence<Imu>) -> bool;
+    fn sensor_msgs__msg__Imu__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Imu>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<Imu>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__Imu
@@ -906,11 +1005,9 @@ extern "C" {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Imu {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::rmw::Header,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
@@ -919,7 +1016,6 @@ pub struct Imu {
     /// Row major about x, y, z axes
     pub orientation_covariance: [f64; 9],
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub angular_velocity: geometry_msgs::msg::rmw::Vector3,
@@ -927,71 +1023,85 @@ pub struct Imu {
     /// Row major about x, y, z axes
     pub angular_velocity_covariance: [f64; 9],
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub linear_acceleration: geometry_msgs::msg::rmw::Vector3,
 
     /// Row major x, y z
     pub linear_acceleration_covariance: [f64; 9],
-
 }
 
-
-
 impl Default for Imu {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__Imu__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__Imu__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__Imu__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__Imu__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for Imu {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Imu__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Imu__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Imu__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Imu__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Imu__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Imu__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for Imu {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for Imu where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/Imu";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Imu() }
-  }
+impl rosidl_runtime_rs::RmwMessage for Imu
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/Imu";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Imu() }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JointState() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JointState(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__JointState__init(msg: *mut JointState) -> bool;
-    fn sensor_msgs__msg__JointState__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<JointState>, size: usize) -> bool;
-    fn sensor_msgs__msg__JointState__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<JointState>);
-    fn sensor_msgs__msg__JointState__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<JointState>, out_seq: *mut rosidl_runtime_rs::Sequence<JointState>) -> bool;
+    fn sensor_msgs__msg__JointState__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<JointState>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__JointState__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<JointState>,
+    );
+    fn sensor_msgs__msg__JointState__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<JointState>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<JointState>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__JointState
@@ -1019,88 +1129,98 @@ extern "C" {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct JointState {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::rmw::Header,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub name: rosidl_runtime_rs::Sequence<rosidl_runtime_rs::String>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub position: rosidl_runtime_rs::Sequence<f64>,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub velocity: rosidl_runtime_rs::Sequence<f64>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub effort: rosidl_runtime_rs::Sequence<f64>,
-
 }
 
-
-
 impl Default for JointState {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__JointState__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__JointState__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__JointState__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__JointState__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for JointState {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JointState__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JointState__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JointState__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JointState__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JointState__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JointState__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for JointState {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for JointState where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/JointState";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JointState() }
-  }
+impl rosidl_runtime_rs::RmwMessage for JointState
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/JointState";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JointState()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Joy() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Joy(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__Joy__init(msg: *mut Joy) -> bool;
-    fn sensor_msgs__msg__Joy__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<Joy>, size: usize) -> bool;
+    fn sensor_msgs__msg__Joy__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<Joy>,
+        size: usize,
+    ) -> bool;
     fn sensor_msgs__msg__Joy__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<Joy>);
-    fn sensor_msgs__msg__Joy__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<Joy>, out_seq: *mut rosidl_runtime_rs::Sequence<Joy>) -> bool;
+    fn sensor_msgs__msg__Joy__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Joy>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<Joy>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__Joy
@@ -1119,64 +1239,79 @@ pub struct Joy {
 
     /// The buttons measurements from a joystick.
     pub buttons: rosidl_runtime_rs::Sequence<i32>,
-
 }
 
-
-
 impl Default for Joy {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__Joy__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__Joy__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__Joy__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__Joy__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for Joy {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Joy__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Joy__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Joy__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Joy__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Joy__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Joy__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for Joy {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for Joy where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/Joy";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Joy() }
-  }
+impl rosidl_runtime_rs::RmwMessage for Joy
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/Joy";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Joy() }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedback() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedback(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__JoyFeedback__init(msg: *mut JoyFeedback) -> bool;
-    fn sensor_msgs__msg__JoyFeedback__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<JoyFeedback>, size: usize) -> bool;
-    fn sensor_msgs__msg__JoyFeedback__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<JoyFeedback>);
-    fn sensor_msgs__msg__JoyFeedback__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<JoyFeedback>, out_seq: *mut rosidl_runtime_rs::Sequence<JoyFeedback>) -> bool;
+    fn sensor_msgs__msg__JoyFeedback__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<JoyFeedback>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__JoyFeedback__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<JoyFeedback>,
+    );
+    fn sensor_msgs__msg__JoyFeedback__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<JoyFeedback>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<JoyFeedback>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__JoyFeedback
@@ -1187,7 +1322,6 @@ extern "C" {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct JoyFeedback {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub type_: u8,
@@ -1199,81 +1333,95 @@ pub struct JoyFeedback {
     /// Intensity of the feedback, from 0.0 to 1.0, inclusive.  If device is
     /// actually binary, driver should treat 0<=x<0.5 as off, 0.5<=x<=1 as on.
     pub intensity: f32,
-
 }
 
 impl JoyFeedback {
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const TYPE_LED: u8 = 0;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const TYPE_RUMBLE: u8 = 1;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const TYPE_BUZZER: u8 = 2;
-
 }
 
-
 impl Default for JoyFeedback {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__JoyFeedback__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__JoyFeedback__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__JoyFeedback__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__JoyFeedback__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for JoyFeedback {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JoyFeedback__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JoyFeedback__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JoyFeedback__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JoyFeedback__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JoyFeedback__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JoyFeedback__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for JoyFeedback {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for JoyFeedback where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/JoyFeedback";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedback() }
-  }
+impl rosidl_runtime_rs::RmwMessage for JoyFeedback
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/JoyFeedback";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedback()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedbackArray() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedbackArray(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__JoyFeedbackArray__init(msg: *mut JoyFeedbackArray) -> bool;
-    fn sensor_msgs__msg__JoyFeedbackArray__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<JoyFeedbackArray>, size: usize) -> bool;
-    fn sensor_msgs__msg__JoyFeedbackArray__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<JoyFeedbackArray>);
-    fn sensor_msgs__msg__JoyFeedbackArray__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<JoyFeedbackArray>, out_seq: *mut rosidl_runtime_rs::Sequence<JoyFeedbackArray>) -> bool;
+    fn sensor_msgs__msg__JoyFeedbackArray__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<JoyFeedbackArray>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__JoyFeedbackArray__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<JoyFeedbackArray>,
+    );
+    fn sensor_msgs__msg__JoyFeedbackArray__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<JoyFeedbackArray>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<JoyFeedbackArray>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__JoyFeedbackArray
@@ -1284,68 +1432,84 @@ extern "C" {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct JoyFeedbackArray {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub array: rosidl_runtime_rs::Sequence<super::super::msg::rmw::JoyFeedback>,
-
 }
 
-
-
 impl Default for JoyFeedbackArray {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__JoyFeedbackArray__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__JoyFeedbackArray__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__JoyFeedbackArray__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__JoyFeedbackArray__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for JoyFeedbackArray {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JoyFeedbackArray__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JoyFeedbackArray__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__JoyFeedbackArray__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JoyFeedbackArray__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JoyFeedbackArray__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__JoyFeedbackArray__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for JoyFeedbackArray {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for JoyFeedbackArray where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/JoyFeedbackArray";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedbackArray() }
-  }
+impl rosidl_runtime_rs::RmwMessage for JoyFeedbackArray
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/JoyFeedbackArray";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__JoyFeedbackArray()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserEcho() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserEcho(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__LaserEcho__init(msg: *mut LaserEcho) -> bool;
-    fn sensor_msgs__msg__LaserEcho__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<LaserEcho>, size: usize) -> bool;
-    fn sensor_msgs__msg__LaserEcho__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<LaserEcho>);
-    fn sensor_msgs__msg__LaserEcho__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<LaserEcho>, out_seq: *mut rosidl_runtime_rs::Sequence<LaserEcho>) -> bool;
+    fn sensor_msgs__msg__LaserEcho__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<LaserEcho>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__LaserEcho__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<LaserEcho>,
+    );
+    fn sensor_msgs__msg__LaserEcho__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<LaserEcho>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<LaserEcho>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__LaserEcho
@@ -1360,64 +1524,81 @@ pub struct LaserEcho {
     /// Multiple values of ranges or intensities.
     /// Each array represents data from the same angle increment.
     pub echoes: rosidl_runtime_rs::Sequence<f32>,
-
 }
 
-
-
 impl Default for LaserEcho {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__LaserEcho__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__LaserEcho__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__LaserEcho__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__LaserEcho__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for LaserEcho {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__LaserEcho__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__LaserEcho__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__LaserEcho__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__LaserEcho__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__LaserEcho__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__LaserEcho__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for LaserEcho {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for LaserEcho where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/LaserEcho";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserEcho() }
-  }
+impl rosidl_runtime_rs::RmwMessage for LaserEcho
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/LaserEcho";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserEcho()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserScan() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserScan(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__LaserScan__init(msg: *mut LaserScan) -> bool;
-    fn sensor_msgs__msg__LaserScan__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<LaserScan>, size: usize) -> bool;
-    fn sensor_msgs__msg__LaserScan__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<LaserScan>);
-    fn sensor_msgs__msg__LaserScan__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<LaserScan>, out_seq: *mut rosidl_runtime_rs::Sequence<LaserScan>) -> bool;
+    fn sensor_msgs__msg__LaserScan__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<LaserScan>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__LaserScan__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<LaserScan>,
+    );
+    fn sensor_msgs__msg__LaserScan__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<LaserScan>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<LaserScan>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__LaserScan
@@ -1471,64 +1652,81 @@ pub struct LaserScan {
     /// device does not provide intensities, please leave
     /// the array empty.
     pub intensities: rosidl_runtime_rs::Sequence<f32>,
-
 }
 
-
-
 impl Default for LaserScan {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__LaserScan__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__LaserScan__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__LaserScan__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__LaserScan__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for LaserScan {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__LaserScan__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__LaserScan__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__LaserScan__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__LaserScan__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__LaserScan__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__LaserScan__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for LaserScan {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for LaserScan where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/LaserScan";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserScan() }
-  }
+impl rosidl_runtime_rs::RmwMessage for LaserScan
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/LaserScan";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__LaserScan()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MagneticField() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MagneticField(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__MagneticField__init(msg: *mut MagneticField) -> bool;
-    fn sensor_msgs__msg__MagneticField__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<MagneticField>, size: usize) -> bool;
-    fn sensor_msgs__msg__MagneticField__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<MagneticField>);
-    fn sensor_msgs__msg__MagneticField__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<MagneticField>, out_seq: *mut rosidl_runtime_rs::Sequence<MagneticField>) -> bool;
+    fn sensor_msgs__msg__MagneticField__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<MagneticField>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__MagneticField__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<MagneticField>,
+    );
+    fn sensor_msgs__msg__MagneticField__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<MagneticField>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<MagneticField>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__MagneticField
@@ -1561,64 +1759,81 @@ pub struct MagneticField {
     /// Row major about x, y, z axes
     /// 0 is interpreted as variance unknown
     pub magnetic_field_covariance: [f64; 9],
-
 }
 
-
-
 impl Default for MagneticField {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__MagneticField__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__MagneticField__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__MagneticField__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__MagneticField__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for MagneticField {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MagneticField__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MagneticField__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MagneticField__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MagneticField__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MagneticField__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MagneticField__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for MagneticField {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for MagneticField where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/MagneticField";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MagneticField() }
-  }
+impl rosidl_runtime_rs::RmwMessage for MagneticField
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/MagneticField";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MagneticField()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiDOFJointState() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiDOFJointState(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__MultiDOFJointState__init(msg: *mut MultiDOFJointState) -> bool;
-    fn sensor_msgs__msg__MultiDOFJointState__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<MultiDOFJointState>, size: usize) -> bool;
-    fn sensor_msgs__msg__MultiDOFJointState__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<MultiDOFJointState>);
-    fn sensor_msgs__msg__MultiDOFJointState__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<MultiDOFJointState>, out_seq: *mut rosidl_runtime_rs::Sequence<MultiDOFJointState>) -> bool;
+    fn sensor_msgs__msg__MultiDOFJointState__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<MultiDOFJointState>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__MultiDOFJointState__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<MultiDOFJointState>,
+    );
+    fn sensor_msgs__msg__MultiDOFJointState__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<MultiDOFJointState>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<MultiDOFJointState>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__MultiDOFJointState
@@ -1647,88 +1862,100 @@ extern "C" {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct MultiDOFJointState {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub header: std_msgs::msg::rmw::Header,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub joint_names: rosidl_runtime_rs::Sequence<rosidl_runtime_rs::String>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub transforms: rosidl_runtime_rs::Sequence<geometry_msgs::msg::rmw::Transform>,
-
 
     // This member is not documented.
     #[allow(missing_docs)]
     pub twist: rosidl_runtime_rs::Sequence<geometry_msgs::msg::rmw::Twist>,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub wrench: rosidl_runtime_rs::Sequence<geometry_msgs::msg::rmw::Wrench>,
-
 }
 
-
-
 impl Default for MultiDOFJointState {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__MultiDOFJointState__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__MultiDOFJointState__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__MultiDOFJointState__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__MultiDOFJointState__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for MultiDOFJointState {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MultiDOFJointState__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MultiDOFJointState__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MultiDOFJointState__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MultiDOFJointState__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MultiDOFJointState__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MultiDOFJointState__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for MultiDOFJointState {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for MultiDOFJointState where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/MultiDOFJointState";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiDOFJointState() }
-  }
+impl rosidl_runtime_rs::RmwMessage for MultiDOFJointState
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/MultiDOFJointState";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiDOFJointState()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiEchoLaserScan() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiEchoLaserScan(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__MultiEchoLaserScan__init(msg: *mut MultiEchoLaserScan) -> bool;
-    fn sensor_msgs__msg__MultiEchoLaserScan__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<MultiEchoLaserScan>, size: usize) -> bool;
-    fn sensor_msgs__msg__MultiEchoLaserScan__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<MultiEchoLaserScan>);
-    fn sensor_msgs__msg__MultiEchoLaserScan__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<MultiEchoLaserScan>, out_seq: *mut rosidl_runtime_rs::Sequence<MultiEchoLaserScan>) -> bool;
+    fn sensor_msgs__msg__MultiEchoLaserScan__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<MultiEchoLaserScan>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__MultiEchoLaserScan__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<MultiEchoLaserScan>,
+    );
+    fn sensor_msgs__msg__MultiEchoLaserScan__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<MultiEchoLaserScan>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<MultiEchoLaserScan>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__MultiEchoLaserScan
@@ -1784,64 +2011,81 @@ pub struct MultiEchoLaserScan {
     /// device does not provide intensities, please leave
     /// the array empty.
     pub intensities: rosidl_runtime_rs::Sequence<super::super::msg::rmw::LaserEcho>,
-
 }
 
-
-
 impl Default for MultiEchoLaserScan {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__MultiEchoLaserScan__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__MultiEchoLaserScan__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__MultiEchoLaserScan__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__MultiEchoLaserScan__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for MultiEchoLaserScan {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MultiEchoLaserScan__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MultiEchoLaserScan__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__MultiEchoLaserScan__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MultiEchoLaserScan__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MultiEchoLaserScan__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__MultiEchoLaserScan__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for MultiEchoLaserScan {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for MultiEchoLaserScan where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/MultiEchoLaserScan";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiEchoLaserScan() }
-  }
+impl rosidl_runtime_rs::RmwMessage for MultiEchoLaserScan
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/MultiEchoLaserScan";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__MultiEchoLaserScan()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatFix() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatFix(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__NavSatFix__init(msg: *mut NavSatFix) -> bool;
-    fn sensor_msgs__msg__NavSatFix__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<NavSatFix>, size: usize) -> bool;
-    fn sensor_msgs__msg__NavSatFix__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<NavSatFix>);
-    fn sensor_msgs__msg__NavSatFix__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<NavSatFix>, out_seq: *mut rosidl_runtime_rs::Sequence<NavSatFix>) -> bool;
+    fn sensor_msgs__msg__NavSatFix__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<NavSatFix>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__NavSatFix__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<NavSatFix>,
+    );
+    fn sensor_msgs__msg__NavSatFix__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<NavSatFix>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<NavSatFix>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__NavSatFix
@@ -1884,11 +2128,9 @@ pub struct NavSatFix {
     /// Beware: this coordinate system exhibits singularities at the poles.
     pub position_covariance: [f64; 9],
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub position_covariance_type: u8,
-
 }
 
 impl NavSatFix {
@@ -1898,77 +2140,92 @@ impl NavSatFix {
     /// estimate an approximate covariance from that.
     pub const COVARIANCE_TYPE_UNKNOWN: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const COVARIANCE_TYPE_APPROXIMATED: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const COVARIANCE_TYPE_DIAGONAL_KNOWN: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const COVARIANCE_TYPE_KNOWN: u8 = 3;
-
 }
 
-
 impl Default for NavSatFix {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__NavSatFix__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__NavSatFix__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__NavSatFix__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__NavSatFix__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for NavSatFix {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__NavSatFix__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__NavSatFix__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__NavSatFix__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__NavSatFix__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__NavSatFix__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__NavSatFix__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for NavSatFix {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for NavSatFix where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/NavSatFix";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatFix() }
-  }
+impl rosidl_runtime_rs::RmwMessage for NavSatFix
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/NavSatFix";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatFix()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatStatus() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatStatus(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__NavSatStatus__init(msg: *mut NavSatStatus) -> bool;
-    fn sensor_msgs__msg__NavSatStatus__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<NavSatStatus>, size: usize) -> bool;
-    fn sensor_msgs__msg__NavSatStatus__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<NavSatStatus>);
-    fn sensor_msgs__msg__NavSatStatus__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<NavSatStatus>, out_seq: *mut rosidl_runtime_rs::Sequence<NavSatStatus>) -> bool;
+    fn sensor_msgs__msg__NavSatStatus__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<NavSatStatus>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__NavSatStatus__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<NavSatStatus>,
+    );
+    fn sensor_msgs__msg__NavSatStatus__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<NavSatStatus>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<NavSatStatus>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__NavSatStatus
@@ -1983,16 +2240,13 @@ extern "C" {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct NavSatStatus {
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub status: i8,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub service: u16,
-
 }
 
 impl NavSatStatus {
@@ -2012,7 +2266,6 @@ impl NavSatStatus {
     /// used by the receiver.
     pub const SERVICE_GPS: u16 = 1;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const SERVICE_GLONASS: u16 = 2;
@@ -2020,67 +2273,84 @@ impl NavSatStatus {
     /// includes BeiDou.
     pub const SERVICE_COMPASS: u16 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const SERVICE_GALILEO: u16 = 8;
-
 }
 
-
 impl Default for NavSatStatus {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__NavSatStatus__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__NavSatStatus__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__NavSatStatus__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__NavSatStatus__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for NavSatStatus {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__NavSatStatus__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__NavSatStatus__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__NavSatStatus__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__NavSatStatus__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__NavSatStatus__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__NavSatStatus__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for NavSatStatus {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for NavSatStatus where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/NavSatStatus";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatStatus() }
-  }
+impl rosidl_runtime_rs::RmwMessage for NavSatStatus
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/NavSatStatus";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__NavSatStatus()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__PointCloud__init(msg: *mut PointCloud) -> bool;
-    fn sensor_msgs__msg__PointCloud__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<PointCloud>, size: usize) -> bool;
-    fn sensor_msgs__msg__PointCloud__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<PointCloud>);
-    fn sensor_msgs__msg__PointCloud__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<PointCloud>, out_seq: *mut rosidl_runtime_rs::Sequence<PointCloud>) -> bool;
+    fn sensor_msgs__msg__PointCloud__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<PointCloud>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__PointCloud__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<PointCloud>,
+    );
+    fn sensor_msgs__msg__PointCloud__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<PointCloud>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<PointCloud>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__PointCloud
@@ -2105,64 +2375,81 @@ pub struct PointCloud {
     /// and the data in each channel should correspond 1:1 with each point.
     /// Channel names in common practice are listed in ChannelFloat32.msg.
     pub channels: rosidl_runtime_rs::Sequence<super::super::msg::rmw::ChannelFloat32>,
-
 }
 
-
-
 impl Default for PointCloud {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__PointCloud__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__PointCloud__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__PointCloud__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__PointCloud__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for PointCloud {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointCloud__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointCloud__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointCloud__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointCloud__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointCloud__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointCloud__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for PointCloud {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for PointCloud where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/PointCloud";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud() }
-  }
+impl rosidl_runtime_rs::RmwMessage for PointCloud
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/PointCloud";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud2() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud2(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__PointCloud2__init(msg: *mut PointCloud2) -> bool;
-    fn sensor_msgs__msg__PointCloud2__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<PointCloud2>, size: usize) -> bool;
-    fn sensor_msgs__msg__PointCloud2__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<PointCloud2>);
-    fn sensor_msgs__msg__PointCloud2__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<PointCloud2>, out_seq: *mut rosidl_runtime_rs::Sequence<PointCloud2>) -> bool;
+    fn sensor_msgs__msg__PointCloud2__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<PointCloud2>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__PointCloud2__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<PointCloud2>,
+    );
+    fn sensor_msgs__msg__PointCloud2__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<PointCloud2>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<PointCloud2>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__PointCloud2
@@ -2187,7 +2474,6 @@ pub struct PointCloud2 {
     /// 1 and width is the length of the point cloud.
     pub height: u32,
 
-
     // This member is not documented.
     #[allow(missing_docs)]
     pub width: u32,
@@ -2209,64 +2495,81 @@ pub struct PointCloud2 {
 
     /// True if there are no invalid points
     pub is_dense: bool,
-
 }
 
-
-
 impl Default for PointCloud2 {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__PointCloud2__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__PointCloud2__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__PointCloud2__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__PointCloud2__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for PointCloud2 {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointCloud2__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointCloud2__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointCloud2__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointCloud2__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointCloud2__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointCloud2__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for PointCloud2 {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for PointCloud2 where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/PointCloud2";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud2() }
-  }
+impl rosidl_runtime_rs::RmwMessage for PointCloud2
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/PointCloud2";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointCloud2()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointField() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointField(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__PointField__init(msg: *mut PointField) -> bool;
-    fn sensor_msgs__msg__PointField__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<PointField>, size: usize) -> bool;
-    fn sensor_msgs__msg__PointField__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<PointField>);
-    fn sensor_msgs__msg__PointField__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<PointField>, out_seq: *mut rosidl_runtime_rs::Sequence<PointField>) -> bool;
+    fn sensor_msgs__msg__PointField__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<PointField>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__PointField__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<PointField>,
+    );
+    fn sensor_msgs__msg__PointField__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<PointField>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<PointField>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__PointField
@@ -2290,106 +2593,113 @@ pub struct PointField {
 
     /// How many elements in the field
     pub count: u32,
-
 }
 
 impl PointField {
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INT8: u8 = 1;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const UINT8: u8 = 2;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INT16: u8 = 3;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const UINT16: u8 = 4;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INT32: u8 = 5;
-
 
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const UINT32: u8 = 6;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const FLOAT32: u8 = 7;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const FLOAT64: u8 = 8;
-
 }
 
-
 impl Default for PointField {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__PointField__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__PointField__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__PointField__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__PointField__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for PointField {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointField__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointField__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__PointField__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointField__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointField__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__PointField__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for PointField {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for PointField where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/PointField";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointField() }
-  }
+impl rosidl_runtime_rs::RmwMessage for PointField
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/PointField";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__PointField()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Range() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Range(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__Range__init(msg: *mut Range) -> bool;
-    fn sensor_msgs__msg__Range__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<Range>, size: usize) -> bool;
+    fn sensor_msgs__msg__Range__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<Range>,
+        size: usize,
+    ) -> bool;
     fn sensor_msgs__msg__Range__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<Range>);
-    fn sensor_msgs__msg__Range__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<Range>, out_seq: *mut rosidl_runtime_rs::Sequence<Range>) -> bool;
+    fn sensor_msgs__msg__Range__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Range>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<Range>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__Range
@@ -2439,7 +2749,6 @@ pub struct Range {
     /// +Inf represents no detection within the fixed distance.
     /// (Object out of range)
     pub range: f32,
-
 }
 
 impl Range {
@@ -2447,67 +2756,82 @@ impl Range {
     /// If you want a value added to this list, send an email to the ros-users list
     pub const ULTRASOUND: u8 = 0;
 
-
     // This constant is not documented.
     #[allow(missing_docs)]
     pub const INFRARED: u8 = 1;
-
 }
 
-
 impl Default for Range {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__Range__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__Range__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__Range__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__Range__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for Range {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Range__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Range__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Range__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Range__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Range__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Range__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for Range {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for Range where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/Range";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Range() }
-  }
+impl rosidl_runtime_rs::RmwMessage for Range
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/Range";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Range() }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RegionOfInterest() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RegionOfInterest(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__RegionOfInterest__init(msg: *mut RegionOfInterest) -> bool;
-    fn sensor_msgs__msg__RegionOfInterest__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<RegionOfInterest>, size: usize) -> bool;
-    fn sensor_msgs__msg__RegionOfInterest__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<RegionOfInterest>);
-    fn sensor_msgs__msg__RegionOfInterest__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<RegionOfInterest>, out_seq: *mut rosidl_runtime_rs::Sequence<RegionOfInterest>) -> bool;
+    fn sensor_msgs__msg__RegionOfInterest__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<RegionOfInterest>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__RegionOfInterest__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<RegionOfInterest>,
+    );
+    fn sensor_msgs__msg__RegionOfInterest__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<RegionOfInterest>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<RegionOfInterest>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__RegionOfInterest
@@ -2542,64 +2866,81 @@ pub struct RegionOfInterest {
     /// is captured (ROI not used), and True if a subwindow is captured (ROI
     /// used).
     pub do_rectify: bool,
-
 }
 
-
-
 impl Default for RegionOfInterest {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__RegionOfInterest__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__RegionOfInterest__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__RegionOfInterest__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__RegionOfInterest__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for RegionOfInterest {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__RegionOfInterest__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__RegionOfInterest__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__RegionOfInterest__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__RegionOfInterest__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__RegionOfInterest__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__RegionOfInterest__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for RegionOfInterest {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for RegionOfInterest where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/RegionOfInterest";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RegionOfInterest() }
-  }
+impl rosidl_runtime_rs::RmwMessage for RegionOfInterest
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/RegionOfInterest";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RegionOfInterest()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RelativeHumidity() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RelativeHumidity(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__RelativeHumidity__init(msg: *mut RelativeHumidity) -> bool;
-    fn sensor_msgs__msg__RelativeHumidity__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<RelativeHumidity>, size: usize) -> bool;
-    fn sensor_msgs__msg__RelativeHumidity__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<RelativeHumidity>);
-    fn sensor_msgs__msg__RelativeHumidity__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<RelativeHumidity>, out_seq: *mut rosidl_runtime_rs::Sequence<RelativeHumidity>) -> bool;
+    fn sensor_msgs__msg__RelativeHumidity__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<RelativeHumidity>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__RelativeHumidity__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<RelativeHumidity>,
+    );
+    fn sensor_msgs__msg__RelativeHumidity__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<RelativeHumidity>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<RelativeHumidity>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__RelativeHumidity
@@ -2624,64 +2965,81 @@ pub struct RelativeHumidity {
 
     /// 0 is interpreted as variance unknown
     pub variance: f64,
-
 }
 
-
-
 impl Default for RelativeHumidity {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__RelativeHumidity__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__RelativeHumidity__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__RelativeHumidity__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__RelativeHumidity__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for RelativeHumidity {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__RelativeHumidity__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__RelativeHumidity__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__RelativeHumidity__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__RelativeHumidity__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__RelativeHumidity__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__RelativeHumidity__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for RelativeHumidity {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for RelativeHumidity where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/RelativeHumidity";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RelativeHumidity() }
-  }
+impl rosidl_runtime_rs::RmwMessage for RelativeHumidity
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/RelativeHumidity";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__RelativeHumidity()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Temperature() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Temperature(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__Temperature__init(msg: *mut Temperature) -> bool;
-    fn sensor_msgs__msg__Temperature__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<Temperature>, size: usize) -> bool;
-    fn sensor_msgs__msg__Temperature__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<Temperature>);
-    fn sensor_msgs__msg__Temperature__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<Temperature>, out_seq: *mut rosidl_runtime_rs::Sequence<Temperature>) -> bool;
+    fn sensor_msgs__msg__Temperature__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<Temperature>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__Temperature__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<Temperature>,
+    );
+    fn sensor_msgs__msg__Temperature__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Temperature>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<Temperature>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__Temperature
@@ -2701,64 +3059,81 @@ pub struct Temperature {
 
     /// 0 is interpreted as variance unknown.
     pub variance: f64,
-
 }
 
-
-
 impl Default for Temperature {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__Temperature__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__Temperature__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__Temperature__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__Temperature__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for Temperature {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Temperature__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Temperature__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__Temperature__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Temperature__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Temperature__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__Temperature__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for Temperature {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for Temperature where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/Temperature";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Temperature() }
-  }
+impl rosidl_runtime_rs::RmwMessage for Temperature
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/Temperature";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Temperature()
+        }
+    }
 }
-
 
 #[link(name = "sensor_msgs__rosidl_typesupport_c")]
 extern "C" {
-    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__TimeReference() -> *const std::ffi::c_void;
+    fn rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__TimeReference(
+    ) -> *const std::ffi::c_void;
 }
 
 #[link(name = "sensor_msgs__rosidl_generator_c")]
 extern "C" {
     fn sensor_msgs__msg__TimeReference__init(msg: *mut TimeReference) -> bool;
-    fn sensor_msgs__msg__TimeReference__Sequence__init(seq: *mut rosidl_runtime_rs::Sequence<TimeReference>, size: usize) -> bool;
-    fn sensor_msgs__msg__TimeReference__Sequence__fini(seq: *mut rosidl_runtime_rs::Sequence<TimeReference>);
-    fn sensor_msgs__msg__TimeReference__Sequence__copy(in_seq: &rosidl_runtime_rs::Sequence<TimeReference>, out_seq: *mut rosidl_runtime_rs::Sequence<TimeReference>) -> bool;
+    fn sensor_msgs__msg__TimeReference__Sequence__init(
+        seq: *mut rosidl_runtime_rs::Sequence<TimeReference>,
+        size: usize,
+    ) -> bool;
+    fn sensor_msgs__msg__TimeReference__Sequence__fini(
+        seq: *mut rosidl_runtime_rs::Sequence<TimeReference>,
+    );
+    fn sensor_msgs__msg__TimeReference__Sequence__copy(
+        in_seq: &rosidl_runtime_rs::Sequence<TimeReference>,
+        out_seq: *mut rosidl_runtime_rs::Sequence<TimeReference>,
+    ) -> bool;
 }
 
 // Corresponds to sensor_msgs__msg__TimeReference
@@ -2778,50 +3153,57 @@ pub struct TimeReference {
 
     /// (optional) name of time source
     pub source: rosidl_runtime_rs::String,
-
 }
 
-
-
 impl Default for TimeReference {
-  fn default() -> Self {
-    unsafe {
-      let mut msg = std::mem::zeroed();
-      if !sensor_msgs__msg__TimeReference__init(&mut msg as *mut _) {
-        panic!("Call to sensor_msgs__msg__TimeReference__init() failed");
-      }
-      msg
+    fn default() -> Self {
+        unsafe {
+            let mut msg = std::mem::zeroed();
+            if !sensor_msgs__msg__TimeReference__init(&mut msg as *mut _) {
+                panic!("Call to sensor_msgs__msg__TimeReference__init() failed");
+            }
+            msg
+        }
     }
-  }
 }
 
 impl rosidl_runtime_rs::SequenceAlloc for TimeReference {
-  fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__TimeReference__Sequence__init(seq as *mut _, size) }
-  }
-  fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__TimeReference__Sequence__fini(seq as *mut _) }
-  }
-  fn sequence_copy(in_seq: &rosidl_runtime_rs::Sequence<Self>, out_seq: &mut rosidl_runtime_rs::Sequence<Self>) -> bool {
-    // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
-    unsafe { sensor_msgs__msg__TimeReference__Sequence__copy(in_seq, out_seq as *mut _) }
-  }
+    fn sequence_init(seq: &mut rosidl_runtime_rs::Sequence<Self>, size: usize) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__TimeReference__Sequence__init(seq as *mut _, size) }
+    }
+    fn sequence_fini(seq: &mut rosidl_runtime_rs::Sequence<Self>) {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__TimeReference__Sequence__fini(seq as *mut _) }
+    }
+    fn sequence_copy(
+        in_seq: &rosidl_runtime_rs::Sequence<Self>,
+        out_seq: &mut rosidl_runtime_rs::Sequence<Self>,
+    ) -> bool {
+        // SAFETY: This is safe since the pointer is guaranteed to be valid/initialized.
+        unsafe { sensor_msgs__msg__TimeReference__Sequence__copy(in_seq, out_seq as *mut _) }
+    }
 }
 
 impl rosidl_runtime_rs::Message for TimeReference {
-  type RmwMsg = Self;
-  fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> { msg_cow }
-  fn from_rmw_message(msg: Self::RmwMsg) -> Self { msg }
+    type RmwMsg = Self;
+    fn into_rmw_message(msg_cow: std::borrow::Cow<'_, Self>) -> std::borrow::Cow<'_, Self::RmwMsg> {
+        msg_cow
+    }
+    fn from_rmw_message(msg: Self::RmwMsg) -> Self {
+        msg
+    }
 }
 
-impl rosidl_runtime_rs::RmwMessage for TimeReference where Self: Sized {
-  const TYPE_NAME: &'static str = "sensor_msgs/msg/TimeReference";
-  fn get_type_support() -> *const std::ffi::c_void {
-    // SAFETY: No preconditions for this function.
-    unsafe { rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__TimeReference() }
-  }
+impl rosidl_runtime_rs::RmwMessage for TimeReference
+where
+    Self: Sized,
+{
+    const TYPE_NAME: &'static str = "sensor_msgs/msg/TimeReference";
+    fn get_type_support() -> *const std::ffi::c_void {
+        // SAFETY: No preconditions for this function.
+        unsafe {
+            rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__TimeReference()
+        }
+    }
 }
-
-

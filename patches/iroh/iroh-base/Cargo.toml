@@ -11,8 +11,6 @@ repository = "https://github.com/n0-computer/iroh"
 # Sadly this also needs to be updated in .github/workflows/ci.yml
 rust-version = "1.95"
 
-[lints]
-workspace = true
 
 [dependencies]
 curve25519-dalek = { version = "5.0.0-pre", features = ["serde", "rand_core", "zeroize"], optional = true }

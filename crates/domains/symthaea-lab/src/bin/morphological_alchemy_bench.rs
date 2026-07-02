@@ -12,7 +12,7 @@ use anyhow::Result;
 use symthaea_humanoid::morphology::HumanoidMorphology;
 use symthaea_phi_search::morphology_genome::MorphologicalGenome;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() -> Result<()> {

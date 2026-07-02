@@ -12,8 +12,8 @@ use crate::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use crate::types::ManipulatorConfig;
 
 pub use symthaea_core::embodiment::{
-    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, GroundingEstimator,
-    MoralGateInput, MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
+    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
+    GroundingEstimator, MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 
 /// Manipulator embodiment bridge.

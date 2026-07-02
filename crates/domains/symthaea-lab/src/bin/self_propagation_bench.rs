@@ -15,7 +15,7 @@ use symthaea_swarm::{HapticPulseMsg, SwarmAggregator};
 use symtropy_physics::body::BodyHandle;
 use symtropy_robotics_bridge_core::platform::PlatformType;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use uuid::Uuid;
 
 #[tokio::main]

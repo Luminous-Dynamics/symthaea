@@ -10,7 +10,7 @@ use anyhow::Result;
 use symthaea_mujoco_bridge::MuJoCoBridge;
 use symthaea_sim_bridge::{EngineeringDomain, SimulationBackend, SimulationRequest, SolverKind};
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() -> Result<()> {

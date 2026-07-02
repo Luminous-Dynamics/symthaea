@@ -1188,13 +1188,33 @@ impl EngineeringManager {
     ///
     /// This is the first step of "Self-Authorship" — identifying where her own
     /// mathematical engine can be improved.
+    ///
+    /// # Safety boundary
+    ///
+    /// `target_file` is resolved relative to the current working directory
+    /// and rejected if it doesn't canonicalize to somewhere inside it --
+    /// this is part of an autonomous "Self-Authorship" loop, so if
+    /// `target_file` is ever derived from an LLM-generated plan or other
+    /// untrusted input, an absolute path or `..` traversal must not be
+    /// able to read arbitrary files off the host.
     pub fn self_audit(&self, target_file: &str) -> Result<String, String> {
         tracing::info!(
             "🔍 Self-Architect: Auditing internal source: {}",
             target_file
         );
 
-        let source = std::fs::read_to_string(target_file)
+        let cwd = std::env::current_dir()
+            .map_err(|e| format!("Failed to resolve current working directory: {e}"))?;
+        let canonical_target = std::path::Path::new(target_file)
+            .canonicalize()
+            .map_err(|e| format!("Failed to read source: {e}"))?;
+        if !canonical_target.starts_with(&cwd) {
+            return Err(format!(
+                "Refusing to audit {target_file:?}: resolves outside the working directory {cwd:?}"
+            ));
+        }
+
+        let source = std::fs::read_to_string(&canonical_target)
             .map_err(|e| format!("Failed to read source: {}", e))?;
 
         // Keep the engineering facade independent from the root language module.
@@ -1274,5 +1294,52 @@ mod tests {
             twin: None,
         };
         assert!(review.blocks_deployment());
+    }
+
+    #[test]
+    fn self_audit_reads_file_within_cwd() {
+        let manager = EngineeringManager::default();
+        let cwd = std::env::current_dir().unwrap();
+        let target = cwd.join("Cargo.toml");
+        let result = manager.self_audit(target.to_str().unwrap());
+        assert!(
+            result.is_ok(),
+            "should be able to audit a file within cwd: {result:?}"
+        );
+    }
+
+    #[test]
+    fn self_audit_rejects_absolute_path_outside_cwd() {
+        let manager = EngineeringManager::default();
+        // /etc/passwd is definitely outside any Rust project's cwd.
+        let result = manager.self_audit("/etc/passwd");
+        assert!(
+            result.is_err(),
+            "must refuse to read a file outside the working directory"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .contains("outside the working directory")
+        );
+    }
+
+    #[test]
+    fn self_audit_rejects_dotdot_traversal_outside_cwd() {
+        let manager = EngineeringManager::default();
+        let cwd = std::env::current_dir().unwrap();
+        // Walk up far enough to guarantee escaping the workspace, then
+        // target a file that plausibly exists outside it (/etc/hostname is
+        // present on virtually every Linux system).
+        let mut traversal = cwd.clone();
+        for _ in 0..10 {
+            traversal.push("..");
+        }
+        traversal.push("etc");
+        traversal.push("hostname");
+        if traversal.canonicalize().is_ok() {
+            let result = manager.self_audit(traversal.to_str().unwrap());
+            assert!(result.is_err());
+        }
     }
 }

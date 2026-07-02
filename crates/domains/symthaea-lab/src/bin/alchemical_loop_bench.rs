@@ -13,7 +13,7 @@ use anyhow::Result;
 use symthaea_materials::haptic_prober::HapticMaterialProber;
 use symthaea_materials::properties::MaterialProperty;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() -> Result<()> {

@@ -212,8 +212,8 @@ impl ManipulatorPhysicsSimulator for SymtropyManipulatorSimulator {
             // Convert torque command to angular velocity target
             // (simplified: torque ∝ target angular velocity for PD motor)
             let target = torque as f64 * gain * 5.0; // Scale factor
-            // Update motor target via constraint system
-            // Note: direct constraint access not available — use body forces instead
+                                                     // Update motor target via constraint system
+                                                     // Note: direct constraint access not available — use body forces instead
             if let Some(body) = self
                 .world
                 .body_mut(self.chain.links[i.min(self.chain.links.len() - 1)])
