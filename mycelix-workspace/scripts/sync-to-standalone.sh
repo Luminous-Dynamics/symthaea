@@ -118,12 +118,15 @@ RSYNC_EXCLUDE=(
     --exclude='docs/assets'
     --exclude='docs/media'
 )
-RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
-if $DRY_RUN; then
-    RSYNC_OPTS+=(--dry-run -v)
-else
-    RSYNC_OPTS+=(-v)
-fi
+RSYNC_OPTS=(-a --delete -v "${RSYNC_EXCLUDE[@]}")
+# Note: no --dry-run here even when $DRY_RUN is set. ${STANDALONE_REPO} is
+# always a disposable local clone (reset --hard to origin/main at the top of
+# every run — see above), so writing into it is harmless either way; the
+# real dry-run safety gate is the commit/push skip near the bottom of this
+# script. Passing --dry-run to rsync used to mean it never actually wrote
+# anything, which made the later "Changes in standalone repo" diff always
+# trivially empty — a --dry-run invocation could never show what it would
+# actually change. Letting rsync really write here fixes that.
 
 # --- Sync cluster directories ------------------------------------------------
 #
@@ -202,7 +205,40 @@ sync_dir() {
         return
     fi
     info "Syncing $(basename "$dst")/"
-    rsync "${RSYNC_OPTS[@]}" "${extra_excludes[@]}" "$src/" "$dst/"
+
+    # Export from git HEAD rather than rsyncing the live working tree.
+    #
+    # This monorepo routinely runs 12+ concurrent Claude sessions (see
+    # .claude/rules/CONCURRENT_SESSIONS.md), each of which can leave
+    # uncommitted, unrelated, in-progress work sitting in files anywhere
+    # under the sync source paths. Rsyncing the working tree directly (the
+    # old behavior) means that state — half-finished, unreviewed, possibly
+    # from a completely different task — gets shipped to the public
+    # standalone repo. Discovered 2026-07-02 (see MYCELIX_REVIEW.md
+    # addendum): a routine sync attempt would have carried another
+    # session's in-progress Symtropy refactor and several other clusters'
+    # uncommitted edits, mixed into what was meant to be one targeted fix.
+    #
+    # Exporting `HEAD` only ever includes committed content, which also
+    # matches what the eventual commit message already claims below
+    # ("update from monorepo @ <SHA>") — the sync was always meant to
+    # represent a specific commit, not scratch working-tree state.
+    local rel_path="${src#"${MONOREPO_ROOT}"/}"
+    local clean_tmp
+    clean_tmp="$(mktemp -d)"
+    if ! git -C "${MONOREPO_ROOT}" archive HEAD -- "${rel_path}" 2>/dev/null \
+        | tar -x -C "${clean_tmp}" 2>/dev/null; then
+        warn "Skipping $(basename "$dst")/ (${rel_path} has no committed content at HEAD)"
+        rm -rf "${clean_tmp}"
+        return
+    fi
+    if [ ! -d "${clean_tmp}/${rel_path}" ]; then
+        warn "Skipping $(basename "$dst")/ (${rel_path} has no committed content at HEAD)"
+        rm -rf "${clean_tmp}"
+        return
+    fi
+    rsync "${RSYNC_OPTS[@]}" "${extra_excludes[@]}" "${clean_tmp}/${rel_path}/" "${dst}/"
+    rm -rf "${clean_tmp}"
 }
 
 info "=== Syncing cluster directories ==="
