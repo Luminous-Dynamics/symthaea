@@ -939,6 +939,11 @@ path = "src/bin/code_gen_smoke.rs"
 required-features = ["code_generation"]
 
 [[bin]]
+name = "broca-curriculum-sync"
+path = "src/bin/broca_curriculum_sync.rs"
+required-features = ["ssm_language"]
+
+[[bin]]
 name = "symthaea-holon"
 path = "src/bin/symthaea-holon.rs"
 required-features = ["api_module"]

@@ -783,7 +783,8 @@ fn parse_args(args: &[String]) -> Result<Options> {
     let mut opts = Options {
         checkpoint_path: None,
         mamba_projection_checkpoint: None,
-        canonical_path: "crates/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl".into(),
+        canonical_path: "crates/domains/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl"
+            .into(),
         json_out: None,
         eval_limit: 0,
         max_gen_tokens: 32,
