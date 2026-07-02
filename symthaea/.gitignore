@@ -70,9 +70,9 @@ archive/
 # Large data directories (use ** so negation patterns work for tracked assets)
 **/data/**
 !**/data/
-!crates/symthaea-broca/data/broca-vocab-*.json
-!crates/symthaea-spore/data/broca-pipeline-distilled.bin
-!crates/symthaea-stt/data/mini_cmudict.txt
+!crates/domains/symthaea-broca/data/broca-vocab-*.json
+!crates/domains/symthaea-spore/data/broca-pipeline-distilled.bin
+!crates/core/symthaea-stt/data/mini_cmudict.txt
 !src/voice/data/cmudict.dict
 !data/benchmarks/
 !data/benchmarks/humaneval/
