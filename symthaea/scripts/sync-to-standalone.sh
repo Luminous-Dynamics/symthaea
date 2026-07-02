@@ -134,8 +134,12 @@ RSYNC_EXCLUDE=(
     # that was never part of git, so it can't build from a fresh clone.
     # Excluding it from Cargo.toml's `exclude = [...]` list alone isn't
     # sufficient -- `default-members`'s `crates/core/*` glob still picks it
-    # up -- so skip syncing the directory entirely instead.
-    --exclude='crates/core/hdc-zkp-bench/'
+    # up -- so skip syncing the directory entirely instead. Pattern is
+    # relative to each sync_dir() source root (e.g. ".../symthaea/crates/"
+    # for the "crates" SOURCE_DIRS entry), NOT the standalone repo root --
+    # a "crates/" prefix here would never match and silently let the
+    # directory back in on every sync.
+    --exclude='core/hdc-zkp-bench/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -527,8 +531,17 @@ echo
 if ! $DRY_RUN && ! $SKIP_CHECK; then
     SYNC_CHECK_FAILED=false
 
+    # Plain `cargo` fails on this NixOS host (rustup shim errors with
+    # "No such file or directory (os error 2)" outside a nix develop
+    # shell) -- wrap every verification call in nix develop so the check
+    # actually runs instead of failing closed on an environment error.
+    run_standalone_cargo() {
+        nix develop "${MONOREPO_ROOT}" --command bash -c \
+            "cd '${STANDALONE_REPO}' && $1"
+    }
+
     info "Running cargo fmt --check in standalone repo..."
-    if (cd "${STANDALONE_REPO}" && cargo fmt --check 2>&1 | head -20); then
+    if run_standalone_cargo "cargo fmt --check 2>&1 | head -20"; then
         ok "cargo fmt passed"
     else
         warn "cargo fmt --check failed — unformatted code detected"
@@ -536,7 +549,7 @@ if ! $DRY_RUN && ! $SKIP_CHECK; then
     fi
 
     info "Running cargo check in standalone repo (default features)..."
-    if (cd "${STANDALONE_REPO}" && cargo check 2>&1 | tail -5); then
+    if run_standalone_cargo "cargo check 2>&1 | tail -40"; then
         ok "cargo check passed"
     else
         warn "cargo check failed — the sync may have issues"
