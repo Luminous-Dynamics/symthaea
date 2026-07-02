@@ -554,7 +554,7 @@ impl ConsciousnessEpidemic {
             .iter()
             .enumerate()
             .rev()
-            .find(|(_, &count)| count > 0)
+            .find(|item| *item.1 > 0)
             .map(|(i, _)| CivicTier::from_index(i))
             .unwrap_or(CivicTier::Dormant);
 

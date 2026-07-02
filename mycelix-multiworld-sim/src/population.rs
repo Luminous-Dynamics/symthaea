@@ -138,7 +138,9 @@ impl PopulationEngine {
                     .iter()
                     .enumerate()
                     .filter(|(j, _)| !paired_males[*j])
-                    .max_by(|(_, &mid_a), (_, &mid_b)| {
+                    .max_by(|x, y| {
+                        let mid_a = *x.1;
+                        let mid_b = *y.1;
                         let ea = id_to_idx
                             .get(&mid_a)
                             .map(|&i| world.agents[i].ethics.as_vec())
@@ -369,7 +371,7 @@ impl PopulationEngine {
                         } else {
                             BiologicalSex::Female
                         };
-                        let gen = fem.generation.saturating_add(1);
+                        let next_generation = fem.generation.saturating_add(1);
                         let trauma = (fem.trauma_level * 0.5).min(1.0);
                         let mother_skills = fem.skills.as_slice();
                         let mother_health = fem.health;
@@ -395,7 +397,7 @@ impl PopulationEngine {
                             child_sex,
                             mother_id: *fem_id,
                             father_id: fem.partner_id,
-                            generation: gen,
+                            generation: next_generation,
                             trauma,
                             mother_skills,
                             father_skills,
