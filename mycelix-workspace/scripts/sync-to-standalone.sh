@@ -47,8 +47,8 @@ error() { printf "${RED}[error]${RESET} %s\n" "$*"; exit 1; }
 
 # --- Validate monorepo --------------------------------------------------------
 
-if [ ! -d "${MONOREPO_ROOT}/mycelix-finance" ]; then
-    error "Cannot find ${MONOREPO_ROOT}/mycelix-finance — run from monorepo root"
+if [ ! -d "${MONOREPO_ROOT}/mycelix-workspace/mycelix-finance" ]; then
+    error "Cannot find ${MONOREPO_ROOT}/mycelix-workspace/mycelix-finance — run from monorepo root"
 fi
 
 info "Monorepo root: ${MONOREPO_ROOT}"
@@ -166,6 +166,32 @@ CLUSTERS=(
     #   mycelix-workspace/mycelix-pulse (synced via the mycelix-workspace block below)
 )
 
+# All Mycelix cluster work is being consolidated into mycelix-workspace/
+# (see MYCELIX_REVIEW.md P0 #1 and the July 2 migration commits). Clusters
+# already moved read from their new mycelix-workspace/<cluster> location;
+# clusters not yet moved (large/live/special-case ones, deferred to a
+# follow-up pass: praxis, marketplace, desci, core, space, health) still
+# read from top-level until they migrate too. Once every cluster in
+# CLUSTERS has moved, this whole loop collapses into the wholesale
+# mycelix-workspace sync below and can be deleted.
+MOVED_TO_WORKSPACE=(
+    mycelix-commons mycelix-civic mycelix-hearth mycelix-finance
+    mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
+    mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
+    mycelix-climate mycelix-manufacturing
+)
+
+cluster_source_dir() {
+    local cluster="$1"
+    for moved in "${MOVED_TO_WORKSPACE[@]}"; do
+        if [ "$cluster" = "$moved" ]; then
+            echo "${MONOREPO_ROOT}/mycelix-workspace/${cluster}"
+            return
+        fi
+    done
+    echo "${MONOREPO_ROOT}/${cluster}"
+}
+
 sync_dir() {
     local src="$1"
     local dst="$2"
@@ -181,7 +207,7 @@ sync_dir() {
 
 info "=== Syncing cluster directories ==="
 for cluster in "${CLUSTERS[@]}"; do
-    sync_dir "${MONOREPO_ROOT}/${cluster}" "${STANDALONE_REPO}/${cluster}"
+    sync_dir "$(cluster_source_dir "$cluster")" "${STANDALONE_REPO}/${cluster}"
 done
 echo
 
@@ -226,20 +252,7 @@ echo
 # mycelix-workspace and is NOT excluded.
 info "=== Syncing mycelix-workspace ==="
 sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
-    --exclude='/mycelix-commons/' \
-    --exclude='/mycelix-civic/' \
-    --exclude='/mycelix-hearth/' \
-    --exclude='/mycelix-finance/' \
-    --exclude='/mycelix-governance/' \
-    --exclude='/mycelix-identity/' \
-    --exclude='/mycelix-personal/' \
-    --exclude='/mycelix-attribution/' \
     --exclude='/mycelix-praxis/' \
-    --exclude='/mycelix-craft/' \
-    --exclude='/mycelix-knowledge/' \
-    --exclude='/mycelix-music/' \
-    --exclude='/mycelix-energy/' \
-    --exclude='/mycelix-climate/' \
     --exclude='/mycelix-core/' \
     --exclude='/mycelix-marketplace/' \
     --exclude='/mycelix-supplychain/' \
