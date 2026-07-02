@@ -335,7 +335,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-climate** | `mycelix-climate/` | 3 (carbon, projects, bridge) | Built |
 | **mycelix-music** | `mycelix-music/` | 5 + 14 support crates (catalog, plays, balances, trust, music-bridge) | Built, WASM verified, DNA/hApp packed |
 | **mycelix-space** | `mycelix-space/` | 5 + orbital-mechanics lib (orbital objects, observations, conjunctions, debris bounties, traffic control) | Built |
-| **mycelix-desci** | `mycelix-desci/` | REST API (Actix-web) | 141 integration tests |
+| **mycelix-desci** | `mycelix-desci/` | REST API (Axum) | 141 integration tests |
 | **mycelix-core** | `mycelix-core/` | 0TML federated learning research | 62 FL tests |
 
 - **Total**: 141+ zomes, ~785K lines Rust (~643K code, tokei-verified), 16 built hApp bundles
