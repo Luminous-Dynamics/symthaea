@@ -3072,7 +3072,7 @@ mod tests {
         // F(10) ≈ 55
         let val = expr.eval(&[("n", 9.0)]);
         assert!(
-            (val - 45.0).abs() < 1.0,
+            (val - 55.0).abs() < 1.0,
             "F(10) ≈ 55 via Binet, got {:.1}",
             val
         );
