@@ -8,7 +8,11 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // `mod tests;` in lib.rs already makes this file the `tests` module, so
+    // this inner `mod tests { ... }` double-nests everything one level
+    // deeper than intended. `use super::*` only reaches the (empty) outer
+    // `tests` module, not the crate root — hence `super::super::*`.
+    use super::super::*;
     use mail_messages_integrity::*;
 
     // ==================== TEST FIXTURES ====================
@@ -26,6 +30,16 @@ mod tests {
     /// Creates a test Timestamp
     fn test_timestamp(micros: i64) -> Timestamp {
         Timestamp::from_micros(micros)
+    }
+
+    /// Creates a unique-ish message ID without pulling in a `uuid` dependency.
+    fn test_message_id() -> String {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        format!(
+            "<test-{}@pulse.test>",
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        )
     }
 
     /// Creates a valid CryptoSuite for testing
@@ -54,12 +68,13 @@ mod tests {
             nonce: [1u8; 24],
             signature: vec![1, 2, 3, 4, 5],
             crypto_suite: test_crypto_suite(),
-            message_id: format!("<test-{}>", uuid::Uuid::new_v4()),
+            message_id: test_message_id(),
             in_reply_to: None,
             references: Vec::new(),
             priority: EmailPriority::Normal,
             read_receipt_requested: false,
             expires_at: None,
+            timestamp: test_timestamp(1_700_000_000_000_000),
         }
     }
 

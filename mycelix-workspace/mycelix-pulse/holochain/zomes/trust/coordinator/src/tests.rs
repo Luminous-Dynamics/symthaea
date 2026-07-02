@@ -8,7 +8,11 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // `mod tests;` in lib.rs already makes this file the `tests` module, so
+    // this inner `mod tests { ... }` double-nests everything one level
+    // deeper than intended. `use super::*` only reaches the (empty) outer
+    // `tests` module, not the crate root — hence `super::super::*`.
+    use super::super::*;
     use mail_trust_integrity::*;
 
     // ==================== TEST FIXTURES ====================
@@ -247,7 +251,10 @@ mod tests {
         }
 
         #[test]
-        fn test_create_attestation_input() {
+        fn test_attestation_input_fields() {
+            // Named distinctly from the `test_create_attestation_input` fixture
+            // helper above (same name would shadow the helper within this
+            // module and silently resolve calls to this 0-arg test itself).
             let input = test_create_attestation_input(test_agent(2), 0.75);
 
             assert_eq!(input.trust_level, 0.75);
@@ -552,7 +559,7 @@ mod tests {
             let final_score = (base_score - penalty).max(0.0);
 
             assert_eq!(penalty, 0.5); // Capped at 0.5
-            assert_eq!(final_score, 0.3);
+            assert!((final_score - 0.3).abs() < 1e-9);
         }
     }
 
