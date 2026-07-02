@@ -15,7 +15,7 @@ categories = ["science", "algorithms", "simulation"]
 name = "symthaea_multirotor"
 
 [dependencies]
-positioning = { path = "../../../../mycelix-position/lib/positioning" }
+positioning = { path = "../../../../mycelix-workspace/mycelix-position/lib/positioning" }
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 symthaea-hal = { path = "../symthaea-hal", default-features = false }

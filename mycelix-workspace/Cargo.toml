@@ -471,6 +471,7 @@ exclude = [
     "mycelix-identity/crates/mycelix-trust-registry",
     "mycelix-desci/zomes/desci_claim/coordinator",
     "mycelix-desci/zomes/desci_claim/integrity",
+    "mycelix-position/lib/positioning",
     "mycelix-identity/zomes/bridge/coordinator",
     "mycelix-identity/zomes/bridge/integrity",
     "mycelix-identity/zomes/credential_schema/coordinator",
@@ -711,7 +712,7 @@ members = [
     # "mycelix-knowledge/apps/leptos", # own [workspace] - cannot be a member of another workspace (task #35)
     "mycelix-space/lib/*",
     "mycelix-space/tools/*",
-    # "mycelix-position/lib/*", # pre-staged — mycelix-position not yet migrated into mycelix-workspace/ (see task #43)
+    "mycelix-position/lib/*",
     "mycelix-core/libs/*",
     "mycelix-core/zomes/*",
     "mycelix-core/0TML/mycelix-hyperfeel",

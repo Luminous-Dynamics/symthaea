@@ -159,14 +159,18 @@ CLUSTERS=(
     # State interop (dual-DID airlock for state-facing credentials)
     mycelix-lawful-identity
     # Frozen — maintenance-only, see mycelix-marketplace/STATUS.md. Still
-    # synced (no active dedicated standalone repo/sync script found for it,
-    # unlike desci/supplychain/space/observatory below — the "own repo"
-    # note here was stale, same as the now-deleted mycelix-praxis
-    # sync-to-standalone.sh that referenced a nonexistent repo).
+    # synced (no active dedicated standalone repo/sync script found for it —
+    # the "own repo" note that used to live here was stale, same as the
+    # now-deleted mycelix-praxis sync-to-standalone.sh that referenced a
+    # nonexistent repo).
     mycelix-marketplace
     # Same "no active dedicated sync script found" situation as
-    # marketplace above — the "own repo" note was stale.
+    # marketplace above — the "own repo" note was also stale for this one.
     mycelix-desci
+    # Decentralized cooperative positioning (GPS-without-GPS): trilateration,
+    # EKF, GDOP. Never had a standalone-repo entry to begin with; newly
+    # migrated 2026-07-02, added straight to canonical sync.
+    mycelix-position
     # Note: clusters WITH their own standalone public repos intentionally NOT
     # synced here (to avoid duplicating code):
     #   mycelix-supplychain → Luminous-Dynamics/mycelix-supplychain
@@ -195,7 +199,7 @@ MOVED_TO_WORKSPACE=(
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
     mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
     mycelix-climate mycelix-manufacturing mycelix-lawful-identity mycelix-core
-    mycelix-praxis mycelix-marketplace mycelix-desci
+    mycelix-praxis mycelix-marketplace mycelix-desci mycelix-position
 )
 
 cluster_source_dir() {

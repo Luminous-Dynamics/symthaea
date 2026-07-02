@@ -170,7 +170,7 @@ symthaea-causal-reasoning = { path = "crates/core/symthaea-causal-reasoning", de
 symthaea-fep = { path = "crates/core/symthaea-fep" }
 
 # Shared positioning and peer-fusion primitives
-positioning = { path = "../mycelix-position/lib/positioning" }
+positioning = { path = "../mycelix-workspace/mycelix-position/lib/positioning" }
 
 # Symthaea Dream - Counterfactual Dream Engine (always enabled)
 symthaea-dream = { path = "crates/domains/symthaea-dream" }
