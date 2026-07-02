@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 # Holochain 0.7 - Coordinator zomes use hdk
 hdk = "0.6"
 serde = { version = "1.0", features = ["derive"] }
-holochain_serialized_bytes = "0.0.56"
+holochain_serialized_bytes = "0.0.57"
 
 # Local integrity zome
 pogq_validation_integrity = { path = "../integrity" }

@@ -674,7 +674,7 @@ members = [
     "mycelix-pulse/tests",
 
     # "mycelix-pulse/happ/backend-rs", # depends on dna/integrity, which has its own [workspace] (WASM profile isolation) — structural conflict, build standalone instead (task #35)
-    "mycelix-pulse/happ/cli",
+    # "mycelix-pulse/happ/cli", # pins holochain_conductor_api/holochain_types to the old 0.5 generation (vs 0.6 everywhere else) — internally inconsistent with its own holochain_client=0.7 pin, likely drifted rather than a deliberate compat target. Excluded rather than guessing at a bump; still builds standalone from its own directory (task #42)
     "mycelix-pulse/crates/*",
     "mycelix-pulse/desktop/*",
     "mycelix-pulse/holochain/crates/*",
@@ -889,7 +889,7 @@ subtle = "2.6"
 # Unified versioning for shared crates
 mycelix-sdk = { path = "sdk" }
 mycelix-fl-core = { path = "crates/mycelix-fl-core" }
-mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-common = { path = "crates/mycelix-bridge-common" }
 mycelix-claim-types = { path = "crates/mycelix-claim-types" }
 mycelix-zome-helpers = { path = "crates/mycelix-zome-helpers" }
 mycelix-music-types = { path = "crates/mycelix-music-types" }

@@ -10,7 +10,7 @@ name = "did_registry"
 [dependencies]
 hdk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-holochain_serialized_bytes = "0.0.56"
+holochain_serialized_bytes = "0.0.57"
 
 # Ed25519 signature verification
 ed25519-dalek = { version = "2.1", default-features = false, features = ["alloc"] }

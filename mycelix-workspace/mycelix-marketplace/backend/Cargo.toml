@@ -30,8 +30,8 @@ members = [
 # Holochain 0.6.0 dependencies
 hdk = "0.6.0"
 hdi = "0.7.0"
-holochain_serialized_bytes = "=0.0.56"
-serde = "=1.0.219"  # Match holochain_serialized_bytes requirement
+holochain_serialized_bytes = "=0.0.57"
+serde = "=1.0.228"  # Match holochain_serialized_bytes requirement
 
 # Additional utilities
 thiserror = "1"

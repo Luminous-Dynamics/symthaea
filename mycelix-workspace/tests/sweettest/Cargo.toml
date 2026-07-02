@@ -31,11 +31,11 @@ serial_test = "3"
 mycelix-crypto = { path = "../../mycelix-identity/crates/mycelix-crypto", features = ["native"] }
 
 # Needed for SerializedBytes derive macro (proc macro references crate by name)
-holochain_serialized_bytes = "0.0.56"
+holochain_serialized_bytes = "0.0.57"
 
 # Bridge types for pure-Rust integration tests (no conductor needed)
-mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common" }
-mycelix-bridge-entry-types = { path = "../../../crates/mycelix-bridge-entry-types" }
+mycelix-bridge-common = { path = "../../crates/mycelix-bridge-common" }
+mycelix-bridge-entry-types = { path = "../../crates/mycelix-bridge-entry-types" }
 
 [[test]]
 name = "identity_workflow"

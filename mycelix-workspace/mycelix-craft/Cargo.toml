@@ -23,7 +23,7 @@ resolver = "2"
 [workspace.dependencies]
 hdk = "0.6.0"
 hdi = "0.7.0"
-holochain_serialized_bytes = "0.0.56"
+holochain_serialized_bytes = "0.0.57"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 getrandom = { version = "0.2", features = ["custom"] }

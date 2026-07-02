@@ -25,8 +25,8 @@ members = [
 # Holochain 0.6.0 dependencies
 hdk = "0.6.0"
 hdi = "0.7.0"
-holochain_serialized_bytes = "=0.0.56"
-serde = { version = "=1.0.219", features = ["derive"] }
+holochain_serialized_bytes = "=0.0.57"
+serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "1.0"
 mycelix-bridge-common = { path = "../../crates/mycelix-bridge-common" }
 thiserror = "1"
