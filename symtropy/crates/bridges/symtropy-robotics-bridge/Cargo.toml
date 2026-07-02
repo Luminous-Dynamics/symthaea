@@ -1,0 +1,15 @@
+[package]
+name = "symtropy-robotics-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_core_pipeline", "bevy_render", "bevy_pbr", "bevy_asset", "bevy_winit", "x11", "bevy_log", "bevy_color", "bevy_state"] }
+symtropy-bevy-core = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-bevy-core" }
+symthaea-bevy-brain = { path = "/srv/luminous-dynamics/symtropy/crates/bridges/symthaea-bevy-brain" }
+symthaea-fep = { path = "../../../../symthaea/crates/core/symthaea-fep" }
+symtropy-math = { path = "../../core/symtropy-math" }
+symtropy-physics = { path = "../../core/symtropy-physics" }
+serde = { version = "1.0", features = ["derive"] }
+nalgebra = "0.34"

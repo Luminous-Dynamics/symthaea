@@ -58,7 +58,6 @@ bytemuck = { version = "1.18", features = ["derive"] }
 resolver = "2"
 exclude = [
     "crates/bridges/symtropy-robotics-bridge",
-    "crates/symtropy-robotics-bridge",
     "crates/bridges/symtropy-symthaea-adapter",
 ]
 members = [

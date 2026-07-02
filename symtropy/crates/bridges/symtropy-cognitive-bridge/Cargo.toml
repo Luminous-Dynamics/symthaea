@@ -1,0 +1,10 @@
+[package]
+name = "symtropy-cognitive-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+bevy = { version = "0.18", default-features = false }
+symtropy-core-stable = { path = "../../core/symtropy-core-stable" }
+serde = { version = "1.0", features = ["derive"] }

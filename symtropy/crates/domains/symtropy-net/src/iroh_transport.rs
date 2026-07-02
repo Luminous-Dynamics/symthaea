@@ -1,0 +1,220 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Iroh transport — direct P2P via QUIC (Magicsock NAT traversal).
+//!
+//! Uses Iroh's QUIC-based networking for <50ms latency peer connections.
+//! NAT traversal is handled automatically by Magicsock — no STUN/TURN
+//! configuration needed in most cases.
+//!
+//! This is the **preferred transport for native (desktop/server) builds**.
+//! For WASM/browser builds, use `RelayTransport` (WebSocket fallback).
+//!
+//! # Architecture
+//!
+//! ```text
+//! IrohTransport
+//!   └→ IrohBridgeHandle (from symthaea::swarm::iroh)
+//!        └→ IrohBridgeActor (async tokio task)
+//!             └→ Iroh Endpoint (QUIC + Magicsock)
+//!                  ├→ Reliable streams (authority messages)
+//!                  └→ Unreliable datagrams (physics state)
+//! ```
+//!
+//! # Integration with Symthaea
+//!
+//! Symthaea's Iroh module (`symthaea/src/swarm/iroh/`) provides:
+//! - `IrohBridgeHandle` — sync-safe handle for the game tick loop
+//! - `IrohBridgeActor` — async actor managing connections
+//! - `TensorStream` — bidirectional streaming (we reuse for physics)
+//! - `HybridHandshake` — trust-gated peer verification
+//!
+//! Symtropy wraps this in the `Transport` trait so the game code
+//! doesn't know or care whether it's using Iroh, WebRTC, or loopback.
+
+use crate::peer::PeerId;
+use crate::transport::{Channel, PeerMessage, Transport, TransportEvent};
+
+/// Iroh-backed transport using QUIC for direct P2P connections.
+///
+/// This is a placeholder struct that will be wired to Symthaea's
+/// `IrohBridgeHandle` when the `iroh` feature is enabled in Symtropy.
+///
+/// The integration path:
+/// 1. Symtropy enables `symthaea/swarm` feature
+/// 2. Creates `IrohBridgeHandle` + `IrohBridgeActor` at startup
+/// 3. Wraps the handle in `IrohTransport`
+/// 4. Passes to `NetworkSession<IrohTransport>`
+/// 5. Game loop calls `session.tick()` — physics flows over QUIC
+pub struct IrohTransport {
+    local_id: PeerId,
+    peers: Vec<PeerId>,
+    connected: bool,
+    /// Outbound message queue (drained by the bridge actor).
+    outbox: Vec<(PeerId, Channel, Vec<u8>)>,
+    /// Inbound message queue (filled by the bridge actor).
+    inbox: Vec<PeerMessage>,
+}
+
+impl IrohTransport {
+    /// Create a new Iroh transport.
+    ///
+    /// In the full integration, this takes an `IrohBridgeHandle` parameter.
+    /// For now, it creates a standalone instance that queues messages
+    /// until the bridge is wired.
+    pub fn new(local_id: PeerId) -> Self {
+        Self {
+            local_id,
+            peers: Vec::new(),
+            connected: false,
+            outbox: Vec::new(),
+            inbox: Vec::new(),
+        }
+    }
+
+    /// Inject a received message (called by the bridge actor adapter).
+    pub fn inject_message(&mut self, msg: PeerMessage) {
+        self.inbox.push(msg);
+    }
+
+    /// Inject a peer connection event.
+    pub fn inject_peer_connected(&mut self, peer: PeerId) {
+        if !self.peers.contains(&peer) {
+            self.peers.push(peer);
+        }
+    }
+
+    /// Inject a peer disconnection event.
+    pub fn inject_peer_disconnected(&mut self, peer: PeerId) {
+        self.peers.retain(|p| *p != peer);
+    }
+
+    /// Drain outbound messages (consumed by the bridge actor adapter).
+    pub fn drain_outbox(&mut self) -> Vec<(PeerId, Channel, Vec<u8>)> {
+        std::mem::take(&mut self.outbox)
+    }
+}
+
+impl Transport for IrohTransport {
+    fn connect(&mut self, _room_id: &str) -> Result<(), String> {
+        // In the full integration, this joins the Iroh swarm.
+        // The room_id maps to a topic/document hash.
+        self.connected = true;
+        Ok(())
+    }
+
+    fn disconnect(&mut self) {
+        self.connected = false;
+        self.peers.clear();
+        self.outbox.clear();
+        self.inbox.clear();
+    }
+
+    fn send(&mut self, to: PeerId, channel: Channel, data: &[u8]) -> Result<(), String> {
+        if !self.connected {
+            return Err("Not connected".into());
+        }
+        self.outbox.push((to, channel, data.to_vec()));
+        Ok(())
+    }
+
+    fn broadcast(&mut self, channel: Channel, data: &[u8]) -> Result<(), String> {
+        if !self.connected {
+            return Err("Not connected".into());
+        }
+        for peer in &self.peers {
+            self.outbox.push((*peer, channel, data.to_vec()));
+        }
+        Ok(())
+    }
+
+    fn poll(&mut self) -> Vec<TransportEvent> {
+        let mut events = Vec::new();
+        for msg in self.inbox.drain(..) {
+            events.push(TransportEvent::Message(msg));
+        }
+        events
+    }
+
+    fn peer_count(&self) -> usize {
+        self.peers.len()
+    }
+
+    fn is_signaling_connected(&self) -> bool {
+        self.connected
+    }
+
+    fn local_peer_id(&self) -> PeerId {
+        self.local_id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn iroh_transport_basic() {
+        let mut transport = IrohTransport::new(PeerId(1));
+        transport.connect("test-room").unwrap();
+        assert!(transport.is_signaling_connected());
+        assert_eq!(transport.peer_count(), 0);
+
+        // Simulate peer joining
+        transport.inject_peer_connected(PeerId(2));
+        assert_eq!(transport.peer_count(), 1);
+
+        // Send a message
+        transport
+            .send(PeerId(2), Channel::Unreliable, b"physics")
+            .unwrap();
+        let outbox = transport.drain_outbox();
+        assert_eq!(outbox.len(), 1);
+        assert_eq!(outbox[0].0, PeerId(2));
+        assert_eq!(outbox[0].2, b"physics");
+    }
+
+    #[test]
+    fn iroh_transport_receive() {
+        let mut transport = IrohTransport::new(PeerId(1));
+        transport.connect("test").unwrap();
+
+        transport.inject_message(PeerMessage {
+            from: PeerId(2),
+            channel: Channel::Reliable,
+            data: b"authority".to_vec(),
+        });
+
+        let events = transport.poll();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            TransportEvent::Message(msg) => {
+                assert_eq!(msg.from, PeerId(2));
+                assert_eq!(msg.data, b"authority");
+            }
+            _ => panic!("Expected Message"),
+        }
+    }
+
+    #[test]
+    fn iroh_transport_broadcast() {
+        let mut transport = IrohTransport::new(PeerId(0));
+        transport.connect("test").unwrap();
+        transport.inject_peer_connected(PeerId(1));
+        transport.inject_peer_connected(PeerId(2));
+
+        transport.broadcast(Channel::Unreliable, b"state").unwrap();
+        let outbox = transport.drain_outbox();
+        assert_eq!(outbox.len(), 2);
+    }
+
+    #[test]
+    fn iroh_transport_disconnect() {
+        let mut transport = IrohTransport::new(PeerId(0));
+        transport.connect("test").unwrap();
+        transport.inject_peer_connected(PeerId(1));
+
+        transport.disconnect();
+        assert!(!transport.is_signaling_connected());
+        assert_eq!(transport.peer_count(), 0);
+    }
+}

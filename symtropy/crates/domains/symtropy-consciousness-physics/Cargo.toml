@@ -1,0 +1,68 @@
+[package]
+name = "symtropy-consciousness-physics"
+version = "0.2.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Integrated information (Phi) as a first-class physics parameter: 5-channel coupling, thermodynamic closure with Landauer bound, CEMI-inspired harmony fields, and 63 research experiments."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "consciousness", "thermodynamics", "simulation", "phi"]
+categories = ["simulation", "science", "game-engines"]
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+# cdylib needed by wasm-bindgen to produce a .wasm module for browsers.
+# rlib retains the normal Rust library interface for native builds and tests.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+symtropy-math = { version = "0.2.0", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-math" }
+symtropy-physics = { version = "0.2.0", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-physics" }
+symthaea-consciousness-equation = { version = "0.1.0", path = "../../../../symthaea/crates/domains/symthaea-consciousness-equation" }
+nalgebra = "0.34"
+rand = "0.8"
+
+# WASM / browser demo — activated by the `wasm` feature
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[features]
+default = []
+consciousness-curvature = []
+consciousness-hdc = []
+pyphi-validation = []
+# Enables wasm-bindgen exports for the browser research demo.
+# Build: cargo build -p symtropy-consciousness-physics --target wasm32-unknown-unknown --features wasm
+# Then: ~/.cargo/bin/wasm-bindgen target/wasm32-unknown-unknown/release/symtropy_consciousness_physics.wasm \
+#         --out-dir www/pkg --target web --no-typescript
+wasm = ["dep:wasm-bindgen", "dep:serde", "dep:serde_json", "dep:console_error_panic_hook"]
+
+[dev-dependencies]
+proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "coupling_bench"
+harness = false
+
+# Feature-gated examples (won't build with `cargo check --examples` without features)
+[[example]]
+name = "curvature_lensing"
+required-features = ["consciousness-curvature"]
+
+[[example]]
+name = "curvature_selforg"
+required-features = ["consciousness-curvature"]
+
+[[example]]
+name = "hdc_cooperation"
+required-features = ["consciousness-hdc"]
+
+[[example]]
+name = "pyphi_validate"
+required-features = ["pyphi-validation"]

@@ -1,0 +1,15 @@
+[package]
+name = "symtropy-fluid"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "SPH-based fluid dynamics primitives for N-dimensional rigid body physics."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "fluid", "sph", "simulation", "n-dimensional"]
+categories = ["simulation", "science"]
+
+[dependencies]
+symtropy-math = { version = "0.2.1", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-math" }
+symtropy-physics = { version = "0.2.1", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-physics" }
+nalgebra = { version = "0.34", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }

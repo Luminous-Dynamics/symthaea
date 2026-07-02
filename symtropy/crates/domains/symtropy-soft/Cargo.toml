@@ -1,0 +1,12 @@
+[package]
+name = "symtropy-soft"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "Soft-body and cloth dynamics for Symtropy using XPBD."
+
+[dependencies]
+symtropy-math = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-math" }
+symtropy-physics = { path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-physics" }
+nalgebra = { version = "0.34", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
