@@ -158,12 +158,17 @@ CLUSTERS=(
     mycelix-core
     # State interop (dual-DID airlock for state-facing credentials)
     mycelix-lawful-identity
+    # Frozen — maintenance-only, see mycelix-marketplace/STATUS.md. Still
+    # synced (no active dedicated standalone repo/sync script found for it,
+    # unlike desci/supplychain/space/observatory below — the "own repo"
+    # note here was stale, same as the now-deleted mycelix-praxis
+    # sync-to-standalone.sh that referenced a nonexistent repo).
+    mycelix-marketplace
     # Note: clusters WITH their own standalone public repos intentionally NOT
     # synced here (to avoid duplicating code):
     #   mycelix-desci       → Luminous-Dynamics/mycelix-desci
     #   mycelix-supplychain → Luminous-Dynamics/mycelix-supplychain
     #   mycelix-space       → Luminous-Dynamics/mycelix-space
-    #   mycelix-marketplace → Luminous-Dynamics/Mycelix-Marketplace
     #   mycelix-observatory → Luminous-Dynamics/mycelix-observatory
     # Submodules (own standalone):
     #   mycelix-health      → Luminous-Dynamics/mycelix-health (submodule)
@@ -175,18 +180,19 @@ CLUSTERS=(
 # (see MYCELIX_REVIEW.md P0 #1 and the July 2 migration commits). Clusters
 # already moved read from their new mycelix-workspace/<cluster> location;
 # clusters not yet moved still read from top-level until they migrate too.
-# Remaining as of 2026-07-02: marketplace (blocked on freeze/retire
-# decision), desci (blocked on mycelix-multiworld-sim settling). praxis,
-# core, and health have since moved (health via submodule surgery, has
-# its own standalone repo — see the wholesale sync exclude below). Once
-# every cluster in CLUSTERS has moved, this whole loop collapses into the
-# wholesale mycelix-workspace sync below and can be deleted.
+# Remaining as of 2026-07-02: desci (blocked on mycelix-multiworld-sim
+# settling). praxis, core, health, and marketplace have since moved
+# (health via submodule surgery, has its own standalone repo — see the
+# wholesale sync exclude below; marketplace frozen but kept, see its
+# STATUS.md). Once every cluster in CLUSTERS has moved, this whole loop
+# collapses into the wholesale mycelix-workspace sync below and can be
+# deleted.
 MOVED_TO_WORKSPACE=(
     mycelix-commons mycelix-civic mycelix-hearth mycelix-finance
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
     mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
     mycelix-climate mycelix-manufacturing mycelix-lawful-identity mycelix-core
-    mycelix-praxis
+    mycelix-praxis mycelix-marketplace
 )
 
 cluster_source_dir() {
@@ -312,12 +318,15 @@ echo
 # mycelix-workspace and is NOT excluded.
 info "=== Syncing mycelix-workspace ==="
 sync_dir "${MONOREPO_ROOT}/mycelix-workspace" "${STANDALONE_REPO}/mycelix-workspace" \
-    --exclude='/mycelix-marketplace/' \
     --exclude='/mycelix-supplychain/' \
     --exclude='/mycelix-desci/' \
     --exclude='/mycelix-health/'
     # mycelix-core's and mycelix-praxis's excludes removed 2026-07-02 — both moved here with real
     # tracked content (was previously excluded to hide an untracked stub).
+    # mycelix-marketplace's exclude also removed 2026-07-02 — migrated,
+    # frozen but kept (STATUS.md), no active dedicated standalone repo
+    # found for it, so it's treated like core/praxis rather than like
+    # desci/supplychain/health.
     # Note: mycelix-prism is NOT excluded — it has no top-level counterpart
     # and no dedicated sync script; this wholesale sync is its only current
     # path to the public repo. mycelix-health IS now excluded (added
