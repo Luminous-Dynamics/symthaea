@@ -104,6 +104,7 @@ def main():
     neural_parser = subparsers.add_parser("neural-link", help="Generate world blueprint from prompt")
     neural_parser.add_argument("prompt", help="Creative world prompt")
     neural_parser.add_argument("--output", default="world_blueprint.yaml", help="Blueprint output file")
+    neural_parser.add_argument("--model", help="Ollama model to use (default: gemma4:e2b)")
 
     # Registry
     registry_parser = subparsers.add_parser("registry", help="Registry management")
@@ -177,7 +178,7 @@ def main():
                 f.write("---\n\n")
         print(f"Generated gallery at {args.output}")
     elif args.command == "neural-link":
-        generate_world_blueprint(args.prompt, args.output)
+        generate_world_blueprint(args.prompt, args.output, model=args.model)
     elif args.command == "registry":
         if args.registry_command == "status":
             print(json.dumps(get_registry_status(), indent=2))
