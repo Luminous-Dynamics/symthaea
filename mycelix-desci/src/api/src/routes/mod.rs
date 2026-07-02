@@ -5,6 +5,7 @@
 
 use axum::{
     Router,
+    middleware::from_fn,
     routing::{get, post, put},
 };
 use std::sync::Arc;
@@ -12,28 +13,48 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::error::ApiError;
+use crate::middleware::require_auth;
 use crate::{handlers, models::*, state::AppState};
 
 /// API routes
+///
+/// Split into a public (read-only GET) router and a protected (mutating
+/// POST/PUT/DELETE) router gated by [`require_auth`]. `/query` stays public
+/// even though it is a POST, since it is a read-only search endpoint (no
+/// state is mutated) — only routes that create or modify stored data require
+/// a bearer token.
 pub fn api_routes() -> Router<Arc<AppState>> {
+    public_routes().merge(protected_routes())
+}
+
+/// Read-only routes. No authentication required.
+fn public_routes() -> Router<Arc<AppState>> {
     Router::new()
-        // Claims endpoints
-        .route("/claims", post(handlers::create_claim))
         .route("/claims/:id", get(handlers::get_claim))
-        .route("/claims/:id/verify", put(handlers::add_verification))
-        .route("/claims/:id/provenance", put(handlers::add_provenance))
-        // Query endpoints
+        // Query endpoints (POST but read-only: no mutation of stored data)
         .route("/query", post(handlers::execute_query))
         .route("/query/categories", get(handlers::get_categories))
         .route("/query/stats", get(handlers::get_stats))
-        // Trust endpoints
+        // Trust endpoints (read)
         .route("/trust/:participant", get(handlers::get_trust_score))
-        .route("/trust/:participant", put(handlers::update_trust_score))
         .route("/trust/stats", get(handlers::get_trust_stats))
         // System endpoints
         .route("/system/health", get(handlers::health_check))
         .route("/system/metrics", get(handlers::get_metrics))
         .route("/system/version", get(handlers::get_version))
+}
+
+/// Mutating routes (POST/PUT/DELETE) that create or modify stored data.
+/// Gated by [`require_auth`] — callers must present a valid bearer JWT.
+fn protected_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        // Claims endpoints
+        .route("/claims", post(handlers::create_claim))
+        .route("/claims/:id/verify", put(handlers::add_verification))
+        .route("/claims/:id/provenance", put(handlers::add_provenance))
+        // Trust endpoints (write)
+        .route("/trust/:participant", put(handlers::update_trust_score))
+        .route_layer(from_fn(require_auth))
 }
 
 /// OpenAPI documentation

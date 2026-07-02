@@ -49,8 +49,15 @@ hex = { workspace = true }
 prometheus = "0.13"
 lazy_static = "1.4"
 
-# Rate limiting (disabled for now - needs proper implementation)
-# tower-governor = "0.3"
+# Rate limiting (per-IP GCRA token bucket via the `governor` crate).
+# Pinned to 0.4 because its axum integration targets axum 0.7 (this crate's
+# axum version); tower_governor >=0.5 pulls in axum 0.8 and does not compile
+# against a 0.7 Router (Response<Body> type mismatch).
+tower_governor = "0.4"
+governor = "0.6"
+
+# JWT bearer-token auth middleware for mutating routes
+jsonwebtoken = "9"
 
 # Project dependencies
 mycelix-desci-core = { path = "../core" }
@@ -61,3 +68,4 @@ tokio-test = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 uuid = { workspace = true }
 rand = "0.8"
+tower = { version = "0.4", features = ["util"] }

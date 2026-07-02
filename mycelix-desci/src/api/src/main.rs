@@ -15,6 +15,8 @@ use axum::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower::ServiceBuilder;
+use tower_governor::GovernorLayer;
+use tower_http::cors::AllowOrigin;
 use tower_http::{
     compression::CompressionLayer, cors::CorsLayer, timeout::TimeoutLayer, trace::TraceLayer,
 };
@@ -32,7 +34,7 @@ mod routes;
 mod state;
 
 use error::Result;
-use middleware::MetricsMiddleware;
+use middleware::{MetricsMiddleware, governor_config};
 use state::AppState;
 
 /// API version
@@ -58,7 +60,7 @@ async fn main() -> Result<()> {
     background::start_quantum_anchor(Arc::clone(&state));
 
     // Build application
-    let app = create_app(Arc::clone(&state));
+    let app = create_app(Arc::clone(&state), &config.cors_allowed_origins);
 
     // Create server address
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
@@ -85,6 +87,17 @@ fn init_logging() {
         .init();
 }
 
+/// Default CORS allowlist for local development plus the DeSci production
+/// frontend domain. Overridable via `CORS_ORIGINS` (comma-separated).
+///
+/// `desci.mycelix.net` / port 8106 is the reserved Mycelix frontend slot for
+/// this cluster per `.claude/rules/PORTS.md` (alphabetical 81XX allocation);
+/// no DeSci-specific frontend config file was found in-repo pinning a
+/// different domain, so this is the documented convention rather than a
+/// discovered one — worth double-checking against actual deployment.
+const DEFAULT_CORS_ORIGINS: &str =
+    "http://localhost:3000,http://localhost:8106,https://desci.mycelix.net";
+
 /// Load configuration from environment
 fn load_config() -> Result<Config> {
     Ok(Config {
@@ -93,9 +106,10 @@ fn load_config() -> Result<Config> {
             .parse()
             .unwrap_or(8080),
         cors_allowed_origins: std::env::var("CORS_ORIGINS")
-            .unwrap_or_else(|_| "*".to_string())
+            .unwrap_or_else(|_| DEFAULT_CORS_ORIGINS.to_string())
             .split(',')
-            .map(String::from)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
             .collect(),
     })
 }
@@ -107,7 +121,7 @@ struct Config {
 }
 
 /// Create the Axum application with all routes and middleware
-fn create_app(state: Arc<AppState>) -> Router {
+fn create_app(state: Arc<AppState>, cors_allowed_origins: &[String]) -> Router {
     // Create OpenAPI documentation
     let openapi = routes::ApiDoc::openapi();
 
@@ -130,21 +144,33 @@ fn create_app(state: Arc<AppState>) -> Router {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(CompressionLayer::new())
-                .layer(configure_cors())
+                .layer(configure_cors(cors_allowed_origins))
                 .layer(TimeoutLayer::new(std::time::Duration::from_secs(30)))
                 .layer(DefaultBodyLimit::max(10 * 1024 * 1024)), // 10MB max
         )
         // Add metrics middleware
         .layer(axum::middleware::from_fn(MetricsMiddleware::track))
+        // Per-IP rate limiting (tower_governor, GCRA token bucket)
+        .layer(GovernorLayer {
+            config: governor_config(),
+        })
 }
 
-/// Configure CORS middleware
-fn configure_cors() -> CorsLayer {
+/// Configure CORS middleware with an explicit origin allowlist.
+///
+/// Wildcard origin (`*`) combined with credential-bearing headers
+/// (`Authorization`) is a real vulnerability — it lets any website read
+/// responses made with a caller's bearer token. Origins are validated
+/// against the exact allowlist parsed from `CORS_ORIGINS`
+/// (see `DEFAULT_CORS_ORIGINS` for the local-dev + production default).
+fn configure_cors(allowed_origins: &[String]) -> CorsLayer {
+    let origins: Vec<HeaderValue> = allowed_origins
+        .iter()
+        .filter_map(|o| o.parse::<HeaderValue>().ok())
+        .collect();
+
     CorsLayer::new()
-        .allow_origin(
-            "*".parse::<HeaderValue>()
-                .expect("Static CORS origin '*' must be valid"),
-        )
+        .allow_origin(AllowOrigin::list(origins))
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
 }
