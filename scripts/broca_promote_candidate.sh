@@ -77,12 +77,12 @@ if [[ "$new_hash" != "$candidate_hash" ]]; then
   exit 1
 fi
 
-baseline_name="production-$timestamp"
-echo "[broca-promote] recapturing production baseline ($baseline_name) for the next cycle's comparison..."
-mkdir -p "$(dirname "$BASELINE_POINTER")"
-BROCA_CHECKPOINT_PATH="$PRODUCTION_CHECKPOINT" scripts/broca_capture_baseline.sh "$baseline_name"
-echo "$BASELINE_ROOT/$baseline_name" > "$BASELINE_POINTER"
-
+# Write the audit-trail entry now, before attempting baseline recapture below.
+# The checkpoint swap above is the part of "promotion" that actually matters
+# and has already succeeded (and was gated) — the log must record it even if
+# the best-effort baseline recapture that follows fails for an unrelated
+# reason (e.g. a transient build issue). Do not let bookkeeping for the next
+# cycle block or hide a promotion that already happened.
 mkdir -p "$(dirname "$PROMOTION_LOG")"
 python3 - "$PROMOTION_LOG" "$promotion_ready" "$candidate_checkpoint" "$candidate_hash" "$backup_path" "$timestamp" <<'PY'
 import json, sys
@@ -110,3 +110,30 @@ echo "[broca-promote] Provenance recorded in: $PROMOTION_LOG"
 echo "[broca-promote] REMINDER: no live Broca consumer hot-reloads its checkpoint."
 echo "[broca-promote]          Restart any running process using --llm-backend broca"
 echo "[broca-promote]          (or similar) to pick up the new weights."
+
+# Recapture the production baseline for the *next* cycle's comparison. This
+# is best-effort: it must not roll back an already-succeeded, already-logged
+# promotion. If it fails, invalidate the stale pointer (rather than leaving
+# it pointing at a baseline that no longer matches production) so the next
+# broca_curriculum_cycle.sh run self-heals by recapturing a fresh one, and
+# exit non-zero so a human notices and can investigate/retry manually.
+#
+# BROCA_DECODER_FEATURES=simd (not the auto-detected mamba-cpu default): this
+# bridge's gate only ever needs --decoder direct,structured, never mamba, and
+# mamba-cpu currently fails to compile regardless (dangling
+# symthaea-broca-tools references from an incomplete crate-split migration in
+# liquid_mamba.rs, unrelated to this bridge) — see broca_curriculum_sync's
+# equivalent note.
+export BROCA_DECODER_FEATURES="${BROCA_DECODER_FEATURES:-simd}"
+
+baseline_name="production-$timestamp"
+echo "[broca-promote] recapturing production baseline ($baseline_name) for the next cycle's comparison..."
+mkdir -p "$(dirname "$BASELINE_POINTER")"
+if BROCA_CHECKPOINT_PATH="$PRODUCTION_CHECKPOINT" BROCA_SKIP_EXERCISM="${BROCA_SKIP_EXERCISM:-1}" scripts/broca_capture_baseline.sh "$baseline_name"; then
+  echo "$BASELINE_ROOT/$baseline_name" > "$BASELINE_POINTER"
+  echo "[broca-promote] baseline recaptured: $BASELINE_ROOT/$baseline_name"
+else
+  rm -f "$BASELINE_POINTER"
+  echo "[broca-promote] WARNING: baseline recapture failed. The promotion above already succeeded and is recorded in $PROMOTION_LOG, but no fresh baseline is recorded — CURRENT_BASELINE has been invalidated so the next cycle run will recapture one automatically. You may also run scripts/broca_capture_baseline.sh manually." >&2
+  exit 3
+fi

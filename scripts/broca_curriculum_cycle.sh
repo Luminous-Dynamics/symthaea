@@ -203,10 +203,20 @@ baseline_dir=""
 if [[ -f "$BASELINE_POINTER" ]]; then
   baseline_dir="$(cat "$BASELINE_POINTER")"
 fi
+# BROCA_DECODER_FEATURES=simd (not the auto-detected mamba-cpu default):
+# this bridge's gate only ever requests --decoder direct,structured, never
+# mamba, so it doesn't need the Liquid-Mamba pathway at all — and mamba-cpu
+# currently fails to compile regardless (dangling symthaea-broca-tools
+# references from an incomplete crate-split migration in liquid_mamba.rs,
+# unrelated to this bridge). This is the deliberately-correct feature set
+# for this gate, not just a workaround, so it stays "simd" even after GPU
+# comes back — see broca_curriculum_sync's equivalent note.
+export BROCA_DECODER_FEATURES="${BROCA_DECODER_FEATURES:-simd}"
+
 if [[ -z "$baseline_dir" || ! -d "$baseline_dir" ]]; then
   baseline_name="production-$(date -u +%Y%m%dT%H%M%SZ)"
   echo "[broca-cycle] no valid production baseline recorded; capturing one now ($baseline_name)..."
-  BROCA_CHECKPOINT_PATH="$PRODUCTION_CHECKPOINT" scripts/broca_capture_baseline.sh "$baseline_name"
+  BROCA_CHECKPOINT_PATH="$PRODUCTION_CHECKPOINT" BROCA_SKIP_EXERCISM="${BROCA_SKIP_EXERCISM:-1}" scripts/broca_capture_baseline.sh "$baseline_name"
   baseline_dir="$BASELINE_ROOT/$baseline_name"
   echo "$baseline_dir" > "$BASELINE_POINTER"
 fi
