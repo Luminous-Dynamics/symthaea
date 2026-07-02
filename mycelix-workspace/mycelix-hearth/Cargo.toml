@@ -80,7 +80,7 @@ hearth-types = { path = "crates/hearth-types" }
 hearth-coordinator-common = { path = "crates/hearth-coordinator-common" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../crates/mycelix-zome-helpers" }
 
 [profile.dev]
 opt-level = "z"

@@ -84,7 +84,7 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 civic-types = { path = "crates/civic-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common", features = ["infrastructure"] }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../crates/mycelix-zome-helpers" }
 commons-types = { path = "../mycelix-commons/crates/commons-types" }
 
 [profile.dev]

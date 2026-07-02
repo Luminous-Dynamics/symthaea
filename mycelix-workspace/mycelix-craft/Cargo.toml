@@ -29,7 +29,7 @@ serde_json = "1.0"
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "=0.3.2" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../crates/mycelix-zome-helpers" }
 thiserror = "2"
 base64 = "0.22"
 

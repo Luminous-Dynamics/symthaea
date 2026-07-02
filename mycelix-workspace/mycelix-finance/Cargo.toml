@@ -60,7 +60,7 @@ derive_more = "0.99"
 # which is incompatible with Holochain's WASM runtime.
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../crates/mycelix-zome-helpers" }
 
 # ZKP verification for transaction privacy
 mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }
