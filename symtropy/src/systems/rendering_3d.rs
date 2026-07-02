@@ -79,6 +79,36 @@ fn waterworks_material(base_color: Color) -> StandardMaterial {
     }
 }
 
+/// Real-PBR variant of [`waterworks_material`] for surfaces upgraded from
+/// flat greybox color to an actual CC0 texture (see assets/textures/waterworks/
+/// and its ATTRIBUTION.md — ambientCG Concrete034/Concrete048/PaintedMetal004).
+/// Deliberately lit (unlike the greybox default) since a flat-shaded texture
+/// looks wrong; the scene's existing DirectionalLight provides real shading.
+///
+/// Deliberately does NOT wire ambientCG's standalone grayscale Roughness map
+/// into `metallic_roughness_texture` — Bevy/glTF expect roughness in the
+/// green channel and metallic in blue of one combined texture, so feeding in
+/// a plain grayscale map (R=G=B) would make bright/rough areas incorrectly
+/// read as partially metallic. Using a flat scalar `perceptual_roughness`
+/// instead until there's a real reason to pack a proper ORM texture.
+fn waterworks_textured_material(
+    base_color_texture: Handle<Image>,
+    normal_map_texture: Handle<Image>,
+    tint: Color,
+    perceptual_roughness: f32,
+) -> StandardMaterial {
+    StandardMaterial {
+        base_color: tint,
+        base_color_texture: Some(base_color_texture),
+        normal_map_texture: Some(normal_map_texture),
+        metallic: 0.0,
+        perceptual_roughness,
+        reflectance: 0.04,
+        unlit: false,
+        ..default()
+    }
+}
+
 fn waterworks_emissive_material(base_color: Color, emissive_strength: f32) -> StandardMaterial {
     StandardMaterial {
         base_color,
@@ -137,8 +167,16 @@ pub fn setup_world_3d(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut physics_world: ResMut<PhysicsWorldRes>,
     old_cameras: Query<Entity, (With<Camera>, Without<Camera3D>)>,
+    asset_server: Res<AssetServer>,
 ) {
     info!("Initializing Embodied 3D Layer: Old Waterworks");
+
+    let old_concrete_color = asset_server.load("textures/waterworks/old_concrete_color.jpg");
+    let old_concrete_normal = asset_server.load("textures/waterworks/old_concrete_normal.jpg");
+    let wet_concrete_color = asset_server.load("textures/waterworks/wet_concrete_color.jpg");
+    let wet_concrete_normal = asset_server.load("textures/waterworks/wet_concrete_normal.jpg");
+    let painted_steel_color = asset_server.load("textures/waterworks/painted_steel_color.jpg");
+    let painted_steel_normal = asset_server.load("textures/waterworks/painted_steel_normal.jpg");
 
     for entity in &old_cameras {
         commands.entity(entity).despawn();
@@ -189,6 +227,24 @@ pub fn setup_world_3d(
     let cols = layout.width as f32;
     let rows = layout.height as f32;
 
+    // Real CC0 textures (ambientCG Concrete034/Concrete048) replacing the flat
+    // greybox colors, shared by every wall/floor tile rather than one
+    // material asset per tile.
+    let wall_material = materials.add(waterworks_textured_material(
+        old_concrete_color.clone(),
+        old_concrete_normal.clone(),
+        Color::WHITE,
+        0.95,
+    ));
+    let floor_material = materials.add(waterworks_textured_material(
+        wet_concrete_color.clone(),
+        wet_concrete_normal.clone(),
+        // Subtle dark-teal tint toward the original WET_CONCRETE mood
+        // (real concrete texture alone reads too bright/dry for "wet").
+        Color::srgb(0.55, 0.62, 0.65),
+        0.6,
+    ));
+
     // Build 3D mesh grid from layout tiles
     for (row_idx, row) in layout.tiles.iter().enumerate() {
         for (col_idx, &cell) in row.iter().enumerate() {
@@ -199,14 +255,14 @@ pub fn setup_world_3d(
                 // Wall: intentional old concrete, not renderer fallback magenta.
                 commands.spawn((
                     Mesh3d(meshes.add(Cuboid::new(TILE_SIZE, TILE_SIZE, 60.0))),
-                    MeshMaterial3d(materials.add(waterworks_material(OLD_CONCRETE))),
+                    MeshMaterial3d(wall_material.clone()),
                     Transform::from_xyz(x, y, 30.0),
                 ));
             } else {
                 // Floor: wet concrete placeholder material.
                 commands.spawn((
                     Mesh3d(meshes.add(Cuboid::new(TILE_SIZE, TILE_SIZE, 2.0))),
-                    MeshMaterial3d(materials.add(waterworks_material(WET_CONCRETE))),
+                    MeshMaterial3d(floor_material.clone()),
                     Transform::from_xyz(x, y, -1.0),
                 ));
             }
@@ -244,7 +300,12 @@ pub fn setup_world_3d(
         .with_children(|parent| {
             parent.spawn((
                 Mesh3d(meshes.add(Cuboid::new(5.5, 3.0, PLAYER_VISUAL_HEIGHT))),
-                MeshMaterial3d(materials.add(waterworks_material(PAINTED_STEEL))),
+                MeshMaterial3d(materials.add(waterworks_textured_material(
+                    painted_steel_color.clone(),
+                    painted_steel_normal.clone(),
+                    PAINTED_STEEL,
+                    0.4,
+                ))),
                 Transform::from_xyz(0.0, 0.0, 4.0),
             ));
             parent.spawn((
