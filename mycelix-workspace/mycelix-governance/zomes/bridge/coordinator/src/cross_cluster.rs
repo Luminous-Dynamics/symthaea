@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use super::*;
-use hdk::prelude::{hdk_extern, wasm_error, WasmErrorInner};
+use hdk::prelude::{WasmErrorInner, hdk_extern, wasm_error};
+use mycelix_bridge_common::{CrossClusterRole, routing_registry};
 use serde::{Deserialize, Serialize};
 
 // =============================================================================
@@ -10,7 +11,8 @@ use serde::{Deserialize, Serialize};
 // =============================================================================
 
 /// Allowed zomes in the personal cluster that governance can call
-const ALLOWED_PERSONAL_ZOMES: &[&str] = &["personal_bridge"];
+const ALLOWED_PERSONAL_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Personal);
 
 /// Dispatch a call to the personal cluster via OtherRole
 ///
@@ -93,7 +95,7 @@ pub fn request_identity_proof(_: ()) -> ExternResult<ExternIO> {
 
 /// Allowed zomes in the identity cluster that governance can call
 const ALLOWED_IDENTITY_ZOMES: &[&str] =
-    &["identity_bridge", "did_registry", "verifiable_credential"];
+    routing_registry::get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Identity);
 
 /// Dispatch a call to the identity cluster via OtherRole
 #[hdk_extern]
@@ -201,12 +203,8 @@ pub struct CheckVoterTrustInput {
 ///
 /// Used for property status checks before proposals, housing capacity
 /// impact assessments, and water stewardship policy verification.
-const ALLOWED_COMMONS_ZOMES: &[&str] = &[
-    "commons_bridge",
-    "property_registry",
-    "housing_governance",
-    "water_steward",
-];
+const ALLOWED_COMMONS_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Commons);
 
 /// Dispatch a call to the commons cluster via OtherRole.
 #[hdk_extern]
@@ -285,7 +283,8 @@ pub fn query_housing_capacity(area: String) -> ExternResult<ExternIO> {
 ///
 /// Used for checking active justice disputes and emergency status
 /// before treasury operations or policy proposals.
-const ALLOWED_CIVIC_ZOMES: &[&str] = &["civic_bridge", "justice_cases", "emergency_coordination"];
+const ALLOWED_CIVIC_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Civic);
 
 /// Dispatch a call to the civic cluster via OtherRole.
 #[hdk_extern]
@@ -364,7 +363,8 @@ pub fn check_emergency_status(area: String) -> ExternResult<ExternIO> {
 ///
 /// Used for treasury operations approved by governance (budget proposals),
 /// payment settlement queries, and staking requirement checks.
-const ALLOWED_FINANCE_ZOMES: &[&str] = &["finance_bridge", "treasury", "payments"];
+const ALLOWED_FINANCE_ZOMES: &[&str] =
+    routing_registry::get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Finance);
 
 /// Dispatch a call to the finance cluster via OtherRole.
 #[hdk_extern]
