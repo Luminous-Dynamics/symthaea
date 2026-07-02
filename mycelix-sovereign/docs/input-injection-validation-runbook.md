@@ -95,11 +95,31 @@ window. The daemon's `LoggingInjector` recorded:
 This is the concrete proof the whole path — egui capture → seal →
 transport → lane-envelope open → bincode decode → M1 consent gate →
 inject — works for real, without needing the `xdg-portal` backend (and
-its consent dialog) in the loop. The `xdg-portal` backend's own
-correctness was already proven separately above (8/8 checks); wiring
-it into this same live path (so the viewer's mouse actually moves the
-host's real cursor) is the natural next stretch validation, not yet
-run.
+its consent dialog) in the loop.
+
+### Stretch validation: `--input-backend xdg-portal` in the same live loop (2026-07-02)
+
+Same setup, `--input-backend xdg-portal` instead of `log`. The operator
+moved the mouse inside the real `xenia-viewer --gui` window: a
+RemoteDesktop consent dialog appeared (confirming the gate is live, not
+a cached/skipped grant from the earlier `inject_bench` runs), the
+operator approved it, and their **real host mouse cursor moved** in
+response to the viewer's captured pointer motion. This is the complete
+proof of the full pipeline through the real OS-level backend, not just
+`LoggingInjector`.
+
+### Real (non-bypassed) M1 consent ceremony (2026-07-02)
+
+Every other live test this session used `--m1-preprod-auto-consent` to
+skip the ceremony. Separately verified the real Approve/Deny path
+(`--consent-port`, no bypass flag):
+
+- **Deny**: daemon exited immediately; viewer received **0** frames.
+- **Approve**: 15 frames streamed and byte-verified via the real
+  ceremony (not the bypass flag), clean exit.
+
+Confirms the M1 gate that protects both frame flow and input injection
+is real end-to-end, not just exercised via the pre-production shortcut.
 
 `WaylandInputInjector`/`UinputInjector` remain scaffold stubs — out of
 scope for this pass.
