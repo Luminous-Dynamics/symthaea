@@ -5,7 +5,6 @@
 ///
 /// This module provides real-time monitoring, Byzantine attack detection,
 /// and operational visibility for the marketplace.
-
 use hdk::prelude::*;
 use std::collections::VecDeque;
 
@@ -117,7 +116,10 @@ impl Alert {
     pub fn byzantine_spike(count: u64) -> ExternResult<Self> {
         Self::new(
             AlertSeverity::Critical,
-            format!("Byzantine attempt spike detected: {} attempts in last hour", count),
+            format!(
+                "Byzantine attempt spike detected: {} attempts in last hour",
+                count
+            ),
             MetricType::ByzantineAttempt,
             count as f64,
             100.0,
@@ -137,7 +139,10 @@ impl Alert {
     pub fn network_compromised(average_matl: f64) -> ExternResult<Self> {
         Self::new(
             AlertSeverity::Critical,
-            format!("Network average MATL score critically low: {:.2}", average_matl),
+            format!(
+                "Network average MATL score critically low: {:.2}",
+                average_matl
+            ),
             MetricType::MatlScoreUpdated,
             average_matl,
             0.5,
@@ -371,20 +376,22 @@ static mut GLOBAL_PERF_METRICS: Option<PerformanceMetrics> = None;
 /// Get or initialize global metrics
 pub fn get_metrics() -> &'static mut MarketplaceMetrics {
     unsafe {
-        if GLOBAL_METRICS.is_none() {
-            GLOBAL_METRICS = Some(MarketplaceMetrics::default());
+        let ptr = std::ptr::addr_of_mut!(GLOBAL_METRICS);
+        if (*ptr).is_none() {
+            *ptr = Some(MarketplaceMetrics::default());
         }
-        GLOBAL_METRICS.as_mut().unwrap()
+        (*ptr).as_mut().unwrap()
     }
 }
 
 /// Get or initialize performance metrics
 pub fn get_perf_metrics() -> &'static mut PerformanceMetrics {
     unsafe {
-        if GLOBAL_PERF_METRICS.is_none() {
-            GLOBAL_PERF_METRICS = Some(PerformanceMetrics::new());
+        let ptr = std::ptr::addr_of_mut!(GLOBAL_PERF_METRICS);
+        if (*ptr).is_none() {
+            *ptr = Some(PerformanceMetrics::new());
         }
-        GLOBAL_PERF_METRICS.as_mut().unwrap()
+        (*ptr).as_mut().unwrap()
     }
 }
 
@@ -535,10 +542,12 @@ mod tests {
 
         // Should generate alert
         assert!(metrics.active_alerts.len() > 0);
-        assert!(metrics
-            .active_alerts
-            .iter()
-            .any(|a| a.severity == AlertSeverity::Critical));
+        assert!(
+            metrics
+                .active_alerts
+                .iter()
+                .any(|a| a.severity == AlertSeverity::Critical)
+        );
     }
 
     #[test]
@@ -577,13 +586,7 @@ mod tests {
 
         // Add 20 events
         for i in 0..20 {
-            let event = MetricEvent::new(
-                MetricType::ListingCreated,
-                i as f64,
-                None,
-                None,
-            )
-            .unwrap();
+            let event = MetricEvent::new(MetricType::ListingCreated, i as f64, None, None).unwrap();
             metrics.record_event(event).unwrap();
         }
 

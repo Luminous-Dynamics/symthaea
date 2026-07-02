@@ -200,6 +200,34 @@ pub fn complete_transaction(transaction_hash: ActionHash) -> ExternResult<Transa
         ))));
     }
 
+    // Settle in the finance cluster BEFORE transitioning to Completed.
+    // settle_transaction_in_finance previously existed but was never called
+    // from anywhere in the transaction lifecycle — marketplace transactions
+    // completed purely on local state with zero SAP ever moving, success or
+    // failure notwithstanding. This makes real settlement a precondition
+    // for completion: the transaction stays in Delivered (unchanged,
+    // retriable) if settlement fails, rather than silently completing
+    // unpaid. See MYCELIX_REVIEW.md P1 #4.
+    //
+    // NOTE: this will currently fail with a role-not-found error in any
+    // deployment where marketplace's happ.yaml doesn't declare a finance
+    // role (the case as of 2026-04-17 per
+    // mycelix-workspace/happs/happ.yaml's "deliberately excluded" note) —
+    // that's a separate, ops-level deployment-bundle decision, not
+    // something this code fix can resolve on its own. The fix here makes
+    // completion CORRECT once marketplace and finance are actually
+    // deployed together; it does not by itself change what's deployed.
+    let settlement = settle_transaction_in_finance(transaction_hash.clone())?;
+    if !settlement.settled {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot complete transaction: finance settlement failed ({}). Transaction remains in \
+             Delivered status and can be retried.",
+            settlement
+                .error
+                .unwrap_or_else(|| "unknown error".to_string())
+        ))));
+    }
+
     // Update transaction status
     let mut updated_transaction = current.transaction.clone();
     updated_transaction.status = TransactionStatus::Completed;
@@ -463,9 +491,16 @@ pub fn settle_transaction_in_finance(
 
     let tx = &output.transaction;
 
-    // Convert AgentPubKey to a DID string (did:key:<base64 pubkey>)
-    let buyer_did = format!("did:key:{:?}", tx.buyer);
-    let seller_did = format!("did:key:{:?}", tx.seller);
+    // Convert AgentPubKey to a DID string. MUST be "did:mycelix:{agent}" —
+    // finance's verify_caller_is_did compares this exact string against
+    // format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey)
+    // (mycelix-finance/zomes/shared/src/lib.rs). Neither "did:key:{:?}"
+    // (Debug format, not even the same shape as Display) nor
+    // bridge::agent_to_did's "did:holo:{agent}" match this — every
+    // settlement attempt was guaranteed to fail auth regardless of Phase 1's
+    // process_payment fix. See MYCELIX_REVIEW.md P1 #4.
+    let buyer_did = format!("did:mycelix:{}", tx.buyer);
+    let seller_did = format!("did:mycelix:{}", tx.seller);
 
     let payload = serde_json::json!({
         "source_happ": "mycelix-marketplace",
