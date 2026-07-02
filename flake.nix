@@ -226,7 +226,7 @@
             }
 
             lum_check_knowledge() {
-              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-knowledge/Cargo.toml" "$@"
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-workspace/mycelix-knowledge/Cargo.toml" "$@"
             }
 
             lum_check_pulse() {
