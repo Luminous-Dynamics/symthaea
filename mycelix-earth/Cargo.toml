@@ -23,9 +23,9 @@ async-trait = "0.1"
 hdi = "0.7"
 sol-atlas-core = { path = "../sol-atlas-core" }
 mycelix-desci-core = { path = "../mycelix-workspace/mycelix-desci/src/core" }
-mycelix-zkp-core = { path = "../crates/mycelix-zkp-core", features = ["backend-winterfell"] }
-symthaea-core = { path = "../symthaea/symthaea-core" }
-symthaea-swarm = { path = "../symthaea/crates/symthaea-swarm" }
+mycelix-zkp-core = { path = "../mycelix-workspace/crates/mycelix-zkp-core", features = ["backend-winterfell"] }
+symthaea-core = { path = "../symthaea/crates/core/symthaea-core" }
+symthaea-swarm = { path = "../symthaea/crates/domains/symthaea-swarm" }
 
 # Binius (Binary-Field STARKs)
 binius-core = { path = "../.deps/binius64/crates/core" }
