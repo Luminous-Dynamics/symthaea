@@ -480,6 +480,21 @@ impl EngineeringManager {
         Ok(())
     }
 
+    /// Render a Lean-formatted certificate for each already-discharged
+    /// safety obligation.
+    ///
+    /// Despite the name, this does **not** perform formal verification of
+    /// the obligation's actual content, and does not invoke a Lean checker
+    /// on the output. `obligation.status` is set to `Discharged` elsewhere
+    /// (`evaluate_concept`, purely from `EvidenceKind::Simulation`
+    /// convergence, not from `EvidenceKind::FormalProof`), so by the time an
+    /// obligation reaches this function it has already been discharged by
+    /// non-formal means. The `goal`/`result` fed to `LeanProofGenerator`
+    /// here are placeholders -- `id implies id` and a hardcoded
+    /// `valid: true` -- used purely to produce a readable rendered artifact
+    /// carrying the obligation's id, not a real proof obligation derived
+    /// from the obligation's content. Do not treat this output as formal
+    /// verification evidence.
     pub fn formally_verify(&self, concept: &EngineeringConcept) -> Vec<(String, String)> {
         let mut proofs = Vec::new();
         for obligation in &concept.safety_case.obligations {

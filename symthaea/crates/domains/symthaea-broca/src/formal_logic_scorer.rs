@@ -61,11 +61,21 @@ impl FormalLogicScorer {
 
         let outcome = check_with_lean4(tmp.path());
 
+        // `score` is documented as "0.0 = no proof, 1.0 = fully verified" on
+        // FormalVerificationResult, and feeds directly into reward shaping
+        // (compute_epistemic_reward: 25% of the epistemic term, 40% of the
+        // final shaped_reward) and CodeGate. LeanNotInstalled/ProcessError
+        // mean zero verification happened -- no proof was established either
+        // way -- so they must score 0.0 like Rejected, not a fabricated
+        // partial-credit value. An environment missing the `lean` binary
+        // would otherwise silently inject a constant, meaningless ~0.15
+        // (0.6 * the 25% weight) into every training reward regardless of
+        // whether the generated code is actually correct.
         let (score, verified) = match outcome {
             CheckOutcome::Accepted => (1.0, true),
             CheckOutcome::Rejected(_) => (0.0, false),
-            CheckOutcome::LeanNotInstalled => (0.6, false), // graceful degradation
-            CheckOutcome::ProcessError(_) => (0.3, false),
+            CheckOutcome::LeanNotInstalled => (0.0, false),
+            CheckOutcome::ProcessError(_) => (0.0, false),
         };
 
         FormalVerificationResult {
@@ -106,6 +116,26 @@ impl FormalLogicScorer {
     /// Direct verification of a formal logic formula (E-axis).
     pub fn verify_formula(&self, formula: &FolFormulaExt) -> FormalVerificationResult {
         self.score_algorithm("evolution_check", formula, "")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_core::hdc::logic_engine::Proposition;
+
+    /// This environment doesn't have `lean` on PATH, so this exercises the
+    /// real CheckOutcome::LeanNotInstalled path (not a mock). Regression
+    /// test for the score/verified contract: no verification occurred, so
+    /// the result must not fabricate partial credit -- score must be 0.0,
+    /// matching the documented "0.0 = no proof, 1.0 = fully verified".
+    #[test]
+    fn missing_lean_binary_reports_zero_score_not_partial_credit() {
+        let scorer = FormalLogicScorer::new();
+        let spec = FolFormulaExt::from_prop(Proposition::True);
+        let result = scorer.score_algorithm("no_lean_available", &spec, "");
+        assert_eq!(result.score, 0.0);
+        assert!(!result.verified);
     }
 }
 
