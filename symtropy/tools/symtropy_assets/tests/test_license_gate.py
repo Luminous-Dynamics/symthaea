@@ -5,7 +5,7 @@ import yaml
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from license_gate import validate_manifest
-from sources.adapter import KenneyAdapter
+from sources.adapter import KenneyAdapter, PolyHavenAdapter
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -48,3 +48,45 @@ def test_kenney_adapter_rejects_empty_identifier(tmp_path):
 
     with pytest.raises(ValueError):
         adapter.fetch_manifest(" !!! ")
+
+
+def test_polyhaven_adapter_generates_cc0_manifest(tmp_path):
+    # Real asset ID, validated end-to-end (download -> Blender normalize ->
+    # ingest -> convert -> export) during this review session.
+    adapter = PolyHavenAdapter(str(tmp_path))
+    manifest = adapter.fetch_manifest("ClassicNightstand_01")
+    manifest_path = tmp_path / "polyhaven.yaml"
+    manifest_path.write_text(yaml.dump(manifest))
+
+    status, reason = validate_manifest(str(manifest_path))
+
+    assert status == "APPROVED_CC0", reason
+    assert manifest["id"] == "polyhaven.ClassicNightstand_01"
+    assert manifest["source"]["source_name"] == "Poly Haven"
+    assert manifest["source"]["source_url"] == "https://polyhaven.com/a/ClassicNightstand_01"
+    assert manifest["license"]["id"] == "CC0-1.0"
+    assert manifest["license"]["commercial_allowed"] is True
+
+
+def test_polyhaven_adapter_preserves_case():
+    adapter = PolyHavenAdapter("/tmp")
+    # Poly Haven IDs are exact-case and load-bearing for API/download URLs —
+    # must NOT be lowercased the way KenneyAdapter slugifies its identifiers.
+    manifest = adapter.fetch_manifest("ClassicNightstand_01")
+    assert "classicnightstand" not in manifest["source"]["source_url"].lower() or \
+        manifest["source"]["source_url"] == "https://polyhaven.com/a/ClassicNightstand_01"
+    assert manifest["source"]["source_url"] == "https://polyhaven.com/a/ClassicNightstand_01"
+
+
+def test_polyhaven_adapter_rejects_invalid_identifier(tmp_path):
+    adapter = PolyHavenAdapter(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        adapter.fetch_manifest("not a valid id!")
+
+
+def test_polyhaven_adapter_rejects_invalid_asset_type(tmp_path):
+    adapter = PolyHavenAdapter(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        adapter.fetch_manifest("ClassicNightstand_01", asset_type="not_a_real_type")
