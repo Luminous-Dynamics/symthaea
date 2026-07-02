@@ -156,6 +156,8 @@ CLUSTERS=(
     # Foundation (FL + mycelix-core-types + feldman-dkg live as shared crates
     # already, but the top-level cluster carries its README + docs + 0TML research)
     mycelix-core
+    # State interop (dual-DID airlock for state-facing credentials)
+    mycelix-lawful-identity
     # Note: clusters WITH their own standalone public repos intentionally NOT
     # synced here (to avoid duplicating code):
     #   mycelix-desci       → Luminous-Dynamics/mycelix-desci
@@ -181,7 +183,7 @@ MOVED_TO_WORKSPACE=(
     mycelix-commons mycelix-civic mycelix-hearth mycelix-finance
     mycelix-governance mycelix-identity mycelix-personal mycelix-attribution
     mycelix-craft mycelix-knowledge mycelix-music mycelix-energy
-    mycelix-climate mycelix-manufacturing
+    mycelix-climate mycelix-manufacturing mycelix-lawful-identity
 )
 
 cluster_source_dir() {
