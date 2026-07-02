@@ -417,7 +417,7 @@ pub fn evolve(config: &TunerConfig) -> TunerResult {
 
     for r#gen in 0..config.max_generations {
         // Sort by fitness (descending)
-        population.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        population.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let best = population[0].1;
         let mean = population.iter().map(|p| p.1).sum::<f64>() / population.len() as f64;
@@ -584,7 +584,7 @@ pub fn evolve_taste(config: &TunerConfig) -> TunerResult {
     let mut best_ever = (population[0].0.clone(), population[0].1);
 
     for r#gen in 0..config.max_generations {
-        population.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        population.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let best = population[0].1;
         let mean = population.iter().map(|p| p.1).sum::<f64>() / population.len() as f64;

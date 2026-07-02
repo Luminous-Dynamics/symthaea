@@ -12,7 +12,7 @@ keywords = ["autonomous-vehicle", "active-inference", "hdc", "bicycle-model", "s
 categories = ["science", "algorithms", "simulation"]
 
 [dependencies]
-# [standalone-stripped] positioning = { path = "../../../../mycelix-workspace/mycelix-position/lib/positioning" }
+# [standalone-stripped] positioning = { path = "../../../../mycelix-position/lib/positioning" }
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 symthaea-hal = { path = "../symthaea-hal", default-features = false }

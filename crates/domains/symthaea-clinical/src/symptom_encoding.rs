@@ -138,30 +138,34 @@ impl SymptomEncoding {
         symptom
     }
 
-    /// Get the composite HDC encoding.
-    pub fn encoding(&self) -> &BinaryHV {
-        self.encoding.as_ref().expect("encoding always computed")
+    /// Get the composite HDC encoding. Recomputed on demand if the cached
+    /// value is missing (e.g. a struct that arrived via `Deserialize`, which
+    /// skips this field), rather than panicking.
+    pub fn encoding(&self) -> BinaryHV {
+        self.encoding.unwrap_or_else(|| self.compute_encoding())
     }
 
     /// Similarity to another symptom encoding (0.0–1.0).
     pub fn similarity(&self, other: &Self) -> f32 {
-        self.encoding().similarity(other.encoding())
+        self.encoding().similarity(&other.encoding())
     }
 
-    /// Recompute: symptom_name ⊗ category ⊗ severity ⊗ duration ⊗ impact.
-    fn recompute_encoding(&mut self) {
+    /// Pure computation: symptom_name ⊗ category ⊗ severity ⊗ duration ⊗ impact.
+    fn compute_encoding(&self) -> BinaryHV {
         let name_label = format!("symptom:{}", self.name);
         let name_hash = blake3::hash(name_label.as_bytes());
         let name_seed = u64::from_le_bytes(name_hash.as_bytes()[..8].try_into().unwrap());
         let name_hv = BinaryHV::random(name_seed);
 
-        let composite = name_hv
+        name_hv
             .bind(&self.category.base_hv())
             .bind(&self.severity.to_hv())
             .bind(&self.duration.to_hv())
-            .bind(&self.functional_impact.to_hv());
+            .bind(&self.functional_impact.to_hv())
+    }
 
-        self.encoding = Some(composite);
+    fn recompute_encoding(&mut self) {
+        self.encoding = Some(self.compute_encoding());
     }
 }
 
@@ -192,7 +196,7 @@ impl SymptomProfile {
         if self.symptoms.is_empty() {
             return BinaryHV::random(0); // degenerate case
         }
-        let hvs: Vec<BinaryHV> = self.symptoms.iter().map(|s| s.encoding().clone()).collect();
+        let hvs: Vec<BinaryHV> = self.symptoms.iter().map(|s| s.encoding()).collect();
         BinaryHV::bundle(&hvs)
     }
 
@@ -291,7 +295,7 @@ mod tests {
         let _within = sadness.similarity(&anhedonia);
         let _between = sadness.similarity(&hypervigilance);
         // Both are valid bound products — encoding integrity check
-        assert!(sadness.encoding().similarity(sadness.encoding()) == 1.0);
+        assert!(sadness.encoding().similarity(&sadness.encoding()) == 1.0);
     }
 
     #[test]

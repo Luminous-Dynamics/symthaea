@@ -1,0 +1,48 @@
+[package]
+name = "hdc-zkp-bench"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Benchmark: HDC XOR binding proof across Binius, Winterfell, and RISC0 backends"
+authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
+
+[[bin]]
+name = "hdc-zkp-bench"
+path = "src/main.rs"
+
+[dependencies]
+# Binius64 (binary field STARKs — XOR is native field addition).
+# Vendored at symthaea/vendor/binius64 (Apache-2.0/MIT,
+# github.com/IrreducibleOSS/binius64) so this crate builds from a fresh
+# clone of either the monorepo or the standalone symthaea repo.
+binius-core = { path = "../../vendor/binius64/crates/core" }
+binius-frontend = { path = "../../vendor/binius64/crates/frontend" }
+binius-prover = { path = "../../vendor/binius64/crates/prover" }
+binius-verifier = { path = "../../vendor/binius64/crates/verifier" }
+binius-transcript = { path = "../../vendor/binius64/crates/transcript" }
+binius-hash = { path = "../../vendor/binius64/crates/hash" }
+
+# Winterfell (prime field STARKs — XOR requires bit decomposition)
+winterfell = "0.13.1"
+winter-math = "0.13.1"
+winter-crypto = "0.13.1"
+
+# Common
+rand = "0.9"
+sha2 = "0.10"
+serde_json = "1.0"
+
+# Cargo does not support nested workspaces: this crate path-depends on
+# vendor/binius64/crates/*, which is itself a full [workspace] with its
+# own workspace.package/workspace.dependencies inheritance. If this crate
+# were a member of the outer symthaea workspace (matched by a members
+# glob), cargo would fold binius64's crates into symthaea's own
+# [workspace.package] instead of binius64's, breaking version/dependency
+# inheritance. Declaring this crate as its own single-package workspace
+# keeps it and its vendored dependency tree self-contained. It's
+# deliberately at crates/hdc-zkp-bench/ (not crates/core/hdc-zkp-bench/),
+# since crates/core/* IS a members glob in symthaea/Cargo.toml and
+# `exclude` does not reliably override an active glob match.
+# Build/test via `cargo check --manifest-path crates/hdc-zkp-bench/Cargo.toml`,
+# not `-p hdc-zkp-bench`.
+[workspace]

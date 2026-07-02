@@ -66,7 +66,7 @@ mod tests {
 
         // Top 30 most abundant mass numbers
         let mut sorted: Vec<_> = result.abundances.iter().collect();
-        sorted.sort_by(|a, b| b.abundance.partial_cmp(&a.abundance).unwrap());
+        sorted.sort_by(|a, b| b.abundance.total_cmp(&a.abundance));
 
         eprintln!("\n--- Top 30 Most Abundant Mass Numbers ---");
         eprintln!("{:>6} {:>12}", "A", "Abundance");
@@ -276,7 +276,7 @@ mod tests {
             .iter()
             .filter(|c| c.q_value > 5.0 && c.q_value < 8.0)
             .collect();
-        alpha_sorted.sort_by(|a, b| a.uncertainty.partial_cmp(&b.uncertainty).unwrap());
+        alpha_sorted.sort_by(|a, b| a.uncertainty.total_cmp(&b.uncertainty));
 
         eprintln!("\n--- Top Alpha Therapy Candidates (Q=5-8 MeV, low uncertainty) ---");
         eprintln!(
@@ -292,7 +292,7 @@ mod tests {
 
         // Most promising PET candidates
         let mut pet_sorted: Vec<_> = pet.iter().collect();
-        pet_sorted.sort_by(|a, b| a.uncertainty.partial_cmp(&b.uncertainty).unwrap());
+        pet_sorted.sort_by(|a, b| a.uncertainty.total_cmp(&b.uncertainty));
 
         eprintln!("\n--- Top PET Imaging Candidates (low uncertainty) ---");
         eprintln!(

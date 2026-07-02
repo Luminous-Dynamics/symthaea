@@ -201,7 +201,7 @@ pub fn normalization_sensitivity() -> NormalizationSensitivityResult {
             .enumerate()
             .map(|(i, s)| (i, s.normalized[theory_idx]))
             .collect();
-        vals.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        vals.sort_by(|a, b| a.1.total_cmp(&b.1));
         let n = vals.len() as f64;
         for (rank, (mol_idx, _)) in vals.iter().enumerate() {
             scores_rank[*mol_idx].normalized[theory_idx] = (rank as f64 + 0.5) / n;

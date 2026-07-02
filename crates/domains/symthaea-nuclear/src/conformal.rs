@@ -46,7 +46,7 @@ mod tests {
                 residual / sigma // normalized score
             })
             .collect();
-        scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        scores.sort_by(|a, b| a.total_cmp(b));
 
         // 95% quantile
         let n_cal = scores.len();
@@ -94,7 +94,7 @@ mod tests {
         let mean_width = interval_widths.iter().sum::<f64>() / interval_widths.len() as f64;
         let median_width = {
             let mut sorted = interval_widths.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sorted.sort_by(|a, b| a.total_cmp(b));
             sorted[sorted.len() / 2]
         };
 

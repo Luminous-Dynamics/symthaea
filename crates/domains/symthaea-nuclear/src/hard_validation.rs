@@ -139,7 +139,7 @@ mod tests {
                         .iter()
                         .map(|&i| (features[i][fi], targets[i]))
                         .collect();
-                    vals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                    vals.sort_by(|a, b| a.0.total_cmp(&b.0));
 
                     // Try splits at every 10th percentile
                     let step = (vals.len() / 10).max(1);

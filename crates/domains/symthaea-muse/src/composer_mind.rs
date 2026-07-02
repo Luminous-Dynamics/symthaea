@@ -226,7 +226,7 @@ impl ComposerMind {
     pub fn primary_goal(&self) -> Option<&CompositionGoal> {
         self.goals
             .iter()
-            .max_by(|a, b| a.urgency.partial_cmp(&b.urgency).unwrap())
+            .max_by(|a, b| a.urgency.total_cmp(&b.urgency))
     }
 
     /// Apply compositional goals to the musical state.

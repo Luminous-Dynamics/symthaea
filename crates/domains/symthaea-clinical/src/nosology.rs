@@ -230,23 +230,30 @@ impl DiagnosticProfile {
         self
     }
 
-    /// Get the composite HDC encoding.
-    pub fn encoding(&self) -> &BinaryHV {
-        self.encoded.as_ref().expect("encoding always computed")
+    /// Get the composite HDC encoding. Recomputed on demand if the cached
+    /// value is missing (e.g. a struct that arrived via `Deserialize`, which
+    /// skips this field), rather than panicking.
+    pub fn encoding(&self) -> BinaryHV {
+        self.encoded.unwrap_or_else(|| self.compute_encoding())
     }
 
     /// Similarity to another diagnostic profile (0.0–1.0).
     pub fn similarity(&self, other: &Self) -> f32 {
-        self.encoding().similarity(other.encoding())
+        self.encoding().similarity(&other.encoding())
     }
 
-    /// Recompute the composite encoding from components.
-    fn recompute_encoding(&mut self) {
+    /// Pure computation of the composite encoding from components.
+    fn compute_encoding(&self) -> BinaryHV {
         let mut composite = self.category.base_hv().bind(&self.severity.to_hv());
         for spec in &self.specifiers {
             composite = composite.bind(&spec.to_hv());
         }
-        self.encoded = Some(composite);
+        composite
+    }
+
+    /// Recompute and cache the composite encoding from components.
+    fn recompute_encoding(&mut self) {
+        self.encoded = Some(self.compute_encoding());
     }
 }
 

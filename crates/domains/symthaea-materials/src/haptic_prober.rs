@@ -62,7 +62,7 @@ impl HapticMaterialProber {
             .min_by(|a, b| {
                 let da = self.euclidean_distance(&est_vals, &a.normalized_values());
                 let db = self.euclidean_distance(&est_vals, &b.normalized_values());
-                da.partial_cmp(&db).unwrap()
+                da.total_cmp(&db)
             })
             .cloned()
     }

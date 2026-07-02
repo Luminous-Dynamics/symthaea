@@ -311,7 +311,7 @@ mod tests {
             }
         }
 
-        unmeasured_predictions.sort_by(|a, b| a.4.partial_cmp(&b.4).unwrap());
+        unmeasured_predictions.sort_by(|a, b| a.4.total_cmp(&b.4));
 
         eprintln!("\n--- Most Confident Unmeasured Predictions (σ < 0.5 MeV, bound) ---");
         eprintln!(
@@ -455,7 +455,7 @@ mod tests {
         }
 
         // Sort by absolute error descending
-        residuals.sort_by(|a, b| b.4.abs().partial_cmp(&a.4.abs()).unwrap());
+        residuals.sort_by(|a, b| b.4.abs().total_cmp(&a.4.abs()));
 
         eprintln!("\n--- Top 20 Largest Residuals (model - experiment) ---");
         eprintln!(

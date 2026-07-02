@@ -98,7 +98,7 @@ pub fn solve_generalized_eigen(
 
     // Step 3: Sort by eigenvalue (ascending)
     let mut indices: Vec<usize> = (0..n_independent).collect();
-    indices.sort_by(|&a, &b| eigenvalues[a].partial_cmp(&eigenvalues[b]).unwrap());
+    indices.sort_by(|&a, &b| eigenvalues[a].total_cmp(&eigenvalues[b]));
 
     let sorted_eigenvalues: Vec<f64> = indices.iter().map(|&i| eigenvalues[i]).collect();
 
@@ -260,7 +260,7 @@ mod tests {
         let (eigenvalues, _) = symmetric_eigen(&diag, n);
 
         let mut sorted = eigenvalues.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
         assert!((sorted[0] - 1.0).abs() < 1e-10);
         assert!((sorted[1] - 2.0).abs() < 1e-10);
         assert!((sorted[2] - 3.0).abs() < 1e-10);
@@ -307,7 +307,7 @@ mod tests {
 
         assert_eq!(result.eigenvalues.len(), 2);
         let mut evals = result.eigenvalues.clone();
-        evals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        evals.sort_by(|a, b| a.total_cmp(b));
         assert!(
             (evals[0] - 1.0).abs() < 1e-8,
             "First eigenvalue: {}, expected 1.0",

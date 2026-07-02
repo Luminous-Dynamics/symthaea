@@ -126,7 +126,7 @@ pub fn rank_by_consciousness(
         })
         .collect();
 
-    results.sort_by(|a, b| b.1.phi.partial_cmp(&a.1.phi).unwrap());
+    results.sort_by(|a, b| b.1.phi.total_cmp(&a.1.phi));
     results
 }
 

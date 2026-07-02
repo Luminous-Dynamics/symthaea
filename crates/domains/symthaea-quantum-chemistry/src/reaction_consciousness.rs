@@ -44,7 +44,7 @@ impl ReactionConsciousnessProfile {
     pub fn equilibrium_coordinate(&self) -> f64 {
         self.points
             .iter()
-            .min_by(|a, b| a.energy.partial_cmp(&b.energy).unwrap())
+            .min_by(|a, b| a.energy.total_cmp(&b.energy))
             .map(|p| p.coordinate)
             .unwrap_or(0.0)
     }

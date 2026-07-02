@@ -314,7 +314,7 @@ fn build_gamelan_scale(state: &MusicalState, tuning: GamelanTuning) -> Vec<f32> 
             }
         }
     }
-    freqs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    freqs.sort_by(|a, b| a.total_cmp(b));
     freqs
 }
 
@@ -364,7 +364,7 @@ fn expand_cents_to_range(cents: &[f32], state: &MusicalState) -> Vec<f32> {
     if !freqs.iter().any(|&f| (f - root).abs() < 0.5) {
         freqs.push(root);
     }
-    freqs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    freqs.sort_by(|a, b| a.total_cmp(b));
     freqs.dedup_by(|a, b| (*a - *b).abs() < 5.0); // deduplicate within 5 Hz
     freqs
 }
@@ -443,7 +443,7 @@ pub fn build_scale(state: &MusicalState) -> Vec<f32> {
         }
     }
 
-    frequencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    frequencies.sort_by(|a, b| a.total_cmp(b));
     frequencies.dedup_by(|a, b| (*a - *b).abs() < 0.1);
     frequencies
 }

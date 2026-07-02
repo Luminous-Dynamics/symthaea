@@ -6,12 +6,16 @@
 # for mycelix dependencies).
 #
 # Usage:
-#   bash symthaea/scripts/sync-to-standalone.sh [--dry-run] [--skip-check] [--force]
+#   bash symthaea/scripts/sync-to-standalone.sh [--dry-run] [--skip-check] [--force] [--allow-check-failure]
 #
 # Options:
-#   --dry-run      Show what would change without modifying the standalone repo
-#   --skip-check   Skip the post-sync `cargo check` verification
-#   --force        Commit and push without interactive confirmation
+#   --dry-run              Show what would change without modifying the standalone repo
+#   --skip-check           Skip the post-sync `cargo check` verification entirely
+#   --force                Commit and push without interactive confirmation
+#   --allow-check-failure  Push even if the post-sync cargo fmt/check verification
+#                          fails (default: a failed check aborts before commit/push,
+#                          regardless of --force, since a broken push to the public
+#                          repo is worse than a delayed one)
 
 set -euo pipefail
 
@@ -25,11 +29,13 @@ STANDALONE_REMOTE="git@github.com:Luminous-Dynamics/symthaea.git"
 DRY_RUN=false
 SKIP_CHECK=false
 FORCE=false
+ALLOW_CHECK_FAILURE=false
 for arg in "$@"; do
     case "$arg" in
-        --dry-run)    DRY_RUN=true ;;
-        --skip-check) SKIP_CHECK=true ;;
-        --force)      FORCE=true ;;
+        --dry-run)              DRY_RUN=true ;;
+        --skip-check)           SKIP_CHECK=true ;;
+        --force)                FORCE=true ;;
+        --allow-check-failure)  ALLOW_CHECK_FAILURE=true ;;
     esac
 done
 
@@ -130,12 +136,6 @@ RSYNC_EXCLUDE=(
     --exclude='node_modules/'
     --exclude='.next/'
     --exclude='dist/'
-    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
-    # that was never part of git, so it can't build from a fresh clone.
-    # Excluding it from Cargo.toml's `exclude = [...]` list alone isn't
-    # sufficient -- `default-members`'s `crates/core/*` glob still picks it
-    # up -- so skip syncing the directory entirely instead.
-    --exclude='crates/core/hdc-zkp-bench/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
@@ -326,14 +326,11 @@ if ! $DRY_RUN; then
     sed -i 's|^\(mycelix-crypto\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/mycelix-crypto"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
-    # hdc-zkp-bench path-depends on an out-of-tree .deps/binius64/ checkout
-    # that was never part of git (local-only dev setup, not synced by this
-    # script), so it cannot build from a fresh standalone clone. This is a
-    # standalone-only exclusion -- the crate remains a normal workspace
-    # member in the monorepo, where some dev environments do have
-    # .deps/binius64 set up.
-    sed -i '/^\s*"crates\/domains\/symthaea-lab",/a\    "crates/core/hdc-zkp-bench",' \
-        "${STANDALONE_REPO}/Cargo.toml"
+    # hdc-zkp-bench lives at crates/hdc-zkp-bench/ (not crates/core/) and
+    # declares its own [workspace], so it's never a member of this
+    # workspace to begin with -- no exclusion needed. It path-depends on
+    # vendor/binius64/, which the existing "vendor" SOURCE_DIRS entry
+    # already syncs.
 
     # mycelix-zkp-core and symtropy-robotics-bridge-core are inherited via
     # `{ workspace = true, ... }` in [dependencies], but the monorepo's own
@@ -527,8 +524,17 @@ echo
 if ! $DRY_RUN && ! $SKIP_CHECK; then
     SYNC_CHECK_FAILED=false
 
+    # Plain `cargo` fails on this NixOS host (rustup shim errors with
+    # "No such file or directory (os error 2)" outside a nix develop
+    # shell) -- wrap every verification call in nix develop so the check
+    # actually runs instead of failing closed on an environment error.
+    run_standalone_cargo() {
+        nix develop "${MONOREPO_ROOT}" --command bash -c \
+            "cd '${STANDALONE_REPO}' && $1"
+    }
+
     info "Running cargo fmt --check in standalone repo..."
-    if (cd "${STANDALONE_REPO}" && cargo fmt --check 2>&1 | head -20); then
+    if run_standalone_cargo "cargo fmt --check 2>&1 | head -20"; then
         ok "cargo fmt passed"
     else
         warn "cargo fmt --check failed — unformatted code detected"
@@ -536,7 +542,7 @@ if ! $DRY_RUN && ! $SKIP_CHECK; then
     fi
 
     info "Running cargo check in standalone repo (default features)..."
-    if (cd "${STANDALONE_REPO}" && cargo check 2>&1 | tail -5); then
+    if run_standalone_cargo "cargo check 2>&1 | tail -40"; then
         ok "cargo check passed"
     else
         warn "cargo check failed — the sync may have issues"
@@ -564,7 +570,7 @@ grid-scaling,fission-reactor,accelerator,threat-assessment,\
 datacenter,experiment-planner,strategic-materials,critical-minerals,\
 advanced-manufacturing,building-systems,design-production,\
 mycelix,unstable-examples"
-    if (cd "${STANDALONE_REPO}" && cargo check -p symthaea --features "$CI_FEATURES" 2>&1 | tail -10); then
+    if run_standalone_cargo "cargo check -p symthaea --features '$CI_FEATURES' 2>&1 | tail -40"; then
         ok "cargo check (CI features) passed"
     else
         warn "cargo check (CI features) failed — compilation errors will break CI"
@@ -572,9 +578,15 @@ mycelix,unstable-examples"
     fi
 
     if $SYNC_CHECK_FAILED; then
-        warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
-        echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
-        echo "  cd ${STANDALONE_REPO} && cargo check"
+        warn "Pre-push checks failed:"
+        echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo fmt --check"
+        echo "  cd ${STANDALONE_REPO} && nix develop ${MONOREPO_ROOT} --command cargo check"
+        if $ALLOW_CHECK_FAILURE; then
+            warn "--allow-check-failure set — proceeding to commit/push anyway"
+        else
+            git -C "${STANDALONE_REPO}" reset HEAD -- . >/dev/null 2>&1
+            error "Aborting before commit/push. Fix the above or re-run with --allow-check-failure to push anyway."
+        fi
     fi
     echo
 elif $SKIP_CHECK; then

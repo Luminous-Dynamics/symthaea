@@ -224,7 +224,7 @@ impl RandomForest {
 
             // Find best split for this feature
             let mut values: Vec<f64> = features.iter().map(|row| row[f_idx]).collect();
-            values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            values.sort_by(|a, b| a.total_cmp(b));
             values.dedup();
 
             // Try ~10 candidate thresholds
@@ -604,7 +604,7 @@ mod tests {
         }
 
         // Sort by B/A (most stable first)
-        candidates.sort_by(|a, b| b.ba.partial_cmp(&a.ba).unwrap());
+        candidates.sort_by(|a, b| b.ba.total_cmp(&a.ba));
 
         eprintln!(
             "Found {} candidates with B/A > 7.0, S2n > 0, S2p > 0, σ < 1.5 MeV\n",
@@ -665,7 +665,7 @@ mod tests {
             if let Some(best) = candidates
                 .iter()
                 .filter(|c| c.z == z)
-                .max_by(|a, b| a.ba.partial_cmp(&b.ba).unwrap())
+                .max_by(|a, b| a.ba.total_cmp(&b.ba))
             {
                 eprintln!(
                     "{:>4} {:>15} {:>5} {:>10.2} {:>8.4} {:>8.2} {:>8.2}",

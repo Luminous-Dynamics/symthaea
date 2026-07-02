@@ -310,7 +310,7 @@ pub fn evaluate_shielding_materials() -> Vec<ShieldingMaterial> {
         .collect();
 
     // Sort by score descending (best first)
-    results.sort_by(|a, b| b.shielding_score.partial_cmp(&a.shielding_score).unwrap());
+    results.sort_by(|a, b| b.shielding_score.total_cmp(&a.shielding_score));
     results
 }
 
@@ -422,7 +422,7 @@ pub fn evaluate_ntp_fuels(predictor: &MlMassPredictor) -> Vec<NtpFuelCandidate> 
         .collect();
 
     // Sort by NTP score descending
-    candidates.sort_by(|a, b| b.ntp_score.partial_cmp(&a.ntp_score).unwrap());
+    candidates.sort_by(|a, b| b.ntp_score.total_cmp(&a.ntp_score));
     candidates
 }
 

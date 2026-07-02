@@ -60,7 +60,7 @@ pub fn cis_excitations(rhf: &RhfResult, n_excitations: usize) -> Vec<CisExcitati
     }
 
     // Sort by energy
-    excitations.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    excitations.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     excitations
         .iter()
