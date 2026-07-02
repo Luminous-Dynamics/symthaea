@@ -8,7 +8,6 @@ repository = "https://github.com/luminous-dynamics/mycelix"
 [workspace]
 exclude = [
     "mycelix-identity/tests",
-    "mycelix-legacy/crates/legacy-types",
     "mycelix-core/libs/identity-client",
     "mycelix-music/apps/api-rust",
     "mycelix-prism/mocks",
@@ -698,7 +697,7 @@ members = [
     # "mycelix-desci/apps/leptos", # pre-staged for task #40 — not yet migrated, dir doesn't exist here
     "mycelix-hearth/crates/*",
     # "mycelix-hearth/apps/leptos", # own [workspace] - cannot be a member of another workspace (task #35)
-    # "mycelix-legacy/crates/*", # pre-staged — mycelix-legacy not yet migrated into mycelix-workspace/ (see task #42)
+    # "mycelix-legacy/crates/*", # legacy-types has no src/lib.rs — manifests-only scaffold, would break cargo check --workspace (task #43)
     "mycelix-manufacturing/crates/*",
     "mycelix-music/apps/leptos",
     "mycelix-personal/crates/*",
@@ -728,6 +727,7 @@ members = [
     "mycelix-commons/zomes/*/*",
     "mycelix-civic/zomes/*/*",
     "mycelix-personal/zomes/*/*",
+    # "mycelix-legacy/zomes/*/*", # manifests-only scaffold, no src/lib.rs anywhere in the cluster — would break cargo check --workspace until real implementation lands (task #43)
     # "mycelix-desci/zomes/*/*", # pre-staged for task #40 — not yet migrated
 
     "happs/consensus/*",
