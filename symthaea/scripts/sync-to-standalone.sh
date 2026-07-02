@@ -370,10 +370,6 @@ if ! $DRY_RUN; then
         "${STANDALONE_REPO}/Cargo.toml"
     sed -i '/^prism-search\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
         "${STANDALONE_REPO}/Cargo.toml"
-    sed -i '/^plexus-common\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
-        "${STANDALONE_REPO}/Cargo.toml"
-    sed -i '/^plexus-search\s*=.*path.*\.\.\//s/^/# [standalone-stripped] /' \
-        "${STANDALONE_REPO}/Cargo.toml"
     # Rewrite positioning to stub (required dep, not optional)
     sed -i 's|^\(positioning\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/positioning"|' \
         "${STANDALONE_REPO}/Cargo.toml"

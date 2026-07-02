@@ -1,0 +1,24 @@
+[package]
+name = "prism-dom-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.prism-dom]
+path = ".."
+
+[[bin]]
+name = "fuzz_parse_html"
+path = "fuzz_targets/fuzz_parse_html.rs"
+test = false
+doc = false
+bench = false

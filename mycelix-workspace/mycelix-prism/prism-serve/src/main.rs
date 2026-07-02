@@ -244,8 +244,9 @@ fn build_app(dist_path: &str) -> Router {
 async fn main() {
     env_logger::init();
 
-    let dist_path = std::env::var("PRISM_DIST")
-        .unwrap_or_else(|_| "/srv/luminous-dynamics/prism/prism-ui/dist".to_string());
+    let dist_path = std::env::var("PRISM_DIST").unwrap_or_else(|_| {
+        "/srv/luminous-dynamics/mycelix-workspace/mycelix-prism/prism-ui/dist".to_string()
+    });
 
     let app = build_app(&dist_path);
 

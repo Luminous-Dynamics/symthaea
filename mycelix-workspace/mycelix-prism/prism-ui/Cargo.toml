@@ -17,6 +17,7 @@ prism-knowledge-bridge = { path = "../prism-knowledge-bridge", features = ["dht"
 
 # Mycelix Holochain client for DHT bridge
 mycelix-claim-types = { path = "../../crates/mycelix-claim-types" }
+mycelix-leptos-client = { path = "../../crates/mycelix-leptos-client" }
 
 # Symthaea consciousness kernel (WASM-safe, no default features)
 symthaea-spore = { path = "../../../symthaea/crates/domains/symthaea-spore", default-features = false }
