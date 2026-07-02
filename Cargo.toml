@@ -10,7 +10,6 @@ members = [
 exclude = [
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
-    "crates/core/hdc-zkp-bench",
 ]
 default-members = [
     "xtask",
