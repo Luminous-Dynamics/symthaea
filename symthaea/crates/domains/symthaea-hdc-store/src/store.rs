@@ -365,6 +365,10 @@ impl HdcStore {
 
     fn flush_header(&mut self) -> Result<(), HdcStoreError> {
         self.mmap[..HEADER_SIZE].copy_from_slice(&self.header.to_bytes());
+        // Without this, header updates (vector_count/live_count/tombstone_count)
+        // can sit in page cache and never reach disk on crash, leaving on-disk
+        // counts stale relative to entry data that was already flushed above.
+        self.mmap.flush_range(0, HEADER_SIZE)?;
         Ok(())
     }
 }

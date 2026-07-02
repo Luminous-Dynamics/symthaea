@@ -147,19 +147,26 @@ impl TherapeuticIntervention {
         self
     }
 
-    /// Get HDC encoding.
-    pub fn encoding(&self) -> &BinaryHV {
-        self.encoding.as_ref().expect("encoding always computed")
+    /// Get HDC encoding. Recomputed on demand if the cached value is missing
+    /// (e.g. a struct that arrived via `Deserialize`, which skips this
+    /// field), rather than panicking.
+    pub fn encoding(&self) -> BinaryHV {
+        self.encoding.unwrap_or_else(|| self.compute_encoding())
     }
 
-    /// Recompute encoding: modality_base ⊗ technique_hv.
-    fn recompute_encoding(&mut self) {
+    /// Pure computation: modality_base ⊗ technique_hv.
+    fn compute_encoding(&self) -> BinaryHV {
         let modality_hv = self.modality.base_hv();
         let technique_label = format!("technique:{}", self.technique);
         let hash = blake3::hash(technique_label.as_bytes());
         let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
         let technique_hv = BinaryHV::random(seed);
-        self.encoding = Some(modality_hv.bind(&technique_hv));
+        modality_hv.bind(&technique_hv)
+    }
+
+    /// Recompute and cache the encoding.
+    fn recompute_encoding(&mut self) {
+        self.encoding = Some(self.compute_encoding());
     }
 }
 
@@ -531,10 +538,10 @@ mod tests {
         // Interventions from the same modality share the modality base vector component
         // After binding with different technique vectors, similarity will be low for all
         // but the encoding captures modality identity
-        let _within = cbt1.encoding().similarity(cbt2.encoding());
-        let _between = cbt1.encoding().similarity(dbt1.encoding());
+        let _within = cbt1.encoding().similarity(&cbt2.encoding());
+        let _between = cbt1.encoding().similarity(&dbt1.encoding());
         // Both are valid encodings
-        assert!(cbt1.encoding().similarity(cbt1.encoding()) == 1.0);
+        assert!(cbt1.encoding().similarity(&cbt1.encoding()) == 1.0);
     }
 
     #[test]
