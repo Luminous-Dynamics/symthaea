@@ -1,0 +1,17 @@
+[package]
+name = "mycelix-bridge-codegen"
+version = "0.1.0"
+edition = "2024"
+authors = ["Tristan Stoltz / Luminous Dynamics"]
+description = "Code generator for Mycelix Type-Safe Bridges."
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "extra-traits", "parsing", "visit"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+walkdir = "2.4"
+convert_case = "0.6"
