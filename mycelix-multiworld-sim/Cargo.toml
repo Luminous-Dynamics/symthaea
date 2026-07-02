@@ -11,7 +11,7 @@ serde_json = "1.0"
 toml = "0.8"
 tracing = "0.1"
 petgraph = { version = "0.7", features = ["serde-1"] }
-mycelix-bridge-common = { path = "../crates/mycelix-bridge-common", default-features = false, features = ["model-governance", "interplanetary"] }
+mycelix-bridge-common = { path = "../mycelix-workspace/crates/mycelix-bridge-common", default-features = false, features = ["model-governance", "interplanetary"] }
 luminous-sim-core = { path = "../crates/luminous-sim-core" }
 anyhow = "1.0"
 mycelix-desci-core = { path = "../mycelix-workspace/mycelix-desci/src/core" }
