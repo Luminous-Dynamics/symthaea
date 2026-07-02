@@ -138,6 +138,9 @@ pub struct OpenChannelInput {
 
 #[hdk_extern]
 pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::PaymentChannel,
@@ -151,6 +154,12 @@ pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
             .flatten()
         {
             if channel.id == input.channel_id {
+                // Caller must be a participant (party_a or party_b) of this channel.
+                if caller_did != channel.party_a && caller_did != channel.party_b {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only channel participants can transfer within this channel".into()
+                    )));
+                }
                 let now = sys_time()?;
                 let (new_a, new_b) = if input.from_a {
                     (
