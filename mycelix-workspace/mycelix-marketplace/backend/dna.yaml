@@ -18,52 +18,60 @@ integrity:
     max_arbitrators: 5
 
   # Integrity zomes define data validation rules
+  #
+  # NOTE: paths must have globally-unique basenames within this manifest —
+  # `hc dna pack` keys embedded bundle resources by basename only, so e.g.
+  # zomes/listings/integrity.wasm and zomes/reputation/integrity.wasm would
+  # silently collide and overwrite each other in the packed .dna (confirmed
+  # via `hc dna unpack`: a from-scratch pack of the old per-directory
+  # "integrity.wasm"/"coordinator.wasm" layout produced a bundle with only
+  # 2 embedded wasm files instead of 10).
   zomes:
     - name: listings_integrity
-      path: zomes/listings/integrity.wasm
+      path: zomes/listings/listings_integrity.wasm
 
     - name: reputation_integrity
-      path: zomes/reputation/integrity.wasm
+      path: zomes/reputation/reputation_integrity.wasm
 
     - name: transactions_integrity
-      path: zomes/transactions/integrity.wasm
+      path: zomes/transactions/transactions_integrity.wasm
 
     - name: arbitration_integrity
-      path: zomes/arbitration/integrity.wasm
+      path: zomes/arbitration/arbitration_integrity.wasm
 
     - name: messaging_integrity
-      path: zomes/messaging/integrity.wasm
+      path: zomes/messaging/messaging_integrity.wasm
 
 # Coordinator zomes implement business logic
 coordinator:
   zomes:
     - name: listings
-      path: zomes/listings/coordinator.wasm
+      path: zomes/listings/listings_coordinator.wasm
       dependencies:
         - name: listings_integrity
         - name: reputation_integrity
 
     - name: reputation
-      path: zomes/reputation/coordinator.wasm
+      path: zomes/reputation/reputation_coordinator.wasm
       dependencies:
         - name: reputation_integrity
 
     - name: transactions
-      path: zomes/transactions/coordinator.wasm
+      path: zomes/transactions/transactions_coordinator.wasm
       dependencies:
         - name: transactions_integrity
         - name: listings_integrity
         - name: reputation_integrity
 
     - name: arbitration
-      path: zomes/arbitration/coordinator.wasm
+      path: zomes/arbitration/arbitration_coordinator.wasm
       dependencies:
         - name: arbitration_integrity
         - name: transactions_integrity
         - name: reputation_integrity
 
     - name: messaging
-      path: zomes/messaging/coordinator.wasm
+      path: zomes/messaging/messaging_coordinator.wasm
       dependencies:
         - name: messaging_integrity
         - name: reputation_integrity

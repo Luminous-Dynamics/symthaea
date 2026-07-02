@@ -14,6 +14,16 @@ autotests = false
 
 [dev-dependencies]
 # Holochain sweettest framework
+#
+# mycelix-workspace/Cargo.lock and each cluster's own independent Cargo.lock
+# (e.g. mycelix-marketplace/backend/Cargo.lock) resolve dependency graphs
+# separately. This workspace's lock already has another member
+# (services/civic-happ/.../agent_reputation/coordinator) exact-pinning
+# hdk = "=0.6.1", which transitively forces holochain to 0.6.1 here too — so
+# whatever cluster DNA gets loaded in a sweettest MUST also be built against
+# hdk 0.6.1, or the WASM host-function ABI won't match ("unknown import
+# __hc__get_init_properties_1"). Don't bump this to "=0.6.2" without also
+# resolving the hdk=0.6.1 pin elsewhere in this workspace first.
 holochain = { version = "0.6", features = ["test_utils"] }
 
 # Async runtime

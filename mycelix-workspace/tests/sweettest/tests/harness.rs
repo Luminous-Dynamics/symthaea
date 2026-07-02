@@ -24,82 +24,91 @@ impl DnaPaths {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
     }
 
+    // NOTE: every path below used to start with "../mycelix-X/..." (treating
+    // each cluster as a sibling of mycelix-workspace/). That was true before
+    // this session's mass migration moved every mycelix-* cluster INTO
+    // mycelix-workspace/ — the sibling paths have resolved to nonexistent
+    // directories ever since, silently no-op'ing every #[ignore]'d sweettest
+    // in this file (they all skip with "DNA not found" rather than failing).
+    // Fixed to be workspace-relative (no leading "../"), matching where the
+    // clusters actually live now.
+
     pub fn identity() -> PathBuf {
-        Self::workspace_root().join("../mycelix-identity/dna/mycelix_identity_dna.dna")
+        Self::workspace_root().join("mycelix-identity/dna/mycelix_identity_dna.dna")
     }
 
     pub fn governance() -> PathBuf {
-        Self::workspace_root().join("../mycelix-governance/dna/mycelix_governance_dna.dna")
+        Self::workspace_root().join("mycelix-governance/dna/mycelix_governance_dna.dna")
     }
 
     pub fn finance() -> PathBuf {
-        Self::workspace_root().join("../mycelix-finance/dna/mycelix_finance.dna")
+        Self::workspace_root().join("mycelix-finance/dna/mycelix_finance.dna")
     }
 
     pub fn praxis() -> PathBuf {
-        Self::workspace_root().join("../mycelix-praxis/dna/praxis.dna")
+        Self::workspace_root().join("mycelix-praxis/dna/praxis.dna")
     }
 
     pub fn supplychain() -> PathBuf {
-        Self::workspace_root().join("../mycelix-supplychain/holochain/dna/supplychain.dna")
+        Self::workspace_root().join("mycelix-supplychain/holochain/dna/supplychain.dna")
     }
 
     pub fn health() -> PathBuf {
-        Self::workspace_root().join("../mycelix-health/dna/health.dna")
+        Self::workspace_root().join("mycelix-health/dna/health.dna")
     }
 
     pub fn marketplace() -> PathBuf {
-        Self::workspace_root().join("../mycelix-marketplace/backend/mycelix_marketplace.dna")
+        Self::workspace_root().join("mycelix-marketplace/backend/mycelix_marketplace.dna")
     }
 
     pub fn climate() -> PathBuf {
-        Self::workspace_root().join("../mycelix-climate/dnas/climate/workdir/climate.dna")
+        Self::workspace_root().join("mycelix-climate/dnas/climate/workdir/climate.dna")
     }
 
     pub fn federated_learning() -> PathBuf {
         Self::workspace_root()
-            .join("../mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna")
+            .join("mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna")
     }
 
     /// Commons cluster DNA -- old unified (property + housing + care + mutualaid + water + food + transport).
     /// This is the pre-split DNA. Use `commons_land()` / `commons_care()` for the split sub-cluster DNAs.
     pub fn commons() -> PathBuf {
-        Self::workspace_root().join("../mycelix-commons/dna/mycelix_commons.dna")
+        Self::workspace_root().join("mycelix-commons/dna/mycelix_commons.dna")
     }
 
     /// Commons-Land sub-cluster DNA (property + housing + water + food).
     pub fn commons_land() -> PathBuf {
-        Self::workspace_root().join("../mycelix-commons/dna/mycelix_commons_land.dna")
+        Self::workspace_root().join("mycelix-commons/dna/mycelix_commons_land.dna")
     }
 
     /// Commons-Care sub-cluster DNA (care + mutualaid + transport + support + space).
     pub fn commons_care() -> PathBuf {
-        Self::workspace_root().join("../mycelix-commons/dna/mycelix_commons_care.dna")
+        Self::workspace_root().join("mycelix-commons/dna/mycelix_commons_care.dna")
     }
 
     /// Civic cluster DNA (justice + emergency + media)
     pub fn civic() -> PathBuf {
-        Self::workspace_root().join("../mycelix-civic/dna/mycelix_civic.dna")
+        Self::workspace_root().join("mycelix-civic/dna/mycelix_civic.dna")
     }
 
     /// Personal cluster DNA (identity vault + health vault + credential wallet + bridge)
     pub fn personal() -> PathBuf {
-        Self::workspace_root().join("../mycelix-personal/dna/mycelix_personal.dna")
+        Self::workspace_root().join("mycelix-personal/dna/mycelix_personal.dna")
     }
 
     /// Hearth cluster DNA (kinship + gratitude + care + autonomy + stories + rhythms + bridge)
     pub fn hearth() -> PathBuf {
-        Self::workspace_root().join("../mycelix-hearth/dna/mycelix_hearth.dna")
+        Self::workspace_root().join("mycelix-hearth/dna/mycelix_hearth.dna")
     }
 
     /// Attribution DNA (dependency registry + usage receipts + reciprocity pledges)
     pub fn attribution() -> PathBuf {
-        Self::workspace_root().join("../mycelix-attribution/dna/mycelix_attribution_dna.dna")
+        Self::workspace_root().join("mycelix-attribution/dna/mycelix_attribution_dna.dna")
     }
 
     /// Energy cluster DNA (projects + investments + grid + regenerative + bridge)
     pub fn energy() -> PathBuf {
-        Self::workspace_root().join("../mycelix-energy/dna/mycelix_energy.dna")
+        Self::workspace_root().join("mycelix-energy/dna/mycelix_energy.dna")
     }
 
     /// LUCID hApp DNA (privacy/ZK attestation)
@@ -270,11 +279,29 @@ pub async fn setup_test_agents(dna_path: &PathBuf, app_name: &str, n: usize) -> 
 /// * `n` - Number of test agents to create.
 #[allow(dead_code)]
 pub async fn setup_test_agents_from_happ(_happ_path: &PathBuf, n: usize) -> Vec<TestAgent> {
-    let role_dnas = DnaPaths::unified_happ_dnas();
+    setup_test_agents_from_roles(&DnaPaths::unified_happ_dnas(), n).await
+}
 
+/// Set up N test agents from an arbitrary, caller-chosen set of roles
+/// (multi-DNA), rather than the fixed `unified_happ_dnas()` list.
+///
+/// Installs all given roles together in a single conductor per agent so
+/// `CallTargetCell::OtherRole` works between them. Each role's cell is
+/// accessible via `TestAgent::call_zome_fn_on_role()`.
+///
+/// Skips roles whose DNA file has not been built yet (with a warning), so
+/// tests can run with a partial set of DNAs available. Deliberately does
+/// NOT include every cluster in the unified hApp — e.g. a test that only
+/// needs `finance` + `marketplace` shouldn't have to build/pack all 20
+/// unified-hApp DNAs first.
+#[allow(dead_code)]
+pub async fn setup_test_agents_from_roles(
+    role_dnas: &[(&'static str, PathBuf)],
+    n: usize,
+) -> Vec<TestAgent> {
     // Load all available DNAs
     let mut loaded: Vec<(String, DnaFile)> = Vec::new();
-    for (role_name, dna_path) in &role_dnas {
+    for (role_name, dna_path) in role_dnas {
         if !dna_path.exists() {
             eprintln!(
                 "WARNING: DNA for role '{}' not found at {:?}, skipping",
@@ -295,7 +322,7 @@ pub async fn setup_test_agents_from_happ(_happ_path: &PathBuf, n: usize) -> Vec<
 
     assert!(
         !loaded.is_empty(),
-        "No DNAs could be loaded for unified hApp. Build at least one DNA first."
+        "No DNAs could be loaded for the requested role set. Build at least one DNA first."
     );
 
     let role_names: Vec<String> = loaded.iter().map(|(name, _)| name.to_string()).collect();
@@ -304,11 +331,11 @@ pub async fn setup_test_agents_from_happ(_happ_path: &PathBuf, n: usize) -> Vec<
 
     for i in 0..n {
         let mut conductor = SweetConductor::from_standard_config().await;
-        let app_name = format!("mycelix-unified-{}", i);
+        let app_name = format!("mycelix-roles-{}", i);
         let app = conductor
             .setup_app(&app_name, &loaded)
             .await
-            .unwrap_or_else(|e| panic!("Failed to setup unified hApp: {:?}", e));
+            .unwrap_or_else(|e| panic!("Failed to setup role-based hApp: {:?}", e));
 
         let cells = app.into_cells();
         assert_eq!(

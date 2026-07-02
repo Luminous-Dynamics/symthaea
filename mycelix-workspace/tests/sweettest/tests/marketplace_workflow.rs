@@ -29,12 +29,7 @@ use serial_test::serial;
 #[serial]
 #[ignore] // Requires DNA bundle
 async fn test_create_and_get_listing() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        1,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 1).await;
 
     let seller = &agents[0];
 
@@ -58,7 +53,10 @@ async fn test_create_and_get_listing() {
         .await;
 
     let action_hash = listing_record.action_hashed().hash.clone();
-    assert!(!action_hash.as_ref().is_empty(), "Listing should be created");
+    assert!(
+        !action_hash.as_ref().is_empty(),
+        "Listing should be created"
+    );
 
     // Retrieve the listing
     let retrieved: Option<Record> = seller
@@ -73,12 +71,7 @@ async fn test_create_and_get_listing() {
 #[serial]
 #[ignore]
 async fn test_list_active_listings() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        1,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 1).await;
 
     let seller = &agents[0];
 
@@ -116,12 +109,7 @@ async fn test_list_active_listings() {
 #[serial]
 #[ignore]
 async fn test_update_listing() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        1,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 1).await;
 
     let seller = &agents[0];
 
@@ -183,12 +171,7 @@ async fn test_update_listing() {
 #[serial]
 #[ignore]
 async fn test_create_transaction() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        2,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 2).await;
 
     let seller = &agents[0];
     let buyer = &agents[1];
@@ -244,12 +227,7 @@ async fn test_create_transaction() {
 #[serial]
 #[ignore]
 async fn test_transaction_status_progression() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        2,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 2).await;
 
     let seller = &agents[0];
     let buyer = &agents[1];
@@ -337,12 +315,7 @@ async fn test_transaction_status_progression() {
 #[serial]
 #[ignore]
 async fn test_deliver_item() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        2,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 2).await;
 
     let seller = &agents[0];
     let buyer = &agents[1];
@@ -408,12 +381,7 @@ async fn test_deliver_item() {
 #[serial]
 #[ignore]
 async fn test_leave_feedback() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        2,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 2).await;
 
     let seller = &agents[0];
     let buyer = &agents[1];
@@ -482,18 +450,17 @@ async fn test_leave_feedback() {
 #[serial]
 #[ignore]
 async fn test_get_reputation_score() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        1,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 1).await;
 
     let agent = &agents[0];
 
     // Get reputation for agent (may be empty for new agent)
     let reputation: serde_json::Value = agent
-        .call_zome_fn("reputation", "get_reputation", agent.agent_pubkey.to_string())
+        .call_zome_fn(
+            "reputation",
+            "get_reputation",
+            agent.agent_pubkey.to_string(),
+        )
         .await;
 
     // New agent should have default/empty reputation
@@ -512,12 +479,7 @@ async fn test_get_reputation_score() {
 #[serial]
 #[ignore]
 async fn test_report_to_bridge() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        2,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 2).await;
 
     let seller = &agents[0];
     let buyer = &agents[1];
@@ -581,12 +543,7 @@ async fn test_report_to_bridge() {
 #[serial]
 #[ignore]
 async fn test_multi_agent_listing_visibility() {
-    let agents = setup_test_agents(
-        &DnaPaths::marketplace(),
-        "mycelix-marketplace",
-        2,
-    )
-    .await;
+    let agents = setup_test_agents(&DnaPaths::marketplace(), "mycelix-marketplace", 2).await;
 
     let seller = &agents[0];
     let browser = &agents[1];
@@ -616,5 +573,196 @@ async fn test_multi_agent_listing_visibility() {
         .call_zome_fn("listings", "get_listing", listing_hash)
         .await;
 
-    assert!(retrieved.is_some(), "Listing should be visible to other agents via DHT");
+    assert!(
+        retrieved.is_some(),
+        "Listing should be visible to other agents via DHT"
+    );
+}
+
+// =============================================================================
+// Cross-Cluster Finance Settlement Tests
+// =============================================================================
+//
+// Written fresh against the CURRENT transactions_coordinator API
+// (CreateTransactionInput/confirm_transaction/mark_shipped/confirm_delivery/
+// complete_transaction) — the older workflow tests above this section use a
+// different, no-longer-current API shape (create_listing price objects,
+// update_status/deliver_item) that predates a redesign; they were not
+// touched here since untangling that drift is a separate, larger task.
+
+/// Test: `complete_transaction` invokes real finance settlement (not a no-op)
+/// and correctly propagates a settlement failure by leaving the transaction
+/// at `Delivered` (not `Completed`), rather than silently completing unpaid.
+///
+/// Deliberately installs marketplace + finance WITHOUT identity: finance's
+/// `process_payment` requires the caller to meet the Participant consciousness
+/// tier via a cross-cluster call to identity's `check_participant_tier`, and
+/// fails closed ("Identity cluster unreachable") when identity isn't
+/// reachable. A fresh test agent has no consciousness-tier history anyway
+/// (combined score 0.0, below the Participant threshold of 0.3), so this
+/// setup exercises exactly the failure path a brand-new, ungated caller
+/// would hit in production — without needing to bootstrap a full 8D
+/// sovereign-profile history just to prove the failure-handling code works.
+/// See MYCELIX_REVIEW.md P1 #4 for the settlement wiring this validates.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires compiled marketplace + finance WASM and packed DNAs"]
+async fn test_complete_transaction_settlement_failure_keeps_delivered_status() {
+    let role_dnas: Vec<(&'static str, std::path::PathBuf)> = vec![
+        ("marketplace", DnaPaths::marketplace()),
+        ("finance", DnaPaths::finance()),
+    ];
+    if !role_dnas.iter().all(|(_, p)| p.exists()) {
+        eprintln!("Skipping: marketplace and/or finance DNA not built");
+        return;
+    }
+
+    let agents = setup_test_agents_from_roles(&role_dnas, 2).await;
+    let seller = &agents[0];
+    let buyer = &agents[1];
+
+    // listing_hash isn't validated against a real listing by create_transaction,
+    // so an arbitrary hash is fine here.
+    let fake_listing_hash = ActionHash::from_raw_36(vec![9u8; 36]);
+
+    let create_input = CreateTransactionInputMirror {
+        seller: seller.agent_pubkey.clone(),
+        listing_hash: fake_listing_hash,
+        quantity: 1,
+        total_price_cents: 5000,
+    };
+    let created: TransactionOutputMirror = buyer
+        .call_zome_fn("transactions", "create_transaction", create_input)
+        .await;
+
+    wait_for_dht_sync().await;
+
+    // Each mutating call creates a new action (update_entry), so the
+    // response's transaction_hash must be threaded forward into the next
+    // call — get_transaction(hash) fetches that EXACT action's snapshot,
+    // not the latest in the update chain, so reusing a stale hash would
+    // read pre-transition state.
+    let confirmed: TransactionOutputMirror = seller
+        .call_zome_fn(
+            "transactions",
+            "confirm_transaction",
+            created.transaction_hash.clone(),
+        )
+        .await;
+
+    wait_for_dht_sync().await;
+
+    let mark_shipped_input = MarkShippedInputMirror {
+        transaction_hash: confirmed.transaction_hash.clone(),
+        tracking_info: None,
+    };
+    let shipped: TransactionOutputMirror = seller
+        .call_zome_fn("transactions", "mark_shipped", mark_shipped_input)
+        .await;
+
+    wait_for_dht_sync().await;
+
+    let delivered: TransactionOutputMirror = buyer
+        .call_zome_fn(
+            "transactions",
+            "confirm_delivery",
+            shipped.transaction_hash.clone(),
+        )
+        .await;
+
+    wait_for_dht_sync().await;
+
+    // complete_transaction must be called by the BUYER: finance's
+    // verify_caller_is_did(&input.from_did) requires the actual calling
+    // agent to equal from_did, and settle_transaction_in_finance sets
+    // from_did = buyer's DID.
+    let complete_result: Result<TransactionOutputMirror, _> = buyer
+        .call_zome_fn_fallible(
+            "transactions",
+            "complete_transaction",
+            delivered.transaction_hash.clone(),
+        )
+        .await;
+
+    assert!(
+        complete_result.is_err(),
+        "complete_transaction should fail when finance settlement is rejected \
+         (no identity cluster installed => consciousness gate fails closed), \
+         got: {:?}",
+        complete_result
+    );
+    let err_msg = format!("{:?}", complete_result.unwrap_err());
+    assert!(
+        err_msg.contains("settlement") || err_msg.contains("Delivered"),
+        "Error should mention settlement failure, got: {}",
+        err_msg
+    );
+
+    // The transaction must remain at Delivered (unchanged, retriable) —
+    // NOT silently advance to Completed despite the failed settlement.
+    // complete_transaction returned Err before calling update_entry, so no
+    // new action was created — delivered.transaction_hash is still latest.
+    let after: Option<TransactionOutputMirror> = buyer
+        .call_zome_fn(
+            "transactions",
+            "get_transaction",
+            delivered.transaction_hash,
+        )
+        .await;
+    let status = after
+        .expect("transaction should still exist")
+        .transaction
+        .status;
+    assert_eq!(
+        status, "delivered",
+        "Transaction should remain Delivered after a failed settlement, got: {:?}",
+        status
+    );
+}
+
+// Mirror types for the transactions_coordinator wire shapes exercised above
+// — must match zomes/transactions/coordinator/src/lib.rs's real struct
+// layout (field names/types/order). Deliberately typed (not
+// serde_json::Value): ActionHash/AgentPubKey encode as raw byte arrays on
+// the wire, which serde_json::Value's Deserialize impl cannot represent
+// ("invalid type: byte array, expected any valid JSON value").
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CreateTransactionInputMirror {
+    seller: AgentPubKey,
+    listing_hash: ActionHash,
+    quantity: u32,
+    total_price_cents: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct MarkShippedInputMirror {
+    transaction_hash: ActionHash,
+    tracking_info: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct TransactionMirror {
+    buyer: AgentPubKey,
+    seller: AgentPubKey,
+    listing_hash: ActionHash,
+    quantity: u32,
+    total_price_cents: u64,
+    status: String,
+    created_at: Timestamp,
+    updated_at: Timestamp,
+    tracking_info: Option<String>,
+    epistemic: EpistemicClassificationMirror,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct EpistemicClassificationMirror {
+    empirical: String,
+    normative: String,
+    materiality: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct TransactionOutputMirror {
+    transaction_hash: ActionHash,
+    transaction: TransactionMirror,
 }

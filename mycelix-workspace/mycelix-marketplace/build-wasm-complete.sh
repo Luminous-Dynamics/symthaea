@@ -38,9 +38,22 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "2️⃣  Building Coordinator Zomes..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Every coordinator crate's [package] name is "${zome}_coordinator", but its
+# [lib] (wasm artifact) name varies per crate: some match the package name
+# (transactions, arbitration), others use the bare zome name (listings,
+# reputation, messaging). Cargo's -p flag needs the package name; the copy
+# step below needs the lib name.
+declare -A LIB_NAME=(
+    [listings]="listings"
+    [reputation]="reputation"
+    [transactions]="transactions_coordinator"
+    [arbitration]="arbitration_coordinator"
+    [messaging]="messaging"
+)
+
 for zome in listings reputation transactions arbitration messaging; do
-    echo "  📦 Building ${zome}..."
-    cargo build --release --target wasm32-unknown-unknown -p "${zome}"
+    echo "  📦 Building ${zome}_coordinator..."
+    cargo build --release --target wasm32-unknown-unknown -p "${zome}_coordinator"
 done
 
 echo ""
@@ -53,18 +66,23 @@ for zome in listings reputation transactions arbitration messaging; do
     mkdir -p "zomes/${zome}"
 done
 
-# Copy integrity zomes
+# Copy integrity zomes. Destination filenames must be globally unique
+# (dna.yaml's basename-keyed bundle resources — see the note there), so
+# these are named "${zome}_integrity.wasm", not the old "integrity.wasm".
 for zome in listings reputation transactions arbitration messaging; do
     echo "  📁 Copying ${zome}_integrity.wasm..."
     cp "target/wasm32-unknown-unknown/release/${zome}_integrity.wasm" \
-       "zomes/${zome}/integrity.wasm"
+       "zomes/${zome}/${zome}_integrity.wasm"
 done
 
-# Copy coordinator zomes
+# Copy coordinator zomes (source filename is the crate's [lib] name, not
+# necessarily the zome name — see LIB_NAME map above). Destination is
+# "${zome}_coordinator.wasm" to keep bundle resource basenames unique.
 for zome in listings reputation transactions arbitration messaging; do
-    echo "  📁 Copying ${zome}.wasm..."
-    cp "target/wasm32-unknown-unknown/release/${zome}.wasm" \
-       "zomes/${zome}/coordinator.wasm"
+    lib_name="${LIB_NAME[$zome]}"
+    echo "  📁 Copying ${lib_name}.wasm..."
+    cp "target/wasm32-unknown-unknown/release/${lib_name}.wasm" \
+       "zomes/${zome}/${zome}_coordinator.wasm"
 done
 
 echo ""
