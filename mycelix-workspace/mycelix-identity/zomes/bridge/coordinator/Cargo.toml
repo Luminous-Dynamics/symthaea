@@ -17,4 +17,4 @@ serde_json = { workspace = true }
 identity_bridge_integrity = { path = "../integrity" }
 did_registry_integrity = { path = "../../did_registry/integrity" }
 mycelix-bridge-common = { workspace = true }
-sovereign-profile = { path = "../../../../crates/sovereign-profile" }
+sovereign-profile = { path = "../../../../../crates/sovereign-profile" }
