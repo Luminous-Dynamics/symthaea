@@ -2,17 +2,23 @@
 resolver = "2"
 members = [
     "xtask",
-    ".",
     "crates/core/*",
     "crates/domains/*",
     "crates/bridges/*",
 ]
+# NOTE: the root package ("symthaea") is automatically a workspace member
+# because this manifest has both [package] and [workspace] — it does NOT
+# need (and must NOT have) an explicit "." entry here. Verified 2026-07-03:
+# with cargo 1.95.0, an explicit "." in `members` silently disables
+# `exclude` for every glob-matched member (spark-engine, symthaea-lab, and
+# the old symthaea-muse-wasm path were all being compiled as full workspace
+# members despite being listed below, because of this). `default-members`
+# below may still reference "." — only the `members` array triggers the bug.
 exclude = [
-    "crates/bridges/symthaea-mycelix-holochain",
-    "crates/symthaea-zkproof/methods",
-    "crates/symthaea-zkproof/host",
-    "crates/symthaea-muse-wasm",
-    "crates/symthaea-spore/fuzz",
+    "crates/core/symthaea-zkproof/methods",
+    "crates/core/symthaea-zkproof/host",
+    "crates/bridges/symthaea-muse-wasm",
+    "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
 ]
@@ -1169,6 +1175,10 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "benchmark_humaneval_verified"
+required-features = ["code_generation"]
+
+[[example]]
+name = "humaneval_benchmark"
 required-features = ["code_generation"]
 
 [[example]]
