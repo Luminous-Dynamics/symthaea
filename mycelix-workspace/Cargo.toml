@@ -644,7 +644,12 @@ members = [
 
     "mycelix-media/tests",
     "mycelix-personal/tests",
-    "mycelix-praxis/tests",
+    # "mycelix-praxis/tests", # depends via path on mycelix-praxis/zomes/adaptive_zome/coordinator,
+    # which is a member of mycelix-praxis/Cargo.toml's own [workspace] — same structural conflict
+    # already fixed for governance/housing/justice above (task #35). Broke `cargo metadata`/`trunk
+    # build` for every crate in this outer workspace with "member of the wrong workspace" (found
+    # 2026-07-03 while rebuilding praxis's frontend dist). Build/test standalone instead:
+    # cargo test --manifest-path mycelix-praxis/tests/Cargo.toml -- --ignored
     "mycelix-property/tests",
     "mycelix-pulse/tests",
 
