@@ -178,13 +178,13 @@ impl FLTrust {
         let included_nodes: Vec<String> = gradients
             .iter()
             .zip(trust_scores.iter())
-            .filter(|(_, &t)| t > 0.0)
+            .filter(|&(_, &t)| t > 0.0)
             .map(|(g, _)| g.node_id.clone())
             .collect();
         let excluded_nodes: Vec<String> = gradients
             .iter()
             .zip(trust_scores.iter())
-            .filter(|(_, &t)| t == 0.0)
+            .filter(|&(_, &t)| t == 0.0)
             .map(|(g, _)| g.node_id.clone())
             .collect();
         let score_pairs: Vec<(String, f64)> = gradients
