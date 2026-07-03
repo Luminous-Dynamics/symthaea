@@ -58,7 +58,8 @@ Honesty matters more than marketing. Symtropy does not:
 
 Symtropy is **dual-licensed**:
 
-- **Core engine** (`symtropy-math`, `symtropy-physics`, `symtropy-render-bridge`, `symtropy-robotics-bridge`, `symtropy-net`, `symtropy-bevy`): **Apache-2.0 OR MIT** — build and ship proprietary products freely.
+- **Permissive today** (`symtropy-math`, `symtropy-physics`, `symtropy-render-bridge`): **Apache-2.0 OR MIT** — zero AGPL deps, ship in proprietary products freely.
+- **AGPL today, permissive `-core` variants planned** (`symtropy-bevy`, `symtropy-robotics-bridge`, `symtropy-net`): each currently requires an AGPL dep — not yet safe to ship in closed-source products; see [LICENSING.md](https://github.com/Luminous-Dynamics/symtropy/blob/main/docs/LICENSING.md) for the split plan.
 - **Research layer** (`symtropy-consciousness-physics`, `symtropy-sim-bridge`, game crates): **AGPL-3.0-or-later** — modifications must be shared back, or negotiate a commercial license.
 
 See [Licensing](./reference/licensing.md) for the full breakdown.
