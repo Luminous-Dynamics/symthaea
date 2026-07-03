@@ -20,7 +20,7 @@ mycelix = []
 atlas = ["dep:sol-atlas-bevy", "dep:sol-atlas-core"]
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
     "bevy_asset", "bevy_core_pipeline", "bevy_render",
     "bevy_sprite", "bevy_sprite_render",
     "bevy_text", "bevy_ui", "bevy_ui_render",
@@ -60,7 +60,7 @@ rand = "0.8"
 hound = "3.5"
 image = { version = "0.24", features = ["png"] }
 cpal = "0.17"
-bevy_egui = "0.39"
+bevy_egui = "0.40"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 symthaea-core = { path = "../symthaea/crates/core/symthaea-core" }
@@ -70,7 +70,6 @@ bytemuck = { version = "1.18", features = ["derive"] }
 resolver = "2"
 exclude = [
     "crates/bridges/symtropy-robotics-bridge",
-    "crates/bridges/symtropy-symthaea-adapter",
 ]
 members = [
     ".",
@@ -79,6 +78,7 @@ members = [
     "crates/core/symtropy-bevy-core",
     "crates/core/symtropy-bevy-scene",
     "crates/bridges/symthaea-bevy-brain",
+    "crates/bridges/symtropy-symthaea-adapter",
     "crates/apps/symtropy-mycelix-village",
     "crates/domains/symtropy-net",
     "crates/domains/symtropy-lifesim-core",
@@ -102,6 +102,24 @@ members = [
     "crates/domains/symtropy-lightyear",
     "crates/apps/symtropy-multiplayer-demo",
     "crates/symtropy-mesh",
+
+    # Restored 2026-07-03 (demo-crate rot triage): Cargo.toml deps had gone
+    # empty despite `src/` importing real crates, orphaning these from the
+    # workspace. See `symtropy/archive/orphaned-demos-2026-07/README.md` for
+    # the ones that were archived instead.
+    "crates/apps/symtropy-auv-demo",
+    "crates/apps/symtropy-exoskeleton-demo",
+    "crates/apps/symtropy-flight-demo",
+    "crates/apps/symtropy-helicopter-demo",
+    "crates/apps/symtropy-humanoid-demo",
+    "crates/apps/symtropy-manipulator-demo",
+    "crates/apps/symtropy-orbital-demo",
+    "crates/apps/symtropy-quadruped-demo",
+    "crates/apps/symtropy-surgical-demo",
+    "crates/apps/symtropy-vehicle-demo",
+    "crates/apps/symtropy-gravcraft-demo",
+    "crates/apps/symtropy-scavenger-demo",
+    "crates/apps/symtropy-web-gallery",
 ]
 
 [lints.clippy]
