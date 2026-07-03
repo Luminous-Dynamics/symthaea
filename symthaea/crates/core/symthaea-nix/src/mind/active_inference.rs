@@ -348,6 +348,13 @@ impl NixActiveInference {
         self.episodic_memory.len()
     }
 
+    /// Current curiosity (epistemic drive) weight.
+    ///
+    /// Exposed primarily for testing the epistemic modulation behaviour.
+    pub fn curiosity_weight(&self) -> f64 {
+        self.curiosity_weight
+    }
+
     /// Reset the inference engine (new conversation).
     pub fn reset(&mut self) {
         self.goal_inference.reset();
@@ -454,5 +461,148 @@ mod tests {
         let plan = engine.process_goal(&goal);
         assert!(!plan.needs_clarification);
         assert!(!plan.actions.is_empty());
+    }
+
+    // ── Epistemic Modulation Tests ──────────────────────────────────────────
+    // These tests cover the conservative curiosity/prediction-error coupling
+    // introduced in `learn_from_outcome`. They are deliberately mechanical:
+    // no HDC similarity math — just clamp semantics and monotonicity.
+
+    /// A single high-surprise outcome MUST increase curiosity_weight, but
+    /// must never push it above the hard ceiling of 0.8.
+    #[test]
+    fn test_epistemic_high_surprise_increases_curiosity_bounded() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        // Start at default weight (0.3)
+        let mut engine = NixActiveInference::new();
+        assert!((engine.curiosity_weight() - 0.3).abs() < 1e-9);
+
+        // Use seeds chosen so that random HVs have near-zero cosine similarity,
+        // guaranteeing prediction_error > 0.4 (HVs in 8192-D are ~orthogonal by
+        // construction; similarity ≈ 0, so error ≈ 1.0).
+        let before = ContinuousHV::random(dim, 1);
+        let after = ContinuousHV::random(dim, 999);
+        engine.observe_state(before.clone());
+
+        engine.learn_from_outcome(
+            &before,
+            ActionCategory::Install,
+            &after,
+            EpisodeOutcome::Success,
+            0.5,
+        );
+
+        let w = engine.curiosity_weight();
+        assert!(w > 0.3, "high surprise must increase curiosity (got {w})");
+        assert!(w <= 0.8, "curiosity must not exceed ceiling 0.8 (got {w})");
+    }
+
+    /// Curiosity weight must NEVER exceed 0.8 even after many consecutive
+    /// high-surprise outcomes (saturation safety).
+    #[test]
+    fn test_epistemic_repeated_high_surprise_saturates_safely() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::with_curiosity(0.7); // near ceiling
+
+        for i in 0..40u64 {
+            let before = ContinuousHV::random(dim, i * 2);
+            let after = ContinuousHV::random(dim, i * 2 + 1);
+            engine.observe_state(before.clone());
+            engine.learn_from_outcome(
+                &before,
+                ActionCategory::Rebuild,
+                &after,
+                EpisodeOutcome::Success,
+                0.5,
+            );
+            let w = engine.curiosity_weight();
+            assert!(
+                w <= 0.8,
+                "curiosity exceeded ceiling 0.8 after {i} high-surprise steps (got {w})"
+            );
+        }
+    }
+
+    /// A single low-surprise outcome MUST decrease curiosity_weight, but
+    /// must never drop it below the hard floor of 0.1.
+    #[test]
+    fn test_epistemic_low_surprise_decreases_curiosity_bounded() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        // Seed world model with a known Install transition so that
+        // the prediction has some non-trivial state (the actual cosine
+        // similarity at high dim will still likely be low, but we use
+        // identical vectors to guarantee zero error).
+        let mut engine = NixActiveInference::new();
+        let state = ContinuousHV::random(dim, 77);
+        engine.observe_state(state.clone());
+
+        // Learn the same transition five times so the world model adapts.
+        for _ in 0..5 {
+            engine.learn_from_outcome(
+                &state,
+                ActionCategory::Install,
+                &state, // identical before/after → similarity = 1.0 → error = 0
+                EpisodeOutcome::Success,
+                0.5,
+            );
+        }
+
+        let w = engine.curiosity_weight();
+        assert!(
+            w < 0.3,
+            "low surprise must decrease curiosity below 0.3 (got {w})"
+        );
+        assert!(
+            w >= 0.1,
+            "curiosity must not fall below floor 0.1 (got {w})"
+        );
+    }
+
+    /// Curiosity weight must NEVER fall below 0.1 even after many consecutive
+    /// low-surprise outcomes (stabilisation floor safety).
+    #[test]
+    fn test_epistemic_repeated_low_surprise_stabilises_safely() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::with_curiosity(0.15); // near floor
+        let state = ContinuousHV::random(dim, 42);
+        engine.observe_state(state.clone());
+
+        for i in 0..40u64 {
+            engine.learn_from_outcome(
+                &state,
+                ActionCategory::Update,
+                &state, // zero error
+                EpisodeOutcome::Success,
+                0.5,
+            );
+            let w = engine.curiosity_weight();
+            assert!(
+                w >= 0.1,
+                "curiosity dropped below floor 0.1 after {i} low-surprise steps (got {w})"
+            );
+        }
+    }
+
+    /// Action selection must be deterministic for identical observations and
+    /// goals (same seed, no interleaved learning).
+    #[test]
+    fn test_epistemic_action_selection_deterministic() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+
+        let mut engine_a = NixActiveInference::new();
+        engine_a.observe_state(ContinuousHV::random(dim, 7));
+        let plan_a = engine_a.process_input("install vim");
+
+        let mut engine_b = NixActiveInference::new();
+        engine_b.observe_state(ContinuousHV::random(dim, 7));
+        let plan_b = engine_b.process_input("install vim");
+
+        // Both engines started from identical state; plans must agree on the
+        // top-ranked action category.
+        assert_eq!(
+            plan_a.actions.first().map(|a| &a.action),
+            plan_b.actions.first().map(|a| &a.action),
+            "action selection must be deterministic for identical inputs"
+        );
     }
 }
