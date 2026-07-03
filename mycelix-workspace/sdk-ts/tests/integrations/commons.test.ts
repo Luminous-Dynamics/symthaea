@@ -93,8 +93,9 @@ describe('Commons Constants', () => {
     expect(COMMONS_ZOMES).toContain('transport_routes');
     expect(COMMONS_ZOMES).toContain('support_knowledge');
     expect(COMMONS_ZOMES).toContain('space');
-    // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 3 support + 1 space = 38
-    expect(COMMONS_ZOMES).toHaveLength(38);
+    // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 3 support + 1 space
+    // + 1 mesh_time + 1 resource_mesh = 40
+    expect(COMMONS_ZOMES).toHaveLength(40);
   });
 });
 
