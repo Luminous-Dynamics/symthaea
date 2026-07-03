@@ -43,7 +43,19 @@
 //! - [`use_homeostasis`] — Retrieve homeostasis (all-pending-zero) state
 
 // --- Core transport ---
-pub mod bridge_finance;
+// bridge_finance.rs is disabled: it's an unfinished manual proof-of-concept
+// ("validate the Bridge Codegen pattern", per its own header) with zero
+// consumers anywhere in the workspace, and it doesn't compile — it imports
+// `use_holochain` from `mycelix_leptos_client` (that function actually lives
+// in *this* crate, re-exported below) and re-exports `ActionHash`/`Record`/
+// `SapBalanceResponse` from `personal_leptos_types`, none of which that crate
+// actually defines (its own comment: "placeholders for types not in
+// personal-leptos-types"). This has silently broken `cargo check --lib` for
+// the entire crate — which every consuming Leptos app depends on — since it
+// was added. Re-enable once it's actually finished against real types,
+// rather than leaving broken scaffolding in the default build of a crate
+// ~20 apps depend on.
+// pub mod bridge_finance;
 pub mod connection_status;
 pub mod holochain_provider;
 pub mod provider;

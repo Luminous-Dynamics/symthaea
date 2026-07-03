@@ -28,8 +28,12 @@ pub fn AppShell(
     #[prop(into)] brand_name: String,
     #[prop(into)] brand_icon: String,
     #[prop(into)] nav_links: Vec<NavLink>,
-    #[prop(optional, into)] mobile_tabs: Option<Vec<NavTab>>,
-    #[prop(optional, into)] meta_view: Option<AnyView>,
+    // Same reasoning as `AppNav::meta_view` below: the sole caller
+    // (`mycelix_leptos_core::AppShell`) always forwards its own already-
+    // built `Option<Vec<NavTab>>` / `Option<AnyView>` straight through, so
+    // these are plain required `Option<T>` props, not `optional, into`.
+    mobile_tabs: Option<Vec<NavTab>>,
+    meta_view: Option<AnyView>,
     children: Children,
 ) -> impl IntoView {
     view! {
