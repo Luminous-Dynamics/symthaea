@@ -6,6 +6,8 @@ __pycache__/
 *.pyc
 pyphi.log
 temp_deps.txt
+__pyphi_cache__/
+.pytest_cache/
 
 # LaTeX
 *.aux
@@ -16,3 +18,10 @@ texput.log
 # Nix
 result
 .direnv/
+
+# Generated / vendored / archival — not useful checked into git
+chronicle/
+archive/
+_archive-*/
+deps/
+symthaea-deps/
