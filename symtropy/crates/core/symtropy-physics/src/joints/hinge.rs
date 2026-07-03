@@ -223,10 +223,23 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
             let rel_angular_vel =
                 body_b.angular_velocity.get(pa, pb) - body_a.angular_velocity.get(pa, pb);
 
-            // Simplified hinge motor: uses velocity-level error if angle tracking is missing.
-            // For Phase 1 robotics, we'll eventually need full angle integration for the PD target_pos.
-            // For now, we use a P-velocity controller: impulse = kp*(target_vel - current_vel) * dt
-            let torque = (motor.kp * (motor.target_pos - rel_angular_vel)
+            // Velocity-only PD controller: this crate does not track a running
+            // joint angle for hinges, so true PD position control (as used by
+            // PrismaticJoint's `MotorDrive::calculate_impulse`, which needs a
+            // `current_pos`) isn't available here without integrating one —
+            // left as a future improvement (would need a persisted relative
+            // angle, e.g. extracted each step from the two bodies' rotors in
+            // the (pa, pb) plane).
+            //
+            // Bug fix: this previously read
+            // `motor.kp * (motor.target_pos - rel_angular_vel)`, subtracting
+            // an angular *velocity* from a position/angle *target* — a unit
+            // mismatch (the doc comment above already claimed this computed
+            // `kp*(target_vel - current_vel)`; the code just used the wrong
+            // field). Fixed to use `motor.target_vel`, matching the intent:
+            // impulse = kp*(target_vel - current_vel) * dt, plus an extra
+            // kd*current_vel damping term.
+            let torque = (motor.kp * (motor.target_vel - rel_angular_vel)
                 - rel_angular_vel * motor.kd)
                 .clamp(-motor.max_force, motor.max_force);
 
