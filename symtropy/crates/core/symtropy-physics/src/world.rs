@@ -23,6 +23,25 @@ use crate::manifold_gen;
 /// perpetual micro-bounce. Mirrors Box2D's `b2_velocityThreshold` default.
 const RESTITUTION_VELOCITY_THRESHOLD: f64 = 1.0;
 
+/// Hard cap on the Baumgarte/TGS position-correction bias velocity, in
+/// units/sec, applied in `resolve_contact`.
+///
+/// Defensive clamp: narrowphase can occasionally report a wildly wrong
+/// penetration depth (observed in practice via a box resting on a
+/// `HalfSpace` — when the analytical fast path in `try_halfspace_contact`
+/// finds no vertex actually penetrating this frame, it falls through to the
+/// generic GJK+EPA path, which treats `HalfSpace` via `Shape::support`'s
+/// documented "approximation" of the plane as a large-but-finite region;
+/// EPA on that crude approximation can return a nonsensical depth, e.g.
+/// ~1e6 units, when it should be a few centimetres). Without a clamp, the
+/// bias term (`depth * baumgarte / dt`) turns that single bad depth report
+/// into an explosive one-frame impulse. Any other source of an
+/// unreasonably large reported depth is guarded the same way. Chosen well
+/// above any legitimate single-frame position-correction need (typical
+/// resting-contact depths are on the order of `slop`, i.e. ~0.01) but far
+/// below what would let one bad frame launch a body across the scene.
+const MAX_BIAS_VELOCITY: f64 = 10.0;
+
 /// Quantize a float to Q16.16 fixed-point (range ±32768, resolution 1/65536).
 ///
 /// Used by the `deterministic-net` feature to guarantee bit-identical simulation
@@ -372,6 +391,22 @@ impl<const D: usize> PhysicsWorld<D> {
                         continue;
                     }
                     self.contacts.push(manifold);
+                    continue;
+                }
+
+                // If this pair is a HalfSpace against a shape the analytical
+                // fast path fully supports (Sphere/Capsule/HyperBox), trust
+                // its "no contact" result and stop here — do NOT fall
+                // through to the generic GJK+EPA path for HalfSpace pairs.
+                // `HalfSpace::support` is only a bounded approximation of an
+                // unbounded plane (see its doc comment); EPA run against
+                // that approximation can return a wildly wrong depth (e.g.
+                // ~1e6, observed via `examples/debug_stack.rs`) for a shape
+                // the analytical path was already precisely able to say
+                // "not touching" this frame. Unsupported shape combinations
+                // (e.g. ConvexHull vs HalfSpace) still fall through below,
+                // since the analytical path can't judge those at all.
+                if self.halfspace_pair_is_analytically_resolved(a, b) {
                     continue;
                 }
 
@@ -750,20 +785,29 @@ impl<const D: usize> PhysicsWorld<D> {
             let n_pts = contact.points.len().max(1) as f64;
             let per_pt = cached_total / n_pts;
 
-            // Apply warm-start impulse (linear + lever-arm angular component,
-            // approximated as acting at the primary/deepest point).
-            let impulse = contact.normal * cached_total;
-            integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
-            integrator::apply_impulse(&mut self.bodies[b], &impulse);
-
+            // Apply the warm-start impulse distributed evenly across all
+            // contact points (both linearly and, via lever arm, angularly),
+            // rather than concentrated at a single point. Concentrating the
+            // *entire* multi-point total at one point would inject a large
+            // spurious torque every frame — most real multi-point loads
+            // (e.g. a box resting flat) are much closer to torque-balanced
+            // across their contact points, and applying the whole warm-start
+            // impulse as if from one corner destabilised exactly that case
+            // (see the stacked-boxes regression test).
+            let per_pt_impulse = contact.normal * per_pt;
             let com_a = self.bodies[a].position();
             let com_b = self.bodies[b].position();
-            let r_a = primary_pt - com_a;
-            let r_b = primary_pt - com_b;
-            let torque_a = Bivector::from_wedge(&(-impulse), &r_a);
-            let torque_b = Bivector::from_wedge(&impulse, &r_b);
-            integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
-            integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
+            for pt in &contact.points {
+                integrator::apply_impulse(&mut self.bodies[a], &(-per_pt_impulse));
+                integrator::apply_impulse(&mut self.bodies[b], &per_pt_impulse);
+
+                let r_a = pt.position - com_a;
+                let r_b = pt.position - com_b;
+                let torque_a = Bivector::from_wedge(&(-per_pt_impulse), &r_a);
+                let torque_b = Bivector::from_wedge(&per_pt_impulse, &r_b);
+                integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
+                integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
+            }
 
             // Seed lambda so TGS Soft starts from warm-start value
             for pt in &mut self.contacts[ci].points {
@@ -834,6 +878,7 @@ impl<const D: usize> PhysicsWorld<D> {
 
         // ─── TGS Soft: per-point velocity+position constraint ───
         let mut total_normal_impulse = 0.0_f64;
+        let mut total_friction_dissipation = 0.0_f64;
 
         for pt in &mut contact.points {
             let r_a = pt.position - com_a;
@@ -849,7 +894,9 @@ impl<const D: usize> PhysicsWorld<D> {
 
             // Position-correction bias (replaces Baumgarte teleport), combined
             // with the restitution target via max() (never both at once).
-            let position_bias = (pt.depth - slop).max(0.0) * baumgarte / safe_dt;
+            // Clamped — see `MAX_BIAS_VELOCITY` doc comment.
+            let position_bias =
+                ((pt.depth - slop).max(0.0) * baumgarte / safe_dt).min(MAX_BIAS_VELOCITY);
             let bias = position_bias.max(pt.restitution_bias);
 
             // Lever-arm effective-mass term: inv_I * |r_perp|^2, where r_perp
@@ -891,52 +938,102 @@ impl<const D: usize> PhysicsWorld<D> {
             }
         }
 
-        // ─── Coulomb friction (once per manifold, based on total normal impulse) ───
+        // ─── Coulomb friction, PER CONTACT POINT ───
+        //
+        // IMPORTANT: friction (and its lever-arm torque) must be applied per
+        // point, bounded by that point's own SHARE of the manifold's total
+        // ACTUALLY APPLIED (i.e. `callback.modulate_impulse`-passed) normal
+        // impulse — not once per manifold using a single "primary" point's
+        // position bounded by the manifold-wide total, and NOT bounded
+        // directly by the point's raw accumulated `pt.lambda` either.
+        //
+        // Concentrating the whole manifold's friction+torque at one point is
+        // fine for the pre-existing linear-only friction (impulse location
+        // doesn't matter for translation), but is unstable once friction
+        // also produces torque: on an asymmetric or partial (e.g. 2-point)
+        // manifold it injects a one-sided torque every frame with nothing to
+        // balance it, and since the resulting spin feeds back into the
+        // tangential velocity at that same point, it can run away (verified
+        // via `examples/debug_stack.rs`: box angular velocity grew
+        // unboundedly, ~0.09/step, forever, with linear position/velocity
+        // otherwise stable).
+        //
+        // Bounding by raw `pt.lambda` (this file's first attempt at this
+        // fix) is also wrong: `pt.lambda` accumulates the UNMODULATED
+        // `delta_lambda` every iteration regardless of whether
+        // `callback.modulate_impulse` actually let any of it through, so a
+        // callback that fully blocks impulses (e.g. gain 0) no longer
+        // blocks friction either (regressed `test_modulate_impulse_blocks_or_preserves`,
+        // which expects EXACTLY zero collision effect under a zero-gain
+        // callback). Instead, each point's friction bound is that point's
+        // proportional share (by raw lambda) of `total_normal_impulse` (the
+        // sum of ACTUALLY applied, modulated deltas) — this reduces to the
+        // original single-point behaviour when there's one point, respects
+        // full blocking when `total_normal_impulse` is zero, and still
+        // load-shares (and self-limits) torque across multi-point manifolds.
         if total_normal_impulse > 1e-15 {
-            let primary_pt = contact.point();
-            let r_a = primary_pt - com_a;
-            let r_b = primary_pt - com_b;
+            let total_raw_lambda: f64 = contact.points.iter().map(|p| p.lambda).sum();
 
-            let v_rel = {
-                let va = self.bodies[a].linear_velocity
-                    + self.bodies[a].angular_velocity.apply_to_vector(&r_a);
-                let vb = self.bodies[b].linear_velocity
-                    + self.bodies[b].angular_velocity.apply_to_vector(&r_b);
-                vb - va
-            };
-            let v_n = contact.normal * v_rel.dot(&contact.normal);
-            let v_t = v_rel - v_n;
-            let v_t_mag = v_t.norm();
+            for pt in &contact.points {
+                if total_raw_lambda <= 1e-15 {
+                    break;
+                }
+                let point_bound = total_normal_impulse * (pt.lambda / total_raw_lambda);
+                if point_bound <= 1e-15 {
+                    continue;
+                }
 
-            if v_t_mag > 1e-10 {
-                let tangent = v_t / v_t_mag;
-                let mut mu = (self.bodies[a].friction * self.bodies[b].friction).sqrt();
+                let r_a = pt.position - com_a;
+                let r_b = pt.position - com_b;
 
-                // ═══ HARMONY FIELD FRICTION MODULATION ═══
-                mu *= callback.friction_multiplier(&primary_pt, contact.body_a);
+                let v_rel = {
+                    let va = self.bodies[a].linear_velocity
+                        + self.bodies[a].angular_velocity.apply_to_vector(&r_a);
+                    let vb = self.bodies[b].linear_velocity
+                        + self.bodies[b].angular_velocity.apply_to_vector(&r_b);
+                    vb - va
+                };
+                let v_n = contact.normal * v_rel.dot(&contact.normal);
+                let v_t = v_rel - v_n;
+                let v_t_mag = v_t.norm();
 
-                // Lever-arm effective mass for the tangential direction, so
-                // friction at an offset from the COM can induce spin instead
-                // of only ever damping linear velocity.
-                let t_dot_ra = r_a.dot(&tangent);
-                let t_dot_rb = r_b.dot(&tangent);
-                let ang_term_a = inv_i_avg_a * (r_a.norm_squared() - t_dot_ra * t_dot_ra);
-                let ang_term_b = inv_i_avg_b * (r_b.norm_squared() - t_dot_rb * t_dot_rb);
-                let denom_t = (total_inv_mass + ang_term_a + ang_term_b).max(1e-15);
+                if v_t_mag > 1e-10 {
+                    let tangent = v_t / v_t_mag;
+                    let mut mu = (self.bodies[a].friction * self.bodies[b].friction).sqrt();
 
-                let j_t_desired = -v_t_mag / denom_t;
-                let j_t = j_t_desired.clamp(-mu * total_normal_impulse, mu * total_normal_impulse);
-                let friction_impulse = tangent * j_t;
-                integrator::apply_impulse(&mut self.bodies[a], &(-friction_impulse));
-                integrator::apply_impulse(&mut self.bodies[b], &friction_impulse);
+                    // ═══ HARMONY FIELD FRICTION MODULATION ═══
+                    mu *= callback.friction_multiplier(&pt.position, contact.body_a);
 
-                let torque_a = Bivector::from_wedge(&(-friction_impulse), &r_a);
-                let torque_b = Bivector::from_wedge(&friction_impulse, &r_b);
-                integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
-                integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
+                    // Lever-arm effective mass for the tangential direction,
+                    // so friction at an offset from the COM can induce spin
+                    // instead of only ever damping linear velocity.
+                    let t_dot_ra = r_a.dot(&tangent);
+                    let t_dot_rb = r_b.dot(&tangent);
+                    let ang_term_a_t = inv_i_avg_a * (r_a.norm_squared() - t_dot_ra * t_dot_ra);
+                    let ang_term_b_t = inv_i_avg_b * (r_b.norm_squared() - t_dot_rb * t_dot_rb);
+                    let denom_t = (total_inv_mass + ang_term_a_t + ang_term_b_t).max(1e-15);
 
-                // Record friction dissipation for consciousness energy budget
-                callback.record_dissipation(j_t.abs() * 0.1);
+                    let j_t_desired = -v_t_mag / denom_t;
+                    let j_t = j_t_desired.clamp(-mu * point_bound, mu * point_bound);
+                    let friction_impulse = tangent * j_t;
+                    integrator::apply_impulse(&mut self.bodies[a], &(-friction_impulse));
+                    integrator::apply_impulse(&mut self.bodies[b], &friction_impulse);
+
+                    let torque_a = Bivector::from_wedge(&(-friction_impulse), &r_a);
+                    let torque_b = Bivector::from_wedge(&friction_impulse, &r_b);
+                    integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
+                    integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
+
+                    total_friction_dissipation += j_t.abs() * 0.1;
+                }
+            }
+        }
+
+        // ─── Post-manifold bookkeeping ───
+        if total_normal_impulse > 1e-15 {
+            // Record friction dissipation for consciousness energy budget
+            if total_friction_dissipation > 0.0 {
+                callback.record_dissipation(total_friction_dissipation);
             }
 
             // ─── Emit collision event ───
@@ -995,6 +1092,52 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
         None
+    }
+
+    /// True if this pair is a `HalfSpace` against a shape type the
+    /// analytical fast path (`contact_against_halfspace`) fully supports
+    /// (`Sphere`, `Capsule`, `HyperBox`) — meaning `try_halfspace_contact`
+    /// returning `None` for this pair is an authoritative "not touching",
+    /// and the pair must NOT be re-checked via the generic GJK+EPA path.
+    ///
+    /// Returns `false` for pairs with no `HalfSpace` at all, or where the
+    /// other shape isn't one of the analytically-supported types (those
+    /// still need the GJK+EPA fallback, since the fast path can't judge
+    /// them).
+    fn halfspace_pair_is_analytically_resolved(&self, idx_a: usize, idx_b: usize) -> bool {
+        let body_a = &self.bodies[idx_a];
+        let body_b = &self.bodies[idx_b];
+
+        let a_is_halfspace = body_a
+            .collider
+            .as_any()
+            .downcast_ref::<HalfSpace<D>>()
+            .is_some();
+        let b_is_halfspace = body_b
+            .collider
+            .as_any()
+            .downcast_ref::<HalfSpace<D>>()
+            .is_some();
+        if !a_is_halfspace && !b_is_halfspace {
+            return false;
+        }
+
+        let other = if a_is_halfspace { body_b } else { body_a };
+        other
+            .collider
+            .as_any()
+            .downcast_ref::<Sphere<D>>()
+            .is_some()
+            || other
+                .collider
+                .as_any()
+                .downcast_ref::<Capsule<D>>()
+                .is_some()
+            || other
+                .collider
+                .as_any()
+                .downcast_ref::<HyperBox<D>>()
+                .is_some()
     }
 
     fn try_mesh_contact(
@@ -1092,6 +1235,7 @@ impl<const D: usize> PhysicsWorld<D> {
                 position,
                 depth,
                 lambda: 0.0,
+                restitution_bias: 0.0,
             });
         }
         Some(manifold)
