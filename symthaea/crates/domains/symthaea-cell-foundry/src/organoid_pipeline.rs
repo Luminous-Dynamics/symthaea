@@ -15,6 +15,9 @@
 //! - Lancaster et al. (2013). Cerebral organoids model human brain development.
 //! - Turing (1952). Chemical basis of morphogenesis.
 //! - Tononi (2004). IIT.
+//! - Levin (2019). The computational boundary of a self — see
+//!   [`crate::bioelectric`] for the gap-junction/Vmem layer this pipeline's
+//!   morphogenetic organoid now carries alongside the chemical field.
 
 use crate::digital_organoid::{DevelopmentalStage, DigitalOrganoid, LocalFieldPotential};
 use crate::morphogenetic_consciousness::NeuralOrganoid;
@@ -271,6 +274,15 @@ impl OrganoidPipeline {
     /// Get a reference to the underlying morphogenetic organoid.
     pub fn morphogenetic_organoid(&self) -> &NeuralOrganoid {
         &self.morphogenetic
+    }
+
+    /// Get a mutable reference to the underlying morphogenetic organoid —
+    /// used to drive bioelectric perturbation/regeneration experiments
+    /// (`amputate`, `capture_target_morphology`,
+    /// `set_gap_junction_permeability`) alongside the pipeline's normal
+    /// day-by-day `step`/`run`.
+    pub fn morphogenetic_organoid_mut(&mut self) -> &mut NeuralOrganoid {
+        &mut self.morphogenetic
     }
 
     // -- private --
