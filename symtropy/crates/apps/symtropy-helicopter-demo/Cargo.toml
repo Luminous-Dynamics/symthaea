@@ -1,6 +1,22 @@
 [package]
 name = "symtropy-helicopter-demo"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
+bevy = { version = "0.19", default-features = false, features = [
+    "bevy_asset", "bevy_core_pipeline", "bevy_render",
+    "bevy_sprite", "bevy_sprite_render",
+    "bevy_text", "bevy_ui", "bevy_ui_render",
+    "bevy_winit", "bevy_color", "bevy_state",
+    "bevy_log", "bevy_post_process", "bevy_shader",
+    "bevy_gizmos", "bevy_gizmos_render", "bevy_pbr",
+    "multi_threaded", "x11",
+    "default_font", "png",
+] }
+symthaea-core = { path = "../../../../symthaea/crates/core/symthaea-core" }
+symthaea-helicopter = { path = "../../../../symthaea/crates/domains/symthaea-helicopter" }
+symtropy-consciousness-physics = { path = "../../domains/symtropy-consciousness-physics" }
+symtropy-physics = { path = "../../core/symtropy-physics" }
+symtropy-robotics-bridge = { path = "../../bridges/symtropy-robotics-bridge" }
+

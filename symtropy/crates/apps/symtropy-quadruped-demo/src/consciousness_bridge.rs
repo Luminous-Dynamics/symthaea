@@ -3,6 +3,7 @@
 //! Consciousness tick wrapper.
 
 use symtropy_consciousness_physics::safety::SafetyTier;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 
 pub fn consciousness_tick(

@@ -14,6 +14,7 @@
 //! No shortcuts: Φ is not a clamped lerp of PE.
 
 use symtropy_consciousness_physics::safety::SafetyTier;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 
 /// Run one consciousness tick through the full pipeline.

@@ -3,6 +3,7 @@
 //! Consciousness pipeline wiring — same pattern as flight-demo + manipulator-demo.
 
 use symtropy_consciousness_physics::safety::SafetyTier;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 
 /// Run one consciousness tick.
