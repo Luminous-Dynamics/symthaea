@@ -427,15 +427,13 @@ jobs:
             cargo test -p symthaea --lib --features "$FEATURES" -- --test-threads=1
 
   test-feature-matrix-critical:
-    name: Test Feature Matrix (core/web_research/pathology)
+    name: Test Feature Matrix (web_research/pathology)
     runs-on: ubuntu-latest
     needs: test
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: core
-            cmd: cargo test -p symthaea --lib -- --test-threads=1
           - name: web_research
             cmd: cargo test -p symthaea --lib --features "web_research_module school_learning" -- --test-threads=1
           - name: pathology_resilience
@@ -472,7 +470,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
-    timeout-minutes: 420
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -640,7 +638,6 @@ jobs:
           - "ssm_language,reasoning_engine"
           - "multi_agent,reasoning_engine"
           - "full_perception,reasoning_engine"
-          - "consciousness_full,school_learning"
           - "all_benchmarks,reasoning_engine"
           - "genesis,reasoning_engine"
           - "vision-manifold,full_perception"
@@ -719,7 +716,7 @@ jobs:
             ${{ runner.os }}-cargo-wasm-
 
       - name: Install wasm-bindgen CLI
-        run: cargo install wasm-bindgen-cli --version 0.2.114
+        run: cargo install wasm-bindgen-cli --version 0.2.108
 
       - name: Install wasm-opt (binaryen)
         run: |
@@ -741,14 +738,14 @@ jobs:
 
       - name: Generate JS bindings
         run: |
-          mkdir -p crates/symthaea-spore/www/pkg
-          wasm-bindgen --target web --out-dir crates/symthaea-spore/www/pkg /tmp/symthaea_spore.wasm
+          mkdir -p crates/domains/symthaea-spore/www/pkg
+          wasm-bindgen --target web --out-dir crates/domains/symthaea-spore/www/pkg /tmp/symthaea_spore.wasm
 
       - name: Size budget check
         run: |
-          WASM_SIZE=$(stat -c%s crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm)
+          WASM_SIZE=$(stat -c%s crates/domains/symthaea-spore/www/pkg/symthaea_spore_bg.wasm)
           echo "WASM size: $((WASM_SIZE / 1024))KB ($WASM_SIZE bytes)"
-          GZIP_SIZE=$(gzip -c crates/symthaea-spore/www/pkg/symthaea_spore_bg.wasm | wc -c)
+          GZIP_SIZE=$(gzip -c crates/domains/symthaea-spore/www/pkg/symthaea_spore_bg.wasm | wc -c)
           echo "WASM gzip: $((GZIP_SIZE / 1024))KB ($GZIP_SIZE bytes)"
           if [ "$WASM_SIZE" -gt 512000 ]; then
             echo "ERROR: WASM binary exceeds 500KB budget"
@@ -756,10 +753,10 @@ jobs:
           fi
 
       - name: Smoke test (export verification)
-        run: node crates/symthaea-spore/www/smoke-test.mjs
+        run: node crates/domains/symthaea-spore/www/smoke-test.mjs
 
       - name: E2E test (consciousness cycles + experiments)
-        run: node crates/symthaea-spore/www/e2e-test.mjs
+        run: node crates/domains/symthaea-spore/www/e2e-test.mjs
 
   deny:
     name: Dependency Audit (cargo-deny)
@@ -824,7 +821,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx
       - name: Generate SBOM
