@@ -226,6 +226,7 @@ fn best_n<const D: usize>(
                     position: candidates[$i].0,
                     depth: candidates[$i].1,
                     lambda: 0.0,
+                    restitution_bias: 0.0,
                 });
             }
         };

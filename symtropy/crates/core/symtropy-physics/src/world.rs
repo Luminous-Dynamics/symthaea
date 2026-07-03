@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 use nalgebra::SVector;
-use symtropy_math::{Capsule, HalfSpace, HyperBox, Point, Sphere};
+use symtropy_math::{Bivector, Capsule, HalfSpace, HyperBox, Point, Sphere};
 
 use crate::body::{BodyHandle, NetId, RigidBody};
 use crate::broadphase;
@@ -17,6 +17,11 @@ use crate::contact::{CollisionEvent, ContactCache, ContactManifold};
 use crate::gjk;
 use crate::integrator;
 use crate::manifold_gen;
+
+/// Relative approach speed (units/sec) below which restitution is not
+/// applied, to avoid tiny resting-contact jitter being amplified into a
+/// perpetual micro-bounce. Mirrors Box2D's `b2_velocityThreshold` default.
+const RESTITUTION_VELOCITY_THRESHOLD: f64 = 1.0;
 
 /// Quantize a float to Q16.16 fixed-point (range ±32768, resolution 1/65536).
 ///
@@ -449,6 +454,17 @@ impl<const D: usize> PhysicsWorld<D> {
             .flat_map(|island| island.contact_indices.iter().copied())
             .collect();
 
+        // 4b. Restitution target computation: computed ONCE per contact point
+        //     here, using velocities as they stand right after integration
+        //     (before warm-start or any solver impulse touches them this
+        //     frame), so the restitution target reflects the true approach
+        //     speed. See `ContactPoint::restitution_bias` doc comment.
+        for &ci in &active_contact_indices {
+            if ci < self.contacts.len() {
+                self.compute_restitution_bias(ci);
+            }
+        }
+
         // 5a. Warm-start: apply previous-frame impulse ONCE before the solver loop.
         //     (The old code accidentally applied warm-starting N times per frame.)
         for &ci in &active_contact_indices {
@@ -670,6 +686,48 @@ impl<const D: usize> PhysicsWorld<D> {
         }
     }
 
+    /// Compute the restitution target velocity for every point of a contact,
+    /// ONCE per frame, from the current (pre-warm-start, pre-solve) velocity.
+    ///
+    /// See `ContactPoint::restitution_bias` doc comment for why this must be
+    /// computed once rather than re-derived from the (already partially
+    /// resolved) relative velocity on every TGS iteration.
+    fn compute_restitution_bias(&mut self, ci: usize) {
+        let (body_a, body_b, normal) = {
+            let c = &self.contacts[ci];
+            (c.body_a, c.body_b, c.normal)
+        };
+        let (idx_a, idx_b) = self.find_body_indices(body_a, body_b);
+        let (Some(a), Some(b)) = (idx_a, idx_b) else {
+            return;
+        };
+
+        let restitution = (self.bodies[a].restitution * self.bodies[b].restitution)
+            .max(0.0)
+            .sqrt();
+        let com_a = self.bodies[a].position();
+        let com_b = self.bodies[b].position();
+        let va = self.bodies[a].linear_velocity;
+        let vb = self.bodies[b].linear_velocity;
+        let wa = self.bodies[a].angular_velocity;
+        let wb = self.bodies[b].angular_velocity;
+
+        for pt in &mut self.contacts[ci].points {
+            let r_a = pt.position - com_a;
+            let r_b = pt.position - com_b;
+            let v_point_a = va + wa.apply_to_vector(&r_a);
+            let v_point_b = vb + wb.apply_to_vector(&r_b);
+            let v_rel_n = (v_point_b - v_point_a).dot(&normal);
+
+            pt.restitution_bias = if restitution > 1e-9 && v_rel_n < -RESTITUTION_VELOCITY_THRESHOLD
+            {
+                -restitution * v_rel_n
+            } else {
+                0.0
+            };
+        }
+    }
+
     /// Warm-start a single contact from the previous frame's impulse cache.
     ///
     /// Called ONCE per contact before the solver loop. Distributes the cached
@@ -692,10 +750,20 @@ impl<const D: usize> PhysicsWorld<D> {
             let n_pts = contact.points.len().max(1) as f64;
             let per_pt = cached_total / n_pts;
 
-            // Apply warm-start impulse
+            // Apply warm-start impulse (linear + lever-arm angular component,
+            // approximated as acting at the primary/deepest point).
             let impulse = contact.normal * cached_total;
             integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
             integrator::apply_impulse(&mut self.bodies[b], &impulse);
+
+            let com_a = self.bodies[a].position();
+            let com_b = self.bodies[b].position();
+            let r_a = primary_pt - com_a;
+            let r_b = primary_pt - com_b;
+            let torque_a = Bivector::from_wedge(&(-impulse), &r_a);
+            let torque_b = Bivector::from_wedge(&impulse, &r_b);
+            integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
+            integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
 
             // Seed lambda so TGS Soft starts from warm-start value
             for pt in &mut self.contacts[ci].points {
@@ -710,6 +778,19 @@ impl<const D: usize> PhysicsWorld<D> {
     /// "bias velocity" `bias = baumgarte * (depth - slop).max(0) / dt`, which is
     /// added to the velocity constraint. Lambda clamping ensures contacts only push
     /// (never pull), eliminating ghost-acceleration artefacts.
+    ///
+    /// Includes lever-arm angular contact response: relative velocity at the
+    /// contact point (not just the centers of mass) drives the impulse, and
+    /// impulses apply a matching angular impulse via `Bivector::from_wedge`
+    /// (the dimension-agnostic replacement for the 3D `r × J` torque). This
+    /// lets off-center impacts induce spin and friction induce rotation,
+    /// instead of only ever translating the center of mass.
+    ///
+    /// Restitution: each point's `restitution_bias` (computed once per frame
+    /// by `compute_restitution_bias`, before any impulse this frame) is
+    /// combined with the position-correction bias via `max()`, so collisions
+    /// actually bounce (mirrors the `-(1+e)*v_rel_n` term in
+    /// `ContactManifold::impulse_magnitude`).
     ///
     /// Returns the updated manifold so accumulated lambdas persist across iterations.
     fn resolve_contact(
@@ -730,6 +811,14 @@ impl<const D: usize> PhysicsWorld<D> {
             return contact;
         }
 
+        // Isotropic (mean-of-axes) inverse inertia — see the TODO in
+        // `integrator.rs` (`integrate` / `apply_angular_impulse`) for why
+        // this is only exact for spheres.
+        let inv_i_avg_a = self.bodies[a].inv_inertia.sum() / D as f64;
+        let inv_i_avg_b = self.bodies[b].inv_inertia.sum() / D as f64;
+        let com_a = self.bodies[a].position();
+        let com_b = self.bodies[b].position();
+
         // Compliance: α = compliance / dt² (adds softness to the constraint)
         // Integrates material-aware elasticity from MultiPhysicsMeshlet if present.
         let material_compliance = if let Some(e) = contact.elasticity {
@@ -747,17 +836,35 @@ impl<const D: usize> PhysicsWorld<D> {
         let mut total_normal_impulse = 0.0_f64;
 
         for pt in &mut contact.points {
+            let r_a = pt.position - com_a;
+            let r_b = pt.position - com_b;
+
             let v_rel_n = {
-                let va = self.bodies[a].linear_velocity;
-                let vb = self.bodies[b].linear_velocity;
+                let va = self.bodies[a].linear_velocity
+                    + self.bodies[a].angular_velocity.apply_to_vector(&r_a);
+                let vb = self.bodies[b].linear_velocity
+                    + self.bodies[b].angular_velocity.apply_to_vector(&r_b);
                 (vb - va).dot(&contact.normal)
             };
 
-            // Position-correction bias (replaces Baumgarte teleport)
-            let bias = (pt.depth - slop).max(0.0) * baumgarte / safe_dt;
+            // Position-correction bias (replaces Baumgarte teleport), combined
+            // with the restitution target via max() (never both at once).
+            let position_bias = (pt.depth - slop).max(0.0) * baumgarte / safe_dt;
+            let bias = position_bias.max(pt.restitution_bias);
 
-            // TGS Soft impulse: Δλ = (-v_rel·n + bias) / (w_a + w_b + α)
-            let denom = total_inv_mass + alpha;
+            // Lever-arm effective-mass term: inv_I * |r_perp|^2, where r_perp
+            // is the component of r orthogonal to the contact normal. This is
+            // the dimension-agnostic generalisation of the classic 3D
+            // "(r × n)² / I" rotational contact term (derivable directly from
+            // `Bivector::from_wedge` + `apply_to_vector`; see
+            // `wedge_matches_3d_lever_arm_identity` in symtropy-math).
+            let n_dot_ra = r_a.dot(&contact.normal);
+            let n_dot_rb = r_b.dot(&contact.normal);
+            let ang_term_a = inv_i_avg_a * (r_a.norm_squared() - n_dot_ra * n_dot_ra);
+            let ang_term_b = inv_i_avg_b * (r_b.norm_squared() - n_dot_rb * n_dot_rb);
+
+            // TGS Soft impulse: Δλ = (-v_rel·n + bias) / (w_a + w_b + I_a + I_b + α)
+            let denom = total_inv_mass + alpha + ang_term_a + ang_term_b;
             let delta_lambda = (-v_rel_n + bias) / denom;
 
             // Clamp: accumulated normal impulse must stay ≥ 0 (no pulling)
@@ -772,6 +879,14 @@ impl<const D: usize> PhysicsWorld<D> {
                 let impulse = contact.normal * modulated_delta;
                 integrator::apply_impulse(&mut self.bodies[a], &(-impulse));
                 integrator::apply_impulse(&mut self.bodies[b], &impulse);
+
+                // Lever-arm angular impulse: torque = impulse ∧ r (order
+                // matters — see `Bivector::from_wedge` doc comment).
+                let torque_a = Bivector::from_wedge(&(-impulse), &r_a);
+                let torque_b = Bivector::from_wedge(&impulse, &r_b);
+                integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
+                integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
+
                 total_normal_impulse += modulated_delta.abs();
             }
         }
@@ -779,7 +894,16 @@ impl<const D: usize> PhysicsWorld<D> {
         // ─── Coulomb friction (once per manifold, based on total normal impulse) ───
         if total_normal_impulse > 1e-15 {
             let primary_pt = contact.point();
-            let v_rel = self.bodies[b].linear_velocity - self.bodies[a].linear_velocity;
+            let r_a = primary_pt - com_a;
+            let r_b = primary_pt - com_b;
+
+            let v_rel = {
+                let va = self.bodies[a].linear_velocity
+                    + self.bodies[a].angular_velocity.apply_to_vector(&r_a);
+                let vb = self.bodies[b].linear_velocity
+                    + self.bodies[b].angular_velocity.apply_to_vector(&r_b);
+                vb - va
+            };
             let v_n = contact.normal * v_rel.dot(&contact.normal);
             let v_t = v_rel - v_n;
             let v_t_mag = v_t.norm();
@@ -791,11 +915,25 @@ impl<const D: usize> PhysicsWorld<D> {
                 // ═══ HARMONY FIELD FRICTION MODULATION ═══
                 mu *= callback.friction_multiplier(&primary_pt, contact.body_a);
 
-                let j_t_desired = -v_t_mag / total_inv_mass;
+                // Lever-arm effective mass for the tangential direction, so
+                // friction at an offset from the COM can induce spin instead
+                // of only ever damping linear velocity.
+                let t_dot_ra = r_a.dot(&tangent);
+                let t_dot_rb = r_b.dot(&tangent);
+                let ang_term_a = inv_i_avg_a * (r_a.norm_squared() - t_dot_ra * t_dot_ra);
+                let ang_term_b = inv_i_avg_b * (r_b.norm_squared() - t_dot_rb * t_dot_rb);
+                let denom_t = (total_inv_mass + ang_term_a + ang_term_b).max(1e-15);
+
+                let j_t_desired = -v_t_mag / denom_t;
                 let j_t = j_t_desired.clamp(-mu * total_normal_impulse, mu * total_normal_impulse);
                 let friction_impulse = tangent * j_t;
                 integrator::apply_impulse(&mut self.bodies[a], &(-friction_impulse));
                 integrator::apply_impulse(&mut self.bodies[b], &friction_impulse);
+
+                let torque_a = Bivector::from_wedge(&(-friction_impulse), &r_a);
+                let torque_b = Bivector::from_wedge(&friction_impulse, &r_b);
+                integrator::apply_angular_impulse(&mut self.bodies[a], &torque_a);
+                integrator::apply_angular_impulse(&mut self.bodies[b], &torque_b);
 
                 // Record friction dissipation for consciousness energy budget
                 callback.record_dissipation(j_t.abs() * 0.1);

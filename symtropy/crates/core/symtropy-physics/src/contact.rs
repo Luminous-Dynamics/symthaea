@@ -19,6 +19,16 @@ pub struct ContactPoint<const D: usize> {
     /// Accumulated normal impulse this frame (TGS Soft solver state).
     /// Initialised to 0.0 each frame; warm-started from the previous frame's cache.
     pub lambda: f64,
+    /// Restitution target velocity (bias), computed ONCE per frame from the
+    /// pre-solve approach speed (`-e * v_rel_n` when bodies are approaching
+    /// faster than a small threshold, else 0.0). The solver combines this
+    /// with the Baumgarte position-correction bias via `max()`, so the target
+    /// departing speed reflects the true approach velocity rather than being
+    /// re-derived (and diluted) on every TGS iteration. See
+    /// `PhysicsWorld::compute_restitution_bias` and the `-(1+e)*v_rel_n`
+    /// term in [`ContactManifold::impulse_magnitude`] below, which this
+    /// mirrors.
+    pub restitution_bias: f64,
 }
 
 /// Collision event emitted when two bodies collide.
@@ -75,6 +85,7 @@ impl<const D: usize> ContactManifold<D> {
             position: point,
             depth,
             lambda: 0.0,
+            restitution_bias: 0.0,
         });
         Self {
             body_a,
@@ -253,6 +264,7 @@ mod tests {
             position: SVector::from([2.0, 0.0, 0.0]),
             depth: 0.7,
             lambda: 0.0,
+            restitution_bias: 0.0,
         });
         assert_eq!(m.points.len(), 2);
         assert!((m.depth() - 0.7).abs() < 1e-12, "primary should be deepest");
