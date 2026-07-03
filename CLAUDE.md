@@ -50,7 +50,7 @@ cargo login <token>   # Already configured in ~/.cargo/credentials.toml
 | **81XX** | **Mycelix Frontends** (alphabetical) | |
 | 8104 | Commons UI | commons.luminousdynamics.io |
 | 8107 | Praxis UI | praxis.mycelix.net |
-| 8110 | Civic UI (Governance+Finance) | governance.luminousdynamics.io |
+| 8110 | Governance UI (Governance+Finance; app lives under `mycelix-governance/apps/leptos`, not `mycelix-civic` — see note below) | governance.luminousdynamics.io |
 | 8111 | Health UI | health.luminousdynamics.io |
 | 8112 | Hearth UI | hearth.luminousdynamics.io |
 | 8117 | Pulse (Decentralized Email) | mail.mycelix.net |
@@ -59,6 +59,7 @@ cargo login <token>   # Already configured in ~/.cargo/credentials.toml
 | 8129 | Craft UI | craft.mycelix.net |
 | 8130 | Prism (Epistemic Browser) | prism.mycelix.net |
 | 8134 | Xenia Admin (operator console for the Xenia remote-support product, part of the separate Mycelix Sovereign Suite — not a Mycelix governance-cluster UI) | admin.sovereign.mycelix.net |
+| 8102 (reserved, per PORTS.md) | mycelix-civic — a *different* cluster from mycelix-governance despite past docs calling 8110 "Civic UI": mycelix-civic owns justice/emergency-coordination/media (20 zomes, 2,276 tests) and has no real UI yet — `mycelix-civic/apps/leptos` renders only a component-library showcase (verified 2026-07-03) | civic.mycelix.net |
 | **82XX/83XX** | **Holochain Conductors** (admin/app) | |
 | 8400-8409 | Dev/test (ad-hoc) | — |
 

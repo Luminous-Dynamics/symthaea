@@ -49,7 +49,7 @@ Alphabetical by cluster short name. Port = 81XX.
 |------|---------|--------|--------|
 | 8100 | mycelix-atlas | — | Reserved |
 | 8101 | mycelix-attribution | attribution.mycelix.net | Reserved |
-| 8102 | mycelix-civic | civic.mycelix.net | Reserved |
+| 8102 | mycelix-civic (justice, emergency coordination, media — a *different* cluster from mycelix-governance/8110) | civic.mycelix.net | Reserved — `mycelix-civic/apps/leptos` is a scaffold rendering only a component showcase, no real pages yet (verified 2026-07-03) |
 | 8103 | mycelix-climate | climate.mycelix.net | Reserved |
 | 8104 | mycelix-commons | commons.mycelix.net | Reserved |
 | 8105 | mycelix-core | — | Reserved |
@@ -57,7 +57,7 @@ Alphabetical by cluster short name. Port = 81XX.
 | 8107 | **mycelix-praxis** | **praxis.mycelix.net** | **LIVE** |
 | 8108 | mycelix-energy | energy.mycelix.net | Reserved |
 | 8109 | mycelix-finance | finance.mycelix.net | Reserved |
-| 8110 | **mycelix-governance** (Civic UI) | **governance.luminousdynamics.io** | **Built** |
+| 8110 | **mycelix-governance** (Governance+Finance UI — was historically nicknamed "Civic UI"; renamed here 2026-07-03 to stop colliding with the actual mycelix-civic cluster below) | **governance.luminousdynamics.io** | **Built** |
 | 8111 | mycelix-health | health.luminousdynamics.io | Built |
 | 8112 | mycelix-hearth | hearth.luminousdynamics.io | Built |
 | 8113 | mycelix-identity | identity.mycelix.net | Reserved |
