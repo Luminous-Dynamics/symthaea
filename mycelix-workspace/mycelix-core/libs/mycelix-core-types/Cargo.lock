@@ -529,6 +529,9 @@ name = "mycelix-core-types"
 version = "0.1.0"
 dependencies = [
  "hdi",
+ "hdk_derive",
+ "holo_hash",
+ "holochain_integrity_types",
  "pyo3",
  "serde",
  "serde_json",

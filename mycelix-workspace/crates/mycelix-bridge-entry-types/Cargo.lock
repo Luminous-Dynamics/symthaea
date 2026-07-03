@@ -511,6 +511,9 @@ name = "mycelix-bridge-entry-types"
 version = "0.1.0"
 dependencies = [
  "hdi",
+ "hdk_derive",
+ "holo_hash",
+ "holochain_integrity_types",
  "holochain_serialized_bytes",
  "serde",
  "serde_json",

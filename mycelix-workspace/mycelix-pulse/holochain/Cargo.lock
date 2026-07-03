@@ -24,6 +24,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
+name = "audit"
+version = "0.1.0"
+dependencies = [
+ "audit_integrity",
+ "hdk",
+ "serde",
+]
+
+[[package]]
+name = "audit_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -50,20 +68,6 @@ dependencies = [
  "arrayref",
  "arrayvec",
  "constant_time_eq",
-]
-
-[[package]]
-name = "blake3"
-version = "1.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0aa83c34e62843d924f905e0f5c866eb1dd6545fc4d719e803d9ba6030371fce"
-dependencies = [
- "arrayref",
- "arrayvec",
- "cc",
- "cfg-if",
- "constant_time_eq",
- "cpufeatures 0.3.0",
 ]
 
 [[package]]
@@ -131,6 +135,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "contacts"
+version = "0.1.0"
+dependencies = [
+ "contacts_integrity",
+ "hdk",
+ "serde",
+]
+
+[[package]]
+name = "contacts_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -150,15 +172,6 @@ name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "cpufeatures"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
 dependencies = [
  "libc",
 ]
@@ -320,31 +333,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
-name = "energy_bridge"
-version = "0.1.0"
-dependencies = [
- "energy_bridge_integrity",
- "hdk",
- "holochain_serialized_bytes",
- "mycelix-bridge-common",
- "mycelix-zome-helpers",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "energy_bridge_integrity"
-version = "0.1.0"
-dependencies = [
- "hdi",
- "holochain_serialized_bytes",
- "mycelix-bridge-entry-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,31 +480,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi 6.0.0",
-]
-
-[[package]]
-name = "grid"
-version = "0.1.0"
-dependencies = [
- "grid_integrity",
- "hdk",
- "holochain_serialized_bytes",
- "mycelix-bridge-common",
- "mycelix-bridge-proc",
- "mycelix-zome-helpers",
- "mycelix_energy_shared",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "grid_integrity"
-version = "0.1.0"
-dependencies = [
- "hdi",
- "holochain_serialized_bytes",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -784,30 +747,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "investments"
-version = "0.1.0"
-dependencies = [
- "hdk",
- "holochain_serialized_bytes",
- "investments_integrity",
- "mycelix-bridge-common",
- "mycelix-zome-helpers",
- "mycelix_energy_shared",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "investments_integrity"
-version = "0.1.0"
-dependencies = [
- "hdi",
- "holochain_serialized_bytes",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "itertools"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -834,6 +773,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
+dependencies = [
+ "cpufeatures",
+]
+
+[[package]]
+name = "keys"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "keys_integrity",
+ "serde",
+]
+
+[[package]]
+name = "keys_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -844,6 +810,170 @@ name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
+
+[[package]]
+name = "mail_backup"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_backup_integrity",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "mail_backup_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_bridge"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_bridge_integrity",
+ "mycelix-zkp-core",
+ "serde",
+]
+
+[[package]]
+name = "mail_bridge_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_capabilities"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_capabilities_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_capabilities_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_federation"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_federation_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_federation_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_messages"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_messages_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_messages_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_profiles"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_profiles_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_profiles_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_search"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_search_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_search_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_sync"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_sync_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_sync_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
+name = "mail_trust"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "mail_trust_integrity",
+ "serde",
+]
+
+[[package]]
+name = "mail_trust_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
 
 [[package]]
 name = "memchr"
@@ -862,62 +992,43 @@ dependencies = [
 ]
 
 [[package]]
-name = "mycelix-bridge-common"
+name = "mycelix-zkp-core"
 version = "0.1.0"
 dependencies = [
- "blake3",
- "hdk",
+ "proofs-commitment",
+ "proofs-config",
+ "rand",
  "serde",
  "serde_json",
- "sovereign-profile",
+ "sha2",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
-name = "mycelix-bridge-entry-types"
+name = "mycelix_rate_limiter"
 version = "0.1.0"
 dependencies = [
- "hdi",
+ "hdk",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_serialized_bytes",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "mycelix-bridge-proc"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn 2.0.118",
-]
-
-[[package]]
-name = "mycelix-zome-helpers"
-version = "0.1.0"
-dependencies = [
- "getrandom 0.2.17",
- "hdk",
- "holo_hash",
- "mycelix-bridge-common",
- "serde",
-]
-
-[[package]]
-name = "mycelix_energy_shared"
-version = "0.1.0"
-dependencies = [
- "hdk",
- "hdk_derive",
- "holo_hash",
- "holochain_integrity_types",
  "holochain_zome_types",
  "serde",
  "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mycelix_stake"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "hdk",
+ "holochain_serialized_bytes",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -954,6 +1065,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
+name = "ppv-lite86"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
+dependencies = [
+ "zerocopy",
+]
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -987,27 +1107,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "projects"
+name = "proofs-commitment"
 version = "0.1.0"
 dependencies = [
- "getrandom 0.3.4",
- "hdk",
- "holochain_serialized_bytes",
- "mycelix-bridge-common",
- "mycelix-zome-helpers",
- "projects_integrity",
- "serde",
- "serde_json",
+ "sha3",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
-name = "projects_integrity"
+name = "proofs-config"
 version = "0.1.0"
 dependencies = [
- "hdi",
- "holochain_serialized_bytes",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1032,26 +1143,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
-name = "regenerative"
-version = "0.1.0"
+name = "rand"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
 dependencies = [
- "hdk",
- "holochain_serialized_bytes",
- "mycelix-bridge-common",
- "mycelix-zome-helpers",
- "regenerative_integrity",
- "serde",
- "serde_json",
+ "libc",
+ "rand_chacha",
+ "rand_core",
 ]
 
 [[package]]
-name = "regenerative_integrity"
-version = "0.1.0"
+name = "rand_chacha"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
- "hdi",
- "holochain_serialized_bytes",
- "serde",
- "serde_json",
+ "ppv-lite86",
+ "rand_core",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+dependencies = [
+ "getrandom 0.2.17",
 ]
 
 [[package]]
@@ -1088,6 +1206,24 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "scheduler"
+version = "0.1.0"
+dependencies = [
+ "hdk",
+ "scheduler_integrity",
+ "serde",
+]
+
+[[package]]
+name = "scheduler_integrity"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "holochain_serialized_bytes",
+ "serde",
+]
 
 [[package]]
 name = "semver"
@@ -1165,8 +1301,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
- "cpufeatures 0.2.17",
+ "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "sha3"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77fd7028345d415a4034cf8777cd4f8ab1851274233b45f84e3d955502d93874"
+dependencies = [
+ "digest",
+ "keccak",
 ]
 
 [[package]]
@@ -1193,13 +1339,6 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
-
-[[package]]
-name = "sovereign-profile"
-version = "0.1.2"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "strsim"
@@ -1515,6 +1654,26 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "zerocopy"
+version = "0.8.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce1022995ff5ff5d841ad7d994facc23098cd40152f2c1d11cd607c6f530653f"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ae7f38b72ec2a254e2b87ef277cf2cd4fb97cbebf944faa6f33354da0867930"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.118",
+]
 
 [[package]]
 name = "zmij"
