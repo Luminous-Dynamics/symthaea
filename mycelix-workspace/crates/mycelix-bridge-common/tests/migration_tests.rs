@@ -255,3 +255,135 @@ fn test_needs_migration_with_migratable() {
     assert!(!is_future_version(2, MockEntry::CURRENT_VERSION));
     assert!(is_future_version(4, MockEntry::CURRENT_VERSION));
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Real end-to-end migration: MerkleLeaf v1 → v2
+//
+// `MerkleLeaf` (mycelix_bridge_common::merkle_timestamp) is the first real
+// entry type to exercise the `Migratable` trait with an actual version bump:
+//
+//   v1: { invention_id, witness_commitment, registered_at }
+//   v2: adds `schema_version` (u8) and `witness_agent_did` (Option<String>)
+//
+// This is deliberately a low-risk, non-security-critical entry type — it's
+// a prior-art timestamping leaf, not a credential or gating profile. Adding
+// fields to it does not change `blake3_leaf`'s hash inputs, so it doesn't
+// perturb the deterministic Merkle root chain.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+use mycelix_bridge_common::merkle_timestamp::MerkleLeaf;
+
+#[test]
+fn test_merkle_leaf_current_version_is_2() {
+    assert_eq!(MerkleLeaf::CURRENT_VERSION, 2);
+}
+
+#[test]
+fn test_merkle_leaf_migrate_from_v1_fills_in_defaults() {
+    // A v1-shaped record exactly as it would have been serialized before
+    // `schema_version` / `witness_agent_did` existed — no extra fields.
+    let v1_json = r#"{
+        "invention_id": "inv-legacy-001",
+        "witness_commitment": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32],
+        "registered_at": 1700000000000000
+    }"#;
+
+    let migrated = MerkleLeaf::migrate_from(v1_json, 1).expect("v1 migration should succeed");
+
+    assert_eq!(migrated.invention_id, "inv-legacy-001");
+    assert_eq!(migrated.registered_at, 1_700_000_000_000_000);
+    assert_eq!(
+        migrated.witness_commitment,
+        [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25, 26, 27, 28, 29, 30, 31, 32
+        ]
+    );
+    // Migrated leaves land on the current schema version...
+    assert_eq!(migrated.schema_version, MerkleLeaf::CURRENT_VERSION);
+    // ...and get a sensible default for the new field: v1 leaves predate
+    // agent-level attribution, so there's nothing better than `None`.
+    assert_eq!(migrated.witness_agent_did, None);
+}
+
+#[test]
+fn test_merkle_leaf_migrate_from_v1_missing_field_fails() {
+    // Malformed v1 data (missing `registered_at`) should fail cleanly,
+    // not silently default to 0.
+    let bad_json = r#"{
+        "invention_id": "inv-bad",
+        "witness_commitment": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    }"#;
+    let err = MerkleLeaf::migrate_from(bad_json, 1).unwrap_err();
+    assert!(matches!(err, MigrationError::DeserializationFailed(_)));
+}
+
+#[test]
+fn test_merkle_leaf_migrate_from_current_version_is_noop() {
+    // Migrating an already-v2 entry should just parse it back out unchanged
+    // (no data loss, no mutation) — a true no-op.
+    let v2_json = r#"{
+        "invention_id": "inv-current-002",
+        "witness_commitment": [32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],
+        "registered_at": 1750000000000000,
+        "schema_version": 2,
+        "witness_agent_did": "did:mycelix:agent-alice"
+    }"#;
+
+    let migrated = MerkleLeaf::migrate_from(v2_json, 2).expect("v2 no-op migration should succeed");
+
+    assert_eq!(migrated.invention_id, "inv-current-002");
+    assert_eq!(migrated.registered_at, 1_750_000_000_000_000);
+    assert_eq!(migrated.schema_version, 2);
+    assert_eq!(
+        migrated.witness_agent_did,
+        Some("did:mycelix:agent-alice".to_string())
+    );
+
+    // Re-migrating the same JSON again produces an identical result —
+    // confirms idempotence of the v2 no-op path.
+    let migrated_again = MerkleLeaf::migrate_from(v2_json, 2).unwrap();
+    assert_eq!(migrated, migrated_again);
+}
+
+#[test]
+fn test_merkle_leaf_migrate_from_future_version_rejected() {
+    // A schema version newer than CURRENT_VERSION means this binary is
+    // older than the data it's reading — reject with a typed error rather
+    // than guessing at a shape.
+    let future_json = r#"{
+        "invention_id": "inv-future",
+        "witness_commitment": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        "registered_at": 1800000000000000,
+        "schema_version": 3
+    }"#;
+
+    let err = MerkleLeaf::migrate_from(future_json, 3).unwrap_err();
+    match err {
+        MigrationError::UnknownVersion {
+            found,
+            max_supported,
+        } => {
+            assert_eq!(found, 3);
+            assert_eq!(max_supported, MerkleLeaf::CURRENT_VERSION);
+        }
+        other => panic!("Expected UnknownVersion, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_merkle_leaf_v1_json_still_deserializes_directly_via_serde_defaults() {
+    // Backward-compat sanity check independent of the Migratable trait:
+    // old on-disk/on-chain v1 JSON (written before this field existed)
+    // must still deserialize straight into `MerkleLeaf` via serde
+    // `#[serde(default)]`, exactly like Holochain's own "read old entries
+    // as-is" guidance in the sibling SchemaMigration framework.
+    let v1_json = r#"{
+        "invention_id": "inv-direct-decode",
+        "witness_commitment": [9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],
+        "registered_at": 42
+    }"#;
+    let leaf: MerkleLeaf = serde_json::from_str(v1_json).expect("serde default backfill");
+    assert_eq!(leaf.schema_version, 1); // NOT current version — this is a raw decode, not a migration
+    assert_eq!(leaf.witness_agent_did, None);
+}

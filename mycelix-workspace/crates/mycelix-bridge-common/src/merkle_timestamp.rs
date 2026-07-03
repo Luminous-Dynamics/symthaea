@@ -22,11 +22,30 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::migration::{Migratable, MigrationError};
+
+/// Default `schema_version` for `MerkleLeaf` JSON written before the field
+/// existed (schema v1). Used by `#[serde(default = ...)]` below so that
+/// pre-migration leaves still deserialize directly.
+fn default_leaf_schema_version() -> u8 {
+    1
+}
+
 // ============================================================================
 // Types
 // ============================================================================
 
 /// A leaf in the Merkle tree — one invention claim's witness commitment.
+///
+/// ## Schema versions
+/// - **v1**: `invention_id`, `witness_commitment`, `registered_at` only.
+/// - **v2**: adds `schema_version` and `witness_agent_did` (optional DID of
+///   the agent who registered/witnessed the claim). See [`Migratable`] impl
+///   below for the v1 → v2 upgrade path.
+///
+/// Note: [`blake3_leaf`] only hashes `invention_id`, `witness_commitment`,
+/// and `registered_at`, so adding these fields does not change the
+/// cryptographic commitment of existing (or migrated) leaves.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MerkleLeaf {
     /// Unique identifier of the invention (references `InventionClaim.id`).
@@ -35,6 +54,60 @@ pub struct MerkleLeaf {
     pub witness_commitment: [u8; 32],
     /// Timestamp when the claim was registered (microseconds).
     pub registered_at: u64,
+    /// Schema version of this leaf. Absent in v1 JSON, in which case it
+    /// deserializes as `1` via the default below.
+    #[serde(default = "default_leaf_schema_version")]
+    pub schema_version: u8,
+    /// DID of the agent who registered/witnessed this claim, if known.
+    /// Added in schema v2; `None` for leaves migrated from v1, which
+    /// predate agent-level attribution.
+    #[serde(default)]
+    pub witness_agent_did: Option<String>,
+}
+
+/// Mirror of the pre-v2 `MerkleLeaf` wire shape (no `schema_version`, no
+/// `witness_agent_did`). Used only by [`Migratable::migrate_from`] to parse
+/// legacy schema-v1 JSON.
+#[derive(Deserialize)]
+struct MerkleLeafV1 {
+    invention_id: String,
+    witness_commitment: [u8; 32],
+    registered_at: u64,
+}
+
+impl Migratable for MerkleLeaf {
+    const CURRENT_VERSION: u8 = 2;
+
+    /// Migrate a JSON-serialized `MerkleLeaf` from `from_version` to
+    /// [`Self::CURRENT_VERSION`].
+    ///
+    /// - `from_version == 1`: parses the legacy 3-field shape and fills in
+    ///   `schema_version: 2` and `witness_agent_did: None` (v1 leaves have
+    ///   no recorded witnessing agent).
+    /// - `from_version == CURRENT_VERSION`: parses directly — a no-op
+    ///   migration, since the entry is already in the current shape.
+    /// - anything else: rejected as an unsupported version.
+    fn migrate_from(json: &str, from_version: u8) -> Result<Self, MigrationError> {
+        match from_version {
+            1 => {
+                let v1: MerkleLeafV1 = serde_json::from_str(json)
+                    .map_err(|e| MigrationError::DeserializationFailed(e.to_string()))?;
+                Ok(MerkleLeaf {
+                    invention_id: v1.invention_id,
+                    witness_commitment: v1.witness_commitment,
+                    registered_at: v1.registered_at,
+                    schema_version: Self::CURRENT_VERSION,
+                    witness_agent_did: None,
+                })
+            }
+            v if v == Self::CURRENT_VERSION => serde_json::from_str::<MerkleLeaf>(json)
+                .map_err(|e| MigrationError::DeserializationFailed(e.to_string())),
+            v => Err(MigrationError::UnknownVersion {
+                found: v,
+                max_supported: Self::CURRENT_VERSION,
+            }),
+        }
+    }
 }
 
 /// A completed Merkle root anchoring a batch of invention claims.
@@ -340,6 +413,8 @@ mod tests {
             invention_id: id.to_string(),
             witness_commitment: *blake3::hash(id.as_bytes()).as_bytes(),
             registered_at: ts,
+            schema_version: MerkleLeaf::CURRENT_VERSION,
+            witness_agent_did: None,
         }
     }
 
