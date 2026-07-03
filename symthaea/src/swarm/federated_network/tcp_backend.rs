@@ -37,9 +37,16 @@ async fn write_framed(
 ) -> NetworkResult<()> {
     use tokio::io::AsyncWriteExt;
 
-    let data = bincode::serialize(msg).map_err(|e| NetworkError::Serialization {
-        reason: e.to_string(),
-    })?;
+    // Must use the bincode::options() builder here (not the plain
+    // bincode::serialize free function, which defaults to a different,
+    // wire-incompatible int encoding) so this round-trips correctly with
+    // read_framed's bincode::options() deserialize below.
+    let data = bincode::options()
+        .with_limit(TCP_MAX_MESSAGE_SIZE as u64)
+        .serialize(msg)
+        .map_err(|e| NetworkError::Serialization {
+            reason: e.to_string(),
+        })?;
 
     if data.len() > TCP_MAX_MESSAGE_SIZE {
         return Err(NetworkError::SendFailed {
