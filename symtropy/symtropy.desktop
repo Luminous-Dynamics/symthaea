@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Symtropy
 Comment=The Room That Remembers You — consciousness-driven survival
-Exec=/srv/luminous-dynamics/symtropy/run.sh --release
+Exec=/srv/luminous-dynamics/symtropy/run.sh --release --atlas
 Icon=/srv/luminous-dynamics/symtropy/assets/icon.png
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Game;
