@@ -20,11 +20,11 @@ license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible
-hdk = "0.6.0"
-hdi = "0.7.0"
+hdk = "=0.6.1"
+hdi = "=0.7.1"
 
 # Required by hdk macros
-holochain_serialized_bytes = "0.0.57"
+holochain_serialized_bytes = "=0.0.57"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

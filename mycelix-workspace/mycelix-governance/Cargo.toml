@@ -28,10 +28,10 @@ license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible (per official compatibility table)
-hdk = "0.6.0"
-hdi = "0.7.0"
-holochain_integrity_types = "0.6.0"
-holochain_serialized_bytes = "0.0.57"
+hdk = "=0.6.1"
+hdi = "=0.7.1"
+holochain_integrity_types = "=0.6.1"
+holochain_serialized_bytes = "=0.0.57"
 
 # Mycelix Core Types for collective sensing integration
 mycelix-core-types = { path = "../mycelix-core/libs/mycelix-core-types", features = ["serde"] }

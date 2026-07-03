@@ -28,8 +28,8 @@ members = [
 
 [workspace.dependencies]
 # Holochain 0.6.0 dependencies
-hdk = "0.6.0"
-hdi = "0.7.0"
+hdk = "=0.6.1"
+hdi = "=0.7.1"
 holochain_serialized_bytes = "=0.0.57"
 serde = "=1.0.228"  # Match holochain_serialized_bytes requirement
 

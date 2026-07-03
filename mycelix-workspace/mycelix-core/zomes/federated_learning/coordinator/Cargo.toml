@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Holochain 0.6 - Coordinator zomes use hdk
-hdk = "0.6.0"
+hdk = "=0.6.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # WASM compatibility
