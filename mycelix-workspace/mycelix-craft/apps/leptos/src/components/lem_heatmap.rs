@@ -9,26 +9,34 @@
 //! This tells a recruiter at a glance whether you're a "doer" (E-heavy),
 //! a "governance thinker" (N-heavy), or a "systems builder" (M-heavy).
 
+use crate::context::{PublishedCredentialView, use_craft};
 use leptos::prelude::*;
-use crate::context::{use_craft, PublishedCredentialView};
 
 /// Parse "E3-N1-M2" into (empirical, normative, materiality) as u8 values.
 fn parse_epistemic_code(code: &str) -> Option<(u8, u8, u8)> {
     let parts: Vec<&str> = code.split('-').collect();
-    if parts.len() != 3 { return None; }
+    if parts.len() != 3 {
+        return None;
+    }
 
-    let e = parts[0].strip_prefix('E').and_then(|s| s.parse::<u8>().ok())?;
-    let n = parts[1].strip_prefix('N').and_then(|s| s.parse::<u8>().ok())?;
-    let m = parts[2].strip_prefix('M').and_then(|s| s.parse::<u8>().ok())?;
+    let e = parts[0]
+        .strip_prefix('E')
+        .and_then(|s| s.parse::<u8>().ok())?;
+    let n = parts[1]
+        .strip_prefix('N')
+        .and_then(|s| s.parse::<u8>().ok())?;
+    let m = parts[2]
+        .strip_prefix('M')
+        .and_then(|s| s.parse::<u8>().ok())?;
     Some((e, n, m))
 }
 
 fn vitality_color(permille: u16) -> &'static str {
     match permille {
-        800.. => "#22c55e",  // green
-        500..=799 => "#f59e0b",  // amber
-        200..=499 => "#ef4444",  // red
-        _ => "#6b7280",  // gray
+        800.. => "#22c55e",     // green
+        500..=799 => "#f59e0b", // amber
+        200..=499 => "#ef4444", // red
+        _ => "#6b7280",         // gray
     }
 }
 
@@ -37,10 +45,10 @@ fn render_panel(
     title: &str,
     x_label: &str,
     y_label: &str,
-    points: &[(f64, f64, &str, f64)],  // (x, y, color, radius)
+    points: &[(f64, f64, &str, f64)], // (x, y, color, radius)
     x_max: f64,
     y_max: f64,
-) -> impl IntoView {
+) -> impl IntoView + use<> {
     let grid_w = 100.0;
     let grid_h = 100.0;
     let margin = 20.0;
@@ -114,24 +122,44 @@ pub fn LemHeatmap() -> impl IntoView {
         let source: Vec<PublishedCredentialView> = if creds.is_empty() {
             vec![
                 PublishedCredentialView {
-                    credential_id: String::new(), title: "Rust".into(), issuer: String::new(),
-                    vitality_permille: 920, mastery_permille: 850,
-                    guild_name: None, epistemic_code: Some("E3-N1-M2".into()), needs_review: false,
+                    credential_id: String::new(),
+                    title: "Rust".into(),
+                    issuer: String::new(),
+                    vitality_permille: 920,
+                    mastery_permille: 850,
+                    guild_name: None,
+                    epistemic_code: Some("E3-N1-M2".into()),
+                    needs_review: false,
                 },
                 PublishedCredentialView {
-                    credential_id: String::new(), title: "Holochain".into(), issuer: String::new(),
-                    vitality_permille: 640, mastery_permille: 720,
-                    guild_name: None, epistemic_code: Some("E3-N1-M2".into()), needs_review: true,
+                    credential_id: String::new(),
+                    title: "Holochain".into(),
+                    issuer: String::new(),
+                    vitality_permille: 640,
+                    mastery_permille: 720,
+                    guild_name: None,
+                    epistemic_code: Some("E3-N1-M2".into()),
+                    needs_review: true,
                 },
                 PublishedCredentialView {
-                    credential_id: String::new(), title: "Data Science".into(), issuer: String::new(),
-                    vitality_permille: 340, mastery_permille: 600,
-                    guild_name: None, epistemic_code: Some("E2-N1-M1".into()), needs_review: true,
+                    credential_id: String::new(),
+                    title: "Data Science".into(),
+                    issuer: String::new(),
+                    vitality_permille: 340,
+                    mastery_permille: 600,
+                    guild_name: None,
+                    epistemic_code: Some("E2-N1-M1".into()),
+                    needs_review: true,
                 },
                 PublishedCredentialView {
-                    credential_id: String::new(), title: "Philosophy".into(), issuer: String::new(),
-                    vitality_permille: 500, mastery_permille: 700,
-                    guild_name: None, epistemic_code: Some("E1-N3-M2".into()), needs_review: false,
+                    credential_id: String::new(),
+                    title: "Philosophy".into(),
+                    issuer: String::new(),
+                    vitality_permille: 500,
+                    mastery_permille: 700,
+                    guild_name: None,
+                    epistemic_code: Some("E1-N3-M2".into()),
+                    needs_review: false,
                 },
             ]
         } else {
