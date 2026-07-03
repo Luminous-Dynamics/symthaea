@@ -27,9 +27,15 @@ fi
 SESSION_TARGET="${TARGETS_DIR}/${SESSION_ID}"
 mkdir -p "$SESSION_TARGET"
 
-# Write env var to persist for the session
+# Write env var to persist for the session. Must be `export`ed, not a bare
+# assignment — verified 2026-07-03: a bare `CARGO_TARGET_DIR=...` line here
+# results in a shell variable visible via $CARGO_TARGET_DIR expansion within
+# the session shell, but NOT propagated into the environment of child
+# processes (cargo, timeout, backgrounded subshells) — i.e. it silently did
+# nothing for every cargo invocation all session, causing exactly the
+# heavy shared-target-dir lock contention this hook exists to prevent.
 if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
-    echo "CARGO_TARGET_DIR=${SESSION_TARGET}" >> "$CLAUDE_ENV_FILE"
+    echo "export CARGO_TARGET_DIR=${SESSION_TARGET}" >> "$CLAUDE_ENV_FILE"
 fi
 
 # Cleanup stale targets (>48h old, no active cargo processes referencing them)
