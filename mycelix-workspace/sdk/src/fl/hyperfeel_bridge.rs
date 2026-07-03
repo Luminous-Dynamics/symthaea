@@ -76,7 +76,7 @@ impl ByzantineAnalysis {
     pub fn flagged_nodes(&self) -> Vec<&str> {
         self.byzantine_flags
             .iter()
-            .filter(|(_, &is_byzantine)| is_byzantine)
+            .filter(|&(_, &is_byzantine)| is_byzantine)
             .map(|(id, _)| id.as_str())
             .collect()
     }
@@ -844,11 +844,7 @@ mod tests {
             .map(|i| {
                 let x = i as f32;
                 // Mix of very different patterns: random-ish alternating high/low
-                if i % 2 == 0 {
-                    1000.0
-                } else {
-                    -1000.0
-                }
+                if i % 2 == 0 { 1000.0 } else { -1000.0 }
             })
             .collect()
     }

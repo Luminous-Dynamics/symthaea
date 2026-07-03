@@ -385,7 +385,7 @@ pub fn analyze_outputs(history: &[OutputHistoryEntry]) -> EpistemicOutputAnalysi
     let dominant_empirical_index = empirical_counts
         .iter()
         .enumerate()
-        .max_by_key(|(_, &count)| count)
+        .max_by_key(|&(_, &count)| count)
         .map(|(idx, _)| idx)
         .unwrap_or(1);
 
@@ -494,8 +494,8 @@ pub fn update_agent_kvector_epistemic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agentic::epistemic_classifier::calculate_epistemic_weight;
     use crate::agentic::UncertaintyCalibration;
+    use crate::agentic::epistemic_classifier::calculate_epistemic_weight;
     use crate::agentic::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
 
     fn create_test_agent() -> InstrumentalActor {

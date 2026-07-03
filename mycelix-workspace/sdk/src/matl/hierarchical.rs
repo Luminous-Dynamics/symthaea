@@ -74,7 +74,7 @@ impl HierarchicalDetector {
         let nodes_in_cluster: Vec<&String> = self
             .clusters
             .iter()
-            .filter(|(_, &c)| c == cluster_id)
+            .filter(|&(_, &c)| c == cluster_id)
             .map(|(n, _)| n)
             .collect();
 
@@ -112,7 +112,7 @@ impl HierarchicalDetector {
     pub fn get_suspected_byzantine(&self) -> Vec<String> {
         self.clusters
             .iter()
-            .filter(|(_, &cluster_id)| {
+            .filter(|&(_, &cluster_id)| {
                 self.cluster_scores
                     .get(&cluster_id)
                     .map(|c| c.suspected_byzantine)

@@ -393,7 +393,7 @@ impl EpistemicStats {
             .empirical_distribution
             .iter()
             .enumerate()
-            .max_by_key(|(_, &count)| count)
+            .max_by_key(|&(_, &count)| count)
             .map(|(idx, _)| idx)
             .unwrap_or(0);
 

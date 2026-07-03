@@ -178,7 +178,7 @@ impl VerificationPlugin for ChecksumVerificationPlugin {
         // Hash reputations (sorted by key for determinism)
         let mut sorted_reps: Vec<_> = reputations.iter().collect();
         sorted_reps.sort_by_key(|(k, _)| (*k).clone());
-        for (k, &v) in &sorted_reps {
+        for &(ref k, &v) in &sorted_reps {
             hasher.update_str(k);
             hasher.update_f32(v);
         }

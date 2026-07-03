@@ -104,7 +104,7 @@ impl DPRng {
     /// Sample from Laplace distribution
     /// Uses the inverse CDF method: X = μ - b * sign(U - 0.5) * ln(1 - 2|U - 0.5|)
     pub fn sample_laplace(&mut self, scale: f64) -> f64 {
-        let u: f64 = self.rng.gen();
+        let u: f64 = self.rng.r#gen();
         // Clamp to (0, 1) exclusive to avoid ln(0) = -inf when u is exactly 0.0 or 1.0
         let u = u.clamp(f64::EPSILON, 1.0 - f64::EPSILON);
         let u_shifted = u - 0.5;
@@ -486,13 +486,9 @@ impl LocalDP {
     /// Randomized response for boolean
     pub fn randomized_response(&mut self, true_value: bool) -> bool {
         let p = 1.0 / (1.0 + self.epsilon.exp());
-        let flip = self.rng.rng.gen::<f64>() < p;
+        let flip = self.rng.rng.r#gen::<f64>() < p;
 
-        if flip {
-            !true_value
-        } else {
-            true_value
-        }
+        if flip { !true_value } else { true_value }
     }
 
     /// RAPPOR-style encoding for categorical data
@@ -624,7 +620,9 @@ impl PrivateTrustAnalytics {
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum PrivacyError {
     /// Privacy budget exceeded
-    #[error("Privacy budget exceeded: requested (ε={requested_epsilon}, δ={requested_delta}), remaining (ε={remaining_epsilon}, δ={remaining_delta})")]
+    #[error(
+        "Privacy budget exceeded: requested (ε={requested_epsilon}, δ={requested_delta}), remaining (ε={remaining_epsilon}, δ={remaining_delta})"
+    )]
     BudgetExceeded {
         /// Epsilon requested for the query.
         requested_epsilon: f64,
@@ -652,10 +650,10 @@ mod tests {
     #[test]
     fn test_noise_generator_laplace() {
         let config = DPConfig::default();
-        let mut gen = NoiseGenerator::new(config);
+        let mut r#gen = NoiseGenerator::new(config);
 
         // Generate many samples, should be centered around 0
-        let samples: Vec<f64> = (0..5000).map(|_| gen.add_noise(0.0, 1.0, 1.0)).collect();
+        let samples: Vec<f64> = (0..5000).map(|_| r#gen.add_noise(0.0, 1.0, 1.0)).collect();
 
         let mean: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
         // Allow 0.3 tolerance for random noise
@@ -669,10 +667,10 @@ mod tests {
     #[test]
     fn test_noise_generator_gaussian() {
         let config = DPConfig::default();
-        let mut gen = NoiseGenerator::with_mechanism(config, NoiseMechanism::Gaussian);
+        let mut r#gen = NoiseGenerator::with_mechanism(config, NoiseMechanism::Gaussian);
 
         // Generate many samples
-        let samples: Vec<f64> = (0..5000).map(|_| gen.add_noise(0.0, 1.0, 1.0)).collect();
+        let samples: Vec<f64> = (0..5000).map(|_| r#gen.add_noise(0.0, 1.0, 1.0)).collect();
 
         let mean: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
         // Gaussian noise with larger sigma has higher variance, allow 0.5 tolerance
