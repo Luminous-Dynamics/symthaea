@@ -1,5 +1,5 @@
 [package]
-name = "symtropy-gravcraft-demo"
+name = "symtropy-scavenger-demo"
 version = "0.1.0"
 edition = "2024"
 
@@ -14,5 +14,8 @@ bevy = { version = "0.19", default-features = false, features = [
     "multi_threaded", "x11",
     "default_font", "png",
 ] }
-symthaea-core = { path = "../../../../symthaea/crates/core/symthaea-core" }
-symthaea-gravcraft = { path = "../../../../symthaea/crates/domains/symthaea-gravcraft" }
+rapier3d = "0.18"
+symtropy-rapier3d-bridge = { path = "../../bridges/symtropy-rapier3d-bridge" }
+symtropy-robotics-bridge = { path = "../../bridges/symtropy-robotics-bridge" }
+symtropy-physics = { path = "../../core/symtropy-physics" }
+symthaea-bevy-brain = { path = "../../bridges/symthaea-bevy-brain" }
