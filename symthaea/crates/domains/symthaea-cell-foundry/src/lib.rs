@@ -18,6 +18,7 @@ pub mod digital_organoid;
 pub mod epigenetics;
 pub mod ethics_gate;
 pub mod experiment_planner;
+pub mod experiments;
 pub mod fep_agent;
 pub mod hydrology;
 pub mod ivg_protocol;
@@ -38,6 +39,10 @@ pub use cell_encoder::encode_cell_state;
 pub use culture_controller::{CultureAdjustment, CultureController};
 pub use epigenetics::{encode_methylation_pattern, methylation_similarity, validate_imprinting};
 pub use ethics_gate::EthicsGate;
+pub use experiments::{
+    ConditionResult, EquifinalityResult, Perturbation, build_radial_bipolar_template,
+    run_equifinality_experiment,
+};
 pub use fep_agent::{CultureAction, CultureFepAgent};
 pub use ivg_protocol::IvgProtocol;
 pub use meiosis_monitor::MeiosisMonitor;
