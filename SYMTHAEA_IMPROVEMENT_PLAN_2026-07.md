@@ -30,6 +30,12 @@ claimed capability surface without running.
 4. **`SafeFallback` docs overpromise.** Core doc table (`embodiment.rs:301-311`) promises
    fallback behavior for Manipulator/AUV/Quadruped/Surgical; only humanoid, multirotor,
    vehicle, helicopter actually implement it (4/10).
+5. **(Found 2026-07-03, Phi audit) The one Phi implementation actually gating motor
+   safety in production has no enforced accuracy validation, and a formal
+   "consciousness verdict" generator sitting in compiled, exported, one-call-away
+   production plumbing weights a self-debunked method at its highest confidence.**
+   See "The Phi/Psi sprawl" in Phase 1.5 below — this is the single most concerning
+   finding of the whole review and belongs here, not buried in a phase note.
 
 (Non-issue, resolved during review: the "plaintext crates.io token" in
 `symthaea/CLAUDE.md:10` was the BWS secret *ID*, not a token; wording fixed 2026-07-03.
@@ -182,26 +188,147 @@ measurable civic signals (smart meter, node uptime, ledger, jury records) by des
 this is not a live inconsistency, just confirms governance and cognition are — correctly,
 deliberately — orthogonal systems today.
 
-**Not yet checked** (agents failed before reaching these; worth a follow-up sweep once
-the API rate limit clears): `phi_gradient_learning.rs`, `phi_topology_validation.rs`,
-`consciousness_self_assessment.rs`, `fractal_consciousness.rs`, `ConsciousnessEquationV2`
-(`src/consciousness/measurement/consciousness_equation_v2.rs` — referenced from
-`consciousness_engine/measure.rs` at a 23-cycle interval alongside SpectralMIPFinder;
-formula not yet read), `UnifiedConsciousnessPipeline` (47-cycle interval, same file),
-`MultiModalIntegrator` (13-cycle interval, same file), symtropy's
-`phi_trace_sim_driven_*.rs` examples.
+### Follow-up sweep (2026-07-03, two agents, both completed — rate limit had cleared)
 
-**Recommendation, in order:**
-1. (S) Resolve the `PhiOrchestrator` vs `TieredPhi` doc contradiction about algebraic
-   connectivity — one is simply wrong and actively misleading; fix or delete the stale
-   claim before anyone trusts `PhiOrchestrator`'s "Accurate" mode.
-2. (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
-   *meant* to be different measures for different purposes (plausible — Ψ's inputs are
-   plausibly closer to "engagement/flow" than "integration") or whether ethics/Broca
-   should actually be gating off Φ too. Either is defensible; the current state — no
-   documented relationship, no cross-validation — is not.
-3. (L) Fold into Seam A: whatever becomes canonical for the facade should be the *same*
-   canonical source the loop uses, not a third independent formula.
+**Finding A — the documented "4-component weighted blend" is fiction in the shipped
+binary.** `ConsciousnessEngine::measure()`'s doc comment describes a weighted consensus
+of SpectralMIPFinder (0.35) + ConsciousnessEquationV2 (0.25) + UnifiedConsciousnessPipeline
+(0.25) + MultiModalIntegrator (0.15), each at its own co-prime interval. But
+`ConsciousnessEngine::new()` has exactly one production call site
+(`cognitive_loop/constructor.rs:989-999`), constructed as
+`(SpectralMIPFinder::with_defaults(), None, None, None)`. The other three fields have
+**no setter anywhere in production code** (only `tests.rs` sets them). So every
+`if let Some(...) = self.x { ... } else { 0.0 }` branch for the other three always takes
+the `0.0` arm, and `compute_unified()` collapses to
+`max(0.35 * sigmoid(spectral_mip_phi), 0.05)`. This has been true since at least the
+2026-06-10 archive snapshot — not a recent regression. Consequence: `episodic_consolidation_boost`
+is always `None` and `subsystem_lr_factor` is always a no-op 1.0 in production, both only
+ever set inside the dead branches.
+
+The three dormant components are real, distinct algorithms, not stubs:
+- **`ConsciousnessEquationV2`** (`src/consciousness/measurement/consciousness_equation_v2.rs`) —
+  a genuine 7-component soft-min blend: `C(t) = σ(softmin(Φ,B,W,A,R,E,K;τ)) ×
+  weighted_coherent_sum(state) × substrate × ρ(t)`. When live it would read
+  `sigmoid(spectral_mip_phi)*0.7 + unified_psi*0.3` as its `Integration` input — i.e. it's
+  *designed* to already reconcile Φ and Ψ, which undercuts the case for building a
+  separate reconciliation (see updated recommendation #2 below).
+- **`UnifiedConsciousnessPipeline`** (`src/consciousness/dynamics/
+  unified_consciousness_pipeline.rs`) — contains its own **second, separately-instantiated
+  `ConsciousnessEquationV2`**, whose output is computed then *discarded* (only
+  `limiting_factor` is kept) in favor of a hand-tuned bypass formula
+  `sigmoid(ltc.estimate_phi()) * (0.5 + 0.25*binding + 0.25*workspace)`, because the "real"
+  equation returns near-zero on cold start. `ltc.estimate_phi()`
+  (`consciousness/integration/hierarchical_ltc.rs:683-709`) is a **fourth** distinct
+  Phi-like heuristic (normalized pairwise correlation between LTC circuit outputs × global
+  coherence) — so this one struct alone contains three different "Phi" computations, two
+  of which it throws away.
+- **`MultiModalIntegrator`** (`consciousness/integration/multi_modal_integration.rs`) —
+  its own doc comment calls `compute_integrated_phi()` a "simplified heuristic": a
+  hand-weighted sum over a static convergence-zone hierarchy
+  (Primary/Secondary/Tertiary/Amodal, weights 0.5/1.0/2.0/3.0), not IIT math, despite
+  being branded "Φ-Guided Binding" throughout the module.
+
+Confirmed test/research-only, unreachable from live `src/` (zero construction sites
+outside their own module tree, only re-exported): `SelfConsciousnessAssessment::
+compute_phi_self()` (averages hand-set, never-computed "integration" attributes),
+`FractalConsciousness`, `PhiGradientTopology`, `MinimalPhiValidation`. Both
+`FractalConsciousness` and `PhiGradientTopology` build on `ConnectivityCalculator`
+(`hdc/spectral_connectivity.rs`) — meaning `PhiGradientTopology` gradient-ascends network
+topology to *maximize* a metric the codebase itself has already shown (r=-0.62) doesn't
+track integration. Harmless since unreachable, but a landmine if anyone wires it up.
+
+**Finding B — the one live Phi has no enforced validation, and one dormant module
+actively inverts the known-bad-method finding.** This is the most serious result of the
+whole review.
+
+1. **`SpectralMIPFinder` — what actually drives `consciousness_level` in production —
+   has no validation of its own.** Its module and test file contain zero
+   correlation/ground-truth claims, only self-consistency checks.
+2. **A real correlation test exists and has never run.** `tests/test_spectral_mip_validation.rs`
+   computes SpectralMIPFinder vs. exhaustive search over synthetic covariance matrices,
+   asserting ρ > 0.50. The root `Cargo.toml` sets `autotests = false` and enumerates 18
+   explicit `[[test]]` targets — this file isn't among them. It has never executed under
+   `cargo test`, isn't in CI, isn't checked by anything, ever.
+3. **Even the best-documented number doesn't validate what it sounds like it validates.**
+   `docs/PHI_VALIDATION_RESULTS.md` claims r≈0.99 for SpectralMIPFinder — but its own
+   author caveat: *"This validates the MIP search strategy (Fiedler vs exhaustive). It
+   does NOT validate the Gaussian MI framework against true IIT Φ (which requires TPMs,
+   not covariance)."* I.e. it shows the fast approximation agrees with an exhaustive
+   search over the *same simplified proxy* — not that the proxy tracks canonical Φ.
+4. **The one wired-and-running test only checks liveness, not accuracy** —
+   `tests/consciousness_ablation.rs::test_spectral_phi_produces_real_values` asserts
+   non-zero output over 100 cycles, nothing about correctness — and an adjacent comment
+   misattributes SampledPartition's r=0.9998 (a different method) to SpectralMIPFinder.
+5. **`consciousness_verifier.rs`** computes a formal `ConsciousnessVerdict`
+   (StronglyConscious/LikelyConscious/…/NotConscious) from three methods, and its own doc
+   comment (line 249) weights the deprecated `SpectralConnectivity`/λ₂ method **3.0 —
+   the highest of the three — calling it "empirically most reliable,"** the exact opposite
+   of `tiered_phi/core.rs`'s own r=-0.62 finding one crate over, with zero cross-reference.
+   It's wired into `ConsciousnessPipeline`'s optional `verifier` field
+   (`hdc/consciousness_integration/pipeline.rs:246-252`, enabled via
+   `enable_verification()`) — and per Finding A's sibling investigation,
+   `ConsciousnessPipeline`/the `consciousness_integration` tree has zero construction
+   sites in live `src/` outside its own module. So it isn't issuing verdicts to anyone
+   today, but it's a fully-built, exported, one-call-away attractive nuisance that would
+   confidently label a system's consciousness using a method already proven not to work.
+   `unified_consciousness_engine.rs` (`ConnectivityCalculator` used unqualified as "the"
+   integrated-information measure, `:273`) and `phi_engine`'s `ResonantPhiCalculator`
+   doc table (cites its own r=-0.62 with no warning column) repeat the same pattern in
+   miniature. Several other modules (`adaptive_topology.rs`, `causal_emergence.rs`,
+   `phi_guided_search.rs`, `topology_synergy.rs`) store `ConnectivityCalculator` output as
+   `phi`/`local_phi` with the deprecation caveat living only in `spectral_connectivity.rs`'s
+   own doc comment, never propagated to callers.
+
+**Finding C — symtropy's "Φ" and the flagship paper's validation table.**
+Symtropy (the game-engine sibling) never imports any symthaea Phi engine
+(`SpectralMIPFinder`/`TieredPhi`/`ConnectivityCalculator`). It imports
+`symthaea-consciousness-equation` (the Master Consciousness Equation) and fills its Φ
+input slot with locally-invented heuristics at every call site: inverse danger level
+(`symtropy-robotics-bridge/src/agent.rs:316`), oscillator coherence
+(`symtropy-bevy/examples/pendulum_swarm*.rs`), or a hardcoded `0.5` constant
+(`symtropy-consciousness-physics/src/{biometrics,phase_transition,wasm_bindings}.rs`).
+The `jphi.md` paper's "Joules per bit of integrated information" framing and the
+`phi_trace_sim_driven_*.rs` / `phi_ablation`/`phi_causal` examples all consume this same
+self-contained heuristic pipeline — none of it is IIT integration. Separately, the
+flagship `papers/book/symthaea_book.tex` validation table (line 991-1013) lists Sampled
+Partition (r=0.9998), Spectral MIP (r=0.99), and λ2 (r=-0.14) as if comparably rigorous
+"against exact exhaustive computation" — per Finding B point 3, the Spectral MIP row is a
+meaningfully weaker claim than the table implies. Psych-bench's Phi-adjacent benchmarks
+(`qualia_confidence/`) are self-disclaiming ("do NOT measure qualia directly," module
+doc) and mostly don't call any Phi calculator at all (one uses its own ad hoc
+`phi_proxy`); the Butlin framework's IIT indicators only wire to real SpectralMIPFinder
+output behind a feature+`#[ignore]`-gated test that doesn't run under default settings.
+
+**Recommendation, in order (supersedes the original three):**
+1. (S) **Remove or fix `consciousness_verifier.rs`'s 3x weighting of the deprecated λ₂
+   method**, and add the same warning to `unified_consciousness_engine.rs` and
+   `phi_engine`'s method table. This is dormant today but the single highest-severity
+   landmine in the whole audit — fix before it ever gets wired to `enable_verification()`.
+2. (S) Fix the `PhiOrchestrator` vs `TieredPhi` doc contradiction about algebraic
+   connectivity (already noted above).
+3. (M) **Wire `test_spectral_mip_validation.rs` into the actual test suite** (add it to
+   `Cargo.toml`'s explicit `[[test]]` list) and re-run it. Right now nobody knows whether
+   SpectralMIPFinder — the thing actually gating robot motor safety — clears even the
+   weak ρ > 0.50 bar, because the test that would tell you has never executed.
+4. (M) Correct `docs/PHI_VALIDATION_RESULTS.md` and `papers/book/symthaea_book.tex`'s
+   validation table to state plainly that the Spectral MIP r≈0.99 number validates search
+   strategy against a Gaussian-MI proxy, not agreement with true TPM-based IIT Φ — the
+   current phrasing invites exactly the conflation `consciousness_ablation.rs`'s own
+   comment already made (misattributing SampledPartition's number to it).
+5. (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
+   *meant* to be different measures (plausible — Ψ's inputs read closer to
+   "engagement/flow" than "integration") or whether ethics/Broca should gate off Φ too.
+   Note `ConsciousnessEquationV2` already has a designed-in Φ/Ψ blend
+   (`sigmoid(Φ)*0.7 + Ψ*0.3`) sitting dormant — turning that on (Finding A) may be a
+   cheaper fix than building a new reconciliation from scratch, once its own cold-start
+   near-zero-output problem (which is why `UnifiedConsciousnessPipeline` bypasses it) is
+   addressed.
+6. (L) Fold into Seam A: whatever becomes canonical for the facade should be the *same*
+   canonical, *validated* source the loop uses — not a third independent formula.
+7. (S, low priority) Add one sentence to `jphi.md` and the phi-gated-safety paper
+   clarifying that symtropy's "Φ" is a locally-defined heuristic input to the Master
+   Consciousness Equation, not a measured IIT quantity — avoids the paper being read as
+   claiming more than the code does.
 
 ## Phase 2 — Finish what was started (M, ~2-3 weeks)
 
