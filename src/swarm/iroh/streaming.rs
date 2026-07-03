@@ -145,8 +145,13 @@ impl TensorStream {
         state.sequence = *seq;
         drop(seq);
 
-        // Serialize
-        let bytes = bincode::serialize(&state)
+        // Serialize. Must use the bincode::options() builder (not the plain
+        // bincode::serialize free function, which defaults to a different,
+        // wire-incompatible int encoding) so this round-trips correctly with
+        // receive_consciousness's bincode::options() deserialize below.
+        let bytes = bincode::options()
+            .with_limit(self.config.max_message_size as u64)
+            .serialize(&state)
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         // Check size
@@ -170,8 +175,11 @@ impl TensorStream {
 
     /// Prepare a tensor payload for streaming
     pub fn prepare_tensor(&self, tensor: &TensorPayload) -> SwarmResult<Vec<u8>> {
-        // Serialize
-        let bytes = bincode::serialize(tensor)
+        // Serialize. Same bincode::options() requirement as prepare_consciousness
+        // above -- must match receive_tensor's bincode::options() deserialize.
+        let bytes = bincode::options()
+            .with_limit(self.config.max_message_size as u64)
+            .serialize(tensor)
             .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
         // Check size

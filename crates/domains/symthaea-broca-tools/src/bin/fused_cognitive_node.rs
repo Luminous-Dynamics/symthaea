@@ -7,8 +7,8 @@ use std::io::{self, Write};
 use std::path::Path;
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
-use symthaea_broca::invariant_guard::AxiomaticInvariantGuard;
-use symthaea_broca::memory_ring::HdcContextRing;
+use symthaea_broca_tools::invariant_guard::AxiomaticInvariantGuard;
+use symthaea_broca_tools::memory_ring::HdcContextRing;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 

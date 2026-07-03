@@ -312,7 +312,10 @@ impl CognitiveLoopService {
                     bridge.apply_moral_gate(symthaea_core::embodiment::MoralGateInput {
                         verdict: verdict_u8,
                         consent_violation: self.stats.consent_violation,
-                        ahimsa_violated: false, // Derived from Blocked verdict
+                        // Independent deontological signal (ahimsa_*/prevent_suffering/
+                        // minimize_collateral obligations), not merely Blocked mirrored —
+                        // see EthicsEngineOutput::ahimsa_violated in ethics_engine.rs.
+                        ahimsa_violated: self.last_ahimsa_violated,
                     });
 
                     let thought_hv = perception.encoding.encoding_result.hdv.clone();

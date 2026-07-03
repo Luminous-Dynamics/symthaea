@@ -1145,8 +1145,9 @@ impl CodeLearningEngine {
                 llm_retries_used: 0,
                 distillation_eligible: false,
                 energy_spent,
-                predicted_quality,
+                predicted_quality: Some(predicted_quality),
                 actual_quality: 0.0,
+                was_hallucination: false,
             };
         }
 

@@ -102,38 +102,3 @@ pub fn ingest_nheri_fsi_sample(name: &str, max_drift: f64) -> LearningObjective 
         .with_tag("NHERI")
         .build()
 }
-
-/// A serializable sample for batch ingestion
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IndustrialSampleSpec {
-    pub id: String,
-    pub name: String,
-    pub domain: String,
-    pub solver: SolverKind,
-    pub ground_truth: std::collections::HashMap<String, f64>,
-    pub source: String,
-}
-
-/// Load a batch of industrial benchmarks from a JSON fixture.
-pub fn load_industrial_benchmarks<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Vec<LearningObjective>, Box<dyn std::error::Error>> {
-    let content = std::fs::read_to_string(path)?;
-    let specs: Vec<IndustrialSampleSpec> = serde_json::from_str(&content)?;
-
-    let mut objectives = Vec::new();
-    for spec in specs {
-        let obj = LearningObjective::new(spec.id.as_str(), spec.name.as_str())
-            .with_description(&format!(
-                "Industrial validation against {} reference. Metrics: {:?}",
-                spec.source, spec.ground_truth
-            ))
-            .with_domain(Domain::from(spec.domain.as_str()))
-            .with_difficulty(Difficulty::Advanced)
-            .with_tag(&spec.source)
-            .build();
-        objectives.push(obj);
-    }
-
-    Ok(objectives)
-}

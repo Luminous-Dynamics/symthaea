@@ -963,9 +963,11 @@ impl EthicsEngine {
         // computes moral free energy (FEP) on the 8D harmony manifold.
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
+        let mut fresh_harmonies_this_cycle = false;
         let (harmonies_alignment, harmonies_approved, harmony_coordinates, moral_free_energy) =
             if let Some(ref mut integrator) = self.harmonies_integrator {
                 if input.cycle % 19 == 0 && input.cycle > 0 {
+                    fresh_harmonies_this_cycle = true;
                     // Prefer dense semantic embedding (Qwen3/BGE-M3 → HdcBridge)
                     // when available — lives in the same JL-projected subspace as
                     // dense HarmonyBasis vectors. Falls back to n-gram encoding.
@@ -1016,8 +1018,12 @@ impl EthicsEngine {
         // Harmony interaction matrix: observe co-activations and apply synergies.
         // Gated to harmonies interval (19 cycles) — these operations involve
         // matrix multiplication and entropy computation that cost 15-20ms/cycle
-        // when run unconditionally.
-        if harmonies_us > 0 {
+        // when run unconditionally. Previously gated on `t.elapsed().as_micros() > 0`
+        // as a proxy for "did the fresh-evaluation branch above just run" -- fragile,
+        // since a fast/lightweight fresh evaluation (or a coarse OS timer) can report
+        // 0 elapsed microseconds, silently skipping the observation. Use the actual
+        // branch outcome instead.
+        if fresh_harmonies_this_cycle {
             self.interaction_matrix.observe(&harmony_coordinates, 0.05);
             harmony_coordinates = self.interaction_matrix.apply(&harmony_coordinates, 0.15);
 

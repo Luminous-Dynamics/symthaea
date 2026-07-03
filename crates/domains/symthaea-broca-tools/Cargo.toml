@@ -16,6 +16,7 @@ symthaea-vision-manifold = { path = "../symthaea-vision-manifold" }
 symthaea-runtime = { path = "../../core/symthaea-runtime" }
 symthaea-swarm = { path = "../symthaea-swarm", features = ["networking"] }
 symtropy-robotics-bridge-core = { workspace = true }
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 mycelix-zkp-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -33,6 +34,8 @@ ureq = { version = "2.9" }
 bincode = { workspace = true }
 md5 = "0.7"
 wasmtime = { version = "44.0.1", optional = true }
+rand = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [[bin]]
 name = "broca-self-architect"
@@ -43,6 +46,15 @@ required-features = ["mamba-cpu", "code-sheaf-eval"]
 name = "broca-sovereign-node"
 path = "src/bin/broca_sovereign_node.rs"
 required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
+
+[[bin]]
+name = "broca-dreamer"
+path = "src/bin/broca_dreamer.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
+name = "fused_cognitive_node"
+path = "src/bin/fused_cognitive_node.rs"
 
 [features]
 default = []

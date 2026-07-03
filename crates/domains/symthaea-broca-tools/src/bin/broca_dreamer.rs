@@ -13,8 +13,8 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::time::Duration;
 use symthaea_broca::encoder::ThoughtChannels;
-use symthaea_broca::foraging_bridge::ForagingBridge;
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
+use symthaea_broca_tools::foraging_bridge::ForagingBridge;
 use symthaea_core::genesis::GenesisSeed;
 
 /// Tracks her "Epistemic Curiosity" — sectors with low coherence.

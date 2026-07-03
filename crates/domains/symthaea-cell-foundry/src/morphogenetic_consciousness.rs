@@ -8,16 +8,26 @@
 //! potential is a morphogenetic field variable that emerges from neural
 //! differentiation, synaptic connectivity, and information integration.
 //!
+//! This chemical (activator/inhibitor) layer is deliberately paired with a
+//! second, electrical layer in [`crate::bioelectric`] — gap-junction-coupled
+//! transmembrane voltage (Vmem) — because chemical gradients alone are not
+//! the whole morphogenesis story. See that module's docs for why.
+//!
 //! References:
 //! - Turing, A. M. (1952). The chemical basis of morphogenesis.
 //! - Trujillo et al. (2019). Complex oscillatory waves in cortical organoids.
 //! - Tononi, G. (2004). IIT and information integration.
 //! - Kauffman, S. A. (1993). Origins of order: Self-organization.
+//! - Levin, M. (2019). The computational boundary of a self: developmental
+//!   bioelectricity drives multicellularity and scale-free cognition.
+//!   Front. Psychol. 10:2688.
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+
+use crate::bioelectric::{BioelectricState, TargetMorphology};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -42,7 +52,9 @@ const SYNAPSE_RADIUS: f32 = 0.12;
 /// Proliferation multiplier: fraction of progenitors that divide per day.
 const PROLIFERATION_RATE: f64 = 0.10;
 /// Maximum cells to avoid runaway proliferation in simulation.
-const MAX_CELLS: usize = 10_000;
+/// `pub(crate)` so [`crate::bioelectric`]'s regenerative proliferation pass
+/// respects the same cap.
+pub(crate) const MAX_CELLS: usize = 10_000;
 
 // ---------------------------------------------------------------------------
 // Cell types (distinct from `types::CellType` which models iPSC lineages)
@@ -159,6 +171,11 @@ pub struct MorphogeneticField {
     /// small organoids).  `connectivity_matrix[i][j]` is the synaptic
     /// weight from cell i to cell j.
     pub connectivity_matrix: Vec<Vec<f64>>,
+    /// Gap-junction-coupled bioelectric (Vmem) layer — see [`crate::bioelectric`].
+    /// Distinct from `connectivity_matrix`: gap junctions couple *all* cells,
+    /// not just neurons, and propagate on a much faster timescale than the
+    /// chemical activator/inhibitor field above.
+    pub bioelectric: BioelectricState,
     /// Seeded RNG for reproducibility.
     #[serde(skip, default = "default_rng")]
     rng: StdRng,
@@ -188,6 +205,7 @@ impl MorphogeneticField {
         let consciousness_potential = vec![0.0f32; n];
         let local_phi = vec![0.0f64; n];
         let connectivity_matrix = vec![vec![0.0f64; n]; n];
+        let bioelectric = BioelectricState::new(n, seed);
         Self {
             cells,
             activator,
@@ -195,6 +213,7 @@ impl MorphogeneticField {
             consciousness_potential,
             local_phi,
             connectivity_matrix,
+            bioelectric,
             rng,
         }
     }
@@ -207,7 +226,10 @@ impl MorphogeneticField {
     // -- helpers --
 
     /// Euclidean distance between two cells.
-    fn distance(a: &[f32; 3], b: &[f32; 3]) -> f32 {
+    ///
+    /// `pub(crate)` so [`crate::bioelectric`] can reuse the same spatial
+    /// metric for gap-junction formation and amputation/wound geometry.
+    pub(crate) fn distance(a: &[f32; 3], b: &[f32; 3]) -> f32 {
         let dx = a[0] - b[0];
         let dy = a[1] - b[1];
         let dz = a[2] - b[2];
@@ -215,7 +237,7 @@ impl MorphogeneticField {
     }
 
     /// Return indices of cells within `radius` of cell `idx`.
-    fn neighbours(&self, idx: usize, radius: f32) -> Vec<usize> {
+    pub(crate) fn neighbours(&self, idx: usize, radius: f32) -> Vec<usize> {
         let pos = &self.cells[idx].position;
         (0..self.cells.len())
             .filter(|&j| j != idx && Self::distance(pos, &self.cells[j].position) < radius)
@@ -270,15 +292,26 @@ impl MorphogeneticField {
         self.inhibitor = new_h;
     }
 
-    /// Differentiate cells based on morphogen gradient and gene expression.
+    /// Differentiate cells based on morphogen gradient, gene expression, and
+    /// bioelectric state.
     ///
     /// High activator + neural gene expression → NeuralProgenitor → Neuron.
     /// Moderate activator → Glial.
     /// Low activator → remains Undifferentiated.
+    ///
+    /// The gene-expression signal is additively biased by each cell's local
+    /// Vmem hyperpolarization (see [`BioelectricState::differentiation_bias`]):
+    /// hyperpolarized cells are nudged toward committing to neural fate, and
+    /// depolarized cells resist it — consistent with Levin lab findings that
+    /// resting-potential state (not just genetics) gates differentiation, and
+    /// that this gating is gap-junction-permeability-dependent (blockable
+    /// independently of gene expression, see `NeuralOrganoid::amputate` /
+    /// `set_gap_junction_permeability`).
     pub fn differentiate(&mut self) {
         let n = self.cells.len();
         for i in 0..n {
             let a = self.activator[i];
+            let vmem_bias = self.bioelectric.differentiation_bias(i);
             let cell = &mut self.cells[i];
 
             // Only progenitors can differentiate.
@@ -288,8 +321,10 @@ impl MorphogeneticField {
                 continue;
             }
 
-            // Neural gene expression is the mean of first 4 genes.
-            let neural_expr: f32 = cell.gene_expression.iter().take(4).sum::<f32>() / 4.0;
+            // Neural gene expression is the mean of first 4 genes, biased by
+            // the cell's bioelectric (Vmem) state.
+            let neural_expr: f32 =
+                (cell.gene_expression.iter().take(4).sum::<f32>() / 4.0 + vmem_bias).min(1.0);
 
             if a > 1.5 && neural_expr > 0.5 {
                 // High activator + neural gene expression → neural lineage
@@ -398,16 +433,33 @@ impl MorphogeneticField {
         for _ in 0..added {
             self.connectivity_matrix.push(vec![0.0; total]);
         }
+        self.bioelectric.resize(total);
     }
 
     /// Compute local phi for every cell based on covariance of firing rates
-    /// in the cell's spatial neighbourhood.
+    /// in the cell's spatial neighbourhood, plus a *basal* information-
+    /// integration term derived from gap-junction-coupled Vmem variance.
+    ///
+    /// Earlier versions of this model gated all information integration on
+    /// `is_neuron()` — i.e. only neurons "computed." That encodes exactly the
+    /// neuron-centrism Levin's TAME framework (Technological Approach to Mind
+    /// Everywhere) argues against: all gap-junction-connected cells, not just
+    /// neurons, integrate and act on bioelectric information (basal
+    /// cognition). See [`BioelectricState::basal_information`].
+    ///
+    /// The basal term is deliberately weighted small relative to the neural
+    /// term and capped well below [`PHI_ETHICS_THRESHOLD`]: basal
+    /// problem-solving competency (Levin's sense) is not the same claim as
+    /// phenomenal consciousness, and undifferentiated/non-neural tissue
+    /// should never trip the consciousness ethics gate on its own.
     pub fn compute_local_phi(&mut self) {
         let n = self.cells.len();
         for i in 0..n {
             let nbrs = self.neighbours(i, NEIGHBOURHOOD_RADIUS);
+            let basal = self.basal_information(i);
+
             if nbrs.is_empty() || !self.cells[i].cell_type.is_neuron() {
-                self.local_phi[i] = 0.0;
+                self.local_phi[i] = basal;
                 continue;
             }
 
@@ -419,7 +471,7 @@ impl MorphogeneticField {
                 .collect();
 
             if rates.len() < 2 {
-                self.local_phi[i] = 0.0;
+                self.local_phi[i] = basal;
                 continue;
             }
 
@@ -434,8 +486,9 @@ impl MorphogeneticField {
                 .count();
             let density = connected as f64 / nbrs.len() as f64;
 
-            // Local phi ≈ variance × connectivity density (simplified IIT).
-            self.local_phi[i] = (var.sqrt() * density).min(1.0);
+            // Local phi ≈ variance × connectivity density (simplified IIT),
+            // plus the basal (non-neural) bioelectric integration term.
+            self.local_phi[i] = (var.sqrt() * density).min(1.0) + basal;
         }
     }
 
@@ -521,6 +574,15 @@ pub struct NeuralOrganoid {
     pub stage: OrganoidStage,
     /// Ethics gate status.
     pub ethics_status: OrganoidEthicsStatus,
+    /// Captured goal pattern the tissue is regenerating toward, if any.
+    /// See [`crate::bioelectric::TargetMorphology`] and
+    /// `NeuralOrganoid::capture_target_morphology` /
+    /// `NeuralOrganoid::amputate`.
+    pub target_morphology: Option<TargetMorphology>,
+    /// Days elapsed since the most recent amputation (used to time out
+    /// regeneration bookkeeping). Irrelevant while `target_morphology` is
+    /// `None`.
+    pub(crate) days_since_wound: u32,
 }
 
 impl NeuralOrganoid {
@@ -533,13 +595,18 @@ impl NeuralOrganoid {
             spontaneous_activity_hz: 0.0,
             stage: OrganoidStage::Proliferative,
             ethics_status: OrganoidEthicsStatus::PreConscious,
+            target_morphology: None,
+            days_since_wound: 0,
         }
     }
 
     /// Advance the organoid by one developmental day.
     ///
-    /// Sequence: proliferate → migrate → differentiate → synaptogenesis →
-    /// reaction-diffusion step → compute phi → update stage → check ethics.
+    /// Sequence: proliferate → regeneration bias (if regenerating) → migrate
+    /// → differentiate (chemically- and bioelectrically-biased) →
+    /// synaptogenesis → gap-junction formation + Vmem equilibration →
+    /// reaction-diffusion step → compute phi (neural + basal) → update stage
+    /// → check ethics.
     pub fn advance_day(&mut self) {
         // If the experiment is halted, do nothing.
         if matches!(
@@ -554,14 +621,29 @@ impl NeuralOrganoid {
         // 1. Proliferate (early days).
         self.field.proliferate();
 
+        // 1.5 Regeneration: extra proliferation for wound-boundary
+        //     progenitors while actively regenerating toward a captured
+        //     target morphology (see `amputate` / `capture_target_morphology`).
+        self.advance_regeneration();
+
         // 2. Migrate toward morphogen gradients.
         self.field.migrate();
 
-        // 3. Differentiate based on current morphogen field.
+        // 3. Differentiate based on current morphogen field and bioelectric
+        //    (Vmem) state.
         self.field.differentiate();
 
         // 4. Form synapses between nearby neurons.
         self.field.form_synapses();
+
+        // 4.5 Bioelectric layer: form/refresh the gap-junction network (all
+        //     cells, not just neurons) and let Vmem equilibrate across it.
+        //     This runs on a faster timescale than the chemical field below —
+        //     see `crate::bioelectric` docs.
+        self.field.form_gap_junctions();
+        for _ in 0..5 {
+            self.field.step_vmem_diffusion(0.2);
+        }
 
         // 5. Run several sub-steps of reaction-diffusion per day.
         for _ in 0..10 {

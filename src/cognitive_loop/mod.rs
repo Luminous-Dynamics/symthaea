@@ -737,6 +737,14 @@ pub struct CognitiveLoopService {
     /// Checked before motor execution: `Blocked` prevents action, `Caution` caps confidence.
     pub(crate) last_ethics_verdict: ethics_engine::EthicalVerdict,
 
+    /// Last ahimsa (non-harm) violation flag from `ethics_engine.evaluate()`'s
+    /// deontological stage. Distinct from `last_ethics_verdict == Blocked`: an
+    /// ahimsa-family obligation (e.g. `ahimsa_*`, `prevent_suffering`,
+    /// `minimize_collateral`) can be violated even when the overall verdict is
+    /// Safe/Caution. Forwarded to `MoralGateInput::ahimsa_violated` to force Red
+    /// on embodiment platforms independent of the coarser verdict channel.
+    pub(crate) last_ahimsa_violated: bool,
+
     /// External override for the ethical verdict. When `Some`, takes precedence
     /// over the ethics engine's output each cycle. Used by safety systems and
     /// integration tests to force a specific verdict for deterministic testing.

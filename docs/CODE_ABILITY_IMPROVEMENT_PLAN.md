@@ -1180,4 +1180,60 @@ Phase 6 is independent future work.
 
 ---
 
+## 2026-07-03 Update: Isolation-vs-Integration Audit + Orchestrator/Self-Mod Wiring
+
+A fresh audit (independent of this file's own phase log) found that several
+pieces marked "DONE" above are real, compile, and pass their own unit tests,
+but were **never actually called from `CodingAgent`'s live generation/error
+path** — they existed only in their own tests/examples:
+
+- `CodeOrchestrator` (`src/language/code_orchestrator.rs`) — cascading
+  native/analogy/LLM synthesis, each accepted only after compiler/test
+  verification.
+- `MagiCodeBridge` (`src/coding_agent/magi_code_bridge.rs`) — predict→resolve
+  Brier-calibrated confidence tracking.
+- `FixRuleGenerator`/`GeneratedFixRule` (`src/coding_agent/self_modification.rs`,
+  Phase 4F) — had **zero callers anywhere**, including its own module, before
+  this update.
+
+Other facts confirmed at audit time: `qwen2.5-coder:7b` genuinely is wired via
+`OllamaBackend`/`IntelligentDispatcher` (real, not aspirational); `code_generation`
+is not in the `default-mind` feature bundle; the last commits touching this
+subsystem before this update were ~2026-05-27/31 (5 weeks dormant); no
+HumanEval/SWE-bench scored result had ever been committed to the repo.
+
+**Wiring landed this session** (commit `520474cddd`):
+- `generation.rs::try_orchestrator_generation()` — calls `CodeOrchestrator`
+  (with MAGI predict/resolve around each attempt) before the legacy
+  `IntelligentDispatcher` path. Gated behind new `CodingAgentConfig.use_orchestrator`
+  (default `false`) + `code_generation` feature — default agent behavior is
+  unchanged until a caller opts in.
+- `generation.rs::observe_errors_for_self_mod()` — feeds every real compiler
+  error from all three auto-fix stages (structured-line-fix, category-aware-fix,
+  basic-pattern-fix) plus the escalate-to-LLM fallback into
+  `FixRuleGenerator::observe_error()`. Rule *generation*
+  (`try_generate_rules()`) additionally requires `CodingAgentConfig.enable_self_modification`
+  (default `false`). Rule *application*/*promotion* remains **entirely
+  unwired** — deliberately: this is a self-modification pipeline, and
+  observation must never silently cascade into the agent mutating its own
+  fix repertoire without an explicit, separate, human-gated promotion step.
+
+Verified via `cargo check --lib --features code_generation` (clean build, only
+3 pre-existing warnings unrelated to this change). Full `cargo test`/HumanEval
+baseline run was **deferred** — the monorepo was under severe concurrent-session
+load at the time (load avg ~70, <400MB free RAM, 12+ other sessions building),
+and two background build attempts were killed by resource pressure rather than
+failing on their own merits. Re-run `cargo test -p symthaea --features code_generation coding_agent::`
+and `cargo run --release --example humaneval_benchmark --features code_generation -- --direct --limit 40`
+in a quieter window to get the first real baseline score for this subsystem.
+
+**Recommended next step**: once a baseline exists, flip `use_orchestrator: true`
+in a benchmark harness (not the default config) and compare pass@1 against the
+`IntelligentDispatcher`-only baseline — this is the first real evidence of
+whether the "verified, self-improving" orchestrator path actually beats the
+raw dispatcher on held-out problems, rather than just having tests that pass
+in isolation.
+
+---
+
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*

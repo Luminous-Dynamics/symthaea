@@ -580,4 +580,180 @@ mod tests {
             "With alpha=0.1, earlier observations should dominate: sim1={sim1}, sim3={sim3}"
         );
     }
+
+    // ── Phase 2.8: Drift Detection Hardening ────────────────────────────────
+    // These tests cover the sensor/drift failure path:
+    //   sensor shift → detect_drift → DriftReport
+    // Invariants: similarity always in [0, 1], drifted flag always correct,
+    // degraded input produces safe uncertainty not false certainty.
+
+    /// Tiny sensor shift must NOT trigger drift at a reasonable threshold.
+    /// Prevents false-positive alarms from sensor noise.
+    #[test]
+    fn test_drift_tiny_change_no_false_alarm() {
+        let dim = 1024;
+        let mut wm = HdcWorldModel::new(dim).with_ema_alpha(0.01); // very slow adaptation
+
+        let expected = ContinuousHV::random(dim, 1);
+        wm.set_expected_state(expected.clone());
+        wm.observe(&expected);
+
+        // Observe the expected state again (tiny "shift" = same vector)
+        wm.observe(&expected);
+
+        let report = wm.detect_drift(0.8);
+        assert!(
+            !report.drifted,
+            "tiny (zero) shift must not trigger drift: sim={}",
+            report.similarity
+        );
+        assert!(
+            report.similarity >= 0.0 && report.similarity <= 1.0,
+            "similarity must be in [0,1]: {}",
+            report.similarity
+        );
+    }
+
+    /// Massive sensor shift (completely orthogonal vector) MUST trigger drift.
+    /// Prevents the system from missing a genuine state collapse.
+    #[test]
+    fn test_drift_massive_change_detected() {
+        let dim = 1024;
+        let mut wm = HdcWorldModel::new(dim).with_ema_alpha(1.0); // instant adaptation
+
+        let expected = ContinuousHV::random(dim, 1);
+        let orthogonal = ContinuousHV::random(dim, 999); // ~orthogonal in high dim
+
+        wm.set_expected_state(expected);
+        wm.observe(&orthogonal);
+
+        let report = wm.detect_drift(0.5);
+        assert!(
+            report.drifted,
+            "massive orthogonal shift must trigger drift: sim={}",
+            report.similarity
+        );
+        assert!(
+            report.similarity >= 0.0 && report.similarity <= 1.0,
+            "similarity must be in [0,1] even for orthogonal input: {}",
+            report.similarity
+        );
+    }
+
+    /// Repeated noisy observations must keep drift report numerically stable.
+    /// Prevents accumulation of floating-point error over many EMA steps.
+    #[test]
+    fn test_drift_noisy_observations_stay_stable() {
+        let dim = 512;
+        let mut wm = HdcWorldModel::new(dim).with_ema_alpha(0.2);
+
+        let expected = ContinuousHV::random(dim, 42);
+        wm.set_expected_state(expected.clone());
+        wm.observe(&expected);
+
+        // Apply 50 noisy observations (all random — high dimensional noise)
+        for seed in 0u64..50 {
+            let noise = ContinuousHV::random(dim, seed * 1000 + 7);
+            wm.observe(&noise);
+
+            let report = wm.detect_drift(0.5);
+            assert!(
+                report.similarity.is_finite(),
+                "similarity must be finite after {seed} noisy observations: {}",
+                report.similarity
+            );
+            assert!(
+                report.similarity >= 0.0 && report.similarity <= 1.0,
+                "similarity must be in [0,1] after {seed} noisy observations: {}",
+                report.similarity
+            );
+        }
+    }
+
+    /// Drift score must always be in [0, 1] — the invariant that downstream
+    /// systems depend on for safe thresholding.
+    #[test]
+    fn test_drift_similarity_always_in_unit_interval() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+
+        let expected = ContinuousHV::random(dim, 1);
+        wm.set_expected_state(expected);
+
+        // Range of seeds covering near-identical, near-orthogonal, and everything between
+        for seed in [1u64, 2, 50, 100, 999, 12345, u64::MAX / 2] {
+            let obs = ContinuousHV::random(dim, seed);
+            wm.observe(&obs);
+            let report = wm.detect_drift(0.5);
+
+            assert!(
+                report.similarity >= 0.0 && report.similarity <= 1.0,
+                "similarity out of [0,1] for seed {seed}: {}",
+                report.similarity
+            );
+            assert!(
+                report.similarity.is_finite(),
+                "similarity must be finite for seed {seed}: {}",
+                report.similarity
+            );
+        }
+    }
+
+    /// Drift detection with no expected state must never claim drift
+    /// regardless of what is observed (the system is in "unknown" mode,
+    /// not "broken" mode — safe uncertainty, not false certainty).
+    #[test]
+    fn test_drift_no_expected_state_never_reports_drift_with_arbitrary_obs() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+
+        for seed in 0u64..20 {
+            let obs = ContinuousHV::random(dim, seed);
+            wm.observe(&obs);
+            let report = wm.detect_drift(0.99); // very aggressive threshold
+            assert!(
+                !report.drifted,
+                "no expected state must never report drift (seed={seed})"
+            );
+            assert!(
+                (report.similarity - 1.0).abs() < 1e-5,
+                "no expected state → similarity=1.0 (seed={seed}): {}",
+                report.similarity
+            );
+        }
+    }
+
+    /// Facet-level drift scores must all be finite and in [0, 1].
+    /// Per-facet drift is the first thing a diagnostic system reads.
+    #[test]
+    fn test_drift_facet_scores_finite_and_bounded() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+
+        let expected = ContinuousHV::random(dim, 99);
+        wm.set_expected_state(expected);
+
+        for (name, seed) in [
+            ("services", 1u64),
+            ("packages", 2),
+            ("network", 3),
+            ("boot", 4),
+        ] {
+            wm.observe_facet(name, &ContinuousHV::random(dim, seed));
+        }
+
+        let report = wm.detect_drift(0.5);
+        assert_eq!(report.facet_drifts.len(), 4, "all four facets must appear");
+
+        for (name, sim) in &report.facet_drifts {
+            assert!(
+                sim.is_finite(),
+                "facet '{name}' drift score must be finite: {sim}"
+            );
+            assert!(
+                *sim >= 0.0 && *sim <= 1.0,
+                "facet '{name}' drift score must be in [0,1]: {sim}"
+            );
+        }
+    }
 }
