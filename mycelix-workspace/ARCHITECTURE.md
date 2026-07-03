@@ -58,15 +58,27 @@ provides, as plain HDK-free Rust so it's unit-testable without a conductor:
   call primitive: validates the target zome/fn against an allowlist, applies
   rate limiting, and only then dispatches.
 
-**Known gap (worth knowing before you touch a bridge zome):** the
-`*-bridge` coordinators were largely written before `routing_registry.rs`
-existed, so several of them (e.g. `commons-bridge`, `civic-bridge`) still
-carry their own hand-rolled pre-validation logic in `dispatch_call` — and
-that logic has drifted between clusters (one validates against an explicit
-allowlist, another validates only for empty strings before delegating).
-Practically: a security fix made in one bridge's `dispatch_call` does not
-automatically apply to the others. If you're touching bridge dispatch logic,
-check whether the cluster you're editing has already been migrated onto
+**Apparent gap that turned out not to be one, verified 2026-07-03** — worth
+recording so it isn't re-flagged without re-checking: `commons-bridge` and
+`civic-bridge`'s `dispatch_call` bodies look very different at a glance
+(commons-bridge does `detect_sub_cluster()` / `is_local_zome()` /
+cross-DNA routing before dispatching; civic-bridge just checks for
+empty-string zome/fn names). This is NOT a validation gap — commons
+genuinely has two sub-cluster DNAs (`commons_land` + `commons_care`) that
+need cross-DNA routing, and civic has one DNA and doesn't. Both call
+`dispatch_call_checked(&input, ALLOWED_ZOMES)` with a real,
+cluster-specific allowlist, and `dispatch_call_checked` itself is what
+actually enforces the allowlist (`crates/mycelix-bridge-common/src/lib.rs`,
+`if !allowed_zomes.contains(&input.zome.as_str())`) — so the allowlist
+enforcement is identical in both; commons-bridge just has legitimately more
+work to do before it gets there. Real remaining gap: the `*-bridge`
+coordinators were largely written before `routing_registry.rs` existed, so
+none of them consume it yet — each still hand-maintains its own
+`ALLOWED_ZOMES` constant rather than reading from the single registry. That
+means keeping N allowlists in sync by hand is still a real (lower-severity)
+maintenance risk, just not a live bypass. If you're touching bridge
+dispatch logic, check whether the cluster you're editing has already been
+migrated onto
 `routing_registry::is_allowed()` — if not, consider migrating it as part of
 your change rather than adding another divergent copy.
 
