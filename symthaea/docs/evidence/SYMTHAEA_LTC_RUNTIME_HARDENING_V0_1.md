@@ -64,3 +64,56 @@ The Z3 result is a proof that the *model you encoded is stable under
 the constraints you gave it*. It is not a proof of the full
 implementation. That distinction is intentional and is preserved here
 for reviewer credibility.
+
+## Phase 2.8 — Causal Graph & Drift Detection Hardening
+
+### What Was Hardened
+
+The causal failure path:
+```
+sensor shift → false drift detection → wrong causal edge → wrong exploration boost → unstable behaviour
+```
+was exercised systematically for the first time.
+
+### Causal Graph Test Inventory (`causal_graph.rs`)
+
+| Test | Failure Mode Covered |
+|---|---|
+| `test_self_edge_no_panic_no_infinite_loop` | Self-loop terminates via `visited` set |
+| `test_duplicate_edge_no_double_count` | HashMap key uniqueness: no count inflation |
+| `test_cycle_traversal_terminates` | A→B→C→A cycle bounded by visited set |
+| `test_disconnected_subgraph_isolation` | Components don't bleed across walk queries |
+| `test_confidence_never_nan_after_repeated_learning` | 100 Hebbian iters stay in [0,1] |
+| `test_side_effects_unknown_node_returns_empty` | Missing node → empty, not panic |
+| `test_root_cause_leaf_node_returns_empty` | Source node has no root causes |
+| `test_stable_drift_replay_example` | Full replay: normal → sensor miss → missing sensor |
+
+### Drift Detection Test Inventory (`hdc_world_model.rs`)
+
+| Test | Failure Mode Covered |
+|---|---|
+| `test_drift_tiny_change_no_false_alarm` | Zero-delta obs doesn't trigger alarm |
+| `test_drift_massive_change_detected` | Orthogonal input at α=1.0 correctly triggers |
+| `test_drift_noisy_observations_stay_stable` | 50 random obs keep similarity finite |
+| `test_drift_similarity_always_in_unit_interval` | 7 diverse seeds, invariant [0,1] holds |
+| `test_drift_no_expected_state_never_reports_drift_with_arbitrary_obs` | Unknown mode = safe uncertainty, not false certainty |
+| `test_drift_facet_scores_finite_and_bounded` | 4 facets all return scores in [0,1] |
+
+### Result
+
+All 137 `mind::` tests pass (0 failures) under
+`CARGO_TARGET_DIR=/tmp/symthaea-ltc-hardening-target`.
+
+Commit: `a99a947255` — `symthaea-nix: Phase 2.8 — causal graph and drift detection hardening`
+
+### Precise Verification Boundary
+
+> **Verified:** topology traversal terminates on cycles, self-edges, and
+> disconnected graphs under the current visited-set implementation. Drift
+> similarity stays in [0, 1] and is never NaN under EMA blending with
+> clamped alpha. Causal edge confidence stays in [0, 1] after Hebbian
+> strengthening and anti-Hebbian weakening.
+>
+> **Not verified:** causal discovery correctness (the PC-algorithm
+> approximation in `CausalDiscoveryEngine`). Not verified: drift
+> thresholds are tuned correctly for production sensor data.
