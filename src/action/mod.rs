@@ -1560,6 +1560,10 @@ pub fn classify_command_destructiveness(program: &str, args: &[String]) -> Destr
         ("tail", ""),
         ("ls", ""),
         ("find", ""),
+        // Text output (no filesystem/state effect at all -- already grouped with
+        // cat/ls/head/tail as ReadOnly in classify_remote_command_capability above,
+        // this list had just never been updated to match)
+        ("echo", ""),
         ("grep", ""),
         ("rg", ""),
         // System info

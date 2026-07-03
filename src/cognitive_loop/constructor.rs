@@ -978,7 +978,13 @@ impl CognitiveLoopService {
             enactive: EnactiveCognition::new(),
             biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
             metrics_collector: None,
-            experience_bus: None,
+            // ExperienceBus::with_defaults() is a plain default-initializer (no
+            // I/O, no external deps) -- every consumer already handles it via
+            // `if let Some(...)`/`.as_ref().map(...)`, none require None, and
+            // this is the only place in the codebase that ever constructs one.
+            // Leaving it None makes guiding_question()/dominant_harmonic() and
+            // the Active Inference principled-signals pipeline permanently dead.
+            experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
             neuromod: super::neuromod_manager::NeuromodManager::default(),

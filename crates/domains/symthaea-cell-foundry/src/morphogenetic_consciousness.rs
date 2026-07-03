@@ -396,6 +396,7 @@ impl MorphogeneticField {
             return;
         }
         let mut new_cells: Vec<OrganoidCell> = Vec::new();
+        let mut parent_indices: Vec<usize> = Vec::new();
         for i in 0..n {
             if !self.cells[i].cell_type.is_progenitor() {
                 continue;
@@ -413,6 +414,7 @@ impl MorphogeneticField {
                     *g = (*g + self.rng.gen_range(-0.05..0.05f32)).clamp(0.0, 1.0);
                 }
                 new_cells.push(daughter);
+                parent_indices.push(i);
                 if n + new_cells.len() >= MAX_CELLS {
                     break;
                 }
@@ -433,7 +435,12 @@ impl MorphogeneticField {
         for _ in 0..added {
             self.connectivity_matrix.push(vec![0.0; total]);
         }
-        self.bioelectric.resize(total);
+        // Daughters inherit their parent's Vmem rather than resetting to a
+        // default: this is proliferation everywhere in the tissue (not just
+        // at a wound), so resetting to a fixed baseline would wash out any
+        // surviving spatial Vmem pattern with a flood of default-valued
+        // newborns as the population grows — see `BioelectricState::resize_inheriting`.
+        self.bioelectric.resize_inheriting(&parent_indices);
     }
 
     /// Compute local phi for every cell based on covariance of firing rates

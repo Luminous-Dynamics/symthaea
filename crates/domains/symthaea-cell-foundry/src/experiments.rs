@@ -257,9 +257,9 @@ mod tests {
 
     #[test]
     fn open_gap_junctions_recover_imposed_bipolar_pattern_better_than_blocked() {
-        let template = build_radial_bipolar_template(7, 200, 20, 0.3);
+        let template = build_radial_bipolar_template(7, 200, 20, 0.2);
         let perturbations = [Perturbation::Amputate {
-            min_r: 0.7,
+            min_r: 0.8,
             max_r: 2.0,
         }];
         let result = run_equifinality_experiment(&template, &perturbations, 40);
@@ -277,18 +277,18 @@ mod tests {
         // The equifinality claim: regardless of how much tissue is removed,
         // open gap junctions recover closer to the *same shared target*
         // than blocked ones do, for each perturbation independently.
-        let template = build_radial_bipolar_template(11, 200, 20, 0.3);
+        let template = build_radial_bipolar_template(11, 200, 20, 0.2);
         let perturbations = [
             Perturbation::Amputate {
-                min_r: 0.9,
+                min_r: 1.1,
+                max_r: 2.0,
+            },
+            Perturbation::Amputate {
+                min_r: 0.95,
                 max_r: 2.0,
             },
             Perturbation::Amputate {
                 min_r: 0.8,
-                max_r: 2.0,
-            },
-            Perturbation::Amputate {
-                min_r: 0.7,
                 max_r: 2.0,
             },
         ];

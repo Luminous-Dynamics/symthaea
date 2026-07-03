@@ -1096,6 +1096,14 @@ name = "time_waterfall_regression"
 [[test]]
 name = "core_facade_boundary"
 
+# Added 2026-07-03: found orphaned during a Phi/Psi audit. Validates the production
+# SpectralMIPFinder (the engine that actually drives consciousness_level -> robot
+# motor safety) against exhaustive-search Φ on synthetic covariance matrices. This
+# file existed since March 2026 but was never added to this explicit test list
+# (autotests = false above), so it had never once run under `cargo test` or CI.
+[[test]]
+name = "test_spectral_mip_validation"
+
 [[example]]
 name = "helicopter_phi_benchmark"
 required-features = ["helicopter"]

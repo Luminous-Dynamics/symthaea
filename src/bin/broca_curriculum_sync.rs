@@ -138,6 +138,19 @@ struct ObjectiveManifestEntry {
     filter_version: String,
 }
 
+/// One synthesized text per objective is held out of training entirely and
+/// saved here instead — never seen during fine-tuning, so later generating
+/// from `channels` on a candidate checkpoint and comparing against
+/// `reference_text` is genuine evidence of whether the objective's content
+/// actually landed, not just a regression-absence check. See
+/// broca_topic_coverage.rs (symthaea-broca), which consumes this file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HoldoutEntry {
+    objective_id: String,
+    channels: Vec<f32>,
+    reference_text: String,
+}
+
 fn state_path() -> PathBuf {
     std::env::var("BROCA_BRIDGE_STATE_PATH")
         .map(PathBuf::from)
@@ -282,7 +295,11 @@ async fn synthesize_for_objective(
     tokenizer: &BpeTokenizer,
     corpus_hashes: &HashSet<String>,
     model_name: &str,
-) -> Result<(Vec<TrainingPair>, ObjectiveManifestEntry)> {
+) -> Result<(
+    Vec<TrainingPair>,
+    Option<HoldoutEntry>,
+    ObjectiveManifestEntry,
+)> {
     let prompt = format!(
         "Objective: {}\nDomain: {}\nDifficulty: {} ({:.2})\nDescription: {}\nTags: {}\n\nWrite {} distinct explanations as instructed.",
         obj.name,
@@ -304,7 +321,11 @@ async fn synthesize_for_objective(
     };
     let result = llm.query_async(query).await;
 
-    let mut accepted = Vec::new();
+    // Collect (text, channels) first; the LAST accepted one is held out of
+    // training entirely (see HoldoutEntry) rather than turned into a
+    // TrainingPair, so there's at least one genuinely-unseen example per
+    // objective to check learning against later.
+    let mut accepted_texts = Vec::new();
     let mut accepted_hashes = Vec::new();
     let mut rejected_hashes = Vec::new();
     let mut seen_this_objective: HashSet<String> = HashSet::new();
@@ -326,10 +347,29 @@ async fn synthesize_for_objective(
         }
 
         seen_this_objective.insert(lower_hash);
-        let channels = build_channels(obj);
-        accepted.push(TrainingPair::new(channels, text, tokenizer));
+        accepted_texts.push(text);
         accepted_hashes.push(h);
     }
+
+    // Hold out the last accepted text when there are enough to spare at
+    // least one for training; with only one accepted text, keep it for
+    // training rather than holding out the objective's only example.
+    let holdout = if accepted_texts.len() >= 2 {
+        let holdout_text = accepted_texts.pop().unwrap();
+        let channels = build_channels(obj);
+        Some(HoldoutEntry {
+            objective_id: obj.id.clone(),
+            channels: channels.channels.to_vec(),
+            reference_text: holdout_text,
+        })
+    } else {
+        None
+    };
+
+    let accepted: Vec<TrainingPair> = accepted_texts
+        .into_iter()
+        .map(|text| TrainingPair::new(build_channels(obj), text, tokenizer))
+        .collect();
 
     let manifest_entry = ObjectiveManifestEntry {
         objective_id: obj.id.clone(),
@@ -343,7 +383,7 @@ async fn synthesize_for_objective(
         filter_version: "v1".to_string(),
     };
 
-    Ok((accepted, manifest_entry))
+    Ok((accepted, holdout, manifest_entry))
 }
 
 /// Existing corpus text hashes, so synthesized pairs that just restate what's
@@ -432,22 +472,27 @@ async fn main() -> Result<()> {
     let mut dataset = TrainingDataset::default();
     let mut manifest_entries = Vec::new();
     let mut consumed_ids = Vec::new();
+    let mut holdout_entries = Vec::new();
 
     for obj in &new_objectives {
-        let (pairs, entry) =
+        let (pairs, holdout, entry) =
             synthesize_for_objective(&mut llm, obj, &tokenizer, &corpus_hashes, &model_name)
                 .await?;
 
         println!(
-            "[broca-curriculum-sync]   {} -> {} accepted, {} rejected",
+            "[broca-curriculum-sync]   {} -> {} accepted, {} rejected, holdout: {}",
             obj.id,
             entry.accepted_pair_hashes.len(),
-            entry.rejected_pair_hashes.len()
+            entry.rejected_pair_hashes.len(),
+            holdout.is_some()
         );
 
         if !pairs.is_empty() {
             consumed_ids.push(obj.id.clone());
             dataset.pairs.extend(pairs);
+        }
+        if let Some(h) = holdout {
+            holdout_entries.push(h);
         }
         manifest_entries.push(entry);
     }
@@ -461,6 +506,7 @@ async fn main() -> Result<()> {
     let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
     let jsonl_path = derived_dir.join(format!("{timestamp}.jsonl"));
     let manifest_path = derived_dir.join(format!("{timestamp}.manifest.json"));
+    let holdout_path = derived_dir.join(format!("{timestamp}.holdout.jsonl"));
 
     // Write the JSONL via TrainingDataset::to_jsonl into a temp path, then
     // atomically rename both it and the manifest into place. Only after both
@@ -479,16 +525,28 @@ async fn main() -> Result<()> {
         &manifest_path,
         &serde_json::to_string_pretty(&manifest_entries)?,
     )?;
+    if !holdout_entries.is_empty() {
+        let holdout_contents = {
+            let mut out = String::new();
+            for entry in &holdout_entries {
+                out.push_str(&serde_json::to_string(entry)?);
+                out.push('\n');
+            }
+            out
+        };
+        atomic_write(&holdout_path, &holdout_contents)?;
+    }
 
     state.trained_objective_ids.extend(consumed_ids);
     state.last_run_utc = Some(chrono::Utc::now().to_rfc3339());
     atomic_write(&state_file, &serde_json::to_string_pretty(&state)?)?;
 
     println!(
-        "[broca-curriculum-sync] wrote {} pairs to {} (manifest: {})",
+        "[broca-curriculum-sync] wrote {} pairs to {} (manifest: {}, holdout: {} entries)",
         dataset.pairs.len(),
         jsonl_path.display(),
-        manifest_path.display()
+        manifest_path.display(),
+        holdout_entries.len()
     );
 
     Ok(())
