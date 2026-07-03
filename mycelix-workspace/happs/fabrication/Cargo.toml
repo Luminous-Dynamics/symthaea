@@ -29,7 +29,10 @@ repository = "https://github.com/Luminous-Dynamics/mycelix-fabrication"
 # Holochain 0.6 - Updated 2026-01-09 per official compatibility table
 hdk = "=0.6.1"
 hdi = "=0.7.1"
+holochain_zome_types = "=0.6.1"
 holochain_integrity_types = "=0.6.1"
+holo_hash = "=0.6.1"
+hdk_derive = "=0.6.1"
 holochain_serialized_bytes = "=0.0.57"
 
 # Serialization

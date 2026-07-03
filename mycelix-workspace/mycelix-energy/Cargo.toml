@@ -22,6 +22,10 @@ license = "AGPL-3.0-or-later"
 # Holochain 0.6 compatible
 hdk = "=0.6.1"
 hdi = "=0.7.1"
+holochain_zome_types = "=0.6.1"
+holochain_integrity_types = "=0.6.1"
+holo_hash = "=0.6.1"
+hdk_derive = "=0.6.1"
 
 # Required by hdk macros
 holochain_serialized_bytes = "=0.0.57"

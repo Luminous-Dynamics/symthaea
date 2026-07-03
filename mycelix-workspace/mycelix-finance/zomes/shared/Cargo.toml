@@ -10,6 +10,10 @@ name = "mycelix_finance_shared"
 
 [dependencies]
 hdk.workspace = true
+holochain_zome_types.workspace = true
+holochain_integrity_types.workspace = true
+holo_hash.workspace = true
+hdk_derive.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 mycelix_finance_types = { path = "../../types" }

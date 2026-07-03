@@ -10,6 +10,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Holochain 0.6 - Integrity zomes use hdi
 hdi = "=0.7.1"
+holochain_integrity_types = "=0.6.1"
+holo_hash = "=0.6.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 holochain_serialized_bytes = "=0.0.57"

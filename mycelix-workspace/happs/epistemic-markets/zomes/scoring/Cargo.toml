@@ -10,6 +10,10 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 hdk.workspace = true
 hdi.workspace = true
+holochain_zome_types.workspace = true
+holochain_integrity_types.workspace = true
+holo_hash.workspace = true
+hdk_derive.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
 serde_json.workspace = true

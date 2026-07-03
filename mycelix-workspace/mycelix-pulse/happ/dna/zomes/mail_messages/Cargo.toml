@@ -12,6 +12,10 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Holochain 0.6 - Coordinator zomes use hdk
 hdk = "=0.6.1"
+holochain_zome_types = "=0.6.1"
+holochain_integrity_types = "=0.6.1"
+holo_hash = "=0.6.1"
+hdk_derive = "=0.6.1"
 serde = { version = "1.0", features = ["derive"] }
 mycelix_mail_integrity = { path = "../../integrity" }
 

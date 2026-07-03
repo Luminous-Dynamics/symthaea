@@ -12,6 +12,8 @@ name = "bridge_integrity"
 [dependencies]
 # Holochain Integrity (HDI) for entry definitions
 hdi = "=0.7.1"
+holochain_integrity_types = "=0.6.1"
+holo_hash = "=0.6.1"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

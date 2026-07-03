@@ -12,6 +12,10 @@ name = "bridge_coordinator"
 [dependencies]
 # Holochain Development (HDK) for business logic
 hdk = "=0.6.1"
+holochain_zome_types = "=0.6.1"
+holochain_integrity_types = "=0.6.1"
+holo_hash = "=0.6.1"
+hdk_derive = "=0.6.1"
 # WASM compatibility for getrandom (transitive dependencies)
 # getrandom 0.2: "custom" feature lets Holochain provide RNG implementation.
 #   Do NOT use "js" - it pulls wasm-bindgen which Holochain's WASM runtime rejects

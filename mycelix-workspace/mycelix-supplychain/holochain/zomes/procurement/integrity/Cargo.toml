@@ -9,5 +9,9 @@ name = "procurement_integrity"
 
 [dependencies]
 hdi.workspace = true
+holochain_zome_types.workspace = true
+holochain_integrity_types.workspace = true
+holo_hash.workspace = true
+hdk_derive.workspace = true
 serde.workspace = true
 holochain_serialized_bytes.workspace = true

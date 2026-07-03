@@ -19,6 +19,10 @@ extensions = ["interplanetary", "federated", "model-governance", "infrastructure
 
 [dependencies]
 hdk = { version = "=0.6.1", optional = true }
+holochain_zome_types = { version = "=0.6.1", optional = true }
+holochain_integrity_types = { version = "=0.6.1", optional = true }
+holo_hash = { version = "=0.6.1", optional = true }
+hdk_derive = { version = "=0.6.1", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 blake3 = "1"
