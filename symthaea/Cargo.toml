@@ -281,6 +281,8 @@ symthaea-physics-bridge = { path = "crates/bridges/symthaea-physics-bridge", opt
 symthaea-sim-bridge = { path = "crates/bridges/symthaea-sim-bridge", optional = true }
 symthaea-digital-twin = { path = "crates/domains/symthaea-digital-twin", optional = true }
 symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety", optional = true }
+# Z3 formal verification bridge, used by school::code_learning's symbolic safety gate
+symthaea-runtime = { path = "crates/core/symthaea-runtime", optional = true }
 symthaea-engineering = { path = "crates/domains/symthaea-engineering", optional = true }
 symthaea-mujoco-bridge = { path = "crates/bridges/symthaea-mujoco-bridge", optional = true }
 symthaea-opensees-bridge = { path = "crates/bridges/symthaea-opensees-bridge", optional = true }
@@ -715,13 +717,13 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
-code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "hcl-rs", "symthaea-core/synthesis-trait", "dep:sha2"]
+code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "hcl-rs", "symthaea-core/synthesis-trait", "dep:sha2", "reasoning_engine"]
 geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 
 # ── Example & module build gates ───────────────────────────────────
 # These gate cfg blocks in src/ code and/or examples.
-school_learning = ["code_generation"]  # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
+school_learning = ["code_generation", "dep:symthaea-runtime"]  # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
 mathematics = []                       # MathService cognitive loop dispatcher + scientific method engine
 scientific_method = ["mathematics"]    # Hypothesis-test-update scientific reasoning cycle
 benchmarks = []                 # Causal validation benchmarks (used by examples/)
