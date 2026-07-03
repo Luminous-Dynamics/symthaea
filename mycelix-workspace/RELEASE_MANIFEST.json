@@ -1,0 +1,26 @@
+{
+  "release": "net-steward-v0.3.0-alpha.4",
+  "identity_success_path_proven": true,
+  "live_identity_resolver_feature_gated": true,
+  "single_verified_claim_grants_consensus": false,
+  "federated_consensus_requires_independent_witnesses": true,
+  "mutation_enabled": false,
+  "rollback_apply_enabled": false,
+  "zk_verifier_enabled": false,
+  "blast_radius_preview_enabled": true,
+  "proof_mode": "simulated_envelope",
+  "consensus_policy": {
+    "min_signers": 2,
+    "prohibit_simulated": true,
+    "prohibit_revoked": true,
+    "prohibit_expired": true
+  },
+  "alpha_track": "v0.3-alpha.4",
+  "alpha_milestones_complete": [
+    "v0.3-alpha.1: Production Holochain Federation",
+    "v0.3-alpha.2: Operation Intent & Approval Envelopes",
+    "v0.3-alpha.3: Dry-Run Executor With Apply Disabled",
+    "v0.3-alpha.4: Blast-Radius Preview"
+  ],
+  "notes": "v0.3-alpha.4: BlastRadiusPreview schema + engine + POST /api/v1/operation/blast-radius-preview endpoint. Read-only display artifact. Risk-tier computation (Negligible/Low/Moderate/High/Critical). SHA-256 preview commitment. Witness-approval threshold gate. 4 integration tests (happy path, topology traversal, critical gate negative twin, commitment non-zero check). apply() permanently disabled by policy — not a feature gate."
+}
