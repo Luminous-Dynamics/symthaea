@@ -4,6 +4,7 @@
 //! Orbital camera for the globe — mouse drag to rotate, scroll to zoom,
 //! golden-ratio Lissajous drift when idle.
 
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use sol_atlas_core::constants::*;
@@ -11,6 +12,15 @@ use sol_atlas_core::constants::*;
 /// Marker component for the orbital camera.
 #[derive(Component)]
 pub struct OrbitalCamera;
+
+/// Pleasant default viewing angle (radians) the camera eases toward once
+/// idle — a gentle 3/4-overhead view showing both the globe's "cap" and a
+/// sense of horizon/depth, rather than leaving the camera wherever the
+/// user last dragged it to.
+const AUTO_ORIENT_TARGET_PHI: f32 = 0.35;
+/// How quickly phi eases toward `AUTO_ORIENT_TARGET_PHI` once idle
+/// (fraction of the remaining distance closed per second).
+const AUTO_ORIENT_EASE_RATE: f32 = 0.5;
 
 /// Configuration resource for the orbital camera.
 #[derive(Resource)]
@@ -44,6 +54,12 @@ impl Default for OrbitalCameraConfig {
 pub fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
+        // Bevy's default TonyMcMapFace tonemapping needs the
+        // `tonemapping_luts` feature (not enabled in this workspace);
+        // without it the whole frame washes out to a uniform color,
+        // hiding the earth texture entirely. Same bug/fix as symtropy's
+        // 3D FPS camera (rendering_3d.rs).
+        Tonemapping::SomewhatBoringDisplayTransform,
         Transform::from_xyz(0.0, 0.0, CAMERA_INITIAL_DISTANCE).looking_at(Vec3::ZERO, Vec3::Y),
         OrbitalCamera,
     ));
@@ -92,6 +108,13 @@ pub fn orbital_camera_system(
         // Auto-rotate when idle
         if config.auto_rotate && config.vel_theta.abs() < 0.0001 {
             config.theta += CAMERA_AUTO_ROTATE_SPEED;
+        }
+
+        // Auto-orient: once drag inertia on phi has settled, gently ease
+        // toward a pleasant default viewing angle instead of staying
+        // wherever the user last left it tilted.
+        if config.vel_phi.abs() < 0.0001 {
+            config.phi += (AUTO_ORIENT_TARGET_PHI - config.phi) * AUTO_ORIENT_EASE_RATE * dt;
         }
     }
 

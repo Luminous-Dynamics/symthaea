@@ -14,15 +14,48 @@ use h3o::{CellIndex, LatLng, Resolution};
 use sol_atlas_core::constants::GLOBE_RADIUS;
 use sol_atlas_core::geo;
 
-/// Default H3 resolution for cell picking — coarse enough (~5,882 cells
-/// globally) that hexagons read as visible chunks of the globe rather than
-/// vanishing at planet-view zoom levels. Finer resolutions make sense once
-/// there's a zoom-dependent LOD story; not needed for this first pass.
+/// Default H3 resolution for cell picking, used only before the camera
+/// distance is known (first frame). `resolution_for_distance` takes over
+/// from there — resolution now tracks zoom level continuously rather than
+/// being fixed, so hexagons always read as a sensible-sized selection area
+/// relative to what's on screen instead of spanning most of the visible
+/// globe at close zoom or vanishing to a speck at orbital distance.
 pub const DEFAULT_RESOLUTION: Resolution = Resolution::Two;
 
+/// Camera distance (globe radii) at/beyond which hex resolution bottoms
+/// out at its coarsest — matches `CAMERA_ZOOM_MAX`.
+const RESOLUTION_FAR_DISTANCE: f32 = 8.0;
+/// Camera distance at/within which hex resolution caps at its finest —
+/// matches `cell_entry`'s close-in zoom target (kept as a plain constant
+/// here rather than importing from `cell_entry`, to avoid a dependency
+/// between the two — both just need to agree on roughly the same number).
+const RESOLUTION_NEAR_DISTANCE: f32 = 1.05;
+/// Coarsest resolution used at `RESOLUTION_FAR_DISTANCE` and beyond.
+const RESOLUTION_MIN: u8 = 0;
+/// Finest resolution used at `RESOLUTION_NEAR_DISTANCE` and closer. Capped
+/// well below H3's max (15) — past this a hex is smaller than a single
+/// screen pixel would resolve at any distance this globe is ever rendered
+/// from, so finer levels would just waste picking precision for nothing
+/// visible.
+const RESOLUTION_MAX: u8 = 9;
+
+/// Maps camera distance to H3 resolution — coarse (whole-region hexes)
+/// from orbit, progressively finer as the camera approaches the surface.
+/// Continuous in camera distance, not tied to a separate discrete "zoom
+/// level" event, so drilling in via repeated clicks (which move the camera
+/// closer) naturally reveals finer hexes with no resolution "pop"
+/// independent of the zoom motion itself.
+pub fn resolution_for_distance(distance: f32) -> Resolution {
+    let t = ((RESOLUTION_FAR_DISTANCE - distance)
+        / (RESOLUTION_FAR_DISTANCE - RESOLUTION_NEAR_DISTANCE))
+        .clamp(0.0, 1.0);
+    let level = RESOLUTION_MIN as f32 + t * (RESOLUTION_MAX - RESOLUTION_MIN) as f32;
+    Resolution::try_from(level.round() as u8).unwrap_or(Resolution::Zero)
+}
+
 /// The H3 cell currently under the cursor (if any), plus the resolution
-/// picking operates at. A plain hover-highlight for now — click-to-enter
-/// (the "small test level inside a cell" step) is future work.
+/// picking currently operates at (recomputed from camera distance every
+/// frame by `hover_cell_system`).
 #[derive(Resource)]
 pub struct HoveredCell {
     pub cell: Option<CellIndex>,
@@ -113,6 +146,11 @@ pub fn hover_cell_system(
         return;
     }
 
+    // Read the camera's actual rendered distance (not a config resource)
+    // so this stays correct even mid-transition, when cell_entry's zoom
+    // system is writing the Transform directly.
+    hovered.resolution = resolution_for_distance(camera_tf.translation().length());
+
     let Some(hit) = ray_sphere_hit(ray, GLOBE_RADIUS) else {
         hovered.cell = None;
         return;
@@ -148,6 +186,28 @@ mod tests {
         // San Francisco, roughly.
         let cell = latlon_to_cell(37.7749, -122.4194, Resolution::Two);
         assert!(cell.is_some());
+    }
+
+    #[test]
+    fn resolution_coarsens_with_distance() {
+        let far = resolution_for_distance(RESOLUTION_FAR_DISTANCE);
+        let mid =
+            resolution_for_distance((RESOLUTION_FAR_DISTANCE + RESOLUTION_NEAR_DISTANCE) / 2.0);
+        let near = resolution_for_distance(RESOLUTION_NEAR_DISTANCE);
+        assert!(u8::from(far) < u8::from(mid));
+        assert!(u8::from(mid) < u8::from(near));
+    }
+
+    #[test]
+    fn resolution_clamps_beyond_the_defined_range() {
+        assert_eq!(
+            resolution_for_distance(RESOLUTION_FAR_DISTANCE * 10.0),
+            Resolution::try_from(RESOLUTION_MIN).unwrap()
+        );
+        assert_eq!(
+            resolution_for_distance(0.0),
+            Resolution::try_from(RESOLUTION_MAX).unwrap()
+        );
     }
 
     #[test]

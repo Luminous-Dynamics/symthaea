@@ -9,6 +9,8 @@
 
 pub mod camera;
 pub mod cell_entry;
+pub mod cell_walk;
+pub mod clouds;
 pub mod data;
 pub mod desci_evidence;
 pub mod frame_capture;
@@ -30,6 +32,7 @@ impl Plugin for TerraAtlasPlugin {
             .init_resource::<h3_grid::HoveredCell>()
             .init_resource::<cell_entry::CellZoomTransition>()
             .add_plugins(holographic_material::HolographicMaterialPlugin)
+            .add_plugins(clouds::CloudMaterialPlugin)
             .add_plugins(desci_evidence::DeSciEvidencePlugin)
             .add_systems(Startup, (globe::spawn_globe, camera::spawn_camera))
             .add_systems(
@@ -41,6 +44,7 @@ impl Plugin for TerraAtlasPlugin {
                     cell_entry::trigger_cell_zoom_system,
                     cell_entry::cancel_zoom_on_manual_input,
                     cell_entry::cell_zoom_transition_system,
+                    clouds::update_cloud_time,
                 )
                     .chain(),
             );

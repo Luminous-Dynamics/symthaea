@@ -10,8 +10,8 @@ use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
 
-/// Holographic material extension — adds Fresnel, scanlines, and noise
-/// on top of StandardMaterial's PBR pipeline.
+/// Holographic material extension — adds Fresnel, scanlines, noise, and a
+/// coastline-outline glow on top of StandardMaterial's PBR pipeline.
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
 pub struct HolographicExtension {
     /// Fresnel glow color (default: Mycelix cyan).
@@ -35,9 +35,30 @@ pub struct HolographicExtension {
     /// Enable holographic effects (1.0 = full, 0.0 = PBR only for Satellite mode).
     #[uniform(100)]
     pub enable_holographic: f32,
+    /// Coastline-outline glow color.
+    #[uniform(100)]
+    pub outline_color: LinearRgba,
+    /// Coastline-outline glow intensity. 0 disables the effect entirely.
+    #[uniform(100)]
+    pub outline_intensity: f32,
+    /// Luminance-gradient threshold for what counts as a land/ocean edge —
+    /// lower catches more (noisier) edges, higher only the starkest ones.
+    #[uniform(100)]
+    pub outline_threshold: f32,
     // Padding for 16-byte alignment
     #[uniform(100)]
     pub _padding: f32,
+    #[uniform(100)]
+    pub _padding2: f32,
+    #[uniform(100)]
+    pub _padding3: f32,
+    /// Same texture as the base material's `base_color_texture`, bound
+    /// again here so the extension shader can sample neighboring texels
+    /// directly for edge detection (the base material's own binding isn't
+    /// accessible from the extension's bind group).
+    #[texture(101)]
+    #[sampler(102)]
+    pub surface_texture: Handle<Image>,
 }
 
 impl Default for HolographicExtension {
@@ -50,7 +71,13 @@ impl Default for HolographicExtension {
             hologram_alpha: 0.6,
             time: 0.0,
             enable_holographic: 1.0,
+            outline_color: LinearRgba::new(0.3, 1.0, 0.85, 1.0),
+            outline_intensity: 0.0,
+            outline_threshold: 0.12,
             _padding: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+            surface_texture: Handle::default(),
         }
     }
 }
