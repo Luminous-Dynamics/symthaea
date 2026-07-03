@@ -11,6 +11,7 @@ use symtropy_math::{Capsule, HalfSpace, HyperBox, Point, Sphere};
 
 use crate::body::{BodyHandle, NetId, RigidBody};
 use crate::broadphase;
+use crate::ccd;
 use crate::constraint::Constraint;
 use crate::contact::{CollisionEvent, ContactCache, ContactManifold};
 use crate::gjk;
@@ -300,6 +301,13 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
         // 1. Integrate all bodies (skip sleeping)
+        // Capture pre-integration positions for the CCD sweep (step 1b): CCD
+        // needs the position at the START of this step combined with the
+        // POST-integration velocity, since that's the actual straight-line
+        // path the body travels during semi-implicit Euler integration.
+        let pre_integration_positions: Vec<SVector<f64, D>> =
+            self.bodies.iter().map(|b| b.position()).collect();
+
         #[cfg(feature = "deterministic-net")]
         for body in &mut self.bodies {
             // Snap accumulated forces to Q16.16 before integration for
@@ -325,6 +333,15 @@ impl<const D: usize> PhysicsWorld<D> {
                 body.linear_velocity[i] = quantize_q16_16(body.linear_velocity[i]);
             }
         }
+
+        // 1b. Continuous Collision Detection (CCD): fast-moving bodies can
+        // tunnel straight through thin colliders within a single discrete
+        // step. For bodies exceeding `ccd::CCD_SPEED_THRESHOLD`, sweep the
+        // pre-integration position forward along the post-integration
+        // velocity and clamp to the time-of-impact if a hit is found, so
+        // narrowphase (step 3) sees a body sitting at the surface instead of
+        // having skipped past it.
+        self.run_ccd_pass(&pre_integration_positions, dt);
 
         // 2. Broadphase: find potentially colliding pairs (incremental static cache)
         let pairs = broadphase::find_pairs_incremental(&self.bodies, &self.static_broadphase);
@@ -560,6 +577,97 @@ impl<const D: usize> PhysicsWorld<D> {
         // Since we cannot modify the trait here, we will leave this as a comment
         // and assume the callback implementation handles the time decay internally
         // based on the physics step time (dt).
+    }
+
+    /// Continuous collision detection sweep for fast-moving bodies.
+    ///
+    /// Only spheres are supported (matching `ccd.rs`'s analytical solvers).
+    /// For each dynamic, non-sleeping sphere body whose speed exceeds
+    /// `ccd::CCD_SPEED_THRESHOLD`, sweeps against every other body's
+    /// pre-integration position:
+    /// - vs. `HalfSpace` colliders: `ccd::sphere_halfspace`
+    /// - vs. `Sphere` colliders: `ccd::sphere_sphere`
+    ///
+    /// The earliest time-of-impact (TOI) across all candidates is used to
+    /// clamp the body's position to `pos_start + vel * toi`, preventing
+    /// tunneling before narrowphase (step 3) runs. Other collider shapes are
+    /// not covered by CCD; fast-moving bodies with e.g. box colliders can
+    /// still tunnel (a known scope limit of the current CCD module).
+    fn run_ccd_pass(&mut self, pre_integration_positions: &[SVector<f64, D>], dt: f64) {
+        let n = self.bodies.len();
+        debug_assert_eq!(n, pre_integration_positions.len());
+
+        for i in 0..n {
+            if !self.bodies[i].is_dynamic() || self.bodies[i].sleeping || self.bodies[i].is_sensor {
+                continue;
+            }
+            let vel_i = self.bodies[i].linear_velocity;
+            if vel_i.norm() <= ccd::CCD_SPEED_THRESHOLD {
+                continue;
+            }
+            let Some(sphere_i) = self.bodies[i].collider.as_any().downcast_ref::<Sphere<D>>()
+            else {
+                continue;
+            };
+            let radius_i = sphere_i.radius;
+            let pos_i0 = pre_integration_positions[i];
+
+            let mut earliest: Option<ccd::CcdHit<D>> = None;
+
+            for j in 0..n {
+                if j == i || self.bodies[j].is_sensor {
+                    continue;
+                }
+
+                if let Some(halfspace) = self.bodies[j]
+                    .collider
+                    .as_any()
+                    .downcast_ref::<HalfSpace<D>>()
+                {
+                    if let Some(hit) = ccd::sphere_halfspace(
+                        &pos_i0,
+                        &vel_i,
+                        radius_i,
+                        &halfspace.normal,
+                        halfspace.offset,
+                        dt,
+                    ) {
+                        if earliest.as_ref().is_none_or(|e| hit.toi < e.toi) {
+                            earliest = Some(hit);
+                        }
+                    }
+                    continue;
+                }
+
+                if let Some(sphere_j) = self.bodies[j].collider.as_any().downcast_ref::<Sphere<D>>()
+                {
+                    let pos_j0 = pre_integration_positions[j];
+                    let vel_j = if self.bodies[j].is_dynamic() && !self.bodies[j].sleeping {
+                        self.bodies[j].linear_velocity
+                    } else {
+                        SVector::zeros()
+                    };
+                    if let Some(hit) = ccd::sphere_sphere(
+                        &pos_i0,
+                        &vel_i,
+                        radius_i,
+                        &pos_j0,
+                        &vel_j,
+                        sphere_j.radius,
+                        dt,
+                    ) {
+                        if earliest.as_ref().is_none_or(|e| hit.toi < e.toi) {
+                            earliest = Some(hit);
+                        }
+                    }
+                }
+            }
+
+            if let Some(hit) = earliest {
+                let corrected = pos_i0 + vel_i * hit.toi;
+                self.bodies[i].transform.translation = Point(corrected);
+            }
+        }
     }
 
     /// Warm-start a single contact from the previous frame's impulse cache.
