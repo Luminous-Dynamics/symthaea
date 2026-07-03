@@ -720,7 +720,7 @@ members = [
     "happs/lucid/*",
     "happs/lucid/*/*",
     # "services/civic-happ/symthaea-bridge", # own [workspace] - cannot be a member of another workspace (task #35)
-    "services/civic-happ/dna/zomes/*/*",
+    # "services/civic-happ/dna/zomes/*/*", # own [workspace] - cannot be a member of another workspace (task #35); was dual-resolving hdk 0.6.0 (own lock) vs 0.6.1 (root) into two ABI-incompatible WASM binaries from identical source
     "mycelix-climate/apps/tauri/src-tauri",
     "mycelix-energy/apps/tauri/src-tauri",
     "mycelix-finance/apps/tauri/src-tauri",
