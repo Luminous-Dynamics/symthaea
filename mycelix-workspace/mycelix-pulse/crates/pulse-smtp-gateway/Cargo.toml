@@ -106,6 +106,20 @@ pqcrypto-traits = "0.3"
 
 # Optional: real holochain_client for Phase 5B. Gate with `holochain-bridge`
 # feature because the dep tree is heavy and the 0.9-dev version pin floats.
+#
+# INTENTIONAL EXCEPTION to the rest of mycelix-workspace's stable hdk=0.6.1/
+# hdi=0.7.1 pin (see mycelix-workspace/Cargo.toml [workspace.dependencies]):
+# this crate tracks a materially newer, pre-release Holochain generation
+# (holochain_client 0.9.0-dev / holochain_types+holochain_zome_types on the
+# 0.7.0-dev line) because mycelix-pulse/flake.nix intentionally points at
+# unpinned upstream `holochain/holochain` main, ahead of the fixed-commit
+# holonix pin every other cluster uses. This is not drift to "fix" -- it's
+# the Phase 11/12 federated-gateway-mesh track from PULSE_READINESS_PLAN.md.
+# A repo-wide Holochain-version reconciliation pass (2026-07-03) verified
+# every other Holochain-dependent Cargo.lock in the workspace against the
+# stable 0.6.1/0.7.1 baseline and deliberately left this one alone -- no
+# stable holochain_client release compatible with 0.6.1 was confirmed to
+# exist, so forcing this crate onto the stable line was out of scope.
 holochain_client = { version = "0.9.0-dev.10", optional = true }
 holo_hash = { version = "0.6", optional = true }
 
