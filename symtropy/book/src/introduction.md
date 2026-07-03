@@ -23,7 +23,7 @@ If you're working on:
 
 - **Integrated Information Theory** — Symtropy is the only engine where Φ modulates forces at the solver level.
 - **Active inference / FEP** — `symtropy-robotics-bridge::RoboticAgent` wraps Symthaea's `EmbodimentBridge` for consciousness-gated motor output.
-- **Emergent cooperation studies** — 63 experiments in `symtropy-consciousness-physics/examples/` cover cooperation emergence, J/Φ convergence, tragedy of commons, Dunbar number, anesthesia transitions.
+- **Emergent cooperation studies** — 68 experiments in `symtropy-consciousness-physics/examples/` cover cooperation emergence, J/Φ convergence, tragedy of commons, Dunbar number, anesthesia transitions.
 - **N-dimensional rigid body dynamics** — 4D Rubik's cubes, Miegakure-style hidden geometry, hyperdimensional simulation.
 
 ### Track B — Generalist adoption
@@ -47,7 +47,7 @@ Honesty matters more than marketing. Symtropy does not:
 
 ## Engine at a glance
 
-- **61K LOC Rust** across 23 crates, 677 tests, 8 on crates.io (as of 2026-04)
+- **61K LOC Rust** across 28 crates, 794 tests, 4 on crates.io (as of 2026-07)
 - **5 collision shapes**, all ND: `Sphere`, `Capsule`, `HyperBox`, `HalfSpace`, `ConvexHull`
 - **4 joint types**, all ND: `DistanceConstraint`, `BallJoint`, `FixedJoint`, `HingeJoint`
 - **GJK + EPA + CCD + raycasting**, all ND-generic
@@ -68,4 +68,4 @@ See [Licensing](./reference/licensing.md) for the full breakdown.
 
 - [Quickstart](./getting-started/quickstart.md) — drop a conscious sphere in 20 lines.
 - [Generic state coupling](./core-concepts/generic-state-coupling.md) — make *your* metric modulate physics.
-- [The 63 experiments](./research/experiments.md) — reproduce the emergent-cooperation results.
+- [The 68 experiments](./research/experiments.md) — reproduce the emergent-cooperation results.
