@@ -8,7 +8,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     holonix = {
-      url = "github:holochain/holonix/main-0.6";
+      url = "github:holochain/holonix/d21b3543"; # pinned to fixed commit, matches mycelix-workspace root (was moving branch main-0.6)
       inputs.nixpkgs.follows = "nixpkgs";
     };
     rust-overlay = {

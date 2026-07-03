@@ -18,7 +18,7 @@
     # Holochain from holonix - using stable 0.6.x release (recommended)
     # Compatible with: Tryorama 0.19.0, @holochain/client 0.20.0
     holonix = {
-      url = "github:holochain/holonix/main-0.6";
+      url = "github:holochain/holonix/d21b3543"; # pinned to fixed commit, matches mycelix-workspace root (was moving branch main-0.6)
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
