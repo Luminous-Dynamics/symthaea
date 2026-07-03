@@ -13,6 +13,7 @@
 //! Phi is never a clamped lerp of PE. Industrial partners can inspect this.
 
 use symtropy_consciousness_physics::safety::SafetyTier;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 
 /// Run one consciousness tick through the full pipeline.
