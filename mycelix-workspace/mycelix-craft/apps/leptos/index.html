@@ -9,8 +9,29 @@
     <title>Mycelix Craft</title>
     <meta name="description" content="Decentralized talent marketplace with living credentials, guild-based mastery, and proof of learning" />
     <link data-trunk rel="css" href="style/main.css" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠</text></svg>" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <!-- Static assets copied into dist/ by Trunk -->
+    <link data-trunk rel="copy-file" href="static/manifest.json" />
+    <link data-trunk rel="copy-file" href="static/sw.js" />
+    <link data-trunk rel="copy-file" href="static/icon.svg" />
 </head>
 <body>
+    <!-- Service Worker registration (PWA offline support) -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(function() {
+            console.log('[Craft] Service Worker registered');
+        }).catch(function(err) {
+            console.log('[Craft] SW registration failed:', err);
+        });
+    }
+    </script>
+
     <!-- Holochain conductor probe — sets __HC_STATUS before WASM mounts -->
     <script id="holochain-bridge">
     (function() {

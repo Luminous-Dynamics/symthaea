@@ -1,0 +1,20 @@
+{
+  "name": "Mycelix Craft — Decentralized Talent Marketplace",
+  "short_name": "Craft",
+  "description": "Decentralized talent marketplace with living credentials, guild-based mastery, and proof of learning.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0c18",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "en-ZA"
+}
