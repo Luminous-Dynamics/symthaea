@@ -3,6 +3,7 @@ target/
 dist/
 node_modules/
 Cargo.lock
+!holochain/Cargo.lock
 
 # Environment
 .env
