@@ -17,4 +17,4 @@ serde_json = { workspace = true }
 grid_integrity = { path = "../integrity" }
 mycelix_energy_shared = { path = "../../shared" }
 mycelix-bridge-proc = { path = "../../../../crates/mycelix-bridge-proc" }
-mycelix-zome-helpers = { path = "../../../../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-zome-helpers = { path = "../../../../crates/mycelix-zome-helpers" }

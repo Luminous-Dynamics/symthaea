@@ -17,7 +17,7 @@ hdk.workspace = true
 dkg_integrity = { path = "../dkg_integrity" }
 
 # Mycelix SDK (for confidence calculation)
-mycelix-sdk = { path = "../../../mycelix-workspace/sdk", default-features = false, features = ["holochain"] }
+mycelix-sdk = { path = "../../../sdk", default-features = false, features = ["holochain"] }
 
 # Serialization
 serde.workspace = true
