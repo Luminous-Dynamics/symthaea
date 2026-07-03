@@ -1969,4 +1969,251 @@ mod tests {
         assert!(targets.contains("Y"));
         assert!(targets.contains("Z"));
     }
+
+    // ── Phase 2.8: Causal Graph Structural Hardening ────────────────────────
+    // These tests exercise failure modes NOT covered by the Hebbian / discovery
+    // tests above: graph topology edge-cases and degraded-input safety.
+
+    /// Self-edge: a node that causes itself.
+    /// Must not panic, must be stored, and must not cause infinite traversal
+    /// in root-cause or side-effect walks.
+    #[test]
+    fn test_self_edge_no_panic_no_infinite_loop() {
+        let mut graph = NixCausalGraph::new(1);
+        graph.add_structural_edge("A", "A", 0.7);
+
+        assert_eq!(graph.edge_count(), 1, "self-edge must be stored");
+
+        // Side-effect walk must terminate (visited set prevents infinite loop)
+        let effects = graph.predict_side_effects("A");
+        // Self-edges targeting the originating variable are filtered out
+        // by the `if to != variable` guard — result is empty, not a hang.
+        assert!(
+            effects.is_empty(),
+            "self-edge should produce no self-referential side-effect"
+        );
+
+        // Root-cause walk must also terminate
+        let rca = graph.analyze_root_causes("A");
+        assert!(
+            rca.root_causes.len() <= 1,
+            "self-edge root-cause analysis must terminate"
+        );
+    }
+
+    /// Duplicate edge insertion: adding the same edge twice must not corrupt
+    /// the edge count or the index.
+    #[test]
+    fn test_duplicate_edge_no_double_count() {
+        let mut graph = NixCausalGraph::new(1);
+        graph.add_structural_edge("X", "Y", 0.5);
+        graph.add_structural_edge("X", "Y", 0.9); // overwrite, not a second entry
+
+        // The map key (from, to) is unique — only one edge survives.
+        assert_eq!(
+            graph.edge_count(),
+            1,
+            "duplicate edge must not inflate count"
+        );
+
+        // The from_index must have exactly one entry for X→Y.
+        let targets = graph.from_index.get("X").expect("index missing X");
+        assert_eq!(
+            targets.len(),
+            1,
+            "from_index must not have duplicate target"
+        );
+    }
+
+    /// Cycle: A→B→C→A. Side-effect and root-cause walks must terminate.
+    #[test]
+    fn test_cycle_traversal_terminates() {
+        let mut graph = NixCausalGraph::new(1);
+        graph.add_structural_edge("A", "B", 0.8);
+        graph.add_structural_edge("B", "C", 0.8);
+        graph.add_structural_edge("C", "A", 0.8); // closes cycle
+
+        assert_eq!(graph.edge_count(), 3);
+
+        // Both traversals must return without hanging.
+        let effects = graph.predict_side_effects("A");
+        assert!(
+            effects.len() <= 3,
+            "cycle walk must not produce unbounded results: got {}",
+            effects.len()
+        );
+
+        let rca = graph.analyze_root_causes("A");
+        assert!(
+            rca.causal_chain.len() <= 3,
+            "cycle root-cause chain must be bounded"
+        );
+    }
+
+    /// Disconnected sub-graph: two completely separate components.
+    /// Querying one must not expose nodes from the other.
+    #[test]
+    fn test_disconnected_subgraph_isolation() {
+        let mut graph = NixCausalGraph::new(1);
+        // Component 1
+        graph.add_structural_edge("A", "B", 0.9);
+        // Component 2 (disconnected)
+        graph.add_structural_edge("X", "Y", 0.9);
+
+        // Side effects of A must not include X or Y
+        let effects_a = graph.predict_side_effects("A");
+        let names: Vec<&str> = effects_a
+            .iter()
+            .map(|e| e.affected_variable.as_str())
+            .collect();
+        assert!(
+            !names.contains(&"X") && !names.contains(&"Y"),
+            "disconnected component must not appear in side-effect walk: {names:?}"
+        );
+
+        // Root causes of X must not include A or B
+        let rca_x = graph.analyze_root_causes("X");
+        let cause_names: Vec<&str> = rca_x
+            .root_causes
+            .iter()
+            .map(|c| c.variable.as_str())
+            .collect();
+        assert!(
+            !cause_names.contains(&"A") && !cause_names.contains(&"B"),
+            "disconnected component must not appear in root-cause walk: {cause_names:?}"
+        );
+    }
+
+    /// NaN confidence via observe_outcome must not propagate into the graph.
+    /// The Hebbian update formula uses `entry.confidence.clamp(0.0, 1.0)`, so
+    /// even if an edge somehow acquired a NaN confidence, subsequent queries
+    /// must remain finite.
+    #[test]
+    fn test_confidence_never_nan_after_repeated_learning() {
+        let mut graph = NixCausalGraph::new(42);
+
+        // Add an edge near the boundary
+        graph.add_structural_edge("cause", "effect", 0.999);
+
+        // Repeatedly strengthen — Hebbian rule: w += η*(1-w) — must converge, not NaN
+        for _ in 0..100 {
+            graph.observe_outcome("cause", &["effect"], &["effect"]);
+        }
+
+        let conf = graph.edge_confidence("cause", "effect").unwrap_or(f64::NAN);
+        assert!(
+            conf.is_finite(),
+            "confidence must be finite after 100 strengthening steps, got {conf}"
+        );
+        assert!(
+            (0.0..=1.0).contains(&conf),
+            "confidence must be in [0, 1], got {conf}"
+        );
+    }
+
+    /// Querying side-effects for a node not in the graph must return empty,
+    /// not a panic.
+    #[test]
+    fn test_side_effects_unknown_node_returns_empty() {
+        let graph = NixCausalGraph::new(1);
+        let effects = graph.predict_side_effects("totally_unknown_node");
+        assert!(
+            effects.is_empty(),
+            "unknown node must return empty side effects"
+        );
+    }
+
+    /// Root-cause analysis for a node with no incoming edges must return empty
+    /// root_causes (not a crash).
+    #[test]
+    fn test_root_cause_leaf_node_returns_empty() {
+        let mut graph = NixCausalGraph::new(1);
+        graph.add_structural_edge("X", "Y", 0.8);
+        // X is a source — it has no incoming edges.
+        let rca = graph.analyze_root_causes("X");
+        assert!(
+            rca.root_causes.is_empty(),
+            "leaf source node must have no root causes"
+        );
+    }
+
+    /// Stable drift replay: simulates the full causal failure path
+    ///     sensor shift → drift detected → causal edge queried
+    /// and verifies that degraded/missing input produces safe uncertainty
+    /// (not false certainty and not a panic).
+    ///
+    /// This is the Phase 2.8 evidence replay example.
+    #[test]
+    fn test_stable_drift_replay_example() {
+        let mut graph = NixCausalGraph::new(7);
+
+        // Baseline structural knowledge
+        graph.add_structural_edge("sensor.temp", "services.thermal.enable", 0.75);
+        graph.add_structural_edge("services.thermal.enable", "boot.kernelParams", 0.60);
+
+        // --- Step 1: Normal operation — sensor observed, no drift --------
+        // (World model drift is checked separately; here we verify the causal
+        // side: sensor has a known downstream chain.)
+        let normal_effects = graph.predict_side_effects("sensor.temp");
+        assert!(
+            !normal_effects.is_empty(),
+            "normal sensor should have known downstream effects"
+        );
+        for effect in &normal_effects {
+            assert!(
+                effect.confidence.is_finite() && effect.confidence >= 0.0,
+                "normal effects must have finite non-negative confidence: {:?}",
+                effect.confidence
+            );
+        }
+
+        // --- Step 2: Sensor anomaly — large shift observed ---------------
+        // Simulate: the sensor reading changes wildly (drift detected upstream),
+        // so we call observe_outcome with an empty observed_effects (the
+        // expected effect didn't materialise — the system adapted differently).
+        graph.observe_outcome(
+            "sensor.temp",
+            &[],                          // nothing materialised as expected
+            &["services.thermal.enable"], // this was predicted
+        );
+
+        // The edge must weaken, not disappear immediately (min_confidence=0.05).
+        let conf_after_miss = graph.edge_confidence("sensor.temp", "services.thermal.enable");
+        match conf_after_miss {
+            Some(c) => {
+                assert!(
+                    c.is_finite() && c >= 0.0 && c <= 1.0,
+                    "confidence after sensor miss must be in [0,1], got {c}"
+                );
+                // Confidence should have decreased
+                assert!(c < 0.75, "missed prediction must weaken edge: conf={c}");
+            }
+            None => {
+                // Edge was pruned — that is safe uncertainty, not false certainty.
+                // The system correctly reports "insufficient evidence".
+                let recs = graph.recommend_fixes("services.thermal.enable");
+                assert!(
+                    recs.iter().any(|r| r.contains("Insufficient")),
+                    "pruned edge should trigger insufficient-evidence recommendation"
+                );
+            }
+        }
+
+        // --- Step 3: Missing sensor data — unknown node queried ----------
+        // Simulates a sensor that dropped off entirely. Must not panic.
+        let missing_effects = graph.predict_side_effects("sensor.missing_entirely");
+        assert!(
+            missing_effects.is_empty(),
+            "missing sensor must produce empty effects, not false certainty"
+        );
+
+        // All remaining edge confidences must be finite and in [0,1].
+        for ((from, to), edge) in &graph.causal_graph {
+            assert!(
+                edge.confidence.is_finite() && (0.0..=1.0).contains(&edge.confidence),
+                "edge {from}→{to} has out-of-bounds confidence: {}",
+                edge.confidence
+            );
+        }
+    }
 }
