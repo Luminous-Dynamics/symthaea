@@ -169,10 +169,10 @@ impl IncrementalBundle {
     ///
     /// Much faster than O(n) rebundling!
     pub fn get_bundle(&mut self) -> BinaryHV {
-        if !self.dirty {
-            if let Some(cached) = &self.cached_bundle {
-                return *cached;
-            }
+        if !self.dirty
+            && let Some(cached) = &self.cached_bundle
+        {
+            return *cached;
         }
 
         // Rebuild from counts - O(2048) = O(1) constant time!

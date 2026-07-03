@@ -375,7 +375,7 @@ impl CElegansConnectome {
         let mut total_degrees: Vec<(usize, usize)> = (0..n)
             .map(|i| (i, in_degree[i] + out_degree[i] + gap_degree[i]))
             .collect();
-        total_degrees.sort_by(|a, b| b.1.cmp(&a.1));
+        total_degrees.sort_by_key(|x| std::cmp::Reverse(x.1));
 
         let hub_indices: Vec<usize> = total_degrees.iter().take(10).map(|(i, _)| *i).collect();
 

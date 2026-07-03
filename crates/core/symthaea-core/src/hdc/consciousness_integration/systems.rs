@@ -379,11 +379,12 @@ impl ConsciousnessPipeline {
 
         // Check if we should apply intervention
         // Only intervene if there's a strong enough predicted deviation
-        if let Some(ref pred) = self.current_prediction {
-            if pred.confidence > 0.7 && pred.intervention.is_some() {
-                // High confidence prediction with intervention - apply it
-                self.apply_intervention();
-            }
+        if let Some(ref pred) = self.current_prediction
+            && pred.confidence > 0.7
+            && pred.intervention.is_some()
+        {
+            // High confidence prediction with intervention - apply it
+            self.apply_intervention();
         }
 
         // Track insight count in state
@@ -1374,18 +1375,18 @@ impl ConsciousnessPipeline {
         }
 
         // Check metacognition
-        if let Some(assessment) = &self.meta_assessment {
-            if assessment.change_recommended {
-                recommendations.push(OptimizationRecommendation {
-                    system: "metacognition".to_string(),
-                    priority: RecommendationPriority::High,
-                    message: format!("Meta-cognitive assessment: {}", assessment.reasoning),
-                    suggested_action: assessment
-                        .recommended_mode
-                        .as_ref()
-                        .map(|m| format!("Switch to {m:?} mode")),
-                });
-            }
+        if let Some(assessment) = &self.meta_assessment
+            && assessment.change_recommended
+        {
+            recommendations.push(OptimizationRecommendation {
+                system: "metacognition".to_string(),
+                priority: RecommendationPriority::High,
+                message: format!("Meta-cognitive assessment: {}", assessment.reasoning),
+                suggested_action: assessment
+                    .recommended_mode
+                    .as_ref()
+                    .map(|m| format!("Switch to {m:?} mode")),
+            });
         }
 
         // Check cross-modal coherence

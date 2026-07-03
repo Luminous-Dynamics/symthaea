@@ -152,18 +152,65 @@ PY
 echo "[broca-cycle] candidate directory: $candidate_dir ($merged_lines merged pairs)"
 
 # ── Step 4: incremental fine-tune, resumed from production ─────────────────
-# BROCA_TRAIN_FEATURES defaults to CPU-only "simd". Note "gpu" is a separate
-# Cargo feature from "mamba"/"mamba-cpu" (gpu = candle-core/cuda + candle-nn,
-# nothing more) — it does NOT pull in the liquid_mamba module, so it doesn't
-# hit the broken symthaea-broca-tools migration (dangling sovereignty_bridge/
-# wasm_architect/etc. references) that "simd" alone already sidesteps. Once
-# the GPU driver/library mismatch on this machine is cleared by a reboot,
-# set BROCA_TRAIN_FEATURES=simd,gpu to use it — full-corpus CPU training is
-# impractically slow (a 1-epoch pass over the ~5.8k-pair base corpus alone
-# was still running after 48 CPU-minutes in testing).
-TRAIN_FEATURES="${BROCA_TRAIN_FEATURES:-simd}"
-echo "[broca-cycle] training candidate checkpoint (epochs=$CYCLE_EPOCHS lr=$CYCLE_LR, features=$TRAIN_FEATURES)..."
-cargo run "${cargo_locked_args[@]}" -p symthaea-broca --features "$TRAIN_FEATURES" --bin broca-train -- \
+# BROCA_TRAIN_BACKEND: cpu (default), gpu, or auto — mirrors the backend
+# selection in the existing scripts/broca_train_and_gate.sh. "gpu" is a
+# separate Cargo feature from "mamba"/"mamba-cpu" (gpu = candle-core/cuda +
+# candle-nn, nothing more) — it does NOT pull in the liquid_mamba module, so
+# it doesn't hit the broken symthaea-broca-tools migration (dangling
+# sovereignty_bridge/wasm_architect/etc. references) that "simd" alone
+# already sidesteps.
+#
+# GPU requires the nix develop .#broca-gpu shell specifically, not the
+# default shell: cudaforge (candle-kernels' build-dependency) resolves nvcc
+# via `which nvcc` before checking CUDA_HOME, and on NixOS `nvcc` is on PATH
+# via the merged-profile symlink /run/current-system/sw/bin/nvcc — deriving
+# cuda_root as nvcc_path.parent().parent() from THAT path lands on
+# /run/current-system/sw, which has no CUDA headers, so plain `nix develop`
+# fails compiling candle-kernels' .cu files with "cuda_runtime.h: No such
+# file or directory". devShells."broca-gpu" works around this by prepending
+# cudaPackages.cuda_nvcc's real store path onto PATH ahead of the system
+# profile. This is a pre-existing bug in the vendored cudaforge crate, not
+# something to patch here — verified 2026-07-03 against the current CUDA
+# 12.9 / driver 595.84 setup.
+TRAIN_BACKEND="${BROCA_TRAIN_BACKEND:-cpu}"
+train_feature_args=(--features simd)
+train_nix_attr=".#broca-gpu"
+case "$TRAIN_BACKEND" in
+  cpu) ;;
+  gpu)
+    train_feature_args=(--features simd,gpu)
+    export CUDA_COMPUTE_CAP="${BROCA_TRAIN_CUDA_COMPUTE_CAP:-75}"
+    export LD_LIBRARY_PATH="/run/opengl-driver/lib:${LD_LIBRARY_PATH:-}"
+    ;;
+  auto)
+    if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+      TRAIN_BACKEND="gpu"
+      train_feature_args=(--features simd,gpu)
+      export CUDA_COMPUTE_CAP="${BROCA_TRAIN_CUDA_COMPUTE_CAP:-75}"
+      export LD_LIBRARY_PATH="/run/opengl-driver/lib:${LD_LIBRARY_PATH:-}"
+    else
+      TRAIN_BACKEND="cpu"
+    fi
+    ;;
+  *)
+    echo "[broca-cycle] BROCA_TRAIN_BACKEND must be cpu, gpu, or auto" >&2
+    exit 2
+    ;;
+esac
+
+# Only wrap in nix develop for the gpu path (per CLAUDE.md: direct cargo for
+# everything else — no reason to pay nix-shell entry cost on the CPU path
+# that already works directly). Skips the wrap if already inside a nix shell.
+run_train() {
+  if [[ "$TRAIN_BACKEND" == "gpu" && -z "${IN_NIX_SHELL:-}" ]]; then
+    nix develop "$train_nix_attr" --command "$@"
+  else
+    "$@"
+  fi
+}
+
+echo "[broca-cycle] training candidate checkpoint (epochs=$CYCLE_EPOCHS lr=$CYCLE_LR, backend=$TRAIN_BACKEND)..."
+run_train cargo run "${cargo_locked_args[@]}" -p symthaea-broca "${train_feature_args[@]}" --bin broca-train -- \
   --data "$merged_data" \
   --eval "$EVAL_FILE" \
   --epochs "$CYCLE_EPOCHS" \

@@ -265,12 +265,12 @@ impl EllipticCurve {
         let coeffs = self.l_function_coefficients(max_p);
         let data: Vec<(f64, f64)> = coeffs
             .iter()
-            .filter_map(|&(p, ap)| {
+            .map(|&(p, ap)| {
                 let norm = ap as f64 / (2.0 * (p as f64).sqrt());
                 // Clamp to [-1, 1] for arccos
                 let clamped = norm.max(-1.0).min(1.0);
                 let theta = clamped.acos(); // θ ∈ [0, π]
-                Some((p as f64, theta))
+                (p as f64, theta)
             })
             .collect();
         ObservedSequence::new(
@@ -288,10 +288,10 @@ impl EllipticCurve {
         let coeffs = self.l_function_coefficients(max_p);
         let thetas: Vec<f64> = coeffs
             .iter()
-            .filter_map(|&(p, ap)| {
+            .map(|&(p, ap)| {
                 let norm = ap as f64 / (2.0 * (p as f64).sqrt());
                 let clamped = norm.max(-1.0).min(1.0);
-                Some(clamped.acos())
+                clamped.acos()
             })
             .collect();
 
@@ -774,7 +774,7 @@ pub fn dimension_s2(n: u64) -> usize {
     // Corrections for elliptic points (approximate)
     g -= 1.0; // genus correction
 
-    (g.round() as usize).max(0)
+    g.round() as usize
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -833,7 +833,7 @@ fn kronecker_symbol(a: i64, n: i64) -> i64 {
     // For odd prime p: use Euler's criterion
     let n_abs = n.unsigned_abs();
     if n_abs == 2 {
-        let a_mod = ((a % 8) + 8) % 8;
+        let a_mod = a.rem_euclid(8);
         return match a_mod {
             1 | 7 => 1,
             3 | 5 => -1,

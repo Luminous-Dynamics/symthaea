@@ -330,7 +330,6 @@ pub fn search_einstein_metrics(config: &EinsteinSearchConfig) -> EinsteinSearchR
                 // Pick two random survivors
                 let i = (lcg() as usize) % survivors.len();
                 let j = (lcg() as usize) % survivors.len();
-                let i = i;
                 let j = if j == i { (j + 1) % survivors.len() } else { j };
 
                 let parent_a = survivors[i].averaged_metric();

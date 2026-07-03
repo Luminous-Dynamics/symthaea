@@ -328,10 +328,10 @@ impl SparseDistributedMemory {
         }
 
         // Age-based eviction: if we have reached capacity, evict oldest entries
-        if let Some(max) = self.config.max_writes {
-            if self.stats.writes >= max {
-                self.evict_oldest();
-            }
+        if let Some(max) = self.config.max_writes
+            && self.stats.writes >= max
+        {
+            self.evict_oldest();
         }
 
         self.write_tick += 1;

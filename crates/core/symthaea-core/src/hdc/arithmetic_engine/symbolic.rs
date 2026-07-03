@@ -858,10 +858,10 @@ impl SymbolicAlgebra {
 
         // Constant folding for exact division
         if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type)
+            && *r != 0
+            && l % r == 0
         {
-            if *r != 0 && l % r == 0 {
-                return SymbolicExpr::constant(l / r, primitives);
-            }
+            return SymbolicExpr::constant(l / r, primitives);
         }
 
         left.div(right, primitives)
@@ -884,10 +884,10 @@ impl SymbolicAlgebra {
         }
 
         // 0^n = 0 (for n > 0)
-        if let (TermType::Constant(0), TermType::Constant(n)) = (&base.term_type, &exp.term_type) {
-            if *n > 0 {
-                return SymbolicExpr::constant(0, primitives);
-            }
+        if let (TermType::Constant(0), TermType::Constant(n)) = (&base.term_type, &exp.term_type)
+            && *n > 0
+        {
+            return SymbolicExpr::constant(0, primitives);
         }
 
         // 1^n = 1
@@ -896,12 +896,13 @@ impl SymbolicAlgebra {
         }
 
         // Constant folding
-        if let (TermType::Constant(b), TermType::Constant(e)) = (&base.term_type, &exp.term_type) {
-            if *e >= 0 && *e < 20 {
-                // Reasonable exponent
-                let result = (*b).pow(*e as u32);
-                return SymbolicExpr::constant(result, primitives);
-            }
+        if let (TermType::Constant(b), TermType::Constant(e)) = (&base.term_type, &exp.term_type)
+            && *e >= 0
+            && *e < 20
+        {
+            // Reasonable exponent
+            let result = (*b).pow(*e as u32);
+            return SymbolicExpr::constant(result, primitives);
         }
 
         base.pow(exp, primitives)

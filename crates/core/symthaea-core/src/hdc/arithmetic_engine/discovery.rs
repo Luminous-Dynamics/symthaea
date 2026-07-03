@@ -281,10 +281,10 @@ impl MathDiscovery {
             let mut symmetric_evidence = Vec::new();
             for (a, b, phi_ab) in &symmetric_pairs {
                 // Find (b, a) pair
-                if let Some((_, _, phi_ba)) = add_data.iter().find(|(x, y, _)| x == b && y == a) {
-                    if (phi_ab - phi_ba).abs() < 0.01 {
-                        symmetric_evidence.push(format!("Φ({a} + {b}) ≈ Φ({b} + {a})"));
-                    }
+                if let Some((_, _, phi_ba)) = add_data.iter().find(|(x, y, _)| x == b && y == a)
+                    && (phi_ab - phi_ba).abs() < 0.01
+                {
+                    symmetric_evidence.push(format!("Φ({a} + {b}) ≈ Φ({b} + {a})"));
                 }
             }
 

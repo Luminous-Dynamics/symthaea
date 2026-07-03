@@ -516,19 +516,19 @@ impl SleepAndAlteredStates {
         self.time_in_state += minutes;
 
         // If sleeping, follow sleep cycle
-        if let Some(ref night) = self.sleep_night {
-            if let Some(stage) = night.stage_at_time(self.time_in_state) {
-                let new_state = match stage {
-                    SleepStage::Wake => AlteredState::Wake,
-                    SleepStage::N1 => AlteredState::SleepN1,
-                    SleepStage::N2 => AlteredState::SleepN2,
-                    SleepStage::N3 => AlteredState::SleepN3,
-                    SleepStage::REM => AlteredState::DreamNonLucid, // Default non-lucid
-                };
+        if let Some(ref night) = self.sleep_night
+            && let Some(stage) = night.stage_at_time(self.time_in_state)
+        {
+            let new_state = match stage {
+                SleepStage::Wake => AlteredState::Wake,
+                SleepStage::N1 => AlteredState::SleepN1,
+                SleepStage::N2 => AlteredState::SleepN2,
+                SleepStage::N3 => AlteredState::SleepN3,
+                SleepStage::REM => AlteredState::DreamNonLucid, // Default non-lucid
+            };
 
-                if new_state != self.current_state {
-                    self.transition_to(new_state);
-                }
+            if new_state != self.current_state {
+                self.transition_to(new_state);
             }
         }
     }

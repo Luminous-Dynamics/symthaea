@@ -668,31 +668,31 @@ impl TriggerSystemLibrary {
             .iter()
             .filter(|sys| {
                 // TRL filter
-                if let Some(min_trl) = criteria.min_trl {
-                    if sys.trl.0 < min_trl {
-                        return false;
-                    }
+                if let Some(min_trl) = criteria.min_trl
+                    && sys.trl.0 < min_trl
+                {
+                    return false;
                 }
 
                 // Cost filter
-                if let Some(max_cost) = criteria.max_cost_usd {
-                    if sys.cost_estimate_usd > max_cost {
-                        return false;
-                    }
+                if let Some(max_cost) = criteria.max_cost_usd
+                    && sys.cost_estimate_usd > max_cost
+                {
+                    return false;
                 }
 
                 // Rep rate filter
-                if let Some(min_rate) = criteria.min_rep_rate_hz {
-                    if sys.max_rep_rate_hz < min_rate {
-                        return false;
-                    }
+                if let Some(min_rate) = criteria.min_rep_rate_hz
+                    && sys.max_rep_rate_hz < min_rate
+                {
+                    return false;
                 }
 
                 // Footprint filter
-                if let Some(max_footprint) = criteria.max_footprint_m3 {
-                    if sys.footprint_m3 > max_footprint {
-                        return false;
-                    }
+                if let Some(max_footprint) = criteria.max_footprint_m3
+                    && sys.footprint_m3 > max_footprint
+                {
+                    return false;
                 }
 
                 true

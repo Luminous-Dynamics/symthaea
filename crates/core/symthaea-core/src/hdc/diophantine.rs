@@ -96,32 +96,15 @@ pub fn pell_equation(d: i64) -> Option<PellSolution> {
         // Compute next convergent with overflow protection. If any step
         // overflows i128, we've exceeded the solver's numeric range and
         // return None rather than panic.
-        let h = match (a as i128)
+        let h = (a as i128)
             .checked_mul(h_prev1)
-            .and_then(|v| v.checked_add(h_prev2))
-        {
-            Some(v) => v,
-            None => return None,
-        };
-        let k = match (a as i128)
+            .and_then(|v| v.checked_add(h_prev2))?;
+        let k = (a as i128)
             .checked_mul(k_prev1)
-            .and_then(|v| v.checked_add(k_prev2))
-        {
-            Some(v) => v,
-            None => return None,
-        };
-        let h2 = match h.checked_mul(h) {
-            Some(v) => v,
-            None => return None,
-        };
-        let k2 = match k.checked_mul(k) {
-            Some(v) => v,
-            None => return None,
-        };
-        let dk2 = match (d as i128).checked_mul(k2) {
-            Some(v) => v,
-            None => return None,
-        };
+            .and_then(|v| v.checked_add(k_prev2))?;
+        let h2 = h.checked_mul(h)?;
+        let k2 = k.checked_mul(k)?;
+        let dk2 = (d as i128).checked_mul(k2)?;
         if h2 - dk2 == 1 && k > 0 {
             return Some(PellSolution {
                 d,

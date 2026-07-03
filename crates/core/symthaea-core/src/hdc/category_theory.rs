@@ -101,7 +101,7 @@ impl Category {
         for from in 0..n {
             for to in 0..n {
                 if self.morphisms[from][to].iter().any(|m| m == f)
-                    || (self.identities.get(from).map_or(false, |id| id == f) && from == to)
+                    || (self.identities.get(from).is_some_and(|id| id == f) && from == to)
                 {
                     return Some(from);
                 }
@@ -170,40 +170,37 @@ impl Category {
             let id_cod = &self.identities[cod];
 
             // f ∘ id_dom = f  (id_dom then f)
-            if let Some(r) = self.compose(id_dom, f) {
-                if r != f.as_str() {
-                    return false;
-                }
+            if let Some(r) = self.compose(id_dom, f)
+                && r != f.as_str()
+            {
+                return false;
             }
             // id_cod ∘ f = f  (f then id_cod)
-            if let Some(r) = self.compose(f, id_cod) {
-                if r != f.as_str() {
-                    return false;
-                }
+            if let Some(r) = self.compose(f, id_cod)
+                && r != f.as_str()
+            {
+                return false;
             }
         }
 
         // Check associativity for all registered triples
         for (fg, h_name) in &self.composition {
             let (f, g) = fg;
-            for (gh, _) in &self.composition {
+            for gh in self.composition.keys() {
                 let (g2, h2) = gh;
                 if g != g2 {
                     continue;
                 }
                 // We have f, g, h2 potentially composable in order f then g then h2
-                if let Some(fg_name) = self.compose(f, g) {
-                    if let Some(g_h2) = self.compose(g, h2) {
-                        let lhs = self.compose(fg_name, h2);
-                        let rhs = self.compose(f, g_h2);
-                        match (lhs, rhs) {
-                            (Some(l), Some(r)) => {
-                                if l != r {
-                                    return false;
-                                }
-                            }
-                            _ => {}
-                        }
+                if let Some(fg_name) = self.compose(f, g)
+                    && let Some(g_h2) = self.compose(g, h2)
+                {
+                    let lhs = self.compose(fg_name, h2);
+                    let rhs = self.compose(f, g_h2);
+                    if let (Some(l), Some(r)) = (lhs, rhs)
+                        && l != r
+                    {
+                        return false;
                     }
                 }
             }
@@ -231,9 +228,7 @@ impl Category {
                 // Check f ∘ g = id_cod and g ∘ f = id_dom
                 let fg = self.compose(f, g);
                 let gf = self.compose(g, f);
-                if fg.map_or(false, |r| r == id_cod.as_str())
-                    && gf.map_or(false, |r| r == id_dom.as_str())
-                {
+                if (fg == Some(id_cod.as_str())) && (gf == Some(id_dom.as_str())) {
                     return true;
                 }
             }
@@ -419,10 +414,10 @@ impl Functor {
                 None => continue,
             };
             // In D: F(g) ∘ F(f) should equal F(fg)
-            if let Some(composed) = d.compose(ff, fg_c) {
-                if composed != ffg.as_str() {
-                    return false;
-                }
+            if let Some(composed) = d.compose(ff, fg_c)
+                && composed != ffg.as_str()
+            {
+                return false;
             }
         }
         true
@@ -619,10 +614,10 @@ impl Adjunction {
             // ε_{F(a)} ∘ F(η_a)
             if let Some(composed) = d.compose(f_eta_a, eps_fa) {
                 let fa_idx = d.objects.iter().position(|o| o == fa);
-                if let Some(idx) = fa_idx {
-                    if composed != d.identities[idx].as_str() {
-                        return false;
-                    }
+                if let Some(idx) = fa_idx
+                    && composed != d.identities[idx].as_str()
+                {
+                    return false;
                 }
             }
         }
@@ -658,10 +653,10 @@ impl Monad {
                 None => return false,
             };
             // codomain of η_a should be T(a)
-            if let Some(cod) = d.codomain_of(eta_a) {
-                if &d.objects[cod] != ta {
-                    return false;
-                }
+            if let Some(cod) = d.codomain_of(eta_a)
+                && &d.objects[cod] != ta
+            {
+                return false;
             }
         }
         // Check μ components: μ_a: T²(a) → T(a)
@@ -674,10 +669,10 @@ impl Monad {
                 Some(o) => o,
                 None => return false,
             };
-            if let Some(cod) = d.codomain_of(mu_a) {
-                if &d.objects[cod] != ta {
-                    return false;
-                }
+            if let Some(cod) = d.codomain_of(mu_a)
+                && &d.objects[cod] != ta
+            {
+                return false;
             }
         }
         true

@@ -451,10 +451,10 @@ pub fn functional_calculus_apply(
 pub fn matrix_exp(op: &BoundedOperator, t: f64) -> BoundedOperator {
     let n = op.rows();
     assert_eq!(n, op.cols(), "matrix_exp requires square operator");
-    if op.is_self_adjoint() {
-        if let Ok(decomp) = spectral_decompose(op) {
-            return spectral_to_operator(&decomp, |lambda| (t * lambda).exp(), n);
-        }
+    if op.is_self_adjoint()
+        && let Ok(decomp) = spectral_decompose(op)
+    {
+        return spectral_to_operator(&decomp, |lambda| (t * lambda).exp(), n);
     }
     // Taylor series fallback: exp(tA) = Σ (tA)ⁿ/n!
     let mut result = identity_matrix(n);

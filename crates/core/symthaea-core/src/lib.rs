@@ -39,6 +39,16 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::if_same_then_else)]
+// Known style debt, not fixed here (2026-07-02): 33 occurrences across the
+// HDC/math modules, each needing real judgment rather than a mechanical
+// rewrite -- type_complexity wants type aliases for research-code tuple
+// types, too_many_arguments wants call sites regrouped into param structs,
+// should_implement_trait wants actual trait impls (FromStr/Iterator/etc.)
+// checked against their exact contract, not just renamed methods. Tracked
+// as follow-up cleanup; CI now enforces -D warnings on everything else.
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::should_implement_trait)]
 #![allow(clippy::manual_memcpy)]
 #![allow(clippy::only_used_in_recursion)]
 #![allow(clippy::redundant_guards)]

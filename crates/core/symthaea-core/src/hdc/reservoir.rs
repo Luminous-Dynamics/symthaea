@@ -141,11 +141,11 @@ impl EchoStateNetwork {
         self.update_state(input);
 
         // Collect training data after warmup
-        if self.steps > self.warmup {
-            if let Some(t) = target {
-                self.training_states.push(self.extended_state());
-                self.training_targets.push(t);
-            }
+        if self.steps > self.warmup
+            && let Some(t) = target
+        {
+            self.training_states.push(self.extended_state());
+            self.training_targets.push(t);
         }
     }
 

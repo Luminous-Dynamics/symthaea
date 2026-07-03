@@ -484,15 +484,15 @@ fn rule_parallel_transitive(state: &GeomState) -> Vec<GeomPredicate> {
                 GeomPredicate::Parallel(a1, b1, c1, d1),
                 GeomPredicate::Parallel(a2, b2, c2, d2),
             ) = (f1, f2)
+                && c1 == a2
+                && d1 == b2
             {
-                if c1 == a2 && d1 == b2 {
-                    out.push(GeomPredicate::Parallel(
-                        a1.clone(),
-                        b1.clone(),
-                        c2.clone(),
-                        d2.clone(),
-                    ));
-                }
+                out.push(GeomPredicate::Parallel(
+                    a1.clone(),
+                    b1.clone(),
+                    c2.clone(),
+                    d2.clone(),
+                ));
             }
         }
     }
@@ -508,15 +508,16 @@ fn rule_perp_perp_is_parallel(state: &GeomState) -> Vec<GeomPredicate> {
                 GeomPredicate::Perpendicular(a1, b1, c1, d1),
                 GeomPredicate::Perpendicular(a2, b2, c2, d2),
             ) = (f1, f2)
+                && c1 == c2
+                && d1 == d2
+                && (a1, b1) != (a2, b2)
             {
-                if c1 == c2 && d1 == d2 && (a1, b1) != (a2, b2) {
-                    out.push(GeomPredicate::Parallel(
-                        a1.clone(),
-                        b1.clone(),
-                        a2.clone(),
-                        b2.clone(),
-                    ));
-                }
+                out.push(GeomPredicate::Parallel(
+                    a1.clone(),
+                    b1.clone(),
+                    a2.clone(),
+                    b2.clone(),
+                ));
             }
         }
     }
@@ -615,15 +616,15 @@ fn rule_equal_length_transitive(state: &GeomState) -> Vec<GeomPredicate> {
                 GeomPredicate::EqualLength(a1, b1, c1, d1),
                 GeomPredicate::EqualLength(a2, b2, c2, d2),
             ) = (f1, f2)
+                && c1 == a2
+                && d1 == b2
             {
-                if c1 == a2 && d1 == b2 {
-                    out.push(GeomPredicate::EqualLength(
-                        a1.clone(),
-                        b1.clone(),
-                        c2.clone(),
-                        d2.clone(),
-                    ));
-                }
+                out.push(GeomPredicate::EqualLength(
+                    a1.clone(),
+                    b1.clone(),
+                    c2.clone(),
+                    d2.clone(),
+                ));
             }
         }
     }
@@ -657,17 +658,18 @@ fn rule_angle_eq_transitive(state: &GeomState) -> Vec<GeomPredicate> {
                 GeomPredicate::AngleEq(a1, b1, c1, d1, e1, g1),
                 GeomPredicate::AngleEq(a2, b2, c2, d2, e2, g2),
             ) = (f1, f2)
+                && d1 == a2
+                && e1 == b2
+                && g1 == c2
             {
-                if d1 == a2 && e1 == b2 && g1 == c2 {
-                    out.push(GeomPredicate::AngleEq(
-                        a1.clone(),
-                        b1.clone(),
-                        c1.clone(),
-                        d2.clone(),
-                        e2.clone(),
-                        g2.clone(),
-                    ));
-                }
+                out.push(GeomPredicate::AngleEq(
+                    a1.clone(),
+                    b1.clone(),
+                    c1.clone(),
+                    d2.clone(),
+                    e2.clone(),
+                    g2.clone(),
+                ));
             }
         }
     }
@@ -681,15 +683,16 @@ fn rule_midpoint_theorem(state: &GeomState) -> Vec<GeomPredicate> {
         for f2 in &state.facts {
             if let (GeomPredicate::Midpoint(m, a1, b1), GeomPredicate::Midpoint(n, a2, c1)) =
                 (f1, f2)
+                && a1 == a2
+                && m != n
+                && b1 != c1
             {
-                if a1 == a2 && m != n && b1 != c1 {
-                    out.push(GeomPredicate::Parallel(
-                        m.clone(),
-                        n.clone(),
-                        b1.clone(),
-                        c1.clone(),
-                    ));
-                }
+                out.push(GeomPredicate::Parallel(
+                    m.clone(),
+                    n.clone(),
+                    b1.clone(),
+                    c1.clone(),
+                ));
             }
         }
     }

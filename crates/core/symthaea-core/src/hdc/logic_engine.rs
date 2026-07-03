@@ -446,10 +446,10 @@ impl LogicEngine {
         for clause in &clauses {
             for (var, pol) in clause {
                 let entry = pure_vars.entry(var.clone()).or_insert(Some(*pol));
-                if let Some(existing) = entry {
-                    if *existing != *pol {
-                        *entry = None; // Not pure
-                    }
+                if let Some(existing) = entry
+                    && *existing != *pol
+                {
+                    *entry = None; // Not pure
                 }
             }
         }
@@ -515,34 +515,34 @@ impl LogicEngine {
 
     /// Modus Ponens: from P and P → Q, derive Q
     pub fn modus_ponens(premise: &Proposition, implication: &Proposition) -> Option<ProofResult> {
-        if let Proposition::Implies(p, q) = implication {
-            if **p == *premise {
-                return Some(ProofResult {
-                    valid: true,
-                    proof_steps: vec![
-                        ProofStepLogic {
-                            step_number: 1,
-                            rule: "Premise".to_string(),
-                            formula: format!("{}", premise),
-                            justification: "Given".to_string(),
-                        },
-                        ProofStepLogic {
-                            step_number: 2,
-                            rule: "Premise".to_string(),
-                            formula: format!("{}", implication),
-                            justification: "Given".to_string(),
-                        },
-                        ProofStepLogic {
-                            step_number: 3,
-                            rule: "Modus Ponens".to_string(),
-                            formula: format!("{}", q),
-                            justification: "From 1, 2 by MP".to_string(),
-                        },
-                    ],
-                    phi: 0.4,
-                    description: format!("Modus Ponens: {} and {} → {}", premise, implication, q),
-                });
-            }
+        if let Proposition::Implies(p, q) = implication
+            && **p == *premise
+        {
+            return Some(ProofResult {
+                valid: true,
+                proof_steps: vec![
+                    ProofStepLogic {
+                        step_number: 1,
+                        rule: "Premise".to_string(),
+                        formula: format!("{}", premise),
+                        justification: "Given".to_string(),
+                    },
+                    ProofStepLogic {
+                        step_number: 2,
+                        rule: "Premise".to_string(),
+                        formula: format!("{}", implication),
+                        justification: "Given".to_string(),
+                    },
+                    ProofStepLogic {
+                        step_number: 3,
+                        rule: "Modus Ponens".to_string(),
+                        formula: format!("{}", q),
+                        justification: "From 1, 2 by MP".to_string(),
+                    },
+                ],
+                phi: 0.4,
+                description: format!("Modus Ponens: {} and {} → {}", premise, implication, q),
+            });
         }
         None
     }
@@ -552,78 +552,77 @@ impl LogicEngine {
         neg_conclusion: &Proposition,
         implication: &Proposition,
     ) -> Option<ProofResult> {
-        if let Proposition::Implies(p, q) = implication {
-            if let Proposition::Not(inner) = neg_conclusion {
-                if **inner == **q {
-                    let result = p.clone().not();
-                    return Some(ProofResult {
-                        valid: true,
-                        proof_steps: vec![
-                            ProofStepLogic {
-                                step_number: 1,
-                                rule: "Premise".to_string(),
-                                formula: format!("{}", neg_conclusion),
-                                justification: "Given".to_string(),
-                            },
-                            ProofStepLogic {
-                                step_number: 2,
-                                rule: "Premise".to_string(),
-                                formula: format!("{}", implication),
-                                justification: "Given".to_string(),
-                            },
-                            ProofStepLogic {
-                                step_number: 3,
-                                rule: "Modus Tollens".to_string(),
-                                formula: format!("{}", result),
-                                justification: "From 1, 2 by MT".to_string(),
-                            },
-                        ],
-                        phi: 0.4,
-                        description: format!(
-                            "Modus Tollens: {} and {} → {}",
-                            neg_conclusion, implication, result
-                        ),
-                    });
-                }
-            }
+        if let Proposition::Implies(p, q) = implication
+            && let Proposition::Not(inner) = neg_conclusion
+            && **inner == **q
+        {
+            let result = p.clone().not();
+            return Some(ProofResult {
+                valid: true,
+                proof_steps: vec![
+                    ProofStepLogic {
+                        step_number: 1,
+                        rule: "Premise".to_string(),
+                        formula: format!("{}", neg_conclusion),
+                        justification: "Given".to_string(),
+                    },
+                    ProofStepLogic {
+                        step_number: 2,
+                        rule: "Premise".to_string(),
+                        formula: format!("{}", implication),
+                        justification: "Given".to_string(),
+                    },
+                    ProofStepLogic {
+                        step_number: 3,
+                        rule: "Modus Tollens".to_string(),
+                        formula: format!("{}", result),
+                        justification: "From 1, 2 by MT".to_string(),
+                    },
+                ],
+                phi: 0.4,
+                description: format!(
+                    "Modus Tollens: {} and {} → {}",
+                    neg_conclusion, implication, result
+                ),
+            });
         }
         None
     }
 
     /// Hypothetical Syllogism: from P → Q and Q → R, derive P → R
     pub fn hypothetical_syllogism(impl1: &Proposition, impl2: &Proposition) -> Option<ProofResult> {
-        if let (Proposition::Implies(p, q1), Proposition::Implies(q2, r)) = (impl1, impl2) {
-            if **q1 == **q2 {
-                let result = p.clone().implies(*r.clone());
-                return Some(ProofResult {
-                    valid: true,
-                    proof_steps: vec![
-                        ProofStepLogic {
-                            step_number: 1,
-                            rule: "Premise".to_string(),
-                            formula: format!("{}", impl1),
-                            justification: "Given".to_string(),
-                        },
-                        ProofStepLogic {
-                            step_number: 2,
-                            rule: "Premise".to_string(),
-                            formula: format!("{}", impl2),
-                            justification: "Given".to_string(),
-                        },
-                        ProofStepLogic {
-                            step_number: 3,
-                            rule: "Hypothetical Syllogism".to_string(),
-                            formula: format!("{}", result),
-                            justification: "From 1, 2 by HS".to_string(),
-                        },
-                    ],
-                    phi: 0.5,
-                    description: format!(
-                        "Hypothetical Syllogism: {} and {} → {}",
-                        impl1, impl2, result
-                    ),
-                });
-            }
+        if let (Proposition::Implies(p, q1), Proposition::Implies(q2, r)) = (impl1, impl2)
+            && **q1 == **q2
+        {
+            let result = p.clone().implies(*r.clone());
+            return Some(ProofResult {
+                valid: true,
+                proof_steps: vec![
+                    ProofStepLogic {
+                        step_number: 1,
+                        rule: "Premise".to_string(),
+                        formula: format!("{}", impl1),
+                        justification: "Given".to_string(),
+                    },
+                    ProofStepLogic {
+                        step_number: 2,
+                        rule: "Premise".to_string(),
+                        formula: format!("{}", impl2),
+                        justification: "Given".to_string(),
+                    },
+                    ProofStepLogic {
+                        step_number: 3,
+                        rule: "Hypothetical Syllogism".to_string(),
+                        formula: format!("{}", result),
+                        justification: "From 1, 2 by HS".to_string(),
+                    },
+                ],
+                phi: 0.5,
+                description: format!(
+                    "Hypothetical Syllogism: {} and {} → {}",
+                    impl1, impl2, result
+                ),
+            });
         }
         None
     }
@@ -633,69 +632,69 @@ impl LogicEngine {
         disjunction: &Proposition,
         negation: &Proposition,
     ) -> Option<ProofResult> {
-        if let Proposition::Or(p, q) = disjunction {
-            if let Proposition::Not(inner) = negation {
-                if **inner == **p {
-                    return Some(ProofResult {
-                        valid: true,
-                        proof_steps: vec![
-                            ProofStepLogic {
-                                step_number: 1,
-                                rule: "Premise".to_string(),
-                                formula: format!("{}", disjunction),
-                                justification: "Given".to_string(),
-                            },
-                            ProofStepLogic {
-                                step_number: 2,
-                                rule: "Premise".to_string(),
-                                formula: format!("{}", negation),
-                                justification: "Given".to_string(),
-                            },
-                            ProofStepLogic {
-                                step_number: 3,
-                                rule: "Disjunctive Syllogism".to_string(),
-                                formula: format!("{}", q),
-                                justification: "From 1, 2 by DS".to_string(),
-                            },
-                        ],
-                        phi: 0.4,
-                        description: format!(
-                            "Disjunctive Syllogism: {} and {} → {}",
-                            disjunction, negation, q
-                        ),
-                    });
-                }
-                // Also check the symmetric case: ¬Q eliminates Q from P ∨ Q
-                if **inner == **q {
-                    return Some(ProofResult {
-                        valid: true,
-                        proof_steps: vec![
-                            ProofStepLogic {
-                                step_number: 1,
-                                rule: "Premise".to_string(),
-                                formula: format!("{}", disjunction),
-                                justification: "Given".to_string(),
-                            },
-                            ProofStepLogic {
-                                step_number: 2,
-                                rule: "Premise".to_string(),
-                                formula: format!("{}", negation),
-                                justification: "Given".to_string(),
-                            },
-                            ProofStepLogic {
-                                step_number: 3,
-                                rule: "Disjunctive Syllogism".to_string(),
-                                formula: format!("{}", p),
-                                justification: "From 1, 2 by DS".to_string(),
-                            },
-                        ],
-                        phi: 0.4,
-                        description: format!(
-                            "Disjunctive Syllogism: {} and {} → {}",
-                            disjunction, negation, p
-                        ),
-                    });
-                }
+        if let Proposition::Or(p, q) = disjunction
+            && let Proposition::Not(inner) = negation
+        {
+            if **inner == **p {
+                return Some(ProofResult {
+                    valid: true,
+                    proof_steps: vec![
+                        ProofStepLogic {
+                            step_number: 1,
+                            rule: "Premise".to_string(),
+                            formula: format!("{}", disjunction),
+                            justification: "Given".to_string(),
+                        },
+                        ProofStepLogic {
+                            step_number: 2,
+                            rule: "Premise".to_string(),
+                            formula: format!("{}", negation),
+                            justification: "Given".to_string(),
+                        },
+                        ProofStepLogic {
+                            step_number: 3,
+                            rule: "Disjunctive Syllogism".to_string(),
+                            formula: format!("{}", q),
+                            justification: "From 1, 2 by DS".to_string(),
+                        },
+                    ],
+                    phi: 0.4,
+                    description: format!(
+                        "Disjunctive Syllogism: {} and {} → {}",
+                        disjunction, negation, q
+                    ),
+                });
+            }
+            // Also check the symmetric case: ¬Q eliminates Q from P ∨ Q
+            if **inner == **q {
+                return Some(ProofResult {
+                    valid: true,
+                    proof_steps: vec![
+                        ProofStepLogic {
+                            step_number: 1,
+                            rule: "Premise".to_string(),
+                            formula: format!("{}", disjunction),
+                            justification: "Given".to_string(),
+                        },
+                        ProofStepLogic {
+                            step_number: 2,
+                            rule: "Premise".to_string(),
+                            formula: format!("{}", negation),
+                            justification: "Given".to_string(),
+                        },
+                        ProofStepLogic {
+                            step_number: 3,
+                            rule: "Disjunctive Syllogism".to_string(),
+                            formula: format!("{}", p),
+                            justification: "From 1, 2 by DS".to_string(),
+                        },
+                    ],
+                    phi: 0.4,
+                    description: format!(
+                        "Disjunctive Syllogism: {} and {} → {}",
+                        disjunction, negation, p
+                    ),
+                });
             }
         }
         None

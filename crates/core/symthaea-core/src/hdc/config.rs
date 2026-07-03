@@ -157,10 +157,9 @@ impl HdcConfig {
     /// Returns how many times larger this config's dimension is
     /// compared to the source dimension.
     pub const fn expansion_factor_from(&self, source_dim: usize) -> usize {
-        if source_dim == 0 {
-            0
-        } else {
-            self.dimension / source_dim
+        match self.dimension.checked_div(source_dim) {
+            Some(v) => v,
+            None => 0,
         }
     }
 

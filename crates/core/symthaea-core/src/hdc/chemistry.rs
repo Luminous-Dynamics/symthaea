@@ -2146,7 +2146,7 @@ pub fn balance_equation(reactants: &[&str], products: &[&str]) -> Result<Vec<i32
     let sign = if int_solution[0] < 0 { -1i64 } else { 1i64 };
     let int_solution: Vec<i64> = int_solution.iter().map(|&x| x * sign).collect();
 
-    if int_solution.iter().any(|&x| x == 0) {
+    if int_solution.contains(&0) {
         return Err("Degenerate solution (zero coefficient found)".to_string());
     }
 
@@ -2389,7 +2389,7 @@ pub fn solve_ice(
         let mut denominator = 1.0f64;
         for i in 0..n {
             let c = initial_concentrations[i] + (stoich_coeffs[i] as f64) * x;
-            let nu = stoich_coeffs[i].abs() as i32;
+            let nu = stoich_coeffs[i].abs();
             if stoich_coeffs[i] > 0 {
                 // product
                 numerator *= c.max(0.0).powi(nu);

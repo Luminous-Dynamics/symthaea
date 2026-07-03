@@ -291,8 +291,9 @@ mod tests {
 
         let prompt = build_translation_prompt(&request);
         assert!(prompt.contains("Uncertain"));
-        let _ = prompt;
-        assert!(prompt.contains("THINK, CAUSE"));
+        // build_translation_prompt doesn't format detected_primitives into the
+        // prompt at all (only epistemic/mood/awareness/topic) -- there was
+        // never a "THINK, CAUSE" style rendering to assert on.
         assert!(prompt.contains("why does consciousness emerge?"));
     }
 

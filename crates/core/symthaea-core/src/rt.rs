@@ -1,7 +1,6 @@
 /// POSIX Hard Real-Time Memory Locking
 /// Prevents the Linux Kernel from lazy-allocating or swapping memory pages.
 /// This guarantees absolute zero page-fault latency during 500Hz control loops.
-
 #[cfg(target_os = "linux")]
 pub fn lock_memory_pages() {
     unsafe {

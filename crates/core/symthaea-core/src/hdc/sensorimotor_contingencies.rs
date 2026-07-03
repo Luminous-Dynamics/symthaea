@@ -551,15 +551,14 @@ impl ContingencyLearner {
         } else {
             let contingency = SensorimotorContingency::new(action.clone(), context, outcome);
 
-            if contingencies.len() >= self.config.max_contingencies_per_action {
-                if let Some(idx) = contingencies
+            if contingencies.len() >= self.config.max_contingencies_per_action
+                && let Some(idx) = contingencies
                     .iter()
                     .enumerate()
                     .min_by(|(_, a), (_, b)| a.confidence.total_cmp(&b.confidence))
                     .map(|(i, _)| i)
-                {
-                    contingencies.remove(idx);
-                }
+            {
+                contingencies.remove(idx);
             }
 
             contingencies.push(contingency.clone());
@@ -911,21 +910,21 @@ impl AffordanceDetector {
         for (action_type, readiness) in ready_actions {
             let action = ActionDescriptor::new(action_type);
 
-            if let Some(prediction) = self.perception.imagine_action(&action, context) {
-                if prediction.confidence >= self.config.min_confidence {
-                    let affordance = ActionAffordance {
-                        action: action_type,
-                        source: context.id.clone(),
-                        salience: readiness * prediction.confidence,
-                        confidence: prediction.confidence,
-                        reachable: true,
-                        effort: 0.3,
-                        risk: prediction.variance,
-                    };
+            if let Some(prediction) = self.perception.imagine_action(&action, context)
+                && prediction.confidence >= self.config.min_confidence
+            {
+                let affordance = ActionAffordance {
+                    action: action_type,
+                    source: context.id.clone(),
+                    salience: readiness * prediction.confidence,
+                    confidence: prediction.confidence,
+                    reachable: true,
+                    effort: 0.3,
+                    risk: prediction.variance,
+                };
 
-                    if affordance.salience >= self.config.salience_threshold {
-                        self.current_affordances.push(affordance);
-                    }
+                if affordance.salience >= self.config.salience_threshold {
+                    self.current_affordances.push(affordance);
                 }
             }
         }

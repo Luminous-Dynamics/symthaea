@@ -623,15 +623,19 @@ mod tests {
     #[test]
     fn attention_summary_none_before_cycle() {
         let s = make_service();
-        // Attention visualizer is only populated after cycles run
-        assert!(s.attention_summary().is_none());
+        // enable_visualization defaults to true, so the visualizer itself is
+        // constructed eagerly (see constructor.rs) — before any cycle runs it
+        // holds zero snapshots, not an absent Option.
+        assert_eq!(s.attention_summary().unwrap().num_snapshots, 0);
     }
 
     #[test]
     fn attention_heatmap_none_before_cycle() {
         let s = make_service();
-        // Attention heatmap requires attention data from cycles
-        assert!(s.attention_heatmap().is_none());
+        // Same eager-construction reasoning as attention_summary above: the
+        // heatmap renderer reports its own "no data" placeholder rather than
+        // the accessor returning None.
+        assert_eq!(s.attention_heatmap().unwrap(), "No attention data recorded");
     }
 
     // ── HDC bridge dimension ──────────────────────────────────────────

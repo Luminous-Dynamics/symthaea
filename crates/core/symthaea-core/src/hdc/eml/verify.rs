@@ -316,10 +316,7 @@ fn real_sample_values_for_assumption(assumption: EmlRealDomainAssumption) -> &'s
     }
 }
 
-fn real_samples<'a>(
-    vars: &'a [String],
-    assumption: EmlRealDomainAssumption,
-) -> Vec<Vec<(&'a str, f64)>> {
+fn real_samples(vars: &[String], assumption: EmlRealDomainAssumption) -> Vec<Vec<(&str, f64)>> {
     if vars.is_empty() {
         return vec![Vec::new()];
     }
@@ -339,17 +336,17 @@ fn real_samples<'a>(
     out
 }
 
-fn real_samples_for_expr<'a>(
-    vars: &'a [String],
+fn real_samples_for_expr(
+    vars: &[String],
     assumption: EmlRealDomainAssumption,
-) -> Vec<Vec<(&'a str, f64)>> {
+) -> Vec<Vec<(&str, f64)>> {
     real_samples(vars, assumption)
 }
 
-fn real_samples_for_term<'a>(
-    vars: &'a [String],
+fn real_samples_for_term(
+    vars: &[String],
     assumption: EmlRealDomainAssumption,
-) -> Vec<Vec<(&'a str, f64)>> {
+) -> Vec<Vec<(&str, f64)>> {
     real_samples(vars, assumption)
 }
 

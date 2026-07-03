@@ -449,7 +449,7 @@ pub fn binomial(n: u64, k: u64) -> u64 {
     let k = k.min(n - k); // symmetry: C(n,k) = C(n,n-k)
     let mut result = 1u64;
     for i in 0..k {
-        result = result.checked_mul(n - i).unwrap_or(u64::MAX) / (i + 1);
+        result = result.saturating_mul(n - i) / (i + 1);
     }
     result
 }
@@ -465,9 +465,7 @@ pub fn multinomial(n: u64, groups: &[u64]) -> u64 {
     let mut result = 1u64;
     let mut remaining = n;
     for &k in groups {
-        result = result
-            .checked_mul(binomial(remaining, k))
-            .unwrap_or(u64::MAX);
+        result = result.saturating_mul(binomial(remaining, k));
         remaining -= k;
     }
     result

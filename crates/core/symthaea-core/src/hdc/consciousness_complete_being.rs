@@ -226,16 +226,15 @@ impl SensorimotorGrounding {
         if let (Some(visual), Some(proprio)) = (
             self.sensory_buffers.get(&SensoryModality::Visual),
             self.sensory_buffers.get(&SensoryModality::Proprioceptive),
-        ) {
-            if let (Some(v), Some(p)) = (visual.back(), proprio.back()) {
-                let combined = BinaryHV::bundle(&[v.encoding, p.encoding]);
-                affordances.push(Affordance {
-                    name: "manipulate".to_string(),
-                    encoding: combined,
-                    relevance: v.intensity * p.intensity,
-                    requires_effector: MotorEffector::Manipulation,
-                });
-            }
+        ) && let (Some(v), Some(p)) = (visual.back(), proprio.back())
+        {
+            let combined = BinaryHV::bundle(&[v.encoding, p.encoding]);
+            affordances.push(Affordance {
+                name: "manipulate".to_string(),
+                encoding: combined,
+                relevance: v.intensity * p.intensity,
+                requires_effector: MotorEffector::Manipulation,
+            });
         }
 
         affordances

@@ -342,11 +342,11 @@ impl TieredPhi {
         }
 
         // Check cache
-        if self.config.enable_cache {
-            if let Some(cached) = self.check_cache(components) {
-                self.stats.cache_hits += 1;
-                return cached;
-            }
+        if self.config.enable_cache
+            && let Some(cached) = self.check_cache(components)
+        {
+            self.stats.cache_hits += 1;
+            return cached;
         }
 
         // Calculate using current tier
@@ -471,25 +471,25 @@ impl TieredPhi {
             .collect();
 
         // Check if we have cached state and same size
-        if let Some(ref mut state) = self.incremental_state {
-            if state.component_hashes.len() == n {
-                // Find changed components
-                let changed_indices: Vec<usize> = (0..n)
-                    .filter(|&i| state.component_hashes[i] != new_hashes[i])
-                    .collect();
+        if let Some(ref mut state) = self.incremental_state
+            && state.component_hashes.len() == n
+        {
+            // Find changed components
+            let changed_indices: Vec<usize> = (0..n)
+                .filter(|&i| state.component_hashes[i] != new_hashes[i])
+                .collect();
 
-                let k = changed_indices.len();
+            let k = changed_indices.len();
 
-                // If few components changed, do incremental update
-                if k > 0 && k <= n / 2 {
-                    state.incremental_updates += 1;
-                    return self.update_incremental(components, &new_hashes, &changed_indices);
-                }
+            // If few components changed, do incremental update
+            if k > 0 && k <= n / 2 {
+                state.incremental_updates += 1;
+                return self.update_incremental(components, &new_hashes, &changed_indices);
+            }
 
-                // If no changes, return cached value
-                if k == 0 {
-                    return state.last_phi;
-                }
+            // If no changes, return cached value
+            if k == 0 {
+                return state.last_phi;
             }
         }
 

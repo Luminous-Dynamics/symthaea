@@ -287,15 +287,15 @@ impl CausalMind {
                 let after = &text[after_start..].trim();
 
                 // Get last word of 'before' as cause, first word of 'after' as effect
-                if let Some(cause) = before.split_whitespace().last() {
-                    if let Some(effect) = after.split_whitespace().next() {
-                        // Clean up punctuation
-                        let cause = cause.trim_matches(|c: char| !c.is_alphanumeric());
-                        let effect = effect.trim_matches(|c: char| !c.is_alphanumeric());
+                if let Some(cause) = before.split_whitespace().last()
+                    && let Some(effect) = after.split_whitespace().next()
+                {
+                    // Clean up punctuation
+                    let cause = cause.trim_matches(|c: char| !c.is_alphanumeric());
+                    let effect = effect.trim_matches(|c: char| !c.is_alphanumeric());
 
-                        if !cause.is_empty() && !effect.is_empty() {
-                            self.add_causal_link(cause, effect, strength);
-                        }
+                    if !cause.is_empty() && !effect.is_empty() {
+                        self.add_causal_link(cause, effect, strength);
                     }
                 }
             }

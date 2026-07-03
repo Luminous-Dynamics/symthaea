@@ -99,22 +99,20 @@ impl PrimitiveSystem {
     pub fn validate_derivation_chain(&self) -> Vec<(String, bool, Option<String>)> {
         let mut diagnostics = Vec::new();
         for (name, prim) in &self.primitives {
-            if !prim.is_base {
-                if let Some(ref derivation) = prim.derivation {
-                    // Parse parent names from derivation expression (split on ^ or whitespace ops)
-                    let parent_names: Vec<&str> = derivation
-                        .split(['^', ' '])
-                        .map(|s| s.trim())
-                        .filter(|s| {
-                            !s.is_empty() && s.chars().next().is_some_and(|c| c.is_uppercase())
-                        })
-                        .collect();
-                    let all_found = parent_names
-                        .iter()
-                        .all(|p| self.primitives.contains_key(*p));
-                    if !all_found {
-                        diagnostics.push((name.clone(), false, Some(derivation.clone())));
-                    }
+            if !prim.is_base
+                && let Some(ref derivation) = prim.derivation
+            {
+                // Parse parent names from derivation expression (split on ^ or whitespace ops)
+                let parent_names: Vec<&str> = derivation
+                    .split(['^', ' '])
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty() && s.chars().next().is_some_and(|c| c.is_uppercase()))
+                    .collect();
+                let all_found = parent_names
+                    .iter()
+                    .all(|p| self.primitives.contains_key(*p));
+                if !all_found {
+                    diagnostics.push((name.clone(), false, Some(derivation.clone())));
                 }
             }
         }

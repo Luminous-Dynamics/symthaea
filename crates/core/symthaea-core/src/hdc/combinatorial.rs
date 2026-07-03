@@ -44,7 +44,7 @@ pub fn pigeonhole_min_max_bucket(items: usize, boxes: usize) -> usize {
     if boxes == 0 {
         return 0;
     }
-    (items + boxes - 1) / boxes // ceiling division
+    items.div_ceil(boxes) // ceiling division
 }
 
 /// Apply the pigeonhole principle to a concrete set. Given a slice of

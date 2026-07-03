@@ -40,10 +40,10 @@ impl ConjectureEngine {
         let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
         let mut rows: Vec<&Conjecture> = Vec::new();
         for c in &self.conjectures {
-            if seen.insert(c.source.as_str()) {
-                if let Some(best) = self.best_for(&c.source) {
-                    rows.push(best);
-                }
+            if seen.insert(c.source.as_str())
+                && let Some(best) = self.best_for(&c.source)
+            {
+                rows.push(best);
             }
         }
 
@@ -83,7 +83,7 @@ impl ConjectureEngine {
             let sanitized_source = latex_escape(&c.source);
 
             let mse_display = if c.training_mse < 1e-10 {
-                format!("$< 10^{{-10}}$")
+                "$< 10^{-10}$".to_string()
             } else if c.training_mse < 1.0 {
                 format!("${:.2e}$", c.training_mse)
             } else {
@@ -133,10 +133,10 @@ impl ConjectureEngine {
         let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
         let mut rows: Vec<&Conjecture> = Vec::new();
         for c in &self.conjectures {
-            if seen.insert(c.source.as_str()) {
-                if let Some(best) = self.best_for(&c.source) {
-                    rows.push(best);
-                }
+            if seen.insert(c.source.as_str())
+                && let Some(best) = self.best_for(&c.source)
+            {
+                rows.push(best);
             }
         }
 
@@ -166,10 +166,10 @@ impl ConjectureEngine {
                 status_tag
             ));
             out.push_str(&format!("║   {}\n", c.formula_str));
-            if let Some(anns) = annotations {
-                if let Some(headline) = anns.get(&c.source) {
-                    out.push_str(&format!("║   {}\n", headline));
-                }
+            if let Some(anns) = annotations
+                && let Some(headline) = anns.get(&c.source)
+            {
+                out.push_str(&format!("║   {}\n", headline));
             }
         }
 
@@ -202,20 +202,20 @@ impl ConjectureEngine {
             }
 
             for target_seq in &self.observations {
-                if let Some(mse_ratio) = Self::cross_fit(conjecture, target_seq) {
-                    if mse_ratio < max_mse_ratio {
-                        matches.push(CrossDomainFormulaMatch {
-                            formula_str: conjecture.formula_str.clone(),
-                            source_seq: conjecture.source.clone(),
-                            source_domain: conjecture.domain,
-                            target_seq: target_seq.name.clone(),
-                            target_domain: target_seq.domain,
-                            source_mse: conjecture.training_mse,
-                            target_mse: mse_ratio * conjecture.training_mse,
-                            mse_ratio,
-                            confidence: conjecture.confidence,
-                        });
-                    }
+                if let Some(mse_ratio) = Self::cross_fit(conjecture, target_seq)
+                    && mse_ratio < max_mse_ratio
+                {
+                    matches.push(CrossDomainFormulaMatch {
+                        formula_str: conjecture.formula_str.clone(),
+                        source_seq: conjecture.source.clone(),
+                        source_domain: conjecture.domain,
+                        target_seq: target_seq.name.clone(),
+                        target_domain: target_seq.domain,
+                        source_mse: conjecture.training_mse,
+                        target_mse: mse_ratio * conjecture.training_mse,
+                        mse_ratio,
+                        confidence: conjecture.confidence,
+                    });
                 }
             }
         }
@@ -314,7 +314,7 @@ impl ConjectureEngine {
             }
         }
 
-        discoveries.sort_by(|a, b| b.matching_primes.cmp(&a.matching_primes));
+        discoveries.sort_by_key(|d| std::cmp::Reverse(d.matching_primes));
         discoveries
     }
 }

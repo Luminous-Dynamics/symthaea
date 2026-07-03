@@ -214,10 +214,10 @@ impl PowerNetwork {
         // Reconstruct full angle vector
         let mut angles = vec![0.0f64; n];
         for (i, bus) in self.buses.iter().enumerate() {
-            if i != slack_idx {
-                if let Some(&ri) = bus_to_reduced.get(&bus.id) {
-                    angles[i] = angles_reduced.get(ri).copied().unwrap_or(0.0);
-                }
+            if i != slack_idx
+                && let Some(&ri) = bus_to_reduced.get(&bus.id)
+            {
+                angles[i] = angles_reduced.get(ri).copied().unwrap_or(0.0);
             }
         }
 

@@ -724,12 +724,11 @@ pub fn integrate_symbolic(term: &TermType, variable: &str) -> Option<TermType> {
             left,
             right,
         } => {
-            if let TermType::Constant(1) = left.as_ref() {
-                if let TermType::Variable(v) = right.as_ref() {
-                    if v == variable {
-                        return Some(func("ln", TermType::Variable(variable.to_string())));
-                    }
-                }
+            if let TermType::Constant(1) = left.as_ref()
+                && let TermType::Variable(v) = right.as_ref()
+                && v == variable
+            {
+                return Some(func("ln", TermType::Variable(variable.to_string())));
             }
             // ∫ f/c dx = (1/c) * ∫f dx
             if !contains_variable(right, variable) {
@@ -761,31 +760,31 @@ pub fn integrate_symbolic(term: &TermType, variable: &str) -> Option<TermType> {
 /// ∫ f(ax+b) dx = F(ax+b) / a
 fn integrate_transcendental(name: &str, arg: &TermType, variable: &str) -> Option<TermType> {
     // Check if argument is the simple variable
-    if let TermType::Variable(v) = arg {
-        if v == variable {
-            return match name {
-                "sin" => Some(negate(func(
-                    "cos",
-                    TermType::Variable(variable.to_string()),
-                ))),
-                "cos" => Some(func("sin", TermType::Variable(variable.to_string()))),
-                "exp" => Some(func("exp", TermType::Variable(variable.to_string()))),
-                "ln" => {
-                    // ∫ ln(x) dx = x*ln(x) - x
-                    let x = TermType::Variable(variable.to_string());
-                    Some(TermType::BinaryOp {
-                        op: SymbolicOp::Sub,
-                        left: Box::new(TermType::BinaryOp {
-                            op: SymbolicOp::Mul,
-                            left: Box::new(x.clone()),
-                            right: Box::new(func("ln", x.clone())),
-                        }),
-                        right: Box::new(x),
-                    })
-                }
-                _ => None,
-            };
-        }
+    if let TermType::Variable(v) = arg
+        && v == variable
+    {
+        return match name {
+            "sin" => Some(negate(func(
+                "cos",
+                TermType::Variable(variable.to_string()),
+            ))),
+            "cos" => Some(func("sin", TermType::Variable(variable.to_string()))),
+            "exp" => Some(func("exp", TermType::Variable(variable.to_string()))),
+            "ln" => {
+                // ∫ ln(x) dx = x*ln(x) - x
+                let x = TermType::Variable(variable.to_string());
+                Some(TermType::BinaryOp {
+                    op: SymbolicOp::Sub,
+                    left: Box::new(TermType::BinaryOp {
+                        op: SymbolicOp::Mul,
+                        left: Box::new(x.clone()),
+                        right: Box::new(func("ln", x.clone())),
+                    }),
+                    right: Box::new(x),
+                })
+            }
+            _ => None,
+        };
     }
 
     // Check for linear argument: a*x + b

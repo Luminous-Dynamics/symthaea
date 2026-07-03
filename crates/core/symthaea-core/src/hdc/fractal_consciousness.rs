@@ -231,15 +231,15 @@ impl FractalSubTopology {
             self.edges.push((from, to));
 
             // Update node connections
-            if let Some(node) = self.nodes.get_mut(&from) {
-                if !node.connections.contains(&to) {
-                    node.connections.push(to);
-                }
+            if let Some(node) = self.nodes.get_mut(&from)
+                && !node.connections.contains(&to)
+            {
+                node.connections.push(to);
             }
-            if let Some(node) = self.nodes.get_mut(&to) {
-                if !node.connections.contains(&from) {
-                    node.connections.push(from);
-                }
+            if let Some(node) = self.nodes.get_mut(&to)
+                && !node.connections.contains(&from)
+            {
+                node.connections.push(from);
             }
         }
     }

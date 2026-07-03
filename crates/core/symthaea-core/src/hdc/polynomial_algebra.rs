@@ -280,11 +280,11 @@ impl Poly {
         // Combine like monomials
         let mut combined: Vec<Term> = Vec::new();
         for term in self.terms.drain(..) {
-            if let Some(last) = combined.last_mut() {
-                if last.mono == term.mono {
-                    last.coeff = last.coeff + term.coeff;
-                    continue;
-                }
+            if let Some(last) = combined.last_mut()
+                && last.mono == term.mono
+            {
+                last.coeff = last.coeff + term.coeff;
+                continue;
             }
             combined.push(term);
         }
@@ -689,11 +689,11 @@ fn auto_reduce(g: &mut Vec<Poly>) {
             if i == j || to_remove[j] {
                 continue;
             }
-            if let (Some(lm_j), Some(lm_i)) = (g[j].leading_monomial(), g[i].leading_monomial()) {
-                if lm_j.divides(lm_i) {
-                    to_remove[i] = true;
-                    break;
-                }
+            if let (Some(lm_j), Some(lm_i)) = (g[j].leading_monomial(), g[i].leading_monomial())
+                && lm_j.divides(lm_i)
+            {
+                to_remove[i] = true;
+                break;
             }
         }
     }
@@ -987,7 +987,7 @@ pub fn resultant(f: &UniPoly, g: &UniPoly) -> Rat {
     rat_det(&mut mat, size)
 }
 
-fn rat_det(mat: &mut Vec<Vec<Rat>>, n: usize) -> Rat {
+fn rat_det(mat: &mut [Vec<Rat>], n: usize) -> Rat {
     let mut det = Rat::one();
     for col in 0..n {
         // Find pivot
@@ -1041,10 +1041,10 @@ pub fn squarefree_part(f: &UniPoly) -> UniPoly {
         return f.clone();
     }
     let (q, _) = UniPoly::pseudo_div(f, &g);
-    if let Some(lc) = q.leading_coeff() {
-        if !lc.is_zero() {
-            return q.scale(Rat::one() / lc);
-        }
+    if let Some(lc) = q.leading_coeff()
+        && !lc.is_zero()
+    {
+        return q.scale(Rat::one() / lc);
     }
     f.clone()
 }

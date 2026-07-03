@@ -187,19 +187,18 @@ impl ConsciousDialogueGenerator {
         if matches!(
             generation_depth,
             GenerationDepth::Reflective | GenerationDepth::Integrative
-        ) {
-            if let Some(memory_ref) = self.memory_reference(&context.memories) {
-                response_parts.push(memory_ref);
-                reasoning.push("Added memory reference".to_string());
-            }
+        ) && let Some(memory_ref) = self.memory_reference(&context.memories)
+        {
+            response_parts.push(memory_ref);
+            reasoning.push("Added memory reference".to_string());
         }
 
         // 4. Counterfactual insight (if integrative and available)
-        if matches!(generation_depth, GenerationDepth::Integrative) {
-            if let Some(cf_insight) = self.counterfactual_insight(&context.counterfactuals) {
-                response_parts.push(cf_insight);
-                reasoning.push("Added counterfactual insight".to_string());
-            }
+        if matches!(generation_depth, GenerationDepth::Integrative)
+            && let Some(cf_insight) = self.counterfactual_insight(&context.counterfactuals)
+        {
+            response_parts.push(cf_insight);
+            reasoning.push("Added counterfactual insight".to_string());
         }
 
         // 5. Metacognitive qualifier (if uncertain)

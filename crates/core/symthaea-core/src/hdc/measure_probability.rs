@@ -118,10 +118,10 @@ impl MeasureSpace {
                     continue;
                 }
                 let u = SigmaAlgebra::union(a, b);
-                if let Some(k) = sets.iter().position(|s| s == &u) {
-                    if (self.measure[k] - self.measure[i] - self.measure[j]).abs() > 1e-10 {
-                        return false;
-                    }
+                if let Some(k) = sets.iter().position(|s| s == &u)
+                    && (self.measure[k] - self.measure[i] - self.measure[j]).abs() > 1e-10
+                {
+                    return false;
                 }
             }
         }

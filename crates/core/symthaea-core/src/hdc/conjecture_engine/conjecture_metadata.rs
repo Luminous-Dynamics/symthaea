@@ -140,12 +140,12 @@ struct EmlMetadataSnapshot {
 impl EmlMetadataSnapshot {
     fn apply_to(&self, conjecture: &mut Conjecture) {
         conjecture.eml_compiled = self.eml_compiled.clone();
-        conjecture.eml_metrics = self.eml_metrics.clone();
+        conjecture.eml_metrics = self.eml_metrics;
         conjecture.eml_verified_real = self.eml_verified_real;
         conjecture.eml_real_domain = self.eml_real_domain;
         conjecture.eml_verified_complex = self.eml_verified_complex;
         conjecture.eml_constructive_compiled = self.eml_constructive_compiled.clone();
-        conjecture.eml_constructive_metrics = self.eml_constructive_metrics.clone();
+        conjecture.eml_constructive_metrics = self.eml_constructive_metrics;
         conjecture.eml_verified_constructive_real = self.eml_verified_constructive_real;
     }
 }
@@ -270,7 +270,7 @@ pub(crate) fn identify_constant(val: f64) -> Option<String> {
         ("√3", 3.0_f64.sqrt()),
         ("1/√3", 1.0 / 3.0_f64.sqrt()),
         ("γ (Euler-Mascheroni)", 0.5772156649015329),
-        ("Catalan", 0.9159655941772190),
+        ("Catalan", 0.915_965_594_177_219),
         ("Apéry ζ(3)", 1.2020569031595942),
     ];
     for (name, known) in candidates {
@@ -300,10 +300,10 @@ pub fn annotate_conjecture(conjecture: &Conjecture) -> String {
     }
 
     let limit = conjecture.formula.eval(&[("n", 1000.0)]);
-    if limit.is_finite() {
-        if let Some(name) = identify_constant(limit) {
-            annotations.push(format!("limit→{}", name));
-        }
+    if limit.is_finite()
+        && let Some(name) = identify_constant(limit)
+    {
+        annotations.push(format!("limit→{}", name));
     }
 
     if let Some(tag) = eml_backend_annotation(conjecture) {
