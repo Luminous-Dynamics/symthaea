@@ -126,16 +126,18 @@ pub fn generate_leptos_bridge(fns: &[ZomeFnMetadata]) -> String {
         let fn_name_str = &f.name;
         let input_ty = syn::parse_str::<Type>(&f.input_type).unwrap();
         let output_ty = syn::parse_str::<Type>(&f.output_type).unwrap();
+        let role_str = &f.role;
         let zome_name = &f.zome;
 
         actions.push(quote! {
-            pub fn #fn_name() -> Action<#input_ty, Result<#output_ty, MycelixError>> {
+            pub fn #fn_name() -> Action<#input_ty, Result<#output_ty, String>> {
                 create_server_action(move |input: #input_ty| {
+                    let role = #role_str;
                     let zome_name = #zome_name;
                     let fn_name = #fn_name_str;
                     async move {
                         let client = use_holochain();
-                        client.call_zome(zome_name, fn_name, input).await
+                        client.call_zome(role, zome_name, fn_name, &input).await
                     }
                 })
             }
@@ -144,7 +146,7 @@ pub fn generate_leptos_bridge(fns: &[ZomeFnMetadata]) -> String {
 
     let expanded = quote! {
         use leptos::prelude::*;
-        use mycelix_leptos_client::{use_holochain, MycelixError};
+        use mycelix_leptos_core::holochain_provider::use_holochain;
 
         #(#actions)*
     };
