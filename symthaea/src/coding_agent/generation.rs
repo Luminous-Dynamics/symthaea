@@ -39,6 +39,18 @@ impl CodingAgent {
             }
         }
 
+        // Try the unified CodeOrchestrator first when wired in (feature + config
+        // gated via `use_orchestrator`). The orchestrator runs native/analogy/LLM
+        // backends internally, each accepted only after its own compiler/test
+        // verification, so a positive result here supersedes the raw
+        // IntelligentDispatcher path for this iteration. Falls through to the
+        // existing dispatcher logic below when disabled or unaccepted, so default
+        // behavior (use_orchestrator=false) is unchanged.
+        #[cfg(feature = "code_generation")]
+        if self.try_orchestrator_generation() {
+            return;
+        }
+
         // Get consciousness state for dispatch routing
         let confidence = self.cognitive_loop.prediction_confidence();
         let phi = self.phi_trace.last().copied().unwrap_or(0.5) as f64;
@@ -351,6 +363,7 @@ impl CodingAgent {
             any_chained_fix = true;
             fix_descriptions.push(format!("structured-line-fix ({} errors)", structured.len()));
             self.store_fix_strategies(&structured, "structured-line-fix");
+            self.observe_errors_for_self_mod(&structured, "structured-line-fix", true);
         }
 
         // Stage 2: Category-aware fixes (operates on output of stage 1)
@@ -370,6 +383,7 @@ impl CodingAgent {
                     .join(", ")
             ));
             self.store_fix_strategies(&structured, "category-aware-fix");
+            self.observe_errors_for_self_mod(&structured, "category-aware-fix", true);
         }
 
         // Commit chained fixes if any stage succeeded
@@ -403,6 +417,7 @@ impl CodingAgent {
 
             // Store successful fix strategies for future reuse
             self.store_fix_strategies(&structured, "basic-pattern-fix");
+            self.observe_errors_for_self_mod(&structured, "basic-pattern-fix", true);
 
             self.observations.push("Basic auto-fix applied".into());
             tracing::info!(
@@ -424,6 +439,7 @@ impl CodingAgent {
             ?categories,
             "Auto-fix exhausted, escalating to LLM"
         );
+        self.observe_errors_for_self_mod(&structured, "escalate-to-llm", false);
 
         false
     }
@@ -702,6 +718,81 @@ impl CodingAgent {
         }
     }
 
+    /// Observe real compiler errors into the self-modification error-cluster
+    /// tracker (`FixRuleGenerator`), closing the wiring gap noted in the coding-agent
+    /// audit: `FixRuleGenerator::observe_error()` previously had zero callers anywhere.
+    ///
+    /// This is an **observation-only** call site: it never applies or promotes a
+    /// generated rule. Rule *generation* (`try_generate_rules()`) additionally
+    /// requires `config.enable_self_modification` (default `false`); rule
+    /// *application*/*promotion* (`try_apply_rule`, `record_rule_outcome`) is not
+    /// wired into the live agent loop at all — this is a self-modification
+    /// pipeline and must never silently mutate the agent's own fix repertoire.
+    pub(super) fn observe_errors_for_self_mod(
+        &mut self,
+        errors: &[crate::language::code_executor::CompileError],
+        strategy: &str,
+        success: bool,
+    ) {
+        for error in errors {
+            let sig = Self::normalize_error_pattern(&error.message);
+            let error_code = error.code.clone().unwrap_or_default();
+            let category = super::error_knowledge::ErrorCategory::from_error_code(&error_code);
+            let context: String = self
+                .generated_code
+                .as_deref()
+                .unwrap_or("")
+                .chars()
+                .take(200)
+                .collect();
+            self.fix_rule_generator.observe_error(
+                &error_code,
+                &format!("{:?}", category),
+                &sig,
+                strategy,
+                success,
+                &context,
+            );
+        }
+
+        if self.config.enable_self_modification {
+            let phi = self.phi_trace.last().copied().unwrap_or(0.0);
+            let calibration = self.current_calibration_quality();
+            let generated = self.fix_rule_generator.try_generate_rules(phi, calibration);
+            if !generated.is_empty() {
+                tracing::info!(
+                    target: "symthaea::coding_agent",
+                    count = generated.len(),
+                    phi = phi,
+                    calibration = calibration,
+                    "FixRuleGenerator hypothesized new fix rule(s) (observation-only, not applied)"
+                );
+                self.observations.push(format!(
+                    "Self-modification: hypothesized {} new fix rule(s) (not auto-applied)",
+                    generated.len()
+                ));
+            }
+        }
+    }
+
+    /// Current MAGI calibration quality (1 - running Brier score), used only to
+    /// gate `FixRuleGenerator::try_generate_rules()`. Without a live orchestrator
+    /// (`magi_bridge` unpopulated), this returns a neutral 0.5, which sits below
+    /// `FixRuleGenerator`'s default 0.8 calibration-gate threshold — so rule
+    /// generation naturally stays inert without real calibration evidence.
+    #[cfg(feature = "code_generation")]
+    fn current_calibration_quality(&self) -> f32 {
+        self.magi_bridge
+            .as_ref()
+            .map(|bridge| (1.0 - bridge.stats().running_brier as f32).clamp(0.0, 1.0))
+            .unwrap_or(0.5)
+    }
+
+    #[cfg(not(feature = "code_generation"))]
+    fn current_calibration_quality(&self) -> f32 {
+        0.5
+    }
+
     /// Synchronously call the async dispatcher.
     pub(super) fn block_on_dispatch(
         dispatcher: &mut IntelligentDispatcher,
@@ -730,6 +821,124 @@ impl CodingAgent {
                     .expect("failed to create tokio runtime for code generation");
                 rt.block_on(dispatcher.generate(prompt, params, epistemic, prediction_error, phi))
             }
+        }
+    }
+
+    /// Attempt generation via the unified `CodeOrchestrator` (native CodeGenerator +
+    /// CodeAlgebra analogy + LLM fallback, each accepted only after compiler/test
+    /// verification). Only active when `config.use_orchestrator` is set — this is
+    /// the real, live call site closing the wiring gap between `CodeOrchestrator`/
+    /// `MagiCodeBridge` and `CodingAgent`, without changing default behavior
+    /// (`IntelligentDispatcher` remains the default route, `use_orchestrator`
+    /// defaults to `false`).
+    ///
+    /// Returns `true` if the orchestrator produced accepted code (already written
+    /// to disk and recorded in `generated_code`/`generation_tiers`) — the caller
+    /// should skip the legacy dispatch path for this iteration. Returns `false` to
+    /// fall through to `IntelligentDispatcher` when the orchestrator is disabled or
+    /// did not produce an accepted candidate.
+    #[cfg(feature = "code_generation")]
+    pub(super) fn try_orchestrator_generation(&mut self) -> bool {
+        if self.orchestrator.is_none() {
+            return false;
+        }
+
+        let target = self.resolve_target_file();
+        let name = target
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("generated")
+            .to_string();
+        let language = self.target_language().to_string();
+        let current_phi = self.phi_trace.last().copied().unwrap_or(0.5);
+
+        let mut request =
+            symthaea_core::synthesis_trait::SynthesisRequest::new(&language, &name, &self.task);
+        request.consciousness_level = current_phi;
+        // If the task text embeds an explicit signature ("fn name(...) -> Ret"),
+        // pass it through — it materially improves native/LLM acceptance odds.
+        if let Some(sig) = Self::extract_fn_signature(&self.task) {
+            request = request.with_signature(&sig);
+        }
+
+        // MAGI world-prediction: predict before generating, resolve immediately
+        // after — the orchestrator's own internal compiler/test verification means
+        // compiled/tests_passed are both already known from `response.accepted`,
+        // so there's no need to defer resolution to the agent's own Testing phase.
+        let prediction_id = self.magi_bridge.as_mut().map(|bridge| {
+            bridge.predict_generation(&name, "orchestrator", 0.6, "code will compile and verify")
+        });
+
+        let response = self
+            .orchestrator
+            .as_ref()
+            .expect("checked is_none above")
+            .synthesize(&request);
+
+        if let Some(id) = prediction_id {
+            if let Some(ref mut bridge) = self.magi_bridge {
+                bridge.resolve_prediction(&id, response.accepted, Some(response.accepted));
+            }
+        }
+
+        if !response.accepted || response.source.trim().is_empty() {
+            self.observations.push(format!(
+                "Orchestrator: no accepted candidate ({})",
+                response.narrative.as_deref().unwrap_or("unverified")
+            ));
+            return false;
+        }
+
+        let tier = Self::orchestrator_backend_tier(&response.backend_name);
+        self.write_code_to_disk(&target, &response.source);
+        self.generated_code = Some(Self::sanitize_generated_code(&Self::strip_code_fences(
+            &response.source,
+        )));
+        self.generation_tiers.push(tier);
+        self.native_exhausted = false;
+        self.observations.push(format!(
+            "Orchestrator accepted via {} (confidence {:.2})",
+            response.backend_name, response.confidence
+        ));
+
+        tracing::info!(
+            target: "symthaea::coding_agent",
+            backend = %response.backend_name,
+            confidence = response.confidence,
+            target = %target.display(),
+            "CodeOrchestrator accepted generation"
+        );
+
+        true
+    }
+
+    /// Map an orchestrator backend name to the existing `BackendTier` telemetry enum.
+    #[cfg(feature = "code_generation")]
+    pub(super) fn orchestrator_backend_tier(backend_name: &str) -> BackendTier {
+        if backend_name.starts_with("LLM:") {
+            BackendTier::LocalLlm
+        } else if backend_name == "HardwareDriverEmitter" || backend_name == "HdlEmitter" {
+            BackendTier::Hardware
+        } else {
+            // CodeGenerator, CodeAlgebra::analogy, GeodesicSkeleton — all native,
+            // compiler-verified, zero-external-call tiers.
+            BackendTier::Native
+        }
+    }
+
+    /// Extract a Rust-style `fn name(...) -> Ret` signature embedded in free text,
+    /// if present. Used to enrich orchestrator requests when the task description
+    /// already specifies an exact signature.
+    #[cfg(feature = "code_generation")]
+    pub(super) fn extract_fn_signature(task: &str) -> Option<String> {
+        let start = task.find("fn ")?;
+        let rest = &task[start..];
+        let end = rest.find(['{', '\n'])?;
+        let sig = rest[..end].trim_end();
+        if sig.contains('(') {
+            Some(sig.to_string())
+        } else {
+            None
         }
     }
 }

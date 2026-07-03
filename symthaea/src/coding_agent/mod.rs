@@ -62,6 +62,8 @@ use crate::cognitive_loop::motor_output_bridge::{
 };
 use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
 use crate::consciousness::fep_active_inference::MotorCommandType;
+#[cfg(feature = "code_generation")]
+use crate::language::code_orchestrator::CodeOrchestrator;
 use crate::language::intelligent_dispatcher::{BackendTier, DispatchResult, IntelligentDispatcher};
 use crate::language::llm_backend::GenerationParams;
 use crate::mind::structured_thought::EpistemicStatus;
@@ -299,6 +301,21 @@ pub struct CodingAgentConfig {
     /// Use Anthropic Claude API as the cloud LLM tier for complex tasks.
     /// Reads `ANTHROPIC_API_KEY` from environment. Falls back gracefully if unavailable.
     pub use_cloud_llm: bool,
+    /// Route generation through the unified `CodeOrchestrator` (native + analogy +
+    /// LLM, each compiler-verified before acceptance) and record MAGI world-prediction
+    /// calibration around every attempt, instead of only the raw `IntelligentDispatcher`
+    /// path. Requires the `code_generation` feature. Defaults to `false` — this closes
+    /// a real wiring gap (the orchestrator previously had zero call sites in the live
+    /// agent loop) without changing default behavior.
+    pub use_orchestrator: bool,
+    /// Allow `FixRuleGenerator::try_generate_rules()` to hypothesize new self-modification
+    /// fix rules from observed error clusters. Defaults to `false`. Observation
+    /// (`FixRuleGenerator::observe_error()`) always runs regardless of this flag — only
+    /// rule *generation* is gated. Rule *application*/*promotion* (`try_apply_rule`,
+    /// `record_rule_outcome`) is never wired into the live agent loop at all, by design:
+    /// this is a self-modification pipeline and must never silently mutate the agent's
+    /// own fix repertoire without an explicit, separate promotion step.
+    pub enable_self_modification: bool,
 }
 
 impl Default for CodingAgentConfig {
@@ -313,6 +330,8 @@ impl Default for CodingAgentConfig {
             enable_real_exec: false,
             use_local_llm: false,
             use_cloud_llm: false,
+            use_orchestrator: false,
+            enable_self_modification: false,
         }
     }
 }
@@ -413,6 +432,22 @@ pub struct CodingAgent {
     geodesic_verifier: Option<symthaea_geodesic::GeodesicSynthesizer>,
     /// Cached GCS violations from the last verification pass, injected into the next prompt.
     gcs_violations: Vec<String>,
+    /// Unified code orchestrator (CodeGenerator + analogy + LLM, all compiler-verified
+    /// before acceptance). Populated only when `config.use_orchestrator` is true — see
+    /// `try_orchestrator_generation()` in `generation.rs` for the live call site.
+    #[cfg(feature = "code_generation")]
+    orchestrator: Option<CodeOrchestrator>,
+    /// MAGI world-prediction bridge: predicts compile/test success before each
+    /// orchestrator attempt and resolves against the actual outcome afterward,
+    /// calibrating confidence over time via Brier scoring. Populated alongside
+    /// `orchestrator` (both gated on `config.use_orchestrator`).
+    #[cfg(feature = "code_generation")]
+    magi_bridge: Option<magi_code_bridge::MagiCodeBridge>,
+    /// Self-modification engine: observes real compiler-error clusters from the
+    /// Fixing phase and (only when `config.enable_self_modification` is set)
+    /// hypothesizes new auto-fix rules. Rules are never applied or promoted from
+    /// this path — see `generation.rs::observe_errors_for_self_mod()`.
+    fix_rule_generator: self_modification::FixRuleGenerator,
 }
 
 impl CodingAgent {
@@ -475,6 +510,8 @@ impl CodingAgent {
         };
 
         let experience_store = Self::try_init_experience_store(&config.working_dir);
+        #[cfg(feature = "code_generation")]
+        let use_orchestrator = config.use_orchestrator;
 
         Self {
             cognitive_loop,
@@ -518,6 +555,19 @@ impl CodingAgent {
             #[cfg(feature = "geodesic_synthesis")]
             geodesic_verifier: None,
             gcs_violations: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            orchestrator: if use_orchestrator {
+                Some(CodeOrchestrator::new())
+            } else {
+                None
+            },
+            #[cfg(feature = "code_generation")]
+            magi_bridge: if use_orchestrator {
+                Some(magi_code_bridge::MagiCodeBridge::new())
+            } else {
+                None
+            },
+            fix_rule_generator: self_modification::FixRuleGenerator::new(),
         }
     }
 
