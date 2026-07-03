@@ -77,7 +77,7 @@ pub fn spawn_globe(
         DirectionalLight {
             illuminance: 12_000.0,
             color: Color::linear_rgb(1.0, 0.98, 0.95),
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.4, 0.6, 0.0)),

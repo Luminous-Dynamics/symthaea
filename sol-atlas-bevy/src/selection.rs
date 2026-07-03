@@ -26,7 +26,7 @@ pub fn setup_selection_ui(mut commands: Commands) {
     commands.spawn((
         Text::new("Sol Atlas — Arrow keys: timeline | Space: play | Click: select | Esc: exit"),
         TextFont {
-            font_size: 16.0,
+            font_size: FontSize::Px(16.0),
             ..default()
         },
         TextColor(Color::linear_rgb(0.6, 0.7, 0.8)),
