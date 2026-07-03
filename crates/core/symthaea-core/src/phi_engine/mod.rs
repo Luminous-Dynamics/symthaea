@@ -24,9 +24,12 @@
 //!
 //! | Method | Complexity | Accuracy | Use Case |
 //! |--------|-----------|----------|----------|
-//! | Continuous | O(n³) | High | Research, small networks |
-//! | Resonator | O(n log n) | Medium | Large networks, real-time |
-//! | Tiered | O(1) to O(2ⁿ) | Variable | Testing to exact |
+//! | Continuous (`ContinuousPhiCalculator` = `ConnectivityCalculator`, algebraic connectivity λ₂) | O(n³) | **Deprecated: r = -0.62 with true Φ** (`hdc/tiered_phi/core.rs`) | Do not use for Φ; topology-connectivity heuristic only |
+//! | Resonator (`ResonantPhiCalculator`) | O(n log n) | **Not a valid Φ approximation** — its own module doc (`hdc/phi_resonant.rs`) says it measures coupled-oscillator resonance dynamics, not IIT integration, and internally uses the same deprecated spectral gap | Modeling synchronization dynamics only |
+//! | Tiered (`TieredPhi`) | O(1) to O(2ⁿ) | Variable — `SampledPartition`: r=0.9998 vs exact for small N; `ExhaustivePartition`: true IIT Φ for n≤12; `RandomBaseline`: testing mock, not a measurement; its own `SpectralConnectivity` tier carries the same r=-0.62 caveat as Continuous above | Prefer `SampledPartition`/`ExhaustivePartition` for anything that needs to approximate real Φ |
+//!
+//! (Corrected 2026-07-03 — this table previously rated the two deprecated/invalid
+//! methods "High"/"Medium" accuracy with no caveat.)
 //!
 //! ## Example Usage
 //!

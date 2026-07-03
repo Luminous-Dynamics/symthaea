@@ -106,14 +106,26 @@ const BASAL_PHI_CAP: f64 = 0.08;
 
 /// Number of radial shells `TargetMorphology` buckets the organoid into.
 const N_SHELLS: usize = 4;
+/// Number of angular octants (sign combination of x/y/z) each shell is
+/// further subdivided into, giving `TargetMorphology` real spatial — not
+/// just radial — resolution.
+const N_OCTANTS: usize = 8;
+/// Total spatial bins = shells x octants.
+const N_BINS: usize = N_SHELLS * N_OCTANTS;
 /// Radius beyond which all cells are bucketed into the outermost shell.
 const SHELL_MAX_RADIUS: f32 = 1.3;
+/// Weight of the Vmem spatial pattern in `TargetMorphology::discrepancy`,
+/// vs. the downstream cell-type composition (weight `1.0 -
+/// VMEM_PATTERN_WEIGHT`). The Vmem pattern is primary because it's the
+/// actual bioelectric "memory" Levin's work argues instructs anatomy —
+/// composition is a secondary, downstream diagnostic.
+const VMEM_PATTERN_WEIGHT: f64 = 0.6;
 /// Per-day probability a wound-boundary progenitor divides during active
 /// regeneration — deliberately higher than the baseline `PROLIFERATION_RATE`
 /// to model blastema-like accelerated growth at the wound site.
 const REGENERATION_PROLIFERATION_BOOST: f64 = 0.25;
-/// RMS shell-composition discrepancy below which regeneration is considered
-/// converged (the wound is "healed").
+/// RMS discrepancy below which regeneration is considered converged (the
+/// wound is "healed").
 const MORPHOLOGY_CONVERGENCE_TOLERANCE: f64 = 0.05;
 /// Days after which regeneration bookkeeping times out even if the target
 /// was never reached (avoids an unbounded regenerating state).
@@ -478,34 +490,85 @@ impl MorphogeneticField {
             self.bioelectric.vmem[idx] = VMEM_WOUND_SPIKE;
         }
     }
+
+    /// Randomize every cell's Vmem within `[VMEM_HYPERPOLARIZED,
+    /// VMEM_DEPOLARIZED]`, without removing or altering any cell's
+    /// type/position/gene expression — the model's analog of a
+    /// pharmacological/optogenetic bioelectric disruption (ion-channel
+    /// drugs, forced depolarization) rather than physical injury. Existing
+    /// gap-junction connections are left intact, so a subsequent
+    /// `step_vmem_diffusion` pass can immediately start smoothing the
+    /// scrambled pattern back toward local coherence — but *not* toward any
+    /// specific spatially-targeted pattern unless surviving structure
+    /// elsewhere still encodes it (see [`crate::experiments`] module docs
+    /// for the boundary this exposes).
+    pub fn scramble_vmem(&mut self, seed: u64) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        for v in self.bioelectric.vmem.iter_mut() {
+            *v = rng.gen_range(VMEM_HYPERPOLARIZED..=VMEM_DEPOLARIZED);
+        }
+    }
+
+    /// Directly impose a Vmem value on every cell as a function of its
+    /// spatial position, without changing cell type/identity — models an
+    /// externally applied or naturally pre-existing bioelectric prepattern
+    /// (Levin's lab routinely imposes target Vmem patterns via
+    /// ionophores/optogenetics independent of any transcriptional change).
+    /// Useful for building organoids with genuine spatial bioelectric
+    /// structure to test recovery against, without waiting on the
+    /// (comparatively rare) Turing-driven differentiation pathway to
+    /// produce heterogeneity on its own.
+    pub fn impose_vmem_pattern(&mut self, f: impl Fn(&[f32; 3]) -> f32) {
+        for i in 0..self.cells.len() {
+            let pos = self.cells[i].position;
+            self.bioelectric.vmem[i] = f(&pos);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
 // TargetMorphology
 // ---------------------------------------------------------------------------
 
-/// A captured "goal" anatomical pattern: the fraction of each coarse cell
-/// type ([undifferentiated, progenitor, neuron, glial]) within each of
-/// [`N_SHELLS`] radial shells of the organoid.
+/// A captured "goal" anatomical pattern, spatially binned into
+/// [`N_SHELLS`] radial shells x [`N_OCTANTS`] angular octants ([`N_BINS`]
+/// bins total).
 ///
-/// This is a deliberately coarse stand-in for what Levin's lab calls the
-/// bioelectric "target morphology" a tissue's collective intelligence
-/// navigates toward and maintains (equifinality / regeneration to a stored
-/// anatomical setpoint, independent of which specific cells survived). A
-/// full model would key this off Vmem pattern directly; this one uses
-/// realized cell-type composition, which is downstream of Vmem in this
-/// simulation and easier to validate against.
+/// The primary signal is `bin_mean_vmem` — the actual bioelectric pattern
+/// Levin's lab argues *is* the stored "memory" of target anatomy, separable
+/// from genome and from chemical gradients (see module docs). Earlier
+/// versions of this type captured only downstream cell-type composition,
+/// which conflated the memory with one of its effects; `bin_composition` is
+/// kept as a secondary, diagnostic signal (useful for interpreting *what*
+/// regenerated, not just whether the voltage pattern matches), weighted
+/// lower in `discrepancy` — see [`VMEM_PATTERN_WEIGHT`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetMorphology {
-    /// `shell_composition[shell][bucket]` — bucket 0=undifferentiated,
+    /// Mean Vmem per spatial bin — the bioelectric pattern memory.
+    pub bin_mean_vmem: Vec<f32>,
+    /// `bin_composition[bin][bucket]` — bucket 0=undifferentiated,
     /// 1=progenitor (incl. neural progenitor), 2=neuron, 3=glial.
-    pub shell_composition: [[f32; 4]; N_SHELLS],
+    pub bin_composition: Vec<[f32; 4]>,
 }
 
 fn shell_index(radius: f32) -> usize {
     let r = radius.clamp(0.0, SHELL_MAX_RADIUS);
     let idx = (r / SHELL_MAX_RADIUS * N_SHELLS as f32) as usize;
     idx.min(N_SHELLS - 1)
+}
+
+/// Sign-combination octant of a position: bit 0 = x>=0, bit 1 = y>=0,
+/// bit 2 = z>=0.
+fn octant_index(pos: &[f32; 3]) -> usize {
+    let x = (pos[0] >= 0.0) as usize;
+    let y = (pos[1] >= 0.0) as usize;
+    let z = (pos[2] >= 0.0) as usize;
+    x | (y << 1) | (z << 2)
+}
+
+fn bin_index(pos: &[f32; 3]) -> usize {
+    let r = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt();
+    shell_index(r) * N_OCTANTS + octant_index(pos)
 }
 
 fn cell_type_bucket(ct: OrganoidCellType) -> usize {
@@ -518,46 +581,72 @@ fn cell_type_bucket(ct: OrganoidCellType) -> usize {
 }
 
 impl TargetMorphology {
-    /// Snapshot the current cell-type-by-shell composition of `field` as a
-    /// goal pattern.
+    /// Snapshot the current per-bin mean Vmem and cell-type composition of
+    /// `field` as a goal pattern.
     pub fn capture(field: &MorphogeneticField) -> Self {
-        let mut counts = [[0u32; 4]; N_SHELLS];
-        let mut totals = [0u32; N_SHELLS];
-        for cell in &field.cells {
-            let r =
-                (cell.position[0].powi(2) + cell.position[1].powi(2) + cell.position[2].powi(2))
-                    .sqrt();
-            let s = shell_index(r);
+        let mut vmem_sum = vec![0.0f64; N_BINS];
+        let mut counts = vec![[0u32; 4]; N_BINS];
+        let mut totals = vec![0u32; N_BINS];
+        for (i, cell) in field.cells.iter().enumerate() {
+            let bin = bin_index(&cell.position);
+            vmem_sum[bin] += field.bioelectric.vmem[i] as f64;
             let b = cell_type_bucket(cell.cell_type);
-            counts[s][b] += 1;
-            totals[s] += 1;
+            counts[bin][b] += 1;
+            totals[bin] += 1;
         }
-        let mut shell_composition = [[0.0f32; 4]; N_SHELLS];
-        for s in 0..N_SHELLS {
-            if totals[s] == 0 {
+        let mut bin_mean_vmem = vec![0.0f32; N_BINS];
+        let mut bin_composition = vec![[0.0f32; 4]; N_BINS];
+        for bin in 0..N_BINS {
+            if totals[bin] == 0 {
                 continue;
             }
+            bin_mean_vmem[bin] = (vmem_sum[bin] / totals[bin] as f64) as f32;
             for b in 0..4 {
-                shell_composition[s][b] = counts[s][b] as f32 / totals[s] as f32;
+                bin_composition[bin][b] = counts[bin][b] as f32 / totals[bin] as f32;
             }
         }
-        Self { shell_composition }
+        Self {
+            bin_mean_vmem,
+            bin_composition,
+        }
     }
 
-    /// RMS distance between this target's shell composition and `field`'s
-    /// current shell composition. 0.0 = exact match.
+    /// Combined RMS discrepancy between this target and `field`'s current
+    /// state: primarily the Vmem spatial pattern, secondarily the
+    /// downstream cell-type composition (see [`VMEM_PATTERN_WEIGHT`]).
+    /// 0.0 = exact match.
     pub fn discrepancy(&self, field: &MorphogeneticField) -> f64 {
         let current = Self::capture(field);
-        let mut sum_sq = 0.0f64;
-        let mut count = 0usize;
-        for s in 0..N_SHELLS {
-            for b in 0..4 {
-                let d = (self.shell_composition[s][b] - current.shell_composition[s][b]) as f64;
-                sum_sq += d * d;
-                count += 1;
+
+        let vmem_span = (VMEM_DEPOLARIZED - VMEM_HYPERPOLARIZED).abs() as f64;
+        let vmem_rms = {
+            let sum_sq: f64 = self
+                .bin_mean_vmem
+                .iter()
+                .zip(current.bin_mean_vmem.iter())
+                .map(|(&a, &b)| {
+                    let d = (a - b) as f64;
+                    d * d
+                })
+                .sum();
+            (sum_sq / N_BINS as f64).sqrt()
+        };
+        let vmem_rms_normalized = (vmem_rms / vmem_span).min(1.0);
+
+        let composition_rms = {
+            let mut sum_sq = 0.0f64;
+            let mut count = 0usize;
+            for bin in 0..N_BINS {
+                for b in 0..4 {
+                    let d = (self.bin_composition[bin][b] - current.bin_composition[bin][b]) as f64;
+                    sum_sq += d * d;
+                    count += 1;
+                }
             }
-        }
-        (sum_sq / count as f64).sqrt()
+            (sum_sq / count as f64).sqrt()
+        };
+
+        VMEM_PATTERN_WEIGHT * vmem_rms_normalized + (1.0 - VMEM_PATTERN_WEIGHT) * composition_rms
     }
 }
 
@@ -582,6 +671,23 @@ impl NeuralOrganoid {
             self.days_since_wound = 0;
         }
         removed
+    }
+
+    /// Scramble the organoid's Vmem pattern without removing any cells —
+    /// see [`MorphogeneticField::scramble_vmem`]. Resets the regeneration
+    /// clock so `advance_regeneration` treats this as fresh damage to
+    /// recover from (bioelectric perturbation without tissue loss).
+    pub fn scramble_vmem(&mut self, seed: u64) {
+        self.field.scramble_vmem(seed);
+        self.days_since_wound = 0;
+    }
+
+    /// Impose a Vmem pattern as a function of position — see
+    /// [`MorphogeneticField::impose_vmem_pattern`]. Does not reset the
+    /// regeneration clock (this is meant for building a starting template,
+    /// not for perturbing an already-running experiment).
+    pub fn impose_vmem_pattern(&mut self, f: impl Fn(&[f32; 3]) -> f32) {
+        self.field.impose_vmem_pattern(f);
     }
 
     /// RMS discrepancy between the captured target morphology and the
@@ -974,6 +1080,62 @@ mod tests {
         assert_eq!(
             cell_type_bucket(OrganoidCellType::Neuron(NeuronSubtype::Excitatory)),
             2
+        );
+    }
+
+    #[test]
+    fn scramble_vmem_changes_pattern_without_removing_cells() {
+        let mut field = MorphogeneticField::new(50, 30);
+        let before_count = field.num_cells();
+        field.scramble_vmem(1);
+        assert_eq!(field.num_cells(), before_count);
+        assert!(
+            field
+                .bioelectric
+                .vmem
+                .iter()
+                .all(|&v| (VMEM_HYPERPOLARIZED..=VMEM_DEPOLARIZED).contains(&v)),
+            "Scrambled Vmem should stay within [hyperpolarized, depolarized]"
+        );
+        // With 50 cells, extremely unlikely all land on the exact same value.
+        let first = field.bioelectric.vmem[0];
+        assert!(field.bioelectric.vmem.iter().any(|&v| v != first));
+    }
+
+    #[test]
+    fn scramble_vmem_is_deterministic_for_a_given_seed() {
+        let mut a = MorphogeneticField::new(20, 1);
+        let mut b = MorphogeneticField::new(20, 1);
+        a.scramble_vmem(42);
+        b.scramble_vmem(42);
+        assert_eq!(a.bioelectric.vmem, b.bioelectric.vmem);
+    }
+
+    #[test]
+    fn impose_vmem_pattern_applies_spatial_function() {
+        let mut field = MorphogeneticField::new(30, 2);
+        field.impose_vmem_pattern(|p| if p[0] >= 0.0 { 0.0 } else { -1.0 });
+        for (i, cell) in field.cells.iter().enumerate() {
+            let expected = if cell.position[0] >= 0.0 { 0.0 } else { -1.0 };
+            assert_eq!(field.bioelectric.vmem[i], expected);
+        }
+    }
+
+    #[test]
+    fn target_morphology_captures_vmem_pattern_not_just_composition() {
+        // Two fields with identical (all-progenitor) composition but
+        // different Vmem patterns should show nonzero discrepancy — proving
+        // the target is keyed off Vmem, not just cell type.
+        let mut field_a = MorphogeneticField::new(40, 4);
+        field_a.impose_vmem_pattern(|_| VMEM_DEPOLARIZED);
+        let mut field_b = MorphogeneticField::new(40, 4);
+        field_b.impose_vmem_pattern(|_| VMEM_HYPERPOLARIZED);
+
+        let target = TargetMorphology::capture(&field_a);
+        let discrepancy = target.discrepancy(&field_b);
+        assert!(
+            discrepancy > 0.0,
+            "Same composition, different Vmem pattern should show nonzero discrepancy"
         );
     }
 }

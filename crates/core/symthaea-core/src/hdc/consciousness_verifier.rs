@@ -1,20 +1,37 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Consciousness Verification Framework
+//! # Consciousness Verification Framework — DEPRECATED, none of its Φ legs are valid
 //!
-//! Provides formal verification of consciousness claims by running multiple
-//! Φ methods on the same topology and cross-validating results.
+//! **Audited 2026-07-03: do not use.** This module's stated approach — run three
+//! independent Φ methods and cross-validate — sounds sound, but none of the three legs
+//! it actually runs is a valid Φ measurement:
 //!
-//! ## Approach
+//! - `SpectralConnectivity` — algebraic connectivity λ₂, documented elsewhere in this
+//!   same crate (`hdc/tiered_phi/core.rs`) as **"deprecated: r = -0.62 with true Φ"**.
+//!   `weighted_average()` below gives this the *highest* weight (3.0) and calls it
+//!   "empirically most reliable" — the exact opposite of that finding.
+//! - `Resonator` (`ResonantPhiCalculator`, `hdc/phi_resonant.rs`) — that module's own
+//!   header says outright: *"This measures resonance dynamics ..., NOT IIT integrated
+//!   information (Φ). The integration metric internally uses the Laplacian spectral
+//!   gap, which has r = -0.62 correlation with true IIT Φ ... it is NOT a valid IIT Φ
+//!   approximation."* Weighted 2.0 here regardless.
+//! - `Tiered(Approximate)` — wired to `ApproximationTier::RandomBaseline`
+//!   (`run_phi_methods()` below), which `TieredPhi` documents as **"O(1) — Deterministic
+//!   random baseline values for testing"**: it does not measure the input at all.
 //!
-//! Instead of relying on a single Φ measurement, this module:
-//! 1. Runs SpectralConnectivity, Tiered(Approximate), and Resonator methods
-//! 2. Cross-validates results for consistency
-//! 3. Evaluates IIT axioms (information, integration, exclusion, composition, intrinsicality)
-//! 4. Produces a confidence-weighted verdict
+//! So `consensus_phi`/`verdict` here are a weighted blend of two already-debunked
+//! methods and a mock testing stub — not a cross-validated measurement of anything.
+//! For a real (if itself unvalidated — see `consciousness_metrics/spectral_mip.rs`'s own
+//! doc comment) Φ, use `SpectralMIPFinder` directly, or `TieredPhi` with
+//! `ApproximationTier::SampledPartition`/`ExhaustivePartition`.
 //!
-//! ## Usage
+//! Confirmed unreachable from the live cognitive loop as of 2026-07-03 (no construction
+//! site for `ConsciousnessPipeline`/`consciousness_integration` outside their own module
+//! tree) — kept `#[deprecated]` rather than deleted so a future reactivation attempt
+//! gets a compiler warning instead of a confident wrong answer.
+//!
+//! ## Usage (do not follow this — kept for historical context only)
 //!
 //! ```rust,ignore
 //! use symthaea::hdc::consciousness_verifier::ConsciousnessVerifier;
@@ -26,6 +43,12 @@
 //! println!("Verdict: {:?}, Φ = {:.4}", report.verdict, report.consensus_phi);
 //! ```
 
+// This module's own internals necessarily reference the now-#[deprecated]
+// ConsciousnessVerifier type throughout (impl blocks, Default, its own tests) — allowed
+// file-wide rather than fixed, since the point is to warn *callers*, not to
+// silence-and-forget the underlying problem here where it's already fully documented.
+#![allow(deprecated)]
+
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -34,6 +57,15 @@ use crate::hdc::unified_hv::ContinuousHV;
 use crate::phi_engine::{ApproximationTier, PhiEngine, PhiMethod};
 
 /// Consciousness verifier that cross-validates multiple Φ methods.
+///
+/// Do not use — none of its three legs is a valid Φ measurement. See module docs.
+#[deprecated(
+    note = "None of ConsciousnessVerifier's three Φ legs is valid: SpectralConnectivity \
+            and Resonator are both documented elsewhere as r=-0.62 with true Φ, and the \
+            Tiered leg uses ApproximationTier::RandomBaseline (a testing mock, not a \
+            measurement). Use SpectralMIPFinder or TieredPhi::SampledPartition/\
+            ExhaustivePartition directly instead."
+)]
 #[derive(Debug, Clone)]
 pub struct ConsciousnessVerifier {
     /// Phi threshold for "conscious" verdict
@@ -246,8 +278,12 @@ impl ConsciousnessVerifier {
 
     /// Compute weighted average of Φ measurements.
     ///
-    /// SpectralConnectivity gets highest weight (empirically most reliable),
-    /// Resonator next, Tiered lowest.
+    /// WRONG on its face (see module docs): weights SpectralConnectivity highest even
+    /// though it's documented elsewhere as r=-0.62 with true Φ, and Resonator second
+    /// even though its own module says it isn't a valid Φ approximation either. Left
+    /// unchanged rather than "corrected" because there's no valid weighting to give —
+    /// none of the three legs this struct runs measures real Φ. Kept only so the
+    /// deprecated struct's historical behavior is reproducible; do not use.
     fn weighted_average(&self, measurements: &[PhiMeasurement]) -> f64 {
         if measurements.is_empty() {
             return 0.0;

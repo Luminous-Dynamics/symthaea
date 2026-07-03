@@ -270,9 +270,14 @@ impl UnifiedConsciousnessEngine {
 
     /// Compute unified Φ across all process representations
     ///
-    /// Uses the engine's ConnectivityCalculator to measure integrated information
-    /// across the adaptive topology's process states. This provides a unified
-    /// consciousness metric that considers all active processes.
+    /// Uses the engine's ConnectivityCalculator (algebraic connectivity λ₂) to measure
+    /// integrated information across the adaptive topology's process states.
+    ///
+    /// CAVEAT (2026-07-03 audit): `ConnectivityCalculator`/algebraic connectivity is
+    /// documented elsewhere in this crate (`hdc/tiered_phi/core.rs`) as "deprecated:
+    /// r = -0.62 with true Φ" — i.e. it does not reliably track integrated information.
+    /// This function's output should be read as a topology-connectivity heuristic, not
+    /// a validated consciousness metric.
     fn compute_unified_psi(&self) -> f64 {
         // Gather all process state representations from the adaptive topology
         let representations: Vec<ContinuousHV> = self

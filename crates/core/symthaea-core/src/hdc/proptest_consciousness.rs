@@ -5,6 +5,13 @@
 //!
 //! Tests invariants of SemanticBridge, ConsciousnessVerifier, and PhiFeedbackController
 //! using proptest with reduced case counts for speed.
+//!
+//! `ConsciousnessVerifier` is `#[deprecated]` (2026-07-03 audit: none of its three Φ
+//! legs is a valid measurement) but these properties test its internal plumbing
+//! (verdict thresholds, weighting arithmetic), not the validity of the underlying
+//! numbers, so the deprecation warning is allowed rather than fixed.
+
+#![allow(deprecated)]
 
 use proptest::prelude::*;
 

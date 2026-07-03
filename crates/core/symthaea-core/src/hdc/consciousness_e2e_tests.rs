@@ -4,6 +4,12 @@
 //! End-to-end consciousness integration tests
 //!
 //! Tests the full pipeline: SemanticBridge → ConsciousnessPipeline → Verifier → Metrics
+//!
+//! `ConsciousnessVerifier` is `#[deprecated]` (2026-07-03 audit: none of its three Φ
+//! legs is a valid measurement) but this file exercises the pipeline wiring, not the
+//! validity of the numbers, so the deprecation warning is allowed rather than fixed.
+
+#![allow(deprecated)]
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::consciousness_integration::{ConsciousnessPipeline, IntegrationConfig};
