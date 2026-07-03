@@ -5,9 +5,9 @@
 // Includes diversity filter (Jaccard on prompts) + structural scoring via GenericStructuralScorer
 
 use crate::generic_structural_scorer_integration::GenericStructuralScorer;
-use symthaea_broca::language_gates::LanguageGateRegistry; // for intent detection
 use std::collections::HashSet;
-use std::path::Path; // assume exists for AST/structural diff
+use std::path::Path;
+use symthaea_broca::language_gates::LanguageGateRegistry; // for intent detection // assume exists for AST/structural diff
 
 use symthaea_broca::tokenizer::BpeTokenizer;
 

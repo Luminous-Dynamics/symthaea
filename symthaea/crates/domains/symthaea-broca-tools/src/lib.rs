@@ -9,8 +9,6 @@
 //! bundled into the language-pipeline crate.
 
 pub mod architect;
-#[cfg(feature = "code-sheaf-eval")]
-pub mod code_analysis;
 pub mod codebase_bridge;
 pub mod cognitive_ledger;
 pub mod compiler_feedback_bridge;
@@ -37,11 +35,6 @@ pub mod swarm_bridge;
 pub mod wasm_architect;
 
 pub use architect::SimulationArchitect;
-#[cfg(feature = "code-sheaf-eval")]
-pub use code_analysis::{
-    RustFunctionExtraction, categorize_code_sheaf_diagnostic, extract_rust_functions,
-    repair_hint_for_code_sheaf_category,
-};
 pub use generic_structural_scorer_integration::{
     GenericStructuralScorer, StructuralVerdict as GenericStructuralVerdict,
 };

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Adaptive invariant guard featuring cold-start calibration loops.
 
-use symthaea_broca::generator::BrocaGenerator;
 use std::cell::Cell;
+use symthaea_broca::generator::BrocaGenerator;
 use symthaea_core::hdc::ContinuousHV;
 
 pub struct AxiomaticInvariantGuard {

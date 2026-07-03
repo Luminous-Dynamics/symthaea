@@ -15,6 +15,8 @@
 pub mod affective_sculpting;
 pub mod architectural_memory;
 pub mod checkpoint;
+#[cfg(feature = "code-sheaf-eval")]
+pub mod code_analysis;
 pub mod cognitive_loop;
 pub mod compiler_trainer;
 pub mod consensus_engine;

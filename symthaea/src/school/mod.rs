@@ -108,6 +108,11 @@ pub mod curriculum;
 #[cfg(feature = "web_research_module")]
 pub mod curriculum_extender;
 pub mod curriculum_loader;
+// Needs symthaea_sim_bridge::SolverKind, which is only pulled in by the
+// engineering-foundations feature, not school_learning — gate it on its
+// actual dependency rather than forcing every school_learning consumer to
+// also pull in the sim-bridge/digital-twin/formal-safety chain.
+#[cfg(feature = "engineering-foundations")]
 pub mod engineering_curriculum;
 #[cfg(feature = "mathematics")]
 pub mod math_curriculum;

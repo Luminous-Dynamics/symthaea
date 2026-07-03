@@ -164,11 +164,6 @@ name = "demo-ecological-closure"
 path = "src/bin/demo_ecological_closure.rs"
 
 [[bin]]
-name = "broca-dreamer"
-path = "src/bin/broca_dreamer.rs"
-required-features = ["mamba-cpu"]
-
-[[bin]]
 name = "broca-benchmark-suite"
 path = "src/bin/broca_benchmark_suite.rs"
 required-features = ["mamba-cpu"]
@@ -221,10 +216,6 @@ therapeutic = []
 speech-data = ["dep:symthaea-stt"]
 code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
 highway-projection = []
-
-[[bin]]
-name = "fused_cognitive_node"
-path = "src/bin/fused_cognitive_node.rs"
 
 [[example]]
 name = "hierarchical_reasoning"

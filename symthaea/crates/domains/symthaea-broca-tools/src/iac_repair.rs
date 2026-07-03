@@ -4,7 +4,9 @@
 // Supports: Terraform, Kubernetes, Ansible, CloudFormation, Pulumi, Docker Compose, HCL
 // In full integration: called from CodeGate or code_orchestrator after generation
 
-use symthaea_broca::emotional_gating_integration::{apply_frustration_trigger, modulate_by_emotion};
+use symthaea_broca::emotional_gating_integration::{
+    apply_frustration_trigger, modulate_by_emotion,
+};
 use symthaea_broca::encoder::ThoughtChannels; // Assume exists
 use symthaea_broca::language_gates::LanguageGateRegistry;
 
