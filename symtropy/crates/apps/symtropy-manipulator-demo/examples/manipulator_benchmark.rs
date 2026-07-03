@@ -40,6 +40,7 @@ use symthaea_manipulator::kinematics::ManipulatorKinematics;
 use symthaea_manipulator::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use symthaea_manipulator::types::NUM_JOINTS;
 use symtropy_physics::body::BodyHandle;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;
 

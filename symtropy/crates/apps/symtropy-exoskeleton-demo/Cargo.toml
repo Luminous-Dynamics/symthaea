@@ -20,3 +20,4 @@ symtropy-consciousness-physics = { path = "../../domains/symtropy-consciousness-
 symtropy-physics = { path = "../../core/symtropy-physics" }
 symtropy-robotics-bridge = { path = "../../bridges/symtropy-robotics-bridge" }
 
+symtropy-demo-capture = { path = "../symtropy-demo-capture" }
