@@ -123,8 +123,34 @@ pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<Minted
     let resolver_did = format!("did:mycelix:{}", caller);
     let now = sys_time()?;
 
-    // If accepted, reverse the balances
+    // If accepted, reverse the balances. Uses the same PendingMintedAdjustment
+    // crash-recovery pattern as confirm_minted_exchange (reversed: true) —
+    // without it, a crash between the two update_minted_balance calls below
+    // would permanently break the zero-sum invariant with no way to detect
+    // or fix it, since resolve_minted_dispute only marks the dispute
+    // `resolved` (which is what guards against being re-run) after both
+    // updates succeed.
     if input.accept {
+        let pending_adj_hash = create_entry(&EntryTypes::PendingMintedAdjustment(
+            PendingMintedAdjustment {
+                exchange_id: exchange.id.clone(),
+                provider_did: exchange.provider_did.clone(),
+                receiver_did: exchange.receiver_did.clone(),
+                hours: exchange.hours as f64,
+                currency_id: exchange.currency_id.clone(),
+                provider_completed: false,
+                receiver_completed: false,
+                created_at: now,
+                reversed: true,
+            },
+        ))?;
+        create_link(
+            anchor_hash("pending-minted-adjustments")?,
+            pending_adj_hash.clone(),
+            LinkTypes::PendingMintedAdjustmentToExchange,
+            (),
+        )?;
+
         // Reverse: provider loses what they gained, receiver gets back what they lost
         update_minted_balance(
             &exchange.provider_did,
@@ -132,11 +158,40 @@ pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<Minted
             exchange.hours,
             false, // provider now "receives" (balance decreases)
         )?;
+        let pending_adj_hash = update_entry(
+            pending_adj_hash,
+            &EntryTypes::PendingMintedAdjustment(PendingMintedAdjustment {
+                exchange_id: exchange.id.clone(),
+                provider_did: exchange.provider_did.clone(),
+                receiver_did: exchange.receiver_did.clone(),
+                hours: exchange.hours as f64,
+                currency_id: exchange.currency_id.clone(),
+                provider_completed: true,
+                receiver_completed: false,
+                created_at: now,
+                reversed: true,
+            }),
+        )?;
+
         update_minted_balance(
             &exchange.receiver_did,
             &exchange.currency_id,
             exchange.hours,
             true, // receiver now "provides" (balance increases)
+        )?;
+        update_entry(
+            pending_adj_hash,
+            &EntryTypes::PendingMintedAdjustment(PendingMintedAdjustment {
+                exchange_id: exchange.id.clone(),
+                provider_did: exchange.provider_did.clone(),
+                receiver_did: exchange.receiver_did.clone(),
+                hours: exchange.hours as f64,
+                currency_id: exchange.currency_id.clone(),
+                provider_completed: true,
+                receiver_completed: true,
+                created_at: now,
+                reversed: true,
+            }),
         )?;
     }
 

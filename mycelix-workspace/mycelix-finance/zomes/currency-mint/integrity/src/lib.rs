@@ -154,20 +154,24 @@ pub struct MintedDispute {
     pub resolved_at: Option<Timestamp>,
 }
 
-/// A pending balance adjustment for crash recovery during exchange confirmation.
+/// A pending balance adjustment for crash recovery during exchange
+/// confirmation OR dispute-acceptance reversal.
 ///
-/// Created BEFORE balance updates in `confirm_minted_exchange`. If a crash occurs
-/// between the provider update and the receiver update, a governance agent can call
-/// `recover_incomplete_minted_confirmations` to complete the interrupted operation and
-/// restore the zero-sum invariant.
+/// Created BEFORE balance updates in `confirm_minted_exchange` (forward:
+/// provider gains, receiver spends) or in `resolve_minted_dispute` when a
+/// dispute is accepted (reversed: provider gives back, receiver gets back —
+/// the opposite direction). If a crash occurs between the two balance
+/// updates, a governance agent can call `recover_incomplete_minted_confirmations`
+/// to complete the interrupted operation and restore the zero-sum invariant;
+/// the `reversed` flag tells the recovery function which direction to apply.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct PendingMintedAdjustment {
     /// The exchange this adjustment belongs to
     pub exchange_id: String,
-    /// DID of the service provider (gains hours)
+    /// DID of the service provider (gains hours on confirm, loses them back on a reversed dispute)
     pub provider_did: String,
-    /// DID of the service receiver (spends hours)
+    /// DID of the service receiver (spends hours on confirm, gets them back on a reversed dispute)
     pub receiver_did: String,
     /// Amount of hours being exchanged
     pub hours: f64,
@@ -179,6 +183,10 @@ pub struct PendingMintedAdjustment {
     pub receiver_completed: bool,
     /// When this pending adjustment was created
     pub created_at: Timestamp,
+    /// If true, this is a dispute-acceptance reversal (provider loses,
+    /// receiver gains — the opposite of a normal exchange confirmation).
+    #[serde(default)]
+    pub reversed: bool,
 }
 
 /// Anchor entry for deterministic link bases

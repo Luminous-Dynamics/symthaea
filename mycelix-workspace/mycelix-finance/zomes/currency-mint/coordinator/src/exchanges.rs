@@ -308,6 +308,7 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         provider_completed: false,
         receiver_completed: false,
         created_at: now,
+        reversed: false,
     };
     let pending_adj_hash = create_entry(&EntryTypes::PendingMintedAdjustment(pending_adj))?;
 
@@ -338,6 +339,7 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         provider_completed: true,
         receiver_completed: false,
         created_at: now,
+        reversed: false,
     };
     update_entry(
         pending_adj_hash.clone(),
@@ -362,6 +364,7 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
         provider_completed: true,
         receiver_completed: true,
         created_at: now,
+        reversed: false,
     };
     update_entry(
         pending_adj_hash,
@@ -606,11 +609,14 @@ pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<
 // PENDING MINTED ADJUSTMENT RECOVERY
 // =============================================================================
 
-/// Recover incomplete balance adjustments from interrupted confirm_minted_exchange calls.
+/// Recover incomplete balance adjustments from interrupted confirm_minted_exchange
+/// or resolve_minted_dispute (accept) calls.
 ///
-/// When confirm_minted_exchange crashes between the provider and receiver balance updates,
-/// the zero-sum invariant is broken. This function finds all PendingMintedAdjustment
-/// entries that are not fully completed and retries the missing balance updates.
+/// When either crashes between the provider and receiver balance updates, the
+/// zero-sum invariant is broken. This function finds all PendingMintedAdjustment
+/// entries that are not fully completed and retries the missing balance
+/// updates, applying the direction recorded in `reversed` (forward for a
+/// confirmed exchange, reversed for an accepted dispute).
 ///
 /// Only callable by a governance agent (or during bootstrap when no agents exist).
 ///
@@ -688,14 +694,17 @@ pub fn recover_incomplete_minted_confirmations(currency_id: String) -> ExternRes
         let hours = adj.hours as f32;
         let mut current_action = record.action_address().clone();
 
-        // Retry missing balance updates
+        // Retry missing balance updates. Direction depends on adj.reversed:
+        // forward (confirm_minted_exchange) has the provider gain and the
+        // receiver pay; reversed (resolve_minted_dispute accepting a
+        // dispute) undoes that — provider pays back, receiver gains back.
         if !adj.provider_completed {
             // Neither side completed — retry provider first
             update_minted_balance(
                 &adj.provider_did,
                 &adj.currency_id,
                 hours,
-                true, // provider gains
+                !adj.reversed, // provider gains (forward) or pays back (reversed)
             )?;
 
             // Mark provider done
@@ -714,7 +723,7 @@ pub fn recover_incomplete_minted_confirmations(currency_id: String) -> ExternRes
                 &adj.receiver_did,
                 &adj.currency_id,
                 hours,
-                false, // receiver pays
+                adj.reversed, // receiver pays (forward) or gains back (reversed)
             )?;
 
             // Mark both sides done
