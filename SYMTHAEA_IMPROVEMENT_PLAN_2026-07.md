@@ -5,6 +5,15 @@ CI/build health, robotics/embodiment) run 2026-07-03. All file:line references v
 against the working tree that day. Kept at monorepo root deliberately — `symthaea/docs/`
 syncs to the public standalone repo; this is internal.
 
+**Extended 2026-07-03 (fourth pass, separate session)**: a fresh architecture review
+re-verified the facade/loop split with three targeted scans and folded in five
+previously-missing workstreams: a CI field-count ratchet (Phase 3), Broca hard-mask
+gating + a confabulation benchmark (Phase 2), feature-flag profile consolidation
+(Phase 3), the automated continuous-learning loop (new Phase 5), and an external
+leakage-proof capability ladder (new Phase 6). Also updated with exact current facts:
+CLS = 131 fields / 42 manager files; `consciousness_verifier.rs` now deprecated-marked;
+a second orphaned Phi validation test found in `symthaea-phi-oracle`.
+
 ## Verdict
 
 The system is deep and mostly honest about itself, but it is **split-brained**: the
@@ -304,12 +313,24 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
    method**, and add the same warning to `unified_consciousness_engine.rs` and
    `phi_engine`'s method table. This is dormant today but the single highest-severity
    landmine in the whole audit — fix before it ever gets wired to `enable_verification()`.
+   *Status 2026-07-03 (fourth pass): partially done — the module now carries
+   `#[deprecated]` + a do-not-use audit banner (`consciousness_verifier.rs:6,62`) and
+   `enable_verification()` has zero callers anywhere. Remaining: the 3.0 weight itself
+   (`consciousness_verifier.rs:296-297`) and the un-warned repeats in
+   `unified_consciousness_engine.rs:273` and `phi_engine`'s method table.*
 2. (S) Fix the `PhiOrchestrator` vs `TieredPhi` doc contradiction about algebraic
    connectivity (already noted above).
 3. (M) **Wire `test_spectral_mip_validation.rs` into the actual test suite** (add it to
    `Cargo.toml`'s explicit `[[test]]` list) and re-run it. Right now nobody knows whether
    SpectralMIPFinder — the thing actually gating robot motor safety — clears even the
    weak ρ > 0.50 bar, because the test that would tell you has never executed.
+   *Second instance (found 2026-07-03, fourth pass): `crates/symthaea-phi-oracle/` is not
+   a workspace member (root `Cargo.toml` members are only `crates/{core,domains,bridges}/*`
+   and phi-oracle isn't in `exclude` either — it compiles only as a transitive path-dep),
+   so its `tests/integration.rs` — including `test_signal_loss_fixed`
+   (`integration.rs:253`), which validates SpectralMIPFinder yields non-degenerate
+   integration on a coupled 6-node system — has also never run. Add phi-oracle to the
+   workspace or relocate the test.*
 4. (M) Correct `docs/PHI_VALIDATION_RESULTS.md` and `papers/book/symthaea_book.tex`'s
    validation table to state plainly that the Spectral MIP r≈0.99 number validates search
    strategy against a Gaussian-MI proxy, not agreement with true TPM-based IIT Φ — the
@@ -351,7 +372,25 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
       `training.rs:670-700`) but never measured end-to-end (`generator.rs:209-215`
       comment admits this). One eval run over the canonical set decides it; no
       retraining needed. Note the main-crate config defaults these ON
-      (`config/mod.rs:928-932`) while the crate defaults them OFF — reconcile.
+      (`config/mod.rs:928-932`) while the crate defaults them OFF
+      (`generator.rs:216,218`) — reconcile.
+- [ ] **Broca hard-mask gating mode (added fourth pass)**: the `EpistemicCubeGate` is
+      penalty/temperature-only — additive logit penalties (`gating.rs:1080,1103`) plus
+      uncertainty-scaled temperature (1.3/1.5/1.8 for uncertain/unknown/OOD,
+      `gating.rs:351-353`); there is **no `NEG_INFINITY` path anywhere in gating.rs**.
+      Hard suppression exists in the codebase (`evaluation.rs:516-531`
+      `suppress_collapse_forbidden_logits`, `controller.rs:935` top-k masking) but is not
+      part of the epistemic gate. Add an opt-in hard-mask mode for E-axis extremes
+      (Unknown/OOD certainty → assertion-token logits = `-inf`), reusing the
+      `suppress_collapse_forbidden_logits` machinery. A gate that can only discourage is
+      documentation, not a gate.
+- [ ] **Confabulation benchmark (added fourth pass)**: no eval measures whether epistemic
+      gating actually suppresses confident-assertion-under-ignorance. Build a small
+      canonical set of prompts whose thought-HVs carry Unknown/OOD epistemic status,
+      score assertion-rate in the generated text with gating off / soft (current default)
+      / hard-mask, and add it beside `eval-canonical-v1.jsonl` in the quality-gate CI
+      test above. This is the measurement that decides whether the soft gate was ever
+      enough — do it before shipping any "epistemic honesty" claim about Broca output.
 - [ ] **Know the decoder you ship**: `BrocaConfig::default()` uses
       `BrocaDecoderKind::Structured` (deterministic readout, `generator.rs:196`) — the
       trained CfC (`Direct`) and Liquid-Mamba paths are opt-in. Decide/document which is
@@ -364,10 +403,19 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
 
 ## Phase 3 — Structural debt (L, ~1 month, parallelizable)
 
-- [ ] **Reverse the CLS field regression** (~121 fields, back from post-refactor ~59):
-      extract `PredictiveCore` (~12 loose training/prediction fields), `ChannelHub`
-      (~10 IO/channel fields), fold `ethics_engine` + verdicts into the existing
-      `ethics_values` manager. Target ~80 without behavior change.
+- [ ] **Reverse the CLS field regression** (exact count 2026-07-03: **131 fields**,
+      `cognitive_loop/mod.rs:381-1029`, 51 `#[cfg]` attrs inside the struct body; back
+      from post-refactor ~59 despite 42 manager files already existing across
+      `cognitive_loop/` and `cognitive_loop/managers/`): extract `PredictiveCore`
+      (~12 loose training/prediction fields), `ChannelHub` (~10 IO/channel fields), fold
+      `ethics_engine` + verdicts into the existing `ethics_values` manager. Target ~80
+      without behavior change.
+- [ ] **Field-count ratchet in CI (added fourth pass)** — the refactor regressed once
+      (59 → 131) because nothing enforces it; without a guard it will regress again.
+      Add a cheap CI step (awk/grep count of fields in the `CognitiveLoopService` struct
+      body, compared against a checked-in `MAX_CLS_FIELDS` number) that fails on increase.
+      Ratchet the number down as the extraction above lands. Rule going forward: no new
+      field on the service struct, ever — new state goes in a manager.
 - [ ] **De-monolith**: move inline glue out of `cycle()` (`cycle.rs:38-728`, ~690 lines:
       integrity sweep, USI/spectrum→neuromod coupling, embodiment step, distress
       emission) into managers; split the monolithic phase files
@@ -376,6 +424,23 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
       `meta_learning_byzantine` + `unified_intelligence` + `asset_evaluator`
       (~3,590 LOC) only reference each other and never activate under any default/profile
       bundle. Wire `multi_agent` into a real profile or archive the island.
+- [ ] **More orphan candidates (added fourth pass, from a reference-count sweep of the
+      55 top-level `src/` modules)**: `src/integration/` (`conscious_pipeline.rs`,
+      `nix_integration.rs` — zero references anywhere, including tests and bins; the
+      strongest candidate), `src/meta/` (zero external refs even with its
+      `code_generation` feature on), `gui_bridge` (2 refs, both bins/tests),
+      `benchmarks` (0 external refs), and thinly-referenced `resonant_speech` (7 refs).
+      Same rule as the enable_* audit: wire it, or delete it — compiled-but-dark code
+      inflates the claimed capability surface.
+- [ ] **Feature-flag profile consolidation (added fourth pass)**: ~177 `[features]`
+      entries in `symthaea/Cargo.toml`; CI samples 7 feature-group bundles + 22
+      single-feature legs + 2 critical combos — effectively 0% of the combination space,
+      and at least one flag (`neural-vocoder-gpu`) is marked "UNTESTED: not in CI
+      matrix" in Cargo.toml itself. Define 4-5 **blessed profiles** (e.g. `minimal`,
+      `default-mind`, `embodied`, `service`, `full-research`) as feature bundles, test
+      those exhaustively in CI, document that anything outside a blessed profile is
+      unsupported, and start folding single-purpose flags into the profiles. Goal: the
+      supported configuration space becomes enumerable.
 - [ ] **Candle unification**: main crate pins candle 0.8.4, broca pins 0.10.2 — two full
       candle stacks compiled, and the vendored `vendor/cudarc-0.13.9-cuda129` patch
       exists only because candle 0.8 needs cudarc 0.13.x. Migrate `neural-bridge` to
@@ -403,7 +468,23 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
 
 - [ ] **Seam C**: make `Symthaea` own a `CognitiveLoopService` and delegate
       perception+dynamics to `cycle()`, demoting `ContinuousMind` to a thin
-      input/memory adapter. High risk (121 fields, 49 cfg gates) — last.
+      input/memory adapter. High risk (131 fields, 51 cfg gates) — last.
+      *Scoping intel (fourth pass, 2026-07-03)*: the blast radius is smaller than the
+      struct sizes suggest. `Symthaea::process()` has only two real production consumers
+      — the main CLI (`src/bin/symthaea.rs:887,1126`) and the phi-lab service
+      (`research/phi-lab/src/bin/phi-lab-service.rs:336,508`); the web eval-api already
+      talks to CLS directly (`src/api/demo_runner.rs`, `src/api/ws.rs:517`), and the
+      REPL's `process()` is its own method. The two stacks share NO state — the only
+      links are two mpsc channels (Mind→CLS swarm events via `swarm_event_tx`,
+      CLS→Mind mesh outbound), and the existing `Symthaea::wire_swarm_channel()`
+      (`src/symthaea/mod.rs:2578`) is called by **no production bin** — the dual-holder
+      bins wire the raw sender manually. The real cost is deduplicating the parallel
+      subsystems both stacks own independently (neuromodulator bath, memory
+      coordinator/episodic memory, swarm/mesh handling — the memory consolidation item
+      below is the same work). Suggested order: first make the facade *read* loop state
+      (inject `CycleMetadata`/grounded facts into phases 3.5/4), then move perception
+      into `cycle_with_hv()`, then delete `ContinuousMind`'s duplicated subsystems one
+      at a time.
 - [ ] **One Broca contract**: the facade Phase-5 translator is an LLM
       (`llm_organ::translate_thought`, `symthaea/mod.rs:1535`) while the loop uses the
       SSM `symthaea-broca` generator via `broca_bridge.rs` — two engines, two
@@ -411,6 +492,62 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
       and route both through one interface.
 - [ ] **Consolidate memory**: three independent coordinators (`Symthaea`,
       `ContinuousMind`, CLS `memory_execution`) → one owner.
+
+## Sequencing note (fourth pass)
+
+Phases are severity-ordered, not strictly serial. Independent early wins that don't
+wait on Phases 1-4: the Phase 5 systemd timer (scripts + lockfile already done), the
+Phase 6 ladder freeze (protocol docs, no code), the Phase 3 field-count ratchet
+(one CI step — land it *before* the extraction so the number only moves down), and
+finishing Phase 1.5 rec #1 (the 3.0 weight fix, one-line). The long poles are Seam C
+(Phase 4) and the CLS extraction (Phase 3); everything else can proceed around them.
+
+## Phase 5 — Close the learning loop (M, added fourth pass)
+
+Today all durable learning is offline and human-triggered: the Broca curriculum bridge
+(cycle → gate → promote) is scripts a person runs. An architecture whose thesis is
+continuous existence should own its consolidation cycle. Governed throughout by the
+self-mod pipeline safety rules (autonomous-except-promotion, provenance sidecars, atomic
+writes, lockfiles — see `memory/feedback_selfmod_pipeline_safety.md`).
+
+- [ ] **Curriculum bridge Phase 4 — the timer**: `broca_curriculum_cycle.sh` already has
+      a lockfile (`target/broca-curriculum-cycle.lock`) put there explicitly to make
+      scheduled runs safe, and never touches the production checkpoint
+      (`PROMOTION_READY.json` + manual `broca_promote_candidate.sh` is the human gate).
+      No `.timer`/service unit exists yet (only `symthaea/systemd/symthaea.service`,
+      unrelated). Write the NixOS systemd timer (weekly, per the design doc's
+      "fast-follow" note) + a small status surface (last run, last gate verdict,
+      pending-promotion flag). Promotion stays human — that boundary is a feature.
+- [ ] **Loop-owned consolidation**: generalize the pattern that already exists for
+      threat memory (dream consolidation in `ThreatMemory`) into a sleep/dream-scheduled
+      episodic → semantic → training-corpus pipeline driven by the cognitive loop itself
+      (biorhythm/cantor_dream managers are the natural owners), emitting curriculum
+      objectives the Phase-4 timer consumes. End state: experience during waking cycles
+      measurably changes next-week weights, with every step provenance-tracked and the
+      promotion gate still human.
+- [ ] **Prerequisite**: `enable_online_learning` is one of the ~14 built-but-disabled
+      config switches in the Phase 3 enable_* audit — benchmark and decide it as part of
+      that audit before layering the consolidation pipeline on top.
+
+## Phase 6 — Honest capability ladder (S to start, ongoing; added fourth pass)
+
+The ETHICS data-leakage incident (claimed 94.5%, real ~50%) is the cautionary tale:
+internal benchmarks drift toward flattery. Pick a small set of **external,
+leakage-proof** benchmarks and publish the honest curve per release — after the Phi
+audit, the credibility of measured claims is the project's main asset.
+
+- [ ] **Pick 3 ladder benchmarks** and freeze protocols in-tree (exact dataset hashes,
+      splits, no training on eval): suggested — HumanEval pass@1 (coding agent; baseline
+      already recorded: 9/40), a re-run held-out ETHICS protocol (post-leakage
+      methodology, documented), and one perception/temporal benchmark that exercises the
+      loop rather than the facade (Sleep-EDF or ARC-AGI 2-AFC, both already have
+      harnesses in psych-bench/examples).
+- [ ] **Loop-driven, not facade-scripted**: each ladder run must go through the live
+      pipeline being claimed (`cycle_with_hv()` via psych-bench's `live_runner.rs` where
+      applicable), not a bespoke eval path — otherwise the number describes the harness.
+- [ ] **Track per release**: a `CAPABILITY_LADDER.md` table (date, commit, score,
+      protocol hash) appended on each release/tag. Regressions are findings, not
+      embarrassments — the honest curve is the point.
 
 ## Documentation corrections (stale claims found during review)
 
