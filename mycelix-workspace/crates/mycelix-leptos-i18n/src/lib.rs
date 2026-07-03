@@ -170,6 +170,12 @@ pub fn t(key: &str, lang: Lang) -> &'static str {
         Lang::Sw => t_sw(key),
         Lang::St => t_st(key),
         Lang::Xh => t_xh(key),
+        Lang::Tn => t_tn(key),
+        Lang::Ns => t_nso(key),
+        Lang::Ts => t_ts(key),
+        Lang::Ss => t_ss(key),
+        Lang::Ve => t_ve(key),
+        Lang::Nr => t_nr(key),
         _ => t_en(key),
     }
 }
@@ -311,6 +317,138 @@ fn t_xh(key: &str) -> &'static str {
         "greeting_afternoon" => "Molo emini",
         "greeting_evening" => "Molo ngokuhlwa",
         "language" => "Ulwimi",
+        _ => t_en(key),
+    }
+}
+
+// Setswana. Core verbs/greetings share roots with Sesotho (t_st); "profile" /
+// "settings" are common loanword renderings. Entries omitted where translator
+// confidence was insufficient (see keys covered by t_st for comparison).
+fn t_tn(key: &str) -> &'static str {
+    match key {
+        "home" => "Legae",
+        "profile" => "Porofaele",
+        "settings" => "Dipeakanyo",
+        "back" => "Morago",
+        "save" => "Boloka",
+        "cancel" => "Khansela",
+        "close" => "Tswala",
+        "submit" => "Romela",
+        "confirm" => "Netefatsa",
+        "delete" => "Phimola",
+        "edit" => "Fetola",
+        "create" => "Tlhama",
+        "search" => "Batla...",
+        "error" => "Phoso",
+        "success" => "Katlego",
+        "greeting_morning" => "Dumela mo mosong",
+        "greeting_afternoon" => "Dumela motshegare",
+        "greeting_evening" => "Dumela maitseboa",
+        "language" => "Puo",
+        _ => t_en(key),
+    }
+}
+
+// Sepedi / Northern Sotho. Sotho-Tswana family, close to t_st/t_tn.
+fn t_nso(key: &str) -> &'static str {
+    match key {
+        "home" => "Gae",
+        "profile" => "Profaele",
+        "settings" => "Dipeakanyo",
+        "back" => "Morago",
+        "save" => "Boloka",
+        "cancel" => "Khansela",
+        "close" => "Tswalela",
+        "submit" => "Romela",
+        "confirm" => "Netefat\u{0161}a",
+        "delete" => "Phumola",
+        "edit" => "Fetola",
+        "create" => "Hlama",
+        "search" => "Nyaka...",
+        "error" => "Pho\u{0161}o",
+        "success" => "Katlego",
+        "greeting_morning" => "Dumela mosong",
+        "greeting_afternoon" => "Dumela mosegare",
+        "greeting_evening" => "Dumela mantsiboa",
+        "language" => "Polelo",
+        _ => t_en(key),
+    }
+}
+
+// Xitsonga. Distinct branch from Nguni/Sotho-Tswana; kept intentionally
+// smaller — only high-confidence, well-attested vocabulary included.
+fn t_ts(key: &str) -> &'static str {
+    match key {
+        "home" => "Kaya",
+        "back" => "Emuva",
+        "save" => "Hlayisa",
+        "cancel" => "Khansela",
+        "close" => "Pfala",
+        "delete" => "Susa",
+        "search" => "Lava...",
+        "error" => "Xihoxo",
+        "greeting_morning" => "Avuxeni",
+        "language" => "Ririmi",
+        _ => t_en(key),
+    }
+}
+
+// siSwati. Nguni family, close to t_zu; entries limited to vocabulary where
+// Swati orthographic shifts (e.g. th->tf) from Zulu are well established.
+fn t_ss(key: &str) -> &'static str {
+    match key {
+        "home" => "Likhaya",
+        "back" => "Emuva",
+        "save" => "Gcina",
+        "cancel" => "Khansela",
+        "close" => "Vala",
+        "submit" => "Tfumela",
+        "delete" => "Susa",
+        "create" => "Dala",
+        "search" => "Sesha...",
+        "greeting_morning" => "Sawubona ekuseni",
+        "language" => "Lulwimi",
+        _ => t_en(key),
+    }
+}
+
+// Tshivenda. Distinct branch, least-resourced of the six here — kept to a
+// small high-confidence core rather than guessing at unfamiliar vocabulary.
+fn t_ve(key: &str) -> &'static str {
+    match key {
+        "home" => "Hayani",
+        "back" => "Murahu",
+        "cancel" => "Khansela",
+        "close" => "Vala",
+        "language" => "Luambo",
+        _ => t_en(key),
+    }
+}
+
+// isiNdebele. Nguni family, very close to t_zu for core vocabulary; the
+// distinctive Ndebele greeting forms (e.g. "Lotjhani") were left untranslated
+// here rather than risk misapplying a Zulu-pattern greeting.
+fn t_nr(key: &str) -> &'static str {
+    match key {
+        "home" => "Ikhaya",
+        "profile" => "Iphrofayela",
+        "settings" => "Izilungiselelo",
+        "back" => "Emuva",
+        "save" => "Gcina",
+        "cancel" => "Khansela",
+        "close" => "Vala",
+        "submit" => "Thumela",
+        "confirm" => "Qinisekisa",
+        "delete" => "Susa",
+        "edit" => "Hlela",
+        "create" => "Dala",
+        "search" => "Sesha...",
+        "loading" => "Iyalayisha...",
+        "error" => "Iphutha",
+        "success" => "Kuphumelele",
+        "connected" => "Ixhunyiwe",
+        "disconnected" => "Inqanyuliwe",
+        "language" => "Ilimi",
         _ => t_en(key),
     }
 }
