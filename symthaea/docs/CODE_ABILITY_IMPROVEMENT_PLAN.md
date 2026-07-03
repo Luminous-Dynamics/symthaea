@@ -1219,13 +1219,37 @@ HumanEval/SWE-bench scored result had ever been committed to the repo.
   fix repertoire without an explicit, separate, human-gated promotion step.
 
 Verified via `cargo check --lib --features code_generation` (clean build, only
-3 pre-existing warnings unrelated to this change). Full `cargo test`/HumanEval
-baseline run was **deferred** — the monorepo was under severe concurrent-session
-load at the time (load avg ~70, <400MB free RAM, 12+ other sessions building),
-and two background build attempts were killed by resource pressure rather than
-failing on their own merits. Re-run `cargo test -p symthaea --features code_generation coding_agent::`
-and `cargo run --release --example humaneval_benchmark --features code_generation -- --direct --limit 40`
-in a quieter window to get the first real baseline score for this subsystem.
+3 pre-existing warnings unrelated to this change). The full `cargo test`
+run and the first HumanEval attempt were killed three times by the
+environment's concurrent-session build contention (load avg ~65-70, other
+sessions compiling); retried once load dropped to ~11.7 and it completed.
+
+**First-ever HumanEval baseline for this subsystem** (`docs/HUMANEVAL_BASELINE_RESULTS.json`,
+2026-07-03, `cargo run --example humaneval_benchmark --features code_generation -- --direct --limit 40`,
+Direct LLM mode via `qwen2.5-coder:7b`, `use_orchestrator` NOT enabled — this
+measures the pre-existing `IntelligentDispatcher` path, not the newly-wired
+orchestrator):
+
+- **Pass@1: 9/40 (22.5%)**, compiled 38/40 (95%).
+- Caveat: 16 of the 40 problems (40%) hit an Ollama request timeout
+  (3-minute cap) rather than a real generation attempt — a side effect of
+  the same build contention noted above saturating the machine while Ollama
+  was serving. Restricting to the 24 problems that actually got an LLM
+  response: **9/24 passed (37.5%)** — likely closer to this backend's true
+  rate on this run. Re-run on an idle machine for a clean number.
+- **Concrete, fixable finding**: 8 of the 40 failures (20% of the whole
+  suite) share one root cause — generated Python references `List`/typing
+  generics without emitting `from typing import List`. This is a single
+  prompt/post-processing fix (inject the typing import, or strip/replace
+  bare `List[...]` annotations) that could plausibly recover ~8 more passes
+  with no model or architecture change at all — the cheapest next lever on
+  this benchmark, cheaper than the orchestrator-wiring work above.
+- Full per-problem results (task id, pass/compile flags, error text, timing)
+  are in `docs/HUMANEVAL_BASELINE_RESULTS.json`.
+
+Re-run `cargo test -p symthaea --features code_generation coding_agent::`
+(not yet re-attempted after the wiring landed) and, once `use_orchestrator`
+has a real caller in a harness, compare its pass@1 against this baseline.
 
 **Recommended next step**: once a baseline exists, flip `use_orchestrator: true`
 in a benchmark harness (not the default config) and compare pass@1 against the
