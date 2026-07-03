@@ -17,7 +17,7 @@ serde_json = "1.0"
 mycelix_mail_integrity = { path = "../../integrity" }
 
 # Mycelix SDK for MATL trust scoring and Bridge messaging
-mycelix-sdk = { path = "../../../../../mycelix-workspace/sdk" }
+mycelix-sdk = { path = "../../../../../sdk" }
 
 [profile.release]
 opt-level = "z"

@@ -299,8 +299,8 @@ impl WisdomTransmissionStudy {
 
         for participant_idx in 0..self.participants.len() {
             // Decide if we show a seed
-            let show_seed = (self.rng.next_u64() as f64 / u64::MAX as f64)
-                < self.config.surfacing_probability;
+            let show_seed =
+                (self.rng.next_u64() as f64 / u64::MAX as f64) < self.config.surfacing_probability;
 
             let seed_shown = if show_seed {
                 self.select_seed_for_participant(participant_idx, &domain)
@@ -311,7 +311,8 @@ impl WisdomTransmissionStudy {
             // Record pre-seed prediction if applicable
             let pre_seed = if seed_shown.is_some() {
                 let noise = (self.rng.next_u64() as f64 / u64::MAX as f64 - 0.5)
-                    * self.participants[participant_idx].calibration * 2.0;
+                    * self.participants[participant_idx].calibration
+                    * 2.0;
                 Some((true_prob + noise).clamp(0.01, 0.99))
             } else {
                 None
@@ -325,7 +326,8 @@ impl WisdomTransmissionStudy {
             };
 
             let noise = (self.rng.next_u64() as f64 / u64::MAX as f64 - 0.5)
-                * self.participants[participant_idx].calibration * 2.0;
+                * self.participants[participant_idx].calibration
+                * 2.0;
             let predicted = (true_prob + noise + influence).clamp(0.01, 0.99);
 
             // Determine outcome
@@ -378,7 +380,11 @@ impl WisdomTransmissionStudy {
         }
     }
 
-    fn select_seed_for_participant(&mut self, participant_idx: usize, domain: &str) -> Option<String> {
+    fn select_seed_for_participant(
+        &mut self,
+        participant_idx: usize,
+        domain: &str,
+    ) -> Option<String> {
         let participant = &self.participants[participant_idx];
 
         // Select a seed matching format and domain
@@ -410,12 +416,7 @@ impl WisdomTransmissionStudy {
         }
     }
 
-    fn calculate_seed_influence(
-        &self,
-        seed_id: &str,
-        _domain: &str,
-        true_prob: f64,
-    ) -> f64 {
+    fn calculate_seed_influence(&self, seed_id: &str, _domain: &str, true_prob: f64) -> f64 {
         let seed = self.seeds.iter().find(|s| s.id == seed_id);
 
         if let Some(seed) = seed {
@@ -494,8 +495,14 @@ impl WisdomTransmissionStudy {
             }
 
             // Calculate influence metrics
-            let total_citations: usize = format_participants.iter().map(|p| p.seeds_cited.len()).sum();
-            let total_views: usize = format_participants.iter().map(|p| p.seeds_viewed.len()).sum();
+            let total_citations: usize = format_participants
+                .iter()
+                .map(|p| p.seeds_cited.len())
+                .sum();
+            let total_views: usize = format_participants
+                .iter()
+                .map(|p| p.seeds_viewed.len())
+                .sum();
 
             let citation_rate = if total_views > 0 {
                 total_citations as f64 / total_views as f64
@@ -590,18 +597,18 @@ impl WisdomTransmissionStudy {
             }
         }
 
-        while let Some((seed_id, gen)) = queue.pop() {
+        while let Some((seed_id, generation)) = queue.pop() {
             if visited.contains(&seed_id) {
                 continue;
             }
             visited.insert(seed_id.clone());
 
             if let Some(seed) = self.seeds.iter_mut().find(|s| s.id == seed_id) {
-                seed.citations.generation = gen;
+                seed.citations.generation = generation;
 
                 for cited_by in seed.citations.cited_by.clone() {
                     if !visited.contains(&cited_by) {
-                        queue.push((cited_by, gen + 1));
+                        queue.push((cited_by, generation + 1));
                     }
                 }
             }
@@ -635,8 +642,8 @@ impl WisdomTransmissionStudy {
                     .sum();
 
                 let num_citers = seed.citations.cites.len().max(1);
-                let new_score =
-                    (1.0 - damping) / num_seeds as f64 + damping * incoming_score / num_citers as f64;
+                let new_score = (1.0 - damping) / num_seeds as f64
+                    + damping * incoming_score / num_citers as f64;
 
                 seed.citations.influence_score = new_score;
             }
@@ -685,9 +692,17 @@ impl WisdomTransmissionStudy {
         };
 
         // Network statistics
-        let max_generation = self.seeds.iter().map(|s| s.citations.generation).max().unwrap_or(0);
-        let avg_citations: f64 = self.seeds.iter().map(|s| s.citations.cited_by.len()).sum::<usize>()
-            as f64
+        let max_generation = self
+            .seeds
+            .iter()
+            .map(|s| s.citations.generation)
+            .max()
+            .unwrap_or(0);
+        let avg_citations: f64 = self
+            .seeds
+            .iter()
+            .map(|s| s.citations.cited_by.len())
+            .sum::<usize>() as f64
             / self.seeds.len().max(1) as f64;
 
         // Top influencers
@@ -698,11 +713,8 @@ impl WisdomTransmissionStudy {
                 .partial_cmp(&a.citations.influence_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        let top_influencers: Vec<String> = sorted_seeds
-            .iter()
-            .take(5)
-            .map(|s| s.id.clone())
-            .collect();
+        let top_influencers: Vec<String> =
+            sorted_seeds.iter().take(5).map(|s| s.id.clone()).collect();
 
         WisdomSummary {
             best_format,
@@ -735,15 +747,15 @@ impl WisdomTransmissionStudy {
         let mut recommendations = Vec::new();
 
         // Format recommendation
-        if let Some((format, eff)) = self
-            .results
-            .format_effectiveness
-            .iter()
-            .max_by(|(_, a), (_, b)| {
-                a.brier_improvement
-                    .partial_cmp(&b.brier_improvement)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+        if let Some((format, eff)) =
+            self.results
+                .format_effectiveness
+                .iter()
+                .max_by(|(_, a), (_, b)| {
+                    a.brier_improvement
+                        .partial_cmp(&b.brier_improvement)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
         {
             recommendations.push(format!(
                 "Best format: {:?} (Brier improvement: {:.4})",
@@ -780,8 +792,11 @@ impl WisdomTransmissionStudy {
             0.0
         };
 
-        let incorrect_sources: Vec<&ResearchWisdomSeed> =
-            self.seeds.iter().filter(|s| !s.source_was_correct).collect();
+        let incorrect_sources: Vec<&ResearchWisdomSeed> = self
+            .seeds
+            .iter()
+            .filter(|s| !s.source_was_correct)
+            .collect();
         let incorrect_avg_citations = if !incorrect_sources.is_empty() {
             incorrect_sources
                 .iter()
