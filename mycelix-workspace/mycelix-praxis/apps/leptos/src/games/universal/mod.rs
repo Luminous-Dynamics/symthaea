@@ -3,9 +3,9 @@
 //! Universal subject games — Financial Literacy, Cybersecurity, Philosophy.
 
 pub mod budget_sim;
-pub mod password_strength;
 pub mod fallacy_detector;
-pub mod hdc_sandbox;
 pub mod hdc_holograph;
+pub mod hdc_sandbox;
 pub mod moral_algebra;
+pub mod password_strength;
 pub mod water_stewardship;

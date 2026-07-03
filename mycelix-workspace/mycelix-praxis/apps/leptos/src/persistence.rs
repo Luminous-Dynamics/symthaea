@@ -7,9 +7,9 @@
 //! No conductor needed -- saves and loads JSON to/from the browser's
 //! localStorage API. Used to persist role selection, sovereignty level,
 //! and other lightweight state across page reloads.
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use web_sys::window;
-use leptos::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum SyncState {
@@ -57,11 +57,7 @@ pub fn use_set_mutation_queue() -> WriteSignal<MutationQueue> {
 
 /// Save a value to localStorage.
 pub fn save<T: Serialize>(key: &str, value: &T) {
-...
-    if let Some(storage) = window()
-        .and_then(|w| w.local_storage().ok())
-        .flatten()
-    {
+    if let Some(storage) = window().and_then(|w| w.local_storage().ok()).flatten() {
         if let Ok(json) = serde_json::to_string(value) {
             let _ = storage.set_item(key, &json);
         }
@@ -80,10 +76,7 @@ pub fn load<T: DeserializeOwned>(key: &str) -> Option<T> {
 
 /// Remove a value from localStorage.
 pub fn remove(key: &str) {
-    if let Some(storage) = window()
-        .and_then(|w| w.local_storage().ok())
-        .flatten()
-    {
+    if let Some(storage) = window().and_then(|w| w.local_storage().ok()).flatten() {
         let _ = storage.remove_item(key);
     }
 }
@@ -93,8 +86,8 @@ pub fn remove(key: &str) {
 // ============================================================
 
 use crate::curriculum::ProgressStore;
-use crate::study_tracker::StudyTracker;
 use crate::student_profile::StudentProfile;
+use crate::study_tracker::StudyTracker;
 
 // ============================================================
 // Governance Store — localStorage-first DAO preview
@@ -131,9 +124,20 @@ impl GovernanceStore {
         save(GOV_KEY, self);
     }
 
-    pub fn create_proposal(&mut self, title: String, description: String, category: String, proposer: String) {
+    pub fn create_proposal(
+        &mut self,
+        title: String,
+        description: String,
+        category: String,
+        proposer: String,
+    ) {
         let now = js_sys::Date::new_0();
-        let date = format!("{:04}-{:02}-{:02}", now.get_full_year(), now.get_month() + 1, now.get_date());
+        let date = format!(
+            "{:04}-{:02}-{:02}",
+            now.get_full_year(),
+            now.get_month() + 1,
+            now.get_date()
+        );
         self.next_id += 1;
         self.proposals.push(LocalProposal {
             id: format!("local_{}", self.next_id),
@@ -153,11 +157,19 @@ impl GovernanceStore {
     pub fn vote(&mut self, proposal_id: &str, is_for: bool) {
         if let Some(p) = self.proposals.iter_mut().find(|p| p.id == proposal_id) {
             if !p.voted {
-                if is_for { p.for_votes += 1; } else { p.against_votes += 1; }
+                if is_for {
+                    p.for_votes += 1;
+                } else {
+                    p.against_votes += 1;
+                }
                 p.voted = true;
                 // Auto-resolve: 5+ for votes = approved, 5+ against = rejected
-                if p.for_votes >= 5 { p.status = "Approved".into(); }
-                if p.against_votes >= 5 { p.status = "Rejected".into(); }
+                if p.for_votes >= 5 {
+                    p.status = "Approved".into();
+                }
+                if p.against_votes >= 5 {
+                    p.status = "Rejected".into();
+                }
                 self.save_store();
             }
         }
@@ -287,8 +299,12 @@ pub fn export_all() -> String {
     let now = js_sys::Date::new_0();
     let exported_at = format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-        now.get_full_year(), now.get_month() + 1, now.get_date(),
-        now.get_hours(), now.get_minutes(), now.get_seconds()
+        now.get_full_year(),
+        now.get_month() + 1,
+        now.get_date(),
+        now.get_hours(),
+        now.get_minutes(),
+        now.get_seconds()
     );
 
     let bundle = ExportBundle {
@@ -305,8 +321,8 @@ pub fn export_all() -> String {
 /// Import student data from a JSON string, merging with existing data.
 /// Returns a summary of what was imported.
 pub fn import_all(json: &str) -> Result<String, String> {
-    let bundle: ExportBundle = serde_json::from_str(json)
-        .map_err(|e| format!("Invalid format: {}", e))?;
+    let bundle: ExportBundle =
+        serde_json::from_str(json).map_err(|e| format!("Invalid format: {}", e))?;
 
     if bundle.version > 1 {
         return Err("This export is from a newer version of Praxis. Please update the app.".into());
@@ -391,7 +407,9 @@ pub fn import_all(json: &str) -> Result<String, String> {
 pub fn trigger_download(filename: &str, content: &str) {
     use wasm_bindgen::JsCast;
     let Some(window) = window() else { return };
-    let Some(document) = window.document() else { return };
+    let Some(document) = window.document() else {
+        return;
+    };
 
     let blob_parts = js_sys::Array::new();
     blob_parts.push(&wasm_bindgen::JsValue::from_str(content));

@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Knowledge Garden / Skill Map — Dynamic, Context-Aware Node Exploration.
 
-use leptos::prelude::*;
-use crate::curriculum::{curriculum_graph, use_progress, use_set_progress, ProgressStatus, CurriculumNode, display_subject, Grade, Subject};
-use crate::location::use_biome;
+use crate::components::gl_canvas::GardenCanvas;
 use crate::components::hardware::{HardwareScanner, PresenceValidator, SafetyGuard};
+use crate::components::voice_ops::VoiceCommandCenter;
+use crate::curriculum::{
+    CurriculumNode, Grade, ProgressStatus, Subject, curriculum_graph, display_subject,
+    use_progress, use_set_progress,
+};
+use crate::location::use_biome;
+use leptos::prelude::*;
 
 #[component]
 pub fn SkillMapPage() -> impl IntoView {
@@ -22,7 +27,7 @@ pub fn SkillMapPage() -> impl IntoView {
             <header class="garden-header">
                 <h2>"Knowledge Garden"</h2>
                 <p>"Explore the civilizational substrate."</p>
-                
+
                 <div class="garden-stats">
                     {move || {
                         let p = progress.get();
@@ -43,16 +48,13 @@ pub fn SkillMapPage() -> impl IntoView {
                 </button>
             </div>
 
-use crate::components::gl_canvas::GardenCanvas;
-
-// ...
             // Constellation View (LOD-Optimized)
             <div class="constellation-container" style="height: 70vh; background: var(--surface-low); border-radius: 12px; position: relative; overflow: hidden">
                 <GardenCanvas node_count=curriculum_graph().nodes.len() />
-                
+
                 // Floating Action Layer (Optimistic DOM)
-                <div 
-                    class="node-sprout" 
+                <div
+                    class="node-sprout"
                     style="position: absolute; top: 30%; left: 40%; cursor: pointer"
                     on:click=move |_| set_selected_id.set(Some("VOC-AGR-101".to_string()))
                 >
@@ -66,8 +68,8 @@ use crate::components::gl_canvas::GardenCanvas;
                 curriculum_graph().node(&id).cloned()
             }).map(|node| {
                 view! {
-                    <NodeDetail 
-                        node=node 
+                    <NodeDetail
+                        node=node
                         on_close=move || set_selected_id.set(None)
                     />
                 }
@@ -77,10 +79,7 @@ use crate::components::gl_canvas::GardenCanvas;
 }
 
 #[component]
-fn NodeDetail(
-    node: CurriculumNode,
-    on_close: impl Fn() + 'static,
-) -> impl IntoView {
+fn NodeDetail(node: CurriculumNode, on_close: impl Fn() + 'static) -> impl IntoView {
     let progress = use_progress();
     let set_progress = use_set_progress();
     let biome = use_biome();
@@ -93,12 +92,18 @@ fn NodeDetail(
     let morphed_description = move || {
         let b = biome.get();
         let base_desc = node.description.clone();
-        
+
         if let Some(params) = &node.biome_parameters {
             if params.hardiness_zones.contains(&b.hardiness_zone) {
-                format!("{} \n\n[BIOREGIONAL ADVICE]: In your Hardiness Zone ({}), this technique is optimal. Current Season ({}) is perfect for execution.", base_desc, b.hardiness_zone, b.current_season)
+                format!(
+                    "{} \n\n[BIOREGIONAL ADVICE]: In your Hardiness Zone ({}), this technique is optimal. Current Season ({}) is perfect for execution.",
+                    base_desc, b.hardiness_zone, b.current_season
+                )
             } else {
-                format!("{} \n\n[BIOREGIONAL WARNING]: Your Hardiness Zone ({}) may require modifications for this technique (Original: Zone {:?}).", base_desc, b.hardiness_zone, params.hardiness_zones)
+                format!(
+                    "{} \n\n[BIOREGIONAL WARNING]: Your Hardiness Zone ({}) may require modifications for this technique (Original: Zone {:?}).",
+                    base_desc, b.hardiness_zone, params.hardiness_zones
+                )
             }
         } else {
             base_desc
@@ -139,36 +144,35 @@ fn NodeDetail(
                         <h5 style="margin: 0.2rem 0">{&w.tradition}": "{&w.pattern_name}</h5>
                         <p style="margin: 0.5rem 0 0 0; font-size: 0.8rem; font-style: italic">{&w.description}</p>
                     </div>
-                use crate::components::hardware::{HardwareScanner, PresenceValidator, SafetyGuard};
-                use crate::components::voice_ops::VoiceCommandCenter;
+                }
+            })}
 
-                // ...
-                            // Artifact Ledger (Proof of Craft)
-                            <section class="artifact-ledger" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border)">
-                                <h4>"Artifact Ledger"</h4>
-                                <p style="font-size: 0.75rem; color: var(--text-tertiary)">"Ground your digital record with physical proof (Proof-of-Craft)."</p>
+            // Artifact Ledger (Proof of Craft)
+            <section class="artifact-ledger" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border)">
+                <h4>"Artifact Ledger"</h4>
+                <p style="font-size: 0.75rem; color: var(--text-tertiary)">"Ground your digital record with physical proof (Proof-of-Craft)."</p>
 
-                                {
-                                    let nid = node.id.clone();
-                                    let ntype = node.node_type.clone();
-                                    move || if ntype == "Physical" {
-                                        view! {
-                                            <PresenceValidator 
-                                                node_id=nid.clone() 
-                                                on_verified=move || {
-                                                    // Trigger verified_presence callback
-                                                } 
-                                            />
-                                            <VoiceCommandCenter />
-                                        }.into_any()
-                                    } else {
-                                        view! { <span></span> }.into_any()
-                                    }
+                {
+                    let nid = node.id.clone();
+                    let ntype = node.node_type.clone();
+                    move || if ntype == "Physical" {
+                        view! {
+                            <PresenceValidator
+                                node_id=nid.clone()
+                                on_verified=move || {
+                                    // Trigger verified_presence callback
                                 }
+                            />
+                            <VoiceCommandCenter />
+                        }.into_any()
+                    } else {
+                        view! { <span></span> }.into_any()
+                    }
+                }
 
-                <input 
-                    type="text" 
-                    placeholder="Link to GitHub, CAD, or Video..." 
+                <input
+                    type="text"
+                    placeholder="Link to GitHub, CAD, or Video..."
                     style="width: 100%; margin-top: 0.5rem"
                     prop:value=artifact_url
                     on:input=move |ev| set_artifact_url.set(event_target_value(&ev))
@@ -248,11 +252,11 @@ fn NodeDetail(
                                 <p style="font-size: 0.75rem; line-height: 1.4; margin: 0.5rem 0 1rem 0">
                                     "As a master of this node, you are eligible for a physical hardware control key."
                                 </p>
-                                <HardwareScanner 
-                                    device_type=node_title.clone() 
+                                <HardwareScanner
+                                    device_type=node_title.clone()
                                     on_linked=move |_grant| {
                                         // Store capability grant locally
-                                    } 
+                                    }
                                 />
                             </section>
                         </SafetyGuard>
@@ -264,7 +268,7 @@ fn NodeDetail(
 
             // Status Control
             <footer style="margin-top: 2rem; display: flex; gap: 0.5rem">
-                <button 
+                <button
                     class=move || if status() == ProgressStatus::Mastered { "btn-primary active" } else { "btn-outline" }
                     on:click=move |_| set_progress.update(|p| p.set_status(&node_id, ProgressStatus::Mastered))
                 >

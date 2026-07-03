@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Educational games — interactive STEM simulations embedded in study pages.
 
-pub mod shared;
+pub mod chemistry;
 pub mod foundation;
 pub mod intermediate;
 pub mod math;
 pub mod physics;
-pub mod chemistry;
+pub mod shared;
 pub mod universal;
 
 use leptos::prelude::*;
@@ -21,62 +21,139 @@ pub fn has_game(node_id: &str) -> bool {
 fn game_type(node_id: &str) -> Option<&'static str> {
     match node_id {
         // Functions (parabola explorer)
-        "CAPS.Mathematics.Gr12.P1.FN" | "CAPS.Mathematics.Gr11.FN.1" |
-        "CAPS.Mathematics.Gr10.FN.1" | "CAPS.Mathematics.Gr10.FN.2" |
-        "CAPS.Mathematics.Gr11.FN.2" => Some("parabola"),
+        "CAPS.Mathematics.Gr12.P1.FN"
+        | "CAPS.Mathematics.Gr11.FN.1"
+        | "CAPS.Mathematics.Gr10.FN.1"
+        | "CAPS.Mathematics.Gr10.FN.2"
+        | "CAPS.Mathematics.Gr11.FN.2" => Some("parabola"),
         // Calculus (tangent line explorer)
         "CAPS.Mathematics.Gr12.P1.CALC" => Some("tangent"),
         // Trigonometry (unit circle explorer)
-        "CAPS.Mathematics.Gr12.P2.TRIG" | "CAPS.Mathematics.Gr11.TRIG.1" |
-        "CAPS.Mathematics.Gr10.TRIG.1" | "CAPS.Mathematics.Gr10.TRIG.2" => Some("unit_circle"),
+        "CAPS.Mathematics.Gr12.P2.TRIG"
+        | "CAPS.Mathematics.Gr11.TRIG.1"
+        | "CAPS.Mathematics.Gr10.TRIG.1"
+        | "CAPS.Mathematics.Gr10.TRIG.2" => Some("unit_circle"),
         // Analytical Geometry
-        "CAPS.Mathematics.Gr12.P2.ANAG" | "CAPS.Mathematics.Gr11.ANAG.1" |
-        "CAPS.Mathematics.Gr10.ANAG.1" => Some("analytical"),
+        "CAPS.Mathematics.Gr12.P2.ANAG"
+        | "CAPS.Mathematics.Gr11.ANAG.1"
+        | "CAPS.Mathematics.Gr10.ANAG.1" => Some("analytical"),
         // Statistics
-        "CAPS.Mathematics.Gr12.P2.STAT" | "CAPS.Mathematics.Gr11.STAT.1" |
-        "CAPS.Mathematics.Gr10.STAT.1" => Some("stats"),
+        "CAPS.Mathematics.Gr12.P2.STAT"
+        | "CAPS.Mathematics.Gr11.STAT.1"
+        | "CAPS.Mathematics.Gr10.STAT.1" => Some("stats"),
         // Projectile Motion
-        "CAPS.PhysicalSciences.Gr12.P1.MECH2" | "CAPS.PhysicalSciences.Gr10.PHY.1" => Some("projectile"),
+        "CAPS.PhysicalSciences.Gr12.P1.MECH2" | "CAPS.PhysicalSciences.Gr10.PHY.1" => {
+            Some("projectile")
+        }
         // Circuit Explorer
-        "CAPS.PhysicalSciences.Gr12.P1.ELEC1" | "CAPS.PhysicalSciences.Gr10.PHY.7" |
-        "CAPS.PhysicalSciences.Gr10.PHY.6" => Some("circuits"),
+        "CAPS.PhysicalSciences.Gr12.P1.ELEC1"
+        | "CAPS.PhysicalSciences.Gr10.PHY.7"
+        | "CAPS.PhysicalSciences.Gr10.PHY.6" => Some("circuits"),
         // Equilibrium Simulator
-        "CAPS.PhysicalSciences.Gr12.P2.EQUIL" | "CAPS.PhysicalSciences.Gr11.CHM.3" => Some("equilibrium"),
+        "CAPS.PhysicalSciences.Gr12.P2.EQUIL" | "CAPS.PhysicalSciences.Gr11.CHM.3" => {
+            Some("equilibrium")
+        }
         // Acid-Base Explorer
         "CAPS.PhysicalSciences.Gr12.P2.ACID" | "CAPS.PhysicalSciences.Gr11.CHM.4" => Some("acids"),
         // Equation Explorer (Physics Discovery)
-        "CAPS.PhysicalSciences.Gr12.P1.EQUATIONS" | "CAPS.PhysicalSciences.Gr11.P1.EQUATIONS" |
-        "UNIVERSAL.PhysicsEquations" | "UNIVERSAL.EquationExplorer" => Some("equation_explorer"),
+        "CAPS.PhysicalSciences.Gr12.P1.EQUATIONS"
+        | "CAPS.PhysicalSciences.Gr11.P1.EQUATIONS"
+        | "UNIVERSAL.PhysicsEquations"
+        | "UNIVERSAL.EquationExplorer" => Some("equation_explorer"),
         // Newton's Gravitation
-        "CAPS.PhysicalSciences.Gr11.P1.GRAV" | "CAPS.PhysicalSciences.Gr12.P1.GRAV" |
-        "UNIVERSAL.Gravitation" => Some("gravity"),
+        "CAPS.PhysicalSciences.Gr11.P1.GRAV"
+        | "CAPS.PhysicalSciences.Gr12.P1.GRAV"
+        | "UNIVERSAL.Gravitation" => Some("gravity"),
         // Ideal Gas Law
-        "CAPS.PhysicalSciences.Gr11.P1.GASES" | "CAPS.PhysicalSciences.Gr12.P2.GASES" |
-        "UNIVERSAL.IdealGas" => Some("ideal_gas"),
+        "CAPS.PhysicalSciences.Gr11.P1.GASES"
+        | "CAPS.PhysicalSciences.Gr12.P2.GASES"
+        | "UNIVERSAL.IdealGas" => Some("ideal_gas"),
         // Schwarzschild Radius / Black Holes
         "UNIVERSAL.BlackHoles" | "UNIVERSAL.Schwarzschild" => Some("schwarzschild"),
         // Coulomb's Law
         "CAPS.PhysicalSciences.Gr11.P1.ELEC2" | "UNIVERSAL.Coulomb" => Some("coulomb"),
         // Lorentz Factor / Special Relativity
-        "CAPS.PhysicalSciences.Gr12.P1.REL" | "UNIVERSAL.Relativity" | "UNIVERSAL.Lorentz" => Some("lorentz"),
+        "CAPS.PhysicalSciences.Gr12.P1.REL" | "UNIVERSAL.Relativity" | "UNIVERSAL.Lorentz" => {
+            Some("lorentz")
+        }
         // Hubble's Law / Cosmology
         "UNIVERSAL.Cosmology" | "UNIVERSAL.Hubble" => Some("hubble"),
         // Boltzmann Distribution
-        "CAPS.PhysicalSciences.Gr12.P1.THERMO" | "UNIVERSAL.Boltzmann" | "UNIVERSAL.StatMech" => Some("boltzmann"),
+        "CAPS.PhysicalSciences.Gr12.P1.THERMO" | "UNIVERSAL.Boltzmann" | "UNIVERSAL.StatMech" => {
+            Some("boltzmann")
+        }
         // Financial Literacy (Budget Simulator)
         id if id.contains("FinancialLiteracy") || id.contains("FINLIT") => Some("budget"),
         // Cybersecurity (Password Strength)
-        id if id.contains("Cybersecurity") || id.contains("CYBER") || id.contains("InfoSec") => Some("password"),
+        id if id.contains("Cybersecurity") || id.contains("CYBER") || id.contains("InfoSec") => {
+            Some("password")
+        }
         // Philosophy / Critical Thinking (Fallacy Detector)
-        id if id.contains("Philosophy") || id.contains("PHIL") || id.contains("CriticalThinking") || id.contains("CRITTHINK") => Some("fallacy"),
+        id if id.contains("Philosophy")
+            || id.contains("PHIL")
+            || id.contains("CriticalThinking")
+            || id.contains("CRITTHINK") =>
+        {
+            Some("fallacy")
+        }
         // Foundation Phase (Gr1-6)
-        id if id.contains("Gr1") || id.contains("Gr2") || id.contains("Grade1") || id.contains("Grade2") => Some("number_bonds"),
-        id if (id.contains("Gr3") || id.contains("Gr4") || id.contains("Gr5") || id.contains("Grade3") || id.contains("Grade4") || id.contains("Grade5")) && (id.contains("NF") || id.contains("fraction") || id.contains("Fraction")) => Some("fraction_pizza"),
-        id if (id.contains("Gr3") || id.contains("Gr4") || id.contains("Gr5") || id.contains("Grade3") || id.contains("Grade4") || id.contains("Grade5")) && (id.contains("OA") || id.contains("multiply") || id.contains("Multiply") || id.contains("times")) => Some("times_tables"),
+        id if id.contains("Gr1")
+            || id.contains("Gr2")
+            || id.contains("Grade1")
+            || id.contains("Grade2") =>
+        {
+            Some("number_bonds")
+        }
+        id if (id.contains("Gr3")
+            || id.contains("Gr4")
+            || id.contains("Gr5")
+            || id.contains("Grade3")
+            || id.contains("Grade4")
+            || id.contains("Grade5"))
+            && (id.contains("NF") || id.contains("fraction") || id.contains("Fraction")) =>
+        {
+            Some("fraction_pizza")
+        }
+        id if (id.contains("Gr3")
+            || id.contains("Gr4")
+            || id.contains("Gr5")
+            || id.contains("Grade3")
+            || id.contains("Grade4")
+            || id.contains("Grade5"))
+            && (id.contains("OA")
+                || id.contains("multiply")
+                || id.contains("Multiply")
+                || id.contains("times")) =>
+        {
+            Some("times_tables")
+        }
         // Intermediate Phase (Gr6-9)
-        id if (id.contains("Gr6") || id.contains("Grade6")) && (id.contains("integer") || id.contains("Integer") || id.contains("negative") || id.contains("NS")) => Some("integer_line"),
-        id if (id.contains("Gr7") || id.contains("Gr8") || id.contains("Grade7") || id.contains("Grade8")) && (id.contains("ALG") || id.contains("algebra") || id.contains("equation") || id.contains("EE")) => Some("equation_balance"),
-        id if id.contains("Pythag") || id.contains("pythag") || id.contains("hypotenuse") || (id.contains("Gr8") && id.contains("GEOM")) => Some("pythagoras"),
+        id if (id.contains("Gr6") || id.contains("Grade6"))
+            && (id.contains("integer")
+                || id.contains("Integer")
+                || id.contains("negative")
+                || id.contains("NS")) =>
+        {
+            Some("integer_line")
+        }
+        id if (id.contains("Gr7")
+            || id.contains("Gr8")
+            || id.contains("Grade7")
+            || id.contains("Grade8"))
+            && (id.contains("ALG")
+                || id.contains("algebra")
+                || id.contains("equation")
+                || id.contains("EE")) =>
+        {
+            Some("equation_balance")
+        }
+        id if id.contains("Pythag")
+            || id.contains("pythag")
+            || id.contains("hypotenuse")
+            || (id.contains("Gr8") && id.contains("GEOM")) =>
+        {
+            Some("pythagoras")
+        }
         _ => None,
     }
 }
