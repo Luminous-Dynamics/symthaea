@@ -138,8 +138,14 @@ pub fn SovereignRadar(
     let weights = weights.unwrap_or_default();
 
     // Pulse effect derived from combined score
+    let tier_weights = weights.clone();
     let score = move || profile.get().combined_score(&weights);
-    let tier = move || profile.get().tier(&weights);
+    let tier = move || profile.get().tier(&tier_weights);
+    // `score` is a plain `move ||` closure (Clone, since `profile` is Copy and
+    // `weights` is Clone) — it's used both by `profile_view` below and by the
+    // separate pulse-animation `<style>` closure further down, so each site
+    // needs its own clone rather than moving the same closure into both.
+    let score_for_pulse = score.clone();
 
     // Axis lines and labels
     let axes_view = SovereignDimension::ALL
@@ -290,7 +296,7 @@ pub fn SovereignRadar(
             <style>
                 {move || {
                     if !pulse { return "".to_string(); }
-                    let s = score();
+                    let s = score_for_pulse();
                     let duration = 4.0 - (s * 3.0);
                     let scale = 1.0 + (s * 0.05);
                     format!(

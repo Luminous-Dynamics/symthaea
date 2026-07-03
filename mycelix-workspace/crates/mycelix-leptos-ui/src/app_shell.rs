@@ -53,7 +53,17 @@ pub fn AppNav(
     #[prop(into)] brand_name: String,
     #[prop(into)] brand_icon: String,
     #[prop(into)] links: Vec<NavLink>,
-    #[prop(optional, into)] meta_view: Option<AnyView>,
+    // No `#[prop(...)]` attribute at all: Leptos's `optional` prop modifier
+    // means "the caller may omit this and get `None`, or pass the *inner*
+    // type and get it auto-wrapped in `Some`" — it does NOT mean "accepts an
+    // already-built `Option<AnyView>` as-is". `AppShell` (the only caller)
+    // forwards its own `meta_view: Option<AnyView>` prop straight through,
+    // so this needs to be a plain required prop of type `Option<AnyView>`
+    // (caller always passes `Some(view)` or `None` explicitly) — not
+    // `optional` (which would need a bare `AnyView`) and not `optional,
+    // into` (which would need `Option<AnyView>: Into<AnyView>`, which
+    // doesn't exist).
+    meta_view: Option<AnyView>,
 ) -> impl IntoView {
     view! {
         <nav class="app-nav" role="navigation" aria-label="main navigation">

@@ -7,6 +7,7 @@ description = "Shared UI components for Mycelix Leptos frontends."
 
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }
+leptos_router = { version = "0.8" }
 lucide-leptos = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 mycelix-leptos-client = { path = "../mycelix-leptos-client" }
