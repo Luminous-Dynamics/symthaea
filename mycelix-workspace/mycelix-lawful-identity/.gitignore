@@ -1,5 +1,6 @@
 target/
 Cargo.lock
+!Cargo.lock
 *.dna
 *.happ
 .DS_Store

@@ -54,6 +54,7 @@ conductor-node-*/
 # Rust (for backend zomes when added)
 target/
 Cargo.lock
+!backend/Cargo.lock
 
 # Local development
 .local/

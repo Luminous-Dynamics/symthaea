@@ -2,6 +2,7 @@
 rust/target/
 **/*.rs.bk
 Cargo.lock
+!holochain/Cargo.lock
 *.pdb
 
 # Node / TypeScript

@@ -8,6 +8,9 @@ target/
 
 # Rust / cargo metadata
 Cargo.lock
+!dna/zomes/trust_filter/Cargo.lock
+!dna/integrity/Cargo.lock
+!dna/zomes/mail_messages/Cargo.lock
 *.profraw
 
 # Node / web artifacts

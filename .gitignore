@@ -75,6 +75,23 @@ htmlcov/
 target/
 Cargo.lock
 !symthaea/Cargo.lock
+# Holochain-dependent hApp/zome dirs: track Cargo.lock for reproducibility
+# (deployable WASM/conductor artifacts) -- reconciled to hdk=0.6.1/hdi=0.7.1
+!mycelix-workspace/mycelix-finance/Cargo.lock
+!mycelix-workspace/crates/mycelix-bridge-common/Cargo.lock
+!mycelix-workspace/crates/mycelix-bridge-entry-types/Cargo.lock
+!mycelix-workspace/mycelix-core/libs/mycelix-core-types/Cargo.lock
+!mycelix-workspace/happs/epistemic-markets/Cargo.lock
+!mycelix-workspace/happs/fabrication/Cargo.lock
+!mycelix-workspace/mycelix-civic/Cargo.lock
+!mycelix-workspace/mycelix-core/zomes/bridge/Cargo.lock
+!mycelix-workspace/mycelix-core/zomes/federated_learning/Cargo.lock
+!mycelix-workspace/mycelix-energy/Cargo.lock
+!mycelix-workspace/mycelix-identity/Cargo.lock
+!mycelix-workspace/mycelix-knowledge/Cargo.lock
+!mycelix-workspace/mycelix-governance/Cargo.lock
+!mycelix-workspace/mycelix-justice/Cargo.lock
+!mycelix-workspace/mycelix-position/Cargo.lock
 **/*.rs.bk
 
 # === OS Files ===
