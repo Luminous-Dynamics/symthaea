@@ -15,10 +15,10 @@ default = []
 experimental = []
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = ["bevy_asset", "bevy_scene", "bevy_pbr", "bevy_render", "bevy_ui", "bevy_text"] }
-bevy_render = { version = "0.18" }
+bevy = { version = "0.19", default-features = false, features = ["bevy_asset", "bevy_scene", "bevy_pbr", "bevy_render", "bevy_ui", "bevy_text"] }
+bevy_render = { version = "0.19" }
 wgpu-types = "23.0"
-bevy_camera = { version = "0.18" }
+bevy_camera = { version = "0.19" }
 symtropy-physics = { path = "../../core/symtropy-physics" }
 symtropy-bevy-core = { path = "../../core/symtropy-bevy-core" }
 symtropy-math = { path = "../../core/symtropy-math" }

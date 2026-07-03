@@ -20,7 +20,7 @@ categories = ["game-engines", "simulation"]
 [dependencies]
 # Bevy — minimal feature set for a headless backend plugin. No wayland/x11
 # because we don't open windows; the user's app will pull those in if needed.
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
     "std",
     "async_executor",
     "bevy_log",
@@ -29,7 +29,7 @@ bevy = { version = "0.18", default-features = false, features = [
 ] }
 
 # Async/ECS bridge.
-bevy-tokio-tasks = "0.18"
+bevy-tokio-tasks = "0.19"
 
 # Channels between Bevy main thread and tokio background task.
 flume = "0.11"

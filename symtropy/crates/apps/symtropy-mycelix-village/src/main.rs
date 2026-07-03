@@ -57,7 +57,7 @@ fn setup_village(
         .insert(Transform::from_xyz(0.0, 70.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y));
     commands.spawn(DirectionalLight {
         illuminance: 12000.0,
-        shadows_enabled: true,
+        shadow_maps_enabled: true,
         ..default()
     });
 

@@ -320,7 +320,7 @@ pub fn setup_world(
     commands.spawn((
         Text::new("WASD: move | E: extract core | Esc: quit"),
         TextFont {
-            font_size: 20.0,
+            font_size: FontSize::Px(20.0),
             ..default()
         },
         TextColor(Color::srgb(0.7, 0.9, 0.7)),
@@ -713,7 +713,7 @@ pub fn world_feedback_listener_system(
         commands.spawn((
             Text2d::new(event.message.clone()),
             TextFont {
-                font_size: 10.0,
+                font_size: FontSize::Px(10.0),
                 ..default()
             },
             TextColor(event.color),

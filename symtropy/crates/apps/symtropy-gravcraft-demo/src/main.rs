@@ -105,7 +105,7 @@ fn setup_scene(
     ));
 
     // Ambient light
-    commands.insert_resource(AmbientLight {
+    commands.insert_resource(GlobalAmbientLight {
         color: Color::srgb(0.1, 0.15, 0.3),
         brightness: 200.0,
         ..default()
@@ -116,7 +116,7 @@ fn setup_scene(
         DirectionalLight {
             color: Color::srgb(0.9, 0.95, 1.0),
             illuminance: 5000.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(10.0, 20.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -163,7 +163,7 @@ fn setup_scene(
     commands.spawn((
         Text::new("Phi: 0.80 | Amplifiers: ON ON ON | Press 1/2/3 to toggle, Up/Down for Phi"),
         TextFont {
-            font_size: 18.0,
+            font_size: FontSize::Px(18.0),
             ..default()
         },
         TextColor(Color::srgba(0.8, 0.9, 1.0, 0.9)),

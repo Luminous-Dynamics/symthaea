@@ -84,7 +84,7 @@ pub fn setup_scene(
     commands.spawn((
         DirectionalLight {
             illuminance: 12000.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             color: Color::srgb(1.0, 0.98, 0.95),
             ..default()
         },
@@ -224,7 +224,7 @@ pub fn update_cautery_glow(
 ) {
     let cautery = surg.last_cautery.clamp(0.0, 1.0);
     for handle in &query {
-        if let Some(mat) = materials.get_mut(&handle.0) {
+        if let Some(mut mat) = materials.get_mut(&handle.0) {
             let alpha = 0.10 + 0.60 * cautery;
             mat.base_color = Color::srgba(1.0, 0.5, 0.05, alpha);
         }
@@ -242,7 +242,7 @@ pub fn update_critical_structure_pulse(
     let danger = (1.0 - (dist / 15.0)).clamp(0.0, 1.0);
     let glow = 0.30 + 1.20 * danger;
     for handle in &query {
-        if let Some(mat) = materials.get_mut(&handle.0) {
+        if let Some(mut mat) = materials.get_mut(&handle.0) {
             mat.emissive = LinearRgba::new(glow * 0.9, 0.05, 0.08 + glow * 0.15, 1.0);
         }
     }

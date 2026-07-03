@@ -578,7 +578,12 @@ impl Plugin for FirstPersonInputPlugin {
 ///
 /// Bring your own `C: PhysicsCallback<D> + Resource` to couple a custom metric
 /// to physics, or use [`NoCouplingResource`] for uncoupled physics-only behavior.
-pub fn step_physics<const D: usize, C: PhysicsCallback<D> + Resource>(
+pub fn step_physics<
+    const D: usize,
+    C: PhysicsCallback<D>
+        + Resource
+        + bevy::ecs::component::Component<Mutability = bevy::ecs::component::Mutable>,
+>(
     mut physics: ResMut<BevyPhysics<D>>,
     mut cb: ResMut<C>,
     time: Res<Time<Fixed>>,

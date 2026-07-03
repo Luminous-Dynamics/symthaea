@@ -8,7 +8,7 @@ use crate::systems::consciousness::NpcConsciousness;
 use crate::systems::psychology::PsychologicalNeeds;
 use crate::systems::rendering::LeviathanSprite;
 use crate::systems::rendering::TILE_SIZE;
-use bevy::core_pipeline::core_3d::graph::Core3d;
+use bevy::core_pipeline::schedule::Core3d;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
@@ -269,7 +269,7 @@ pub fn setup_world_3d(
         Name::new("Old Waterworks interaction focus prompt"),
         Text2d::new(""),
         TextFont {
-            font_size: 9.0,
+            font_size: FontSize::Px(9.0),
             ..default()
         },
         TextColor(FIELD_DECK_CYAN),
@@ -286,7 +286,7 @@ pub fn setup_world_3d(
     commands.spawn((
         DirectionalLight {
             illuminance: 1200.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(0.0, 0.0, 300.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -415,7 +415,7 @@ pub fn setup_world_3d(
                 parent.spawn((
                     Text2d::new("Power Junction (Offline)"),
                     TextFont {
-                        font_size: 12.0,
+                        font_size: FontSize::Px(12.0),
                         ..default()
                     },
                     TextColor(Color::srgb(1.0, 0.8, 0.6)),
@@ -437,7 +437,7 @@ pub fn setup_world_3d(
                 parent.spawn((
                     Text2d::new("CHRONICLE SEALED"),
                     TextFont {
-                        font_size: 5.5,
+                        font_size: FontSize::Px(5.5),
                         ..default()
                     },
                     TextColor(REPAIR_TAG),
@@ -471,7 +471,7 @@ pub fn setup_world_3d(
                 parent.spawn((
                     Text2d::new("Water Pump (Sabotaged)"),
                     TextFont {
-                        font_size: 12.0,
+                        font_size: FontSize::Px(12.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.6, 0.8, 1.0)),
@@ -529,7 +529,7 @@ pub fn setup_world_3d(
                 parent.spawn((
                     Text2d::new("Fabricator"),
                     TextFont {
-                        font_size: 12.0,
+                        font_size: FontSize::Px(12.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.9, 0.7, 1.0)),
@@ -742,7 +742,7 @@ pub fn setup_world_3d(
             color: Color::srgb(1.0, 0.8, 0.2),
             intensity: 8000.0,
             range: 150.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(layout.core_pos.x, layout.core_pos.y, 25.0),
@@ -1001,7 +1001,7 @@ fn spawn_waterworks_render_diagnostics(
                 parent.spawn((
                     Text2d::new(*label),
                     TextFont {
-                        font_size: 6.0,
+                        font_size: FontSize::Px(6.0),
                         ..default()
                     },
                     TextColor(Color::WHITE),
@@ -1405,7 +1405,7 @@ pub fn machine_state_visual_system_3d(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for (junction, material_handle, children) in &junctions {
-        if let Some(material) = materials.get_mut(&material_handle.0) {
+        if let Some(mut material) = materials.get_mut(&material_handle.0) {
             *material = if junction.is_damaged {
                 waterworks_emissive_material(WARNING_AMBER, 0.18)
             } else {
@@ -1423,7 +1423,7 @@ pub fn machine_state_visual_system_3d(
             if status_bar.is_some() {
                 *visibility = Visibility::Visible;
                 if let Some(child_material) = child_material {
-                    if let Some(material) = materials.get_mut(&child_material.0) {
+                    if let Some(mut material) = materials.get_mut(&child_material.0) {
                         *material = if junction.is_damaged {
                             waterworks_material(WARNING_AMBER)
                         } else {
@@ -1445,7 +1445,7 @@ pub fn machine_state_visual_system_3d(
 
     for (pump, material_handle, children) in &pumps {
         let restored = !pump.is_sabotaged && pump.is_running;
-        if let Some(material) = materials.get_mut(&material_handle.0) {
+        if let Some(mut material) = materials.get_mut(&material_handle.0) {
             *material = if !restored {
                 waterworks_material(PAINTED_STEEL)
             } else {
@@ -1471,7 +1471,7 @@ pub fn machine_state_visual_system_3d(
     }
 
     for (fabricator, material_handle, children) in &fabricators {
-        if let Some(material) = materials.get_mut(&material_handle.0) {
+        if let Some(mut material) = materials.get_mut(&material_handle.0) {
             *material = if fabricator.is_active {
                 waterworks_emissive_material(REPAIR_TAG, 0.28)
             } else {
@@ -1489,7 +1489,7 @@ pub fn machine_state_visual_system_3d(
             if status_panel.is_some() {
                 *visibility = Visibility::Visible;
                 if let Some(child_material) = child_material {
-                    if let Some(material) = materials.get_mut(&child_material.0) {
+                    if let Some(mut material) = materials.get_mut(&child_material.0) {
                         *material = if fabricator.is_active {
                             waterworks_emissive_material(FIELD_DECK_CYAN, 0.32)
                         } else {
@@ -1566,7 +1566,7 @@ pub fn leviathan_visual_system_3d(
         SleepPhase::Hunting => 1.0,
     };
     for mat_handle in &materials_query {
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             let red = (0.18 + alpha * 0.72).clamp(0.0, 1.0);
             mat.base_color = Color::srgb(red, 0.08, 0.06);
             mat.emissive = mat.base_color.to_linear() * (0.05 + alpha * 0.35);

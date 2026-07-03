@@ -35,7 +35,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("SURGICAL\ntip: ---\ndist critical: ---\ntrocar compliance: ---\ntip force: ---\njaw: --- cautery: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(1.0, 0.85, 0.85)),
@@ -50,7 +50,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nsafety level: ---\nPE: ---\n\nCAUTERY DUAL INTERLOCK\n  Φ channel: ---\n  HW channel: ---\n  combined: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),

@@ -270,23 +270,23 @@ pub fn hydrate_gpu_telemetry_system(
     }
 }
 
-use bevy::render::storage::ShaderStorageBuffer;
+use bevy::render::storage::ShaderBuffer;
 
 /// GPU Storage Buffer handle for telemetry data.
 #[derive(Resource)]
 pub struct TelemetryGpuBuffer {
-    pub nodes_buffer: Handle<ShaderStorageBuffer>,
+    pub nodes_buffer: Handle<ShaderBuffer>,
 }
 
 /// Initialize the GPU Storage Buffer asset and resource.
 pub fn setup_telemetry_gpu_buffer(
     mut commands: Commands,
-    storage_buffers: Option<ResMut<Assets<ShaderStorageBuffer>>>,
+    storage_buffers: Option<ResMut<Assets<ShaderBuffer>>>,
 ) {
     let Some(mut storage_buffers) = storage_buffers else {
         return;
     };
-    let nodes_buffer = storage_buffers.add(ShaderStorageBuffer::new(
+    let nodes_buffer = storage_buffers.add(ShaderBuffer::new(
         &[], // Starts empty
         bevy::asset::RenderAssetUsages::default(),
     ));
@@ -297,12 +297,12 @@ pub fn setup_telemetry_gpu_buffer(
 pub fn sync_telemetry_to_gpu_system(
     telemetry: Res<TelemetryBufferResource>,
     gpu_buffer: Option<Res<TelemetryGpuBuffer>>,
-    storage_buffers: Option<ResMut<Assets<ShaderStorageBuffer>>>,
+    storage_buffers: Option<ResMut<Assets<ShaderBuffer>>>,
 ) {
     let (Some(gpu_buffer), Some(mut storage_buffers)) = (gpu_buffer, storage_buffers) else {
         return;
     };
-    if let Some(buffer) = storage_buffers.get_mut(&gpu_buffer.nodes_buffer) {
+    if let Some(mut buffer) = storage_buffers.get_mut(&gpu_buffer.nodes_buffer) {
         buffer.set_data(&telemetry.nodes);
     }
 }

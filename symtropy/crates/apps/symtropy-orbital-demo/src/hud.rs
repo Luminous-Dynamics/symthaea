@@ -36,7 +36,7 @@ pub fn setup_hud(mut commands: Commands) {
                     "ORBITAL\nee position: ---\ncomm window: ---\nsolar exposure: ---\nattitude drift: ---\njoint effort: ---",
                 ),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(1.0, 1.0, 0.75)),
@@ -51,7 +51,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nmotor gain: ---\nPE: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),

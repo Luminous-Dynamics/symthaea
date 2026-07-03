@@ -63,7 +63,7 @@ pub fn setup_scene(
     commands.spawn((
         DirectionalLight {
             illuminance: 9500.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(5.0, -5.0, 8.0).looking_at(Vec3::new(3.0, 0.0, 0.3), Vec3::Z),
@@ -220,7 +220,7 @@ pub fn update_terrain_cue_visual(
     for (mut transform, mat_handle) in &mut query {
         // Place the cue tile just ahead of the robot (1.5 m forward along X).
         transform.translation = Vec3::new(base_x + 1.5, 0.0, 0.02);
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             let alpha = (0.05 + 0.60 * r).clamp(0.0, 0.7);
             mat.base_color = Color::srgba(1.0, 0.75, 0.15, alpha);
         }

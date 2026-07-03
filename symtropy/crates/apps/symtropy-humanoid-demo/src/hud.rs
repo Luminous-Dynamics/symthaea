@@ -34,7 +34,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("HUMANOID\nuprightness: ---\nroot height: ---\nhead height: ---\njoints effort: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.75, 0.90, 1.0)),
@@ -49,7 +49,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nmotor gain: ---\nPE: ---\npush: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),

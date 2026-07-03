@@ -81,7 +81,7 @@ pub fn setup_scene(
     commands.spawn((
         DirectionalLight {
             illuminance: 8000.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(2.0, -2.0, 4.0).looking_at(Vec3::ZERO, Vec3::Z),
@@ -229,7 +229,7 @@ pub fn update_workspace_envelope(
         transform.scale = Vec3::splat(scale / 0.855); // Normalize since mesh radius is 0.855
 
         // Update material color
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             mat.base_color = color;
         }
     }

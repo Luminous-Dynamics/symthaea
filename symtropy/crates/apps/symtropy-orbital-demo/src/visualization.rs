@@ -56,7 +56,7 @@ pub fn setup_scene(
     commands.spawn((
         DirectionalLight {
             illuminance: 15000.0,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             color: Color::srgb(1.0, 0.95, 0.85),
             ..default()
         },
@@ -217,7 +217,7 @@ pub fn update_lighting_cue(
     }
     // Fade the comm beam alpha with comm_window
     for handle in &beam_q {
-        if let Some(mat) = materials.get_mut(&handle.0) {
+        if let Some(mut mat) = materials.get_mut(&handle.0) {
             let alpha = 0.10 + 0.55 * st.comm_window as f32;
             mat.base_color = Color::srgba(0.2, 0.85, 1.0, alpha);
         }

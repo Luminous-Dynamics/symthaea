@@ -45,7 +45,7 @@ pub fn setup_hud(mut commands: Commands) {
             }).with_child((
                 Text::new("ADAPTIVE SAFETY\nCertainty: ---\nTier: ---\nStiffness: ---\nPE: ---\nCycles: 0"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.0, 0.9, 0.3)),
@@ -60,7 +60,7 @@ pub fn setup_hud(mut commands: Commands) {
             }).with_child((
                 Text::new("ISO/TS 15066 SSM\nStatus: ---\nSp: ---\nCycles: 0"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.9, 0.6, 0.1)),
@@ -77,7 +77,7 @@ pub fn setup_hud(mut commands: Commands) {
         }).with_child((
             Text::new("THROUGHPUT ADVANTAGE: measuring..."),
             TextFont {
-                font_size: 28.0,
+                font_size: FontSize::Px(28.0),
                 ..default()
             },
             TextColor(Color::srgb(1.0, 1.0, 1.0)),

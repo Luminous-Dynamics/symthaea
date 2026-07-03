@@ -508,7 +508,7 @@ pub fn setup_globe_view(
         DirectionalLight {
             illuminance: 5_000.0,
             color: Color::linear_rgb(1.0, 0.98, 0.95),
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.4, 0.6, 0.0)),
@@ -548,7 +548,7 @@ pub fn setup_globe_view(
     commands.spawn((
         Text::new("SOL ATLAS"),
         TextFont {
-            font_size: 16.0,
+            font_size: FontSize::Px(16.0),
             ..default()
         },
         TextColor(Color::srgba(0.4, 0.7, 0.8, 0.65)),
@@ -565,7 +565,7 @@ pub fn setup_globe_view(
     commands.spawn((
         Text::new("ALL DATA"),
         TextFont {
-            font_size: 13.0,
+            font_size: FontSize::Px(13.0),
             ..default()
         },
         TextColor(Color::srgba(0.5, 0.7, 0.8, 0.55)),
@@ -583,7 +583,7 @@ pub fn setup_globe_view(
     commands.spawn((
         Text::new("Year 0 | Growth"),
         TextFont {
-            font_size: 13.0,
+            font_size: FontSize::Px(13.0),
             ..default()
         },
         TextColor(Color::srgba(0.4, 0.7, 0.5, 0.5)),
@@ -1279,7 +1279,7 @@ pub fn setup_globe_view(
             parent.spawn((
                 Text::new("-- Controls --"),
                 TextFont {
-                    font_size: 11.0,
+                    font_size: FontSize::Px(11.0),
                     ..default()
                 },
                 TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
@@ -1303,7 +1303,7 @@ pub fn setup_globe_view(
                 parent.spawn((
                     Text::new(line),
                     TextFont {
-                        font_size: 10.0,
+                        font_size: FontSize::Px(10.0),
                         ..default()
                     },
                     TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
@@ -1318,7 +1318,7 @@ pub fn setup_globe_view(
             parent.spawn((
                 Text::new("-- Metrics --"),
                 TextFont {
-                    font_size: 11.0,
+                    font_size: FontSize::Px(11.0),
                     ..default()
                 },
                 TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
@@ -1330,7 +1330,7 @@ pub fn setup_globe_view(
             parent.spawn((
                 Text::new("Loading..."),
                 TextFont {
-                    font_size: 10.0,
+                    font_size: FontSize::Px(10.0),
                     ..default()
                 },
                 TextColor(Color::srgba(0.4, 0.6, 0.5, 0.6)),
@@ -1887,7 +1887,7 @@ pub fn city_stress_evolution_system(
     for (city, mat_handle) in city_markers.iter_mut() {
         // Find matching stress data by city name
         if let Some(stress) = stress_data.iter().find(|s| s.name == city.name) {
-            if let Some(mat) = materials.get_mut(&mat_handle.0) {
+            if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                 let c = sol_atlas_core::energy_trading::stress_color(stress.allostatic_load);
                 mat.base_color = Color::linear_rgba(c[0], c[1], c[2], 0.8);
                 mat.emissive = LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0);
@@ -2013,7 +2013,7 @@ pub fn aesthetic_apply_system(
 
     // Update atmosphere/fresnel materials
     for mat_handle in atmo_q.iter() {
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             let f = &config.fresnel;
             mat.base_color = Color::linear_rgba(f.color[0], f.color[1], f.color[2], f.color[3]);
             mat.emissive =

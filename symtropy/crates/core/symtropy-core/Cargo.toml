@@ -9,7 +9,7 @@ keywords = ["bevy", "game-engine", "symtropy", "physics", "distribution"]
 categories = ["game-engines"]
 
 [dependencies]
-bevy = { version = "0.18", default-features = false }
+bevy = { version = "0.19", default-features = false }
 symtropy-bevy-core = { version = "0.1.1", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-bevy-core" }
 symtropy-bevy-scene = { version = "0.1.1", path = "/srv/luminous-dynamics/symtropy/crates/core/symtropy-bevy-scene" }
 symtropy-devconsole = { version = "0.1.1", path = "/srv/luminous-dynamics/symtropy/crates/domains/symtropy-devconsole" }

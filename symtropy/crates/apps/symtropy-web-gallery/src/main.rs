@@ -36,7 +36,7 @@ fn setup_gallery(mut commands: Commands) {
             parent.spawn((
                 Text::new("Symtropy Consciousness Gallery"),
                 TextFont {
-                    font_size: 40.0,
+                    font_size: FontSize::Px(40.0),
                     ..default()
                 },
             ));
@@ -44,7 +44,7 @@ fn setup_gallery(mut commands: Commands) {
             parent.spawn((
                 Text::new("63 Experiments in Integrated Information & Physics"),
                 TextFont {
-                    font_size: 20.0,
+                    font_size: FontSize::Px(20.0),
                     ..default()
                 },
             ));

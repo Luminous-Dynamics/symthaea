@@ -16,8 +16,8 @@ readme = "README.md"
 # Bevy with NO default features. Audio backends (cpal/alsa) collide with
 # downstream consumers that pin a different cpal version (e.g. some
 # Symthaea crates), and most users want to opt into Bevy features
-# themselves. Users add `bevy = "0.18"` separately if they want defaults.
-bevy = { version = "0.18", default-features = false }
+# themselves. Users add `bevy = "0.19"` separately if they want defaults.
+bevy = { version = "0.19", default-features = false }
 
 # The four Symtropy distribution crates. Versions are tested-together per
 # meta-crate release.

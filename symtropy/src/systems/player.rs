@@ -79,7 +79,7 @@ pub fn flashlight_system(
         sprite.color = color;
     }
     if let Some(mat_handle) = opt_mat {
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             mat.base_color = color;
         }
     }
@@ -142,7 +142,7 @@ pub fn extraction_system(
                 sprite.color = color;
             }
             if let Some(mat_handle) = opt_mat {
-                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                     mat.base_color = color;
                 }
             }
@@ -156,7 +156,7 @@ pub fn extraction_system(
                     sprite.color = color;
                 }
                 if let Some(mat_handle) = opt_mat {
-                    if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                    if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                         mat.base_color = color;
                     }
                 }

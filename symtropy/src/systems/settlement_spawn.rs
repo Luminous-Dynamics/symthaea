@@ -60,7 +60,7 @@ pub fn spawn_infrastructure_system(
             parent.spawn((
                 Text2d::new("Power Junction (Offline)"),
                 TextFont {
-                    font_size: 12.0,
+                    font_size: FontSize::Px(12.0),
                     ..default()
                 },
                 TextColor(Color::srgb(1.0, 0.8, 0.6)),
@@ -90,7 +90,7 @@ pub fn spawn_infrastructure_system(
             parent.spawn((
                 Text2d::new("Water Pump (Sabotaged)"),
                 TextFont {
-                    font_size: 12.0,
+                    font_size: FontSize::Px(12.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 0.8, 1.0)),
@@ -120,7 +120,7 @@ pub fn spawn_infrastructure_system(
             parent.spawn((
                 Text2d::new("Fabricator"),
                 TextFont {
-                    font_size: 12.0,
+                    font_size: FontSize::Px(12.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.9, 0.7, 1.0)),

@@ -37,7 +37,7 @@ pub fn setup_hud(mut commands: Commands) {
                     "EXOSKELETON\nCoP: ---\nGRF: ---\nexo effort: ---\nbattery SoC: ---\nhuman torques (rms): ---",
                 ),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.75, 0.90, 1.0)),
@@ -52,7 +52,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nmode: ---\nPE: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),

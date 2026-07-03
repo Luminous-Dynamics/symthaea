@@ -79,7 +79,7 @@ fn main() {
                 ..default()
             })
             .set(RenderPlugin {
-                render_creation: RenderCreation::Automatic(wgpu_settings),
+                render_creation: RenderCreation::Automatic(Box::new(wgpu_settings)),
                 ..default()
             })
             .set(ImagePlugin::default_nearest()),

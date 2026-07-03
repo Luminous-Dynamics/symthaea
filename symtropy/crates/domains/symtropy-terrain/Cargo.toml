@@ -13,6 +13,6 @@ symtropy-rapier3d-bridge = { path = "/srv/luminous-dynamics/symtropy/crates/brid
 rapier3d = "0.18"
 nalgebra = "0.34"
 image = "0.25"
-bevy = { version = "0.18", default-features = false, features = ["bevy_render", "bevy_asset", "bevy_image", "bevy_state", "bevy_log", "multi_threaded"] }
-bevy_mesh = "0.18"
+bevy = { version = "0.19", default-features = false, features = ["bevy_render", "bevy_asset", "bevy_image", "bevy_state", "bevy_log", "multi_threaded"] }
+bevy_mesh = "0.19"
 futures-lite = "2.0"

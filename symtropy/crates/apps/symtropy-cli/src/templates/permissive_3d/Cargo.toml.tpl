@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.18"
+bevy = "0.19"
 
 # The Permissive Symtropy distribution: re-exports symtropy-bevy-core
 # + symtropy-bevy-scene + symtropy-devconsole.

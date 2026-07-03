@@ -38,7 +38,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("FLIGHT\naltitude: ---\nroll/pitch: ---\nthrust: ---\nwaypoint: -/-"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.85, 0.95, 1.0)),
@@ -54,7 +54,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nmotor gain: ---\nPE: ---\ngust: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),

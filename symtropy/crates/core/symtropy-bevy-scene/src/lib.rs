@@ -135,7 +135,7 @@ fn spawn_sun_system(mut commands: Commands, sun: Res<SunConfig>) {
         DirectionalLight {
             illuminance: sun.illuminance,
             color: sun.color,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(
@@ -166,7 +166,7 @@ pub fn fixed_light(illuminance: f32, color: Color, euler_xyz: Vec3) -> impl Bund
         DirectionalLight {
             illuminance,
             color,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(

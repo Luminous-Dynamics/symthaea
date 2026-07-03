@@ -230,7 +230,7 @@ pub fn collapse_visual_system(
                 sprite.color = Color::srgba(0.3, 0.3, 0.3, 0.7);
             }
             if let Some(mat_handle) = opt_mat {
-                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                     mat.base_color = Color::srgba(0.3, 0.3, 0.3, 0.7);
                 }
             }
@@ -240,7 +240,7 @@ pub fn collapse_visual_system(
                 sprite.color = Color::srgba(1.0, 1.0, 1.0, 1.0);
             }
             if let Some(mat_handle) = opt_mat {
-                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                     mat.base_color = Color::srgba(1.0, 1.0, 1.0, 1.0);
                 }
             }

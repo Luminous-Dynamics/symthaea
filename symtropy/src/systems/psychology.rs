@@ -345,7 +345,7 @@ pub fn npc_visual_state_system(
                 sprite.custom_size = Some(Vec2::splat(12.0));
             }
             if let Some(mat_handle) = opt_mat {
-                if let Some(mat) = materials.get_mut(&mat_handle.0) {
+                if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                     mat.base_color = Color::srgb(0.3, 0.3, 0.3);
                 }
             }
@@ -389,7 +389,7 @@ pub fn npc_visual_state_system(
         }
 
         if let Some(mat_handle) = opt_mat {
-            if let Some(mat) = materials.get_mut(&mat_handle.0) {
+            if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
                 let Srgba {
                     red, green, blue, ..
                 } = mat.base_color.to_srgba();

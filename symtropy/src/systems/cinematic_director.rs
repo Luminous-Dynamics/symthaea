@@ -223,7 +223,7 @@ pub fn setup_cinematic_overlay(mut commands: Commands) {
     commands.spawn((
         Text::new(""),
         TextFont {
-            font_size: 22.0,
+            font_size: FontSize::Px(22.0),
             ..default()
         },
         TextColor(Color::srgba(0.85, 0.9, 0.95, 0.0)),

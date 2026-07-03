@@ -10,7 +10,7 @@ categories = ["game-engines", "rendering"]
 readme = "README.md"
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
     "bevy_core_pipeline",
     "bevy_render",
     "bevy_pbr",
@@ -24,4 +24,4 @@ ron = "0.8"
 # Tests construct an `App` to verify plugin registration; needs a window
 # backend even though we don't open windows in tests. x11 keeps tests
 # CI-friendly on Linux without dragging in wayland deps.
-bevy = { version = "0.18", default-features = false, features = ["x11"] }
+bevy = { version = "0.19", default-features = false, features = ["x11"] }

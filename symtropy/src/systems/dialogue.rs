@@ -308,7 +308,7 @@ pub fn dialogue_system(
             commands.spawn((
                 Text::new(text),
                 TextFont {
-                    font_size: 14.0,
+                    font_size: FontSize::Px(14.0),
                     ..default()
                 },
                 TextColor(Color::srgba(0.9, 0.9, 0.7, 0.9)),
@@ -389,7 +389,7 @@ pub fn dialogue_action_bark_system(
         commands.spawn((
             Text::new(bark_text),
             TextFont {
-                font_size: 14.0,
+                font_size: FontSize::Px(14.0),
                 ..default()
             },
             TextColor(Color::srgba(0.5, 0.9, 1.0, 0.95)),

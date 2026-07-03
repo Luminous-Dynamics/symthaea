@@ -6,7 +6,7 @@
 use bevy::pbr::{ExtendedMaterial, MaterialExtension, MaterialPlugin, StandardMaterial};
 use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, ShaderType};
-use bevy::render::storage::ShaderStorageBuffer;
+use bevy::render::storage::ShaderBuffer;
 use bevy::shader::ShaderRef;
 
 pub struct NdSlicingPlugin;
@@ -76,7 +76,7 @@ pub struct TelemetryExtension {
     pub settings: TelemetrySettings,
 
     #[storage(101, read_only)]
-    pub nodes: Handle<ShaderStorageBuffer>,
+    pub nodes: Handle<ShaderBuffer>,
 }
 
 #[derive(Default, Debug, Clone, Copy, Reflect, ShaderType)]

@@ -34,7 +34,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("AUV\ndepth: ---\nposition: ---\nthruster effort: ---\nwaypoint: -/-"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(1.0, 0.92, 0.60)),
@@ -51,7 +51,7 @@ pub fn setup_hud(mut commands: Commands) {
                     "CONSCIOUSNESS\nΦ: ---\ntier: ---\nmotor gain: ---\nPE: ---\ncurrent: ---",
                 ),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),

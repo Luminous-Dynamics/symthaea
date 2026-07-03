@@ -37,7 +37,7 @@ pub fn setup_scene(
     commands.spawn((
         DirectionalLight {
             illuminance: 9000.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(6.0, -6.0, 20.0).looking_at(Vec3::ZERO, Vec3::Z),

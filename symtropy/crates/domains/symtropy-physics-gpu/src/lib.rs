@@ -6,17 +6,14 @@
 pub mod fluid;
 pub mod render;
 
+use bevy::core_pipeline::schedule::camera_driver;
 use bevy::prelude::*;
 use bevy::render::{
     Render, RenderApp,
     extract_resource::{ExtractResource, ExtractResourcePlugin},
-    render_graph::{
-        Node, NodeRunError, RenderGraph, RenderGraphContext, RenderGraphExt, RenderLabel,
-        RenderSubGraph,
-    },
     render_resource::*,
-    renderer::{RenderContext, RenderDevice},
-    storage::ShaderStorageBuffer,
+    renderer::{RenderContext, RenderDevice, RenderGraph},
+    storage::ShaderBuffer,
 };
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
@@ -102,8 +99,8 @@ pub struct GpuBroadphaseManager {
     pub colliders: Vec<GpuCollider>,
     pub physics_states: Vec<GpuPhysicsState>,
     pub social_states: Vec<GpuCitizenSocialState>,
-    pub instance_buffer: Handle<ShaderStorageBuffer>,
-    pub social_buffer: Handle<ShaderStorageBuffer>,
+    pub instance_buffer: Handle<ShaderBuffer>,
+    pub social_buffer: Handle<ShaderBuffer>,
 }
 
 #[derive(Resource, ExtractResource, Clone)]
@@ -140,27 +137,16 @@ impl Plugin for GpuPhysicsPlugin {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
                 .add_systems(Render, prepare_buffers)
-                .add_render_graph_node::<BroadphaseComputeNode>(
-                    BroadphaseSubGraph,
-                    BroadphaseLabel,
-                );
+                .add_systems(RenderGraph, broadphase_readback.before(camera_driver));
         }
     }
 
     fn finish(&self, app: &mut App) {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.init_resource::<BroadphasePipeline>();
-            let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
-            graph.add_sub_graph(BroadphaseSubGraph, RenderGraph::default());
         }
     }
 }
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderSubGraph)]
-pub struct BroadphaseSubGraph;
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub struct BroadphaseLabel;
 
 #[derive(Resource)]
 struct BroadphasePipeline {
@@ -316,7 +302,7 @@ impl FromWorld for BroadphasePipeline {
                 shader: shader.clone(),
                 shader_defs: vec![],
                 entry_point: Some(Cow::from("count_and_scatter")),
-                push_constant_ranges: vec![],
+                immediate_size: 0,
                 zero_initialize_workgroup_memory: false,
             });
 
@@ -326,7 +312,7 @@ impl FromWorld for BroadphasePipeline {
             shader,
             shader_defs: vec![],
             entry_point: Some(Cow::from("integrate")),
-            push_constant_ranges: vec![],
+            immediate_size: 0,
             zero_initialize_workgroup_memory: false,
         });
 
@@ -337,7 +323,7 @@ impl FromWorld for BroadphasePipeline {
                 shader: social_shader,
                 shader_defs: vec![],
                 entry_point: Some(Cow::from("apply_social_decay")),
-                push_constant_ranges: vec![],
+                immediate_size: 0,
                 zero_initialize_workgroup_memory: false,
             });
 
@@ -484,30 +470,18 @@ fn prepare_buffers(
     });
 }
 
-#[derive(Default)]
-pub struct BroadphaseComputeNode;
-
-impl Node for BroadphaseComputeNode {
-    fn run(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        let buffers = match world.get_resource::<BroadphaseBuffers>() {
-            Some(b) => b,
-            None => return Ok(()),
-        };
-        let command_encoder = render_context.command_encoder();
-        command_encoder.copy_buffer_to_buffer(
-            &buffers.nociception_buffer,
-            0,
-            &buffers.nociception_staging,
-            0,
-            256,
-        );
-        Ok(())
-    }
+fn broadphase_readback(mut render_context: RenderContext, buffers: Option<Res<BroadphaseBuffers>>) {
+    let Some(buffers) = buffers else {
+        return;
+    };
+    let command_encoder = render_context.command_encoder();
+    command_encoder.copy_buffer_to_buffer(
+        &buffers.nociception_buffer,
+        0,
+        &buffers.nociception_staging,
+        0,
+        256,
+    );
 }
 
 fn readback_nociception(mut _results: ResMut<NociceptionResults>) {}
@@ -532,7 +506,7 @@ fn upload_physics_to_gpu_sparse(
     mut manager: ResMut<GpuBroadphaseManager>,
     _bodies: Query<(&PhysicsBody, &GlobalTransform)>,
     time: Res<Time>,
-    mut storage_buffers: ResMut<Assets<ShaderStorageBuffer>>,
+    mut storage_buffers: ResMut<Assets<ShaderBuffer>>,
 ) {
     if time.elapsed_secs() % 5.0 < 0.02 {
         info!("TRACE: upload_physics_to_gpu_sparse ticking...");
@@ -559,18 +533,18 @@ fn upload_physics_to_gpu_sparse(
             };
             300_000
         ];
-        manager.instance_buffer = storage_buffers.add(ShaderStorageBuffer::new(
+        manager.instance_buffer = storage_buffers.add(ShaderBuffer::new(
             bytemuck::cast_slice(&buffer),
             bevy::asset::RenderAssetUsages::default(),
         ));
     }
 
     if storage_buffers.get(&manager.social_buffer).is_none() {
-        manager.social_buffer = storage_buffers.add(ShaderStorageBuffer::new(
+        manager.social_buffer = storage_buffers.add(ShaderBuffer::new(
             bytemuck::cast_slice(&manager.social_states),
             bevy::asset::RenderAssetUsages::default(),
         ));
-    } else if let Some(buffer) = storage_buffers.get_mut(&manager.social_buffer) {
+    } else if let Some(mut buffer) = storage_buffers.get_mut(&manager.social_buffer) {
         buffer.set_data(&manager.social_states);
     }
 }

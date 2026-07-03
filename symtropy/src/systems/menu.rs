@@ -71,7 +71,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                     inner.spawn((
                         Text::new("SYMTROPY"),
                         TextFont {
-                            font_size: 56.0,
+                            font_size: FontSize::Px(56.0),
                             ..default()
                         },
                         TextColor(Color::srgb(0.3, 0.95, 0.85)),
@@ -84,7 +84,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                     inner.spawn((
                         Text::new("consciousness-first technology"),
                         TextFont {
-                            font_size: 16.0,
+                            font_size: FontSize::Px(16.0),
                             ..default()
                         },
                         TextColor(Color::srgba(0.5, 0.75, 0.7, 0.7)),
@@ -110,7 +110,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                         inner.spawn((
                             Text::new(format!("{}[{}]  {}", prefix, i + 1, exp.name)),
                             TextFont {
-                                font_size: 22.0,
+                                font_size: FontSize::Px(22.0),
                                 ..default()
                             },
                             TextColor(Color::srgba(r, g, b, a)),
@@ -126,7 +126,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                         inner.spawn((
                             Text::new(format!("      {}", exp.subtitle)),
                             TextFont {
-                                font_size: 13.0,
+                                font_size: FontSize::Px(13.0),
                                 ..default()
                             },
                             TextColor(Color::srgba(0.45, 0.55, 0.5, sub_a)),
@@ -142,7 +142,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                     inner.spawn((
                         Text::new("  [S]  Settings"),
                         TextFont {
-                            font_size: 18.0,
+                            font_size: FontSize::Px(18.0),
                             ..default()
                         },
                         TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
@@ -155,7 +155,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                     inner.spawn((
                         Text::new("  [Esc]  Quit"),
                         TextFont {
-                            font_size: 18.0,
+                            font_size: FontSize::Px(18.0),
                             ..default()
                         },
                         TextColor(Color::srgba(0.4, 0.5, 0.45, 0.5)),
@@ -169,7 +169,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                     inner.spawn((
                         Text::new("Powered by Symthaea | Mycelix | Eight Harmonies"),
                         TextFont {
-                            font_size: 11.0,
+                            font_size: FontSize::Px(11.0),
                             ..default()
                         },
                         TextColor(Color::srgba(0.35, 0.5, 0.45, 0.5)),
@@ -179,7 +179,7 @@ pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
                     inner.spawn((
                         Text::new("v0.1.0"),
                         TextFont {
-                            font_size: 10.0,
+                            font_size: FontSize::Px(10.0),
                             ..default()
                         },
                         TextColor(Color::srgba(0.3, 0.4, 0.35, 0.4)),
@@ -346,7 +346,7 @@ pub fn setup_loading(mut commands: Commands, seed: Res<DungeonSeed>) {
             parent.spawn((
                 Text::new("Generating dungeon..."),
                 TextFont {
-                    font_size: 28.0,
+                    font_size: FontSize::Px(28.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.5, 0.8, 0.7)),
@@ -354,7 +354,7 @@ pub fn setup_loading(mut commands: Commands, seed: Res<DungeonSeed>) {
             parent.spawn((
                 Text::new(format!("Seed: {}", seed.0)),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.4, 0.6, 0.5)),

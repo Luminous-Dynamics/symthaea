@@ -23,6 +23,6 @@ kvector-zkp = { path = "../../../../mycelix-workspace/mycelix-core/libs/kvector-
 # mycelix-differential-privacy = { path = "../../../../../mycelix-core/libs/differential-privacy" }
 
 # Game engine
-bevy = { version = "0.18", default-features = false }
+bevy = { version = "0.19", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

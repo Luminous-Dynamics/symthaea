@@ -15,7 +15,7 @@ symtropy-robotics-bridge-core = { path = "/srv/luminous-dynamics/symtropy/crates
 symtropy-consciousness-physics = { path = "/srv/luminous-dynamics/symtropy/crates/domains/symtropy-consciousness-physics" }
 symthaea-muse = { path = "../../../../symthaea/crates/domains/symthaea-muse" }
 symtropy-devconsole = { version = "0.1.0", path = "/srv/luminous-dynamics/symtropy/crates/domains/symtropy-devconsole", features = ["phi-panel"] }
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
     "png",
     "bevy_ui", "bevy_ui_render", "bevy_text", "default_font",
 ] }

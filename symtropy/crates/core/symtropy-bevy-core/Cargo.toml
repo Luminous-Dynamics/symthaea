@@ -12,7 +12,7 @@ readme = "README.md"
 [dependencies]
 symtropy-physics = { version = "0.2.1", path = "../symtropy-physics" }
 symtropy-math = { version = "0.2.1", path = "../symtropy-math" }
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
     "bevy_render",

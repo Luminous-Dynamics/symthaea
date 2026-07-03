@@ -406,7 +406,7 @@ fn projector_to_shader_system(
         let Some(body) = physics.world.body(p.bob) else {
             continue;
         };
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             mat.extension.settings.w_pos = body.position()[3] as f32;
             mat.extension.settings.w_slice = projector.w_slice as f32;
             mat.extension.settings.slice_thickness = projector.slice_thickness as f32;
@@ -423,7 +423,7 @@ fn color_by_phi(
     for (p, mat_handle) in &query {
         let phi = physics.field.phi(p.bob);
         let phi_norm = (phi / PHI_NORMALIZE).clamp(0.0, 1.0) as f32;
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             let new_color = Color::hsl(240.0 - phi_norm * 240.0, 1.0, 0.5);
             mat.base.base_color = new_color;
         }

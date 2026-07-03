@@ -38,7 +38,7 @@ fn inspector_ui(
             // For now, assume one active heatmap material
             #[allow(clippy::collapsible_if)]
             if let Some(mesh_mat) = query_material.iter_mut().next() {
-                if let Some(material) = materials.get_mut(&*mesh_mat) {
+                if let Some(mut material) = materials.get_mut(&*mesh_mat) {
                     let settings = &mut material.extension.settings;
 
                     ui.add(

@@ -1070,7 +1070,7 @@ fn setup(
         PointLight {
             intensity: 100_000.0,
             range: 20.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(0.0, 3.5, 0.0),
@@ -1952,7 +1952,7 @@ fn ecological_meter_system(
         transform.scale.y = height;
         transform.translation.y = height * 0.5;
 
-        if let Some(mat) = materials.get_mut(&material.0) {
+        if let Some(mut mat) = materials.get_mut(&material.0) {
             mat.base_color = color.with_alpha(0.35 + value * 0.65);
             mat.emissive = color.to_linear() * (0.02 + value * 0.18);
         }
@@ -1975,7 +1975,7 @@ fn consequence_visual_system(
 
     for (visual, material, mut transform) in &mut material_query {
         let color = consequence_color(outcome.intervention, visual.kind);
-        if let Some(mat) = materials.get_mut(&material.0) {
+        if let Some(mut mat) = materials.get_mut(&material.0) {
             mat.base_color = color;
             mat.emissive =
                 color.to_linear() * consequence_emissive(outcome.intervention, visual.kind);

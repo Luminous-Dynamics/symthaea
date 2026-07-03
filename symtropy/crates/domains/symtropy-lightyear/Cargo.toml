@@ -10,9 +10,9 @@ description = "Lightyear integration for Symtropy — prediction, rollback, inte
 lightyear = "0.26"
 
 # Bevy sub-crates (match Symtropy's Bevy 0.18)
-bevy_app = "0.18"
-bevy_ecs = "0.18"
-bevy_log = "0.18"
+bevy_app = "0.19"
+bevy_ecs = "0.19"
+bevy_log = "0.19"
 
 # Symtropy crates
 symtropy-net = { path = "/srv/luminous-dynamics/symtropy/crates/domains/symtropy-net" }
@@ -26,4 +26,4 @@ serde = { version = "1", features = ["derive"] }
 
 # Bytes for Link buffers
 bytes = "1"
-bevy_reflect = "0.18"
+bevy_reflect = "0.19"

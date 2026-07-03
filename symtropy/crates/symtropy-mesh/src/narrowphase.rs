@@ -64,6 +64,7 @@ pub fn generate_mesh_contacts(
                     position: contact_pos,
                     depth: epa_res.depth,
                     lambda: 0.0,
+                    restitution_bias: 0.0,
                 });
 
                 manifolds.push(ContactManifold {
@@ -176,6 +177,7 @@ pub fn generate_meshlet_contacts(
                         position: contact_pos,
                         depth: epa_res.depth,
                         lambda: 0.0,
+                        restitution_bias: 0.0,
                     });
 
                     manifolds.push(ContactManifold {

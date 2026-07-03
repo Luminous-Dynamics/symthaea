@@ -371,7 +371,7 @@ fn color_by_phi(
     for (p, mat_handle) in &query {
         let phi = physics.field.phi(p.bob);
         let phi_norm = (phi / PHI_NORMALIZE).clamp(0.0, 1.0) as f32;
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+        if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             mat.base_color = Color::hsl(240.0 - phi_norm * 240.0, 1.0, 0.5);
             // Faint emissive scaled by Phi — high-Phi cells visibly glow.
             let emissive_mag = phi_norm * 0.4;

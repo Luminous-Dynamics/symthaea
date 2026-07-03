@@ -36,7 +36,7 @@ pub fn setup_hud(mut commands: Commands) {
                     "HELICOPTER\naltitude: ---\noff-station: ---\nrotor rpm: ---\ncollective: ---",
                 ),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(1.0, 0.85, 0.85)),
@@ -51,7 +51,7 @@ pub fn setup_hud(mut commands: Commands) {
             .with_child((
                 Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nmotor gain: ---\nPE: ---\nwind: ---"),
                 TextFont {
-                    font_size: 16.0,
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 1.0, 0.6)),
