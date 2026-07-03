@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Signal types for P2P communication and cryptographic verification.
 
-use hdk::prelude::*;
 use federated_learning_integrity::*;
+use hdk::prelude::*;
 
 use crate::auth::check_rate_limit;
 
@@ -120,7 +120,9 @@ impl SignedSignal {
             for (i, byte) in nonce.iter_mut().enumerate() {
                 let shift = (i % 8) * 8;
                 *byte = ((ts.wrapping_shr(shift as u32)) & 0xFF) as u8;
-                if i >= 8 { *byte ^= i as u8; }
+                if i >= 8 {
+                    *byte ^= i as u8;
+                }
             }
         });
 
@@ -142,7 +144,12 @@ impl SignedSignal {
 
         // Add signal type and content
         match &self.signal {
-            Signal::GradientSubmitted { node_id, round, action_hash, .. } => {
+            Signal::GradientSubmitted {
+                node_id,
+                round,
+                action_hash,
+                ..
+            } => {
                 bytes.extend_from_slice(b"GradientSubmitted:");
                 bytes.extend_from_slice(node_id.as_bytes());
                 bytes.push(b':');
@@ -150,7 +157,12 @@ impl SignedSignal {
                 bytes.push(b':');
                 bytes.extend_from_slice(action_hash.get_raw_39());
             }
-            Signal::RoundCompleted { round, accuracy, byzantine_count, .. } => {
+            Signal::RoundCompleted {
+                round,
+                accuracy,
+                byzantine_count,
+                ..
+            } => {
                 bytes.extend_from_slice(b"RoundCompleted:");
                 bytes.extend_from_slice(&round.to_le_bytes());
                 bytes.push(b':');
@@ -158,7 +170,12 @@ impl SignedSignal {
                 bytes.push(b':');
                 bytes.extend_from_slice(&byzantine_count.to_le_bytes());
             }
-            Signal::ByzantineDetected { node_id, round, confidence, .. } => {
+            Signal::ByzantineDetected {
+                node_id,
+                round,
+                confidence,
+                ..
+            } => {
                 bytes.extend_from_slice(b"ByzantineDetected:");
                 bytes.extend_from_slice(node_id.as_bytes());
                 bytes.push(b':');
@@ -166,15 +183,24 @@ impl SignedSignal {
                 bytes.push(b':');
                 bytes.extend_from_slice(&confidence.to_le_bytes());
             }
-            Signal::RoundStarted { round, schedule_hash, .. } => {
+            Signal::RoundStarted {
+                round,
+                schedule_hash,
+                ..
+            } => {
                 bytes.extend_from_slice(b"RoundStarted:");
                 bytes.extend_from_slice(&round.to_le_bytes());
-                if let Some(ref sh) = schedule_hash {
+                if let Some(sh) = schedule_hash {
                     bytes.push(b':');
                     bytes.extend_from_slice(sh.as_bytes());
                 }
             }
-            Signal::GradientReady { node_id, round, gradient_hash, .. } => {
+            Signal::GradientReady {
+                node_id,
+                round,
+                gradient_hash,
+                ..
+            } => {
                 bytes.extend_from_slice(b"GradientReady:");
                 bytes.extend_from_slice(node_id.as_bytes());
                 bytes.push(b':');
@@ -182,7 +208,12 @@ impl SignedSignal {
                 bytes.push(b':');
                 bytes.extend_from_slice(gradient_hash.as_bytes());
             }
-            Signal::CommitReady { round, validator_id, commitment_hash, .. } => {
+            Signal::CommitReady {
+                round,
+                validator_id,
+                commitment_hash,
+                ..
+            } => {
                 bytes.extend_from_slice(b"CommitReady:");
                 bytes.extend_from_slice(&round.to_le_bytes());
                 bytes.push(b':');
@@ -190,7 +221,13 @@ impl SignedSignal {
                 bytes.push(b':');
                 bytes.extend_from_slice(commitment_hash.as_bytes());
             }
-            Signal::ConsensusReached { round, agreed_hash, validator_count, consensus_weight, .. } => {
+            Signal::ConsensusReached {
+                round,
+                agreed_hash,
+                validator_count,
+                consensus_weight,
+                ..
+            } => {
                 bytes.extend_from_slice(b"ConsensusReached:");
                 bytes.extend_from_slice(&round.to_le_bytes());
                 bytes.push(b':');
@@ -277,28 +314,34 @@ pub fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
     // Try to decode as SignedRemoteSignalInput first (secure path)
     if let Ok(signed_input) = signal.decode::<SignedRemoteSignalInput>() {
         // Decode the signature from base64
-        let signature_bytes = base64_decode(&signed_input.signature_base64)
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid signature encoding: {:?}", e)
-            )))?;
+        let signature_bytes = base64_decode(&signed_input.signature_base64).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid signature encoding: {:?}",
+                e
+            )))
+        })?;
 
         if signature_bytes.len() != 64 {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid signature length: expected 64 bytes, got {}", signature_bytes.len())
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid signature length: expected 64 bytes, got {}",
+                signature_bytes.len()
+            ))));
         }
 
-        let signature = Signature::try_from(signature_bytes.as_slice())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid signature format: {:?}", e)
-            )))?;
+        let signature = Signature::try_from(signature_bytes.as_slice()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid signature format: {:?}",
+                e
+            )))
+        })?;
 
         // SEC-005: Verify the cryptographic signature
         let is_valid = verify_signal_signature(&signed_input.signed_signal, &caller, &signature)?;
 
         if !is_valid {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Signal signature verification failed: signature does not match claimed source".to_string()
+                "Signal signature verification failed: signature does not match claimed source"
+                    .to_string()
             )));
         }
 
@@ -317,26 +360,58 @@ pub fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
         let caller_str = caller.to_string();
 
         match &mut verified_signal {
-            Signal::GradientSubmitted { source, signature: sig, .. } |
-            Signal::RoundCompleted { source, signature: sig, .. } |
-            Signal::ByzantineDetected { source, signature: sig, .. } |
-            Signal::RoundStarted { source, signature: sig, .. } |
-            Signal::GradientReady { source, signature: sig, .. } |
-            Signal::CommitReady { source, signature: sig, .. } |
-            Signal::ConsensusReached { source, signature: sig, .. } => {
+            Signal::GradientSubmitted {
+                source,
+                signature: sig,
+                ..
+            }
+            | Signal::RoundCompleted {
+                source,
+                signature: sig,
+                ..
+            }
+            | Signal::ByzantineDetected {
+                source,
+                signature: sig,
+                ..
+            }
+            | Signal::RoundStarted {
+                source,
+                signature: sig,
+                ..
+            }
+            | Signal::GradientReady {
+                source,
+                signature: sig,
+                ..
+            }
+            | Signal::CommitReady {
+                source,
+                signature: sig,
+                ..
+            }
+            | Signal::ConsensusReached {
+                source,
+                signature: sig,
+                ..
+            } => {
                 *source = Some(caller_str.clone());
                 *sig = Some(signed_input.signature_base64.clone());
             }
         }
 
-        debug!("Received cryptographically verified signal from {}: {:?}", caller, verified_signal);
+        debug!(
+            "Received cryptographically verified signal from {}: {:?}",
+            caller, verified_signal
+        );
         emit_signal(verified_signal)?;
         return Ok(());
     }
 
     // H-08: Legacy unsigned signal path removed. All signals must include Ed25519 signature.
     return Err(wasm_error!(WasmErrorInner::Guest(
-        "Unsigned signals are no longer accepted. All signals must include Ed25519 signature.".to_string()
+        "Unsigned signals are no longer accepted. All signals must include Ed25519 signature."
+            .to_string()
     )));
 }
 
@@ -359,7 +434,9 @@ pub struct CreateSignedSignalOutput {
 /// SECURITY (SEC-005): Signs the signal with the caller's private key
 /// The recipient can verify the signature using verify_signal_signature
 #[hdk_extern]
-pub fn create_signed_signal(input: CreateSignedSignalInput) -> ExternResult<CreateSignedSignalOutput> {
+pub fn create_signed_signal(
+    input: CreateSignedSignalInput,
+) -> ExternResult<CreateSignedSignalOutput> {
     // Create signed signal wrapper with timestamp and nonce
     let signed_signal = SignedSignal::new(input.signal);
 
@@ -386,40 +463,45 @@ pub fn create_signed_signal(input: CreateSignedSignalInput) -> ExternResult<Crea
 pub fn verify_signed_signal_explicit(input: SignedRemoteSignalInput) -> ExternResult<bool> {
     // Get claimed source from the signal
     let claimed_source = match &input.signed_signal.signal {
-        Signal::GradientSubmitted { source, .. } |
-        Signal::RoundCompleted { source, .. } |
-        Signal::ByzantineDetected { source, .. } |
-        Signal::RoundStarted { source, .. } |
-        Signal::GradientReady { source, .. } |
-        Signal::CommitReady { source, .. } |
-        Signal::ConsensusReached { source, .. } => {
-            source.as_ref()
-                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-                    "Signal has no source specified for verification".to_string()
-                )))?
-        }
+        Signal::GradientSubmitted { source, .. }
+        | Signal::RoundCompleted { source, .. }
+        | Signal::ByzantineDetected { source, .. }
+        | Signal::RoundStarted { source, .. }
+        | Signal::GradientReady { source, .. }
+        | Signal::CommitReady { source, .. }
+        | Signal::ConsensusReached { source, .. } => source.as_ref().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Signal has no source specified for verification".to_string()
+            ))
+        })?,
     };
 
     // Parse the claimed source as AgentPubKey
-    let source_key = AgentPubKey::try_from(claimed_source.as_str())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid source agent key: {:?}", e)
-        )))?;
+    let source_key = AgentPubKey::try_from(claimed_source.as_str()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid source agent key: {:?}",
+            e
+        )))
+    })?;
 
     // Decode signature
-    let signature_bytes = base64_decode(&input.signature_base64)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid signature encoding: {:?}", e)
-        )))?;
+    let signature_bytes = base64_decode(&input.signature_base64).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid signature encoding: {:?}",
+            e
+        )))
+    })?;
 
     if signature_bytes.len() != 64 {
         return Ok(false);
     }
 
-    let signature = Signature::try_from(signature_bytes.as_slice())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid signature format: {:?}", e)
-        )))?;
+    let signature = Signature::try_from(signature_bytes.as_slice()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid signature format: {:?}",
+            e
+        )))
+    })?;
 
     // Verify signature
     let is_valid = verify_signal_signature(&input.signed_signal, &source_key, &signature)?;
@@ -477,48 +559,51 @@ pub fn gossip_relay(input: GossipRelayInput) -> ExternResult<u32> {
 
     // C-02: Verify cryptographic signature before processing gossip relay
     {
-        let signature_bytes = base64_decode(&input.signed_input.signature_base64)
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Gossip relay: invalid signature encoding: {:?}", e)
-            )))?;
+        let signature_bytes = base64_decode(&input.signed_input.signature_base64).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Gossip relay: invalid signature encoding: {:?}",
+                e
+            )))
+        })?;
 
         if signature_bytes.len() != 64 {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Gossip relay: invalid signature length: expected 64 bytes, got {}", signature_bytes.len())
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Gossip relay: invalid signature length: expected 64 bytes, got {}",
+                signature_bytes.len()
+            ))));
         }
 
-        let signature = Signature::try_from(signature_bytes.as_slice())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Gossip relay: invalid signature format: {:?}", e)
-            )))?;
+        let signature = Signature::try_from(signature_bytes.as_slice()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Gossip relay: invalid signature format: {:?}",
+                e
+            )))
+        })?;
 
         // Extract source from the signal to verify against
         let source_str = match &input.signed_input.signed_signal.signal {
-            Signal::GradientSubmitted { source, .. } |
-            Signal::RoundCompleted { source, .. } |
-            Signal::ByzantineDetected { source, .. } |
-            Signal::RoundStarted { source, .. } |
-            Signal::GradientReady { source, .. } |
-            Signal::CommitReady { source, .. } |
-            Signal::ConsensusReached { source, .. } => {
-                source.as_ref()
-                    .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-                        "Gossip relay: signal has no source for signature verification".to_string()
-                    )))?
-            }
+            Signal::GradientSubmitted { source, .. }
+            | Signal::RoundCompleted { source, .. }
+            | Signal::ByzantineDetected { source, .. }
+            | Signal::RoundStarted { source, .. }
+            | Signal::GradientReady { source, .. }
+            | Signal::CommitReady { source, .. }
+            | Signal::ConsensusReached { source, .. } => source.as_ref().ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Gossip relay: signal has no source for signature verification".to_string()
+                ))
+            })?,
         };
 
-        let source_key = AgentPubKey::try_from(source_str.as_str())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Gossip relay: invalid source agent key: {:?}", e)
-            )))?;
+        let source_key = AgentPubKey::try_from(source_str.as_str()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Gossip relay: invalid source agent key: {:?}",
+                e
+            )))
+        })?;
 
-        let is_valid = verify_signal_signature(
-            &input.signed_input.signed_signal,
-            &source_key,
-            &signature,
-        )?;
+        let is_valid =
+            verify_signal_signature(&input.signed_input.signed_signal, &source_key, &signature)?;
 
         if !is_valid {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -561,7 +646,8 @@ pub fn gossip_relay(input: GossipRelayInput) -> ExternResult<u32> {
 
     // Select random subset of peers (fanout)
     let my_agent = agent_info()?.agent_initial_pubkey;
-    let peer_keys: Vec<AgentPubKey> = links.iter()
+    let peer_keys: Vec<AgentPubKey> = links
+        .iter()
         .filter_map(|link| link.target.clone().into_agent_pub_key())
         .filter(|key| key != &my_agent) // Don't send to self
         .collect();
@@ -586,7 +672,11 @@ pub fn gossip_relay(input: GossipRelayInput) -> ExternResult<u32> {
     let n = peer_keys.len();
     for i in 0..GOSSIP_FANOUT.min(n) {
         // Simple hash-based selection to avoid duplicates
-        let idx = ((nonce_seed.wrapping_add(i as u64).wrapping_mul(0x9e3779b97f4a7c15)) >> 32) as usize % n;
+        let idx = ((nonce_seed
+            .wrapping_add(i as u64)
+            .wrapping_mul(0x9e3779b97f4a7c15))
+            >> 32) as usize
+            % n;
         if !selected.contains(&idx) {
             selected.push(idx);
         }
