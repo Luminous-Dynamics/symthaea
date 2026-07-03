@@ -163,6 +163,34 @@ impl<const D: usize> Bivector<D> {
     pub fn apply_to_vector(&self, v: &SVector<f64, D>) -> SVector<f64, D> {
         self.to_matrix() * v
     }
+
+    /// Wedge product `a ∧ b`: the bivector representing the oriented plane
+    /// spanned by `a` and `b`. Component `(i, j) = a_i*b_j - a_j*b_i`.
+    ///
+    /// This is the dimension-agnostic replacement for the 3D cross product
+    /// used to compute torque/angular-impulse from a force/impulse applied
+    /// at an offset from the center of mass.
+    ///
+    /// **Ordering matters** and is chosen to be consistent with
+    /// [`Self::apply_to_vector`]: given an impulse `j` applied at an offset
+    /// `r` from a body's center of mass, the correct torque bivector is
+    /// `Bivector::from_wedge(&j, &r)` (impulse first, offset second) — NOT
+    /// `from_wedge(&r, &j)`. With this ordering,
+    /// `(inv_inertia * Bivector::from_wedge(&j, &r)).apply_to_vector(&r)`
+    /// reproduces the standard `(inv_inertia * (r × j)) × r` lever-arm
+    /// identity from 3D rigid body dynamics (verified in
+    /// `wedge_matches_3d_lever_arm_identity` below); the reversed argument
+    /// order produces the negated (physically wrong) sign.
+    #[inline]
+    pub fn from_wedge(a: &SVector<f64, D>, b: &SVector<f64, D>) -> Self {
+        let mut bv = Self::zero();
+        for i in 0..D {
+            for j in (i + 1)..D {
+                bv.set(i, j, a[i] * b[j] - a[j] * b[i]);
+            }
+        }
+        bv
+    }
 }
 
 impl<const D: usize> Default for Bivector<D> {
@@ -272,5 +300,67 @@ mod tests {
         let c = a.add(&b);
         assert!((c.get(0, 1) - 1.0).abs() < 1e-14);
         assert!((c.get(0, 2) - 1.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn wedge_antisymmetric() {
+        let a = SVector::from([1.0, 2.0, 3.0]);
+        let b = SVector::from([4.0, -1.0, 0.5]);
+        let ab = Bivector::<3>::from_wedge(&a, &b);
+        let ba = Bivector::<3>::from_wedge(&b, &a);
+        // a∧b = -(b∧a)
+        for i in 0..3 {
+            for j in (i + 1)..3 {
+                assert!((ab.get(i, j) + ba.get(i, j)).abs() < 1e-14);
+            }
+        }
+    }
+
+    #[test]
+    fn wedge_parallel_vectors_is_zero() {
+        let a = SVector::from([2.0, 0.0, 0.0]);
+        let b = SVector::from([5.0, 0.0, 0.0]);
+        let bv = Bivector::<3>::from_wedge(&a, &b);
+        assert!(bv.norm() < 1e-14, "parallel vectors should wedge to zero");
+    }
+
+    /// Verifies that `Bivector::from_wedge(&j, &r)` combined with
+    /// `apply_to_vector` reproduces the standard 3D lever-arm identity
+    /// `(inv_i * (r × j)) × r`, which for a unit-inertia body reduces to
+    /// `j * |r|^2 - r * (r·j)` (BAC-CAB expansion). This is the physical
+    /// contract the contact solver's angular-impulse code depends on: torque
+    /// bivector must be built as `from_wedge(&impulse, &r)`, NOT
+    /// `from_wedge(&r, &impulse)`.
+    #[test]
+    fn wedge_matches_3d_lever_arm_identity() {
+        let r = SVector::from([1.0, 0.0, 0.0]);
+        let j = SVector::from([0.0, 1.0, 0.0]); // impulse along +Y, offset along +X
+
+        let torque = Bivector::<3>::from_wedge(&j, &r);
+        let delta_v_rot = torque.apply_to_vector(&r); // unit inverse-inertia
+
+        // Expected: j * |r|^2 - r * (r·j) = (0,1,0)*1 - (1,0,0)*0 = (0,1,0)
+        let expected = j * r.norm_squared() - r * r.dot(&j);
+        assert!(
+            (delta_v_rot - expected).norm() < 1e-14,
+            "delta_v_rot = {delta_v_rot:?}, expected = {expected:?}"
+        );
+
+        // The normal-direction (n = j here) component must be POSITIVE —
+        // this is the "effective mass" contribution used by the contact
+        // solver and must never be negative (would imply energy injection
+        // if flipped when combined with the solver's sign convention).
+        let n = j.normalize();
+        assert!(
+            delta_v_rot.dot(&n) > 0.0,
+            "lever-arm contribution should be positive for this convention"
+        );
+
+        // Reversed argument order must give the negated (wrong) result.
+        let reversed = Bivector::<3>::from_wedge(&r, &j).apply_to_vector(&r);
+        assert!(
+            (reversed + expected).norm() < 1e-14,
+            "reversed wedge order should negate the result"
+        );
     }
 }
