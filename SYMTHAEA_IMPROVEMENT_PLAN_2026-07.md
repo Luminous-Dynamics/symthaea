@@ -35,38 +35,59 @@ claimed capability surface without running.
 `symthaea/CLAUDE.md:10` was the BWS secret *ID*, not a token; wording fixed 2026-07-03.
 CLAUDE.md is not in the standalone sync file list — nothing leaked.)
 
-## Phase 0 — Broken things & dead weight (S effort each, ~1-2 days total)
+## Phase 0 — Broken things & dead weight (S effort each, ~1-2 days total) — DONE 2026-07-03
 
-- [ ] **Ahimsa dead-path**: derive `ahimsa_violated` in `cycle.rs:315` from a real ethics
-      signal instead of the hardcoded `false`.
-- [ ] **CI: remove the always-failing matrix leg** — `feature-interactions` line ~643
-      tests `consciousness_full,school_learning` but `consciousness_full` was removed
-      from Cargo.toml (feature no longer exists). `fail-fast:false` hides it as one
-      permanently red cell.
-- [ ] **CI: pin `sbom` job** to `@1.95.0` (currently `@stable`, ci.yml:827); drop the
-      dangling workspace exclude `crates/bridges/symthaea-mycelix-holochain` (directory
-      no longer exists); drop the redundant `test-feature-matrix-critical: core` leg
-      (identical to `test`); lower `test-feature-matrix` timeout 420 → ~90 min.
-- [ ] **Broca half-split breakage**: `code-sheaf-eval` feature does not compile
-      (`evaluation.rs:16` imports `crate::code_analysis`, which moved to
-      `symthaea-broca-tools`) — kills 33 tests + `broca-exercism-bench` silently.
-      Also broken bins with refs to moved modules: `bin/fused_cognitive_node.rs:10-11`
-      (`invariant_guard`, `memory_ring`), `bin/broca_dreamer.rs:16` (`foraging_bridge`).
-- [ ] **Delete orphans**: `src/proof_state.rs` (560 LOC) and
-      `src/curriculum_generator.rs` (731 LOC) have zero references repo-wide.
-- [ ] **Actuator-count table divergence**: `symtropy-robotics-bridge-core/src/platform.rs:47`
-      says Humanoid=64; the actual crate reports 21 (Dmc21). Single-source or add a
-      cross-crate assertion test.
+- [x] **Ahimsa dead-path**: derive `ahimsa_violated` in `cycle.rs:315` from a real ethics
+      signal instead of the hardcoded `false`. Commit `28d6a83581`. Wired from
+      `EthicsEngineOutput::ahimsa_violated` (deontological `ahimsa_*`/`prevent_suffering`/
+      `minimize_collateral` violations net of restorative-justice credit) via a new
+      `CognitiveLoopService::last_ahimsa_violated` field, set in `cycle_strategy.rs`
+      alongside `last_ethics_verdict`. Verified: `cargo check -p symthaea --lib --locked`
+      clean.
+- [x] **CI: remove the always-failing matrix leg / pin sbom / drop redundant job / tighten
+      timeout**. Commit `a9b22a6c7d`.
+- [x] **Broca half-split breakage** (`code-sheaf-eval` + two broken bins). Commit
+      `92144a1578`. Root cause: `code_analysis.rs` was misclassified as toolkit in the
+      2026-07-02 split — `evaluation.rs` (core) needs it, and broca-tools depends on
+      broca (not the reverse), so the import was structurally impossible after the move.
+      Moved it back; relocated `broca_dreamer.rs`/`fused_cognitive_node.rs` to
+      broca-tools (they need `foraging_bridge`/`invariant_guard`/`memory_ring`, all
+      toolkit). Verified: both `-p symthaea-broca --features code-sheaf-eval` and
+      `-p symthaea-broca-tools --bins --features mamba-cpu` clean.
+- [x] **Delete orphans** (`proof_state.rs`, `curriculum_generator.rs`). Verified via main
+      crate check.
+- [x] **Actuator-count table divergence**. Commit `ba090577b6`. Fixed Humanoid 64→21
+      (Dmc21 default, not FullSpine). No automated parity test added — would pull AGPL
+      humanoid physics + bevy into a deliberately thin/permissive-licensed bridge crate
+      for one integer assertion; documented the manual-recheck expectation instead.
+- [x] **Workspace `exclude` bug (found during Phase 0, not in original scope)**. Commit
+      `ced92660ec`. Real Cargo behavior: an explicit `"."` in a non-virtual workspace's
+      `members` list silently disables `exclude` for every glob-matched member. Had let
+      `spark-engine`, `symthaea-lab`, and (post-reorg) `symthaea-muse-wasm` compile as
+      full workspace members despite being listed as excluded. Root-caused via isolated
+      repro, confirmed via `cargo metadata`/`cargo tree` before and after (146→143
+      workspace members). Removed `"."` from `members` (root stays included automatically
+      via its own `[package]` table); `default-members` may still reference it.
+
+Process notes from this pass, saved to memory: (1) `git mv` done but not yet committed
+can get scooped into an unrelated concurrent session's commit in this shared-tree
+monorepo — happened here (`code_analysis.rs`'s move landed via `b015f4aceb`, someone
+else's clippy-debt commit); content was fine, just misattributed. (2) `run_in_background`
+Bash calls do not reliably inherit `CARGO_TARGET_DIR` (the harness's `VAR=value :` wrapper
+only scopes the assignment to the no-op `:`), silently falling back to the shared,
+contended default target dir — use `env CARGO_TARGET_DIR=... cargo ...` or run foreground.
 
 ## Phase 1 — Safety & truth on the product path (M, ~1-2 weeks)
 
 - [ ] **Seam B — ethics-gate `Symthaea::process()`**: give the facade an `EthicsEngine`
       (reuse `ethics_engine.rs`) and gate `ProcessResponse` before return. ~3-4 files,
       300-500 LOC.
-- [ ] **Seam A — one canonical Phi**: extract `ConsciousnessCore::phi()` and make
+- [ ] **Seam A — one canonical Phi (scope corrected/expanded 2026-07-03, see Phi/Psi
+      audit below)**: extract `ConsciousnessCore::phi()` and make
       `ContinuousMind::update_consciousness` (`src/mind/tick.rs:323`, currently a naive
       mean-pairwise-dissimilarity with a hardcoded 0.1 empty-memory fallback) delegate to
-      it. The facade's Phi and the loop's Phi are currently incomparable numbers.
+      it. The facade's Phi and the loop's Phi are currently incomparable numbers. This
+      item originally undersold the problem — it's not two Phis, see below.
 - [ ] **Decide `enable_moral_anomaly_response`**: benchmark ON, then default ON or delete
       the subsystem. Same for `enable_validation_overlay` (`config/mod.rs:904`).
 - [ ] **Close the SafeFallback gap**: implement for manipulator, quadruped, surgical,
@@ -74,6 +95,113 @@ CLAUDE.md is not in the standalone sync file list — nothing leaked.)
       amend the doc table to stop promising them. Also unify orbital's 0.3 hard cliff
       (`embodiment.rs:71`) and surgical's parallel `SurgicalSafetyLevel` ladder under the
       `MotorSafetyLevel` contract so per-tier enforcement is auditable.
+
+## Phase 1.5 — The Phi/Psi sprawl (audited 2026-07-03, direct investigation)
+
+Prompted by a direct question ("we may have many phi implementations") after Phase 0
+landed. The original review's "two Phis" (facade vs loop) undersold this badly. Full
+audit below; four parallel research agents were launched but all failed mid-run to a
+session-wide API rate limit (unrelated to the codebase) — findings below are from
+continuing solo with direct grep/read, so treat as thorough-but-not-exhaustive.
+
+**At least four live, independent, consequential "how integrated/conscious is the
+system" measures exist, plus several dormant ones:**
+
+1. **`SpectralMIPFinder`** (`crates/core/symthaea-core/src/consciousness_metrics/
+   spectral_mip.rs`) — O(n³) Fiedler-ordering MIP search over a mutual-information graph
+   Laplacian. This is what the **cognitive loop's motor-safety chain actually runs**:
+   `ConsciousnessEngine::measure()` (`cognitive_loop/consciousness_engine/measure.rs`)
+   pushes every 2 cycles, computes every 47, adapts every 94, writes into
+   `self.carryover.history.consciousness_level`. Every robotics platform's
+   `MotorSafetyLevel::from_phi()` call (10+ platforms + `motor_bridge.rs`) receives this
+   same value uniformly, since it's threaded through the single `EmbodimentBridge::step()`
+   trait parameter — **this one consumer chain is internally consistent**.
+2. **`ConsciousnessUnificationEngine.psi`** (`src/consciousness/dynamics/
+   consciousness_unification.rs`) — a *different* formula entirely: a weighted sum of
+   baseline CfC temporal-coherence + voice + flow + relational + body + embodied
+   contributions (`cognitive_loop/helpers/cycle_extracted.rs:544-554`), explicitly
+   Tononi-1994-inspired in its comments but structurally unrelated to SpectralMIPFinder.
+   Feeds **`ethics_engine.rs:927`** (`consciousness_level: input.unified_psi`) and
+   **Broca's generation gate** (`training.rs`, `broca_psi > 0.4`). So within the *same
+   cognitive cycle*, motor safety and ethics/language-generation gate off two unrelated
+   numbers with no cross-validation between them — this is the real headline finding,
+   more precise than the original "facade vs loop" framing.
+3. **`TieredPhi`** (`hdc/tiered_phi/`) — a well-documented, deliberately multi-tier system
+   (RandomBaseline/SampledPartition/SpectralConnectivity/ExhaustivePartition) with an
+   honest warning that its own SpectralConnectivity tier (algebraic connectivity λ₂) is
+   **"deprecated: r = -0.62 with true Φ"** (`tiered_phi/core.rs:106`). Real production
+   consumers are narrow and non-safety-critical: `symthaea-quadruped`'s curiosity drive,
+   `symthaea-physics`'s plasma encoder, and — via the `phi_engine` caching wrapper —
+   **`symthaea-mycelix-bridge`'s federated-learning gradient quality scoring**
+   (`assess_update()`/`ConsciousnessBackend`, mycelix-core FL research, NOT the civic
+   governance system — corrected below).
+4. **`ContinuousMind::update_consciousness`** (facade, `src/mind/tick.rs:323`) — bespoke
+   pairwise-HV-dissimilarity mean, doesn't call into any of the above, plus ad hoc
+   "relational psi boost" and "swarm phi boost" (`mesh_peers.average_phi()`) multipliers
+   layered on top. Two *separate* `average_phi()` implementations exist across
+   `src/swarm/holochain.rs:196` and `src/swarm/mesh/mod.rs:937`.
+
+**Three "let's unify this" layers exist and none of them is what the hot path calls:**
+
+- **`PhiOrchestrator`** (`hdc/phi_orchestrator.rs`) — adaptively selects between
+  `ConnectivityCalculator` (algebraic connectivity — the *same* underlying method
+  TieredPhi calls deprecated), `ResonantPhiCalculator` (a fifth algorithm: coupled-
+  oscillator dynamics), and `TieredPhi`. Its own doc comment claims algebraic
+  connectivity is **"Most accurate"** — a direct, unresolved contradiction with
+  TieredPhi's own docs one file over calling it deprecated at r=-0.62. The doc comment
+  also names types (`RealPhiCalculator`, `ResonatorPhiCalculator`) that don't match what
+  it actually imports (`ConnectivityCalculator`, `ResonantPhiCalculator`) — stale
+  documentation compounding the contradiction.
+- **`phi_engine/`** — a caching wrapper, itself built on `TieredPhi`.
+- **`research/phi-lab/`** — an entire parallel tree with its own copies of
+  `tiered_phi.rs`, `phi_orchestrator.rs`, `consciousness_equation_v2.rs`, and 8+
+  topology-validation examples. Appears to be a research sandbox, not wired into
+  production, but is one more place "Phi" gets independently defined.
+
+None of `PhiOrchestrator`, `phi_engine`, or `TieredPhi` is what
+`ConsciousnessEngine::measure()` actually calls for the production consciousness_level —
+it goes straight to `SpectralMIPFinder`.
+
+**`TruePhiCalculator`** (`consciousness_metrics/calculator.rs`, Shannon-entropy-based
+"TruePhi") is used in physics/neuroscience modules and directly inside
+`symthaea-mycelix-bridge` (separately from its `phi_engine`/TieredPhi usage above) — same
+FL-research scope, not governance.
+
+**Correction on Mycelix governance** (the original synthesis overclaimed this): the civic
+voting-tier system does **not** currently consume any symthaea Phi/Psi value.
+`mycelix-bridge-common::consciousness_profile.rs`'s 4D `ConsciousnessProfile`/
+`evaluate_governance()` — which does have a `from_symthaea()` adapter constructor — is
+explicitly `#[deprecated(note = "Use sovereign_gate::SovereignCredential (8D) instead")]`
+at line 346. **The live system is the 8-axis Sovereign Profile**
+(`crates/sovereign-profile`, published as `sovereign-profile` on crates.io; consumed via
+`mycelix-bridge-common::sovereign_gate.rs`): Epistemic Integrity, Thermodynamic Yield,
+Network Resilience, Economic Velocity, Civic Participation, Stewardship & Care, Semantic
+Resonance, Domain Competence. Checked `sovereign_gate.rs` and `sovereign-profile/
+collectors.rs` directly — zero references to Phi/Psi/symthaea. All 8 axes are externally
+measurable civic signals (smart meter, node uptime, ledger, jury records) by design, so
+this is not a live inconsistency, just confirms governance and cognition are — correctly,
+deliberately — orthogonal systems today.
+
+**Not yet checked** (agents failed before reaching these; worth a follow-up sweep once
+the API rate limit clears): `phi_gradient_learning.rs`, `phi_topology_validation.rs`,
+`consciousness_self_assessment.rs`, `fractal_consciousness.rs`, `ConsciousnessEquationV2`
+(`src/consciousness/measurement/consciousness_equation_v2.rs` — referenced from
+`consciousness_engine/measure.rs` at a 23-cycle interval alongside SpectralMIPFinder;
+formula not yet read), `UnifiedConsciousnessPipeline` (47-cycle interval, same file),
+`MultiModalIntegrator` (13-cycle interval, same file), symtropy's
+`phi_trace_sim_driven_*.rs` examples.
+
+**Recommendation, in order:**
+1. (S) Resolve the `PhiOrchestrator` vs `TieredPhi` doc contradiction about algebraic
+   connectivity — one is simply wrong and actively misleading; fix or delete the stale
+   claim before anyone trusts `PhiOrchestrator`'s "Accurate" mode.
+2. (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
+   *meant* to be different measures for different purposes (plausible — Ψ's inputs are
+   plausibly closer to "engagement/flow" than "integration") or whether ethics/Broca
+   should actually be gating off Φ too. Either is defensible; the current state — no
+   documented relationship, no cross-validation — is not.
+3. (L) Fold into Seam A: whatever becomes canonical for the facade should be the *same*
+   canonical source the loop uses, not a third independent formula.
 
 ## Phase 2 — Finish what was started (M, ~2-3 weeks)
 
