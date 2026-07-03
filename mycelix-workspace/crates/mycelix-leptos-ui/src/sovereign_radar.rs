@@ -111,8 +111,11 @@ fn ring_polygon(value: f64, radius: f64, cx: f64, cy: f64) -> String {
 /// 8D Sovereign Profile radar chart component.
 #[component]
 pub fn SovereignRadar(
-    /// The profile to render.
-    #[prop(into)]
+    /// The profile to render. Defaults to a neutral `SovereignProfile` —
+    /// every current caller in the workspace renders this with no `profile`
+    /// prop at all (a pre-existing gap; the required prop with no default
+    /// meant every one of these ~10 call sites has never actually compiled).
+    #[prop(default = Signal::stored(SovereignProfile::default()))]
     profile: Signal<SovereignProfile>,
     /// Chart size preset.
     #[prop(default = SovereignRadarSize::Medium)]

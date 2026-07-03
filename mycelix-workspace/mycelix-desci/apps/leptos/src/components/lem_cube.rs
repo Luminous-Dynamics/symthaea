@@ -55,7 +55,7 @@ pub fn LemCube(
         <div class="glass-panel" style=format!("padding: 1rem; border-left: 4px solid {};", domain_color)>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                 <h4 style="font-size: 0.875rem; margin: 0; color: var(--accent-indigo);">"LEM Cube Classification"</h4>
-                <Show when=move || normative >= 2>
+                <Show when=move || (normative >= 2)>
                     <div class="pulse-indicator" title="Somatic Witness Verified">
                         <span class="pulse-dot"></span>
                         <span style="font-size: 0.65rem; color: #DC143C; font-weight: bold; margin-left: 4px;">"SOMATIC PULSE"</span>

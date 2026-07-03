@@ -221,3 +221,33 @@ pub struct ConsensusSnapshot {
     pub state: String,
     pub trend: String,
 }
+
+// ── ZKP-verified peer review ──
+//
+// Mirrors `mycelix-desci/src/api/src/handlers/zkp_review.rs`'s
+// ZkReviewRequest/ZkReviewResponse — the frontend can't depend on that
+// crate directly (it's an Axum REST server, not WASM-buildable), so these
+// are hand-kept-in-sync wire types, matching this file's existing pattern
+// for the rest of the DeSci REST API surface.
+
+/// Request to verify a ZKP peer review (POST /api/v1/reviews/verify-zkp).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkReviewRequest {
+    pub paper_id: String,
+    pub proof_bytes: Vec<u8>,
+    pub expertise_commitment: Vec<u8>,
+    pub review_commitment: Vec<u8>,
+    pub expertise_domains: Vec<String>,
+    pub score: u8,
+}
+
+/// Response from ZKP review verification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkReviewResponse {
+    pub verified: bool,
+    pub domain_tag: String,
+    pub paper_id: String,
+    pub score: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
