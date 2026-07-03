@@ -9,7 +9,7 @@
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
-use crate::holochain::{use_holochain, ConnectionBadge, HolochainProvider};
+use crate::holochain::{ConnectionBadge, HolochainProvider, use_holochain};
 
 use crate::pages::credentials::real_credentials;
 use crate::persistence;
@@ -85,7 +85,8 @@ const PROFILE_VIEW_KEY: &str = "praxis_professional_view_agent";
 const PROFILE_FILTER_KEY: &str = "praxis_professional_filter_skill";
 
 fn initial_profile(student_name: String) -> ProfessionalProfileDraft {
-    let mut draft = persistence::load::<ProfessionalProfileDraft>(PROFILE_DRAFT_KEY).unwrap_or_default();
+    let mut draft =
+        persistence::load::<ProfessionalProfileDraft>(PROFILE_DRAFT_KEY).unwrap_or_default();
     if draft.display_name.is_empty() && !student_name.is_empty() {
         draft.display_name = student_name;
     }
@@ -149,11 +150,7 @@ fn ProfileInner() -> impl IntoView {
         let hc = hc_pubkey.clone();
         async move {
             match hc
-                .call_zome_default::<(), String>(
-                    "craft_graph",
-                    "get_my_agent_pubkey",
-                    &(),
-                )
+                .call_zome_default::<(), String>("craft_graph", "get_my_agent_pubkey", &())
                 .await
             {
                 Ok(key) => key,
@@ -194,13 +191,27 @@ fn ProfileInner() -> impl IntoView {
             display_name: draft.get().display_name,
             headline: draft.get().headline,
             bio: draft.get().bio,
-            location: if draft.get().location.is_empty() { None } else { Some(draft.get().location) },
-            website: if draft.get().website.is_empty() { None } else { Some(draft.get().website) },
-            avatar_url: if draft.get().avatar_url.is_empty() { None } else { Some(draft.get().avatar_url) },
+            location: if draft.get().location.is_empty() {
+                None
+            } else {
+                Some(draft.get().location)
+            },
+            website: if draft.get().website.is_empty() {
+                None
+            } else {
+                Some(draft.get().website)
+            },
+            avatar_url: if draft.get().avatar_url.is_empty() {
+                None
+            } else {
+                Some(draft.get().avatar_url)
+            },
         };
 
         if hc.is_mock() {
-            set_status.set(Some("Saved locally — connect a conductor to publish.".into()));
+            set_status.set(Some(
+                "Saved locally — connect a conductor to publish.".into(),
+            ));
             return;
         }
 
@@ -226,7 +237,10 @@ fn ProfileInner() -> impl IntoView {
                 endorsed_agent = viewed.trim().to_string();
             }
         }
-        if endorsed_agent.is_empty() || draft.skill.trim().is_empty() || draft.rationale.trim().is_empty() {
+        if endorsed_agent.is_empty()
+            || draft.skill.trim().is_empty()
+            || draft.rationale.trim().is_empty()
+        {
             set_status.set(Some("Provide agent pubkey, skill, and rationale.".into()));
             return;
         }
@@ -235,11 +249,17 @@ fn ProfileInner() -> impl IntoView {
             endorsed_agent,
             skill: draft.skill.trim().to_string(),
             rationale: draft.rationale.trim().to_string(),
-            evidence: if draft.evidence.trim().is_empty() { None } else { Some(draft.evidence.trim().to_string()) },
+            evidence: if draft.evidence.trim().is_empty() {
+                None
+            } else {
+                Some(draft.evidence.trim().to_string())
+            },
         };
 
         if hc.is_mock() {
-            set_status.set(Some("Endorsement saved locally — connect to publish.".into()));
+            set_status.set(Some(
+                "Endorsement saved locally — connect to publish.".into(),
+            ));
             return;
         }
 
@@ -271,6 +291,8 @@ fn ProfileInner() -> impl IntoView {
                     <ConnectionBadge />
                 </div>
             </div>
+
+            <crate::holochain::ConductorSettingsPanel />
 
             {move || {
                 status.get().map(|s| view! { <div class="profile-status">{s}</div> })

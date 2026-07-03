@@ -10,7 +10,7 @@
 
 use leptos::prelude::*;
 
-use crate::curriculum::{curriculum_graph, use_progress, ProgressStatus};
+use crate::curriculum::{ProgressStatus, curriculum_graph, use_progress};
 use crate::holochain::use_holochain;
 use crate::ledger::StewardshipLedger;
 
@@ -77,9 +77,16 @@ pub enum ActivityKind {
 // Real data generators — computed from localStorage, no mocks
 // ---------------------------------------------------------------------------
 
-fn real_stats(progress: &crate::curriculum::ProgressStore, tracker: &crate::study_tracker::StudyTracker) -> LearnerStats {
+fn real_stats(
+    progress: &crate::curriculum::ProgressStore,
+    tracker: &crate::study_tracker::StudyTracker,
+) -> LearnerStats {
     // XP: 10 per problem answered + 50 per mastered topic + 25 per pomodoro
-    let problems_xp = progress.bkt_states.values().map(|b| b.attempts as u64 * 10).sum::<u64>();
+    let problems_xp = progress
+        .bkt_states
+        .values()
+        .map(|b| b.attempts as u64 * 10)
+        .sum::<u64>();
     let mastery_xp = progress.mastered_count() as u64 * 50;
     let pomodoro_xp = (tracker.total_minutes as u64 / 25) * 25;
     let total = problems_xp + mastery_xp + pomodoro_xp;
@@ -91,7 +98,7 @@ fn real_stats(progress: &crate::curriculum::ProgressStore, tracker: &crate::stud
 
     LearnerStats {
         xp_total: total,
-        xp_today: pomodoro_xp.min(200), // approximate
+        xp_today: pomodoro_xp.min(200),    // approximate
         xp_this_week: total.min(2000) / 4, // approximate
         level,
         xp_to_next_level: (xp_for_next - xp_for_current) as u64,
@@ -119,18 +126,30 @@ fn real_streak(tracker: &crate::study_tracker::StudyTracker) -> StreakInfo {
 
 fn real_due_reviews(progress: &crate::curriculum::ProgressStore) -> DueReviews {
     let now = js_sys::Date::now();
-    let due: Vec<_> = progress.srs_cards.values().filter(|c| now >= c.next_review_ms).collect();
-    let overdue = due.iter().filter(|c| now - c.next_review_ms > 24.0 * 60.0 * 60.0 * 1000.0).count() as u32;
+    let due: Vec<_> = progress
+        .srs_cards
+        .values()
+        .filter(|c| now >= c.next_review_ms)
+        .collect();
+    let overdue = due
+        .iter()
+        .filter(|c| now - c.next_review_ms > 24.0 * 60.0 * 60.0 * 1000.0)
+        .count() as u32;
     DueReviews {
         total_due: due.len() as u32,
         overdue,
-        new_available: progress.srs_cards.values().filter(|c| c.repetitions == 0).count() as u32,
+        new_available: progress
+            .srs_cards
+            .values()
+            .filter(|c| c.repetitions == 0)
+            .count() as u32,
     }
 }
 
 fn real_skills(progress: &crate::curriculum::ProgressStore) -> Vec<SkillMastery> {
     let graph = curriculum_graph();
-    let mut subjects: std::collections::HashMap<String, (f32, usize)> = std::collections::HashMap::new();
+    let mut subjects: std::collections::HashMap<String, (f32, usize)> =
+        std::collections::HashMap::new();
     for n in &graph.nodes {
         let bkt = progress.bkt(&n.id);
         if bkt.attempts > 0 {
@@ -139,7 +158,8 @@ fn real_skills(progress: &crate::curriculum::ProgressStore) -> Vec<SkillMastery>
             entry.1 += 1;
         }
     }
-    let mut skills: Vec<SkillMastery> = subjects.into_iter()
+    let mut skills: Vec<SkillMastery> = subjects
+        .into_iter()
         .filter(|(_, (_, count))| *count > 0)
         .map(|(name, (total_mastery, count))| SkillMastery {
             name: name.clone(),
@@ -147,13 +167,24 @@ fn real_skills(progress: &crate::curriculum::ProgressStore) -> Vec<SkillMastery>
             domain: name,
         })
         .collect();
-    skills.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap_or(std::cmp::Ordering::Equal));
+    skills.sort_by(|a, b| {
+        b.level
+            .partial_cmp(&a.level)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     skills.truncate(5);
     if skills.is_empty() {
         // Show top subjects by node count for new users
-        let mut top: Vec<_> = graph.subjects().iter().take(5).map(|s| SkillMastery {
-            name: s.to_string(), level: 0.0, domain: s.to_string()
-        }).collect();
+        let mut top: Vec<_> = graph
+            .subjects()
+            .iter()
+            .take(5)
+            .map(|s| SkillMastery {
+                name: s.to_string(),
+                level: 0.0,
+                domain: s.to_string(),
+            })
+            .collect();
         top
     } else {
         skills
@@ -166,22 +197,39 @@ fn real_recommendations(progress: &crate::curriculum::ProgressStore) -> Vec<Reco
     if weakest.is_empty() {
         // New user — suggest starting points
         vec![
-            Recommendation { title: "Start with your grade's top topic".into(), reason: "Begin your learning journey on the constellation".into(), course_domain: "Getting Started".into() },
-            Recommendation { title: "Try a flashcard session".into(), reason: "5 minutes of spaced repetition goes a long way".into(), course_domain: "Review".into() },
+            Recommendation {
+                title: "Start with your grade's top topic".into(),
+                reason: "Begin your learning journey on the constellation".into(),
+                course_domain: "Getting Started".into(),
+            },
+            Recommendation {
+                title: "Try a flashcard session".into(),
+                reason: "5 minutes of spaced repetition goes a long way".into(),
+                course_domain: "Review".into(),
+            },
         ]
     } else {
-        weakest.iter().map(|(id, pct)| {
-            let title = graph.node(id).map(|n| n.title.clone()).unwrap_or_default();
-            Recommendation {
-                title,
-                reason: format!("{}% mastery — practice to strengthen", (pct * 100.0) as u32),
-                course_domain: graph.node(id).map(|n| n.subject_area.clone()).unwrap_or_default(),
-            }
-        }).collect()
+        weakest
+            .iter()
+            .map(|(id, pct)| {
+                let title = graph.node(id).map(|n| n.title.clone()).unwrap_or_default();
+                Recommendation {
+                    title,
+                    reason: format!("{}% mastery — practice to strengthen", (pct * 100.0) as u32),
+                    course_domain: graph
+                        .node(id)
+                        .map(|n| n.subject_area.clone())
+                        .unwrap_or_default(),
+                }
+            })
+            .collect()
     }
 }
 
-fn real_activity(tracker: &crate::study_tracker::StudyTracker, progress: &crate::curriculum::ProgressStore) -> Vec<ActivityEvent> {
+fn real_activity(
+    tracker: &crate::study_tracker::StudyTracker,
+    progress: &crate::curriculum::ProgressStore,
+) -> Vec<ActivityEvent> {
     let mut events = Vec::new();
     let streak = tracker.current_streak();
     let mastered = progress.mastered_count();
@@ -277,8 +325,8 @@ pub fn DashboardPage() -> impl IntoView {
                 <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem">
                     "Internet down? Beam the entire Praxis app to a nearby peer via Bluetooth/P2P."
                 </p>
-                <button 
-                    class="btn-primary" 
+                <button
+                    class="btn-primary"
                     style="background: var(--accent); border-color: var(--accent)"
                     on:click=move |_| {
                         // Trigger WebBluetooth / Wi-Fi Direct Gossip logic
@@ -857,9 +905,22 @@ fn XpLevelCard() -> impl IntoView {
     let stats = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome_default::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
+            match hc
+                .call_zome_default::<(), LearnerStats>("gamification", "get_learner_stats", &())
+                .await
+            {
                 Ok(s) => s,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); real_stats(&p, &t) },
+                Err(_) => {
+                    let p = crate::persistence::load::<crate::curriculum::ProgressStore>(
+                        "praxis_progress",
+                    )
+                    .unwrap_or_default();
+                    let t = crate::persistence::load::<crate::study_tracker::StudyTracker>(
+                        "praxis_study_tracker",
+                    )
+                    .unwrap_or_default();
+                    real_stats(&p, &t)
+                }
             }
         }
     });
@@ -909,9 +970,18 @@ fn StreakCard() -> impl IntoView {
     let streak = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome_default::<(), StreakInfo>("gamification", "get_streak", &()).await {
+            match hc
+                .call_zome_default::<(), StreakInfo>("gamification", "get_streak", &())
+                .await
+            {
                 Ok(s) => s,
-                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); real_streak(&t) },
+                Err(_) => {
+                    let t = crate::persistence::load::<crate::study_tracker::StudyTracker>(
+                        "praxis_study_tracker",
+                    )
+                    .unwrap_or_default();
+                    real_streak(&t)
+                }
             }
         }
     });
@@ -960,9 +1030,18 @@ fn DueReviewsCard() -> impl IntoView {
     let reviews = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome_default::<(), DueReviews>("srs", "get_due_summary", &()).await {
+            match hc
+                .call_zome_default::<(), DueReviews>("srs", "get_due_summary", &())
+                .await
+            {
                 Ok(r) => r,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_due_reviews(&p) },
+                Err(_) => {
+                    let p = crate::persistence::load::<crate::curriculum::ProgressStore>(
+                        "praxis_progress",
+                    )
+                    .unwrap_or_default();
+                    real_due_reviews(&p)
+                }
             }
         }
     });
@@ -1003,9 +1082,18 @@ fn SkillsCard() -> impl IntoView {
     let skills = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome_default::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
+            match hc
+                .call_zome_default::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &())
+                .await
+            {
                 Ok(s) => s,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_skills(&p) },
+                Err(_) => {
+                    let p = crate::persistence::load::<crate::curriculum::ProgressStore>(
+                        "praxis_progress",
+                    )
+                    .unwrap_or_default();
+                    real_skills(&p)
+                }
             }
         }
     });
@@ -1065,7 +1153,13 @@ fn RecommendationsSection() -> impl IntoView {
                 .await
             {
                 Ok(r) => r,
-                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_recommendations(&p) },
+                Err(_) => {
+                    let p = crate::persistence::load::<crate::curriculum::ProgressStore>(
+                        "praxis_progress",
+                    )
+                    .unwrap_or_default();
+                    real_recommendations(&p)
+                }
             }
         }
     });
@@ -1117,7 +1211,17 @@ fn RecentActivitySection() -> impl IntoView {
                 .await
             {
                 Ok(a) => a,
-                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("praxis_study_tracker").unwrap_or_default(); let p = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress").unwrap_or_default(); real_activity(&t, &p) },
+                Err(_) => {
+                    let t = crate::persistence::load::<crate::study_tracker::StudyTracker>(
+                        "praxis_study_tracker",
+                    )
+                    .unwrap_or_default();
+                    let p = crate::persistence::load::<crate::curriculum::ProgressStore>(
+                        "praxis_progress",
+                    )
+                    .unwrap_or_default();
+                    real_activity(&t, &p)
+                }
             }
         }
     });
@@ -1203,9 +1307,14 @@ fn ProgressCard() -> impl IntoView {
     // Find highest-weight unmastered Gr12 topics
     let priority_topics = Memo::new(move |_| {
         let p = progress.get();
-        let mut topics: Vec<_> = graph.nodes.iter()
+        let mut topics: Vec<_> = graph
+            .nodes
+            .iter()
             .filter(|n| {
-                n.grade_levels.first().map(|g| g == "Grade12").unwrap_or(false)
+                n.grade_levels
+                    .first()
+                    .map(|g| g == "Grade12")
+                    .unwrap_or(false)
                     && p.get(&n.id).status != ProgressStatus::Mastered
                     && n.exam_weight.is_some()
             })
@@ -1215,7 +1324,17 @@ fn ProgressCard() -> impl IntoView {
             let wb = b.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
             wb.cmp(&wa)
         });
-        topics.into_iter().take(3).map(|n| (n.id.clone(), n.title.clone(), n.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0))).collect::<Vec<_>>()
+        topics
+            .into_iter()
+            .take(3)
+            .map(|n| {
+                (
+                    n.id.clone(),
+                    n.title.clone(),
+                    n.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0),
+                )
+            })
+            .collect::<Vec<_>>()
     });
 
     view! {
@@ -1324,16 +1443,25 @@ fn CurriculumRecommendationsSection() -> impl IntoView {
         let mut recs = Vec::new();
         for node in &graph.nodes {
             let status = p.get(&node.id).status;
-            if status == ProgressStatus::Mastered { continue; }
+            if status == ProgressStatus::Mastered {
+                continue;
+            }
 
             let prereqs = graph.prereqs_for(&node.id);
-            let all_prereqs_met = prereqs.is_empty() || prereqs.iter().all(|pid| {
-                p.get(pid).status == ProgressStatus::Mastered
-            });
+            let all_prereqs_met = prereqs.is_empty()
+                || prereqs
+                    .iter()
+                    .all(|pid| p.get(pid).status == ProgressStatus::Mastered);
 
             if all_prereqs_met {
                 let weight = node.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
-                recs.push((node.id.clone(), node.title.clone(), node.subdomain.clone(), weight, status));
+                recs.push((
+                    node.id.clone(),
+                    node.title.clone(),
+                    node.subdomain.clone(),
+                    weight,
+                    status,
+                ));
             }
         }
 
@@ -1450,7 +1578,11 @@ fn ShareProgress() -> impl IntoView {
         let hours = t.hours_studied();
         let days_left = t.days_until_exam().unwrap_or(0);
 
-        let name = if prof.name.is_empty() { "A student".to_string() } else { prof.name.clone() };
+        let name = if prof.name.is_empty() {
+            "A student".to_string()
+        } else {
+            prof.name.clone()
+        };
         format!(
             "{} on Praxis:\n\u{1F331} {} topics mastered ({}% of curriculum)\n\u{1F525} {}-day study streak\n\u{23F0} {:.0} hours studied\n\u{1F3AF} {} days until exams\n\nhttps://praxis.mycelix.net",
             name, mastered, pct, streak, hours, days_left
@@ -1589,61 +1721,187 @@ fn SubjectMasteryBreakdown() -> impl IntoView {
 }
 
 /// Pending TEND card — shows economic value earned from learning.
+///
+/// Also the Trial-Mode -> Sovereign-Mode graduation point: under the native
+/// Tauri app, "Connect & Claim TEND" replays every claimed BKT mastery state
+/// through `validate_pwa_import` (real BKT-integrity check, hard-capped at
+/// 10 retroactive TEND) and marks the reconciled pending events as synced.
+/// In a plain browser, there is no conductor to validate against, so the
+/// same slot instead prompts the learner to go get the native app.
 #[component]
 fn PendingTendCard() -> impl IntoView {
-    let ledger = crate::persistence::PendingTendLedger::load();
-    let total = ledger.total_earned;
-    let pending = ledger.total_pending;
-    let event_count = ledger.events.len();
-    let should_prompt = ledger.should_prompt_connection();
+    let (ledger, set_ledger) = signal(crate::persistence::PendingTendLedger::load());
+    let (sync_result, set_sync_result) =
+        signal(None::<Result<crate::tauri_bridge::PwaImportResult, String>>);
+    let (syncing, set_syncing) = signal(false);
+    let is_tauri = crate::tauri_bridge::is_tauri();
 
-    // Calculate credit capacity based on top subject mastery (MATL)
-    let credit_limit = 40 + (total as i32 / 5); // Simple local mock of get_credit_capacity logic
+    let on_connect_claim = move |_: leptos::ev::MouseEvent| {
+        if syncing.get_untracked() {
+            return;
+        }
+        set_syncing.set(true);
+        set_sync_result.set(None);
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let progress =
+                crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
+                    .unwrap_or_default();
+
+            let outcome = match serde_json::to_string(&progress) {
+                Ok(json) => crate::tauri_bridge::validate_pwa_import(json).await,
+                Err(e) => Err(format!("Could not export local progress: {e}")),
+            };
+
+            if let Ok(result) = &outcome {
+                // The learner's claimed mastery held up to BKT replay — the
+                // pending local ledger has now been reconciled against a
+                // real, verified TEND grant, so retire the unsynced events.
+                let mut l = crate::persistence::PendingTendLedger::load();
+                let unsynced = l.unsynced_count();
+                if unsynced > 0 {
+                    l.mark_synced(unsynced);
+                }
+                let _ = result; // validated_tend is shown, not re-added — it's already reflected via mark_synced
+                set_ledger.set(l);
+            }
+
+            set_sync_result.set(Some(outcome));
+            set_syncing.set(false);
+        });
+    };
 
     view! {
         <div class="dash-card tend-card">
             <h3>"Learning Economy"</h3>
-            <div style="display: flex; align-items: baseline; gap: 0.5rem">
-                <span style="font-size: 2rem; font-weight: 700; color: var(--primary)">{format!("{:.1}", total)}</span>
-                <span style="font-size: 0.9rem; color: var(--text-secondary)">"TEND earned"</span>
-            </div>
-            
-            // Mutual Credit Capacity
-            <div style="margin-top: 1rem; padding: 0.75rem; background: var(--surface-low); border-radius: 6px; border: 1px solid var(--border)">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase">"Credit Capacity"</span>
-                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--success)">"\u{00B1}"{credit_limit}" TEND"</span>
-                </div>
-                <div class="progress-bar" style="height: 4px; margin-bottom: 0.25rem">
-                    <div class="progress-bar-fill success" style=format!("width: {}%", (total as i32 * 100 / credit_limit).min(100))></div>
-                </div>
-                <p style="font-size: 0.65rem; color: var(--text-secondary); margin: 0">"Your credit limit grows as your MATL trust score increases."</p>
-            </div>
+            {move || {
+                let l = ledger.get();
+                let total = l.total_earned;
+                let pending = l.total_pending;
+                let event_count = l.events.len();
+                let should_prompt = l.should_prompt_connection();
+                let credit_limit = 40 + (total as i32 / 5); // Simple local mock of get_credit_capacity logic
 
-            {if pending > 0.0 {
                 view! {
-                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">
-                        {format!("{:.1} pending", pending)}" \u{2014} connect to claim"
+                    <div style="display: flex; align-items: baseline; gap: 0.5rem">
+                        <span style="font-size: 2rem; font-weight: 700; color: var(--primary)">{format!("{:.1}", total)}</span>
+                        <span style="font-size: 0.9rem; color: var(--text-secondary)">"TEND earned"</span>
                     </div>
-                }.into_any()
-            } else {
-                view! { <span></span> }.into_any()
-            }}
-            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem">
-                {event_count}" sessions \u{2014} 1 TEND = 1 hour community service"
-            </div>
-            {if should_prompt {
-                view! {
-                    <div role="status" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--primary, #7c3aed); color: #fff; border-radius: 0.5rem; text-align: center">
-                        <strong>"Your knowledge has value."</strong>
-                        <div style="font-size: 0.85rem; margin-top: 0.25rem">
-                            "Connect to the network to secure "{format!("{:.1}", pending)}" TEND and join the mesh."
+
+                    // Mutual Credit Capacity
+                    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--surface-low); border-radius: 6px; border: 1px solid var(--border)">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem">
+                            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase">"Credit Capacity"</span>
+                            <span style="font-size: 0.85rem; font-weight: 700; color: var(--success)">"\u{00B1}"{credit_limit}" TEND"</span>
                         </div>
+                        <div class="progress-bar" style="height: 4px; margin-bottom: 0.25rem">
+                            <div class="progress-bar-fill success" style=format!("width: {}%", (total as i32 * 100 / credit_limit).min(100))></div>
+                        </div>
+                        <p style="font-size: 0.65rem; color: var(--text-secondary); margin: 0">"Your credit limit grows as your MATL trust score increases."</p>
                     </div>
+
+                    {if pending > 0.0 {
+                        view! {
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">
+                                {format!("{:.1} pending", pending)}" \u{2014} connect to claim"
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! { <span></span> }.into_any()
+                    }}
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem">
+                        {event_count}" sessions \u{2014} 1 TEND = 1 hour community service"
+                    </div>
+                    {if should_prompt {
+                        view! {
+                            <div role="status" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--primary, #7c3aed); color: #fff; border-radius: 0.5rem; text-align: center">
+                                <strong>"Your knowledge has value."</strong>
+                                <div style="font-size: 0.85rem; margin-top: 0.25rem">
+                                    "Connect to the network to secure "{format!("{:.1}", pending)}" TEND and join the mesh."
+                                </div>
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! { <span></span> }.into_any()
+                    }}
+                }
+            }}
+
+            // Trial Mode -> Sovereign Mode graduation action
+            {if is_tauri {
+                view! {
+                    <button
+                        class="btn-primary"
+                        style="width: 100%; margin-top: 0.75rem"
+                        disabled=move || syncing.get()
+                        on:click=on_connect_claim
+                    >
+                        {move || if syncing.get() { "Verifying with conductor\u{2026}" } else { "Connect & Claim TEND" }}
+                    </button>
+                    {move || sync_result.get().map(|r| match r {
+                        Ok(result) => {
+                            let msg = if result.rejected_nodes > 0 {
+                                format!(
+                                    "{:.1} TEND verified and claimed \u{2014} {} topics validated, {} rejected as inconsistent with your practice history",
+                                    result.validated_tend, result.validated_nodes, result.rejected_nodes
+                                )
+                            } else {
+                                format!(
+                                    "{:.1} TEND verified and claimed from {} validated topics",
+                                    result.validated_tend, result.validated_nodes
+                                )
+                            };
+                            view! {
+                                <div role="status" style="margin-top: 0.5rem; padding: 0.5rem; background: var(--success-low, #e6f7ec); color: var(--success); border-radius: 0.4rem; font-size: 0.8rem">
+                                    {msg}
+                                </div>
+                            }.into_any()
+                        }
+                        Err(msg) => view! {
+                            <div role="alert" style="margin-top: 0.5rem; padding: 0.5rem; background: var(--error-low, #fdeaea); color: var(--error); border-radius: 0.4rem; font-size: 0.8rem">
+                                {format!("Could not claim TEND: {msg}")}
+                            </div>
+                        }.into_any(),
+                    })}
                 }.into_any()
             } else {
-                view! { <span></span> }.into_any()
+                view! { <GoSovereignPrompt /> }.into_any()
             }}
         </div>
+    }
+}
+
+/// Browser-mode call-to-action: no conductor means TEND can't actually be
+/// verified/claimed here — invite the learner to the native app instead of
+/// pretending a "Connect" button would do anything in a plain browser tab.
+#[component]
+fn GoSovereignPrompt() -> impl IntoView {
+    let (expanded, set_expanded) = signal(false);
+
+    view! {
+        <button
+            class="btn-outline"
+            style="display: block; text-align: center; width: 100%; margin-top: 0.75rem"
+            on:click=move |_| set_expanded.update(|v| *v = !*v)
+        >
+            "Go Sovereign \u{2014} verify and claim real TEND"
+        </button>
+        {move || if expanded.get() {
+            view! {
+                <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--surface-low); border: 1px solid var(--border); border-radius: 8px; font-size: 0.8rem; color: var(--text-secondary)">
+                    <p style="margin: 0 0 0.5rem">
+                        "Pending TEND here is a local estimate \u{2014} it isn't yet backed by a running "
+                        "Holochain conductor, so there's nothing to verify it against in a browser tab."
+                    </p>
+                    <p style="margin: 0">
+                        "Install the native Praxis desktop app to connect to the mesh. It replays your "
+                        "practice history against the real BKT mastery formula and mints verified TEND "
+                        "(up to 10 retroactively) \u{2014} tampered or fabricated progress is rejected."
+                    </p>
+                </div>
+            }.into_any()
+        } else {
+            view! { <span></span> }.into_any()
+        }}
     }
 }

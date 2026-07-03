@@ -43,8 +43,9 @@ members = [
 # Excluded from workspace: these pull in non-WASM-compatible deps.
 # - tests: full holochain conductor (tokio/mio)
 # - edunet-agg, mycelix-governance: statrs/nalgebra (rand -> getrandom 0.2)
+# - apps/tauri/src-tauri: native Tauri backend (tokio/full, tauri) — not WASM
 # Run tests with: cargo test --manifest-path tests/Cargo.toml
-exclude = ["tests", "crates/praxis-agg", "crates/praxis-content-gen", "crates/praxis-standards-ingest", "crates/mycelix-governance", "apps/leptos"]
+exclude = ["tests", "crates/praxis-agg", "crates/praxis-content-gen", "crates/praxis-standards-ingest", "crates/mycelix-governance", "apps/leptos", "apps/tauri/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

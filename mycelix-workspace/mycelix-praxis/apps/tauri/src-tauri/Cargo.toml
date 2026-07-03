@@ -15,6 +15,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 
+# Real Holochain conductor connection (native tokio WebSocket, msgpack wire
+# protocol — same NativeWsTransport used to test BrowserWsTransport against
+# a real conductor). Backs the `holochain_connect` / `call_zome` Tauri
+# commands that mycelix-leptos-client's TauriIpcTransport (used by the
+# Leptos frontend when running under Tauri) invokes.
+mycelix-leptos-client = { path = "../../../../crates/mycelix-leptos-client", features = ["native"] }
+
 # Consciousness engine (optional — enables real sensor data instead of simulation)
 # symthaea-soma = { path = "../../../../symthaea/crates/symthaea-soma", optional = true }
 

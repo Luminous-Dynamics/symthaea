@@ -37,6 +37,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use mycelix_leptos_client::{ConnectConfig, NativeWsTransport};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -50,10 +51,7 @@ pub enum ConductorState {
     /// Starting up (loading DNA, generating keys)
     Starting,
     /// Running and connected
-    Running {
-        admin_port: u16,
-        app_port: u16,
-    },
+    Running { admin_port: u16, app_port: u16 },
     /// Failed to start
     Error(String),
 }
@@ -68,8 +66,8 @@ pub struct ConsciousnessState {
     pub serotonin: f32,
     pub norepinephrine: f32,
     /// Derived signals
-    pub valence: f32,   // DA - cortisol (-1 to 1)
-    pub arousal: f32,   // NE + DA*0.5 (0 to 1.5)
+    pub valence: f32, // DA - cortisol (-1 to 1)
+    pub arousal: f32, // NE + DA*0.5 (0 to 1.5)
     /// Metabolic state
     pub wake_state: String, // "Alert", "Focused", "Drowsy", "Sleeping"
     /// Timestamp
@@ -81,6 +79,11 @@ struct AppState {
     conductor_state: std::sync::Mutex<ConductorState>,
     consciousness: std::sync::Mutex<ConsciousnessState>,
     consciousness_tick: std::sync::atomic::AtomicU64,
+    /// Real Holochain conductor connection (Sovereign Mode).
+    ///
+    /// Populated by `holochain_connect`, consumed by `call_zome`. `tokio::sync::Mutex`
+    /// (not `std::sync::Mutex`) because it's held across `.await` points.
+    hc_transport: tokio::sync::Mutex<Option<NativeWsTransport>>,
 }
 
 // ============== IPC Commands ==============
@@ -89,6 +92,103 @@ struct AppState {
 #[tauri::command]
 fn get_conductor_state(state: tauri::State<AppState>) -> ConductorState {
     state.conductor_state.lock().unwrap().clone()
+}
+
+// ============== Holochain IPC bridge (TauriIpcTransport backend) ==============
+//
+// These two commands are the native-side implementation that
+// `mycelix_leptos_client::TauriIpcTransport` (see
+// `crates/mycelix-leptos-client/src/tauri.rs`) calls via
+// `window.__TAURI__.core.invoke(...)`. Before this, `TauriIpcTransport`
+// was dead code — no Tauri backend implemented these commands, so a
+// Leptos frontend running under Tauri had no real way to reach a
+// conductor. `holochain_connect` opens a real `NativeWsTransport`
+// (native tokio WebSocket, Holochain 0.6 msgpack wire protocol,
+// `Authenticate` + `AppInfo` handshake — the same protocol
+// `BrowserWsTransport` uses in the browser) and stashes it in
+// `AppState`; `call_zome` reuses that connection for zome calls.
+//
+// `rename_all = "snake_case"` is required because `TauriIpcTransport`
+// sends JSON keys `app_id` / `auth_token` / `fn_name` (snake_case) —
+// Tauri's default is to expect camelCase JS-side keys mapped to
+// snake_case Rust params.
+
+/// Response shape expected by `TauriIpcTransport::call_zome` — it
+/// deserializes the invoke() result into a struct with a `data` field
+/// holding the MessagePack-encoded zome output bytes.
+#[derive(Serialize)]
+struct ZomeCallOutput {
+    data: Vec<u8>,
+}
+
+/// Open a real connection to the Holochain conductor.
+///
+/// Called by `TauriIpcTransport::connect()`. `url`/`app_id`/`auth_token`
+/// come from the Leptos frontend's `ConnectConfig` (conductor URL,
+/// installed app ID, optional auth token issued by the admin API).
+#[tauri::command(rename_all = "snake_case")]
+async fn holochain_connect(
+    url: String,
+    app_id: String,
+    auth_token: Option<Vec<u8>>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let transport = NativeWsTransport::new();
+    let config = ConnectConfig {
+        url: url.clone(),
+        app_id,
+        auth_token,
+        reconnect: None,
+        request_timeout_ms: Some(30_000),
+    };
+
+    transport
+        .connect_native(config)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    *state.hc_transport.lock().await = Some(transport);
+    // admin_port unknown here (we only ever talk to the app interface) — 0 is a
+    // sentinel, not a real port. app_port is embedded in `url` for display use.
+    *state
+        .conductor_state
+        .lock()
+        .expect("conductor_state mutex poisoned") = ConductorState::Running {
+        admin_port: 0,
+        app_port: url
+            .rsplit(':')
+            .next()
+            .and_then(|s| s.trim_end_matches('/').parse().ok())
+            .unwrap_or(0),
+    };
+    Ok(())
+}
+
+/// Call a zome function on the already-connected conductor.
+///
+/// Called by `TauriIpcTransport::call_zome()`. Fails with a clear error
+/// if `holochain_connect` hasn't succeeded yet.
+#[tauri::command(rename_all = "snake_case")]
+async fn call_zome(
+    role: String,
+    zome: String,
+    fn_name: String,
+    payload: Vec<u8>,
+    state: tauri::State<'_, AppState>,
+) -> Result<ZomeCallOutput, String> {
+    let transport = {
+        let guard = state.hc_transport.lock().await;
+        guard.clone().ok_or_else(|| {
+            "Not connected to conductor — call holochain_connect first".to_string()
+        })?
+    };
+
+    let data = transport
+        .call_zome_native(&role, &zome, &fn_name, payload)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(ZomeCallOutput { data })
 }
 
 /// Validate BKT integrity from imported PWA progress data.
@@ -255,18 +355,26 @@ fn tick_consciousness(
     keyboard_active: bool,
     mouse_moving: bool,
 ) -> ConsciousnessState {
-    let tick = state.consciousness_tick.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tick = state
+        .consciousness_tick
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let mut cs = state.consciousness.lock().unwrap();
 
     // Desktop sensor simulation (replaced by real Soma when consciousness feature enabled)
     // Keyboard activity → attention proxy → dopamine + norepinephrine
-    let activity = if keyboard_active { 0.7 } else if mouse_moving { 0.4 } else { 0.1 };
+    let activity = if keyboard_active {
+        0.7
+    } else if mouse_moving {
+        0.4
+    } else {
+        0.1
+    };
 
     // Simple coupled-oscillator simulation (matches Leptos consciousness.rs)
     let t = tick as f64 * 0.25; // 4Hz tick rate
-    let theta = (t * 0.4).sin() as f32 * 0.3 + 0.5;  // ~4Hz theta
-    let gamma = (t * 4.0).sin() as f32 * 0.2 + 0.5;   // ~40Hz gamma
+    let theta = (t * 0.4).sin() as f32 * 0.3 + 0.5; // ~4Hz theta
+    let gamma = (t * 4.0).sin() as f32 * 0.2 + 0.5; // ~40Hz gamma
 
     // Phi proxy: phase-amplitude coupling modulated by activity
     cs.phi = (theta * gamma * activity).clamp(0.0, 1.0);
@@ -314,6 +422,7 @@ fn main() {
                 tick: 0,
             }),
             consciousness_tick: std::sync::atomic::AtomicU64::new(0),
+            hc_transport: tokio::sync::Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             get_conductor_state,
@@ -321,6 +430,8 @@ fn main() {
             get_platform_info,
             get_consciousness,
             tick_consciousness,
+            holochain_connect,
+            call_zome,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Praxis");

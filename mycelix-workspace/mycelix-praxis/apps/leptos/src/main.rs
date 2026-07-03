@@ -24,10 +24,12 @@ mod search;
 mod social_proof;
 mod student_profile;
 mod study_tracker;
+mod tauri_bridge;
 mod theme;
 mod tutor;
 
 fn main() {
     console_error_panic_hook::set_once();
+    holochain::apply_conductor_url_override();
     mount_to_body(app::App);
 }
