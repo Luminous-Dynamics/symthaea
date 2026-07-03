@@ -582,15 +582,6 @@ pub mod knowledge;
 // Domain-specific verifiers for ODE solutions, Einstein condition, CSP solutions.
 pub mod z3_bridge;
 
-// Phase 5: Curriculum generator with Z3-verified lemmas. Generates formal
-// lemma statements from the IMO curriculum and verifies them via z3_bridge.
-// JSON-persisted catalog for human inspection + downstream proof-checker reuse.
-pub mod curriculum_generator;
-
-// Proof State: goal trees, tactic engine, proof search (Phase 5 math plan)
-// ProofTree struct with goal stack, tactic application, backtracking search.
-pub mod proof_state;
-
 // ============================================================================
 // Re-exports for Convenience
 // ============================================================================

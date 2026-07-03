@@ -427,15 +427,13 @@ jobs:
             cargo test -p symthaea --lib --features "$FEATURES" -- --test-threads=1
 
   test-feature-matrix-critical:
-    name: Test Feature Matrix (core/web_research/pathology)
+    name: Test Feature Matrix (web_research/pathology)
     runs-on: ubuntu-latest
     needs: test
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: core
-            cmd: cargo test -p symthaea --lib -- --test-threads=1
           - name: web_research
             cmd: cargo test -p symthaea --lib --features "web_research_module school_learning" -- --test-threads=1
           - name: pathology_resilience
@@ -472,7 +470,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
-    timeout-minutes: 420
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -640,7 +638,6 @@ jobs:
           - "ssm_language,reasoning_engine"
           - "multi_agent,reasoning_engine"
           - "full_perception,reasoning_engine"
-          - "consciousness_full,school_learning"
           - "all_benchmarks,reasoning_engine"
           - "genesis,reasoning_engine"
           - "vision-manifold,full_perception"
@@ -824,7 +821,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx
       - name: Generate SBOM

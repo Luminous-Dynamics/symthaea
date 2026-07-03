@@ -17,7 +17,7 @@ mod gated_run {
     use symthaea_fabrication_kernel::thought::GeometricThought;
     use symthaea_infrastructure::simulator::SympoiesisSandbox;
     use symthaea_infrastructure::town_simpoiesis::TownSympoiesis;
-    use symthaea_materials::{encoder::MaterialHdcEncoder, MaterialProperty};
+    use symthaea_materials::{MaterialProperty, encoder::MaterialHdcEncoder};
     use symthaea_mujoco_bridge::MuJoCoBridge;
     use symthaea_proprioception::Proprioceptor;
     use symthaea_silicon::{PowerDistributionLogic, SiliconArchitect, SiliconPPA};

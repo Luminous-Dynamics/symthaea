@@ -11,10 +11,10 @@ use anyhow::Result;
 use nalgebra::SVector;
 use symtropy_consciousness_physics::ConsciousnessField;
 use symtropy_math::Point;
-use symtropy_physics::joints::{HingeJoint, MotorDrive};
 use symtropy_physics::PhysicsWorld;
+use symtropy_physics::joints::{HingeJoint, MotorDrive};
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<()> {

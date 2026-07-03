@@ -14,7 +14,7 @@ mod gated_run {
     use symthaea_causal_reasoning::causal_calculus::{CausalDAG, StructuralCausalModel};
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_engineering::{EngineeringAssistant, EngineeringConcept, EngineeringManager};
-    use symthaea_runtime::school::{load_industrial_benchmarks, Domain, LearningObjective};
+    use symthaea_runtime::school::{Domain, LearningObjective, load_industrial_benchmarks};
 
     pub fn run_performance_matrix() -> Result<(), Box<dyn std::error::Error>> {
         println!("🚀 Initializing Symthaea Cross-Field Performance Matrix...");

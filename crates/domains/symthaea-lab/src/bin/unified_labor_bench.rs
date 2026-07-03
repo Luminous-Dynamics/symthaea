@@ -16,7 +16,7 @@ use symthaea_humanoid::types::{HumanoidConfig, HumanoidState};
 use symthaea_swarm::{HapticPulseMsg, SwarmAggregator, SwarmMessage, SwarmStateMsg};
 use symtropy_robotics_bridge_core::platform::PlatformType;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use uuid::Uuid;
 
 #[tokio::main]

@@ -3221,7 +3221,7 @@ dependencies = [
  "derive-new",
  "libm",
  "matrixmultiply",
- "ndarray 0.16.1",
+ "ndarray",
  "num-traits",
  "paste",
  "portable-atomic-util",
@@ -6490,7 +6490,6 @@ checksum = "1f628eaec48bfd21b865dc2950cfa014450c01d2fa2b69a86c2fd5844ec523c0"
 dependencies = [
  "curve25519-dalek 4.1.3",
  "ed25519 2.2.3",
- "rand_core 0.6.4",
  "serde",
  "sha2 0.10.9",
  "subtle",
@@ -10811,7 +10810,7 @@ dependencies = [
  "lance-tokenizer",
  "libm",
  "log",
- "ndarray 0.16.1",
+ "ndarray",
  "num-traits",
  "object_store",
  "prost 0.14.4",
@@ -11951,16 +11950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "minicov"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4869b6a491569605d66d3952bcdf03df789e5b536e5f0cf7758a7f08a55ae24d"
-dependencies = [
- "cc",
- "walkdir",
-]
-
-[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12095,75 +12084,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "mycelix-bridge-common"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "serde",
- "sovereign-profile",
-]
-
-[[package]]
-name = "mycelix-claim-types"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "mycelix-crypto"
 version = "0.1.0"
 dependencies = [
- "bs58",
- "chacha20poly1305",
- "ed25519-dalek 2.1.0",
- "getrandom 0.2.17",
- "pqcrypto-dilithium",
- "pqcrypto-kyber",
- "pqcrypto-sphincsplus",
- "pqcrypto-traits",
- "rand 0.8.6",
  "serde",
- "thiserror 1.0.69",
- "zeroize",
 ]
 
 [[package]]
 name = "mycelix-fl-core"
 version = "0.1.0"
 dependencies = [
- "mycelix-bridge-common",
  "rand 0.8.6",
  "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "mycelix-sdk"
 version = "0.1.0"
 dependencies = [
- "base64 0.21.7",
- "bincode 1.3.3",
- "blake3",
- "chrono",
- "ed25519-dalek 2.1.0",
- "getrandom 0.2.17",
- "hex",
- "mycelix-fl-core",
- "mycelix_finance_types",
- "ndarray 0.15.6",
- "once_cell",
- "rand 0.8.6",
- "rand_distr 0.4.3",
- "regex",
  "serde",
- "serde_json",
- "sha2 0.10.9",
- "sha3",
- "subtle",
- "thiserror 1.0.69",
- "uuid",
- "zeroize",
 ]
 
 [[package]]
@@ -12172,20 +12111,9 @@ version = "0.1.0"
 dependencies = [
  "pqcrypto-dilithium",
  "pqcrypto-traits",
- "proofs-commitment",
- "proofs-config",
- "rand 0.8.6",
  "serde",
- "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "mycelix_finance_types"
-version = "0.1.0"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -12449,19 +12377,6 @@ name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
-
-[[package]]
-name = "ndarray"
-version = "0.15.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb12d4e967ec485a5f71c6311fe28158e9d6f4bc4a447b474184d0f91a8fa32"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "rawpointer",
-]
 
 [[package]]
 name = "ndarray"
@@ -13657,7 +13572,7 @@ checksum = "1fa7e49bd669d32d7bc2a15ec540a527e7764aec722a45467814005725bcd721"
 dependencies = [
  "half",
  "libloading 0.8.9",
- "ndarray 0.16.1",
+ "ndarray",
  "ort-sys",
  "smallvec 2.0.0-alpha.10",
  "tracing",
@@ -14434,32 +14349,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pqcrypto-kyber"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c00293cf898859d0c771455388054fd69ab712263c73fdc7f287a39b1ba000"
-dependencies = [
- "cc",
- "glob",
- "libc",
- "pqcrypto-internals",
- "pqcrypto-traits",
-]
-
-[[package]]
-name = "pqcrypto-sphincsplus"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f6ff8925443869aab1332bb8b0fe3b75cf113516bccf05da4dc71bc33162252"
-dependencies = [
- "cc",
- "glob",
- "libc",
- "pqcrypto-internals",
- "pqcrypto-traits",
-]
-
-[[package]]
 name = "pqcrypto-traits"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14515,38 +14404,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc0d895b311e3af9902528fbb8f928688abbd95872819320517cc24ca6b2bd08"
 dependencies = [
  "num-integer",
-]
-
-[[package]]
-name = "prism-common"
-version = "0.1.0"
-dependencies = [
- "mycelix-claim-types",
- "serde",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "prism-ingest"
-version = "0.1.0"
-dependencies = [
- "log",
- "prism-common",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "prism-search"
-version = "0.1.0"
-dependencies = [
- "bincode 1.3.3",
- "getrandom 0.3.4",
- "log",
- "prism-common",
- "prism-ingest",
- "serde",
 ]
 
 [[package]]
@@ -14642,21 +14499,6 @@ name = "profiling"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
-
-[[package]]
-name = "proofs-commitment"
-version = "0.1.0"
-dependencies = [
- "sha3",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "proofs-config"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "proptest"
@@ -17346,13 +17188,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea06cc588e43c632923a55450401b8f25e628131571d4e1baea1bdfdb2b5ed06"
 
 [[package]]
-name = "sovereign-profile"
-version = "0.1.2"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "spade"
 version = "2.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -17362,19 +17197,6 @@ dependencies = [
  "num-traits",
  "robust",
  "smallvec 1.15.2",
-]
-
-[[package]]
-name = "spark-engine"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "proptest",
- "rand 0.8.6",
- "rand_chacha 0.3.1",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -17868,14 +17690,12 @@ dependencies = [
  "mycelix-sdk",
  "mycelix-zkp-core",
  "nalgebra 0.34.2",
- "ndarray 0.16.1",
+ "ndarray",
  "once_cell",
  "ort",
  "parking_lot 0.12.5",
  "petgraph 0.6.5",
  "positioning",
- "prism-common",
- "prism-search",
  "proptest",
  "quinn",
  "quote",
@@ -17916,7 +17736,7 @@ dependencies = [
  "symthaea-clime",
  "symthaea-clinical",
  "symthaea-coding-feedback",
- "symthaea-consciousness-equation",
+ "symthaea-consciousness-equation 0.1.0",
  "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
  "symthaea-core",
@@ -18070,7 +17890,6 @@ name = "symthaea-auv"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "positioning",
  "rand 0.8.6",
  "serde",
  "serde_json",
@@ -18216,7 +18035,6 @@ dependencies = [
  "symthaea-swarm",
  "symthaea-vision-manifold",
  "symtropy-robotics-bridge-core",
- "syn 2.0.117",
  "tokio",
  "tree-sitter",
  "tree-sitter-go",
@@ -18313,6 +18131,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-consciousness-equation"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45898805d126fdae27f3ce7ad6afb6276a3eba4cff8157b2bcc14131f80ed9bf"
+dependencies = [
+ "serde",
+ "web-time",
+]
+
+[[package]]
 name = "symthaea-consciousness-resonance"
 version = "0.1.0"
 dependencies = [
@@ -18360,7 +18188,7 @@ dependencies = [
  "hf-hub",
  "libc",
  "nalgebra 0.34.2",
- "ndarray 0.16.1",
+ "ndarray",
  "num-complex",
  "once_cell",
  "ordered-float 4.6.0",
@@ -18451,7 +18279,7 @@ dependencies = [
  "hf-hub",
  "lru 0.16.4",
  "memmap2",
- "ndarray 0.16.1",
+ "ndarray",
  "ort",
  "rand 0.8.6",
  "rand_chacha 0.3.1",
@@ -18534,8 +18362,8 @@ dependencies = [
  "symthaea-hal",
  "symthaea-humanoid",
  "symthaea-sensors",
- "symtropy-math 0.2.1",
- "symtropy-physics 0.2.1",
+ "symtropy-math 0.1.0",
+ "symtropy-physics 0.1.0",
 ]
 
 [[package]]
@@ -18750,7 +18578,6 @@ name = "symthaea-helicopter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "positioning",
  "rand 0.8.6",
  "serde",
  "serde_json",
@@ -18816,10 +18643,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symthaea-lab"
-version = "0.1.0"
-
-[[package]]
 name = "symthaea-lean-bridge"
 version = "0.1.0"
 dependencies = [
@@ -18849,7 +18672,7 @@ dependencies = [
  "symthaea-core",
  "symthaea-fep",
  "symthaea-swarm",
- "symtropy-physics 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "symtropy-physics 0.2.1",
  "uuid",
 ]
 
@@ -18870,7 +18693,7 @@ dependencies = [
  "anyhow",
  "bincode 1.3.3",
  "chrono",
- "ndarray 0.16.1",
+ "ndarray",
  "rusqlite",
  "serde",
  "symthaea-core",
@@ -18895,7 +18718,6 @@ dependencies = [
  "anyhow",
  "mujoco-rs",
  "parking_lot 0.12.5",
- "positioning",
  "proptest",
  "rand 0.8.6",
  "rand_chacha 0.3.1",
@@ -18930,27 +18752,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "symthaea-muse-wasm"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "getrandom 0.2.17",
- "js-sys",
- "serde",
- "serde_json",
- "symthaea-muse",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-test",
- "web-sys",
-]
-
-[[package]]
 name = "symthaea-mycelix-bridge"
 version = "0.1.0"
 dependencies = [
- "mycelix-fl-core",
- "mycelix-sdk",
  "serde",
  "serde_json",
  "symthaea-core",
@@ -19303,7 +19107,6 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
- "symthaea",
  "symthaea-broca",
  "symthaea-core",
  "symthaea-psych-bench",
@@ -19320,8 +19123,8 @@ dependencies = [
  "serde",
  "symthaea-core",
  "symthaea-fep",
- "symtropy-math 0.2.1",
- "symtropy-physics 0.2.1",
+ "symtropy-math 0.1.0",
+ "symtropy-physics 0.1.0",
 ]
 
 [[package]]
@@ -19376,7 +19179,7 @@ name = "symthaea-runtime"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "ndarray 0.16.1",
+ "ndarray",
  "quote",
  "serde",
  "serde_json",
@@ -19424,8 +19227,8 @@ version = "0.1.0"
 dependencies = [
  "nalgebra 0.34.2",
  "rand 0.8.6",
- "symtropy-math 0.2.1",
- "symtropy-physics 0.2.1",
+ "symtropy-math 0.1.0",
+ "symtropy-physics 0.1.0",
 ]
 
 [[package]]
@@ -19437,7 +19240,7 @@ dependencies = [
  "ctrlc",
  "hound",
  "nalgebra 0.34.2",
- "ndarray 0.16.1",
+ "ndarray",
  "rand 0.8.6",
  "ringbuf",
  "rustfft",
@@ -19495,7 +19298,7 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea-broca",
- "symthaea-consciousness-equation",
+ "symthaea-consciousness-equation 0.1.0",
  "symthaea-core",
  "symthaea-foveation",
  "symthaea-harmonies",
@@ -19528,7 +19331,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "symthaea-broca",
- "symthaea-consciousness-equation",
+ "symthaea-consciousness-equation 0.1.0",
  "symthaea-core",
  "symthaea-harmonies",
  "symthaea-neuroevolution",
@@ -19694,7 +19497,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "approx",
- "positioning",
  "proptest",
  "rand 0.8.6",
  "serde",
@@ -19795,13 +19597,14 @@ dependencies = [
 
 [[package]]
 name = "symtropy-consciousness-physics"
-version = "0.2.0"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ecad0d624da801d4d49ac7a7183308368ef0ac2dd050542c08461a06230f946"
 dependencies = [
  "nalgebra 0.34.2",
- "rand 0.8.6",
- "symthaea-consciousness-equation",
- "symtropy-math 0.2.1",
- "symtropy-physics 0.2.1",
+ "symthaea-consciousness-equation 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "symtropy-math 0.1.0",
+ "symtropy-physics 0.1.0",
 ]
 
 [[package]]
@@ -19816,14 +19619,6 @@ dependencies = [
 [[package]]
 name = "symtropy-math"
 version = "0.2.1"
-dependencies = [
- "nalgebra 0.34.2",
- "serde",
-]
-
-[[package]]
-name = "symtropy-math"
-version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841858b8728f009da5942903c5048099e4caf4037edb43f003512db36ac63904"
 dependencies = [
@@ -19833,12 +19628,13 @@ dependencies = [
 
 [[package]]
 name = "symtropy-physics"
-version = "0.2.1"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "359b88b6211ba60e78b6fd11063394b75d942ffc46ef1c4ab5cd2a8c666d78df"
 dependencies = [
  "arrayvec",
  "nalgebra 0.34.2",
- "serde",
- "symtropy-math 0.2.1",
+ "symtropy-math 0.1.0",
 ]
 
 [[package]]
@@ -19850,20 +19646,15 @@ dependencies = [
  "arrayvec",
  "nalgebra 0.34.2",
  "serde",
- "symtropy-math 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "symtropy-math 0.2.1",
 ]
 
 [[package]]
 name = "symtropy-robotics-bridge-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
- "nalgebra 0.34.2",
  "serde",
  "symtropy-consciousness-physics",
- "symtropy-math 0.2.1",
- "symtropy-physics 0.2.1",
 ]
 
 [[package]]
@@ -21602,7 +21393,6 @@ dependencies = [
  "atomic",
  "getrandom 0.4.2",
  "js-sys",
- "rand 0.10.1",
  "serde_core 1.0.228 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid-rng-internal",
  "wasm-bindgen",
@@ -21615,7 +21405,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7150d9f2ad44ac625d243aec4e6692320f818241f3f30e653630d1f729163bac"
 dependencies = [
  "getrandom 0.4.2",
- "rand 0.10.1",
 ]
 
 [[package]]
@@ -21856,45 +21645,6 @@ checksum = "1f01b580c9ac74c8d8f0c0e4afb04eeef2acf145458e52c03845ee9cd23e3d12"
 dependencies = [
  "unicode-ident",
 ]
-
-[[package]]
-name = "wasm-bindgen-test"
-version = "0.3.58"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45649196a53b0b7a15101d845d44d2dda7374fc1b5b5e2bbf58b7577ff4b346d"
-dependencies = [
- "async-trait",
- "cast",
- "js-sys",
- "libm",
- "minicov",
- "nu-ansi-term",
- "num-traits",
- "oorandom",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test-macro",
- "wasm-bindgen-test-shared",
-]
-
-[[package]]
-name = "wasm-bindgen-test-macro"
-version = "0.3.58"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f579cdd0123ac74b94e1a4a72bd963cf30ebac343f2df347da0b8df24cdebed2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "wasm-bindgen-test-shared"
-version = "0.2.108"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8145dd1593bf0fb137dbfa85b8be79ec560a447298955877804640e40c2d6ea"
 
 [[package]]
 name = "wasm-compose"

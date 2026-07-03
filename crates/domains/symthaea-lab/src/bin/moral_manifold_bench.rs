@@ -9,7 +9,7 @@
 use anyhow::Result;
 use symthaea_swarm::SwarmAggregator;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use uuid::Uuid;
 
 // Define mock types to avoid Holochain dependency conflicts in the lab

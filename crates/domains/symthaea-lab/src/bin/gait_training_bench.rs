@@ -16,7 +16,7 @@ use symthaea_humanoid::morphology::HumanoidMorphology;
 use symthaea_humanoid::types::{HumanoidCommand, HumanoidConfig, HumanoidState};
 use symtropy_robotics_bridge_core::safety::JointSafetyAuthority;
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<()> {

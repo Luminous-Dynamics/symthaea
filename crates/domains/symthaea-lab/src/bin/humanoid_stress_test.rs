@@ -15,7 +15,7 @@ use symtropy_physics::body::BodyType;
 use symtropy_physics::{PhysicsWorld, RigidBody};
 use symtropy_robotics_bridge_core::platform::PlatformType;
 use tracing::{info, level_filters::LevelFilter, warn};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<()> {

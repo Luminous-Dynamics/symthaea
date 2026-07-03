@@ -29,7 +29,6 @@ tree-sitter.workspace = true
 tree-sitter-rust = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
-syn = { version = "2.0", features = ["full", "visit"], optional = true }
 ureq = { version = "2.9" }
 bincode = { workspace = true }
 md5 = "0.7"
@@ -51,5 +50,5 @@ default = []
 # symthaea_broca::liquid_mamba, which only exists when that feature is on.
 mamba-cpu = ["symthaea-broca/mamba-cpu"]
 networking = ["symthaea-broca/networking"]
-code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
+code-sheaf-eval = ["dep:symthaea-geodesic"]
 wasm-sandbox = ["dep:wasmtime"]
