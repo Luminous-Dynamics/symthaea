@@ -46,8 +46,8 @@ chrono = { workspace = true }
 hex = { workspace = true }
 
 # Metrics
-prometheus = "0.13"
-lazy_static = "1.4"
+prometheus = "0.14"
+lazy_static = "1.5"
 
 # Rate limiting (per-IP GCRA token bucket via the `governor` crate).
 # Pinned to 0.4 because its axum integration targets axum 0.7 (this crate's
@@ -65,7 +65,7 @@ mycelix-zkp-core = { workspace = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 uuid = { workspace = true }
 rand = "0.8"
 tower = { version = "0.4", features = ["util"] }

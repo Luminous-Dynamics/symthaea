@@ -38,7 +38,7 @@ holochain_serialized_bytes = "=0.0.57"
 serde = "=1.0.228"  # Match holochain_serialized_bytes requirement
 
 # Additional utilities
-thiserror = "1"
+thiserror = "2"
 
 [profile.release]
 opt-level = "z"        # Optimize for size (WASM)

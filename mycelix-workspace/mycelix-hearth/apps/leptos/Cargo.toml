@@ -49,7 +49,7 @@ web-sys = { version = "0.3", features = [
 
 # Utilities
 console_error_panic_hook = "0.1"
-gloo-timers = { version = "0.3", features = ["futures"] }
+gloo-timers = { version = "0.4", features = ["futures"] }
 send_wrapper = "0.6"
 
 # WASM-safe mirror types (NO hdi dependencies)

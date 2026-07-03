@@ -38,8 +38,8 @@ serde_json = "1.0"
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 
 # Utilities
-thiserror = "1.0"
-derive_more = "0.99"
+thiserror = "2.0"
+derive_more = "2.1"
 
 # WASM compatibility - getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
 # NOTE: Do NOT use features = ["js"] or ["wasm_js"] - they pull in wasm-bindgen

@@ -46,7 +46,7 @@ hdk_derive = "=0.6.1"
 holochain_serialized_bytes = "=0.0.57"
 
 # Serialization
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
 
 # Bridge
@@ -55,8 +55,8 @@ mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 
 # Utilities
 chrono = "0.4"
-thiserror = "1.0"
-derive_more = "0.99"
+thiserror = "2.0"
+derive_more = "2.1"
 
 # WASM compatibility - getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
 # NOTE: Do NOT use features = ["js"] or ["wasm_js"] - they pull in wasm-bindgen

@@ -26,10 +26,10 @@ serde_json = "1.0"
 thiserror = "2.0"
 
 # Real cryptography - ed25519 signatures
-ed25519-dalek = { version = "2.1", features = ["serde", "rand_core", "batch"] }
+ed25519-dalek = { version = "2.2", features = ["serde", "rand_core", "batch"] }
 sha2 = "0.10"
 rand = "0.8"
-zeroize = { version = "1.7", features = ["derive"] }
+zeroize = { version = "1.9", features = ["derive"] }
 hex = "0.4"
 
 # BLS12-381 aggregate signatures (optional)

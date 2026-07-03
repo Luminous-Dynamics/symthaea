@@ -155,7 +155,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -163,12 +163,6 @@ name = "constant_time_eq"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
-
-[[package]]
-name = "convert_case"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
 name = "convert_case"
@@ -307,19 +301,6 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "0.99.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6edb4b64a43d977b8e99788fe3a04d483834fba1215a7e02caa415b626497f7f"
-dependencies = [
- "convert_case 0.4.0",
- "proc-macro2",
- "quote",
- "rustc_version",
- "syn 2.0.118",
-]
-
-[[package]]
-name = "derive_more"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d751e9e49156b02b44f9c1815bcb94b984cdcc4396ecc32521c739452808b134"
@@ -333,7 +314,7 @@ version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "799a97264921d8623a957f6c3b9011f3b5492f557bbb7a5a19b7fa6d06ba8dcb"
 dependencies = [
- "convert_case 0.10.0",
+ "convert_case",
  "proc-macro2",
  "quote",
  "rustc_version",
@@ -398,7 +379,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -623,7 +604,7 @@ checksum = "8e08d69f8af5042aa369b7fda3d9bea7ffe08de680aa9f897c29e50de0e2460c"
 dependencies = [
  "base64",
  "blake2b_simd",
- "derive_more 2.1.1",
+ "derive_more",
  "futures",
  "holochain_serialized_bytes",
  "holochain_util",
@@ -632,7 +613,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha2",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -687,7 +668,7 @@ dependencies = [
  "serde-transcode",
  "serde_bytes",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -732,7 +713,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -755,7 +736,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34a27bd154f022c9eabae7fde1b44bd9b0f5d68005bdb43f5553d4e840824b54"
 dependencies = [
  "derive_builder",
- "derive_more 2.1.1",
+ "derive_more",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_nonce",
@@ -768,7 +749,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "subtle",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
  "uuid",
 ]
@@ -859,7 +840,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -894,12 +875,12 @@ dependencies = [
 name = "mycelix_justice_integrity"
 version = "0.1.0"
 dependencies = [
- "derive_more 0.99.20",
+ "derive_more",
  "getrandom 0.2.17",
  "hdi",
  "holochain_serialized_bytes",
  "serde",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -1194,31 +1175,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.18",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.118",
+ "thiserror-impl",
 ]
 
 [[package]]

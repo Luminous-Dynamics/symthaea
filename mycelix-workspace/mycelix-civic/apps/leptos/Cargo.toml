@@ -28,7 +28,7 @@ web-sys = { version = "0.3", features = [
     "Window", "Storage", "Document",
 ] }
 console_error_panic_hook = "0.1"
-gloo-timers = "0.3"
+gloo-timers = "0.4"
 
 # Shared Mycelix Leptos infrastructure — provides StatCard, TelemetryLine,
 # GraphNode/Edge, FlowIndicator, SovereignRadar, Indlela, theme framework,

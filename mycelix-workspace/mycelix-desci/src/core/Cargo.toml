@@ -27,19 +27,19 @@ clap = { workspace = true }
 mycelix-zkp-core = { workspace = true }
 
 # Additional dependencies
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 url = "2.5"
 toml = "0.8"
-dirs = "5.0"
+dirs = "6.0"
 hex = "0.4"
-regex = "1.10"
+regex = "1.12"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 [dev-dependencies]
 proptest = { workspace = true }
 tokio-test = "0.4"
-tempfile = "3.8"
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+tempfile = "3.27"
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 [[bench]]
 name = "core_benchmarks"
