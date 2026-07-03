@@ -1035,6 +1035,7 @@ impl CognitiveLoopService {
                 )
             },
             last_ethics_verdict: super::ethics_engine::EthicalVerdict::Safe,
+            last_ahimsa_violated: false,
             ethics_verdict_override: None,
             kosmic_song: crate::mycelix::KosmicSong::default(),
             drive_manager: super::managers::DriveManager::default(),

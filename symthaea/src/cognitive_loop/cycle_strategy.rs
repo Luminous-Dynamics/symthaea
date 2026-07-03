@@ -692,6 +692,7 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
+        self.last_ahimsa_violated = ethics_output.ahimsa_violated;
         self.last_ethics_verdict = self
             .ethics_verdict_override
             .unwrap_or(ethics_output.unified_verdict);
