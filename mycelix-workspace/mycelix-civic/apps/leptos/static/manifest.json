@@ -1,0 +1,20 @@
+{
+  "name": "Mycelix Civic — Justice, Emergency & Media Verification",
+  "short_name": "Civic",
+  "description": "Community justice cases, emergency coordination, and media verification for the Mycelix civic cluster.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f14",
+  "theme_color": "#eab308",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["government", "social"],
+  "lang": "en-ZA"
+}
