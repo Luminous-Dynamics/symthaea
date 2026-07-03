@@ -217,6 +217,20 @@ cargo build --release
 cargo build --release --features mycelix
 ```
 
+### Building without Nix
+
+The `justfile` / `run.sh` workflow assumes a Nix environment, but you don't need Nix to build Symtropy — you need a Rust toolchain plus (on Linux, for the full game/launcher build only) the same system libraries CI installs (`.github/workflows/ci.yml`):
+
+```bash
+# Debian/Ubuntu
+sudo apt-get update
+sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+```
+
+These are required because Bevy pulls in ALSA (audio) and udev (input device enumeration) on Linux. **The pure-library quickstart — `symtropy-math`, `symtropy-physics`, `symtropy-consciousness-physics`, no Bevy — needs none of this.** Only `cargo build --release` (the Bevy-based game/launcher) requires these system packages.
+
+macOS and Windows builds need no extra system packages beyond a standard Rust toolchain.
+
 ## License
 
 **Dual-track license model** — see [LICENSING.md](docs/LICENSING.md) for the full breakdown.
