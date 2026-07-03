@@ -107,6 +107,13 @@ pub enum GamePhase {
     /// Sol Atlas globe view — planetary coordination layer.
     #[cfg(feature = "atlas")]
     GlobeView,
+    /// Walkable ground-level view inside a fully-drilled-into H3 cell.
+    /// Only reachable by drilling all the way in (see cell_entry.rs's
+    /// zoom-floor detection) — every other zoom level stays the orbital
+    /// GlobeView, per design: "only walkable if you're already in the hex,
+    /// otherwise just an overhead view."
+    #[cfg(feature = "atlas")]
+    CellWalk,
     /// Phase 11: City-Scale Governance Demonstration.
     CityScale,
     /// Muse: Thermodynamic Visualizer.

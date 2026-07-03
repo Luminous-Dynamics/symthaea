@@ -38,7 +38,3 @@ pub fn physics_sync_transforms(
         }
     }
 }
-
-pub fn physics_apply_inputs() {}
-pub fn physics_step() {}
-pub fn consciousness_sync_system() {}

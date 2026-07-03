@@ -56,11 +56,14 @@ impl Plugin for SymtropyPlugin {
             .add_plugins(symtropy_render_bridge::NdSlicingPlugin)
             .add_message::<components::NpcActionEvent>()
             .add_message::<components::WorldFeedbackEvent>()
-            // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
+            // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz.
+            // physics_apply_inputs/physics_step were empty {} bodies wired in
+            // here as if they did real stepping — actual movement happens via
+            // direct kinematic Transform writes in each movement system
+            // (player_movement_system_3d etc.), not through these. Removed
+            // rather than left as misleading no-op placeholders.
             .add_systems(FixedUpdate, (
-                systems::engine_physics::physics_apply_inputs,
                 systems::thermodynamic::thermodynamic_enforcement_system,
-                systems::engine_physics::physics_step,
                 systems::engine_physics::physics_sync_transforms,
             ).chain().run_if(in_playing_or_3d))
             .add_systems(Startup, (
@@ -128,7 +131,6 @@ impl Plugin for SymtropyPlugin {
                 systems::psychology::npc_collapse_recovery_system,
                 systems::consciousness::player_consciousness_system,
                 systems::consciousness::npc_consciousness_system,
-                systems::engine_physics::consciousness_sync_system,
                 systems::thermodynamic::collapse_visual_system,
                 systems::rendering::hud_system, systems::minimap::update_minimap,
                 systems::room_memory::room_memory_update_system,
@@ -176,6 +178,9 @@ impl Plugin for SymtropyPlugin {
             app.add_plugins(bevy::pbr::MaterialPlugin::<
                 sol_atlas_bevy::holographic_material::HolographicMaterial,
             >::default())
+                .add_plugins(bevy::pbr::MaterialPlugin::<
+                    sol_atlas_bevy::clouds::CloudMaterial,
+                >::default())
                 .init_resource::<sol_atlas_bevy::camera::OrbitalCameraConfig>()
                 .init_resource::<sol_atlas_bevy::timeline::TimelineState>()
                 .init_resource::<sol_atlas_bevy::selection::SelectedMarker>()
@@ -214,6 +219,7 @@ impl Plugin for SymtropyPlugin {
                     (
                         systems::atlas::globe_input_system,
                         systems::atlas::draw_arcs_system,
+                        systems::atlas::draw_gravity_grid_system,
                         sol_atlas_bevy::camera::orbital_camera_system,
                         sol_atlas_bevy::timeline::timeline_input_system,
                         sol_atlas_bevy::timeline::timeline_autoplay_system,
@@ -241,16 +247,18 @@ impl Plugin for SymtropyPlugin {
                         sol_atlas_bevy::selection::click_select_system,
                         sol_atlas_bevy::selection::update_selection_text,
                         sol_atlas_bevy::holographic_material::update_holographic_time,
+                        sol_atlas_bevy::clouds::update_cloud_time,
                         sol_atlas_bevy::frame_capture::frame_capture_system,
                         systems::demo_director::demo_director_system,
                     )
                         .run_if(in_state(GamePhase::GlobeView)),
                 )
-                // H3 hex grid — Step 1 of the H3 Earth / telemetry solar
-                // system / procedural galaxy plan. Cell indexing + hover
-                // picking + boundary rendering, plus (Step 2) a
-                // double-click zoom transition into a picked cell. Entering
-                // a cell to load a walkable scene (Step 3) is a later step.
+                // H3 hex grid — Step 1 (cell indexing + hover picking +
+                // boundary rendering) and Step 2 (click-driven drill-down
+                // zoom, finer hexes as you approach) of the H3 Earth /
+                // telemetry solar system / procedural galaxy plan. Step 3
+                // (walkable view once fully drilled in) is wired below via
+                // watch_for_cell_arrival_system + the CellWalk state.
                 .add_systems(
                     Update,
                     (
@@ -259,10 +267,40 @@ impl Plugin for SymtropyPlugin {
                         sol_atlas_bevy::cell_entry::trigger_cell_zoom_system,
                         sol_atlas_bevy::cell_entry::cancel_zoom_on_manual_input,
                         sol_atlas_bevy::cell_entry::cell_zoom_transition_system,
+                        systems::atlas::watch_for_cell_arrival_system,
                     )
                         .chain()
                         .after(sol_atlas_bevy::camera::orbital_camera_system)
                         .run_if(in_state(GamePhase::GlobeView)),
+                )
+                // Step 3: walkable ground-level view, only reachable by
+                // drilling all the way into a cell (never at intermediate
+                // zoom levels — those stay the orbital GlobeView).
+                .init_resource::<sol_atlas_bevy::cell_walk::CellWalkLook>()
+                .add_systems(
+                    OnEnter(GamePhase::CellWalk),
+                    (
+                        sol_atlas_bevy::cell_walk::setup_cell_walk,
+                        sol_atlas_bevy::cell_walk::cell_walk_cursor_grab_system,
+                    ),
+                )
+                .add_systems(
+                    OnExit(GamePhase::CellWalk),
+                    (
+                        sol_atlas_bevy::cell_walk::cleanup_cell_walk,
+                        sol_atlas_bevy::cell_walk::cell_walk_cursor_release_system,
+                    ),
+                )
+                .add_systems(
+                    Update,
+                    (
+                        sol_atlas_bevy::cell_walk::cell_walk_mouse_look_system,
+                        sol_atlas_bevy::cell_walk::cell_walk_movement_system,
+                        sol_atlas_bevy::cell_walk::cell_walk_camera_sync_system,
+                        systems::atlas::cell_walk_escape_system,
+                    )
+                        .chain()
+                        .run_if(in_state(GamePhase::CellWalk)),
                 )
                 .add_systems(
                     OnExit(GamePhase::GlobeView),

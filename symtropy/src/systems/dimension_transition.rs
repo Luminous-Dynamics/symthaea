@@ -1,17 +1,27 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Real-time dimension transitioning: seamlessly shift between 2D, 2.5D, 3D, and 4D.
+//! Camera-only dimension presets for the default 2D dungeon crawler: F1-F4
+//! smoothly interpolate the (still-`Camera2d`, still-sprite-rendered) camera's
+//! zoom and vertical offset between four presets. The world's actual geometry
+//! never becomes 3D through this system — sprites stay flat sprites at every
+//! preset.
 //!
-//! No other game engine does this. The physics always runs in the same dimension;
-//! the "dimension mode" controls how the world is projected and experienced:
+//! - **2D**: Top-down, tight zoom. (Current default)
+//! - **2.5D**: Zoomed out further with a Y offset — a cheap "looking from
+//!   above and behind" parallax cue, not real isometric projection.
+//! - **3D**/**4D**: Historically documented as "full 3D camera with free
+//!   look, walls become tall" — that was never implemented. These presets
+//!   are actually just a further zoom-out/offset step, identical in kind to
+//!   2.5D. A real embodied first-person/3D-mesh mode does exist in this
+//!   engine (see `rendering_3d.rs`), but it's a separate, hardcoded
+//!   experience (`--experience waterworks-3d`) with its own world-building
+//!   pipeline, not something F3/F4 switch the default game into.
+//! - **4D's W-slider** (`[`/`]` keys) is real and independent of this
+//!   camera-preset confusion: it reveals/hides `FourDBody`-tagged hidden
+//!   dimensional secrets (see `four_d_rendering.rs`) regardless of which
+//!   camera preset is active.
 //!
-//! - **2D**: Top-down orthographic. Classic dungeon crawler. (Current default)
-//! - **2.5D**: Isometric/oblique perspective. Adds visual depth without changing gameplay.
-//! - **3D**: Full 3D camera with free look. Walls become tall. Z axis visible.
-//! - **4D**: 3D view + W slider. Move the slider to reveal hidden rooms in the 4th dimension.
-//!
-//! Transition is smooth — camera angle interpolates, projection blends.
-//! Press F1-F4 to switch dimensions, or use the scroll wheel to slide.
+//! Press F1-F4 to switch presets, or use the scroll wheel to slide.
 
 use bevy::prelude::*;
 
@@ -59,11 +69,6 @@ impl DimensionMode {
     /// Whether the W slider is active (4D cross-section).
     pub fn has_w_slider(&self) -> bool {
         matches!(self, Self::D4)
-    }
-
-    /// Whether sprite rendering should be used (2D/2.5D) vs mesh (3D/4D).
-    pub fn uses_sprites(&self) -> bool {
-        matches!(self, Self::D2 | Self::D2Half)
     }
 
     /// Display name.
@@ -214,13 +219,5 @@ mod tests {
         assert!(!DimensionMode::D2.has_w_slider());
         assert!(!DimensionMode::D3.has_w_slider());
         assert!(DimensionMode::D4.has_w_slider());
-    }
-
-    #[test]
-    fn sprites_in_2d_meshes_in_3d() {
-        assert!(DimensionMode::D2.uses_sprites());
-        assert!(DimensionMode::D2Half.uses_sprites());
-        assert!(!DimensionMode::D3.uses_sprites());
-        assert!(!DimensionMode::D4.uses_sprites());
     }
 }

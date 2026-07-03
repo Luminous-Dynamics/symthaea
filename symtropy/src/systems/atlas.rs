@@ -49,6 +49,10 @@ pub struct CelestialBodyMesh {
 #[derive(Component)]
 pub struct CloudLayer;
 
+/// Sacred-geometry wireframe sphere marker — gated by `OverlayManager::show_grid`.
+#[derive(Component)]
+pub struct GridLayer;
+
 /// City indicator — always visible at orbit, shows grid stress.
 #[derive(Component)]
 pub struct CityIndicator {
@@ -63,6 +67,9 @@ pub struct TimelineHud;
 /// Active data view preset — filters which layers are visible.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub enum DataView {
+    /// No data overlays — just the globe. Default, so first impressions
+    /// aren't a wall of arcs/markers obscuring the landmass.
+    Off,
     All,
     Energy,
     Climate,
@@ -73,13 +80,14 @@ pub enum DataView {
 
 impl Default for DataView {
     fn default() -> Self {
-        Self::All
+        Self::Off
     }
 }
 
 impl DataView {
     pub fn label(&self) -> &'static str {
         match self {
+            Self::Off => "OVERLAYS OFF",
             Self::All => "ALL DATA",
             Self::Energy => "ENERGY",
             Self::Climate => "CLIMATE",
@@ -91,18 +99,20 @@ impl DataView {
 
     pub fn next(&self) -> Self {
         match self {
+            Self::Off => Self::All,
             Self::All => Self::Energy,
             Self::Energy => Self::Climate,
             Self::Climate => Self::Civilization,
             Self::Civilization => Self::Infrastructure,
             Self::Infrastructure => Self::Interplanetary,
-            Self::Interplanetary => Self::All,
+            Self::Interplanetary => Self::Off,
         }
     }
 
     /// Which layers are visible in this view.
     pub fn visible_layers(&self) -> Vec<Layer> {
         match self {
+            Self::Off => Vec::new(),
             Self::All => Layer::all().into_iter().collect(),
             Self::Energy => vec![
                 Layer::Energy,
@@ -154,8 +164,12 @@ impl Default for OverlayManager {
             show_metrics: true,
             show_labels: true,
             show_timeline_bar: true,
-            show_grid: true,
-            show_orbits: true,
+            // Off by default, matching DataView — the gravity-well grid
+            // funnel and orbit rings are exactly the "circles at the
+            // bottom" clutter, now correctly wired (draw_gravity_grid_system)
+            // but still needed an actual default change to stop showing.
+            show_grid: false,
+            show_orbits: false,
         }
     }
 }
@@ -166,6 +180,14 @@ pub fn overlay_toggle_system(
     mut overlays: ResMut<OverlayManager>,
     mut panels: Query<&mut Visibility, With<SidePanel>>,
     mut scrubbers: Query<&mut Visibility, (With<TimelineScrubber>, Without<SidePanel>)>,
+    mut grids: Query<
+        &mut Visibility,
+        (
+            With<GridLayer>,
+            Without<SidePanel>,
+            Without<TimelineScrubber>,
+        ),
+    >,
 ) {
     if kb.just_pressed(KeyCode::KeyH) {
         if overlays.show_controls && overlays.show_metrics {
@@ -208,6 +230,15 @@ pub fn overlay_toggle_system(
         };
         for mut vis in scrubbers.iter_mut() {
             *vis = scrub_vis;
+        }
+
+        let grid_vis = if overlays.show_grid {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        for mut vis in grids.iter_mut() {
+            *vis = grid_vis;
         }
     }
 }
@@ -258,12 +289,38 @@ pub fn atlas_toggle_system(kb: Res<ButtonInput<KeyCode>>, mut next: ResMut<NextS
     }
 }
 
+/// Watches for `CellZoomTransition::arrived_at_floor` (set by
+/// `sol_atlas_bevy::cell_entry` — a separate crate that can't reference
+/// `GamePhase` itself) and transitions into the walkable view. Only fires
+/// when you've drilled all the way in, never at intermediate zoom steps —
+/// "only walkable if you're already in the hex, otherwise just an overhead
+/// view."
+pub fn watch_for_cell_arrival_system(
+    mut transition: ResMut<sol_atlas_bevy::cell_entry::CellZoomTransition>,
+    mut next: ResMut<NextState<GamePhase>>,
+) {
+    if transition.arrived_at_floor.take().is_some() {
+        next.set(GamePhase::CellWalk);
+    }
+}
+
+/// Escape returns from the walkable cell view to the orbital globe view.
+pub fn cell_walk_escape_system(
+    kb: Res<ButtonInput<KeyCode>>,
+    mut next: ResMut<NextState<GamePhase>>,
+) {
+    if kb.just_pressed(KeyCode::Escape) {
+        next.set(GamePhase::GlobeView);
+    }
+}
+
 /// Set up the globe view — spawn globe, camera, lights, stars, and data markers.
 pub fn setup_globe_view(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut holo_materials: ResMut<Assets<sol_atlas_bevy::holographic_material::HolographicMaterial>>,
+    mut cloud_materials: ResMut<Assets<sol_atlas_bevy::clouds::CloudMaterial>>,
     asset_server: Res<AssetServer>,
     dungeon_cameras: Query<Entity, (With<Camera2d>, Without<OrbitalCamera>)>,
     hud_texts: Query<Entity, With<crate::systems::rendering::HudText>>,
@@ -299,8 +356,13 @@ pub fn setup_globe_view(
     let holo_globe =
         holo_materials.add(sol_atlas_bevy::holographic_material::HolographicMaterial {
             base: StandardMaterial {
-                base_color: Color::linear_rgba(0.15, 0.22, 0.28, 0.5),
-                base_color_texture: Some(earth_texture),
+                // Brightened from (0.15, 0.22, 0.28, 0.5) — combined with
+                // the old fresnel-gated shader alpha, that near-black tint
+                // crushed the actual continent/ocean texture to
+                // near-invisible everywhere except the grazing silhouette
+                // edge. Still teal-tinted, but the real texture now reads.
+                base_color: Color::linear_rgba(0.55, 0.68, 0.72, 0.9),
+                base_color_texture: Some(earth_texture.clone()),
                 emissive: LinearRgba::new(4.0, 3.0, 1.5, 1.0), // strong glow — city lights visible through hologram
                 emissive_texture: Some(night_texture), // city lights glow through holographic transparency
                 alpha_mode: AlphaMode::Blend,
@@ -313,7 +375,13 @@ pub fn setup_globe_view(
                 fresnel_power: 3.0,
                 scanline_speed: 0.5,
                 scanline_density: 20.0,
-                hologram_alpha: 0.55,
+                hologram_alpha: 0.9,
+                // Bright glowing coastline outline — legible landmass
+                // boundaries independent of the tinted base texture color.
+                outline_color: LinearRgba::new(0.3, 1.0, 0.85, 1.0),
+                outline_intensity: 1.4,
+                outline_threshold: 0.12,
+                surface_texture: earth_texture,
                 ..default()
             },
         });
@@ -325,17 +393,30 @@ pub fn setup_globe_view(
         AtlasEntity,
     ));
 
-    // [1.5] Cloud layer — translucent atmosphere, rotates independently for parallax
+    // [1.5] Cloud layer — dual-layer parallax scroll, contrast-enhanced
+    // coverage, sun-facing silver-lining rim glow (see clouds.wgsl).
     let clouds_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64));
     let clouds_texture: Handle<Image> = asset_server.load("textures/earth-clouds.jpg");
-    let clouds_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.6, 0.7, 0.8, 0.15), // ghost clouds — barely visible in holographic mode
-        base_color_texture: Some(clouds_texture),
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        double_sided: true,
-        cull_mode: None,
-        ..default()
+    let clouds_material = cloud_materials.add(sol_atlas_bevy::clouds::CloudMaterial {
+        base: StandardMaterial {
+            alpha_mode: AlphaMode::Blend,
+            double_sided: true,
+            cull_mode: None,
+            unlit: false,
+            // Fully matte, zero specular reflectance — real clouds are a
+            // diffuse scattering medium, not shiny. Likely cause of the
+            // rapid "flashing": a sharp moving specular highlight sweeping
+            // across the cloud alpha-cutout pattern as the orbital camera
+            // slowly auto-rotates/drifts, only visible now that real GPU
+            // PBR lighting is actually running.
+            perceptual_roughness: 1.0,
+            reflectance: 0.0,
+            ..default()
+        },
+        extension: sol_atlas_bevy::clouds::CloudExtension {
+            settings: sol_atlas_bevy::clouds::CloudSettings::default(),
+            cloud_texture: clouds_texture,
+        },
     });
     commands.spawn((
         Mesh3d(clouds_mesh),
@@ -361,6 +442,7 @@ pub fn setup_globe_view(
         Mesh3d(grid_mesh),
         MeshMaterial3d(grid_material),
         Transform::IDENTITY,
+        GridLayer,
         AtlasEntity,
     ));
 
@@ -1294,7 +1376,21 @@ pub fn setup_globe_view(
 }
 
 /// Draw maglev corridor arcs using gizmos (immediate-mode, redrawn each frame).
-pub fn draw_arcs_system(atlas_data: Option<Res<AtlasData>>, mut gizmos: Gizmos, time: Res<Time>) {
+pub fn draw_arcs_system(
+    atlas_data: Option<Res<AtlasData>>,
+    mut gizmos: Gizmos,
+    time: Res<Time>,
+    view: Res<DataView>,
+) {
+    // Data-flow arcs (trades/TEND/maglev/supply/shipping) were previously
+    // drawn via immediate-mode gizmos unconditionally, regardless of
+    // DataView — they don't have a Visibility component like marker
+    // entities do, so the DataView::Off default didn't hide them. This is
+    // the actual fix for "I can still see the overlays".
+    if *view == DataView::Off {
+        return;
+    }
+
     let Some(atlas_data) = atlas_data else { return };
     let t = time.elapsed_secs();
 
@@ -1447,10 +1543,24 @@ pub fn draw_arcs_system(atlas_data: Option<Res<AtlasData>>, mut gizmos: Gizmos, 
             );
         }
     }
+}
 
-    // ═══ SPACE-TIME GRAVITY WELL GRID ══════════════════════════════
-    // Radial + concentric grid that dips into a funnel beneath the globe.
-    // y = base - k / (r² + ε) — space-time curvature visualization.
+/// Space-time gravity-well grid — radial + concentric funnel grid beneath
+/// the globe (y = base - k / (r² + ε), a curvature visualization). Was
+/// drawn unconditionally inside `draw_arcs_system` despite
+/// `OverlayManager::show_grid` existing specifically to gate it — the flag
+/// was set by `overlay_toggle_system` but nothing ever read it. Split into
+/// its own system so that field actually does something.
+pub fn draw_gravity_grid_system(
+    mut gizmos: Gizmos,
+    time: Res<Time>,
+    overlays: Res<OverlayManager>,
+) {
+    if !overlays.show_grid {
+        return;
+    }
+    let t = time.elapsed_secs();
+
     let base_y = -0.7;
     let gravity_k = 0.15;
     let epsilon = 0.3;
@@ -1671,6 +1781,7 @@ pub fn data_view_switch_system(
             *text = Text::new(view.label());
             // Color by view type
             let c = match *view {
+                DataView::Off => [0.4, 0.4, 0.45],
                 DataView::All => [0.5, 0.7, 0.8],
                 DataView::Energy => [1.0, 0.8, 0.2],
                 DataView::Climate => [0.9, 0.3, 0.2],
@@ -1848,6 +1959,7 @@ pub fn aesthetic_apply_system(
                 mat.extension.hologram_alpha = 1.0;
                 mat.extension.fresnel_power = 2.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.3, 0.5, 0.8, 1.0);
+                mat.extension.outline_intensity = 0.0; // real photo texture — no need for a vector outline
                 mat.base.unlit = false; // enable PBR lighting
             }
             sol_atlas_core::aesthetics::Aesthetic::Night => {
@@ -1856,6 +1968,7 @@ pub fn aesthetic_apply_system(
                 mat.extension.scanline_density = 10.0;
                 mat.extension.fresnel_power = 2.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.1, 0.15, 0.3, 1.0);
+                mat.extension.outline_intensity = 0.0;
                 mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Minimal => {
@@ -1863,6 +1976,10 @@ pub fn aesthetic_apply_system(
                 mat.extension.hologram_alpha = 0.3;
                 mat.extension.fresnel_power = 4.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.2, 0.3, 0.4, 1.0);
+                // "Minimal" is billed as coastline-outlines-only — a good
+                // future candidate for this effect too, but out of scope
+                // for the current ask (fixing Holographic specifically).
+                mat.extension.outline_intensity = 0.0;
                 mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Procedural => {
@@ -1871,16 +1988,24 @@ pub fn aesthetic_apply_system(
                 mat.extension.scanline_density = 12.0;
                 mat.extension.fresnel_power = 3.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.0, 0.87, 1.0, 1.0);
+                mat.extension.outline_intensity = 0.0;
                 mat.base.unlit = true;
             }
             sol_atlas_core::aesthetics::Aesthetic::Holographic => {
-                // Full holographic effects — see-through globe
+                // Full holographic effects. hologram_alpha was 0.35 — with
+                // the old fresnel-gated shader alpha that crushed the
+                // visible landmass to near-nothing face-on; now that the
+                // shader alpha isn't fresnel-gated, keep it high enough
+                // that continents actually read.
                 mat.extension.enable_holographic = 1.0;
-                mat.extension.hologram_alpha = 0.35; // more transparent — see far side
+                mat.extension.hologram_alpha = 0.9;
                 mat.extension.scanline_density = 20.0;
                 mat.extension.scanline_speed = 0.5;
                 mat.extension.fresnel_power = 3.0;
                 mat.extension.fresnel_color = LinearRgba::new(0.0, 0.87, 1.0, 1.0);
+                mat.extension.outline_color = LinearRgba::new(0.3, 1.0, 0.85, 1.0);
+                mat.extension.outline_intensity = 1.4;
+                mat.extension.outline_threshold = 0.12;
                 mat.base.unlit = true;
             }
         }
