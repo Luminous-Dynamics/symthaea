@@ -10,7 +10,10 @@ pub enum PlatformType {
     Quadrotor,
     /// Autonomous car (3 actuators: steering, throttle, brake).
     Vehicle,
-    /// Bipedal humanoid (64 DOF FullSpine core).
+    /// Bipedal humanoid (21 DOF Dmc21 default morphology; symthaea-humanoid
+    /// also supports Dexterous53 (53) and FullSpine (64) variants, which this
+    /// single enum variant cannot represent — `num_actuators()` reflects the
+    /// crate's actual default, not the maximum-dexterity configuration).
     Humanoid,
     /// Autonomous underwater vehicle (8 thrusters).
     Auv,
@@ -39,12 +42,19 @@ impl PlatformType {
     ///
     /// Values sourced from each `symthaea-<platform>` crate's `NUM_ACTUATORS`
     /// constant (or equivalent). Update here AND in the symthaea crate when
-    /// changing actuator counts.
+    /// changing actuator counts. For Humanoid specifically, this must track
+    /// `symthaea_humanoid::types::NUM_ACTUATORS` / `HumanoidConfig::default()`
+    /// (currently `HumanoidMorphology::Dmc21`), not the highest-DOF variant.
+    /// Found diverged 2026-07-03 (this said 64/FullSpine; the real default is
+    /// 21/Dmc21) — this crate is deliberately permissively-licensed and thin
+    /// (no symthaea platform deps), so there is no automated parity check
+    /// against symthaea-humanoid here; re-verify by hand when either side's
+    /// default morphology changes.
     pub fn num_actuators(&self) -> usize {
         match self {
             Self::Quadrotor => 4,
             Self::Vehicle => 3,
-            Self::Humanoid => 64, // Upgraded to Flagship 64-DOF FullSpine
+            Self::Humanoid => 21, // Dmc21 default morphology (symthaea_humanoid::types::NUM_ACTUATORS)
             Self::Auv => 8,
             Self::Helicopter => 6,
             Self::Manipulator => 8,
