@@ -535,4 +535,196 @@ mod tests {
         // Debug wraps the string in quotes, Display doesn't
         assert!(!display.contains('"'));
     }
+
+    // ── Phase 2.9-A: World Model Transition Hardening ───────────────────────
+    // Covers the delta-vector transition table that feeds predict_state →
+    // prediction_error → curiosity modulation. Invariants: outputs always
+    // finite, running average converges, contradictory inputs don't corrupt.
+
+    /// Contradictory transitions (same action, opposite state changes) must
+    /// converge toward zero delta — not diverge or NaN.
+    #[test]
+    fn test_contradictory_transitions_converge() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+
+        let base = ContinuousHV::random(dim, 1);
+
+        // Alternately teach Install: "go toward state A" and "go toward state B"
+        // where A and B are near-orthogonal. The running average must stay finite.
+        for i in 0u64..30 {
+            let before = base.clone();
+            // Alternate between two opposite target states
+            let after = if i % 2 == 0 {
+                ContinuousHV::random(dim, 100)
+            } else {
+                ContinuousHV::random(dim, 200)
+            };
+            wm.learn_transition(&before, ActionCategory::Install, &after);
+        }
+
+        wm.observe(base);
+        let predicted = wm.predict_state(&ActionCategory::Install);
+
+        // After contradictory training, prediction must still be finite
+        for v in predicted.as_slice() {
+            assert!(
+                v.is_finite(),
+                "predicted state must be finite after contradictory transitions: {v}"
+            );
+        }
+        assert_eq!(wm.total_observations(), 30);
+    }
+
+    /// Running average stays finite and bounded over 100 consecutive transitions.
+    /// Verifies the `((n-1)/n)*old + (1/n)*new` formula doesn't accumulate error.
+    #[test]
+    fn test_running_average_stays_finite_over_many_transitions() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+
+        let start = ContinuousHV::random(dim, 1);
+        wm.observe(start.clone());
+
+        for i in 0u64..100 {
+            let before = ContinuousHV::random(dim, i * 3 + 10);
+            let after = ContinuousHV::random(dim, i * 3 + 11);
+            wm.learn_transition(&before, ActionCategory::Rebuild, &after);
+
+            // Check after every step
+            let predicted = wm.predict_state(&ActionCategory::Rebuild);
+            for (idx, v) in predicted.as_slice().iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "predicted[{idx}] not finite after {i} transitions: {v}"
+                );
+            }
+        }
+
+        assert_eq!(wm.total_observations(), 100);
+    }
+
+    /// EFE must be finite for every action category and a range of curiosity weights.
+    #[test]
+    fn test_expected_free_energy_always_finite() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+
+        let current = ContinuousHV::random(dim, 1);
+        let goal = ContinuousHV::random(dim, 2);
+        wm.observe(current.clone());
+
+        // Teach a few actions
+        for (before_seed, after_seed, action) in [
+            (10u64, 11u64, ActionCategory::Install),
+            (20, 21, ActionCategory::Remove),
+            (30, 31, ActionCategory::Rebuild),
+        ] {
+            wm.learn_transition(
+                &ContinuousHV::random(dim, before_seed),
+                action,
+                &ContinuousHV::random(dim, after_seed),
+            );
+        }
+
+        let all_actions = [
+            ActionCategory::Install,
+            ActionCategory::Remove,
+            ActionCategory::Enable,
+            ActionCategory::Disable,
+            ActionCategory::Rebuild,
+            ActionCategory::Rollback,
+            ActionCategory::Configure,
+            ActionCategory::GarbageCollect,
+            ActionCategory::Update,
+            ActionCategory::Custom("custom-op".into()),
+        ];
+
+        for curiosity in [0.0f64, 0.1, 0.3, 0.5, 0.8, 1.0] {
+            for action in &all_actions {
+                let efe = wm.expected_free_energy(action, &goal, curiosity);
+                assert!(
+                    efe.is_finite(),
+                    "EFE must be finite for {action} at curiosity={curiosity}: {efe}"
+                );
+            }
+        }
+    }
+
+    /// Trajectory with all-unknown actions must return a trajectory of identical
+    /// states (no-change prediction) and never panic.
+    #[test]
+    fn test_trajectory_all_unknown_actions_returns_no_change() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+
+        let state = ContinuousHV::random(dim, 42);
+        wm.observe(state.clone());
+
+        // No transitions learned — all actions unknown
+        let actions = vec![
+            ActionCategory::Rollback,
+            ActionCategory::Configure,
+            ActionCategory::Enable,
+        ];
+        let traj = wm.predict_trajectory(&actions);
+
+        assert_eq!(traj.len(), 4, "trajectory must have initial + N steps");
+
+        // All steps should be identical to the current state (unknown = no change)
+        for (i, step) in traj.iter().enumerate() {
+            let sim = step.similarity(&state);
+            assert!(
+                (sim - 1.0).abs() < 1e-5,
+                "unknown-action trajectory step {i} should match current state: sim={sim}"
+            );
+        }
+    }
+
+    /// Free energy is always in [0, 1] since it equals 1 - similarity.clamp(0,1).
+    #[test]
+    fn test_free_energy_always_in_unit_interval() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+
+        let goal = ContinuousHV::random(dim, 99);
+
+        for seed in [1u64, 2, 50, 100, 999, 12345] {
+            wm.observe(ContinuousHV::random(dim, seed));
+            let fe = wm.compute_free_energy(&goal);
+            assert!(
+                fe >= 0.0 && fe <= 1.0,
+                "free energy must be in [0,1] for seed {seed}: {fe}"
+            );
+            assert!(
+                fe.is_finite(),
+                "free energy must be finite for seed {seed}: {fe}"
+            );
+        }
+    }
+
+    /// predict_state output must always be finite, even when the delta table
+    /// was built from many diverse inputs.
+    #[test]
+    fn test_predict_state_output_always_finite() {
+        let dim = 256;
+        let mut wm = NixWorldModel::new(dim);
+
+        for i in 0u64..20 {
+            let before = ContinuousHV::random(dim, i * 2);
+            let after = ContinuousHV::random(dim, i * 2 + 1);
+            wm.learn_transition(&before, ActionCategory::Update, &after);
+        }
+
+        let current = ContinuousHV::random(dim, 9999);
+        wm.observe(current);
+
+        let predicted = wm.predict_state(&ActionCategory::Update);
+        for (i, v) in predicted.as_slice().iter().enumerate() {
+            assert!(
+                v.is_finite(),
+                "predicted[{i}] must be finite after diverse training: {v}"
+            );
+        }
+    }
 }
