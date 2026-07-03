@@ -480,6 +480,13 @@ mod tests {
         app.add_plugins(bevy::gizmos::GizmoPlugin);
         app.init_asset::<Mesh>();
         app.init_asset::<StandardMaterial>();
+        // setup_world_3d loads a texture via AssetServer; needs Assets<Image>
+        // registered even though we never add the full ImagePlugin here.
+        app.init_asset::<bevy::image::Image>();
+        // Bevy 0.19's GizmoPlugin added draw_skinned_mesh_bounds, which
+        // unconditionally reads Assets<SkinnedMeshInverseBindposes> — normally
+        // registered by the full mesh/PBR plugin stack we don't add here.
+        app.init_asset::<bevy::mesh::skinning::SkinnedMeshInverseBindposes>();
 
         // Add SymtropyPlugin
         app.add_plugins(SymtropyPlugin);
