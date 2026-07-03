@@ -78,4 +78,13 @@ All zomes in this project already configure this, but you must set it in your en
 
 ## License
 
-Mycelix is licensed under Apache-2.0. By submitting a pull request, you agree that your contributions will be licensed under the same terms.
+Mycelix is licensed under the GNU Affero General Public License v3.0 or later
+(AGPL-3.0-or-later). By submitting a pull request, you agree that your
+contributions will be licensed under the same terms.
+
+A separate commercial license is available for organizations that need to
+run a modified version as a closed network service or embed this code in a
+closed-source product without releasing their changes under the AGPL. See
+`COMMERCIAL_LICENSE.md` at the repository root for details — this only
+affects downstream users/licensees, not contributors submitting PRs under
+the AGPL.

@@ -53,10 +53,17 @@ mycelix-workspace/
 
 ## Core Concepts
 
-### MATL (45% Byzantine Tolerance)
+### MATL (Mycelix Adaptive Trust Layer)
 ```
 Composite = 0.4·PoGQ + 0.3·Consistency + 0.3·Reputation
 ```
+45% is the theoretical ceiling of this composite formula under worst-case
+adversary assumptions, not an empirical result. The **empirically validated**
+figure (mycelix-core/0TML federated-learning benchmarks) is **34% Byzantine
+tolerance** (exceeds the classical 33% single-round-consensus limit) — see
+`mycelix-core/CLAUDE.md` and `sdk/src/lib.rs`. Cite 34% when describing
+tested behavior; 45% only when explicitly describing the formula's design
+ceiling.
 
 ### Epistemic Charter (E-N-M)
 - **E (Empirical)**: E0-E4 (Subjective → Publicly Reproducible)
@@ -124,7 +131,7 @@ hc dna pack .
 | Mycelix-Core | 62 | Verified |
 | DeSci | 141 | Verified |
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
-| TypeScript SDK | 6,650 pass / 196 skip | All pass, types aligned to Rust serde values (2026-02-14) |
+| TypeScript SDK | 8,743 pass / 215 skip / 20 todo (8,979 total) | Re-verified 2026-07-03 via `npx vitest run`; supersedes the 2026-02-14 count below, which was stale by ~2,300 tests as the suite grew |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
 | Commons cluster workspace | 5,276 | `cargo test --workspace` total. Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation + DoS hardening + link tag validation + delete auth + update bypass fix across all 39 zomes (includes mesh-time, resource-mesh) |
 | Civic cluster workspace | 2,273 | `cargo test --workspace` total. Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + audit trail + integrity validation + DoS hardening + link tag validation across all 16 zomes |

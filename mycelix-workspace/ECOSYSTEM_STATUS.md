@@ -1,6 +1,11 @@
 # Mycelix Ecosystem Status
 
-**Last verified**: 2026-03-18
+**Last verified**: 2026-03-18 (STALE — predates the 2026-07-02 cluster
+reorganization into `mycelix-workspace/mycelix-*/`; several entries below
+describe pre-migration state, e.g. clusters listed here as "scaffolded" are
+built with full test suites per `mycelix-workspace/CLAUDE.md`'s hApp Status
+table, which is the more current source. Treat the table below as historical
+until re-verified.)
 **Holochain**: 0.6.0 | **HDK**: 0.6.0 | **HDI**: 0.7.0
 
 ## hApp Bundle Status
@@ -69,7 +74,7 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 
 | hApp | Zomes | Tests | Notes |
 |------|-------|-------|-------|
-| **Core (0TML)** | 6 (agents, bridge, dkg, epistemic_storage, federated_learning, pogq_validation) | 62 verified | 45% BFT validated. REST API implemented (4 endpoints: /health, /status, /trust/{id}, /pogq/validate). Python coordinator + Rust zomes. |
+| **Core (0TML)** | 6 (agents, bridge, dkg, epistemic_storage, federated_learning, pogq_validation) | 62 verified | 34% BFT validated (empirical; exceeds classical 33% limit — see `mycelix-core/CLAUDE.md`). 45% is the MATL formula's theoretical ceiling, not yet empirically matched. REST API implemented (4 endpoints: /health, /status, /trust/{id}, /pogq/validate). Python coordinator + Rust zomes. |
 | **Mail** | 12 | Submodule tests | PQC encryption, decentralized email. Most complete hApp. |
 | **DeSci** | N/A (REST API) | 141 verified | Axum service, **not a Holochain hApp**. CLI + REST. |
 

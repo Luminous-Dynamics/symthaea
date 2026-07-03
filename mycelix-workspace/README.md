@@ -19,7 +19,7 @@ mycelix-workspace/
 │   ├── mycelix-zome-helpers/ # Shared Holochain zome utilities
 │   └── sweettest-harness/   # Integration test harness for sweettests
 ├── sdk/             # Rust SDK for Mycelix integration
-├── sdk-ts/          # TypeScript SDK (37 modules, ~226K LOC, 6,316 tests)
+├── sdk-ts/          # TypeScript SDK (37 modules, ~226K LOC, 8,979 tests)
 ├── sdk-python/      # Python SDK
 ├── sdk-wasm/        # WebAssembly SDK
 ├── dashboard/       # React/Vite web dashboard
@@ -30,7 +30,10 @@ mycelix-workspace/
 
 ## Ecosystem
 
-This workspace orchestrates 25 domain-specific clusters:
+This workspace orchestrates the domain-specific clusters below (count varies
+by source across this repo's docs, from ~16 to 25, depending on whether
+frontier/beta clusters are included — see `mycelix-workspace/CLAUDE.md`'s
+hApp Status table for the current authoritative per-cluster breakdown):
 
 | Tier | Clusters |
 |------|----------|
@@ -52,7 +55,7 @@ The `mycelix-fl-core` crate implements Byzantine-resilient federated learning th
 ## SDKs
 
 - **Rust** (`sdk/`): 18 modules, ~50K LOC, 1,036+ tests
-- **TypeScript** (`sdk-ts/`): 37 modules, ~226K LOC, 6,316 tests
+- **TypeScript** (`sdk-ts/`): 37 modules, ~226K LOC, 8,979 tests (verified 2026-07-03)
 - **Python** (`sdk-python/`): Bindings for data science workflows
 - **WASM** (`sdk-wasm/`): Browser-compatible Mycelix client
 

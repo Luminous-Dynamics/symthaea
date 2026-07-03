@@ -15,15 +15,15 @@
 use civic_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, dispatch_constellation_call, needs_refresh,
-    resolve_civic_zome, routing_registry, AuditTrailEntry, AuditTrailQuery, AuditTrailResult,
-    BridgeDomain, BridgeHealth, ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
-    ConstellationTarget, CrossClusterDispatchInput, CrossClusterRole, DispatchInput,
-    DispatchResult, EmergencyCareQuery, EmergencyCareResult, EmergencyFoodQuery,
-    EmergencyFoodResult, EventTypeQuery, FactcheckStatusQuery, FactcheckStatusResult,
-    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult, JusticeAreaQuery,
-    JusticeAreaResult, ResolveQueryInput, ShelterCapacityQuery, ShelterCapacityResult,
-    WaterSafetyQuery, WaterSafetyResult, RATE_LIMIT_WINDOW_SECS,
+    self as bridge, AuditTrailEntry, AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth,
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, ConstellationTarget,
+    CrossClusterDispatchInput, CrossClusterRole, DispatchInput, DispatchResult, EmergencyCareQuery,
+    EmergencyCareResult, EmergencyFoodQuery, EmergencyFoodResult, EventTypeQuery,
+    FactcheckStatusQuery, FactcheckStatusResult, GateAuditInput, GovernanceAuditFilter,
+    GovernanceAuditResult, JusticeAreaQuery, JusticeAreaResult, RATE_LIMIT_WINDOW_SECS,
+    ResolveQueryInput, ShelterCapacityQuery, ShelterCapacityResult, WaterSafetyQuery,
+    WaterSafetyResult, check_rate_limit_count, dispatch_constellation_call, needs_refresh,
+    resolve_civic_zome, routing_registry,
 };
 use mycelix_zome_helpers as _;
 
@@ -38,13 +38,11 @@ use mycelix_zome_helpers as _;
 /// 3. If no remote exists, returns Internal("identity") to trigger standard failure path.
 fn get_identity_target() -> ConstellationTarget {
     // 1. Check for simulation target first (for sweettest)
-    if let Ok(links) = get_links(
-        LinkQuery::try_new(
-            agent_info().unwrap().agent_initial_pubkey,
-            LinkTypes::GateAudit,
-        )
-        .unwrap(),
-    ) {
+    let simulation_links = agent_info()
+        .ok()
+        .and_then(|info| LinkQuery::try_new(info.agent_initial_pubkey, LinkTypes::GateAudit).ok())
+        .and_then(|query| get_links(query).ok());
+    if let Some(links) = simulation_links {
         for link in links {
             if let Some(target_str) = link.tag.to_string().ok() {
                 if let Ok(agent) = AgentPubKey::from_b64_str(&target_str) {
@@ -819,16 +817,14 @@ pub fn query_property_for_enforcement(
     };
 
     match bridge::dispatch_call_cross_cluster_commons(&dispatch, ALLOWED_COMMONS_ZOMES) {
-        Ok(result) if result.success => {
-            Ok(PropertyEnforcementResult {
-                property_found: true,
-                enforcement_advisory: Some(format!(
-                    "Property '{}' is in the commons registry — case '{}' enforcement may proceed after verification",
-                    input.property_id, input.case_id
-                )),
-                error: None,
-            })
-        }
+        Ok(result) if result.success => Ok(PropertyEnforcementResult {
+            property_found: true,
+            enforcement_advisory: Some(format!(
+                "Property '{}' is in the commons registry — case '{}' enforcement may proceed after verification",
+                input.property_id, input.case_id
+            )),
+            error: None,
+        }),
         Ok(result) => Ok(PropertyEnforcementResult {
             property_found: false,
             enforcement_advisory: None,
@@ -3070,11 +3066,12 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let r2: CareCredentialVerifyResult = serde_json::from_str(&json).unwrap();
         assert!(!r2.commons_reachable);
-        assert!(r2
-            .error
-            .as_ref()
-            .unwrap()
-            .contains("OtherRole not installed"));
+        assert!(
+            r2.error
+                .as_ref()
+                .unwrap()
+                .contains("OtherRole not installed")
+        );
     }
 
     // ========================================================================

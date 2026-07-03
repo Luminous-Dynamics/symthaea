@@ -14,7 +14,7 @@ use identity_bridge_integrity::*;
 use mycelix_bridge_common::consciousness_profile::{
     ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
 };
-use mycelix_bridge_common::{check_rate_limit_count, RATE_LIMIT_WINDOW_SECS};
+use mycelix_bridge_common::{RATE_LIMIT_WINDOW_SECS, check_rate_limit_count};
 use mycelix_zome_helpers as _;
 
 /// Substrate registration metadata.
@@ -199,7 +199,10 @@ pub fn verify_tier_remote(input: VerifyTierInput) -> ExternResult<ConsciousnessT
     }
 
     if moral_resonance < min_threshold {
-        debug!("Contextual Moral Gating Triggered for {}: Score {:.2} < {:.2}. Downgrading to Observer.", did, moral_resonance, min_threshold);
+        debug!(
+            "Contextual Moral Gating Triggered for {}: Score {:.2} < {:.2}. Downgrading to Observer.",
+            did, moral_resonance, min_threshold
+        );
         Ok(ConsciousnessTier::Observer)
     } else {
         Ok(tier)
@@ -236,10 +239,10 @@ fn get_moral_resonance_score(did: &str) -> ExternResult<f64> {
     let prediction_error = get_predicted_entropy(did).unwrap_or(0.1);
 
     for link in links {
-        if let Some(record) = get(
-            ActionHash::try_from(link.target).unwrap(),
-            GetOptions::default(),
-        )? {
+        let Ok(action_hash) = ActionHash::try_from(link.target) else {
+            continue;
+        };
+        if let Some(record) = get(action_hash, GetOptions::default())? {
             if let Some(rep) = record
                 .entry()
                 .to_app_option::<IdentityReputation>()
