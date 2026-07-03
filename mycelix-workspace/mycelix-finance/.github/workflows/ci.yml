@@ -128,7 +128,7 @@ jobs:
       - name: Run integration tests
         run: |
           nix develop --command bash -c "
-            cd tests && cargo test --features integration
+            cd tests && cargo test --features integration -- --include-ignored --test-threads=1
           "
 
   security-audit:

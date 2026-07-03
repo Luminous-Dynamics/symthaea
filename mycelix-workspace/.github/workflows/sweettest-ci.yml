@@ -1,3 +1,14 @@
+# NOTE ON WHERE THIS FILE ACTUALLY RUNS:
+# This file lives at mycelix-workspace/.github/workflows/ in the private
+# monorepo. mycelix-workspace/scripts/sync-to-standalone.sh syncs the whole
+# mycelix-workspace/ directory into the public repo as a SUBDIRECTORY
+# (standalone-repo/mycelix-workspace/.github/workflows/...) — GitHub Actions
+# only executes workflows found at a repo's ROOT .github/workflows/, so as
+# currently synced this file does not run in CI anywhere. The public repo's
+# root .github/workflows/ is intentionally excluded from sync (hand-maintained
+# there per the sync script) — if the intent is for this workflow to be live,
+# copy it manually into the standalone repo's root .github/workflows/ (or fix
+# the sync script to publish it there) rather than assuming it already runs.
 name: Mycelix Sweettest CI
 
 on:
@@ -152,11 +163,16 @@ jobs:
           RUST_LOG: warn
 
   # ── Commons Cluster Unit Tests ─────────────────────────────────
+  # Unlike the sweettest jobs below (which need a WASM build + a live
+  # multi-conductor setup and stay push/dispatch-only for cost), these are
+  # plain `cargo test --workspace` — cheap enough to run on every PR, and an
+  # external PR should get real compile+test signal, not just cargo-deny.
   commons-unit-tests:
     name: Commons Cluster Unit Tests (5,276 tests)
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     timeout-minutes: 60
     steps:
@@ -189,6 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     timeout-minutes: 45
     steps:
@@ -221,6 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     timeout-minutes: 45
     steps:
