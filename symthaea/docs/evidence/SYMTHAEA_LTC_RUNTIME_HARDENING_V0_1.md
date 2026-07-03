@@ -117,3 +117,54 @@ Commit: `a99a947255` — `symthaea-nix: Phase 2.8 — causal graph and drift det
 > **Not verified:** causal discovery correctness (the PC-algorithm
 > approximation in `CausalDiscoveryEngine`). Not verified: drift
 > thresholds are tuned correctly for production sensor data.
+
+## Phase 2.9 — World Model Hardening + End-to-End Integration
+
+### Phase 2.9-A: World Model Transition Table (`world_model.rs`)
+
+| Test | What It Proves |
+|---|---|
+| `test_contradictory_transitions_converge` | 30 alternating Install transitions stay finite |
+| `test_running_average_stays_finite_over_many_transitions` | 100 Rebuild steps, checked after every step |
+| `test_expected_free_energy_always_finite` | 10 action categories × 6 curiosity weights = 60 EFE checks |
+| `test_trajectory_all_unknown_actions_returns_no_change` | 3 unknown actions → trajectory = current state |
+| `test_free_energy_always_in_unit_interval` | 6 seeds, `fe` always in [0, 1] |
+| `test_predict_state_output_always_finite` | 20 diverse Update transitions, output stays finite |
+
+### Phase 2.9-C: End-to-End Cross-Layer Integration Harness
+
+**File:** `tests/sensor_drift_causal_action_integration.rs`
+
+This is the first test to exercise all four hardened layers together in a
+single verifiable scenario:
+
+```
+sensor observation
+     ↓  HdcWorldModel::observe / detect_drift    (Phase 2.8)
+     ↓  NixCausalGraph::predict_side_effects     (Phase 2.8)
+     ↓  NixWorldModel::predict_state / EFE       (Phase 2.9-A)
+     ↓  NixActiveInference::learn_from_outcome   (Phase 2.7)
+```
+
+| Test | Scenario |
+|---|---|
+| `test_integration_normal_operation_no_drift_stable_curiosity` | Healthy sensor: no drift, finite EFE, curiosity ≤ initial |
+| `test_integration_sensor_shift_propagates_safely` | Orthogonal shift: drift detected, edge weakens, EFE finite, curiosity in (0.3, 0.8] |
+| `test_integration_missing_sensor_graceful_degradation` | No sensor data: zero-state finite, empty causal effects, plan still produced |
+| `test_integration_multi_step_learning_loop_stays_bounded` | 5 cycles: all values in [0,1], curiosity in [0.1, 0.8] throughout |
+
+### Result
+
+778 passing tests; 1 pre-existing failure (`test_greeting_acknowledges_hardware`,
+out of scope — sovereign conversation hardware-profile test, not introduced here).
+
+Commit: `a88fafaeab` — `symthaea-nix: Phase 2.9 — world model hardening + end-to-end integration harness`
+
+### Precise Verification Boundary
+
+> **Verified:** the four hardened layers compose safely for the defined
+> scenarios. No value escapes its declared range [0,1] across the full
+> sensor→drift→causal→action chain for any of the four scenarios.
+>
+> **Not verified:** real sensor data distributions, hardware-specific
+> timing, or concurrent multi-agent operation.
