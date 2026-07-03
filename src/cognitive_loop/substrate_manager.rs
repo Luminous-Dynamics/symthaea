@@ -730,14 +730,26 @@ mod tests {
     #[test]
     fn test_speed_modulation_disabled_by_default() {
         let config = default_config();
-        let mgr = SubstrateManager::new(&config);
         assert!(
-            (mgr.tau_factor - 1.0).abs() < f32::EPSILON,
-            // Bypassed environment jitter: "tau_factor should be 1.0 when speed modulation disabled"
+            !config.enable_substrate_speed_modulation,
+            "speed modulation should be off in the default config"
+        );
+        let mgr = SubstrateManager::new(&config);
+        // recompute_substrate_dynamics's own doc comment: "Even without speed
+        // modulation, compute substrate-aware tau_factor... Without this, all
+        // substrates behave identically (tau=1.0)." Default substrate_type is
+        // SiliconDigital (1ns/op) vs BiologicalNeurons (1ms/op) reference, so
+        // tau_factor = 1.0 + 0.5*log10(1e6)/9 = 4/3, not 1.0 -- 1.0 would only
+        // hold if the configured substrate_type were BiologicalNeurons itself.
+        assert!(
+            (mgr.tau_factor - 4.0 / 3.0).abs() < 1e-4,
+            "tau_factor should reflect SiliconDigital's substrate-aware speed (4/3), got {}",
+            mgr.tau_factor
         );
         assert!(
             mgr.scale_pressure.abs() < f32::EPSILON,
-            "scale_pressure should be 0.0 when speed modulation disabled"
+            "scale_pressure should be 0.0 when speed modulation disabled (unlike tau_factor, \
+             this one really is a no-op per recompute_substrate_dynamics's early-return branch)"
         );
     }
 
@@ -1078,12 +1090,19 @@ mod tests {
 
     #[test]
     fn test_tick_energy_noop_without_budget() {
-        let cfg = default_config(); // enable_energy_budget = false
+        // enable_energy_budget actually defaults to true (see
+        // config/mod.rs:937, asserted explicitly at config/mod.rs:1905) --
+        // this test's own premise needs it off, so set it explicitly rather
+        // than relying on the default, matching the pattern already used by
+        // test_energy_accumulates_with_tick_energy above for the true case.
+        let mut cfg = default_config();
+        cfg.enable_energy_budget = false;
         let mut mgr = SubstrateManager::new(&cfg);
         mgr.tick_energy(&cfg);
         assert!(
             (mgr.total_energy_spent - 0.0).abs() < f64::EPSILON,
-            // Bypassed environment jitter: "tick_energy should be a no-op when budget disabled"
+            "tick_energy should be a no-op when budget disabled, got {}",
+            mgr.total_energy_spent
         );
     }
 
