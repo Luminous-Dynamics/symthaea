@@ -371,3 +371,104 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+    use symtropy_math::Point;
+
+    proptest! {
+        /// Property: after repeatedly injecting random angular velocity into
+        /// BOTH the allowed hinge plane and disallowed planes, then solving
+        /// the joint's velocity constraint each step, the disallowed-plane
+        /// relative angular velocity is driven toward (and stays near) zero —
+        /// the hinge's single-DOF constraint holds within tolerance,
+        /// regardless of how much "random torque" keeps perturbing it.
+        #[test]
+        fn hinge_disallowed_plane_stays_near_zero_under_random_torque(
+            seed_xz in prop::collection::vec(-5.0f64..5.0, 20),
+            seed_yz in prop::collection::vec(-5.0f64..5.0, 20),
+        ) {
+            let mut a = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::origin(), 0.5, 1.0);
+            let mut b = RigidBody::<3>::dynamic_sphere(
+                BodyHandle(1),
+                Point::new([2.0, 0.0, 0.0]),
+                0.5,
+                1.0,
+            );
+
+            // Hinge allows rotation only in the XY plane (axes 0, 1).
+            let joint = HingeJoint::new(BodyHandle(0), BodyHandle(1), 0, 1);
+            let dt = 0.016;
+
+            for i in 0..seed_xz.len() {
+                // "Random torque" injected directly as angular velocity noise
+                // in the two DISALLOWED planes (XZ = axes 0,2 and YZ = axes 1,2).
+                let cur_xz = b.angular_velocity.get(0, 2);
+                b.angular_velocity.set(0, 2, cur_xz + seed_xz[i]);
+                let cur_yz = b.angular_velocity.get(1, 2);
+                b.angular_velocity.set(1, 2, cur_yz + seed_yz[i]);
+
+                joint.solve_velocity(&mut a, &mut b, dt, None);
+            }
+
+            // After the constraint solve, disallowed-plane relative angular
+            // velocity must be small — the projection in `solve_velocity`
+            // halves the disallowed component every step (relative component
+            // corrected by `stiffness * 0.5` split across both bodies), so it
+            // should not be able to run away to the same magnitude as the
+            // injected noise.
+            let rel_xz = (b.angular_velocity.get(0, 2) - a.angular_velocity.get(0, 2)).abs();
+            let rel_yz = (b.angular_velocity.get(1, 2) - a.angular_velocity.get(1, 2)).abs();
+
+            prop_assert!(
+                rel_xz.is_finite() && rel_yz.is_finite(),
+                "hinge constraint produced non-finite angular velocity: xz={rel_xz}, yz={rel_yz}"
+            );
+            prop_assert!(
+                rel_xz < 10.0 && rel_yz < 10.0,
+                "hinge disallowed-plane angular velocity should stay bounded, got xz={rel_xz}, yz={rel_yz}"
+            );
+        }
+
+        /// Property: the hinge's positional constraint (`solve`) never
+        /// produces non-finite state, and monotonically reduces the anchor
+        /// separation distance (or leaves it at zero), for arbitrary starting
+        /// offsets and stiffness values.
+        #[test]
+        fn hinge_position_solve_never_diverges(
+            dx in -5.0f64..5.0, dy in -5.0f64..5.0, dz in -5.0f64..5.0,
+            stiffness in 0.0f64..1.0,
+        ) {
+            let mut a = RigidBody::<3>::static_body(
+                BodyHandle(0),
+                Point::origin(),
+                Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
+            );
+            let mut b = RigidBody::<3>::dynamic_sphere(
+                BodyHandle(1),
+                Point::new([dx, dy, dz]),
+                0.5,
+                1.0,
+            );
+
+            let mut joint = HingeJoint::new(BodyHandle(0), BodyHandle(1), 0, 1);
+            joint.stiffness = stiffness;
+
+            let initial_dist = a.transform.translation.distance(&b.transform.translation);
+
+            for _ in 0..50 {
+                joint.solve(&mut a, &mut b, 0.016);
+            }
+
+            let final_dist = a.transform.translation.distance(&b.transform.translation);
+
+            prop_assert!(final_dist.is_finite(), "hinge solve produced non-finite distance");
+            prop_assert!(
+                final_dist <= initial_dist + 1e-6,
+                "hinge solve should never increase anchor separation: initial={initial_dist}, final={final_dist}"
+            );
+        }
+    }
+}

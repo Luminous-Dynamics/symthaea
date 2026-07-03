@@ -789,3 +789,121 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::gjk;
+    use arrayvec::ArrayVec;
+    use proptest::prelude::*;
+    use symtropy_math::{Point, Sphere};
+
+    proptest! {
+        /// EPA never panics and always returns a finite result on a genuinely
+        /// intersecting pair of spheres produced by real GJK output (not a
+        /// synthetic/degenerate simplex).
+        #[test]
+        fn epa_finite_on_real_gjk_intersection(
+            x in -3.0f64..3.0, y in -3.0f64..3.0, z in -3.0f64..3.0,
+            r in 0.3f64..3.0,
+        ) {
+            let a = Sphere::<3>::new(Point::origin(), r);
+            let b = Sphere::<3>::new(Point::origin(), r);
+            let pa: SVector<f64, 3> = SVector::zeros();
+            let pb = SVector::from([x, y, z]);
+
+            let gjk_result = gjk::intersects(&a, &pa, &b, &pb);
+            if gjk_result.intersecting {
+                let result = penetration(&a, &pa, &b, &pb, &gjk_result.simplex);
+                if let Some(epa) = result {
+                    prop_assert!(
+                        epa.normal.iter().all(|v| v.is_finite()),
+                        "EPA normal not finite: {:?}", epa.normal
+                    );
+                    prop_assert!(epa.depth.is_finite(), "EPA depth not finite: {}", epa.depth);
+                    // Small negative slack tolerated (numerical/EPA_TOLERANCE), but
+                    // never a large negative value that would flip contact direction.
+                    prop_assert!(epa.depth >= -1e-3, "EPA depth unexpectedly negative: {}", epa.depth);
+                }
+            }
+        }
+
+        /// EPA must never panic when handed a degenerate simplex (all points
+        /// coincident) — a pathological input that can arise if GJK terminates
+        /// early on numerically-degenerate geometry.
+        #[test]
+        fn epa_never_panics_on_coincident_point_simplex(
+            x in -20.0f64..20.0, y in -20.0f64..20.0, z in -20.0f64..20.0,
+        ) {
+            let a = Sphere::<3>::new(Point::origin(), 1.0);
+            let b = Sphere::<3>::new(Point::origin(), 1.0);
+            let pa: SVector<f64, 3> = SVector::zeros();
+            let pb = SVector::from([0.5, 0.0, 0.0]);
+
+            let point = SVector::from([x, y, z]);
+            let mut simplex: ArrayVec<SVector<f64, 3>, 5> = ArrayVec::new();
+            for _ in 0..4 {
+                simplex.push(point);
+            }
+
+            // Must not panic; if it returns a result, that result must be finite.
+            let result = penetration(&a, &pa, &b, &pb, &simplex);
+            if let Some(epa) = result {
+                prop_assert!(epa.normal.iter().all(|v| v.is_finite()));
+                prop_assert!(epa.depth.is_finite());
+            }
+        }
+
+        /// EPA must never panic on a collinear "simplex" (all points on a
+        /// single line through the origin) — a degenerate face/edge case with
+        /// zero enclosed volume/area.
+        #[test]
+        fn epa_never_panics_on_collinear_simplex(
+            t0 in -8.0f64..8.0, t1 in -8.0f64..8.0, t2 in -8.0f64..8.0, t3 in -8.0f64..8.0,
+        ) {
+            let a = Sphere::<3>::new(Point::origin(), 1.0);
+            let b = Sphere::<3>::new(Point::origin(), 1.0);
+            let pa: SVector<f64, 3> = SVector::zeros();
+            let pb = SVector::from([0.5, 0.0, 0.0]);
+
+            let dir: SVector<f64, 3> = SVector::from([1.0, 0.0, 0.0]);
+            let mut simplex: ArrayVec<SVector<f64, 3>, 5> = ArrayVec::new();
+            simplex.push(dir * t0);
+            simplex.push(dir * t1);
+            simplex.push(dir * t2);
+            simplex.push(dir * t3);
+
+            let result = penetration(&a, &pa, &b, &pb, &simplex);
+            if let Some(epa) = result {
+                prop_assert!(epa.normal.iter().all(|v| v.is_finite()));
+                prop_assert!(epa.depth.is_finite());
+            }
+        }
+
+        /// EPA must never panic on an empty or single-point simplex (an
+        /// under-sized input that shouldn't occur from real GJK output, but
+        /// the function must degrade gracefully rather than index out of
+        /// bounds or divide by zero).
+        #[test]
+        fn epa_never_panics_on_undersized_simplex(
+            x in -5.0f64..5.0, y in -5.0f64..5.0, z in -5.0f64..5.0,
+            n in 0usize..2,
+        ) {
+            let a = Sphere::<3>::new(Point::origin(), 1.0);
+            let b = Sphere::<3>::new(Point::origin(), 1.0);
+            let pa: SVector<f64, 3> = SVector::zeros();
+            let pb = SVector::from([0.5, 0.0, 0.0]);
+
+            let mut simplex: ArrayVec<SVector<f64, 3>, 5> = ArrayVec::new();
+            for _ in 0..n {
+                simplex.push(SVector::from([x, y, z]));
+            }
+
+            let result = penetration(&a, &pa, &b, &pb, &simplex);
+            if let Some(epa) = result {
+                prop_assert!(epa.normal.iter().all(|v| v.is_finite()));
+                prop_assert!(epa.depth.is_finite());
+            }
+        }
+    }
+}
