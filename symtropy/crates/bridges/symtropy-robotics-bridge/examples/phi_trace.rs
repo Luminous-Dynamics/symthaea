@@ -279,6 +279,12 @@ fn main() {
     let mut agent = RoboticAgent::new(BodyHandle(0), platform, "phi_trace");
 
     let mut phi_samples = Vec::with_capacity(steps);
+    // Ticks where the Φ-gated `safety_tier` collapsed to Red (via the
+    // `RoboticAgentTrait::can_act()` default, which delegates to
+    // `SafetyTier::allows_output()`) — the agent produced zero motor
+    // authority that tick, independent of the sprint-threshold diagnostic
+    // below.
+    let mut blocked_ticks = 0usize;
     let mut csv_file = csv_path.as_ref().and_then(|p| {
         let f = std::fs::File::create(p).ok()?;
         let mut w = std::io::BufWriter::new(f);
@@ -293,6 +299,9 @@ fn main() {
             synth_observation(dim, step, seed)
         };
         let _gain = agent.tick(&obs, danger);
+        if !agent.can_act() {
+            blocked_ticks += 1;
+        }
         let phi = agent.phi();
         phi_samples.push(phi);
         if let Some(w) = csv_file.as_mut() {
@@ -317,6 +326,12 @@ fn main() {
     let pct = 100.0 * above as f64 / s.n as f64;
     println!(" SPRINT_THRESHOLD = 0.125 (2026-04-19 recalibration)");
     println!(" Φ > 0.125 fraction : {:.1} %  ({} / {})", pct, above, s.n);
+    println!(
+        " can_act()==false (Red tier)  : {} / {} ({:.1} %)",
+        blocked_ticks,
+        s.n,
+        100.0 * blocked_ticks as f64 / s.n as f64
+    );
     println!();
     println!(" Pre-FEP-wiring band (commit ≤6517226491): [0.099, 0.145]");
     println!(" Post-FEP-wiring band (commit 996750d12b+): [0.088, 0.133]");

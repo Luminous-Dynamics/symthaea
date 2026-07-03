@@ -4,12 +4,42 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 
+# Excluded from the parent symtropy workspace (see root Cargo.toml's
+# `workspace.exclude`) for licensing reasons — it's AGPL and pulled in only
+# as a path dependency by specific consumers (platform demos), not built
+# directly by `cargo check --workspace`. Deliberately has NO `[workspace]`
+# table of its own: several in-workspace demo crates
+# (`crates/apps/symtropy-*-demo`) depend on this crate by path, and Cargo
+# resolves it as part of their (single) workspace graph. Giving this
+# manifest its own `[workspace]` table breaks that — Cargo then reports
+# "multiple workspace roots found in the same workspace" as soon as a real
+# in-workspace dependent exists. The tradeoff: this crate (and its
+# examples/tests) can no longer be `cargo check`ed standalone by cd-ing into
+# it directly — check it via a dependent instead, e.g.
+# `cargo check -p symtropy-manipulator-demo`, or transiently add a
+# `[workspace]` table back only while nothing in `members` depends on it.
+
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = ["bevy_core_pipeline", "bevy_render", "bevy_pbr", "bevy_asset", "bevy_winit", "x11", "bevy_log", "bevy_color", "bevy_state"] }
+bevy = { version = "0.19", default-features = false, features = ["bevy_core_pipeline", "bevy_render", "bevy_pbr", "bevy_asset", "bevy_winit", "x11", "bevy_log", "bevy_color", "bevy_state"] }
 symtropy-bevy-core = { path = "../../core/symtropy-bevy-core" }
 symthaea-bevy-brain = { path = "../symthaea-bevy-brain" }
 symthaea-fep = { path = "../../../../symthaea/crates/core/symthaea-fep" }
 symtropy-math = { path = "../../core/symtropy-math" }
 symtropy-physics = { path = "../../core/symtropy-physics" }
+symtropy-robotics-bridge-core = { path = "../symtropy-robotics-bridge-core" }
+symtropy-consciousness-physics = { path = "../../domains/symtropy-consciousness-physics" }
+symthaea-consciousness-equation = { path = "../../../../symthaea/crates/domains/symthaea-consciousness-equation" }
 serde = { version = "1.0", features = ["derive"] }
 nalgebra = "0.34"
+
+# Only used by this crate's Φ-benchmark examples (phi_trace_sim_driven*,
+# paired_benchmark_live) to drive `RoboticAgent::tick` from each platform's
+# real simulator/encoder instead of synthetic observations. Not needed by
+# the library itself.
+[dev-dependencies]
+symthaea-auv = { path = "../../../../symthaea/crates/domains/symthaea-auv" }
+symthaea-manipulator = { path = "../../../../symthaea/crates/domains/symthaea-manipulator" }
+symthaea-humanoid = { path = "../../../../symthaea/crates/domains/symthaea-humanoid" }
+symthaea-helicopter = { path = "../../../../symthaea/crates/domains/symthaea-helicopter" }
+symthaea-vehicle = { path = "../../../../symthaea/crates/domains/symthaea-vehicle" }
+symthaea-multirotor = { path = "../../../../symthaea/crates/domains/symthaea-multirotor" }

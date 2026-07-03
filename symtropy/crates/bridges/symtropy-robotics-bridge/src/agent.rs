@@ -8,10 +8,13 @@ use serde::{Deserialize, Serialize};
 use symthaea_bevy_brain::CognitiveBrain;
 use symthaea_fep::HapticSemanticBinder;
 use symtropy_bevy_core::{BevyPhysics, PhysicsBody};
+use symtropy_math::Bivector;
 
-/// Marker for the root entity of a robotic agent.
+/// Marker for the root entity of a robotic agent (ECS tag component only —
+/// for the consciousness-driving agent with `.tick()`/`.phi()`, see
+/// [`RoboticAgent`] further down this file).
 #[derive(Component, Serialize, Deserialize, Clone, Debug)]
-pub struct RoboticAgent {
+pub struct RoboticAgentTag {
     pub model_name: String,
 }
 
@@ -142,9 +145,23 @@ fn propagate_sensory_input_system(
     }
 }
 
-/// Translates LTC output neurons into PD motor drive targets for kinematic joints.
+/// Direct-drive proportional torque gain applied per unit of normalized
+/// motor output ([-1.0, 1.0] LTC output -> Newton-meters). A full actuator
+/// model (gearing, current limits, per-joint PD gains) is out of scope for
+/// this generic ECS bridge — platform demos that need real PD position
+/// control implement their own controller (e.g.
+/// `symtropy-manipulator-demo`'s `admittance_control.rs`) and don't route
+/// through this Bevy system at all.
+const MOTOR_TORQUE_GAIN: f64 = 5.0;
+
+/// Translates LTC output neurons into torque applied to kinematic joints.
+///
+/// `RoboticJoint` doesn't currently carry per-joint rotation-axis metadata,
+/// so every joint is driven as a single-DOF hinge rotating in the physics
+/// world's xy plane (bivector components `(0, 1)`). Multi-axis joints would
+/// need an explicit axis/plane field added to `RoboticJoint`.
 fn apply_motor_commands_system(
-    brains: Query<(&CognitiveBrain, &RoboticAgent)>,
+    brains: Query<(&CognitiveBrain, &RoboticAgentTag)>,
     mut joints: Query<(&RoboticJoint, &mut PhysicsBody, &ChildOf)>,
     mut physics: ResMut<BevyPhysics<3>>,
 ) {
@@ -152,10 +169,11 @@ fn apply_motor_commands_system(
         if let Ok((brain, _agent)) = brains.get(parent.get()) {
             let output = &brain.motor_output;
             if output.len() > joint.motor_index {
-                let _target_pos = output[joint.motor_index] as f64;
-                if let Some(_rb) = physics.world.body_mut(body.handle) {
-                    // Assuming a MotorDrive is attached to the body in the physics world
-                    // rb.apply_torque(...) or set PD target
+                let target = output[joint.motor_index] as f64;
+                if let Some(rb) = physics.world.body_mut(body.handle) {
+                    let mut torque = Bivector::zero();
+                    torque.set(0, 1, target * MOTOR_TORQUE_GAIN);
+                    rb.apply_torque(torque);
                 }
             }
         }
@@ -176,7 +194,7 @@ pub fn spawn_robot(
 
     commands
         .spawn((
-            RoboticAgent {
+            RoboticAgentTag {
                 model_name: name.to_string(),
             },
             brain,
@@ -190,4 +208,175 @@ pub fn spawn_robot(
             GlobalTransform::default(),
         ))
         .id()
+}
+
+// ---------------------------------------------------------------------
+// Headless consciousness-driven RoboticAgent
+// ---------------------------------------------------------------------
+//
+// This is a *different* concept from `RoboticAgentTag` above: it's not a
+// Bevy component at all, but the concrete type the platform demos
+// (`crates/apps/symtropy-*-demo`) and this crate's `examples/*.rs` Φ
+// benchmarks construct directly via `RoboticAgent::new(handle, platform,
+// name)` and drive headlessly via `.tick(observation, danger_level)` /
+// `.phi()`. It implements the trait of the same name from
+// `symtropy-robotics-bridge-core` (re-exported from this crate's root as
+// `RoboticAgentTrait` to avoid colliding with this concrete struct) so
+// `tick_motor_commands()` / `MotorPlanner` dispatch works generically over
+// it. Callers must `use symtropy_robotics_bridge::RoboticAgentTrait;` to
+// bring `.tick()` / `.phi()` / `.bottleneck()` / `.can_act()` into scope —
+// `RoboticAgent::new()` and the public `caution` / `safety_tier` fields
+// don't need it.
+
+use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::{EntityConsciousness, SafetyTier};
+use symtropy_physics::body::BodyHandle;
+use symtropy_robotics_bridge_core::RoboticAgent as CoreRoboticAgent;
+use symtropy_robotics_bridge_core::platform::PlatformType;
+
+/// EMA smoothing factor for the `caution` accumulator — how quickly caution
+/// tracks the current danger level (~6-7 ticks to reach 63% of a step
+/// change).
+const CAUTION_EMA_ALPHA: f64 = 0.15;
+
+/// Default energy budget for the internal [`EntityConsciousness`]. Large
+/// enough that these headless demo/benchmark agents never hit the
+/// low-energy `SafetyTier::Red` collapse path from budget exhaustion —
+/// only from Φ itself, which is what the demos/benchmarks are measuring.
+const DEFAULT_ENERGY_BUDGET: f64 = 1_000.0;
+
+/// A consciousness-driven robotic agent: wraps the real
+/// `MasterConsciousnessEquation` pipeline (via
+/// `symtropy_consciousness_physics::EntityConsciousness`) behind the simple
+/// `tick(observation, danger) -> motor_gain` contract the platform demos and
+/// Φ-gated-safety benchmark examples expect.
+///
+/// Construct with [`RoboticAgent::new`]; drive with `.tick()` / read `.phi()`
+/// via the [`symtropy_robotics_bridge_core::RoboticAgent`] trait (import it
+/// from this crate's root as `RoboticAgentTrait`).
+pub struct RoboticAgent {
+    body: BodyHandle,
+    platform: PlatformType,
+    pub name: String,
+    consciousness: EntityConsciousness,
+    /// EMA of recent danger levels. Rises under sustained danger, decays
+    /// back down once danger subsides — a softer behavioral signal
+    /// independent of the harder Φ-gated `safety_tier`.
+    pub caution: f64,
+    /// Current Φ-gated safety tier (mirrors `self.consciousness.safety_tier`
+    /// after each tick; exposed directly so callers don't need
+    /// `symtropy-consciousness-physics` in scope just to read it).
+    pub safety_tier: SafetyTier,
+}
+
+impl RoboticAgent {
+    /// Create a new agent for `platform`, tracking physics body `body`, with
+    /// a display `name` (logging/telemetry only, no uniqueness requirement).
+    pub fn new(body: BodyHandle, platform: PlatformType, name: impl Into<String>) -> Self {
+        Self {
+            body,
+            platform,
+            name: name.into(),
+            consciousness: EntityConsciousness::new(DEFAULT_ENERGY_BUDGET),
+            caution: 0.0,
+            safety_tier: SafetyTier::Green,
+        }
+    }
+}
+
+impl CoreRoboticAgent for RoboticAgent {
+    fn body(&self) -> BodyHandle {
+        self.body
+    }
+
+    fn platform(&self) -> PlatformType {
+        self.platform
+    }
+
+    /// Run one perception-action tick through the real
+    /// `MasterConsciousnessEquation` (via `EntityConsciousness::compute`) and
+    /// return the resulting motor gain in `[0, 1]`.
+    ///
+    /// `observation` is platform-specific (see each demo's
+    /// `consciousness_bridge.rs` for its packing convention). This method is
+    /// deliberately shape-agnostic: `observation[0]` is treated as a
+    /// prediction-error-like signal, and any remaining channels are averaged
+    /// into an embodiment-grounding signal — never a PE-to-Phi shortcut, the
+    /// full equation always runs.
+    fn tick(&mut self, observation: &[f64], danger_level: f64) -> f64 {
+        let danger = danger_level.clamp(0.0, 1.0);
+        let prediction_error = observation.first().copied().unwrap_or(0.0).clamp(0.0, 2.0);
+        let embodiment = if observation.len() > 2 {
+            (observation[2..].iter().sum::<f64>() / (observation.len() - 2) as f64).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+
+        let inputs = ConsciousnessInputs {
+            phi: (1.0 - danger).clamp(0.0, 1.0),
+            broadcast: (1.0 - prediction_error / 2.0).clamp(0.0, 1.0),
+            working_memory: 0.7,
+            attention: (1.0 - danger).clamp(0.0, 1.0),
+            recurrence: 0.6,
+            embodiment,
+            knowledge: 0.5,
+            synchrony: (1.0 - prediction_error / 2.0).clamp(0.0, 1.0),
+        };
+
+        self.consciousness.compute(&inputs);
+        self.safety_tier = self.consciousness.safety_tier;
+
+        // Sustained danger raises caution; sustained safety lets it settle.
+        self.caution += (danger - self.caution) * CAUTION_EMA_ALPHA;
+
+        self.consciousness.effective_motor_gain().clamp(0.0, 1.0)
+    }
+
+    fn phi(&self) -> f64 {
+        self.consciousness.phi()
+    }
+
+    fn bottleneck(&self) -> &str {
+        self.consciousness.bottleneck()
+    }
+
+    fn can_act(&self) -> bool {
+        self.safety_tier.allows_output()
+    }
+}
+
+#[cfg(test)]
+mod consciousness_agent_tests {
+    use super::*;
+
+    #[test]
+    fn tick_produces_valid_phi_and_gain() {
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "test");
+        let gain = agent.tick(&[0.01, 0.0, 0.5, 0.5], 0.0);
+        assert!((0.0..=1.0).contains(&gain));
+        assert!((0.0..=1.0).contains(&agent.phi()));
+    }
+
+    #[test]
+    fn sustained_danger_raises_caution() {
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "test");
+        let initial = agent.caution;
+        for _ in 0..20 {
+            agent.tick(&[0.8, 0.95], 0.95);
+        }
+        assert!(agent.caution > initial);
+    }
+
+    #[test]
+    fn low_danger_decreases_caution_after_high_danger() {
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "test");
+        for _ in 0..10 {
+            agent.tick(&[0.8, 0.95], 0.95);
+        }
+        let high = agent.caution;
+        for _ in 0..50 {
+            agent.tick(&[0.01, 0.0], 0.0);
+        }
+        assert!(agent.caution < high);
+    }
 }
