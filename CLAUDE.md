@@ -16,15 +16,15 @@ Full details: @.claude/rules/CREDENTIALS.md
 cargo login <token>   # Already configured in ~/.cargo/credentials.toml
 ```
 
-**Published crates (April 2026):**
+**Published crates (verified against crates.io 2026-07-03):**
 
 | Crate | Version | Registry |
 |-------|---------|----------|
-| `symtropy-math` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-math) |
-| `symtropy-physics` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-physics) |
-| `symtropy-consciousness-physics` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-consciousness-physics) |
-| `symtropy-bevy` | 0.1.0 | [crates.io](https://crates.io/crates/symtropy-bevy) |
-| `symthaea-core` | 0.5.0 | [crates.io](https://crates.io/crates/symthaea-core) |
+| `symtropy-math` | 0.2.1 | [crates.io](https://crates.io/crates/symtropy-math) |
+| `symtropy-physics` | 0.2.1 | [crates.io](https://crates.io/crates/symtropy-physics) |
+| `symtropy-consciousness-physics` | 0.2.0 | [crates.io](https://crates.io/crates/symtropy-consciousness-physics) |
+| `symtropy-bevy` | 0.2.0 | [crates.io](https://crates.io/crates/symtropy-bevy) |
+| `symthaea-core` | 0.5.1 | [crates.io](https://crates.io/crates/symthaea-core) |
 | `symthaea-consciousness-equation` | 0.1.0 | [crates.io](https://crates.io/crates/symthaea-consciousness-equation) |
 | `symthaea-fep` | 0.1.0 | [crates.io](https://crates.io/crates/symthaea-fep) |
 | `sovereign-profile` | 0.1.2 | [crates.io](https://crates.io/crates/sovereign-profile) |
