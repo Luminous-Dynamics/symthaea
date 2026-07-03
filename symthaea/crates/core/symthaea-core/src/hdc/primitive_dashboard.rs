@@ -211,7 +211,7 @@ impl PrimitiveDashboard {
     /// Get top N most used primitives
     pub fn top_primitives(&self, n: usize) -> Vec<(&String, &PrimitiveStats)> {
         let mut sorted: Vec<_> = self.stats.iter().collect();
-        sorted.sort_by(|a, b| b.1.activations.cmp(&a.1.activations));
+        sorted.sort_by_key(|x| std::cmp::Reverse(x.1.activations));
         sorted.into_iter().take(n).collect()
     }
 

@@ -200,7 +200,7 @@ pub fn sos_univariate(p: &Poly) -> Option<Vec<Poly>> {
             // p = ax² + bx + c
             let a = p.coeffs.get(2).copied().unwrap_or(0.0);
             let b = p.coeffs.get(1).copied().unwrap_or(0.0);
-            let c = p.coeffs.get(0).copied().unwrap_or(0.0);
+            let c = p.coeffs.first().copied().unwrap_or(0.0);
             if a < 1e-12 {
                 return None; // degree-2 polynomial must have a > 0
             }
@@ -223,7 +223,7 @@ pub fn sos_univariate(p: &Poly) -> Option<Vec<Poly>> {
             let b = p.coeffs.get(3).copied().unwrap_or(0.0);
             let c = p.coeffs.get(2).copied().unwrap_or(0.0);
             let d = p.coeffs.get(1).copied().unwrap_or(0.0);
-            let e = p.coeffs.get(0).copied().unwrap_or(0.0);
+            let e = p.coeffs.first().copied().unwrap_or(0.0);
             if a < 1e-12 {
                 return None;
             }

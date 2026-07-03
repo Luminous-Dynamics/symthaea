@@ -361,10 +361,10 @@ fn extract_integers(text: &str) -> Vec<i64> {
             current.clear();
         }
     }
-    if !current.is_empty() {
-        if let Ok(n) = current.parse::<i64>() {
-            out.push(n);
-        }
+    if !current.is_empty()
+        && let Ok(n) = current.parse::<i64>()
+    {
+        out.push(n);
     }
     out
 }
@@ -465,7 +465,7 @@ fn template_pigeonhole(text: &str) -> Option<CurriculumProblem> {
     if items <= boxes || boxes == 0 {
         return None;
     }
-    let min_collision = (items + boxes - 1) / boxes;
+    let min_collision = items.div_ceil(boxes);
     Some(CurriculumProblem {
         name: format!("Pigeonhole {}/{}", items, boxes),
         difficulty: Difficulty::Easy,
@@ -483,21 +483,20 @@ fn template_pell(text: &str) -> Option<CurriculumProblem> {
     // Look for "D = N" or "- N·y²" pattern
     if let Some(d) =
         extract_labeled_integer(text, "D =").or_else(|| extract_labeled_integer(text, "D="))
+        && (2..=150).contains(&d)
     {
-        if d >= 2 && d <= 150 {
-            return Some(CurriculumProblem {
-                name: format!("Pell D={}", d),
-                difficulty: Difficulty::Medium,
-                domain: Domain::NumberTheory,
-                kind: ProblemKind::PellEquation { d },
-            });
-        }
+        return Some(CurriculumProblem {
+            name: format!("Pell D={}", d),
+            difficulty: Difficulty::Medium,
+            domain: Domain::NumberTheory,
+            kind: ProblemKind::PellEquation { d },
+        });
     }
     // Fallback: find "− N" or "-N" after x² to get the D coefficient
     let ints = extract_integers(text);
     // A Pell problem usually contains D as the 2nd or 3rd integer — heuristic
     for &n in &ints {
-        if n >= 2 && n <= 150 && (n as f64).sqrt().fract() > 1e-6 {
+        if (2..=150).contains(&n) && (n as f64).sqrt().fract() > 1e-6 {
             return Some(CurriculumProblem {
                 name: format!("Pell D={}", n),
                 difficulty: Difficulty::Medium,
@@ -525,22 +524,19 @@ fn template_crt(text: &str) -> Option<CurriculumProblem> {
     // Verify by computing the expected solution
     use crate::hdc::number_theory::NumberTheoryEngine;
     let engine = NumberTheoryEngine::new();
-    match engine.crt(&residues) {
-        Some((x, _m)) => Some(CurriculumProblem {
-            name: format!("CRT {} residues", residues.len()),
-            difficulty: if residues.len() <= 2 {
-                Difficulty::Easy
-            } else {
-                Difficulty::Medium
-            },
-            domain: Domain::NumberTheory,
-            kind: ProblemKind::CrtSystem {
-                residues,
-                expected: x,
-            },
-        }),
-        None => None,
-    }
+    engine.crt(&residues).map(|(x, _m)| CurriculumProblem {
+        name: format!("CRT {} residues", residues.len()),
+        difficulty: if residues.len() <= 2 {
+            Difficulty::Easy
+        } else {
+            Difficulty::Medium
+        },
+        domain: Domain::NumberTheory,
+        kind: ProblemKind::CrtSystem {
+            residues,
+            expected: x,
+        },
+    })
 }
 
 /// Legendre: "Determine whether a is a quadratic residue mod p" → (a, p).
@@ -632,7 +628,7 @@ fn template_euler_phi(text: &str) -> Option<CurriculumProblem> {
         return None;
     }
     let n = *ints.iter().max().unwrap() as u64;
-    if n < 2 || n > 10_000 {
+    if !(2..=10_000).contains(&n) {
         return None;
     }
     use crate::hdc::number_theory::ModularRing;

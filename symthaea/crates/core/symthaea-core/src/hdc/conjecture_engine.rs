@@ -385,7 +385,7 @@ impl ConjectureEngine {
     /// For each invariant, status is assigned based on whether it was
     /// symbolically proven via the chain-rule path:
     /// - `symbolically_proven == true` → `ConjectureStatus::FormallyVerified`
-    ///    (eligible for fast-track macro promotion)
+    ///   (eligible for fast-track macro promotion)
     /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
     ///   and `MacroPromotionTier::Quarantined`, so unproven trajectory fits
     ///   cannot enter the permanent macro pool through either fast-track or
@@ -758,14 +758,14 @@ pub fn detect_z3_path() -> Option<std::path::PathBuf> {
     }
 
     // 2. `which z3` via PATH
-    if let Ok(output) = std::process::Command::new("which").arg("z3").output() {
-        if output.status.success() {
-            let found = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !found.is_empty() {
-                let path = std::path::PathBuf::from(&found);
-                if path.exists() {
-                    return Some(path);
-                }
+    if let Ok(output) = std::process::Command::new("which").arg("z3").output()
+        && output.status.success()
+    {
+        let found = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !found.is_empty() {
+            let path = std::path::PathBuf::from(&found);
+            if path.exists() {
+                return Some(path);
             }
         }
     }

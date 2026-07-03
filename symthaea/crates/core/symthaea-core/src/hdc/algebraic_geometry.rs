@@ -83,7 +83,7 @@ pub fn newton_system(
 }
 
 /// Gaussian elimination to solve A x = b; returns x or None if singular.
-fn solve_linear(a: &mut Vec<Vec<f64>>, b: &[f64]) -> Option<Vec<f64>> {
+fn solve_linear(a: &mut [Vec<f64>], b: &[f64]) -> Option<Vec<f64>> {
     let n = b.len();
     let mut b = b.to_vec();
 

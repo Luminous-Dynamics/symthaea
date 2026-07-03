@@ -535,12 +535,12 @@ impl PredictiveHdcEncoder {
         // Slightly decrease attention on non-detected primitives
         // This creates competition between primitives
         for name in &self.primitive_names {
-            if !detected_primitives.contains(name) {
-                if let Some(weight) = self.attention_weights.get_mut(name) {
-                    let delta = self.config.attention_lr * error * 0.1; // Smaller decrease
-                    *weight = (*weight - delta)
-                        .clamp(self.config.min_attention, self.config.max_attention);
-                }
+            if !detected_primitives.contains(name)
+                && let Some(weight) = self.attention_weights.get_mut(name)
+            {
+                let delta = self.config.attention_lr * error * 0.1; // Smaller decrease
+                *weight =
+                    (*weight - delta).clamp(self.config.min_attention, self.config.max_attention);
             }
         }
 

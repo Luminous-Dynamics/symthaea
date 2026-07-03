@@ -993,7 +993,7 @@ pub fn bootstrap_mean_ci(
     confidence: f64,
     seed: u64,
 ) -> (f64, f64) {
-    bootstrap_statistic_ci(data, |d| mean(d), n_bootstrap, confidence, seed)
+    bootstrap_statistic_ci(data, mean, n_bootstrap, confidence, seed)
 }
 
 /// Non-parametric bootstrap CI for the standard deviation.
@@ -1003,7 +1003,7 @@ pub fn bootstrap_std_ci(
     confidence: f64,
     seed: u64,
 ) -> (f64, f64) {
-    bootstrap_statistic_ci(data, |d| std_dev(d), n_bootstrap, confidence, seed)
+    bootstrap_statistic_ci(data, std_dev, n_bootstrap, confidence, seed)
 }
 
 /// Non-parametric bootstrap CI for the median.
@@ -1013,7 +1013,7 @@ pub fn bootstrap_median_ci(
     confidence: f64,
     seed: u64,
 ) -> (f64, f64) {
-    bootstrap_statistic_ci(data, |d| median(d), n_bootstrap, confidence, seed)
+    bootstrap_statistic_ci(data, median, n_bootstrap, confidence, seed)
 }
 
 /// Generic non-parametric bootstrap CI for any statistic.

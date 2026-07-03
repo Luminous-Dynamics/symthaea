@@ -901,7 +901,7 @@ impl ContinuousHV {
             // We fold the vector back by bundling its constituent segments.
             // We apply the inverse permutation to each segment before bundling
             // to recover the original semantic alignment.
-            let chunk_count = (self.values.len() + target_dim - 1) / target_dim;
+            let chunk_count = self.values.len().div_ceil(target_dim);
             let mut folded = vec![0.0f32; target_dim];
 
             for k in 0..chunk_count {

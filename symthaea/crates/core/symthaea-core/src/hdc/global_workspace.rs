@@ -370,14 +370,14 @@ impl GlobalWorkspace {
 
         if self.config.winner_takes_all {
             // Winner-takes-all: only strongest enters
-            if let Some(winner) = self.competitors.first() {
-                if winner.activation > self.config.entry_threshold {
-                    // Clear workspace, install winner
-                    self.workspace.clear();
-                    self.workspace.push(winner.clone());
-                    new_contents.push(winner.clone());
-                    ignition = true;
-                }
+            if let Some(winner) = self.competitors.first()
+                && winner.activation > self.config.entry_threshold
+            {
+                // Clear workspace, install winner
+                self.workspace.clear();
+                self.workspace.push(winner.clone());
+                new_contents.push(winner.clone());
+                ignition = true;
             }
             self.competitors.clear();
         } else {

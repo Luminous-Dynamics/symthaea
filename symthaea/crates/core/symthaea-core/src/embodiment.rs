@@ -169,12 +169,13 @@ impl GroundingEstimator {
         self.window.push(prediction_error);
 
         // Social grounding: requires peers and a stable temporal model
-        if let Some(peers) = peer_count {
-            if peers > 0 && self.window.len() >= 16 {
-                let mean = self.window.iter().sum::<f32>() / self.window.len() as f32;
-                if mean < 0.3 {
-                    return GROUNDING_SOCIAL;
-                }
+        if let Some(peers) = peer_count
+            && peers > 0
+            && self.window.len() >= 16
+        {
+            let mean = self.window.iter().sum::<f32>() / self.window.len() as f32;
+            if mean < 0.3 {
+                return GROUNDING_SOCIAL;
             }
         }
 

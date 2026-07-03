@@ -573,18 +573,18 @@ impl ResonatorNetwork {
             // Update introspection state
             self.iteration_count += 1;
             for (idx, &name_str) in unknowns.iter().enumerate() {
-                if let Some(est) = estimates.get(name_str) {
-                    if let Some(state) = self.states.get_mut(idx) {
-                        state.estimate = est.clone();
-                        state.confidence = if !self.codebook.is_empty() {
-                            self.codebook
-                                .iter()
-                                .map(|e| cosine_similarity(est, &e.vector))
-                                .fold(f32::NEG_INFINITY, f32::max)
-                        } else {
-                            0.5 // default confidence without codebook
-                        };
-                    }
+                if let Some(est) = estimates.get(name_str)
+                    && let Some(state) = self.states.get_mut(idx)
+                {
+                    state.estimate = est.clone();
+                    state.confidence = if !self.codebook.is_empty() {
+                        self.codebook
+                            .iter()
+                            .map(|e| cosine_similarity(est, &e.vector))
+                            .fold(f32::NEG_INFINITY, f32::max)
+                    } else {
+                        0.5 // default confidence without codebook
+                    };
                 }
             }
 
@@ -595,10 +595,9 @@ impl ResonatorNetwork {
                     let ci = i * n - i * (i + 1) / 2 + j - i - 1;
                     if let (Some(ei), Some(ej)) =
                         (estimates.get(unknowns[i]), estimates.get(unknowns[j]))
+                        && ci < self.coupling_strengths.len()
                     {
-                        if ci < self.coupling_strengths.len() {
-                            self.coupling_strengths[ci] = cosine_similarity(ei, ej).abs();
-                        }
+                        self.coupling_strengths[ci] = cosine_similarity(ei, ej).abs();
                     }
                 }
             }

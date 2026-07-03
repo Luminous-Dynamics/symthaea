@@ -75,11 +75,11 @@ impl PrimitiveGraph {
         let mut encodings = Vec::new();
 
         for name in all_names {
-            if let Some(prim) = system.get(name) {
-                if prim.domain == domain {
-                    nodes.push((prim.name.clone(), prim.tier, prim.is_base));
-                    encodings.push(prim.encoding);
-                }
+            if let Some(prim) = system.get(name)
+                && prim.domain == domain
+            {
+                nodes.push((prim.name.clone(), prim.tier, prim.is_base));
+                encodings.push(prim.encoding);
             }
         }
 

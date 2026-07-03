@@ -281,7 +281,7 @@ pub fn expr_to_latex(expr: &Expr) -> String {
                         .map(|c| c.is_ascii_digit())
                         .unwrap_or(false) =>
                 {
-                    format!("{}", s)
+                    s.to_string()
                 }
                 s => s.to_string(),
             },
@@ -303,10 +303,10 @@ pub fn expr_to_latex(expr: &Expr) -> String {
                 }
             }
             Expr::BinOp(BinOp::Add, l, r) => {
-                if let Expr::Const(c) = r.as_ref() {
-                    if *c < 0.0 {
-                        return format!("{} - {}", wrap_if_lower(l, 4), const_to_latex(-c));
-                    }
+                if let Expr::Const(c) = r.as_ref()
+                    && *c < 0.0
+                {
+                    return format!("{} - {}", wrap_if_lower(l, 4), const_to_latex(-c));
                 }
                 format!("{} + {}", wrap_if_lower(l, 4), wrap_if_lower(r, 4))
             }

@@ -600,8 +600,8 @@ impl ConsciousnessTopology {
         }
 
         // 6. Calculate Betti numbers
-        let mut creators = vec![0; 3];
-        let mut killers = vec![0; 3];
+        let mut creators = [0; 3];
+        let mut killers = [0; 3];
 
         for j in 0..m {
             let dim = simplices[j].dim;

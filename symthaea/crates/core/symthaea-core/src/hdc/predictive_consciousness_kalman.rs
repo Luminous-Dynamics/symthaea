@@ -756,9 +756,8 @@ impl PredictiveConsciousness {
         }
 
         let std = var.sqrt();
-        let m3 = data.iter().map(|x| ((x - mean) / std).powi(3)).sum::<f64>() / n;
 
-        m3
+        data.iter().map(|x| ((x - mean) / std).powi(3)).sum::<f64>() / n
     }
 }
 

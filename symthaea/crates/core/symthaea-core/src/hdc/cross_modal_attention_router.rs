@@ -359,15 +359,14 @@ impl CrossModalAttentionRouter {
             }
 
             // Apply inhibition of return
-            if self.config.inhibition_of_return {
-                if let Some(state) = self.attention_state.get(&input.modality) {
-                    if state.dwell_time > 3 {
-                        // Reduce attention to recently attended modalities
-                        let ior_penalty =
-                            self.config.ior_strength * (state.dwell_time as f64 / 10.0).min(1.0);
-                        score *= 1.0 - ior_penalty;
-                    }
-                }
+            if self.config.inhibition_of_return
+                && let Some(state) = self.attention_state.get(&input.modality)
+                && state.dwell_time > 3
+            {
+                // Reduce attention to recently attended modalities
+                let ior_penalty =
+                    self.config.ior_strength * (state.dwell_time as f64 / 10.0).min(1.0);
+                score *= 1.0 - ior_penalty;
             }
 
             // Weight by confidence

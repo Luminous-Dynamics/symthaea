@@ -942,7 +942,7 @@ fn kronecker_symbol_i64(d: i64, n: i64) -> i64 {
 
     // Handle n = 2 separately
     if n_abs == 2 {
-        let d_mod8 = ((d % 8) + 8) % 8;
+        let d_mod8 = d.rem_euclid(8);
         return match d_mod8 {
             1 | 7 => 1,
             3 | 5 => -1,

@@ -354,9 +354,7 @@ impl YoungTableau {
         for row in &mut self.entries {
             // Find leftmost element > to_insert
             if let Some(pos) = row.iter().position(|&e| e > to_insert) {
-                let bumped = row[pos];
-                row[pos] = to_insert;
-                to_insert = bumped;
+                std::mem::swap(&mut row[pos], &mut to_insert);
                 // Continue to next row
             } else {
                 // No element > to_insert: append to end of this row
@@ -430,9 +428,7 @@ pub fn rsk_correspondence(permutation: &[usize]) -> (YoungTableau, YoungTableau)
         let mut new_row_idx = p.entries.len(); // default: new row at bottom
         for (row_idx, row) in p.entries.iter_mut().enumerate() {
             if let Some(pos) = row.iter().position(|&e| e > val) {
-                let bumped = row[pos];
-                row[pos] = val;
-                val = bumped;
+                std::mem::swap(&mut row[pos], &mut val);
             } else {
                 row.push(val);
                 new_row_idx = row_idx;
@@ -650,21 +646,20 @@ fn enumerate_filling(
         // SSYT: rows weakly increase (left neighbor must be ≤ entry)
         if col > 0 {
             // Left neighbor could be in μ (fixed) or in the skew
-            if let Some(&left_idx) = cell_to_idx.get(&(row, col - 1)) {
-                if filling[left_idx] > entry {
-                    continue;
-                }
+            if let Some(&left_idx) = cell_to_idx.get(&(row, col - 1))
+                && filling[left_idx] > entry
+            {
+                continue;
             }
             // If left neighbor is in μ (not a skew cell), the constraint is automatically satisfied
             // since μ cells are not filled (they are 0) — we treat them as boundary
         }
         // SSYT: columns strictly increase (top neighbor must be < entry)
-        if row > 0 {
-            if let Some(&top_idx) = cell_to_idx.get(&(row - 1, col)) {
-                if filling[top_idx] >= entry {
-                    continue;
-                }
-            }
+        if row > 0
+            && let Some(&top_idx) = cell_to_idx.get(&(row - 1, col))
+            && filling[top_idx] >= entry
+        {
+            continue;
         }
 
         filling[pos] = entry;

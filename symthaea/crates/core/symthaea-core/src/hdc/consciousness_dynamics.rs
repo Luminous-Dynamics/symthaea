@@ -421,10 +421,10 @@ impl ConsciousnessDynamics {
             let trajectory = self.simulate(&initial_state, num_steps, self.config.dt);
 
             // If converged, store attractor
-            if let Some(ref attractor) = trajectory.attractor {
-                if !self.is_duplicate_attractor(attractor) {
-                    self.attractors.push(attractor.clone());
-                }
+            if let Some(ref attractor) = trajectory.attractor
+                && !self.is_duplicate_attractor(attractor)
+            {
+                self.attractors.push(attractor.clone());
             }
 
             // Store trajectory

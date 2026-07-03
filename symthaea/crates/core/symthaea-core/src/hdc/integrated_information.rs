@@ -425,10 +425,10 @@ impl IntegratedInformation {
                 metadata: None,
             };
 
-            if let Ok(mut obs) = observer.try_write() {
-                if let Err(e) = obs.record_phi_measurement(event) {
-                    eprintln!("[OBSERVER ERROR] Failed to record Φ measurement: {e}");
-                }
+            if let Ok(mut obs) = observer.try_write()
+                && let Err(e) = obs.record_phi_measurement(event)
+            {
+                eprintln!("[OBSERVER ERROR] Failed to record Φ measurement: {e}");
             }
         }
 

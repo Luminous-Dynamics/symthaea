@@ -69,12 +69,11 @@ impl ConjectureEngine {
                         conjecture.confidence = (conjecture.confidence + 0.95) / 2.0;
                     }
 
-                    if is_constant {
-                        if let Expr::Const(c) = &conjecture.formula {
-                            if let Some(name) = identify_constant(*c) {
-                                conjecture.formula_str = name;
-                            }
-                        }
+                    if is_constant
+                        && let Expr::Const(c) = &conjecture.formula
+                        && let Some(name) = identify_constant(*c)
+                    {
+                        conjecture.formula_str = name;
                     }
                 } else if test_mse.is_finite() && mean_rel_error > 0.5 {
                     conjecture.status = ConjectureStatus::Refuted {
@@ -142,20 +141,20 @@ impl ConjectureEngine {
                     };
                     elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
                     conjecture.confidence = 0.95;
-                } else if let Some(cx) = first_failure {
-                    if known.contains_key(&(cx as i64)) {
-                        let pred = conjecture.formula.eval(&[("n", cx)]);
-                        let expected = known[&(cx as i64)];
-                        let rel_err = if expected.abs() > 1e-10 {
-                            ((pred - expected) / expected).abs()
-                        } else {
-                            (pred - expected).abs()
-                        };
-                        if rel_err > 0.5 {
-                            conjecture.status = ConjectureStatus::Refuted { counterexample: cx };
-                            conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
-                            conjecture.confidence = 0.0;
-                        }
+                } else if let Some(cx) = first_failure
+                    && known.contains_key(&(cx as i64))
+                {
+                    let pred = conjecture.formula.eval(&[("n", cx)]);
+                    let expected = known[&(cx as i64)];
+                    let rel_err = if expected.abs() > 1e-10 {
+                        ((pred - expected) / expected).abs()
+                    } else {
+                        (pred - expected).abs()
+                    };
+                    if rel_err > 0.5 {
+                        conjecture.status = ConjectureStatus::Refuted { counterexample: cx };
+                        conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
+                        conjecture.confidence = 0.0;
                     }
                 }
             }

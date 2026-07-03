@@ -865,19 +865,19 @@ impl ConsciousnessPipeline {
         self.subsystems = subsystems;
 
         // === OBSERVABILITY: Record metrics ===
-        if let Some(ref collector) = self.metrics_collector {
-            if let Ok(mut obs) = collector.write() {
-                let _ = obs.record_phi_measurement(crate::observability::PhiMeasurementEvent {
-                    timestamp: chrono::Utc::now(),
-                    phi: self.state.phi,
-                    components: crate::observability::PhiComponents {
-                        integration: self.state.phi,
-                        ..Default::default()
-                    },
-                    temporal_continuity: self.state.temporal_coherence,
-                    metadata: None,
-                });
-            }
+        if let Some(ref collector) = self.metrics_collector
+            && let Ok(mut obs) = collector.write()
+        {
+            let _ = obs.record_phi_measurement(crate::observability::PhiMeasurementEvent {
+                timestamp: chrono::Utc::now(),
+                phi: self.state.phi,
+                components: crate::observability::PhiComponents {
+                    integration: self.state.phi,
+                    ..Default::default()
+                },
+                temporal_continuity: self.state.temporal_coherence,
+                metadata: None,
+            });
         }
 
         // === PERIODIC VERIFICATION ===
@@ -885,10 +885,9 @@ impl ConsciousnessPipeline {
             && self
                 .current_cycle
                 .is_multiple_of(self.verification_interval as u64)
+            && let Some(ref verifier) = self.verifier
         {
-            if let Some(ref verifier) = self.verifier {
-                self.latest_verification = Some(verifier.verify_from_state(&self.state));
-            }
+            self.latest_verification = Some(verifier.verify_from_state(&self.state));
         }
 
         // Store in history (bounded ring buffer)

@@ -379,7 +379,7 @@ pub fn gen_pigeonhole(difficulty: Difficulty, state: &mut u64) -> CurriculumProb
     };
     let items = items_lo + (xorshift64(state) as usize) % (items_hi - items_lo);
     let boxes = boxes_lo + (xorshift64(state) as usize) % (boxes_hi - boxes_lo);
-    let min_collision = (items + boxes - 1) / boxes; // ⌈items / boxes⌉
+    let min_collision = items.div_ceil(boxes); // ⌈items / boxes⌉
     CurriculumProblem {
         name: format!("Pigeonhole {}/{}", items, boxes),
         difficulty,

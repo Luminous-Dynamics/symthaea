@@ -166,8 +166,8 @@ pub struct Tape<T: Scalar> {
 }
 
 thread_local! {
-    static F64_TAPE: RefCell<Option<Tape<f64>>> = RefCell::new(None);
-    static C64_TAPE: RefCell<Option<Tape<Complex64>>> = RefCell::new(None);
+    static F64_TAPE: RefCell<Option<Tape<f64>>> = const { RefCell::new(None) };
+    static C64_TAPE: RefCell<Option<Tape<Complex64>>> = const { RefCell::new(None) };
 }
 
 impl<T: Scalar> Tape<T> {

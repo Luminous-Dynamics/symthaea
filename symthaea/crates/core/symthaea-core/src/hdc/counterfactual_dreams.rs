@@ -427,11 +427,11 @@ impl CounterfactualDreamEngine {
         dream.base_scenario.narrative_coherence *= 1.3;
 
         // If focused on specific memory, emphasize it
-        if let Some(id) = focus_memory_id {
-            if let Some(memory) = self.memories.get(&id) {
-                dream.counterfactual_theme =
-                    format!("Lucid exploration: {}", memory.counterfactual_question);
-            }
+        if let Some(id) = focus_memory_id
+            && let Some(memory) = self.memories.get(&id)
+        {
+            dream.counterfactual_theme =
+                format!("Lucid exploration: {}", memory.counterfactual_question);
         }
 
         self.bizarreness = old_bizarreness;

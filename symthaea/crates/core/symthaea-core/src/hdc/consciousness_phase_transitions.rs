@@ -345,18 +345,18 @@ impl ConsciousnessPhaseTransitions {
         sys_state.update_derived_quantities(self.config.critical_point);
 
         // Check for phase transition
-        if let Some(last) = self.history.last() {
-            if last.phase != sys_state.phase {
-                let transition = PhaseTransition {
-                    from: last.phase,
-                    to: sys_state.phase,
-                    tau_transition: (last.integration + integration) / 2.0,
-                    order: self.classify_transition_order(last, &sys_state),
-                    latent_heat: (last.order_parameter - sys_state.order_parameter).abs(),
-                    timestamp: self.timestamp,
-                };
-                self.transitions.push(transition);
-            }
+        if let Some(last) = self.history.last()
+            && last.phase != sys_state.phase
+        {
+            let transition = PhaseTransition {
+                from: last.phase,
+                to: sys_state.phase,
+                tau_transition: (last.integration + integration) / 2.0,
+                order: self.classify_transition_order(last, &sys_state),
+                latent_heat: (last.order_parameter - sys_state.order_parameter).abs(),
+                timestamp: self.timestamp,
+            };
+            self.transitions.push(transition);
         }
 
         self.history.push(sys_state);
@@ -431,13 +431,13 @@ impl ConsciousnessPhaseTransitions {
 
     /// Predict time to phase transition
     pub fn predict_transition_time(&self) -> Option<f64> {
-        if let Some(slowing_rate) = self.detect_critical_slowing() {
-            if let Some(current) = self.history.last() {
-                let distance = (current.integration - self.config.critical_point).abs();
-                // Simple prediction: time ~ distance / rate
-                if slowing_rate > 0.001 {
-                    return Some(distance / slowing_rate);
-                }
+        if let Some(slowing_rate) = self.detect_critical_slowing()
+            && let Some(current) = self.history.last()
+        {
+            let distance = (current.integration - self.config.critical_point).abs();
+            // Simple prediction: time ~ distance / rate
+            if slowing_rate > 0.001 {
+                return Some(distance / slowing_rate);
             }
         }
         None

@@ -179,10 +179,10 @@ impl SelfAwareConsciousness {
         }
 
         // 8. Self-directed mode adjustment if recommended
-        if meta_assessment.change_recommended {
-            if let Some(new_mode) = meta_assessment.recommended_mode {
-                self.engine.set_mode(new_mode);
-            }
+        if meta_assessment.change_recommended
+            && let Some(new_mode) = meta_assessment.recommended_mode
+        {
+            self.engine.set_mode(new_mode);
         }
 
         SelfAwareUpdate {

@@ -433,7 +433,7 @@ impl NumberTheoryEngine {
         let mut m = s;
         let mut c = ring.power(z, q);
         let mut t = ring.power(a, q);
-        let mut r = ring.power(a, (q + 1) / 2);
+        let mut r = ring.power(a, q.div_ceil(2));
         loop {
             if t == 1 {
                 return Some(r);

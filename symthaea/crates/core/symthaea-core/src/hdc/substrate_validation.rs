@@ -566,10 +566,10 @@ impl SubstrateValidationFramework {
             .map(|k| k.evidence_level)
             .unwrap_or(EvidenceLevel::None);
 
-        if let Some(knowledge) = self.substrates.get_mut(substrate) {
-            if let Some(pred) = knowledge.predictions.get_mut(prediction_idx) {
-                pred.record_result(passed);
-            }
+        if let Some(knowledge) = self.substrates.get_mut(substrate)
+            && let Some(pred) = knowledge.predictions.get_mut(prediction_idx)
+        {
+            pred.record_result(passed);
         }
 
         self.check_evidence_upgrade(substrate)

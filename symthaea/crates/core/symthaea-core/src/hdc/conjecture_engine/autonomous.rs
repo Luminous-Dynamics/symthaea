@@ -1332,7 +1332,7 @@ pub fn analyze_system_autonomous(
     } else {
         let best_var = invariants.first().map(|i| i.variance).unwrap_or(f64::MAX);
         let lyapunov = find_lyapunov_candidate(rhs, initial_state, var_names, t_max, dt);
-        let mut report = format!("DISSIPATIVE SYSTEM: no conservation law found\n");
+        let mut report = "DISSIPATIVE SYSTEM: no conservation law found\n".to_string();
         report += &format!(
             "  Best candidate variance: {:.2e} (threshold: {:.2e})\n",
             best_var, conservation_threshold
@@ -1379,7 +1379,7 @@ fn find_lyapunov_candidate(
         / last_quarter.len() as f64;
 
     if mean_last.is_finite() && var_last < mean_last * mean_last * 0.5 {
-        let names: Vec<&str> = var_names.iter().copied().collect();
+        let names: Vec<&str> = var_names.to_vec();
         return Some(format!(
             "Σ{}ᵢ² → {:.2} (bounded attractor, not Lyapunov)",
             if names.len() <= 3 {

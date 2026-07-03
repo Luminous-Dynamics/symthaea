@@ -450,10 +450,11 @@ impl UnifiedUnderstandingPipeline {
                 continue;
             }
             let idx = word_idx as i32 + offset;
-            if idx >= 0 && (idx as usize) < words.len() {
-                if let Some(primes) = self.grounded.lexicon().decompose(words[idx as usize]) {
-                    context_primes.extend(primes.clone());
-                }
+            if idx >= 0
+                && (idx as usize) < words.len()
+                && let Some(primes) = self.grounded.lexicon().decompose(words[idx as usize])
+            {
+                context_primes.extend(primes.clone());
             }
         }
 
@@ -620,29 +621,27 @@ impl UnifiedUnderstandingPipeline {
             let word_lower = word.to_lowercase();
 
             // Check if it's a person/entity reference
-            if let Some(primes) = self.grounded.lexicon().decompose(&word_lower) {
-                if primes.contains(&SemanticPrime::Someone)
+            if let Some(primes) = self.grounded.lexicon().decompose(&word_lower)
+                && (primes.contains(&SemanticPrime::Someone)
                     || primes.contains(&SemanticPrime::I)
-                    || primes.contains(&SemanticPrime::You)
-                {
-                    // It's an entity reference
-                    let entity = if let Some(existing) = self.tracked_entities.get_mut(&word_lower)
-                    {
-                        existing.mention_count += 1;
-                        existing.clone()
-                    } else {
-                        let new_entity = TrackedEntity {
-                            name: word_lower.clone(),
-                            semantic_hv: grounded.semantic_hv,
-                            role: EntityRole::Agent, // Default
-                            valence: grounded.embodied.valence,
-                            mention_count: 1,
-                        };
-                        self.tracked_entities.insert(word_lower, new_entity.clone());
-                        new_entity
+                    || primes.contains(&SemanticPrime::You))
+            {
+                // It's an entity reference
+                let entity = if let Some(existing) = self.tracked_entities.get_mut(&word_lower) {
+                    existing.mention_count += 1;
+                    existing.clone()
+                } else {
+                    let new_entity = TrackedEntity {
+                        name: word_lower.clone(),
+                        semantic_hv: grounded.semantic_hv,
+                        role: EntityRole::Agent, // Default
+                        valence: grounded.embodied.valence,
+                        mention_count: 1,
                     };
-                    entities.push(entity);
-                }
+                    self.tracked_entities.insert(word_lower, new_entity.clone());
+                    new_entity
+                };
+                entities.push(entity);
             }
         }
 

@@ -537,10 +537,9 @@ impl RelationalConsciousness {
         for i in 1..recent.len() {
             if let (Some(prev_active), Some(curr_active)) =
                 (&recent[i - 1].active_agent, &recent[i].active_agent)
+                && prev_active != curr_active
             {
-                if prev_active != curr_active {
-                    alternations += 1;
-                }
+                alternations += 1;
             }
         }
 

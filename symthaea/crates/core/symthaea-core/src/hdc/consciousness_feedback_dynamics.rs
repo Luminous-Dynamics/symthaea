@@ -619,13 +619,13 @@ impl EmotionalPredictor {
 
     /// Get early warning for emotional distress
     pub fn early_warning(&self) -> Option<String> {
-        if let Some(pred) = self.predictions.back() {
-            if let Some(intervention) = &pred.intervention {
-                return Some(format!(
-                    "Emotional prediction: valence {:.2} arousal {:.2} in {} steps. Recommended: {:?}",
-                    pred.predicted_valence, pred.predicted_arousal, pred.horizon, intervention
-                ));
-            }
+        if let Some(pred) = self.predictions.back()
+            && let Some(intervention) = &pred.intervention
+        {
+            return Some(format!(
+                "Emotional prediction: valence {:.2} arousal {:.2} in {} steps. Recommended: {:?}",
+                pred.predicted_valence, pred.predicted_arousal, pred.horizon, intervention
+            ));
         }
         None
     }
@@ -1134,10 +1134,10 @@ impl AdaptiveDreamScheduler {
             .push(record);
 
         // Keep only last 50 records per type
-        if let Some(history) = self.effectiveness_history.get_mut(&dream_type) {
-            if history.len() > 50 {
-                history.remove(0);
-            }
+        if let Some(history) = self.effectiveness_history.get_mut(&dream_type)
+            && history.len() > 50
+        {
+            history.remove(0);
         }
 
         // Update optimal intervals based on effectiveness

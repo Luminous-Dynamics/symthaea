@@ -366,9 +366,8 @@ impl Goal {
 
     /// True if the conclusion is trivially true or is already a hypothesis.
     pub fn is_closed(&self) -> bool {
-        match &self.conclusion {
-            Expr::Bool(true) => return true,
-            _ => {}
+        if let Expr::Bool(true) = &self.conclusion {
+            return true;
         }
         if self.conclusion.is_tautology() {
             return true;
@@ -783,15 +782,15 @@ pub fn tactic_omega(goal: &Goal) -> TacticResult {
     let mut env: HashMap<String, i64> = HashMap::new();
     for (_, hyp) in &goal.hypotheses {
         if let Expr::Eq(lhs, rhs) = hyp {
-            if let Expr::Var(v) = lhs.as_ref() {
-                if let Some(n) = rhs.eval(&env) {
-                    env.insert(v.clone(), n);
-                }
+            if let Expr::Var(v) = lhs.as_ref()
+                && let Some(n) = rhs.eval(&env)
+            {
+                env.insert(v.clone(), n);
             }
-            if let Expr::Var(v) = rhs.as_ref() {
-                if let Some(n) = lhs.eval(&env) {
-                    env.insert(v.clone(), n);
-                }
+            if let Expr::Var(v) = rhs.as_ref()
+                && let Some(n) = lhs.eval(&env)
+            {
+                env.insert(v.clone(), n);
             }
         }
     }
@@ -1616,17 +1615,16 @@ impl TacticProver {
 
         // Try cases on all hypotheses that are Or/And
         for (hyp_name, hyp_expr) in &goal.hypotheses {
-            if matches!(hyp_expr, Expr::Or(_, _) | Expr::And(_, _)) {
-                if let TacticResult::Subgoals(subs) = tactic_cases(goal, hyp_name) {
-                    let mut new_goals = subs;
-                    new_goals.extend(rest.clone());
-                    if new_goals.len() <= self.max_goals {
-                        let mut new_trace = trace.clone();
-                        new_trace.push(format!("cases {}", hyp_name));
-                        if let result @ Some(_) = self.prove_goals(new_goals, new_trace, depth + 1)
-                        {
-                            return result;
-                        }
+            if matches!(hyp_expr, Expr::Or(_, _) | Expr::And(_, _))
+                && let TacticResult::Subgoals(subs) = tactic_cases(goal, hyp_name)
+            {
+                let mut new_goals = subs;
+                new_goals.extend(rest.clone());
+                if new_goals.len() <= self.max_goals {
+                    let mut new_trace = trace.clone();
+                    new_trace.push(format!("cases {}", hyp_name));
+                    if let result @ Some(_) = self.prove_goals(new_goals, new_trace, depth + 1) {
+                        return result;
                     }
                 }
             }

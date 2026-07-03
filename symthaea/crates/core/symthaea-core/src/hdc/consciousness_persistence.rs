@@ -550,10 +550,9 @@ impl ConsciousnessPersistence {
                 if let Some(id_str) = name_str
                     .strip_prefix("snapshot_")
                     .and_then(|s| s.strip_suffix(".sym"))
+                    && let Ok(id) = id_str.parse::<u64>()
                 {
-                    if let Ok(id) = id_str.parse::<u64>() {
-                        latest_id = Some(latest_id.map(|l| l.max(id)).unwrap_or(id));
-                    }
+                    latest_id = Some(latest_id.map(|l| l.max(id)).unwrap_or(id));
                 }
             }
         }
@@ -605,15 +604,14 @@ impl ConsciousnessPersistence {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
 
-            if name_str.starts_with("snapshot_") && name_str.ends_with(".sym") {
-                if let Some(id_str) = name_str
+            if name_str.starts_with("snapshot_")
+                && name_str.ends_with(".sym")
+                && let Some(id_str) = name_str
                     .strip_prefix("snapshot_")
                     .and_then(|s| s.strip_suffix(".sym"))
-                {
-                    if let Ok(id) = id_str.parse::<u64>() {
-                        snapshots.push((id, name_str.to_string()));
-                    }
-                }
+                && let Ok(id) = id_str.parse::<u64>()
+            {
+                snapshots.push((id, name_str.to_string()));
             }
         }
 
