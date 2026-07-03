@@ -7,7 +7,7 @@
 
 ## Secrets & Credentials
 - **Vault**: Use `~/.cargo/bin/bws secret get <id>` for tokens. 
-- **Crates.io**: Token is `736da236-a95f-4dd2-8efc-b42800c9106a`.
+- **Crates.io**: Token lives in BWS under secret ID `736da236-a95f-4dd2-8efc-b42800c9106a` (this UUID is the vault lookup key, NOT the token itself — fetch with `bws secret get`).
 
 ## Coding Standard: Symthaea Core
 - **Math**: Strictly follow Lie Theory and su(2) representations in `symthaea-core`.
