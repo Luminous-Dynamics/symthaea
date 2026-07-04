@@ -105,6 +105,86 @@ contended default target dir — use `env CARGO_TARGET_DIR=... cargo ...` or run
       item originally undersold the problem — it's not two Phis, see below.
 - [ ] **Decide `enable_moral_anomaly_response`**: benchmark ON, then default ON or delete
       the subsystem. Same for `enable_validation_overlay` (`config/mod.rs:904`).
+
+      **Investigated 2026-07-04, no code change — benchmark run blocked by system
+      load, do not treat this as a completed decision.** Correcting the file
+      reference: both flags live in `src/cognitive_loop/config/mod.rs` (not a
+      standalone `src/config/mod.rs`), at exactly lines 401/901
+      (`enable_moral_anomaly_response`) and 415/904 (`enable_validation_overlay`).
+
+      What `enable_moral_anomaly_response` actually gates (traced end-to-end):
+      the anomaly *detector* (`MoralTopology::detect_anomalies`,
+      `hdc/moral_topology/anomaly.rs`) always runs regardless of this flag,
+      refreshing on an adaptive cadence (97 cycles initially, then 150-600).
+      Its safety-critical consequence — escalating the ethics verdict to
+      `Blocked`/`Caution` when `trajectory_convergence` fires
+      (`ethics_engine.rs:1156-1164`) — is **unconditional**, not gated by this
+      flag. What the flag *does* gate (`cycle_strategy.rs:744-772`) is a
+      self-tuning feedback loop: when true, detected anomalies additionally
+      scale the cognitive loop's own learning rate, exploration urge, and
+      prediction confidence proportional to anomaly severity (e.g. drift alert
+      dampens LR to 0.85x, trajectory convergence dampens more aggressively).
+      So this is a learning-stability/self-correction knob, not a
+      block-vs-allow safety gate — the actual safety net already fires with or
+      without it.
+
+      Found the right reusable harness per the task's own instruction to prefer
+      existing infra: `examples/soak_moral_anomaly.rs` is a purpose-built A/B
+      soak test (10,000 cycles, 4 phases: Healthy/Degrading/Critical/Recovery)
+      comparing response ON vs OFF on consciousness-level stability (std dev)
+      and anomaly-score convergence, with a built-in recommendation printout.
+      (`examples/benchmark_moral_unified.rs`, by contrast, is the static
+      Hendrycks ETHICS classifier eval — confirmed via grep it never touches
+      `CognitiveLoopConfig`/`MoralAnomalyConfig` at all, so it's the wrong
+      harness for this specific flag.)
+
+      Attempted to actually run `soak_moral_anomaly` release build + execution
+      this session and could not get real numbers: `cargo build --release
+      --example soak_moral_anomaly` sat for 38+ minutes wall-clock consuming
+      only ~5s of actual CPU time (confirmed via `ps`/`pstree` — no live rustc
+      job under the cargo process, just an idle `cargo`+`sccache` client),
+      starved by extreme concurrent load on the shared dev box (load average
+      59-93 on a 12-core machine from ~5 other concurrent sessions' builds
+      observed live via `ps aux`). Killed the stalled build rather than let it
+      sit indefinitely contributing to contention. **No binary was produced, so
+      there are zero real execution numbers for either condition** — per this
+      task's own explicit instruction not to fabricate/estimate benchmark
+      results (the ETHICS 94.5%/~50% leakage incident is the cited cautionary
+      tale), no default flip or deletion was made. Both flags are unchanged at
+      their current defaults (`false`).
+
+      Verified low regression risk either way before stopping: every test that
+      exercises `enable_moral_anomaly_response` already sets it to `true`
+      explicitly (`tests/moral_topology_consciousness_e2e.rs`,
+      `tests/moral_topology_api_integration.rs`), so nothing depends on the
+      current `false` default; `tests/convergence_integration.rs` uses
+      `CognitiveLoopConfig::default()` but only asserts finiteness/severity
+      thresholds independent of the LR/exploration/confidence modulation this
+      flag controls.
+
+      `enable_validation_overlay` is a *different, unrelated* subsystem (traced
+      it too, since the task said to handle both) — it scales substrate
+      *feasibility* (`effective_feasibility = raw × (floor + (1−floor) ×
+      honest_confidence)`, `substrate_manager.rs:257`), not moral judgment at
+      all. There's no ground-truth "correct" feasibility number to benchmark
+      accuracy against — per `THE_SUBSTRATE_ROADMAP.md` this is a deliberate
+      epistemic-humility multiplier over an admittedly hypothetical
+      Multiple-Realizability framework, same category of judgment call as the
+      Φ/Ψ decision in Phase 1.5 item 5, not an empirical one. With the default
+      `SiliconDigital` substrate (`honest_confidence` ≈ 0.10) and default floor
+      0.5, turning it on would multiply `effective_feasibility` by ~0.55 for
+      the default profile — a material, project-wide behavior change to
+      telemetry/consciousness numbers that shouldn't be flipped as a side
+      effect of this task. Recommend treating it as its own separate decision
+      (needs explicit sign-off, not a benchmark run) rather than bundling it
+      with the moral-anomaly-response call.
+
+      **Next step for whoever picks this back up**: re-run
+      `cargo build --release --example soak_moral_anomaly && ./target/release/
+      examples/soak_moral_anomaly` (or the session's `$CARGO_TARGET_DIR`
+      equivalent) at a time of lower shared-machine contention, or in the
+      background with no wall-clock deadline, then apply the harness's own
+      printed ON/OFF recommendation to `config/mod.rs:901`.
 - [ ] **Close the SafeFallback gap**: implement for manipulator, quadruped, surgical,
       orbital, auv, exoskeleton per the behaviors the core doc already specifies — or
       amend the doc table to stop promising them. Also unify orbital's 0.3 hard cliff
