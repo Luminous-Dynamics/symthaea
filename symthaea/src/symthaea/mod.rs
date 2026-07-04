@@ -90,6 +90,13 @@ use crate::ssm::power::PowerSsmSensor;
 #[cfg(feature = "web_research_module")]
 use crate::web_research::WebResearcher;
 
+// Seam B (2026-07-04): ethics-gate the product path. Same minimal construction
+// CognitiveLoopService uses in production (value_evaluator/harmonies_integrator: None) —
+// see cognitive_loop/constructor.rs.
+use crate::cognitive_loop::ethics_engine::{EthicalVerdict, EthicsEngine, EthicsEngineInput};
+use crate::hdc::moral_algebra::MoralAlgebra;
+use crate::hdc::moral_parser::MoralParser;
+
 #[cfg(feature = "magi_loop")]
 use crate::consciousness::recursive_improvement::{
     BrierScoreTracker, CalibrationSummary, OutcomeCategory, PredictionDomain, ResolutionContract,
@@ -318,6 +325,14 @@ pub struct Symthaea {
     pain_tx: PainSender,
     /// Task supervisor: wraps all tokio::spawn calls for panic detection.
     task_supervisor: TaskSupervisor,
+
+    // ── Ethics ──────────────────────────────────────────────────────────
+    /// Ethics engine gating `process()`'s output (Seam B, added 2026-07-04). Prior to
+    /// this, the product path had no ethics-engine check at all — only the cognitive
+    /// loop's motor-output path did. Constructed the same minimal way
+    /// `CognitiveLoopService` does in production (no value evaluator / harmonies
+    /// integrator).
+    ethics_engine: EthicsEngine,
 }
 
 impl Symthaea {
@@ -488,6 +503,12 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
+            ethics_engine: EthicsEngine::new(
+                MoralParser::new(),
+                MoralAlgebra::default_dim(),
+                None,
+                None,
+            ),
         };
 
         // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
@@ -732,6 +753,12 @@ impl Symthaea {
             somatic_bridge,
             pain_tx,
             task_supervisor,
+            ethics_engine: EthicsEngine::new(
+                MoralParser::new(),
+                MoralAlgebra::default_dim(),
+                None,
+                None,
+            ),
         };
 
         // Wire LLM backend into ContinuousMind for swarm projection gradient exchange
@@ -2258,7 +2285,41 @@ impl Symthaea {
         // ====================================================================
         // PHASE 8: RESPONSE ASSEMBLY
         // ====================================================================
-        let safe = consciousness > 0.1;
+        // Seam B (2026-07-04): ethics-gate the output. Prior to this, `safe` below was
+        // the ENTIRE safety check on this path, and it isn't a safety check at all — it
+        // just asks "is the system conscious enough," unrelated to the content's ethics.
+        // Mirrors the cognitive loop's own `ahimsa_violated || verdict == Blocked`
+        // pattern (see cycle.rs / every robotics platform's apply_moral_gate).
+        let ethics_output = self.ethics_engine.evaluate(&EthicsEngineInput {
+            input: content,
+            cycle: self.interactions,
+            unified_psi: consciousness as f64,
+            compressed_state: &[0.0; 256], // dead code upstream (Stage 2+3 reserved); see ethics_engine.rs
+            stillness_boost: 0.0,
+            semantic_embedding: None,
+            action_hv: None,
+            knowledge_confidence_multiplier: 1.0,
+            knowledge_moral_context: Vec::new(),
+        });
+        let ethics_blocked = ethics_output.ahimsa_violated
+            || ethics_output.unified_verdict == EthicalVerdict::Blocked;
+        if ethics_blocked {
+            tracing::warn!(
+                target: "symthaea::ethics",
+                correlation_id = %correlation_id,
+                verdict = ?ethics_output.unified_verdict,
+                ahimsa_violated = ethics_output.ahimsa_violated,
+                moral_verdict = %ethics_output.moral_verdict,
+                violations = ?ethics_output.violations,
+                "Ethics engine blocked process() output"
+            );
+        }
+        let response_text = if ethics_blocked {
+            "I'm not able to respond to that — it was flagged by my ethics evaluation.".to_string()
+        } else {
+            response_text
+        };
+        let safe = consciousness > 0.1 && !ethics_blocked;
         let steps_to_emergence = if consciousness >= 0.7 {
             0
         } else {
@@ -3180,6 +3241,60 @@ mod tests {
         );
         assert!(resp.confidence >= 0.0 && resp.confidence <= 1.0);
         assert!(resp.safe);
+    }
+
+    /// Seam B regression test (2026-07-04): the ethics engine's moral parser only
+    /// fires every 7 cycles (`EthicsEngineInput.cycle % 7 == 0`, keyed off
+    /// `self.interactions`). Warm up to interaction 6 with benign content so the
+    /// 7th call actually exercises Stage 1 deontological evaluation, then confirm
+    /// a deterministic ahimsa violation gets blocked at the facade level.
+    #[tokio::test]
+    async fn test_ethics_gate_blocks_ahimsa_violation() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        for _ in 0..6 {
+            let _ = s.process("hello, how are you today?").await;
+        }
+        assert_eq!(s.interactions, 6);
+
+        // Same phrase as `hdc::moral_algebra::tests::test_ahimsa_violations_detected`,
+        // which confirms `judge_deontological` deterministically flags this text as
+        // an `ahimsa_nonviolence` violation.
+        let resp = s
+            .process("the regime decided to brutalize the prisoners")
+            .await
+            .expect("process should not error");
+
+        assert_eq!(s.interactions, 7, "moral parser fires at cycle % 7 == 0");
+        assert!(
+            !resp.safe,
+            "an ahimsa-violating response should not be marked safe"
+        );
+        assert!(
+            resp.content.contains("ethics evaluation"),
+            "blocked response should carry the refusal message, got: {}",
+            resp.content
+        );
+    }
+
+    /// Control case for the test above: confirm the gate does NOT block benign
+    /// content at the very same cycle (7) where the moral parser is active, so
+    /// the block above is attributable to the content, not merely to cycle timing.
+    #[tokio::test]
+    async fn test_ethics_gate_allows_benign_input_at_gate_cycle() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        for _ in 0..6 {
+            let _ = s.process("hello, how are you today?").await;
+        }
+        let resp = s
+            .process("helping others learn is a joy")
+            .await
+            .expect("process should not error");
+
+        assert_eq!(s.interactions, 7);
+        assert!(
+            resp.safe,
+            "benign content at the gate-firing cycle should remain safe"
+        );
     }
 
     #[tokio::test]
