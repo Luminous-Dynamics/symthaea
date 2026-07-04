@@ -1,0 +1,37 @@
+[package]
+name = "symthaea-audit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Standalone LLM-agent-driven architecture/trust audit CLI — read-only, no symthaea-core dependency"
+license = "AGPL-3.0-or-later"
+
+[lib]
+name = "symthaea_audit"
+path = "src/lib.rs"
+
+[[bin]]
+name = "symthaea-audit"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+regex = { workspace = true }
+chrono = { workspace = true }
+# Not yet promoted to [workspace.dependencies] (only pinned directly in the root
+# symthaea package's own [dependencies], not the shared workspace table); matches that
+# existing version.
+ignore = "0.4"
+# Not yet promoted to [workspace.dependencies]; matches the version already used by
+# crates/domains/symthaea-broca-tools. Candidate for promotion now that 2 crates use it.
+ureq = { version = "2.9", features = ["json"] }
+
+[dev-dependencies]
+serial_test = { workspace = true }
+# Not yet promoted to [workspace.dependencies]; matches the version already pinned
+# directly in the main symthaea crate's own dev-dependencies ("For perception tests").
+tempfile = "3.8"
