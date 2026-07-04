@@ -21,6 +21,12 @@ symthaea-fep = { path = "../../core/symthaea-fep" }
 serde = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
+# Real rigid-body physics (Bevy-free, GJK/EPA + LBVH broadphase) for the
+# opt-in cell-packing correction pass — see src/packing.rs. symtropy-math
+# is needed directly because symtropy-physics doesn't re-export its Point<D>.
+symtropy-physics = { path = "../../../../symtropy/crates/core/symtropy-physics" }
+symtropy-math = { path = "../../../../symtropy/crates/core/symtropy-math" }
+nalgebra = { workspace = true }
 
 [dev-dependencies]
 proptest = "1.4"

@@ -345,15 +345,24 @@ impl MorphogeneticField {
     /// (any cell type, unlike `form_synapses` which is neuron-only).
     /// Existing zero-weight pairs are (re-)attempted each call so a blocked
     /// network can "heal" once permeability is restored.
+    ///
+    /// Candidate pairs come from [`MorphogeneticField::neighbours`]
+    /// (grid-backed once a day's grid has been built). Candidates are
+    /// sorted before use so the `i < j` ordering — and therefore the
+    /// sequence of `self.bioelectric.rng` draws below — matches the
+    /// original O(n^2) pairwise scan exactly; the grid returns matches in
+    /// bucket order, not index order.
     pub fn form_gap_junctions(&mut self) {
         let n = self.cells.len();
         let permeability = self.bioelectric.gap_junction_permeability as f64;
         for i in 0..n {
-            let pos_i = self.cells[i].position;
-            for j in (i + 1)..n {
-                if Self::distance(&pos_i, &self.cells[j].position) < GAP_JUNCTION_RADIUS
-                    && self.bioelectric.gap_junction_matrix[i][j] == 0.0
-                {
+            let mut candidates = self.neighbours(i, GAP_JUNCTION_RADIUS);
+            candidates.sort_unstable();
+            for j in candidates {
+                if j <= i {
+                    continue;
+                }
+                if self.bioelectric.gap_junction_matrix[i][j] == 0.0 {
                     let w = self.bioelectric.rng.gen_range(0.4..1.0f64) * permeability;
                     self.bioelectric.gap_junction_matrix[i][j] = w;
                     self.bioelectric.gap_junction_matrix[j][i] = w;
@@ -968,6 +977,17 @@ impl NeuralOrganoid {
     /// Whether positional homing is currently enabled.
     pub fn positional_homing_enabled(&self) -> bool {
         self.positional_homing_enabled
+    }
+
+    /// Enable or disable the opt-in real-physics packing correction pass —
+    /// see [`crate::packing`] for what it does and why it's off by default.
+    pub fn set_packing_enabled(&mut self, enabled: bool) {
+        self.packing_enabled = enabled;
+    }
+
+    /// Whether the packing correction pass is currently enabled.
+    pub fn packing_enabled(&self) -> bool {
+        self.packing_enabled
     }
 
     /// Apply one day's positional-homing pull, if enabled and a target has
