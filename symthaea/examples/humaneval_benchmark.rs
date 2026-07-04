@@ -10,10 +10,20 @@
 //!   --llm        Full agent pipeline with LLM escalation
 //!   (default)    Native-only (no LLM)
 //!
+//! Flags:
+//!   --orchestrator  (Agent/Native modes only) route through CodeOrchestrator +
+//!                   MagiCodeBridge instead of the raw IntelligentDispatcher path,
+//!                   and enable FixRuleGenerator rule-generation observation.
+//!                   Combine with SYMTHAEA_HARD_GEODESIC_REJECTION=1 /
+//!                   SYMTHAEA_GEODESIC_REJECTION_SHADOW=1 env vars to also exercise
+//!                   the structural-surprise fast-fail retry loop in
+//!                   verified_generation.rs (only reachable via the orchestrator).
+//!
 //! Run:
-//!   Direct:  `cargo run --example humaneval_benchmark --features code_generation -- --direct --limit 20`
-//!   Agent:   `cargo run --example humaneval_benchmark --features code_generation -- --llm --limit 20`
-//!   Verify:  `... -- --direct --limit 20 --verify-canonical`
+//!   Direct:       `cargo run --example humaneval_benchmark --features code_generation -- --direct --limit 20`
+//!   Agent:        `cargo run --example humaneval_benchmark --features code_generation -- --llm --limit 20`
+//!   Orchestrator: `cargo run --example humaneval_benchmark --features code_generation -- --llm --orchestrator --limit 20`
+//!   Verify:       `... -- --direct --limit 20 --verify-canonical`
 //!
 //! Requires: HumanEval.jsonl.gz at benchmarks/ai_benchmarks/data/humaneval/human-eval-master/data/
 
@@ -122,13 +132,15 @@ fn generate_direct(problem: &HumanEvalProblem) -> String {
 // ── Agent Mode ───────────────────────────────────────────────────────────
 
 /// Generate a solution using the full coding agent pipeline.
-fn generate_agent(problem: &HumanEvalProblem, use_llm: bool) -> String {
+fn generate_agent(problem: &HumanEvalProblem, use_llm: bool, use_orchestrator: bool) -> String {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let config = CodingAgentConfig {
         max_iterations: 5,
         working_dir: temp_dir.path().to_path_buf(),
         target_file: Some(PathBuf::from("solution.py")),
         use_local_llm: use_llm,
+        use_orchestrator,
+        enable_self_modification: use_orchestrator,
         ..Default::default()
     };
 
@@ -298,6 +310,7 @@ fn main() {
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(164);
     let verify = args.iter().any(|a| a == "--verify-canonical");
+    let use_orchestrator = args.iter().any(|a| a == "--orchestrator");
 
     let data_path = PathBuf::from(
         "benchmarks/ai_benchmarks/data/humaneval/human-eval-master/data/HumanEval.jsonl.gz",
@@ -312,12 +325,33 @@ fn main() {
     let problems: Vec<&HumanEvalProblem> = problems.iter().take(limit).collect();
 
     let mode_str = match mode {
-        BenchMode::Direct => "Direct LLM (qwen2.5-coder:7b, no cognitive loop)",
-        BenchMode::Agent => "Agent + LLM (full consciousness pipeline)",
-        BenchMode::Native => "Native-only (no LLM)",
+        BenchMode::Direct => "Direct LLM (qwen2.5-coder:7b, no cognitive loop)".to_string(),
+        BenchMode::Agent => format!(
+            "Agent + LLM (full consciousness pipeline{})",
+            if use_orchestrator {
+                ", orchestrator"
+            } else {
+                ""
+            }
+        ),
+        BenchMode::Native => format!(
+            "Native-only (no LLM{})",
+            if use_orchestrator {
+                ", orchestrator"
+            } else {
+                ""
+            }
+        ),
     };
     eprintln!("HumanEval Benchmark — {} problems", problems.len());
     eprintln!("Mode: {}\n", mode_str);
+    if use_orchestrator {
+        eprintln!(
+            "  SYMTHAEA_HARD_GEODESIC_REJECTION={}  SYMTHAEA_GEODESIC_REJECTION_SHADOW={}\n",
+            std::env::var_os("SYMTHAEA_HARD_GEODESIC_REJECTION").is_some(),
+            std::env::var_os("SYMTHAEA_GEODESIC_REJECTION_SHADOW").is_some()
+        );
+    }
 
     if verify {
         eprintln!("Verifying canonical solutions...");
@@ -338,8 +372,8 @@ fn main() {
 
         let solution = match mode {
             BenchMode::Direct => generate_direct(problem),
-            BenchMode::Agent => generate_agent(problem, true),
-            BenchMode::Native => generate_agent(problem, false),
+            BenchMode::Agent => generate_agent(problem, true, use_orchestrator),
+            BenchMode::Native => generate_agent(problem, false, use_orchestrator),
         };
 
         let (passed, compiled, error) = run_test(problem, &solution);
@@ -440,6 +474,9 @@ fn main() {
     let json_report = serde_json::json!({
         "benchmark": "humaneval",
         "mode": format!("{:?}", mode),
+        "use_orchestrator": use_orchestrator,
+        "hard_geodesic_rejection": std::env::var_os("SYMTHAEA_HARD_GEODESIC_REJECTION").is_some(),
+        "geodesic_rejection_shadow": std::env::var_os("SYMTHAEA_GEODESIC_REJECTION_SHADOW").is_some(),
         "model": "qwen2.5-coder:7b",
         "total": total, "passed": passed,
         "pass_at_1": passed as f64 / total as f64,
@@ -447,7 +484,10 @@ fn main() {
         "results": json_results,
     });
 
-    let report_path = std::env::temp_dir().join("symthaea_humaneval.json");
+    let report_suffix =
+        format!("{:?}{}", mode, if use_orchestrator { "_orch" } else { "" }).to_lowercase();
+    let report_path =
+        std::env::temp_dir().join(format!("symthaea_humaneval_{}.json", report_suffix));
     let _ = std::fs::write(
         &report_path,
         serde_json::to_string_pretty(&json_report).unwrap(),
