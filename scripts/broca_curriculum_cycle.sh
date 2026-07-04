@@ -85,12 +85,37 @@ fi
 
 # ── Step 2: synthesize training pairs for real ─────────────────────────────
 echo "[broca-cycle] synthesizing training pairs for new objectives..."
+mkdir -p "$CURRICULUM_DERIVED_DIR/holdout"
+shopt -s nullglob
+holdout_files_before=("$CURRICULUM_DERIVED_DIR"/holdout/*.holdout.jsonl)
+shopt -u nullglob
+
 "${sync_cmd[@]}"
 
+# holdout/ is a separate subdirectory from the training-pair jsonl files
+# specifically so this glob (used for the training merge below) can never
+# accidentally include held-out text — see broca_curriculum_sync.rs's note.
 shopt -s nullglob
 derived_jsonl_files=("$CURRICULUM_DERIVED_DIR"/*.jsonl)
 derived_manifest_files=("$CURRICULUM_DERIVED_DIR"/*.manifest.json)
+holdout_files_after=("$CURRICULUM_DERIVED_DIR"/holdout/*.holdout.jsonl)
 shopt -u nullglob
+
+# The one holdout file broca-curriculum-sync just wrote this cycle (if any
+# new objectives produced enough accepted text to spare a holdout) — used
+# later to check whether THIS cycle's new material actually landed, not
+# full history.
+new_holdout_file=""
+for f in "${holdout_files_after[@]}"; do
+  found=0
+  for old in "${holdout_files_before[@]}"; do
+    [[ "$f" == "$old" ]] && found=1 && break
+  done
+  if [[ "$found" -eq 0 ]]; then
+    new_holdout_file="$f"
+    break
+  fi
+done
 
 if [[ ${#derived_jsonl_files[@]} -eq 0 ]]; then
   echo "[broca-cycle] no curriculum-derived pairs on disk; nothing to train on"

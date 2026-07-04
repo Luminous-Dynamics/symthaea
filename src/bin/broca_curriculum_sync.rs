@@ -506,7 +506,15 @@ async fn main() -> Result<()> {
     let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
     let jsonl_path = derived_dir.join(format!("{timestamp}.jsonl"));
     let manifest_path = derived_dir.join(format!("{timestamp}.manifest.json"));
-    let holdout_path = derived_dir.join(format!("{timestamp}.holdout.jsonl"));
+    // Deliberately in a separate holdout/ subdirectory, not just a distinct
+    // suffix: the cycle script globs "$CURRICULUM_DERIVED_DIR"/*.jsonl to
+    // build the training merge, and *.holdout.jsonl would still match that
+    // glob (it ends in .jsonl too) — putting it in its own subdirectory
+    // means the non-recursive glob can never accidentally pull held-out
+    // text into training, with no filter logic to keep in sync.
+    let holdout_path = derived_dir
+        .join("holdout")
+        .join(format!("{timestamp}.holdout.jsonl"));
 
     // Write the JSONL via TrainingDataset::to_jsonl into a temp path, then
     // atomically rename both it and the manifest into place. Only after both
