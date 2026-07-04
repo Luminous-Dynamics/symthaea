@@ -435,11 +435,11 @@ impl<I: I2c> HalRuntime<I> {
         let tick_start = Instant::now();
 
         // 0a. Poll e-stop (if wired)
-        if let Some(ref mut poller) = self.estop_poller {
-            if poller.poll() {
-                warn!("e-stop poller triggered");
-                return Err(HalError::EStop);
-            }
+        if let Some(ref mut poller) = self.estop_poller
+            && poller.poll()
+        {
+            warn!("e-stop poller triggered");
+            return Err(HalError::EStop);
         }
 
         // 0b. Read current monitors → check overcurrent
@@ -533,11 +533,11 @@ impl<I: I2c> HalRuntime<I> {
             let tick_start = Instant::now();
 
             // Check max ticks
-            if let Some(max) = max_ticks {
-                if self.tick_count >= max {
-                    debug!(ticks = self.tick_count, "max ticks reached");
-                    return Ok(self.tick_count);
-                }
+            if let Some(max) = max_ticks
+                && self.tick_count >= max
+            {
+                debug!(ticks = self.tick_count, "max ticks reached");
+                return Ok(self.tick_count);
             }
 
             // Check e-stop before tick
