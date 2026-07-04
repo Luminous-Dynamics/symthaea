@@ -129,7 +129,7 @@ impl SocialEmbedding {
             if self.agent_models.len() >= self.max_agents {
                 // Remove oldest
                 self.agent_models
-                    .sort_by(|a, b| b.last_update.cmp(&a.last_update));
+                    .sort_by_key(|m| std::cmp::Reverse(m.last_update));
                 self.agent_models.pop();
             }
 
