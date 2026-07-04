@@ -5,6 +5,7 @@
 
 /// Baked into the binary via `include_str!` — no runtime file dependency.
 const TEMPLATE: &str = include_str!("../templates/audit_system_prompt.md");
+const VERIFY_TEMPLATE: &str = include_str!("../templates/verify_system_prompt.md");
 
 const RUN_CHECK_DOC: &str = "- `run_check` — `{\"type\": \"run_check\", \"cmd\": \"...\"}` — run a \
     whitelisted read-only command (e.g. a compile check). Only the exact commands the operator \
@@ -26,6 +27,14 @@ pub fn build_system_prompt(focus: Option<&str>, run_check_enabled: bool) -> Stri
     TEMPLATE
         .replace("{focus_clause}", &focus_clause)
         .replace("{run_check_doc}", run_check_doc)
+}
+
+/// Builds the verification-pass system prompt. Unlike [`build_system_prompt`], the
+/// draft report to verify isn't interpolated here — it's seeded into the initial user
+/// turn by the caller, so this prompt stays generic and reusable.
+pub fn build_verification_prompt(run_check_enabled: bool) -> String {
+    let run_check_doc = if run_check_enabled { RUN_CHECK_DOC } else { "" };
+    VERIFY_TEMPLATE.replace("{run_check_doc}", run_check_doc)
 }
 
 #[cfg(test)]
@@ -70,5 +79,21 @@ mod tests {
         let prompt = build_system_prompt(Some("x"), true);
         assert!(!prompt.contains("{focus_clause}"));
         assert!(!prompt.contains("{run_check_doc}"));
+    }
+
+    #[test]
+    fn verification_prompt_has_verdict_vocabulary_and_no_placeholders() {
+        let prompt = build_verification_prompt(false);
+        for word in ["VERIFIED", "UNVERIFIED", "CONTRADICTED"] {
+            assert!(prompt.contains(word), "missing verdict word: {word}");
+        }
+        assert!(!prompt.contains("{run_check_doc}"));
+        assert!(!prompt.contains("run_check"));
+    }
+
+    #[test]
+    fn verification_prompt_documents_run_check_when_enabled() {
+        let prompt = build_verification_prompt(true);
+        assert!(prompt.contains("run_check"));
     }
 }

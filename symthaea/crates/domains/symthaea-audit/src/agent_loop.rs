@@ -211,15 +211,23 @@ pub struct RunOutcome {
     pub truncated_by_turn_budget: bool,
 }
 
+/// `initial_context`, when set, is prepended to the first user turn — used both for
+/// heuristic pre-scan hints and for single-shot file prefetch content. The model keeps
+/// full tool access regardless; this only changes what it starts out already knowing.
 pub fn run(
     client: &dyn LlmClient,
     sandbox: &Sandbox,
     system_prompt: &str,
     max_turns: usize,
+    initial_context: Option<&str>,
 ) -> Result<RunOutcome> {
+    let opening = match initial_context {
+        Some(ctx) if !ctx.trim().is_empty() => format!("{ctx}\n\nBegin the audit."),
+        _ => "Begin the audit.".to_string(),
+    };
     let mut history: Vec<Turn> = vec![Turn {
         role: Role::User,
-        content: "Begin the audit.".to_string(),
+        content: opening,
     }];
     let mut last_action: Option<ActionRequest> = None;
     let mut repeat_count = 0usize;
@@ -378,7 +386,7 @@ mod tests {
                 format!("done {END_OF_REPORT_MARKER}"),
             ]),
         };
-        let outcome = run(&client, &sandbox, "system", 5).unwrap();
+        let outcome = run(&client, &sandbox, "system", 5, None).unwrap();
         assert!(outcome.report.contains(END_OF_REPORT_MARKER));
     }
 
@@ -390,7 +398,7 @@ mod tests {
         let client = StubClient {
             responses: std::cell::RefCell::new(vec![repeated.clone(); 10]),
         };
-        let outcome = run(&client, &sandbox, "system", 40).unwrap();
+        let outcome = run(&client, &sandbox, "system", 40, None).unwrap();
         assert!(outcome.truncated_by_turn_budget);
         assert!(outcome.turns_used < 40);
     }
@@ -406,8 +414,52 @@ mod tests {
                     .collect(),
             ),
         };
-        let outcome = run(&client, &sandbox, "system", 3).unwrap();
+        let outcome = run(&client, &sandbox, "system", 3, None).unwrap();
         assert!(outcome.truncated_by_turn_budget);
         assert!(outcome.report.contains("[AUDIT"));
+    }
+
+    struct RecordingClient {
+        responses: std::cell::RefCell<Vec<String>>,
+        seen_first_turn: std::cell::RefCell<Option<String>>,
+    }
+
+    impl LlmClient for RecordingClient {
+        fn complete(&self, _system_prompt: &str, history: &[Turn]) -> Result<String> {
+            if self.seen_first_turn.borrow().is_none() {
+                *self.seen_first_turn.borrow_mut() = history.first().map(|t| t.content.clone());
+            }
+            Ok(self.responses.borrow_mut().remove(0))
+        }
+        fn name(&self) -> &'static str {
+            "recording"
+        }
+    }
+
+    #[test]
+    fn initial_context_is_prepended_to_first_turn() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sandbox = Sandbox::new(tmp.path(), vec![]).unwrap();
+        let client = RecordingClient {
+            responses: std::cell::RefCell::new(vec![format!("done {END_OF_REPORT_MARKER}")]),
+            seen_first_turn: std::cell::RefCell::new(None),
+        };
+        run(&client, &sandbox, "system", 5, Some("HINT: check foo")).unwrap();
+        let seen = client.seen_first_turn.borrow().clone().unwrap();
+        assert!(seen.contains("HINT: check foo"));
+        assert!(seen.contains("Begin the audit."));
+    }
+
+    #[test]
+    fn empty_initial_context_falls_back_to_plain_opening() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sandbox = Sandbox::new(tmp.path(), vec![]).unwrap();
+        let client = RecordingClient {
+            responses: std::cell::RefCell::new(vec![format!("done {END_OF_REPORT_MARKER}")]),
+            seen_first_turn: std::cell::RefCell::new(None),
+        };
+        run(&client, &sandbox, "system", 5, Some("   ")).unwrap();
+        let seen = client.seen_first_turn.borrow().clone().unwrap();
+        assert_eq!(seen, "Begin the audit.");
     }
 }

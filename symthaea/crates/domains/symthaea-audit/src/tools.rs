@@ -158,6 +158,12 @@ impl Sandbox {
         &self.allow_exec
     }
 
+    /// Public resolve for callers (e.g. `prefetch`) that need the canonical path
+    /// itself rather than file contents — e.g. to check `is_file()`/`is_dir()`.
+    pub fn resolve_for_prefetch(&self, requested: &str) -> Result<PathBuf, SandboxViolation> {
+        self.resolve(requested)
+    }
+
     fn resolve(&self, requested: &str) -> Result<PathBuf, SandboxViolation> {
         resolve_in_sandbox(&self.root, Path::new(requested))
     }

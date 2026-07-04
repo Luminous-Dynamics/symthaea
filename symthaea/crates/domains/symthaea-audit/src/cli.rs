@@ -51,20 +51,48 @@ pub struct Cli {
     /// disables `run_check` entirely — it is not even advertised to the model.
     #[arg(long)]
     pub allow_exec: Option<String>,
+
+    /// Comma-separated repo-relative paths (files or directories) to read wholesale
+    /// and hand to the model in its first turn, instead of making it plan a sequence
+    /// of read_file/list_dir calls to discover the same content. The model keeps full
+    /// tool access afterward. Aimed at smaller/local models, which are typically much
+    /// weaker at multi-turn exploration planning than at reading a lot of text at once.
+    #[arg(long)]
+    pub single_shot_paths: Option<String>,
+
+    /// Run a second pass after the main audit that re-checks each cited claim against
+    /// the actual repository content, appending a "Verification Notes" section rather
+    /// than replacing the original report.
+    #[arg(long, default_value_t = false)]
+    pub verify: bool,
+
+    /// Disable the deterministic (non-LLM) pre-scan that flags functions called with a
+    /// literal `None` argument in one place and a non-`None` argument at the same
+    /// position elsewhere — on by default since it costs nothing and directly targets
+    /// this tool's highest-value finding shape.
+    #[arg(long, default_value_t = false)]
+    pub no_hints: bool,
 }
 
 impl Cli {
     /// Parsed, trimmed, non-empty entries of `--allow-exec`. Empty when unset.
     pub fn allow_exec_list(&self) -> Vec<String> {
-        self.allow_exec
-            .as_deref()
-            .unwrap_or("")
-            .split(',')
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect()
+        split_comma_list(self.allow_exec.as_deref())
     }
+
+    /// Parsed, trimmed, non-empty entries of `--single-shot-paths`. Empty when unset.
+    pub fn single_shot_paths_list(&self) -> Vec<String> {
+        split_comma_list(self.single_shot_paths.as_deref())
+    }
+}
+
+fn split_comma_list(raw: Option<&str>) -> Vec<String> {
+    raw.unwrap_or("")
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -103,6 +131,9 @@ mod tests {
             openai_base_url: None,
             max_turns: 40,
             allow_exec: Some(" cargo check , pytest --collect-only ,, ".to_string()),
+            single_shot_paths: None,
+            verify: false,
+            no_hints: false,
         };
         assert_eq!(
             cli.allow_exec_list(),
@@ -125,6 +156,9 @@ mod tests {
             openai_base_url: None,
             max_turns: 40,
             allow_exec: None,
+            single_shot_paths: None,
+            verify: false,
+            no_hints: false,
         };
         assert!(cli.allow_exec_list().is_empty());
     }
