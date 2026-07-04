@@ -3,7 +3,7 @@ name = "symtropy-net"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Decentralized P2P state sync via Holochain DHT for Symtropy"
+description = "Deterministic lockstep physics sync for Symtropy: tested lockstep protocol + in-memory loopback transport; WebSocket relay transport compiles but is untested against a live server; Iroh QUIC P2P transport is a documented stub (see iroh_transport.rs)"
 
 [features]
 default = []
