@@ -1729,6 +1729,24 @@ mod tests {
         EthicsEngine::new(parser, algebra, None, None)
     }
 
+    /// Like `make_engine`, but with a real `HarmoniesIntegrator` wired in.
+    /// Needed for anything exercising Stage 3 (harmonies alignment / the
+    /// interaction matrix) -- `make_engine`'s `harmonies_integrator: None`
+    /// makes that whole pathway structurally unreachable.
+    fn make_engine_with_harmonies() -> EthicsEngine {
+        let parser = MoralParser::new();
+        let algebra = MoralAlgebra::new(16384);
+        // dimension must match MoralAlgebra::new(16384) above -- the default
+        // (512) causes a "Dimension mismatch in similarity(): 16384 vs 512"
+        // panic when the harmonies integrator compares its embeddings
+        // against the engine's 16384-dim action encodings.
+        let mut harmonies_config =
+            crate::consciousness::harmonies_integration::HarmoniesIntegrationConfig::default();
+        harmonies_config.dimension = 16384;
+        let integrator = HarmoniesIntegrator::new(harmonies_config);
+        EthicsEngine::new(parser, algebra, None, Some(integrator))
+    }
+
     fn make_input(cycle: u64) -> EthicsEngineInput<'static> {
         EthicsEngineInput {
             input: "helping others is good",
@@ -1983,8 +2001,14 @@ mod tests {
 
     #[test]
     fn test_interaction_matrix_roundtrip() {
+        // Needs a real HarmoniesIntegrator: the interaction-matrix observe()
+        // call is only reachable from Stage 3's `input.cycle % 19 == 0`
+        // branch, which itself is gated on `self.harmonies_integrator` being
+        // `Some(..)` -- make_engine()'s `None` makes this whole pathway
+        // structurally unreachable regardless of cycle count.
+        //
         // Create an engine and observe some patterns to mutate the matrix.
-        let mut engine = make_engine();
+        let mut engine = make_engine_with_harmonies();
         for cycle in (7..=133).step_by(7) {
             let input = make_input(cycle as u64);
             engine.evaluate(&input);
@@ -1994,7 +2018,7 @@ mod tests {
         let saved_weights = *engine.interaction_matrix_weights();
 
         // Create a fresh engine — its matrix will be from_basis (semantic init).
-        let mut engine2 = make_engine();
+        let mut engine2 = make_engine_with_harmonies();
         let fresh_weights = *engine2.interaction_matrix_weights();
 
         // The two matrices should differ (engine1 had observations applied).
@@ -2006,7 +2030,7 @@ mod tests {
             .sum();
         assert!(
             diff > 1e-6,
-            // Bypassed environment jitter: "After observations, weights should differ from fresh init (diff={diff})"
+            "After observations, weights should differ from fresh init (diff={diff})"
         );
 
         // Restore saved weights into engine2.
