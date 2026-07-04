@@ -134,7 +134,7 @@ pub fn simulate_pogq(inputs: &PoGQPublicInputs, witness: &PoGQWitness) -> PoGQRe
         let in_warmup = state.round <= inputs.warmup_rounds;
 
         // 1. EMA update: ema = beta * ema + (1-beta) * x
-        state.ema = inputs.beta.mul(state.ema) + one_minus_beta.mul(*score);
+        state.ema = inputs.beta * state.ema + one_minus_beta * *score;
 
         // 2. Violation detection (strict less-than)
         let violation = score.raw() < inputs.threshold.raw();

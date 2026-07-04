@@ -47,24 +47,32 @@ impl FixedPoint {
         self.0
     }
 
-    /// Fixed-point multiply: (a * b) >> 16
-    pub fn mul(self, other: Self) -> Self {
-        Self((self.0 as i128 * other.0 as i128 / Q16_16_SCALE as i128) as i64)
-    }
-
-    /// Fixed-point divide: (a << 16) / b
-    pub fn div(self, other: Self) -> Self {
-        if other.0 == 0 {
-            return Self(i64::MAX); // Saturate on division by zero
-        }
-        Self((self.0 as i128 * Q16_16_SCALE as i128 / other.0 as i128) as i64)
-    }
-
     /// Represent 1.0 in Q16.16.
     pub const ONE: Self = Self(Q16_16_SCALE as i64);
 
     /// Represent 0.0 in Q16.16.
     pub const ZERO: Self = Self(0);
+}
+
+impl std::ops::Mul for FixedPoint {
+    type Output = Self;
+
+    /// Fixed-point multiply: (a * b) >> 16
+    fn mul(self, other: Self) -> Self {
+        Self((self.0 as i128 * other.0 as i128 / Q16_16_SCALE as i128) as i64)
+    }
+}
+
+impl std::ops::Div for FixedPoint {
+    type Output = Self;
+
+    /// Fixed-point divide: (a << 16) / b
+    fn div(self, other: Self) -> Self {
+        if other.0 == 0 {
+            return Self(i64::MAX); // Saturate on division by zero
+        }
+        Self((self.0 as i128 * Q16_16_SCALE as i128 / other.0 as i128) as i64)
+    }
 }
 
 impl std::ops::Add for FixedPoint {
@@ -107,7 +115,7 @@ mod tests {
     fn test_fixed_multiply() {
         let a = FixedPoint::from_f32(0.5);
         let b = FixedPoint::from_f32(0.8);
-        let c = a.mul(b);
+        let c = a * b;
         assert!((c.to_f32() - 0.4).abs() < 0.001);
     }
 
@@ -115,7 +123,7 @@ mod tests {
     fn test_fixed_divide() {
         let a = FixedPoint::from_f32(1.0);
         let b = FixedPoint::from_f32(2.0);
-        let c = a.div(b);
+        let c = a / b;
         assert!((c.to_f32() - 0.5).abs() < 0.001);
     }
 
