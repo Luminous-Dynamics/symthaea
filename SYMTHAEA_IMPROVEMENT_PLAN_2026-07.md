@@ -309,47 +309,71 @@ doc) and mostly don't call any Phi calculator at all (one uses its own ad hoc
 output behind a feature+`#[ignore]`-gated test that doesn't run under default settings.
 
 **Recommendation, in order (supersedes the original three):**
-1. (S) **Remove or fix `consciousness_verifier.rs`'s 3x weighting of the deprecated λ₂
-   method**, and add the same warning to `unified_consciousness_engine.rs` and
-   `phi_engine`'s method table. This is dormant today but the single highest-severity
-   landmine in the whole audit — fix before it ever gets wired to `enable_verification()`.
-   *Status 2026-07-03 (fourth pass): partially done — the module now carries
-   `#[deprecated]` + a do-not-use audit banner (`consciousness_verifier.rs:6,62`) and
-   `enable_verification()` has zero callers anywhere. Remaining: the 3.0 weight itself
-   (`consciousness_verifier.rs:296-297`) and the un-warned repeats in
-   `unified_consciousness_engine.rs:273` and `phi_engine`'s method table.*
-2. (S) Fix the `PhiOrchestrator` vs `TieredPhi` doc contradiction about algebraic
-   connectivity (already noted above).
-3. (M) **Wire `test_spectral_mip_validation.rs` into the actual test suite** (add it to
-   `Cargo.toml`'s explicit `[[test]]` list) and re-run it. Right now nobody knows whether
-   SpectralMIPFinder — the thing actually gating robot motor safety — clears even the
-   weak ρ > 0.50 bar, because the test that would tell you has never executed.
-   *Second instance (found 2026-07-03, fourth pass): `crates/symthaea-phi-oracle/` is not
-   a workspace member (root `Cargo.toml` members are only `crates/{core,domains,bridges}/*`
-   and phi-oracle isn't in `exclude` either — it compiles only as a transitive path-dep),
-   so its `tests/integration.rs` — including `test_signal_loss_fixed`
-   (`integration.rs:253`), which validates SpectralMIPFinder yields non-degenerate
-   integration on a coupled 6-node system — has also never run. Add phi-oracle to the
-   workspace or relocate the test.*
-4. (M) Correct `docs/PHI_VALIDATION_RESULTS.md` and `papers/book/symthaea_book.tex`'s
+1. [x] (S) **Remove or fix `consciousness_verifier.rs`'s 3x weighting of the deprecated
+   λ₂ method** — **DONE 2026-07-04, commit `a15b07b47b`.** Deprecated the whole module
+   (`#[deprecated]` on the struct, not just a doc banner) with a full explanation;
+   deliberately left the numeric weights (3.0/2.0/1.0) unchanged rather than
+   "rebalancing" them, since none of the three legs is valid — reweighting invalid
+   methods doesn't produce a meaningful result, only replacement does. Added
+   `#[allow(deprecated)]` at all 5 consumer sites (2 tests, 1 field, 1 constructor call,
+   1 re-export), each annotated with why. Also fixed the same un-warned repeat in
+   `unified_consciousness_engine.rs:273` (`compute_unified_psi()` doc comment) and
+   `phi_engine`'s method table (previously rated the two invalid methods
+   "High"/"Medium" accuracy). Verified: `cargo check -p symthaea-core --lib` clean, 0
+   errors, 0 warnings from any touched file.
+2. [x] (S) Fix the `PhiOrchestrator` vs `TieredPhi` doc contradiction — **DONE
+   2026-07-04, commit `a15b07b47b`.** Corrected the module doc, the adaptive-selection
+   ASCII diagram, and both `PhiMode`/`CalculatorType` enum variant docs. Also fixed a
+   second bug found while there: the doc-comment type names (`RealPhiCalculator`,
+   `ResonatorPhiCalculator`) didn't match what the module actually imports
+   (`ConnectivityCalculator`, `ResonantPhiCalculator`) — stale documentation compounding
+   the original contradiction. Kept variant names for API stability (renaming
+   `PhiMode::Accurate`/`Fast` would be a breaking change out of scope here); added
+   caveats instead.
+3. [x] (M) **Wire `test_spectral_mip_validation.rs` into the actual test suite** —
+   **DONE 2026-07-04, commit `8ee930380f`.** Added the `[[test]]` entry; this
+   immediately surfaced real bitrot (a match pattern invalid under the current
+   edition's match-ergonomics rules, fixed per the compiler's own suggestion). **Result,
+   run for the first time ever: all 6 tests pass. Pearson r = 0.9866, Spearman ρ =
+   0.9264 (N=62)** — clears not just the weak ρ>0.50 bar the test asserts, but the
+   test's own "STRONG VALIDATION" bar (r>0.70 and ρ>0.70). Confirms the r≈0.99 figure in
+   `docs/PHI_VALIDATION_RESULTS.md` is real and reproducible; it just needed to actually
+   run to be trustworthy rather than merely written down. Caveat from the audit still
+   holds — this validates the Fiedler-ordering search strategy against the same
+   Gaussian-MI proxy used for both exact and spectral computation, not agreement with
+   true TPM-based IIT Φ.
+   *Second instance — DONE 2026-07-04, commit `41c20edccd`.* `crates/symthaea-phi-oracle/`
+   sat directly under `crates/` instead of `crates/domains/`, so it was never matched by
+   the workspace's glob patterns and its `tests/integration.rs` (`test_signal_loss_fixed`
+   included) had also never run. Moved it into `crates/domains/`, fixed the 4 relative
+   paths this broke (its own `symthaea-core` dep, plus 3 consumers:
+   `symthaea-telemetry-sink`, `symthaea-telemetry-grpc`, `symthaea-bevy-dash`). **Result:
+   all 42 tests pass** (27 unit + 14 integration + 1 doctest), including
+   `test_signal_loss_fixed`.
+4. [ ] (M) Correct `docs/PHI_VALIDATION_RESULTS.md` and `papers/book/symthaea_book.tex`'s
    validation table to state plainly that the Spectral MIP r≈0.99 number validates search
    strategy against a Gaussian-MI proxy, not agreement with true TPM-based IIT Φ — the
    current phrasing invites exactly the conflation `consciousness_ablation.rs`'s own
-   comment already made (misattributing SampledPartition's number to it).
-5. (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
+   comment already made (misattributing SampledPartition's number to it). *Not yet done —
+   the underlying number is now freshly re-verified (item 3 above), which makes this a
+   pure wording fix, not a re-derivation.*
+5. [ ] (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
    *meant* to be different measures (plausible — Ψ's inputs read closer to
    "engagement/flow" than "integration") or whether ethics/Broca should gate off Φ too.
    Note `ConsciousnessEquationV2` already has a designed-in Φ/Ψ blend
    (`sigmoid(Φ)*0.7 + Ψ*0.3`) sitting dormant — turning that on (Finding A) may be a
    cheaper fix than building a new reconciliation from scratch, once its own cold-start
    near-zero-output problem (which is why `UnifiedConsciousnessPipeline` bypasses it) is
-   addressed.
-6. (L) Fold into Seam A: whatever becomes canonical for the facade should be the *same*
-   canonical, *validated* source the loop uses — not a third independent formula.
-7. (S, low priority) Add one sentence to `jphi.md` and the phi-gated-safety paper
+   addressed. *Not yet done — this is a design decision, deliberately left for explicit
+   discussion rather than a unilateral code change.*
+6. [ ] (L) Fold into Seam A: whatever becomes canonical for the facade should be the *same*
+   canonical, *validated* source the loop uses — not a third independent formula. *Blocked
+   on item 5.*
+7. [x] (S, low priority) Add one sentence to `jphi.md` and the phi-gated-safety paper
    clarifying that symtropy's "Φ" is a locally-defined heuristic input to the Master
-   Consciousness Equation, not a measured IIT quantity — avoids the paper being read as
-   claiming more than the code does.
+   Consciousness Equation, not a measured IIT quantity — **DONE 2026-07-04, commit
+   `b53ae1ea2e`.** `phi-gated-safety` already had an exemplary version of this caveat
+   (right in its abstract); only `jphi.md` needed it.
 
 ## Phase 2 — Finish what was started (M, ~2-3 weeks)
 
