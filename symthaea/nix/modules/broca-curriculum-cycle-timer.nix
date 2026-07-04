@@ -67,6 +67,19 @@ in {
       description = "BROCA_CURRICULUM_MIN_NEW_OBJECTIVES passed to the cycle script.";
     };
 
+    curriculumPath = mkOption {
+      type = types.str;
+      default = "/srv/luminous-dynamics/.symthaea/curriculum.json";
+      description = ''
+        SYMTHAEA_CURRICULUM_PATH passed to the cycle script. Without this,
+        broca-curriculum-sync falls back to its own XDG-based default
+        (~/.local/share/symthaea/curriculum.json), which is NOT where
+        CurriculumExtender writes on this host — .symthaea/ at the monorepo
+        root is the real local-state convention (gitignored, alongside
+        consciousness.db and curriculum_failures/). Confirmed 2026-07-04.
+      '';
+    };
+
     user = mkOption {
       type = types.str;
       default = "tstoltz";
@@ -89,15 +102,26 @@ in {
 
     systemd.services.broca-curriculum-cycle = {
       description = "Broca curriculum fine-tuning cycle (never promotes; writes PROMOTION_READY.json for human review)";
-      path = with pkgs; [ cargo git flock coreutils gnugrep gawk python3 nix ];
       serviceConfig = {
         Type = "oneshot";
         User = cfg.user;
         WorkingDirectory = repoRoot;
         ExecStart = "${repoRoot}/scripts/broca_curriculum_cycle.sh";
+        # PATH includes /run/current-system/sw/bin, not just a curated tool
+        # list: the repo's own .cargo/config.toml sets rustc-wrapper =
+        # "sccache" and relies on the mold linker, both of which live in the
+        # system-wide profile (per CLAUDE.md: "mold and sccache are
+        # pre-configured system-wide (NixOS)"), not in any individually-
+        # listed nix package. Discovered 2026-07-04 the hard way: a curated
+        # `path = [ cargo git flock ... ]` list (missing sccache/mold/cc)
+        # let bash resolve but made `cargo run` fail building the sync bin
+        # (exit 101). /etc/profiles/per-user/<user>/bin covers home-manager
+        # user packages (e.g. git resolves there, not the system profile).
         Environment = [
           "BROCA_TRAIN_BACKEND=${cfg.trainBackend}"
           "BROCA_CURRICULUM_MIN_NEW_OBJECTIVES=${toString cfg.minNewObjectives}"
+          "SYMTHAEA_CURRICULUM_PATH=${cfg.curriculumPath}"
+          "PATH=/run/current-system/sw/bin:/etc/profiles/per-user/${cfg.user}/bin:/nix/var/nix/profiles/default/bin"
         ];
         # No Restart= — a failed cycle should surface as a failed unit, not
         # silently retry and potentially mask a real problem (fail-closed,
