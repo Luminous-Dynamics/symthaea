@@ -57,7 +57,7 @@ tower_governor = "0.4"
 governor = "0.6"
 
 # JWT bearer-token auth middleware for mutating routes
-jsonwebtoken = "9"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 
 # Project dependencies
 mycelix-desci-core = { path = "../core" }
