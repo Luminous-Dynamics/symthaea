@@ -84,6 +84,7 @@
           cargo-edit
           cargo-expand
           cargo-nextest
+          cargo-machete
           bacon
 
           # System libraries
@@ -96,6 +97,12 @@
           alsa-lib
           libpulseaudio
           portaudio
+
+          # espeak-ng headers/libs for espeak-rs-sys's bindgen build script
+          # (voice-tts feature). CI installs libespeak-ng-dev via apt; this
+          # was missing from the devShell, forcing ad-hoc nix-shell -p to
+          # discover it locally.
+          espeak-ng
 
           # Audio file formats
           flac
