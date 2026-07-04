@@ -206,6 +206,67 @@ jobs:
           CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_execute_timeout --lib
           CARGO_TARGET_DIR=target/hardened-lib cargo test -p symthaea test_real_execution_handles_large_stdout --lib
 
+  test-cognitive-hardening:
+    name: Cognitive Core Hardening (Phases 2.7–2.9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Regression-protect the full cognitive hardening arc:
+    #   Phase 2.7 — LTC timing + epistemic modulation
+    #   Phase 2.8 — causal graph topology + drift detection
+    #   Phase 2.9 — world model transitions + episodic memory + E2E integration
+    # Evidence: docs/evidence/SYMTHAEA_LTC_RUNTIME_HARDENING_V0_1.md
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/cognitive-hardening
+          key: ${{ runner.os }}-cargo-cognitive-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cognitive-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Phase 2.7 — Active Inference / Epistemic Modulation
+        env:
+          CARGO_TARGET_DIR: target/cognitive-hardening
+        run: cargo test -p symthaea-nix --lib "mind::active_inference"
+
+      - name: Phase 2.8 — Causal Graph Topology Hardening
+        env:
+          CARGO_TARGET_DIR: target/cognitive-hardening
+        run: cargo test -p symthaea-nix --lib "mind::causal_graph"
+
+      - name: Phase 2.8 — Drift Detection Hardening
+        env:
+          CARGO_TARGET_DIR: target/cognitive-hardening
+        run: cargo test -p symthaea-nix --lib "mind::hdc_world_model"
+
+      - name: Phase 2.9-A — World Model Transition Hardening
+        env:
+          CARGO_TARGET_DIR: target/cognitive-hardening
+        run: cargo test -p symthaea-nix --lib "mind::world_model"
+
+      - name: Phase 2.9-B — Episodic Memory Boundary Tests
+        env:
+          CARGO_TARGET_DIR: target/cognitive-hardening
+        run: cargo test -p symthaea-nix --lib "mind::episodic_memory"
+
+      - name: Phase 2.9-C — End-to-End Cross-Layer Integration
+        env:
+          CARGO_TARGET_DIR: target/cognitive-hardening
+        run: cargo test -p symthaea-nix --test sensor_drift_causal_action_integration
+
   test-hardened-daemon:
     name: Hardened Daemon Regressions
     runs-on: ubuntu-latest
