@@ -139,4 +139,111 @@ mod tests {
         assert_eq!(cfg.burst_size, 120);
         drop(governor);
     }
+
+    /// Behavioral test: actually sends requests through a real `GovernorLayer`
+    /// and asserts a 429 once the burst is exhausted. The tests above only
+    /// checked config *values* -- none of them ever drove a request through
+    /// the layer, so a `tower_governor`/`governor` upgrade that silently
+    /// changed burst/refill semantics would not have been caught.
+    mod rate_limit_behavior {
+        use super::*;
+        use axum::{
+            Router,
+            body::Body,
+            extract::ConnectInfo,
+            http::{Request as HttpRequest, StatusCode},
+            routing::get,
+        };
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+        use tower::ServiceExt;
+        use tower_governor::GovernorLayer;
+
+        async fn ok_handler() -> &'static str {
+            "ok"
+        }
+
+        /// A tiny burst (2) with a long refill period so the test isn't
+        /// racing the token bucket's own replenishment.
+        fn tiny_governor_layer() -> GovernorLayer<PeerIpKeyExtractor, NoOpMiddleware> {
+            let config = GovernorConfigBuilder::default()
+                .period(std::time::Duration::from_secs(60))
+                .burst_size(2)
+                .finish()
+                .expect("valid governor rate-limit config");
+            GovernorLayer {
+                config: Arc::new(config),
+            }
+        }
+
+        fn app() -> Router {
+            Router::new()
+                .route("/ping", get(ok_handler))
+                .layer(tiny_governor_layer())
+        }
+
+        fn request_from(ip: IpAddr) -> HttpRequest<Body> {
+            let mut req = HttpRequest::builder()
+                .method("GET")
+                .uri("/ping")
+                .body(Body::empty())
+                .unwrap();
+            // PeerIpKeyExtractor reads this extension directly (see
+            // `maybe_connect_info` in tower_governor::key_extractor) --
+            // `oneshot()` never populates it from a real socket, so it must
+            // be inserted manually to exercise per-IP keying in a test.
+            req.extensions_mut()
+                .insert(ConnectInfo(SocketAddr::new(ip, 0)));
+            req
+        }
+
+        #[tokio::test]
+        async fn burst_then_429() {
+            let ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1));
+            let app = app();
+
+            // Burst size is 2: the first two requests from this IP must
+            // succeed.
+            for i in 0..2 {
+                let response = app.clone().oneshot(request_from(ip)).await.unwrap();
+                assert_eq!(
+                    response.status(),
+                    StatusCode::OK,
+                    "request {i} within burst should succeed"
+                );
+            }
+
+            // The third request within the same (long) refill period must
+            // be rejected with 429 -- this is the actual behavior a
+            // tower_governor/governor version bump could silently break.
+            let response = app.clone().oneshot(request_from(ip)).await.unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::TOO_MANY_REQUESTS,
+                "request beyond burst size must be rate-limited"
+            );
+        }
+
+        #[tokio::test]
+        async fn different_ips_have_independent_buckets() {
+            let ip_a = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+            let ip_b = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 20));
+            let app = app();
+
+            // Exhaust ip_a's burst.
+            for _ in 0..2 {
+                let response = app.clone().oneshot(request_from(ip_a)).await.unwrap();
+                assert_eq!(response.status(), StatusCode::OK);
+            }
+            let response = app.clone().oneshot(request_from(ip_a)).await.unwrap();
+            assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+
+            // ip_b must be unaffected -- per-IP keying, not a global limiter.
+            let response = app.clone().oneshot(request_from(ip_b)).await.unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::OK,
+                "a different IP must have its own independent bucket"
+            );
+        }
+    }
 }
