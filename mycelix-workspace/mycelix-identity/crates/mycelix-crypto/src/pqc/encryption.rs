@@ -14,8 +14,7 @@ use crate::envelope::EncryptedEnvelope;
 use crate::error::CryptoError;
 use crate::traits::Encryptor;
 
-use chacha20poly1305::aead::AeadCore;
-use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
+use chacha20poly1305::aead::{Aead, Generate, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use zeroize::Zeroizing;
 
@@ -76,7 +75,7 @@ impl Encryptor for XChaCha20Encryptor {
             .map_err(|_| CryptoError::Validation("Key must be exactly 32 bytes".into()))?;
 
         let cipher = XChaCha20Poly1305::new(&key_array.into());
-        let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
+        let nonce = XNonce::generate();
 
         let ciphertext = cipher
             .encrypt(&nonce, plaintext)
