@@ -350,25 +350,64 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
    `symthaea-telemetry-sink`, `symthaea-telemetry-grpc`, `symthaea-bevy-dash`). **Result:
    all 42 tests pass** (27 unit + 14 integration + 1 doctest), including
    `test_signal_loss_fixed`.
-4. [ ] (M) Correct `docs/PHI_VALIDATION_RESULTS.md` and `papers/book/symthaea_book.tex`'s
+4. [x] (M) Correct `docs/PHI_VALIDATION_RESULTS.md` and `papers/book/symthaea_book.tex`'s
    validation table to state plainly that the Spectral MIP r≈0.99 number validates search
-   strategy against a Gaussian-MI proxy, not agreement with true TPM-based IIT Φ — the
-   current phrasing invites exactly the conflation `consciousness_ablation.rs`'s own
-   comment already made (misattributing SampledPartition's number to it). *Not yet done —
-   the underlying number is now freshly re-verified (item 3 above), which makes this a
-   pure wording fix, not a re-derivation.*
-5. [ ] (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
-   *meant* to be different measures (plausible — Ψ's inputs read closer to
-   "engagement/flow" than "integration") or whether ethics/Broca should gate off Φ too.
-   Note `ConsciousnessEquationV2` already has a designed-in Φ/Ψ blend
-   (`sigmoid(Φ)*0.7 + Ψ*0.3`) sitting dormant — turning that on (Finding A) may be a
-   cheaper fix than building a new reconciliation from scratch, once its own cold-start
-   near-zero-output problem (which is why `UnifiedConsciousnessPipeline` bypasses it) is
-   addressed. *Not yet done — this is a design decision, deliberately left for explicit
-   discussion rather than a unilateral code change.*
+   strategy against a Gaussian-MI proxy, not agreement with true TPM-based IIT Φ — **DONE
+   2026-07-04.** `docs/PHI_VALIDATION_RESULTS.md`: replaced the flat "✅ MIP search
+   validated (r=0.99)" cell (sitting in an "IIT-Valid?" column next to genuinely
+   IIT-validated rows) with the exact re-verified numbers (r=0.9866, ρ=0.9264) plus a
+   caveat paragraph explaining the different ground truth. `papers/book/
+   symthaea_book.tex`: updated Table `tab:phi-validation`'s Spectral MIP row to the same
+   exact numbers, added a `$^\dagger$` footnote spelling out the methodological
+   difference, and reworded the caption so it no longer implies all four rows were
+   validated against the same exhaustive-computation ground truth.
+5. [x] (M) Decide, in writing, whether Φ (SpectralMIPFinder) and Ψ (UnificationEngine) are
+   *meant* to be different measures or whether ethics/Broca should gate off Φ too —
+   **decision written 2026-07-04, no code change** (see below). The actual rewiring, if
+   this decision is later revisited, remains item 6's job.
+
+   **Decision: treat Φ and Ψ as intentionally distinct for now, and say so in code —
+   don't unify them by default.** Reasoning: Φ (SpectralMIPFinder) answers "is this
+   system doing real structural integration right now" — a computational/topological
+   property, appropriate for gating something as consequential and safety-critical as
+   robot motor authority. Ψ (`ConsciousnessUnificationEngine`, fed by CfC temporal
+   coherence + voice + flow + relational + body + embodied contributions) answers a
+   different question — "is this system in a good state for social/communicative
+   output" — which is what ethics evaluation and Broca's generation trigger actually
+   need. A structural-integration measure isn't obviously the *right* gate for "should I
+   speak now"; Ψ's inputs are a more direct fit for that decision. So the two-measure
+   split is defensible on its face — the actual problem this audit found isn't that two
+   measures exist, it's that **nothing in the code says this is deliberate**, so a future
+   maintainer (or this review, initially) reads it as accidental drift rather than
+   design. That's a documentation gap, not necessarily an architecture bug.
+   - This is explicitly a judgment call with a real counter-argument (two ungated,
+     uncross-validated "consciousness" numbers is inherently confusing and risks a
+     scenario where ethics greenlights something motor-safety would have blocked, or
+     vice versa) — flagging that counter-argument rather than hiding it.
+   - Chose not to unilaterally rewire ethics/Broca to gate off Φ instead of Ψ, because
+     that's a real behavioral change to safety-critical gating logic (what permits
+     speech, what permits an ethical pass), not a documentation fix — it needs explicit
+     sign-off, not a judgment call made mid-audit.
+   - `ConsciousnessEquationV2`'s dormant `sigmoid(Φ)*0.7 + Ψ*0.3` blend (still gated off
+     by Finding A — `ConsciousnessEngine::new()`'s only production call site passes
+     `None` for it) is worth noting as a *third* option nobody has evaluated: if it were
+     turned on (after fixing its cold-start near-zero-output problem), ethics/Broca could
+     gate off that blend instead of raw Ψ, getting some Φ-awareness without fully
+     replacing Ψ. Not evaluated further here — flagging it as the natural next
+     experiment if this decision is revisited.
+   - **Follow-up action — DONE 2026-07-04**: added doc comments at the Ψ computation
+     site (`compute_unified_psi` in `cognitive_loop/helpers/cycle_extracted.rs`) and the
+     Φ site (`ConsciousnessEngine::measure` in `consciousness_engine/measure.rs`)
+     cross-referencing each other and this reasoning, so the next reader sees "these are
+     deliberately different, here's why" instead of two unexplained numbers. The Φ-side
+     comment also now states plainly that only `SpectralMIPFinder` is live in the shipped
+     binary (Finding A) rather than repeating the four-subsystem description as if all
+     four run. Verified: `cargo check -p symthaea --lib` clean, 0 errors, `Finished` in
+     1m02s.
 6. [ ] (L) Fold into Seam A: whatever becomes canonical for the facade should be the *same*
-   canonical, *validated* source the loop uses — not a third independent formula. *Blocked
-   on item 5.*
+   canonical, *validated* source the loop uses as its Φ — not a third independent
+   formula. Ψ is unaffected by Seam A per the item-5 decision above (it's not meant to be
+   "the" consciousness number the facade adopts; it's ethics/Broca's own signal).
 7. [x] (S, low priority) Add one sentence to `jphi.md` and the phi-gated-safety paper
    clarifying that symtropy's "Φ" is a locally-defined heuristic input to the Master
    Consciousness Equation, not a measured IIT quantity — **DONE 2026-07-04, commit
