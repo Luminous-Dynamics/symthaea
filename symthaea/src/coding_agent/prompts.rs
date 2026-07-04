@@ -273,8 +273,13 @@ impl CodingAgent {
         let task_lower = self.task.to_lowercase();
 
         // Phase 1: Hardcoded pattern templates (exact keyword matches — fast, reliable)
-        if let Some(code) = Self::match_native_pattern(&task_lower) {
-            return Some(code);
+        // These templates are Rust source verbatim (doc comments, `pub fn`, etc.) —
+        // only apply them when the target language is actually Rust, otherwise they
+        // leak Rust syntax into e.g. generated Python.
+        if self.target_language() == "rust" {
+            if let Some(code) = Self::match_native_pattern(&task_lower) {
+                return Some(code);
+            }
         }
 
         // Phase 2: HDC Program Algebra (semantic matching -> generated code)
@@ -576,7 +581,32 @@ impl CodingAgent {
 
     /// Extract a likely function name from a task description.
     pub(super) fn extract_function_name(task: &str) -> Option<String> {
-        let stop_words = ["a", "an", "the", "my", "our", "new", "simple", "basic"];
+        // Prefer an explicit function declaration already present in the task text
+        // (e.g. HumanEval-style prompts embed the real `def name(...)`/`fn name(...)`
+        // signature) over the prose heuristics below. Those heuristics can misfire
+        // when a docstring's prose happens to contain "function " as plain English
+        // ("...to this function is a string...") rather than a declaration keyword —
+        // that specific collision previously extracted "is" as a function name.
+        for marker in ["def ", "fn "] {
+            let mut search_from = 0;
+            while let Some(rel_idx) = task[search_from..].find(marker) {
+                let idx = search_from + rel_idx;
+                let after = &task[idx + marker.len()..];
+                let name: String = after
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                let rest = after[name.len()..].trim_start();
+                if !name.is_empty() && rest.starts_with('(') {
+                    return Some(name.to_lowercase());
+                }
+                search_from = idx + marker.len();
+            }
+        }
+
+        let stop_words = [
+            "a", "an", "the", "my", "our", "new", "simple", "basic", "is", "are", "was", "were",
+        ];
         // Look for explicit function names: "add a X function", "implement X", "create X"
         let patterns = [
             "function ",

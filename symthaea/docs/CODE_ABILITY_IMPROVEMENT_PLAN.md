@@ -1318,6 +1318,46 @@ that machinery can be fairly evaluated. Two independent tracks now exist:
    it's the only way to find out whether the "verified, self-improving"
    thesis holds up at all, on the language where the machinery is real.
 
+### Fixed same day: the two Finding-1 bugs, root-caused precisely
+
+- `prompts.rs::native_code_template()` called `match_native_pattern()`
+  unconditionally — that function returns **hardcoded Rust source strings**
+  keyed on task keywords (e.g. `task.contains("absolute")` returns
+  `"/// Return the absolute value.\npub fn absolute(...)..."` verbatim).
+  HumanEval/4 (`mean_absolute_deviation`) hit this exact keyword and got Rust
+  source stuffed into a `.py` file. Fix: gate this phase behind
+  `self.target_language() == "rust"`.
+- `prompts.rs::extract_function_name()`'s prose-heuristic fallback scanned
+  for the substring `"function "` anywhere in the task text and took the
+  *next word* as the function name — with no way to distinguish a real
+  declaration from English prose. HumanEval/1's docstring contains
+  "...to this **function is** a string containing..." — matched, took `is`
+  (a Python reserved word) as the function name, emitted `def is(...)`.
+  Fix: scan for an actual `def name(`/`fn name(` declaration first (which
+  HumanEval-style prompts always embed) and only fall back to the prose
+  heuristic — now with `"is"/"are"/"was"/"were"` also added to the
+  stop-word list as defense in depth — when no real declaration exists.
+
+**Verified impact** (`docs/HUMANEVAL_AGENT_POSTFIX_RESULTS.json`, same 15
+problems, `--llm` mode, `cargo test -p symthaea --features code_generation coding_agent::`
+— all 52 existing tests still pass):
+
+- **Compiled: 8/15 → 15/15 (100%)**. Every syntax error from the Rust-idiom
+  leakage is gone.
+- **Pass@1: still 0/15.** Code now compiles but is logically wrong — the
+  underlying cause is different again: e.g. HumanEval/2 generated
+  `def truncate_number(v: list, f: callable) -> value:`. The literal string
+  `"callable"` does not appear anywhere in Symthaea's source (checked via
+  grep across `src/`), so this is not a template bug — it's the LLM itself
+  producing a generic, hallucinated signature. Direct mode passes the raw
+  HumanEval prompt (which already contains the correct signature) straight
+  to the LLM; the Agent pipeline's own prompt-construction evidently doesn't
+  preserve signature fidelity as reliably. This is a **third, distinct,
+  more open-ended issue** (prompt fidelity through the Understanding/Planning
+  phases) — not yet fixed, flagged here rather than pursued further without
+  checking in, since it's architecturally bigger than the two scoped bugs
+  above.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*

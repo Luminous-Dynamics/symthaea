@@ -1,0 +1,164 @@
+{
+  "benchmark": "humaneval",
+  "mode": "Agent",
+  "use_orchestrator": false,
+  "hard_geodesic_rejection": false,
+  "geodesic_rejection_shadow": false,
+  "model": "qwen2.5-coder:7b",
+  "total": 15,
+  "passed": 0,
+  "pass_at_1": 0.0,
+  "compiled": 15,
+  "results": [
+    {
+      "task_id": "HumanEval/0",
+      "entry_point": "has_close_elements",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-0/generated.py\", line 24, in <module>\n    check(has_close_elements)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-0/generated.py\", line 14, in check\n    assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.3) == True\n           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-0/generated.py\", line 3, in has_close_elements\n    return [x for x in v if f(x)]\n                            ^\nNameError: name 'f' is not defined\n",
+      "mode": "Agent",
+      "elapsed_ms": 65758,
+      "code_len": 114
+    },
+    {
+      "task_id": "HumanEval/1",
+      "entry_point": "separate_paren_groups",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-1/generated.py\", line 26, in <module>\n    check(separate_paren_groups)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-1/generated.py\", line 14, in check\n    assert candidate('(()()) ((())) () ((())()())') == [\n           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: separate_paren_groups() missing 1 required positional argument: 'n'\n",
+      "mode": "Agent",
+      "elapsed_ms": 60667,
+      "code_len": 117
+    },
+    {
+      "task_id": "HumanEval/2",
+      "entry_point": "truncate_number",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-2/generated.py\", line 1, in <module>\n    def truncate_number(v: list, f: callable) -> value:\n                                                 ^^^^^\nNameError: name 'value' is not defined. Did you mean: 'False'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 60144,
+      "code_len": 122
+    },
+    {
+      "task_id": "HumanEval/3",
+      "entry_point": "below_zero",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-3/generated.py\", line 22, in <module>\n    check(below_zero)\n    ~~~~~^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-3/generated.py\", line 14, in check\n    assert candidate([]) == False\n           ~~~~~~~~~^^^^\nTypeError: below_zero() missing 1 required positional argument: 'n'\n",
+      "mode": "Agent",
+      "elapsed_ms": 59087,
+      "code_len": 106
+    },
+    {
+      "task_id": "HumanEval/4",
+      "entry_point": "mean_absolute_deviation",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-4/generated.py\", line 1, in <module>\n    def mean_absolute_deviation(v: list, f: callable) -> value:\n                                                         ^^^^^\nNameError: name 'value' is not defined. Did you mean: 'False'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 57186,
+      "code_len": 130
+    },
+    {
+      "task_id": "HumanEval/5",
+      "entry_point": "intersperse",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-5/generated.py\", line 19, in <module>\n    check(intersperse)\n    ~~~~~^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-5/generated.py\", line 15, in check\n    assert candidate([5, 6, 3, 2], 8) == [5, 8, 6, 8, 3, 8, 2]\n           ~~~~~~~~~^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-5/generated.py\", line 3, in intersperse\n    return [x for x in v if f(x)]\n                            ^\nNameError: name 'f' is not defined\n",
+      "mode": "Agent",
+      "elapsed_ms": 55124,
+      "code_len": 107
+    },
+    {
+      "task_id": "HumanEval/6",
+      "entry_point": "parse_nested_parens",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-6/generated.py\", line 19, in <module>\n    check(parse_nested_parens)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-6/generated.py\", line 14, in check\n    assert candidate('(()()) ((())) () ((())()())') == [2, 3, 1, 3]\n           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: parse_nested_parens() missing 1 required positional argument: 'n'\n",
+      "mode": "Agent",
+      "elapsed_ms": 61904,
+      "code_len": 115
+    },
+    {
+      "task_id": "HumanEval/7",
+      "entry_point": "filter_by_substring",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-7/generated.py\", line 1, in <module>\n    def filter_by_substring(v: list, f: callable) -> value:\n                                                     ^^^^^\nNameError: name 'value' is not defined. Did you mean: 'False'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 70251,
+      "code_len": 126
+    },
+    {
+      "task_id": "HumanEval/8",
+      "entry_point": "sum_product",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-8/generated.py\", line 21, in <module>\n    check(sum_product)\n    ~~~~~^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-8/generated.py\", line 14, in check\n    assert candidate([]) == (0, 1)\n           ^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "mode": "Agent",
+      "elapsed_ms": 70621,
+      "code_len": 88
+    },
+    {
+      "task_id": "HumanEval/9",
+      "entry_point": "rolling_max",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-9/generated.py\", line 20, in <module>\n    check(rolling_max)\n    ~~~~~^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-9/generated.py\", line 14, in check\n    assert candidate([]) == []\n           ~~~~~~~~~^^^^\nTypeError: rolling_max() missing 1 required positional argument: 'n'\n",
+      "mode": "Agent",
+      "elapsed_ms": 66406,
+      "code_len": 107
+    },
+    {
+      "task_id": "HumanEval/10",
+      "entry_point": "make_palindrome",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-10/generated.py\", line 43, in <module>\n    check(make_palindrome)\n    ~~~~~^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-10/generated.py\", line 36, in check\n    assert candidate('') == ''\n           ^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "mode": "Agent",
+      "elapsed_ms": 59667,
+      "code_len": 109
+    },
+    {
+      "task_id": "HumanEval/11",
+      "entry_point": "string_xor",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-11/generated.py\", line 19, in <module>\n    check(string_xor)\n    ~~~~~^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-11/generated.py\", line 14, in check\n    assert candidate('111000', '101010') == '010010'\n           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-11/generated.py\", line 3, in string_xor\n    return [x for x in v if f(x)]\n                            ^\nNameError: name 'f' is not defined\n",
+      "mode": "Agent",
+      "elapsed_ms": 57147,
+      "code_len": 106
+    },
+    {
+      "task_id": "HumanEval/12",
+      "entry_point": "longest",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-12/generated.py\", line 1, in <module>\n    def longest(v: list, f: callable) -> value:\n                                         ^^^^^\nNameError: name 'value' is not defined. Did you mean: 'False'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 58613,
+      "code_len": 114
+    },
+    {
+      "task_id": "HumanEval/13",
+      "entry_point": "greatest_common_divisor",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-13/generated.py\", line 20, in <module>\n    check(greatest_common_divisor)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-13/generated.py\", line 14, in check\n    assert candidate(3, 7) == 1\n           ~~~~~~~~~^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-13/generated.py\", line 3, in greatest_common_divisor\n    return [x for x in v if f(x)]\n                       ^\nTypeError: 'int' object is not iterable\n",
+      "mode": "Agent",
+      "elapsed_ms": 55776,
+      "code_len": 119
+    },
+    {
+      "task_id": "HumanEval/14",
+      "entry_point": "all_prefixes",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1427774-14/generated.py\", line 19, in <module>\n    check(all_prefixes)\n    ~~~~~^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1427774-14/generated.py\", line 14, in check\n    assert candidate('') == []\n           ~~~~~~~~~^^^^\nTypeError: all_prefixes() missing 1 required positional argument: 'n'\n",
+      "mode": "Agent",
+      "elapsed_ms": 53693,
+      "code_len": 108
+    }
+  ]
+}
