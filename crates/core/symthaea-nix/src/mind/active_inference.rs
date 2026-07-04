@@ -139,6 +139,78 @@ impl NixActiveInference {
         }
     }
 
+    /// Process user input asynchronously using the hybrid symbolic-neural encoder.
+    #[cfg(feature = "native")]
+    pub async fn process_input_async(
+        &mut self,
+        input: &str,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<ActionPlan, super::neural_bridge::BridgeError> {
+        // 1. Infer the user's goal via the hybrid encoder
+        let goal = self
+            .goal_inference
+            .infer_async(input, &mut self.codebook, bridge)
+            .await?;
+
+        // 2. Compute current free energy (gap between state and goal)
+        let current_fe = self.world_model.compute_free_energy(&goal.goal_state);
+
+        // 3. If goal is unclear, recommend clarification
+        if goal.needs_clarification {
+            return Ok(ActionPlan {
+                actions: Vec::new(),
+                current_free_energy: current_fe,
+                goal,
+                needs_clarification: true,
+            });
+        }
+
+        // 4. Score all candidate actions
+        let candidates = self.score_candidates(&goal.goal_state);
+
+        Ok(ActionPlan {
+            actions: candidates,
+            current_free_energy: current_fe,
+            needs_clarification: false,
+            goal,
+        })
+    }
+
+    /// Process user input synchronously using the offline-safe hybrid symbolic-neural encoder.
+    pub fn process_input_hybrid_offline(
+        &mut self,
+        input: &str,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<ActionPlan, super::neural_bridge::BridgeError> {
+        // 1. Infer the user's goal via the hybrid encoder
+        let goal = self
+            .goal_inference
+            .infer_hybrid_offline(input, &mut self.codebook, bridge)?;
+
+        // 2. Compute current free energy (gap between state and goal)
+        let current_fe = self.world_model.compute_free_energy(&goal.goal_state);
+
+        // 3. If goal is unclear, recommend clarification
+        if goal.needs_clarification {
+            return Ok(ActionPlan {
+                actions: Vec::new(),
+                current_free_energy: current_fe,
+                goal,
+                needs_clarification: true,
+            });
+        }
+
+        // 4. Score all candidate actions
+        let candidates = self.score_candidates(&goal.goal_state);
+
+        Ok(ActionPlan {
+            actions: candidates,
+            current_free_energy: current_fe,
+            needs_clarification: false,
+            goal,
+        })
+    }
+
     /// Score all candidate action categories against the goal.
     fn score_candidates(&self, goal_state: &ContinuousHV) -> Vec<ScoredAction> {
         let candidates = Self::all_standard_actions();
@@ -604,5 +676,32 @@ mod tests {
             plan_b.actions.first().map(|a| &a.action),
             "action selection must be deterministic for identical inputs"
         );
+    }
+
+    #[test]
+    fn test_process_input_hybrid_offline_determinism() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let bridge = crate::mind::neural_bridge::NeuralBridge::new();
+
+        let mut engine_a = NixActiveInference::new();
+        engine_a.observe_state(ContinuousHV::random(dim, 42));
+        let plan_a = engine_a
+            .process_input_hybrid_offline("install firefox", &bridge)
+            .unwrap();
+
+        let mut engine_b = NixActiveInference::new();
+        engine_b.observe_state(ContinuousHV::random(dim, 42));
+        let plan_b = engine_b
+            .process_input_hybrid_offline("install firefox", &bridge)
+            .unwrap();
+
+        assert_eq!(
+            plan_a.actions.first().map(|a| &a.action),
+            plan_b.actions.first().map(|a| &a.action),
+            "hybrid action planning must be deterministic for identical inputs"
+        );
+
+        assert!(plan_a.current_free_energy.is_finite());
+        assert!(!plan_a.actions.is_empty());
     }
 }

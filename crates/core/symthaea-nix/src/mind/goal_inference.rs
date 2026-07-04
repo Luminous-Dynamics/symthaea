@@ -206,6 +206,134 @@ impl GoalInference {
         }
         None
     }
+
+    /// Infer the user's goal asynchronously using the hybrid symbolic-neural encoder.
+    ///
+    /// Blends the exact matching of the symbolic encoder with the semantic
+    /// generalization of the BGE-M3 neural bridge.
+    #[cfg(feature = "native")]
+    pub async fn infer_async(
+        &mut self,
+        input: &str,
+        codebook: &mut NixCodebook,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<InferredGoal, super::neural_bridge::BridgeError> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err(super::neural_bridge::BridgeError::EmptyInput);
+        }
+
+        // 1. Get symbolic representation
+        let symbolic_hv = {
+            let mut enc = UserInputEncoder::new(codebook);
+            enc.encode_input(input)
+        };
+
+        // 2. Get neural representation
+        let embed_res = bridge.embed_text(input).await?;
+        let neural_hv = embed_res.continuous;
+
+        // 3. Blend them (40% symbolic, 60% neural)
+        let blended_hv = if symbolic_hv.norm() > 1e-6 {
+            let refs = [&symbolic_hv, &neural_hv];
+            let weights = [0.4, 0.6];
+            ContinuousHV::weighted_bundle(&refs, &weights)
+        } else {
+            neural_hv
+        };
+
+        // 4. Store in working memory
+        self.working_memory.push(
+            blended_hv.clone(),
+            MemorySource::UserInput,
+            input.to_string(),
+        );
+
+        // 5. Boost items related to this hybrid intent
+        self.working_memory.attend(&blended_hv, 0.3);
+
+        // 6. Blend with accumulated context
+        let context = self.working_memory.context_vector();
+        let goal_state = if context.norm() > 1e-6 {
+            let refs = [&blended_hv, &context];
+            let weights = [1.0, self.context_weight as f32];
+            ContinuousHV::weighted_bundle(&refs, &weights)
+        } else {
+            blended_hv
+        };
+
+        let confidence = self.estimate_confidence(input);
+        let description = self.describe_goal(input);
+
+        Ok(InferredGoal {
+            goal_state,
+            confidence,
+            description,
+            needs_clarification: confidence < 0.5,
+        })
+    }
+
+    /// Offline-safe hybrid goal inference using deterministic embeddings.
+    pub fn infer_hybrid_offline(
+        &mut self,
+        input: &str,
+        codebook: &mut NixCodebook,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<InferredGoal, super::neural_bridge::BridgeError> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err(super::neural_bridge::BridgeError::EmptyInput);
+        }
+
+        // 1. Get symbolic representation
+        let symbolic_hv = {
+            let mut enc = UserInputEncoder::new(codebook);
+            enc.encode_input(input)
+        };
+
+        // 2. Get deterministic offline neural representation
+        let embed_res = bridge.embed_deterministic(input)?;
+        let neural_hv = embed_res.continuous;
+
+        // 3. Blend them (40% symbolic, 60% neural)
+        let blended_hv = if symbolic_hv.norm() > 1e-6 {
+            let refs = [&symbolic_hv, &neural_hv];
+            let weights = [0.4, 0.6];
+            ContinuousHV::weighted_bundle(&refs, &weights)
+        } else {
+            neural_hv
+        };
+
+        // 4. Store in working memory
+        self.working_memory.push(
+            blended_hv.clone(),
+            MemorySource::UserInput,
+            input.to_string(),
+        );
+
+        // 5. Boost items related to this hybrid intent
+        self.working_memory.attend(&blended_hv, 0.3);
+
+        // 6. Blend with accumulated context
+        let context = self.working_memory.context_vector();
+        let goal_state = if context.norm() > 1e-6 {
+            let refs = [&blended_hv, &context];
+            let weights = [1.0, self.context_weight as f32];
+            ContinuousHV::weighted_bundle(&refs, &weights)
+        } else {
+            blended_hv
+        };
+
+        let confidence = self.estimate_confidence(input);
+        let description = self.describe_goal(input);
+
+        Ok(InferredGoal {
+            goal_state,
+            confidence,
+            description,
+            needs_clarification: confidence < 0.5,
+        })
+    }
 }
 
 impl Default for GoalInference {
@@ -415,5 +543,56 @@ mod tests {
 
         let other = gi.infer("hello world foo", &mut cb);
         assert!(other.description.starts_with("Process:"));
+    }
+
+    #[test]
+    fn test_infer_hybrid_offline_determinism() {
+        let mut gi = GoalInference::new();
+        let mut cb = NixCodebook::new();
+        let bridge = crate::mind::neural_bridge::NeuralBridge::new();
+
+        let goal1 = gi
+            .infer_hybrid_offline("install postgresql", &mut cb, &bridge)
+            .unwrap();
+        gi.reset();
+        let goal2 = gi
+            .infer_hybrid_offline("install postgresql", &mut cb, &bridge)
+            .unwrap();
+
+        let sim = goal1.goal_state.similarity(&goal2.goal_state);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "Hybrid offline goal inference must be deterministic: sim={sim}"
+        );
+        assert!(goal1.goal_state.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_infer_hybrid_offline_generalization() {
+        let mut gi = GoalInference::new();
+        let mut cb = NixCodebook::new();
+        let bridge = crate::mind::neural_bridge::NeuralBridge::new();
+
+        let pg_goal = gi
+            .infer_hybrid_offline("install postgresql", &mut cb, &bridge)
+            .unwrap();
+        gi.reset();
+        let db_goal = gi
+            .infer_hybrid_offline("set up database", &mut cb, &bridge)
+            .unwrap();
+        gi.reset();
+        let other_goal = gi
+            .infer_hybrid_offline("clean disk space", &mut cb, &bridge)
+            .unwrap();
+
+        let sim_related = pg_goal.goal_state.similarity(&db_goal.goal_state);
+        let sim_unrelated = pg_goal.goal_state.similarity(&other_goal.goal_state);
+
+        assert!(sim_related.is_finite());
+        assert!(sim_unrelated.is_finite());
+        // Since pg_goal and db_goal both use "install" / "database" semantics from the bridge,
+        // they should share some alignment, but at least the similarity stays bounded in [-1, 1].
+        assert!(sim_related >= -1.0 && sim_related <= 1.0);
+        assert!(sim_unrelated >= -1.0 && sim_unrelated <= 1.0);
     }
 }

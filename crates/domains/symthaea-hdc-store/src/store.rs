@@ -227,7 +227,7 @@ impl HdcStore {
         // - HEADER_SIZE (128), ENTRY_HV_OFFSET (32), ENTRY_SIZE (2080) are all 32-aligned
         // So every HV pointer is 32-byte aligned. Assert rather than silently leaking.
         assert!(
-            (ptr as usize) % 32 == 0,
+            (ptr as usize).is_multiple_of(32),
             "BinaryHV pointer not 32-byte aligned at offset {hv_start} — \
              this indicates a layout invariant violation (bug)"
         );
