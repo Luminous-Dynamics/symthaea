@@ -6,7 +6,7 @@
 //! Custom serializers, deserializers, and formatting utilities
 
 use crate::error::{Error, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::path::Path;
 
 /// Serialize to JSON with pretty printing
@@ -53,13 +53,14 @@ pub fn from_json_file<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T>
 
 /// Serialize to binary using bincode
 pub fn to_binary<T: Serialize>(value: &T) -> Result<Vec<u8>> {
-    bincode::serialize(value)
+    bincode::serde::encode_to_vec(value, bincode::config::standard())
         .map_err(|e| Error::SerializationError(format!("Binary serialization failed: {}", e)))
 }
 
 /// Deserialize from binary using bincode
 pub fn from_binary<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
-    bincode::deserialize(bytes)
+    bincode::serde::decode_from_slice(bytes, bincode::config::standard())
+        .map(|(value, _consumed)| value)
         .map_err(|e| Error::SerializationError(format!("Binary deserialization failed: {}", e)))
 }
 
