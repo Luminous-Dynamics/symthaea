@@ -133,10 +133,8 @@ pub fn interpolate_snapshots(
     let lerp_f64 = |a: f64, b: f64| a + (b - a) * s as f64;
 
     // Interpolate harmony activations
-    let mut harmony_activations = [0.0f32; 8];
-    for i in 0..8 {
-        harmony_activations[i] = lerp_f32(a.harmony_activations[i], b.harmony_activations[i]);
-    }
+    let harmony_activations: [f32; 8] =
+        std::array::from_fn(|i| lerp_f32(a.harmony_activations[i], b.harmony_activations[i]));
 
     // Interpolate thought vector (element-wise, matching shorter length)
     let tv_len = a.thought_vector.len().min(b.thought_vector.len());

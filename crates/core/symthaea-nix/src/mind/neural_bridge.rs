@@ -353,9 +353,6 @@ impl NeuralBridge {
     /// Fetch raw float embedding from Ollama `/api/embeddings`.
     #[cfg(feature = "native")]
     async fn fetch_embedding(&self, text: &str) -> Result<Vec<f32>, BridgeError> {
-        use hyper_util::rt::TokioIo;
-        use tokio::net::TcpStream;
-
         // Parse the endpoint URL manually (avoid reqwest/hyper-full dependency)
         let url = format!("{}/api/embeddings", self.config.endpoint);
         let body = serde_json::json!({
@@ -644,19 +641,16 @@ mod tests {
     #[test]
     fn test_empty_input_returns_error() {
         let b = bridge();
-        assert_eq!(
-            b.embed_deterministic(""),
-            Err(BridgeError::EmptyInput),
+        assert!(
+            matches!(b.embed_deterministic(""), Err(BridgeError::EmptyInput)),
             "empty string must return EmptyInput"
         );
-        assert_eq!(
-            b.embed_deterministic("   "),
-            Err(BridgeError::EmptyInput),
+        assert!(
+            matches!(b.embed_deterministic("   "), Err(BridgeError::EmptyInput)),
             "whitespace-only must return EmptyInput"
         );
-        assert_eq!(
-            b.embed_deterministic("\t\n"),
-            Err(BridgeError::EmptyInput),
+        assert!(
+            matches!(b.embed_deterministic("\t\n"), Err(BridgeError::EmptyInput)),
             "tab/newline must return EmptyInput"
         );
     }

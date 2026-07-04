@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
 use crate::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType};
-use crate::language::llm_organ::{LLMOrgan, LLMQuery, QueryType};
+use crate::language::llm_organ::{LLMOrgan, LLMQuery, LLMQueryParams, QueryType};
 use crate::school::curriculum::{Curriculum, CurriculumSchema, ObjectiveSchema};
 use crate::school::objective::{Difficulty, Domain, LearningObjective, ObjectiveBuilder};
 use crate::web_research::WebResearcher;
@@ -99,6 +99,21 @@ Constraints:
 
 const MAX_JSON_RETRIES: usize = 2;
 const MAX_DIMENSIONALITY_RETRIES: usize = 2;
+
+/// Generation params for curriculum-synthesis/repair LLM calls.
+///
+/// `LLMOrgan::query_async`'s default `max_generation_length` (1024 tokens,
+/// tuned for short conversational replies) reliably truncated the JSON
+/// objective list mid-array for real research topics (observed 2026-07-04:
+/// "EOF while parsing a list" on every synthesis/repair attempt). Curriculum
+/// JSON needs far more headroom since it embeds multiple full objectives.
+fn curriculum_json_params() -> LLMQueryParams {
+    LLMQueryParams {
+        temperature: None,
+        max_length: Some(2048),
+        stop_sequences: Vec::new(),
+    }
+}
 
 /// Summary of a research ingestion attempt.
 #[derive(Debug, Clone)]
@@ -396,7 +411,7 @@ impl CurriculumExtender {
             content: prompt,
             context: Vec::new(),
             system_prompt: Some(CURRICULUM_ARCHITECT_PROMPT.to_string()),
-            params: None,
+            params: Some(curriculum_json_params()),
         };
 
         // 4. LLM Translation
@@ -464,7 +479,7 @@ impl CurriculumExtender {
                                 content: repair_prompt,
                                 context: Vec::new(),
                                 system_prompt: Some(CURRICULUM_REPAIR_PROMPT.to_string()),
-                                params: None,
+                                params: Some(curriculum_json_params()),
                             };
                             let repaired = self.llm.query_async(repair_query).await;
                             candidate_json = sanitize_json(&repaired.text);
@@ -572,7 +587,7 @@ impl CurriculumExtender {
                                 content: repair_prompt,
                                 context: Vec::new(),
                                 system_prompt: Some(CURRICULUM_REPAIR_PROMPT.to_string()),
-                                params: None,
+                                params: Some(curriculum_json_params()),
                             };
 
                             let repaired = self.llm.query_async(repair_query).await;
@@ -648,7 +663,7 @@ impl CurriculumExtender {
                             content: repair_prompt,
                             context: Vec::new(),
                             system_prompt: Some(CURRICULUM_REPAIR_PROMPT.to_string()),
-                            params: None,
+                            params: Some(curriculum_json_params()),
                         };
 
                         let repaired = self.llm.query_async(repair_query).await;
@@ -671,7 +686,7 @@ impl CurriculumExtender {
                     content: repair_prompt,
                     context: Vec::new(),
                     system_prompt: Some(CURRICULUM_REPAIR_PROMPT.to_string()),
-                    params: None,
+                    params: Some(curriculum_json_params()),
                 };
                 let repaired = self.llm.query_async(repair_query).await;
                 candidate_json = sanitize_json(&repaired.text);

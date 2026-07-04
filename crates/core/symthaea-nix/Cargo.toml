@@ -33,6 +33,7 @@ tree-sitter-nix = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 # WASM-safe
+blake3 = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

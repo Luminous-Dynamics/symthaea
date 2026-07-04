@@ -79,7 +79,7 @@ pub fn generate(
     });
 
     // Create overlapping soft rectangles for each neuromodulator
-    for (_i, nc) in sorted.iter().enumerate() {
+    for nc in sorted.iter() {
         if nc.level < 0.1 {
             continue; // skip negligible neuromodulators
         }

@@ -2303,6 +2303,15 @@ impl Symthaea {
         });
         let ethics_blocked = ethics_output.ahimsa_violated
             || ethics_output.unified_verdict == EthicalVerdict::Blocked;
+        eprintln!(
+            "DEBUG ethics: cycle={} ahimsa_violated={} unified_verdict={:?} moral_verdict={} deont={} violations={:?}",
+            self.interactions,
+            ethics_output.ahimsa_violated,
+            ethics_output.unified_verdict,
+            ethics_output.moral_verdict,
+            ethics_output.deontological_verdict,
+            ethics_output.violations,
+        );
         if ethics_blocked {
             tracing::warn!(
                 target: "symthaea::ethics",

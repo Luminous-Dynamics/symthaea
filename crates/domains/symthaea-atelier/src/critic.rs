@@ -393,9 +393,12 @@ pub fn apply_fep_wisdom(
     // ── Harmony homeostatic decay: prevent all-1.0 saturation ──
     // Each harmony drifts toward its own baseline (diversity-preserving)
     let harmony_baselines = [0.4, 0.5, 0.6, 0.5, 0.4, 0.5, 0.6, 0.3];
-    for i in 0..8 {
-        snapshot.harmony_activations[i] +=
-            (harmony_baselines[i] - snapshot.harmony_activations[i]) * decay * 1.5;
+    for (act, baseline) in snapshot
+        .harmony_activations
+        .iter_mut()
+        .zip(harmony_baselines.iter())
+    {
+        *act += (baseline - *act) * decay * 1.5;
     }
 
     // ── EXPLOIT: reinforce what works (dominant harmony only) ──
@@ -472,7 +475,7 @@ pub fn apply_fep_wisdom(
 
     // ── Golden ratio correction ──
     if verdict.golden_ratio < 0.3 {
-        snapshot.valence = snapshot.valence * 0.97;
+        snapshot.valence *= 0.97;
     }
 }
 
