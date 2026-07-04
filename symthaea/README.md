@@ -99,6 +99,22 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 
 **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md). Start with [docs/START_HERE.md](docs/START_HERE.md).
 
+## Runtime Verification
+
+The cognitive core (LTC timing, active inference, causal graph, drift detection, world model) is hardened with a layered evidence chain. Each layer has a test inventory and a precise **verified / not verified** boundary statement.
+
+| Evidence | What it covers |
+|---|---|
+| [SYMTHAEA_LTC_RUNTIME_HARDENING_V0_1.md](docs/evidence/SYMTHAEA_LTC_RUNTIME_HARDENING_V0_1.md) | Phases 2.7–2.9: timing contracts, Z3 stability, epistemic modulation, causal graph topology, drift detection, world model transitions, end-to-end integration |
+| [validate_ltc_runtime_hardening.sh](scripts/validate_ltc_runtime_hardening.sh) | Reproducible isolated validation script (`CARGO_TARGET_DIR=/tmp/symthaea-ltc-hardening-target`) |
+
+Run the full validation in one command:
+
+```bash
+./scripts/validate_ltc_runtime_hardening.sh
+```
+
+
 ## For Researchers
 
 ### Papers

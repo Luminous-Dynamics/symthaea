@@ -134,7 +134,7 @@ impl SovereignConversation {
             msg.push(format!("  Existing OS: {}", os_names.join(", ")));
         }
         if self.hardware.has_tpm {
-            msg.push("  Security chip: available (can auto-unlock disk encryption)".into());
+            msg.push("  TPM 2.0: available (can auto-unlock disk encryption at boot)".into());
         }
 
         // Migration insights
