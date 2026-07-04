@@ -133,29 +133,29 @@ fn numeric_to_lean(ty: NumericType) -> &'static str {
 ///   by the detected SMT fragment.
 pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
     // Route 1: pure propositional.
-    if phi.is_purely_propositional() {
-        if let FolFormulaExt::Base(prop) = phi {
-            // Use the Phase 1 path verbatim: no Mathlib, no arithmetic.
-            // We synthesize a proof and render a full file (with `variable
-            // (P : Prop)` declarations).
-            let result = symthaea_core::hdc::logic_engine::ProofResult {
-                valid: true,
-                proof_steps: vec![symthaea_core::hdc::logic_engine::ProofStepLogic {
-                    step_number: 1,
-                    rule: "Modus Ponens".to_string(),
-                    formula: format!("{}", prop),
-                    justification: "routed_from_fol_ext".to_string(),
-                }],
-                phi: 0.5,
-                description: "pure-propositional via FolFormulaExt dispatch".to_string(),
-            };
-            return render_lean_file(theorem_name, prop, &result);
-        }
-        // Non-Base purely-prop (e.g., nested And/Or/Not/Implies over Base)
-        // — try to synthesize against the unwrapped Proposition. Phase 1
-        // synthesizer handles these when we re-extract. For now, fall
-        // through to the arithmetic path which will emit `sorry`.
+    if phi.is_purely_propositional()
+        && let FolFormulaExt::Base(prop) = phi
+    {
+        // Use the Phase 1 path verbatim: no Mathlib, no arithmetic.
+        // We synthesize a proof and render a full file (with `variable
+        // (P : Prop)` declarations).
+        let result = symthaea_core::hdc::logic_engine::ProofResult {
+            valid: true,
+            proof_steps: vec![symthaea_core::hdc::logic_engine::ProofStepLogic {
+                step_number: 1,
+                rule: "Modus Ponens".to_string(),
+                formula: format!("{}", prop),
+                justification: "routed_from_fol_ext".to_string(),
+            }],
+            phi: 0.5,
+            description: "pure-propositional via FolFormulaExt dispatch".to_string(),
+        };
+        return render_lean_file(theorem_name, prop, &result);
     }
+    // Non-Base purely-prop (e.g., nested And/Or/Not/Implies over Base)
+    // — try to synthesize against the unwrapped Proposition. Phase 1
+    // synthesizer handles these when we re-extract. For now, fall
+    // through to the arithmetic path which will emit `sorry`.
 
     // Route 2: arithmetic.
     let fragment = detect_fragment(phi);
@@ -170,9 +170,9 @@ pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
     out.push_str(&format!("-- Mathlib tactic: {}\n", mathlib_tactic));
     out.push_str("-- Requires `import Mathlib.Tactic` + a Lake project with Mathlib resolved.\n");
     out.push_str("-- See lean-proofs/phase2/README.md for setup.\n");
-    out.push_str("\n");
+    out.push('\n');
     out.push_str("import Mathlib.Tactic\n");
-    out.push_str("\n");
+    out.push('\n');
     out.push_str(&format!("theorem {} : {} := by\n", theorem_name, goal_lean));
     out.push_str(&format!("  {}\n", tactic.to_lean()));
     out

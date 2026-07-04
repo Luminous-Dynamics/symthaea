@@ -220,17 +220,17 @@ pub fn synthesize_proof_term(
         }
         Proposition::Or(a, b) => {
             // Excluded-middle shortcut: A ∨ ¬A or ¬A ∨ A.
-            if let Proposition::Not(na) = b.as_ref() {
-                if a.as_ref() == na.as_ref() {
-                    let a_term = prop_to_lean_term(a);
-                    return Some(format!("Classical.em {}", a_term.to_lean()));
-                }
+            if let Proposition::Not(na) = b.as_ref()
+                && a.as_ref() == na.as_ref()
+            {
+                let a_term = prop_to_lean_term(a);
+                return Some(format!("Classical.em {}", a_term.to_lean()));
             }
-            if let Proposition::Not(na) = a.as_ref() {
-                if na.as_ref() == b.as_ref() {
-                    let a_term = prop_to_lean_term(b);
-                    return Some(format!("(Classical.em {}).symm", a_term.to_lean()));
-                }
+            if let Proposition::Not(na) = a.as_ref()
+                && na.as_ref() == b.as_ref()
+            {
+                let a_term = prop_to_lean_term(b);
+                return Some(format!("(Classical.em {}).symm", a_term.to_lean()));
             }
             // Try the left side first.
             if let Some(ta) = synthesize_proof_term(a, hypotheses, depth - 1) {
@@ -257,10 +257,10 @@ pub fn synthesize_proof_term(
         Proposition::False => {
             // Find contradictory pair A and ¬A in context.
             for (nname, nh) in hypotheses {
-                if let Proposition::Not(inner) = nh {
-                    if let Some(ht) = synthesize_proof_term(inner, hypotheses, depth - 1) {
-                        return Some(format!("({} {})", nname, ht));
-                    }
+                if let Proposition::Not(inner) = nh
+                    && let Some(ht) = synthesize_proof_term(inner, hypotheses, depth - 1)
+                {
+                    return Some(format!("({} {})", nname, ht));
                 }
             }
             None

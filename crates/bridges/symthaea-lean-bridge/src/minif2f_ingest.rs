@@ -493,15 +493,15 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, IngestError> {
             // before the single-char match so a U+207B with anything
             // other than U+00B9 after it still errors cleanly.
             if ch == '\u{207B}' {
-                if let Some((next_ch, next_len)) = next_char(&src[i + ch_len..]) {
-                    if next_ch == '\u{00B9}' {
-                        out.push(Token {
-                            kind: TokenKind::Reciprocal,
-                            offset: start,
-                        });
-                        i += ch_len + next_len;
-                        continue;
-                    }
+                if let Some((next_ch, next_len)) = next_char(&src[i + ch_len..])
+                    && next_ch == '\u{00B9}'
+                {
+                    out.push(Token {
+                        kind: TokenKind::Reciprocal,
+                        offset: start,
+                    });
+                    i += ch_len + next_len;
+                    continue;
                 }
                 return Err(IngestError::UnknownChar { ch, offset: start });
             }
@@ -675,14 +675,9 @@ impl<'a> Parser<'a> {
     fn parse_binder_group(&mut self) -> Result<Vec<LeanBinder>, IngestError> {
         self.expect(&TokenKind::LParen, "`(` to start binder")?;
         let mut names = Vec::new();
-        loop {
-            match self.peek().clone() {
-                TokenKind::Ident(s) => {
-                    self.advance();
-                    names.push(s);
-                }
-                _ => break,
-            }
+        while let TokenKind::Ident(s) = self.peek().clone() {
+            self.advance();
+            names.push(s);
         }
         if names.is_empty() {
             return Err(IngestError::Unexpected {
