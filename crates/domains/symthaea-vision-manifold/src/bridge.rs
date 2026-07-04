@@ -547,20 +547,20 @@ impl VisionBridge {
 
         // Working memory: what we're attending to (highest weight)
         let wm_bundle;
-        if let Some(wm) = self.manifold.working_memory() {
-            if let Some(bundle) = wm.bundle_attended() {
-                wm_bundle = bundle;
-                components.push(&wm_bundle);
-                weights.push(0.4);
-            }
+        if let Some(wm) = self.manifold.working_memory()
+            && let Some(bundle) = wm.bundle_attended()
+        {
+            wm_bundle = bundle;
+            components.push(&wm_bundle);
+            weights.push(0.4);
         }
 
         // Scene graph: relational structure
-        if let Some(sg) = self.manifold.scene_graph() {
-            if let Some(ghv) = sg.graph_hv() {
-                components.push(ghv);
-                weights.push(0.3);
-            }
+        if let Some(sg) = self.manifold.scene_graph()
+            && let Some(ghv) = sg.graph_hv()
+        {
+            components.push(ghv);
+            weights.push(0.3);
         }
 
         // Manifold state: raw perception (lowest weight — already in the thought HV)
