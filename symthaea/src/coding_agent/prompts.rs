@@ -18,11 +18,31 @@ impl CodingAgent {
             let detector = CodeTaskDetector::new();
             let task_type = detector.detect_task_type(&self.task);
             let guidance = match task_type {
+                // CREATE guidance is language-specific (unlike Debug/Refactor below,
+                // which don't mention any language's syntax) — was previously
+                // hardcoded to Rust conventions (`use` statements, `<T>` generics,
+                // `pub` items) and injected unconditionally, contradicting
+                // `codegen_system_prompt()`'s language-aware instructions for
+                // non-Rust targets.
                 crate::cognitive_loop::routing::CodeTaskType::Create => {
-                    "Type: CREATE — Write a complete, compilable Rust implementation.\n\
-                     Rules: Output ONLY the code (no fn main wrapper for library items). \
-                     Include all necessary `use` statements. Declare generic type parameters \
-                     explicitly (e.g., `<T>` on struct/fn/impl). Add `pub` to public items.\n"
+                    match self.target_language() {
+                        "python" => {
+                            "Type: CREATE — Write a complete, correct Python implementation.\n\
+                         Rules: Output ONLY the function (matching the exact signature given). \
+                         Include any necessary `import` statements. Match the type hints already \
+                         present in the signature — do not invent new ones.\n"
+                        }
+                        "nix" => {
+                            "Type: CREATE — Write a complete, correct Nix expression.\n\
+                         Rules: Output ONLY the code.\n"
+                        }
+                        _ => {
+                            "Type: CREATE — Write a complete, compilable Rust implementation.\n\
+                         Rules: Output ONLY the code (no fn main wrapper for library items). \
+                         Include all necessary `use` statements. Declare generic type parameters \
+                         explicitly (e.g., `<T>` on struct/fn/impl). Add `pub` to public items.\n"
+                        }
+                    }
                 }
                 crate::cognitive_loop::routing::CodeTaskType::Debug => {
                     "Type: DEBUG — Fix the broken code.\n\
@@ -270,6 +290,24 @@ impl CodingAgent {
     /// the task doesn't match any known pattern — the caller should escalate
     /// to an LLM tier rather than produce a TODO stub.
     pub(super) fn native_code_template(&self) -> Option<String> {
+        // When the task text already contains an explicit function declaration
+        // (e.g. a HumanEval-style prompt embedding the real `def name(...)`/
+        // `fn name(...)` signature, docstring and doctests), the caller has fully
+        // specified what's needed — skip native pattern-matching (both phases
+        // below) entirely and escalate straight to the LLM. Native matching here
+        // is a fuzzy semantic lookup against a small library of canonical patterns
+        // (fibonacci, find_first, count_if, ...) designed for short underspecified
+        // asks like "add a fibonacci function"; against a rich, fully-specified
+        // prompt it can (and did) false-positive-match an unrelated pattern and
+        // return a syntactically fine but semantically wrong function — e.g.
+        // `truncate_number` fuzzy-matched the `find_first` pattern and returned
+        // its generic `(v: list, f: callable) -> value` signature verbatim,
+        // silently short-circuiting before the LLM was ever consulted. See
+        // docs/CODE_ABILITY_IMPROVEMENT_PLAN.md, 2026-07-04.
+        if Self::task_declared_function_name(&self.task).is_some() {
+            return None;
+        }
+
         let task_lower = self.task.to_lowercase();
 
         // Phase 1: Hardcoded pattern templates (exact keyword matches — fast, reliable)
@@ -579,14 +617,11 @@ impl CodingAgent {
         None
     }
 
-    /// Extract a likely function name from a task description.
-    pub(super) fn extract_function_name(task: &str) -> Option<String> {
-        // Prefer an explicit function declaration already present in the task text
-        // (e.g. HumanEval-style prompts embed the real `def name(...)`/`fn name(...)`
-        // signature) over the prose heuristics below. Those heuristics can misfire
-        // when a docstring's prose happens to contain "function " as plain English
-        // ("...to this function is a string...") rather than a declaration keyword —
-        // that specific collision previously extracted "is" as a function name.
+    /// Scan the task text for an explicit function declaration (`def name(`/
+    /// `fn name(`) and return its name if one exists — i.e. the task already
+    /// fully specifies the signature, as HumanEval-style prompts do, rather
+    /// than being a short natural-language ask like "add a fibonacci function".
+    pub(super) fn task_declared_function_name(task: &str) -> Option<String> {
         for marker in ["def ", "fn "] {
             let mut search_from = 0;
             while let Some(rel_idx) = task[search_from..].find(marker) {
@@ -602,6 +637,20 @@ impl CodingAgent {
                 }
                 search_from = idx + marker.len();
             }
+        }
+        None
+    }
+
+    /// Extract a likely function name from a task description.
+    pub(super) fn extract_function_name(task: &str) -> Option<String> {
+        // Prefer an explicit function declaration already present in the task text
+        // (e.g. HumanEval-style prompts embed the real `def name(...)`/`fn name(...)`
+        // signature) over the prose heuristics below. Those heuristics can misfire
+        // when a docstring's prose happens to contain "function " as plain English
+        // ("...to this function is a string...") rather than a declaration keyword —
+        // that specific collision previously extracted "is" as a function name.
+        if let Some(name) = Self::task_declared_function_name(task) {
+            return Some(name);
         }
 
         let stop_words = [
