@@ -342,17 +342,15 @@ impl AestheticTracker {
 
         // Project aesthetic quality onto harmonies using the system's current activations.
         // Harmonies that are active AND the artwork scored well get reinforced.
-        let mut harmony_projection = [0.0f32; 8];
-        for i in 0..8 {
-            harmony_projection[i] = harmony_activations[i] * score.composite;
-        }
+        let harmony_projection: [f32; 8] =
+            std::array::from_fn(|i| harmony_activations[i] * score.composite);
 
         // Accumulate long-term harmony bias: EMA toward high-scoring harmony activations.
         // Alpha 0.01 = very slow drift, building aesthetic identity over many sessions.
         let bias_alpha = 0.01_f32;
-        for i in 0..8 {
-            let target = harmony_activations[i] * score.composite;
-            self.harmony_bias[i] = self.harmony_bias[i] * (1.0 - bias_alpha) + target * bias_alpha;
+        for (bias, &activation) in self.harmony_bias.iter_mut().zip(harmony_activations.iter()) {
+            let target = activation * score.composite;
+            *bias = *bias * (1.0 - bias_alpha) + target * bias_alpha;
         }
 
         AestheticFeedback {
@@ -420,10 +418,9 @@ impl AestheticTracker {
         // Harmony bias: human-rated works get 5x stronger bias update.
         // This is how Symthaea learns "what sounds she likes = what humans like."
         let human_bias_alpha = 0.05_f32;
-        for i in 0..8 {
-            let target = harmony_activations[i] * score;
-            self.harmony_bias[i] =
-                self.harmony_bias[i] * (1.0 - human_bias_alpha) + target * human_bias_alpha;
+        for (bias, &activation) in self.harmony_bias.iter_mut().zip(harmony_activations.iter()) {
+            let target = activation * score;
+            *bias = *bias * (1.0 - human_bias_alpha) + target * human_bias_alpha;
         }
 
         // Strong dopamine signal: human approval is the ultimate reward
@@ -436,10 +433,7 @@ impl AestheticTracker {
             0.0
         };
 
-        let mut harmony_projection = [0.0f32; 8];
-        for i in 0..8 {
-            harmony_projection[i] = harmony_activations[i] * score;
-        }
+        let harmony_projection: [f32; 8] = std::array::from_fn(|i| harmony_activations[i] * score);
 
         AestheticFeedback {
             dopamine_delta: dopamine_delta.clamp(-0.2, 0.3),

@@ -367,13 +367,12 @@ pub fn coherence_score(
     let texture_alignment = 1.0 - (avg_roughness - visual_complexity * 0.5).abs();
 
     // Weighted composite
-    let composite = (0.35 * hue_valence_alignment
+
+    (0.35 * hue_valence_alignment
         + 0.30 * energy_alignment
         + 0.20 * lightness_complexity_alignment
         + 0.15 * texture_alignment)
-        .clamp(0.0, 1.0);
-
-    composite
+        .clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
