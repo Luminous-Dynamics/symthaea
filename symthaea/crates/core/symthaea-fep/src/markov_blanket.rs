@@ -470,6 +470,12 @@ impl MarkovBoundaryOperator {
     }
 
     /// Current smoothed permeability.
+    // Deliberately returns the EMA-smoothed field, not the raw `permeability`
+    // field the name would naively suggest -- `permeability_ema` is the
+    // authoritative public value (see compute_permeability, which also
+    // returns &self.permeability_ema); `permeability` is the pre-smoothing
+    // internal working value. Not a bug, don't "fix" per clippy's suggestion.
+    #[allow(clippy::misnamed_getters)]
     pub fn permeability(&self) -> &BlanketPermeability {
         &self.permeability_ema
     }
@@ -620,12 +626,6 @@ pub struct SwarmCoalition {
 }
 
 impl SwarmCoalition {
-    /// Collective Φ = internal + permeability-weighted boundary.
-    ///
-    /// When boundary permeability is low, the coalition is isolated and
-    /// `collective_phi ≈ internal_phi` (sovereign sub-swarm).
-    /// When high, external information integrates into the collective.
-
     /// Levin Endosymbiotic Assimilation: Absorbs an entire independent swarm coalition
     /// as a nested, specialized "cognitive organelle". Instead of breaking down the sub-swarm's
     /// internal structures via flat fusion, the parent boundary encapsulates it, scaling the
@@ -709,7 +709,7 @@ impl SwarmCoalition {
                         + consensus_belief.mean[i] * reeducation_factor;
 
                     // Collapse its prior confidence to make it highly receptive to collective feedback
-                    rogue_belief.precision[i] = rogue_belief.precision[i] * 0.5;
+                    rogue_belief.precision[i] *= 0.5;
                 }
             }
             return true; // Informational cancer successfully clamped and suppressed
@@ -813,7 +813,10 @@ impl SwarmCoalition {
     }
 
     /// Collective Φ = internal + permeability-weighted boundary.
-
+    ///
+    /// When boundary permeability is low, the coalition is isolated and
+    /// `collective_phi ≈ internal_phi` (sovereign sub-swarm).
+    /// When high, external information integrates into the collective.
     pub fn collective_phi(&self) -> f64 {
         self.internal_phi + self.mean_external_permeability * self.boundary_phi
     }

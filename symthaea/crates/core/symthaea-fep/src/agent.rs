@@ -161,35 +161,34 @@ impl ActiveInferenceAgent {
             .update_from_error(fe_components.prediction_error, self.timestamp);
 
         // Temporal difference learning: if we have a previous state and action
-        if let (Some(prev_state), Some(action)) = (&self.previous_state, self.last_action) {
-            if let Some(ref mut td_learner) = self.td_learner {
-                // Observe the transition and compute TD error
-                let td_error = td_learner.observe_transition(
-                    prev_state,
-                    action,
-                    &self.belief,
-                    observation,
-                    &self.model,
-                    self.timestamp,
-                );
+        if let (Some(prev_state), Some(action)) = (&self.previous_state, self.last_action)
+            && let Some(ref mut td_learner) = self.td_learner
+        {
+            // Observe the transition and compute TD error
+            let td_error = td_learner.observe_transition(
+                prev_state,
+                action,
+                &self.belief,
+                observation,
+                &self.model,
+                self.timestamp,
+            );
 
-                // Update generative model using TD learning
-                td_learner.update_model(
-                    &mut self.model,
-                    prev_state,
-                    action,
-                    &self.belief,
-                    observation,
-                    td_error,
-                );
+            // Update generative model using TD learning
+            td_learner.update_model(
+                &mut self.model,
+                prev_state,
+                action,
+                &self.belief,
+                observation,
+                td_error,
+            );
 
-                // Update stats
-                self.stats.td_updates += 1;
-                let n = self.stats.td_updates as f64;
-                self.stats.avg_td_error =
-                    (self.stats.avg_td_error * (n - 1.0) + td_error.abs()) / n;
-                self.stats.transition_accuracy = td_learner.avg_prediction_accuracy;
-            }
+            // Update stats
+            self.stats.td_updates += 1;
+            let n = self.stats.td_updates as f64;
+            self.stats.avg_td_error = (self.stats.avg_td_error * (n - 1.0) + td_error.abs()) / n;
+            self.stats.transition_accuracy = td_learner.avg_prediction_accuracy;
         }
 
         // Also use direct model learning (Hebbian-like), but only if TD learning is not active
