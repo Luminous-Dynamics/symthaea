@@ -424,6 +424,26 @@ output behind a feature+`#[ignore]`-gated test that doesn't run under default se
       core gating trio (codegate / language_gates / emotional_gating_integration) stays
       core. Then prune now-dead heavy deps from broca's Cargo.toml (`rnix`, `rowan`,
       `tree-sitter-*`, `pqcrypto-*`, `sled`, `syn`).
+- [ ] **The split already broke a real feature — fix before finishing the rest.** Found
+      2026-07-04 by an independent audit pass, confirmed live: `symthaea-broca/src/
+      liquid_mamba.rs` (the crate's flagship `LiquidMambaGenerator`, public, gated by
+      `#[cfg(feature = "mamba-cpu")]`, `lib.rs:76-77,150`) still references 15 module
+      paths that were physically moved to `symthaea-broca-tools` and never existed back
+      in `symthaea-broca` since
+      (`crate::morphological_bridge`, `foraging_bridge`, `sovereign_law`, `swarm_bridge`,
+      `wasm_architect`, `memory_kernel`, `formal_bridge`, `sovereignty_bridge`,
+      `geodesic_bridge`, `somatic_bridge`, `simulation_bridge`, `codebase_bridge`,
+      `cognitive_ledger`, `compiler_feedback_bridge`, `substrate_rewriter` — 31 references
+      total). `symthaea-broca`'s `Cargo.toml` has no dependency on `symthaea-broca-tools`
+      at all, so there's no qualified-path fix available without adding one — this is the
+      wrong-direction coupling (core→toolkit) the split was supposed to avoid, unlike the
+      `emotional_gating_integration.rs` case above which is toolkit→core and fine.
+      **Confirmed broken**: `cargo check -p symthaea-broca --features mamba-cpu` → 29
+      compile errors. Root cause it slipped through: the split's own verification only
+      ran `cargo check --features code-sheaf-eval`, never `mamba-cpu`/`liquid-mamba`, so
+      the one feature it broke was never exercised. `mamba-cpu` gates 12+ real `[[bin]]`/
+      `[[example]]` targets and the top-level `liquid-mamba` feature — not experimental
+      scaffolding, an advertised generation backend per root CLAUDE.md.
 - [ ] **Automate the Broca quality gate**: `evaluate_quality_suite` +
       `check_quality_suite` with `CanonicalQualityThresholds` (`evaluation.rs:449-460`)
       over `tests/fixtures/eval-canonical-v1.jsonl` already exist but only run via the
