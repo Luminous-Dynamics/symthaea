@@ -324,9 +324,8 @@ pub fn compute_persistent_homology(complex: &SimplicialComplex) -> Vec<Persisten
         });
     }
 
-    for i in 0..n {
+    for (i, (s_birth, birth_val)) in simplices.iter().enumerate().take(n) {
         if !deaths.contains(&i) {
-            let (s_birth, birth_val) = &simplices[i];
             pairs.push(PersistencePair {
                 dimension: s_birth.dimension(),
                 birth: *birth_val,
@@ -503,7 +502,7 @@ impl ConsciousnessTopologyAnalyzer {
         self.point_window.push_back(point);
 
         // Rebuild complex periodically
-        if self.point_counter % 10 == 0 {
+        if self.point_counter.is_multiple_of(10) {
             self.rebuild_complex();
         }
     }
