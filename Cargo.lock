@@ -18101,12 +18101,15 @@ dependencies = [
 name = "symthaea-cell-foundry"
 version = "0.1.0"
 dependencies = [
+ "nalgebra 0.34.2",
  "proptest",
  "rand 0.8.6",
  "serde",
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+ "symtropy-math 0.1.0",
+ "symtropy-physics 0.1.0",
 ]
 
 [[package]]

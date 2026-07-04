@@ -3,13 +3,21 @@
 use crate::controller::SurgicalController;
 use crate::encoder::SurgicalHdcEncoder;
 use crate::simulator::{SimpleSurgicalSimulator, SurgicalPhysicsSimulator};
-use crate::types::{NUM_ACTUATORS, SurgicalConfig, SurgicalSafetyLevel};
+use crate::types::{NUM_ACTUATORS, SurgicalConfig, surgical_cautery_allowed, surgical_torque_gain};
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
-    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
+
+/// Emergency fallback posture for the surgical robot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurgicalFallbackStage {
+    /// Withdraw the tool tip (joint 1 pulls back), close the jaw, and
+    /// disable cautery — the surgical-specific "safe" posture at Red.
+    Retract,
+}
 
 pub struct SurgicalEmbodiment {
     controller: SurgicalController,
@@ -22,7 +30,8 @@ pub struct SurgicalEmbodiment {
     moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
-    surgical_safety: SurgicalSafetyLevel,
+    fallback_stage: SurgicalFallbackStage,
+    fallback_cycles_in_stage: u32,
 }
 
 impl SurgicalEmbodiment {
@@ -39,7 +48,8 @@ impl SurgicalEmbodiment {
             moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
-            surgical_safety: SurgicalSafetyLevel::FullControl,
+            fallback_stage: SurgicalFallbackStage::Retract,
+            fallback_cycles_in_stage: 0,
         }
     }
     pub fn set_safety_override(&mut self, l: MotorSafetyLevel) {
@@ -48,8 +58,8 @@ impl SurgicalEmbodiment {
     pub fn clear_safety_override(&mut self) {
         self.safety_override = None;
     }
-    pub fn surgical_safety(&self) -> SurgicalSafetyLevel {
-        self.surgical_safety
+    pub fn fallback_stage(&self) -> SurgicalFallbackStage {
+        self.fallback_stage
     }
     /// Apply moral gate from ethics engine. SAFETY-CRITICAL: surgical robot cuts human tissue.
     /// Ahimsa violation or Blocked verdict forces Retract (emergency stop + disable cautery + withdraw pose).
@@ -67,37 +77,54 @@ impl SurgicalEmbodiment {
             };
     }
     pub fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
-        self.surgical_safety = SurgicalSafetyLevel::from_phi(phi);
-        // Moral gate downgrades surgical_safety: Red moral → force Retract so existing
-        // retract-pose + disable-cautery logic below engages uniformly.
-        if matches!(
-            self.moral_safety,
-            Some(MotorSafetyLevel::Red) | Some(MotorSafetyLevel::Orange)
-        ) {
-            self.surgical_safety = SurgicalSafetyLevel::Retract;
-        }
-        let tg = self.surgical_safety.torque_gain();
-        let pl = MotorSafetyLevel::from_phi(phi);
-        self.current_safety = pl;
+        // Unified tier: MotorSafetyLevel is the single source of truth for
+        // phi + safety_override + moral gate combined (previously the
+        // parallel `SurgicalSafetyLevel` ladder only looked at phi + moral
+        // gate, silently ignoring `safety_override` — an external
+        // SafetyAgent override could report Red in telemetry without ever
+        // actually retracting the tool. Fixed by deriving everything from
+        // this one combined value.)
+        let phi_level = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = phi_level;
         if let Some(ov) = self.safety_override {
             self.current_safety = self.current_safety.max(ov);
         }
         if let Some(m) = self.moral_safety {
             self.current_safety = self.current_safety.max(m);
         }
+
+        let tg = surgical_torque_gain(self.current_safety);
+        let cautery_ok = surgical_cautery_allowed(self.current_safety);
+
         let mut cmd = self.controller.forward(hv, dt);
         for t in &mut cmd.joint_torques {
             *t *= tg;
         }
-        if !self.surgical_safety.cautery_allowed() {
+        if !cautery_ok {
             cmd.cautery = 0.0;
         }
-        if self.surgical_safety == SurgicalSafetyLevel::Retract {
+
+        // ── SafeFallback: Retract ──────────────────────────────────────
+        // Triggers on general Red (phi/override/ahimsa — anything that
+        // maxes current_safety to Red) OR specifically on a moral consent
+        // violation (Orange from the ethics engine, not from phi). Consent
+        // violation is a stronger, more certain signal than a merely-low
+        // Phi reading, so it earns the full active withdrawal pose rather
+        // than phi-only Orange's plain zero-torque Freeze.
+        let force_retract = matches!(self.current_safety, MotorSafetyLevel::Red)
+            || self.moral_safety == Some(MotorSafetyLevel::Orange);
+        if force_retract {
+            self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
             cmd.joint_torques = [0.0, -0.3, 0.0, 0.0, 0.0, 0.0];
             cmd.jaw = 0.0;
             cmd.cautery = 0.0;
+        } else {
+            self.fallback_stage = SurgicalFallbackStage::Retract;
+            self.fallback_cycles_in_stage = 0;
         }
-        // Moral-Red (ahimsa) is stricter than phi-Red retract pose: full emergency stop, zero torque.
+        // Moral-Red (ahimsa) is stricter than the general Retract pose: full
+        // emergency stop, zero torque — even the withdrawal motion itself
+        // may be unsafe if harm is actively in progress right now.
         if self.moral_safety == Some(MotorSafetyLevel::Red) {
             cmd.joint_torques = [0.0; 6];
             cmd.jaw = 0.0;
@@ -140,7 +167,8 @@ impl SurgicalEmbodiment {
         self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
-        self.surgical_safety = SurgicalSafetyLevel::FullControl;
+        self.fallback_stage = SurgicalFallbackStage::Retract;
+        self.fallback_cycles_in_stage = 0;
     }
     pub fn safety_level(&self) -> MotorSafetyLevel {
         self.current_safety
@@ -199,6 +227,24 @@ impl symthaea_core::embodiment::EmbodimentBridge for SurgicalEmbodiment {
     }
 }
 
+impl SafeFallback for SurgicalEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "surgical"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        8 // High: in contact with human tissue, though base is stationary
+    }
+    fn safe_fallback_description(&self) -> &'static str {
+        "Retract: withdraw tool tip, close jaw, disable cautery"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,8 +256,10 @@ mod tests {
     #[test]
     fn test_retract() {
         let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t"));
-        b.step(&ContinuousHV::random(16384, 42), 0.001, 0.05);
-        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract);
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.001, 0.05);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(b.fallback_stage(), SurgicalFallbackStage::Retract);
+        assert!(b.safe_fallback_active());
     }
     #[test]
     fn test_extended() {
@@ -236,7 +284,7 @@ mod tests {
             MotorSafetyLevel::Red,
             "ahimsa must force Red at any phi"
         );
-        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract);
+        assert_eq!(b.fallback_stage(), SurgicalFallbackStage::Retract);
         assert!(
             r.control_effort < 1e-6,
             "ahimsa must emergency-stop (strict zero), got {}",
@@ -253,7 +301,9 @@ mod tests {
         });
         let r = b.step(&ContinuousHV::random(16384, 42), 0.001, 0.9);
         assert_eq!(r.safety_level, MotorSafetyLevel::Orange);
-        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract);
+        // Consent violation is a stronger signal than phi-only Orange —
+        // it earns the full Retract withdrawal pose, not just zero torque.
+        assert_eq!(b.fallback_stage(), SurgicalFallbackStage::Retract);
     }
 
     #[test]
@@ -335,7 +385,7 @@ mod tests {
         assert_eq!(b.total_steps(), 50);
         b.reset();
         assert_eq!(b.total_steps(), 0);
-        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::FullControl);
+        assert_eq!(b.fallback_cycles_in_stage, 0);
         // Override must also clear (documented in reset impl).
         let r = b.step(&hv, 0.001, 0.9);
         assert_eq!(r.safety_level, MotorSafetyLevel::Green);
@@ -343,13 +393,48 @@ mod tests {
 
     #[test]
     fn test_retract_pose_also_disables_cautery() {
-        // When phi drops into Retract tier, cautery_allowed is false — verify
+        // When phi drops into the Red tier, cautery_allowed is false — verify
         // that the step's end state has cautery_power at 0 regardless of how
         // loudly the HV would otherwise request it.
         let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("cautery_attempt"));
-        b.step(&ContinuousHV::random(16384, 7), 0.001, 0.05);
-        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract);
+        let r = b.step(&ContinuousHV::random(16384, 7), 0.001, 0.05);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(b.fallback_stage(), SurgicalFallbackStage::Retract);
         // Cautery capability check at the safety layer (policy-level assertion).
-        assert!(!b.surgical_safety().cautery_allowed());
+        assert!(!surgical_cautery_allowed(r.safety_level));
+        assert_eq!(b.simulator.state().cautery_power, 0.0);
+    }
+
+    #[test]
+    fn test_safe_fallback_trait_impl() {
+        let b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        assert_eq!(b.platform_name(), "surgical");
+        assert_eq!(b.safe_fallback_priority(), 8);
+        assert_eq!(b.safe_fallback_latency_cycles(), 1);
+        assert!(b.safe_fallback_description().contains("Retract"));
+    }
+
+    #[test]
+    fn test_safety_override_now_actually_retracts() {
+        // Regression test for the bug the unification fixed: previously
+        // `SurgicalSafetyLevel` was derived only from phi + moral gate, so
+        // an external SafetyAgent override to Red would report Red in
+        // `safety_level` but NEVER actually retract the tool (the physical
+        // command stayed whatever phi/moral said). Now current_safety is
+        // the single input to both the reported tier AND the Retract
+        // fallback, so an override must retract for real.
+        let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.set_safety_override(MotorSafetyLevel::Red);
+        let hv = ContinuousHV::random(16384, 42);
+        let r = b.step(&hv, 0.001, 0.9); // phi alone would be Green
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(b.fallback_stage(), SurgicalFallbackStage::Retract);
+        // Exact expected effort for the fixed Retract command:
+        // joint_torques=[0,-0.3,0,0,0,0], jaw=0, cautery=0 → 0.3/8.
+        assert!(
+            (r.control_effort - 0.3 / 8.0).abs() < 1e-5,
+            "expected exact Retract withdrawal effort 0.3/8, got {}",
+            r.control_effort
+        );
     }
 }

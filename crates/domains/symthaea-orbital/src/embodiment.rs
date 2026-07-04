@@ -4,10 +4,19 @@ use crate::simulator::{OrbitalPhysicsSimulator, SimpleOrbitalSimulator};
 use crate::types::{NUM_ACTUATORS, OrbitalConfig};
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
-    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
+
+/// Emergency fallback behavior for the orbital servicing arm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrbitalFallbackStage {
+    /// Zero relative-motion torque on every joint — hold station attitude
+    /// and let the arm passively drift with the host spacecraft rather
+    /// than risk an uncontrolled motion near other spacecraft/debris.
+    Park,
+}
 
 pub struct OrbitalEmbodiment {
     ctrl: OrbitalController,
@@ -20,6 +29,8 @@ pub struct OrbitalEmbodiment {
     moral_safety: Option<MotorSafetyLevel>,
     effort: f32,
     pe: f32,
+    fallback_stage: OrbitalFallbackStage,
+    fallback_cycles_in_stage: u32,
 }
 impl OrbitalEmbodiment {
     pub fn new(g: &GenesisSeed) -> Self {
@@ -35,6 +46,8 @@ impl OrbitalEmbodiment {
             moral_safety: None,
             effort: 0.0,
             pe: 0.0,
+            fallback_stage: OrbitalFallbackStage::Park,
+            fallback_cycles_in_stage: 0,
         }
     }
     pub fn set_safety_override(&mut self, l: MotorSafetyLevel) {
@@ -42,6 +55,9 @@ impl OrbitalEmbodiment {
     }
     pub fn clear_safety_override(&mut self) {
         self.safety_ov = None;
+    }
+    pub fn fallback_stage(&self) -> OrbitalFallbackStage {
+        self.fallback_stage
     }
     /// Apply moral gate from ethics engine.
     /// Orbital platforms can damage other spacecraft/debris — ahimsa forces Red (park), consent Orange.
@@ -68,9 +84,20 @@ impl OrbitalEmbodiment {
         }
         let gain = self.safety.motor_gain();
         let mut cmd = self.ctrl.forward(hv, dt);
-        if gain <= 0.3 {
+
+        // ── SafeFallback: Park at Red (unifies the former 0.3 hard cliff
+        // under the shared MotorSafetyLevel contract) ───────────────────
+        // Previously `gain <= 0.3` zeroed torques at BOTH Orange (gain=0.3)
+        // AND Red (gain=0.0) — collapsing the graduated Orange tier into
+        // the same hard stop as Red. Only Red should trigger the full
+        // Park fallback; Orange keeps its designed reduced-but-nonzero
+        // authority (motor_gain() == 0.3) like every other platform.
+        if matches!(self.safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
             cmd.joint_torques = [0.0; NUM_ACTUATORS];
         } else {
+            self.fallback_stage = OrbitalFallbackStage::Park;
+            self.fallback_cycles_in_stage = 0;
             for t in &mut cmd.joint_torques {
                 *t *= gain;
             }
@@ -116,6 +143,8 @@ impl OrbitalEmbodiment {
         self.moral_safety = None;
         self.effort = 0.0;
         self.pe = 0.0;
+        self.fallback_stage = OrbitalFallbackStage::Park;
+        self.fallback_cycles_in_stage = 0;
     }
     pub fn safety_level(&self) -> MotorSafetyLevel {
         self.safety
@@ -172,6 +201,25 @@ impl symthaea_core::embodiment::EmbodimentBridge for OrbitalEmbodiment {
         self.apply_moral_gate(gate)
     }
 }
+
+impl SafeFallback for OrbitalEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "orbital"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        3 // Low-moderate: stationary/contained, but debris/collision risk
+    }
+    fn safe_fallback_description(&self) -> &'static str {
+        "Park: zero relative-motion torque on every joint, hold station attitude"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,10 +229,56 @@ mod tests {
         assert!(b.step(&ContinuousHV::random(16384, 42), 0.01, 0.7).success);
     }
     #[test]
-    fn test_orange_parks() {
+    fn test_orange_retains_scaled_authority_not_hard_zero() {
+        // NOTE: this test used to be named test_orange_parks and asserted
+        // control_effort < 0.01 at Orange — that was the "0.3 hard cliff"
+        // bug this fix closes. `gain <= 0.3` caught BOTH Orange (gain=0.3)
+        // and Red (gain=0.0), collapsing Orange into the same hard stop as
+        // Red. Orange must now retain its designed reduced-but-nonzero
+        // authority, matching every other platform's motor_gain() contract.
         let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
         let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.15);
-        assert!(r.control_effort < 0.01);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Orange);
+        assert!(
+            r.control_effort > 0.0,
+            "Orange must retain scaled (non-zero) authority, got {}",
+            r.control_effort
+        );
+    }
+    #[test]
+    fn test_red_parks_hard_stop() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.05);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert!(
+            r.control_effort < 1e-6,
+            "Red must fully Park (hard zero), got {}",
+            r.control_effort
+        );
+        assert_eq!(b.fallback_stage(), OrbitalFallbackStage::Park);
+    }
+    #[test]
+    fn test_safe_fallback_trait_impl() {
+        let b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        assert_eq!(b.platform_name(), "orbital");
+        assert_eq!(b.safe_fallback_priority(), 3);
+        assert_eq!(b.safe_fallback_latency_cycles(), 1);
+        assert!(b.safe_fallback_description().contains("Park"));
+    }
+    #[test]
+    fn test_safe_fallback_active_at_orange_and_red() {
+        // safe_fallback_active() is defined (by the shared trait default) as
+        // Red OR Orange, even though only Red triggers the hard Park zero —
+        // Orange is still "fallback active" in the sense of reduced
+        // authority per the trait's own documented invariant.
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let hv = ContinuousHV::random(16384, 42);
+        b.step(&hv, 0.01, 0.9); // Green
+        assert!(!b.safe_fallback_active());
+        b.step(&hv, 0.01, 0.15); // Orange
+        assert!(b.safe_fallback_active());
+        b.step(&hv, 0.01, 0.05); // Red
+        assert!(b.safe_fallback_active());
     }
     #[test]
     fn test_moral_gate_ahimsa_forces_red() {
@@ -242,7 +336,7 @@ mod tests {
         b.set_safety_override(MotorSafetyLevel::Red);
         let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.9);
         assert_eq!(r.safety_level, MotorSafetyLevel::Red);
-        // Red parks; motor gain ≤ 0.3 zeroes torques.
+        // Red triggers the Park SafeFallback: hard zero.
         assert!(r.control_effort < 0.01);
     }
 

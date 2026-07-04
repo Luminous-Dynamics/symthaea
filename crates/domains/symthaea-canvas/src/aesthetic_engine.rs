@@ -85,8 +85,7 @@ impl AestheticEngine {
 
         // Complexity: Cantor depth (0-5) + Betti sum, scaled
         let betti_sum = (snap.betti_0 + snap.betti_1 + snap.betti_2) as f32;
-        let complexity =
-            ((snap.cantor_metacognitive_depth * 0.3 + betti_sum * 0.1).min(1.0)).max(0.0);
+        let complexity = (snap.cantor_metacognitive_depth * 0.3 + betti_sum * 0.1).clamp(0.0, 1.0);
 
         // Turbulence: PE^0.5 (emphasize small errors)
         let turbulence = snap.prediction_error.abs().sqrt().min(1.0);
@@ -117,7 +116,7 @@ impl AestheticEngine {
         }
 
         // Layout center from thought vector dims 0,1
-        let cx = if snap.thought_vector.len() > 0 {
+        let cx = if !snap.thought_vector.is_empty() {
             256.0 + snap.thought_vector[0] * 64.0
         } else {
             256.0
@@ -155,10 +154,8 @@ impl AestheticEngine {
         let a = self.ema_alpha;
         let b = 1.0 - a;
 
-        let mut harmony_radii = [0.0f32; 8];
-        for i in 0..8 {
-            harmony_radii[i] = prev.harmony_radii[i] * b + new.harmony_radii[i] * a;
-        }
+        let harmony_radii: [f32; 8] =
+            std::array::from_fn(|i| prev.harmony_radii[i] * b + new.harmony_radii[i] * a);
 
         AestheticState {
             luminosity: prev.luminosity * b + new.luminosity * a,

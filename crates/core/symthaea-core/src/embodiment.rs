@@ -298,18 +298,39 @@ impl std::fmt::Display for AgentIdentity {
 /// it loses its goal-directed authority. The machine's MINIMUM-SAFE
 /// behavior must execute regardless of consciousness state.
 ///
-/// This trait defines what "minimum-safe behavior" means for each platform:
+/// This trait defines what "minimum-safe behavior" means for each platform.
 ///
-/// | Platform | Red-tier Safe Fallback |
-/// |----------|------------------------|
-/// | Manipulator | Hold current pose (gravity compensation) |
-/// | Helicopter | Autorotation descent |
-/// | Quadrotor | Controlled emergency landing |
-/// | **Vehicle** | **Maximum brake + hazards + lane hold** |
-/// | **Exoskeleton** | **Lock legs in standing position** |
-/// | AUV | Buoyancy ascent to surface |
-/// | Quadruped | Controlled sit/lie-down |
-/// | Surgical | Freeze in place, retract cautery |
+/// STATUS (2026-07, SafeFallback audit): this table previously promised
+/// fallback behavior for Manipulator/AUV/Quadruped/Surgical while only
+/// Humanoid/Multirotor/Vehicle/Helicopter actually implemented the
+/// `SafeFallback` trait — a real doc/code gap (Phase 1 of
+/// `SYMTHAEA_IMPROVEMENT_PLAN_2026-07.md`). All 10 platform crates now
+/// implement it; see each crate's `embodiment.rs` for the `impl SafeFallback`
+/// block, which is the authoritative source — this table is a summary.
+///
+/// | Platform | Red-tier Safe Fallback | Priority |
+/// |----------|------------------------|----------|
+/// | Humanoid | StandingLock: zero torque + gravity-comp hip pitch baseline | 9 |
+/// | Multirotor (Quadrotor) | Multi-stage: StabilizeHover → ControlledDescent → Touchdown | 10 |
+/// | **Vehicle** | **Multi-stage: MaintainCourse → GradualDeceleration → EmergencyBrake → PostStop** | 10 |
+/// | Helicopter | Multi-stage: StabilizeHover → AutorotationDescent → Touchdown flare | 10 |
+/// | Manipulator | GravityHold: per-joint gravity-compensation torque holds current pose; gripper frozen | 5 |
+/// | **Exoskeleton** | **Backdrivable: zero assistive torque on every joint — wearer retains full voluntary control** | 9 |
+/// | AUV | BuoyancyAscent: vertical thrusters commanded to surface, all other thrust suppressed | 6 |
+/// | Quadruped | SitDown: fold hip/thigh/knee joints into a stable low crouch, halt locomotion | 6 |
+/// | Surgical | Retract: withdraw tool tip, close jaw, disable cautery (also triggers on ethics-engine consent violation, not just Red) | 8 |
+/// | Orbital | Park: zero relative-motion torque on every joint, hold station attitude | 3 |
+///
+/// Orbital and Surgical previously had their own bespoke safety ladders
+/// running in parallel to `MotorSafetyLevel` (orbital's `gain <= 0.3` "hard
+/// cliff" collapsed Orange into the same hard-zero as Red; surgical's
+/// `SurgicalSafetyLevel` enum was a byte-for-byte duplicate of this type's
+/// own 4-tier thresholds). Both are now unified: `MotorSafetyLevel` is the
+/// single source of the tier decision for every platform; surgical keeps
+/// two small platform-specific derive functions (`surgical_torque_gain`,
+/// `surgical_cautery_allowed`) rather than a parallel enum, so the STRUCTURE
+/// (4 Phi-derived tiers) is shared while per-tier numeric tuning stays
+/// platform-appropriate and auditable against this one contract.
 ///
 /// # Design Principle
 ///

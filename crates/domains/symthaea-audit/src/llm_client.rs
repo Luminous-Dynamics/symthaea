@@ -22,7 +22,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::cli::{Cli, LlmProviderArg};
 
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+// Generous on purpose: local Ollama models under real-world load (shared dev boxes,
+// concurrent builds) can take minutes for a single turn, especially as the growing
+// tool-call history lengthens the prompt each turn.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(600);
 const DEFAULT_MAX_TOKENS: usize = 4096;
 const DEFAULT_TEMPERATURE: f32 = 0.2;
 

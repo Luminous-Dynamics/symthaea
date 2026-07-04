@@ -175,8 +175,8 @@ impl TasteModel {
         let error = score.composite - predicted;
 
         // Gradient descent
-        for i in 0..4 {
-            self.weights[i] += self.lr * error * profile[i];
+        for (w, &p) in self.weights.iter_mut().zip(profile.iter()) {
+            *w += self.lr * error * p;
         }
         self.bias += self.lr * error;
 
@@ -202,8 +202,8 @@ impl TasteModel {
 
     fn predict_raw(&self, profile: &[f32; 4]) -> f32 {
         let mut sum = self.bias;
-        for i in 0..4 {
-            sum += self.weights[i] * profile[i];
+        for (&w, &p) in self.weights.iter().zip(profile.iter()) {
+            sum += w * p;
         }
         sum
     }

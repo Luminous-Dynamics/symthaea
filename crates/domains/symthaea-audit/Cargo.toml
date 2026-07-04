@@ -28,7 +28,7 @@ chrono = { workspace = true }
 ignore = "0.4"
 # Not yet promoted to [workspace.dependencies]; matches the version already used by
 # crates/domains/symthaea-broca-tools. Candidate for promotion now that 2 crates use it.
-ureq = "2.9"
+ureq = { version = "2.9", features = ["json"] }
 
 [dev-dependencies]
 serial_test = { workspace = true }

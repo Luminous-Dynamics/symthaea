@@ -106,16 +106,27 @@ impl AuvEmbodiment {
             Some(override_level) => phi_level.max(override_level),
             None => phi_level,
         };
-        // Ethics gate max-composes on top of phi + override. Moral-Red zeros
-        // thrust via motor_gain() just like phi-Red.
+        // Ethics gate max-composes on top of phi + override.
         if let Some(m) = self.moral_safety {
             self.current_safety = self.current_safety.max(m);
         }
         let gain = self.current_safety.motor_gain();
         let mut cmd = self.controller.forward(thought_hv, dt);
-        if gain < 1.0 {
-            for t in &mut cmd.thrusters {
-                *t *= gain;
+
+        // ── SafeFallback: BuoyancyAscent at Red ──────────────────────
+        // Zero thrust in open water is not safe — the vehicle drifts with
+        // current/tide at whatever depth it happens to be. Actively ascend
+        // to the surface instead, at full authority (not gain-scaled).
+        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
+            self.apply_buoyancy_ascent(&mut cmd);
+        } else {
+            self.fallback_stage = AuvFallbackStage::BuoyancyAscent;
+            self.fallback_cycles_in_stage = 0;
+            if gain < 1.0 {
+                for t in &mut cmd.thrusters {
+                    *t *= gain;
+                }
             }
         }
         self.last_control_effort = cmd.control_effort();
@@ -157,6 +168,8 @@ impl AuvEmbodiment {
         self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.fallback_stage = AuvFallbackStage::BuoyancyAscent;
+        self.fallback_cycles_in_stage = 0;
     }
     pub fn safety_level(&self) -> MotorSafetyLevel {
         self.current_safety
@@ -216,6 +229,24 @@ impl symthaea_core::embodiment::EmbodimentBridge for AuvEmbodiment {
     }
 }
 
+impl SafeFallback for AuvEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "auv"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        6 // Moderate-high: mobile, operates near reefs/wrecks/other vessels
+    }
+    fn safe_fallback_description(&self) -> &'static str {
+        "BuoyancyAscent: vertical thrusters commanded to surface, all other thrust suppressed"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,7 +266,15 @@ mod tests {
         let hv = ContinuousHV::random(16384, 42);
         let r = bridge.step(&hv, 0.01, 0.05);
         assert_eq!(r.safety_level, MotorSafetyLevel::Red);
-        assert_eq!(r.control_effort, 0.0);
+        // NOTE: this used to assert control_effort == 0.0, but that was the
+        // bug this fix closes — zero thrust in open water just means
+        // drifting with current at whatever depth. Red now commands
+        // BuoyancyAscent (a deliberate, non-zero surfacing thrust).
+        assert!(
+            r.control_effort > 0.0,
+            "Red must command BuoyancyAscent (non-zero), got {}",
+            r.control_effort
+        );
     }
 
     #[test]
@@ -282,7 +321,15 @@ mod tests {
             MotorSafetyLevel::Red,
             "ahimsa must force Red regardless of phi"
         );
-        assert_eq!(r.control_effort, 0.0, "Red tier zeros thrust");
+        // NOTE: this used to assert control_effort == 0.0 ("Red tier zeros
+        // thrust") — that was exactly the gap this fix closes. Ahimsa-Red
+        // now commands BuoyancyAscent, a deliberate non-zero surfacing
+        // thrust, not a passive drift.
+        assert!(
+            r.control_effort > 0.0,
+            "ahimsa-Red must command BuoyancyAscent (non-zero), got {}",
+            r.control_effort
+        );
     }
 
     #[test]
@@ -300,5 +347,74 @@ mod tests {
             MotorSafetyLevel::Orange,
             "consent violation → Orange"
         );
+    }
+
+    #[test]
+    fn test_red_triggers_buoyancy_ascent_stage() {
+        let mut bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.01, 0.05);
+        assert_eq!(bridge.fallback_stage(), AuvFallbackStage::BuoyancyAscent);
+    }
+
+    #[test]
+    fn test_red_ascends_toward_surface_over_time() {
+        // The core safety fix: sustained Red must actually reduce depth
+        // (ascend), not just leave the vehicle drifting at whatever depth
+        // it happened to be.
+        let mut bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        // Start at neutral buoyancy, depth 10m (AuvEmbodiment::new default).
+        let initial_depth = bridge.simulator.state().depth_m();
+        for _ in 0..3000 {
+            let r = bridge.step(&hv, 0.01, 0.05); // Red throughout
+            assert!(r.success, "state must stay finite while ascending");
+        }
+        let final_depth = bridge.simulator.state().depth_m();
+        assert!(
+            final_depth < initial_depth,
+            "BuoyancyAscent should reduce depth: initial={initial_depth}, final={final_depth}"
+        );
+    }
+
+    #[test]
+    fn test_red_commands_fixed_ascent_thrust_not_scaled_output() {
+        // At Red, the vertical thrusters must be the fixed ascent command,
+        // not the gain-scaled (and thus zeroed) neural controller output.
+        let mut bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.01, 0.05);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        // Only thrusters 4 and 5 are commanded (ASCENT_THRUST each), all
+        // others zero: mean |thrust| over 8 actuators = 2*ASCENT_THRUST/8.
+        let expected = 2.0 * ASCENT_THRUST / 8.0;
+        assert!(
+            (r.control_effort - expected).abs() < 1e-5,
+            "expected fixed ascent thrust {expected}, got {}",
+            r.control_effort
+        );
+    }
+
+    #[test]
+    fn test_safe_fallback_trait_impl() {
+        let bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        assert_eq!(bridge.platform_name(), "auv");
+        assert_eq!(bridge.safe_fallback_priority(), 6);
+        assert_eq!(bridge.safe_fallback_latency_cycles(), 1);
+        assert!(
+            bridge
+                .safe_fallback_description()
+                .contains("BuoyancyAscent")
+        );
+    }
+
+    #[test]
+    fn test_safe_fallback_active_iff_red_or_orange() {
+        let mut bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.01, 0.9); // Green
+        assert!(!bridge.safe_fallback_active());
+        bridge.step(&hv, 0.01, 0.05); // Red
+        assert!(bridge.safe_fallback_active());
     }
 }

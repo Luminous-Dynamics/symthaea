@@ -49,6 +49,12 @@ const PHI_ETHICS_THRESHOLD: f64 = 0.3;
 const PHI_HISTORY_CAP: usize = 512;
 /// Connectivity radius for synaptogenesis.
 const SYNAPSE_RADIUS: f32 = 0.12;
+/// Cell size for the shared per-day spatial grid (`crate::spatial_grid`)
+/// that backs `neighbours()`/`form_synapses`/`form_gap_junctions`. Must
+/// stay >= the largest of `NEIGHBOURHOOD_RADIUS`, `SYNAPSE_RADIUS` (both
+/// above), and `GAP_JUNCTION_RADIUS` (bioelectric.rs) — currently
+/// `GAP_JUNCTION_RADIUS` = 0.4 is the largest.
+pub(crate) const SPATIAL_GRID_CELL_SIZE: f32 = 0.4;
 /// Proliferation multiplier: fraction of progenitors that divide per day.
 const PROLIFERATION_RATE: f64 = 0.10;
 /// Maximum cells to avoid runaway proliferation in simulation.
@@ -179,6 +185,17 @@ pub struct MorphogeneticField {
     /// Seeded RNG for reproducibility.
     #[serde(skip, default = "default_rng")]
     rng: StdRng,
+    /// Cached per-day spatial index (grid + the position snapshot it was
+    /// built from — cached together so `neighbours()` never has to
+    /// re-collect positions on every call, which would silently reintroduce
+    /// O(n) work per query) backing `neighbours()`/`form_synapses`/
+    /// `form_gap_junctions` — see `crate::spatial_grid`. `None` until
+    /// `rebuild_spatial_grid` is called (which `advance_day` does once per
+    /// day); every distance-based method falls back to the original
+    /// brute-force scan when it's `None`, so standalone/unit-test usage
+    /// that never calls `advance_day` is completely unaffected.
+    #[serde(skip)]
+    spatial_grid: Option<(crate::spatial_grid::SpatialGrid, Vec<[f32; 3]>)>,
 }
 
 fn default_rng() -> StdRng {
@@ -215,6 +232,7 @@ impl MorphogeneticField {
             connectivity_matrix,
             bioelectric,
             rng,
+            spatial_grid: None,
         }
     }
 
@@ -236,12 +254,40 @@ impl MorphogeneticField {
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
 
-    /// Return indices of cells within `radius` of cell `idx`.
+    /// Return indices of cells within `radius` of cell `idx`. Uses the
+    /// cached spatial grid when one has been built (see
+    /// `rebuild_spatial_grid`) and `radius` fits within its cell size;
+    /// otherwise falls back to the original brute-force O(n) scan, so
+    /// standalone/unit-test usage (which never calls `advance_day`, and
+    /// therefore never builds a grid) is completely unaffected.
     pub(crate) fn neighbours(&self, idx: usize, radius: f32) -> Vec<usize> {
+        if let Some((grid, positions)) = &self.spatial_grid {
+            if radius <= grid.cell_size() {
+                return grid.query_radius(positions, &self.cells[idx].position, radius, Some(idx));
+            }
+        }
+        self.neighbours_brute_force(idx, radius)
+    }
+
+    /// The original O(n) reference implementation of `neighbours`, kept as
+    /// the fallback path and as the correctness oracle for
+    /// `spatial_grid`'s tests.
+    fn neighbours_brute_force(&self, idx: usize, radius: f32) -> Vec<usize> {
         let pos = &self.cells[idx].position;
         (0..self.cells.len())
             .filter(|&j| j != idx && Self::distance(pos, &self.cells[j].position) < radius)
             .collect()
+    }
+
+    /// Rebuild the cached spatial grid from current positions. Cheap
+    /// relative to what it saves: called once per day from `advance_day`,
+    /// right after the last step that can move a cell (`migrate`), so it
+    /// stays valid through synapse/gap-junction formation, the reaction-
+    /// diffusion substeps, and phi computation — none of which move cells.
+    pub(crate) fn rebuild_spatial_grid(&mut self) {
+        let positions: Vec<[f32; 3]> = self.cells.iter().map(|c| c.position).collect();
+        let grid = crate::spatial_grid::SpatialGrid::build(&positions, SPATIAL_GRID_CELL_SIZE);
+        self.spatial_grid = Some((grid, positions));
     }
 
     /// Discrete Laplacian for a scalar field at cell `idx` using the
@@ -363,26 +409,31 @@ impl MorphogeneticField {
     }
 
     /// Form synapses between nearby neurons (synaptogenesis).
+    ///
+    /// Candidate pairs come from [`Self::neighbours`] (grid-backed once a
+    /// day's grid has been built). Candidates are sorted before use so the
+    /// `i < j` ordering — and therefore the sequence of `self.rng` draws
+    /// below — matches the original O(n^2) pairwise scan exactly; the grid
+    /// returns matches in bucket order, not index order.
     pub fn form_synapses(&mut self) {
         let n = self.cells.len();
         for i in 0..n {
             if !self.cells[i].cell_type.is_neuron() {
                 continue;
             }
-            let pos_i = self.cells[i].position;
-            for j in (i + 1)..n {
-                if !self.cells[j].cell_type.is_neuron() {
+            let mut candidates = self.neighbours(i, SYNAPSE_RADIUS);
+            candidates.sort_unstable();
+            for j in candidates {
+                if j <= i || !self.cells[j].cell_type.is_neuron() {
                     continue;
                 }
-                if Self::distance(&pos_i, &self.cells[j].position) < SYNAPSE_RADIUS {
-                    // Add bidirectional connection if not already present.
-                    if !self.cells[i].connectivity.contains(&j) {
-                        self.cells[i].connectivity.push(j);
-                        self.cells[j].connectivity.push(i);
-                        let w = self.rng.gen_range(0.1..1.0f64);
-                        self.connectivity_matrix[i][j] = w;
-                        self.connectivity_matrix[j][i] = w;
-                    }
+                // Add bidirectional connection if not already present.
+                if !self.cells[i].connectivity.contains(&j) {
+                    self.cells[i].connectivity.push(j);
+                    self.cells[j].connectivity.push(i);
+                    let w = self.rng.gen_range(0.1..1.0f64);
+                    self.connectivity_matrix[i][j] = w;
+                    self.connectivity_matrix[j][i] = w;
                 }
             }
         }
@@ -596,6 +647,11 @@ pub struct NeuralOrganoid {
     /// `false` so existing behavior/tests are unaffected unless explicitly
     /// opted in.
     pub(crate) positional_homing_enabled: bool,
+    /// Whether the opt-in real-physics packing correction pass
+    /// (`crate::packing`) runs each day. See
+    /// `NeuralOrganoid::set_packing_enabled`. Defaults to `false` for the
+    /// same reason as `positional_homing_enabled`.
+    pub(crate) packing_enabled: bool,
 }
 
 impl NeuralOrganoid {
@@ -611,6 +667,7 @@ impl NeuralOrganoid {
             target_morphology: None,
             days_since_wound: 0,
             positional_homing_enabled: false,
+            packing_enabled: false,
         }
     }
 
@@ -644,6 +701,20 @@ impl NeuralOrganoid {
         //     bioelectrically-isolated ("defected") cells, independent of
         //     regeneration state — see `induce_local_defection`.
         self.field.defective_proliferate();
+
+        // 1.7 Packing (opt-in): resolve any physical overlap left by this
+        //     day's proliferation via real collision response, before
+        //     migration reads positions. See `crate::packing`.
+        if self.packing_enabled {
+            crate::packing::resolve_packing(&mut self.field);
+        }
+
+        // 1.8 Rebuild the spatial grid backing neighbours() now that this
+        //     day's cell count and positions are settled (proliferation,
+        //     regeneration, defection, and packing have all already run) —
+        //     must happen before `migrate`, the first step that queries
+        //     neighbours this day. See `crate::spatial_grid`.
+        self.field.rebuild_spatial_grid();
 
         // 2. Migrate toward morphogen gradients.
         self.field.migrate();

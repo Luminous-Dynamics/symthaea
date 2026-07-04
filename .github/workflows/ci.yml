@@ -170,6 +170,46 @@ jobs:
       - name: Run tests
         run: cargo test -p symthaea --lib -- --test-threads=1
 
+  test-nextest:
+    name: Test (nextest, observational)
+    runs-on: ubuntu-latest
+    # Non-blocking: this job never fails the workflow (continue-on-error
+    # below). It exists so we can watch cargo-nextest's process-per-test
+    # isolation behave on this suite for a while before ever depending on
+    # it -- not a replacement for the `test` job above.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Run tests with nextest
+        run: cargo nextest run -p symthaea --lib
+
   test-hardened-lib:
     name: Hardened Lib Regressions
     runs-on: ubuntu-latest

@@ -6,7 +6,7 @@ use crate::simulator::{ExoskeletonPhysicsSimulator, SimpleExoskeletonSimulator};
 use crate::types::{AssistanceMode, ExoskeletonConfig, NUM_ACTUATORS};
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
-    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -185,6 +185,41 @@ impl symthaea_core::embodiment::EmbodimentBridge for ExoskeletonEmbodiment {
     }
 }
 
+/// SafeFallback for the exoskeleton — Backdrivable.
+///
+/// Unlike most platforms, "safe" for a device rigidly strapped to a human
+/// body is NOT locking rigid — it's going fully compliant. Zero assistive
+/// torque (the physically-enforced part: `exo_torques` in the simulator's
+/// dynamics goes to zero on every joint) means the wearer's own muscles and
+/// joints retain full voluntary control; the device neither resists nor
+/// drives the limb. This is the standard safety behavior for real lower-limb
+/// gait-assist exoskeletons (fail-safe = disengage, not fail-locked).
+///
+/// NOTE: `ExoskeletonCommand::stiffness_gain`/`damping_gain` are also zeroed
+/// at Red in `step()` below, but — verified 2026-07 — the simulator's
+/// physics never reads either field; only `joint_torques` affects dynamics.
+/// So today those two fields are command-level intent, not yet a physically
+/// enforced impedance term. Not fixed here (out of scope: would mean adding
+/// real impedance dynamics to the simulator); flagging so the doc doesn't
+/// overpromise what stiffness/damping zeroing currently does.
+impl SafeFallback for ExoskeletonEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "exoskeleton"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        9 // Critical: rigidly coupled to a human body, like humanoid
+    }
+    fn safe_fallback_description(&self) -> &'static str {
+        "Backdrivable: zero assistive torque on every joint — wearer retains full voluntary control"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,5 +282,39 @@ mod tests {
             MotorSafetyLevel::Orange,
             "consent violation must force Orange retreat"
         );
+    }
+
+    #[test]
+    fn test_safe_fallback_trait_impl() {
+        let b = ExoskeletonEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        assert_eq!(b.platform_name(), "exoskeleton");
+        assert_eq!(b.safe_fallback_priority(), 9);
+        assert_eq!(b.safe_fallback_latency_cycles(), 1);
+        assert!(b.safe_fallback_description().contains("Backdrivable"));
+    }
+
+    #[test]
+    fn test_safe_fallback_active_iff_red_or_orange() {
+        let mut b = ExoskeletonEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let hv = ContinuousHV::random(16384, 42);
+        b.step(&hv, 0.005, 0.9); // Green
+        assert!(!b.safe_fallback_active());
+        b.step(&hv, 0.005, 0.05); // Red
+        assert!(b.safe_fallback_active());
+    }
+
+    #[test]
+    fn test_red_backdrivable_zeros_exo_torques() {
+        // The safety-critical claim in the SafeFallback description: at Red,
+        // the exo commands zero assistive torque on every joint, so the
+        // device is fully backdrivable (does not resist the wearer). This
+        // is the physically-enforced part of "backdrivable" — `exo_torques`
+        // is what the simulator's dynamics actually consume.
+        let mut b = ExoskeletonEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let hv = ContinuousHV::random(16384, 42);
+        b.step(&hv, 0.005, 0.05); // Red
+        for (i, t) in b.simulator.state().exo_torques.iter().enumerate() {
+            assert_eq!(*t, 0.0, "exo_torques[{i}] should be zero at Red, got {t}");
+        }
     }
 }

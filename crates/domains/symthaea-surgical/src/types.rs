@@ -1,40 +1,42 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use serde::{Deserialize, Serialize};
+use symthaea_core::embodiment::MotorSafetyLevel;
 
 pub const NUM_JOINTS: usize = 6;
 pub const NUM_STATE_CHANNELS: usize = 24;
 pub const NUM_ACTUATORS: usize = 8;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SurgicalSafetyLevel {
-    FullControl,
-    Reduced,
-    Freeze,
-    Retract,
+// ── Surgical safety, unified under the shared MotorSafetyLevel contract ────
+//
+// This used to be a standalone `SurgicalSafetyLevel` enum with its own
+// `from_phi()` threshold function — a byte-for-byte parallel copy of
+// `MotorSafetyLevel`'s own 4-tier thresholds (0.6/0.3/0.1), duplicated so
+// the two ladders had to be hand-kept in sync. Per the SafeFallback audit
+// (2026-07), it's unified here: `MotorSafetyLevel` is the single source of
+// the tier decision (computed once, incorporating phi + safety_override +
+// moral gate — see `embodiment.rs`), and these two free functions derive
+// surgical-specific *behavior* from that one shared tier. The STRUCTURE
+// (4 tiers, Phi-derived) is shared with every other platform; only the
+// per-tier numeric tuning (torque gain, cautery gate) is surgical-specific,
+// which is exactly what the unification was meant to make auditable.
+
+/// Surgical-specific torque gain per shared safety tier.
+///
+/// Stricter than the generic `MotorSafetyLevel::motor_gain()` (0.6/0.3 for
+/// Yellow/Orange) because this platform cuts human tissue: Orange freezes
+/// completely rather than retaining 30% authority.
+pub fn surgical_torque_gain(level: MotorSafetyLevel) -> f32 {
+    match level {
+        MotorSafetyLevel::Green => 1.0,
+        MotorSafetyLevel::Yellow => 0.4,
+        MotorSafetyLevel::Orange | MotorSafetyLevel::Red => 0.0,
+    }
 }
-impl SurgicalSafetyLevel {
-    pub fn from_phi(phi: f64) -> Self {
-        if phi > 0.6 {
-            Self::FullControl
-        } else if phi > 0.3 {
-            Self::Reduced
-        } else if phi > 0.1 {
-            Self::Freeze
-        } else {
-            Self::Retract
-        }
-    }
-    pub fn torque_gain(&self) -> f32 {
-        match self {
-            Self::FullControl => 1.0,
-            Self::Reduced => 0.4,
-            Self::Freeze | Self::Retract => 0.0,
-        }
-    }
-    pub fn cautery_allowed(&self) -> bool {
-        matches!(self, Self::FullControl)
-    }
+
+/// Cautery is only ever allowed at full (Green) confidence.
+pub fn surgical_cautery_allowed(level: MotorSafetyLevel) -> bool {
+    matches!(level, MotorSafetyLevel::Green)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,8 +166,8 @@ mod tests {
     }
     #[test]
     fn test_safety() {
-        assert!(SurgicalSafetyLevel::from_phi(0.8).cautery_allowed());
-        assert!(!SurgicalSafetyLevel::from_phi(0.4).cautery_allowed());
+        assert!(surgical_cautery_allowed(MotorSafetyLevel::from_phi(0.8)));
+        assert!(!surgical_cautery_allowed(MotorSafetyLevel::from_phi(0.4)));
     }
 
     #[test]
@@ -189,46 +191,32 @@ mod tests {
     #[test]
     fn test_safety_torque_gain_ordering() {
         // Gain must decrease monotonically as safety tightens.
-        let full = SurgicalSafetyLevel::FullControl.torque_gain();
-        let reduced = SurgicalSafetyLevel::Reduced.torque_gain();
-        let freeze = SurgicalSafetyLevel::Freeze.torque_gain();
-        let retract = SurgicalSafetyLevel::Retract.torque_gain();
+        let full = surgical_torque_gain(MotorSafetyLevel::Green);
+        let reduced = surgical_torque_gain(MotorSafetyLevel::Yellow);
+        let freeze = surgical_torque_gain(MotorSafetyLevel::Orange);
+        let retract = surgical_torque_gain(MotorSafetyLevel::Red);
         assert!(full > reduced);
         assert!(reduced > freeze);
-        assert_eq!(freeze, retract, "freeze and retract both zero torque");
+        assert_eq!(
+            freeze, retract,
+            "orange (freeze) and red (retract) both zero torque"
+        );
         assert_eq!(freeze, 0.0);
     }
 
     #[test]
     fn test_safety_from_phi_boundaries() {
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.61),
-            SurgicalSafetyLevel::FullControl
-        );
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.60),
-            SurgicalSafetyLevel::Reduced
-        );
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.31),
-            SurgicalSafetyLevel::Reduced
-        );
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.30),
-            SurgicalSafetyLevel::Freeze
-        );
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.11),
-            SurgicalSafetyLevel::Freeze
-        );
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.10),
-            SurgicalSafetyLevel::Retract
-        );
-        assert_eq!(
-            SurgicalSafetyLevel::from_phi(0.0),
-            SurgicalSafetyLevel::Retract
-        );
+        // MotorSafetyLevel::from_phi is the single shared source of the
+        // 4-tier boundary now — verified thoroughly in symthaea-core itself;
+        // this just confirms the surgical-specific gain/cautery functions
+        // agree with it at the documented thresholds.
+        assert_eq!(MotorSafetyLevel::from_phi(0.61), MotorSafetyLevel::Green);
+        assert_eq!(MotorSafetyLevel::from_phi(0.60), MotorSafetyLevel::Yellow);
+        assert_eq!(MotorSafetyLevel::from_phi(0.31), MotorSafetyLevel::Yellow);
+        assert_eq!(MotorSafetyLevel::from_phi(0.30), MotorSafetyLevel::Orange);
+        assert_eq!(MotorSafetyLevel::from_phi(0.11), MotorSafetyLevel::Orange);
+        assert_eq!(MotorSafetyLevel::from_phi(0.10), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(0.0), MotorSafetyLevel::Red);
     }
 
     #[test]
@@ -247,9 +235,9 @@ mod tests {
 
     #[test]
     fn test_cautery_only_at_full_control() {
-        assert!(SurgicalSafetyLevel::FullControl.cautery_allowed());
-        assert!(!SurgicalSafetyLevel::Reduced.cautery_allowed());
-        assert!(!SurgicalSafetyLevel::Freeze.cautery_allowed());
-        assert!(!SurgicalSafetyLevel::Retract.cautery_allowed());
+        assert!(surgical_cautery_allowed(MotorSafetyLevel::Green));
+        assert!(!surgical_cautery_allowed(MotorSafetyLevel::Yellow));
+        assert!(!surgical_cautery_allowed(MotorSafetyLevel::Orange));
+        assert!(!surgical_cautery_allowed(MotorSafetyLevel::Red));
     }
 }

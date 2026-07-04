@@ -1344,19 +1344,59 @@ problems, `--llm` mode, `cargo test -p symthaea --features code_generation codin
 
 - **Compiled: 8/15 → 15/15 (100%)**. Every syntax error from the Rust-idiom
   leakage is gone.
-- **Pass@1: still 0/15.** Code now compiles but is logically wrong — the
-  underlying cause is different again: e.g. HumanEval/2 generated
-  `def truncate_number(v: list, f: callable) -> value:`. The literal string
-  `"callable"` does not appear anywhere in Symthaea's source (checked via
-  grep across `src/`), so this is not a template bug — it's the LLM itself
-  producing a generic, hallucinated signature. Direct mode passes the raw
-  HumanEval prompt (which already contains the correct signature) straight
-  to the LLM; the Agent pipeline's own prompt-construction evidently doesn't
-  preserve signature fidelity as reliably. This is a **third, distinct,
-  more open-ended issue** (prompt fidelity through the Understanding/Planning
-  phases) — not yet fixed, flagged here rather than pursued further without
-  checking in, since it's architecturally bigger than the two scoped bugs
-  above.
+- **Pass@1: still 0/15.** Code now compiles but is logically wrong — e.g.
+  HumanEval/2 generated `def truncate_number(v: list, f: callable) -> value:`.
+  Initially misdiagnosed as an LLM hallucination (the literal string
+  `"callable"` doesn't appear in `src/coding_agent/` or `src/language/`) —
+  corrected below, it's a third, *found and fixed* bug, not an LLM issue.
+
+### Also fixed same day: Rust-only CREATE guidance, and the real Finding-3 root cause
+
+- `build_generation_prompt()`'s `CodeTaskType::Create` guidance block was
+  unconditionally Rust-specific ("Write a complete, compilable Rust
+  implementation", `<T>` generics, `pub` items) and injected regardless of
+  target language — contradicting `codegen_system_prompt()`'s existing
+  language branching right next to it. Fixed to branch on `target_language()`
+  the same way. Verified this had **zero effect on its own** (identical
+  `code_len` before/after) — which is what led to the real discovery below.
+- **Real root cause of the 0/15 pass rate, found by grepping the exact
+  string `"(v: list, f: callable) -> value"` across the repo**: it's not an
+  LLM hallucination at all — it's a **hardcoded pattern-library entry**,
+  `crates/core/symthaea-core/src/hdc/program_algebra.rs:1323`, the
+  `"find_first"` pattern's `python_signature` field, added via
+  `add_with_meta(...)`. `native_code_template()`'s Phase 2 (HDC/analogy
+  semantic matching, `prompts.rs`) fuzzy-matched this generic "search a
+  collection" pattern against `truncate_number`'s task text via
+  `lib.find_similar(&task_hv, 0.52)` and returned its templated signature
+  **verbatim**, completely bypassing the LLM. This explains everything
+  observed: the CREATE-guidance fix (LLM-prompt-only) had no effect because
+  the LLM path was never reached; output was byte-identical across all
+  three fix attempts because native matching is deterministic.
+  Fix (`prompts.rs`): added `task_declared_function_name()` — scans for an
+  explicit `def name(`/`fn name(` declaration already present in the task
+  text — and made `native_code_template()` return `None` immediately when
+  one exists, skipping Phase 1 and Phase 2 native matching entirely and
+  escalating straight to the LLM. Rationale: native's fuzzy pattern library
+  (fibonacci, find_first, count_if, ...) is designed for short underspecified
+  asks ("add a fibonacci function"); when the task already fully specifies
+  the signature (as every HumanEval-style prompt does), guessing from a
+  small canonical-pattern library is strictly worse than asking the LLM.
+  `extract_function_name()` was refactored to share this same declaration
+  scan as its first-choice path (its prose fallback, used only when no
+  declaration exists, is unchanged from the earlier fix).
+
+**Verified**: `cargo check` clean, all 52 existing `coding_agent` unit tests
+pass. Partial live re-run confirms the fix is taking effect — per-problem
+latency jumped from ~40-80s (native fast-path, no LLM call) to 650-1000s+
+(now genuinely reaching the LLM) — but a full 15-problem pass@1 number was
+**not obtained**: the monorepo hit severe concurrent-session load (avg 46-62)
+immediately after, and repeated benchmark runs were killed by the
+environment before completing. Re-run once load drops:
+```
+cargo run --example humaneval_benchmark --features code_generation -- --llm --limit 15
+```
+and compare against `docs/HUMANEVAL_AGENT_POSTFIX_RESULTS.json` (0/15, pre
+this fix) for the real before/after number.
 
 ---
 
