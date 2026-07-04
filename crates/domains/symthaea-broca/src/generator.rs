@@ -341,6 +341,15 @@ pub struct BrocaGenerator {
     code_gate: crate::gating::CodeGate,
 }
 
+/// Result of loading a `BrocaGenerator` from a checkpoint: the generator
+/// itself plus optional recovered optimizer/embedding/genesis-phrase state.
+type CheckpointLoadResult = anyhow::Result<(
+    BrocaGenerator,
+    Option<AdamState>,
+    Option<Vec<f32>>,
+    Option<String>,
+)>;
+
 impl BrocaGenerator {
     /// Create a new generator from genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
@@ -468,7 +477,7 @@ impl BrocaGenerator {
     pub fn from_checkpoint<P: AsRef<std::path::Path>>(
         path: P,
         genesis: &GenesisSeed,
-    ) -> anyhow::Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
+    ) -> CheckpointLoadResult {
         // Path 1: Try full BrocaCheckpoint (CfC-HDC + all state)
         if let Ok(checkpoint) = BrocaCheckpoint::load_from_file(&path) {
             let adam = checkpoint.adam_state.clone();
@@ -521,7 +530,7 @@ impl BrocaGenerator {
     pub fn from_checkpoint_allow_checksum_mismatch<P: AsRef<std::path::Path>>(
         path: P,
         genesis: &GenesisSeed,
-    ) -> anyhow::Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
+    ) -> CheckpointLoadResult {
         // Path 1: Try full BrocaCheckpoint
         if let Ok(checkpoint) = BrocaCheckpoint::load_from_file_allow_checksum_mismatch(&path) {
             let adam = checkpoint.adam_state.clone();
@@ -708,12 +717,12 @@ impl BrocaGenerator {
         // 1b. Blend NSM semantic content into thought HV if enabled and provided.
         // This gives the generator actual compositional meaning (e.g., FEEL(BAD) ⊗ BECAUSE ⊗ MOVE(AWAY))
         // rather than just scalar metadata about the thought.
-        if self.config.enable_nsm_semantic {
-            if let Some(sem_hv) = semantic_hv {
-                let alpha = self.config.nsm_semantic_alpha.clamp(0.0, 1.0);
-                if alpha > 0.0 {
-                    thought_hv.lerp_in_place(sem_hv, 1.0 - alpha, alpha);
-                }
+        if self.config.enable_nsm_semantic
+            && let Some(sem_hv) = semantic_hv
+        {
+            let alpha = self.config.nsm_semantic_alpha.clamp(0.0, 1.0);
+            if alpha > 0.0 {
+                thought_hv.lerp_in_place(sem_hv, 1.0 - alpha, alpha);
             }
         }
 
@@ -1042,15 +1051,14 @@ impl BrocaGenerator {
             if !self.tokenizer.is_special(next_token) {
                 let token_str = self.tokenizer.token_str(next_token);
                 // Auto-spacing: insert space between consecutive alphanumeric tokens
-                if self.config.enable_auto_spacing {
-                    if let (Some(&last_byte), Some(&first_byte)) =
+                if self.config.enable_auto_spacing
+                    && let (Some(&last_byte), Some(&first_byte)) =
                         (text_bytes.last(), token_str.as_bytes().first())
-                    {
-                        if last_byte.is_ascii_alphanumeric() && first_byte.is_ascii_alphanumeric() {
-                            text_bytes.push(b' ');
-                            on_token(" ");
-                        }
-                    }
+                    && last_byte.is_ascii_alphanumeric()
+                    && first_byte.is_ascii_alphanumeric()
+                {
+                    text_bytes.push(b' ');
+                    on_token(" ");
                 }
                 // Decode byte tokens (<0xHH>) to raw bytes for proper UTF-8
                 if token_str.starts_with("<0x") && token_str.ends_with('>') && token_str.len() == 6
@@ -1181,10 +1189,10 @@ fn apply_decode_suppression(
     channels: &ThoughtChannels,
     config: &BrocaConfig,
 ) {
-    if config.suppress_unknown_tokens {
-        if let Some(logit) = logits.get_mut(tokenizer.unk_id as usize) {
-            *logit = f32::NEG_INFINITY;
-        }
+    if config.suppress_unknown_tokens
+        && let Some(logit) = logits.get_mut(tokenizer.unk_id as usize)
+    {
+        *logit = f32::NEG_INFINITY;
     }
 
     if config.suppress_code_tokens_without_code_intent && !code_intent_active(channels) {

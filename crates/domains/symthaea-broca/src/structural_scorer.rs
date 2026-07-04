@@ -26,6 +26,12 @@ impl StructuralVerdict {
 
 pub struct NixStructuralScorer {}
 
+impl Default for NixStructuralScorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NixStructuralScorer {
     pub fn new() -> Self {
         Self {}
@@ -72,10 +78,10 @@ impl NixStructuralScorer {
 
         // Simple walk for top-level attribute assignments
         for node in root_node.descendants() {
-            if let Some(entry) = AttrpathValue::cast(node) {
-                if let Some(path) = entry.attrpath() {
-                    paths.insert(path.to_string().replace(" ", ""));
-                }
+            if let Some(entry) = AttrpathValue::cast(node)
+                && let Some(path) = entry.attrpath()
+            {
+                paths.insert(path.to_string().replace(" ", ""));
             }
         }
 

@@ -387,7 +387,7 @@ impl LanguageGateRegistry {
         }
 
         // Fallback: keyword matching on any available context
-        for (_key, gate) in &self.gates {
+        for gate in self.gates.values() {
             let kws: Vec<&str> = gate.intent_keywords.iter().map(|s| s.as_str()).collect();
             if channels.prompt_contains_any(&kws) {
                 return Some(gate);

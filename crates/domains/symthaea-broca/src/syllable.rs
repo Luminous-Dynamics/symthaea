@@ -42,10 +42,8 @@ pub fn count_syllables(word: &str) -> usize {
     // Silent-e: subtract 1 if word ends with 'e' (but not "le" pattern like "table")
     if chars.len() > 2 && chars[chars.len() - 1] == 'e' {
         let penult = chars[chars.len() - 2];
-        if !matches!(penult, 'a' | 'e' | 'i' | 'o' | 'u' | 'y' | 'l') {
-            if count > 1 {
-                count -= 1;
-            }
+        if !matches!(penult, 'a' | 'e' | 'i' | 'o' | 'u' | 'y' | 'l') && count > 1 {
+            count -= 1;
         }
     }
 
@@ -62,9 +60,7 @@ pub fn count_syllables(word: &str) -> usize {
 
 /// Count total syllables in a line of text.
 pub fn count_line_syllables(line: &str) -> usize {
-    line.split_whitespace()
-        .map(|word| count_syllables(word))
-        .sum()
+    line.split_whitespace().map(count_syllables).sum()
 }
 
 /// Check if adding a word would exceed the syllable limit for the current line.

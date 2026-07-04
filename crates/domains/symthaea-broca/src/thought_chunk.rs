@@ -229,10 +229,8 @@ impl DynamicChunker {
         let velocity = current_coherence - self.last_coherence;
         self.last_coherence = current_coherence;
 
-        let should_boundary = self.current_chunk_tokens.len() >= self.min_chunk_size
-            && velocity < -self.coherence_velocity_threshold;
-
-        should_boundary
+        self.current_chunk_tokens.len() >= self.min_chunk_size
+            && velocity < -self.coherence_velocity_threshold
     }
 
     pub fn reset(&mut self) {

@@ -22,6 +22,12 @@ pub struct RustWalker {
     parser: Parser,
 }
 
+impl Default for RustWalker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RustWalker {
     pub fn new() -> Self {
         let mut parser = Parser::new();

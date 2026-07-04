@@ -88,7 +88,7 @@ pub fn compute_epistemic_reward(
     let shaped_reward = correctness * 0.60 + epistemic * 0.40;
     let advantage = shaped_reward - baseline;
 
-    (advantage.max(-1.0).min(1.0), epistemic)
+    (advantage.clamp(-1.0, 1.0), epistemic)
 }
 
 #[cfg(test)]

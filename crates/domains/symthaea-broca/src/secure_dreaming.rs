@@ -4,7 +4,7 @@
 
 use crate::self_optimization::SelfOptimizationEngine;
 use pqcrypto_dilithium::dilithium5;
-use pqcrypto_traits::sign::{PublicKey, SecretKey, SignedMessage};
+use pqcrypto_traits::sign::{PublicKey, SignedMessage};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 

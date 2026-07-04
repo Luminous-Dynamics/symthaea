@@ -142,10 +142,10 @@ impl SelfOptimizationEngine {
 
         // REAL REGEX PARSING
         let re = regex::Regex::new(r"Composite Score:\s+([0-9.]+)")?;
-        if let Some(caps) = re.captures(&stdout) {
-            if let Some(score_str) = caps.get(1) {
-                return Ok(score_str.as_str().parse::<f32>().unwrap_or(0.0));
-            }
+        if let Some(caps) = re.captures(&stdout)
+            && let Some(score_str) = caps.get(1)
+        {
+            return Ok(score_str.as_str().parse::<f32>().unwrap_or(0.0));
         }
 
         Ok(0.0)
@@ -161,7 +161,7 @@ impl SelfOptimizationEngine {
                 let parts: Vec<&str> = line_clone.split_whitespace().collect();
                 for part in parts {
                     if let Ok(val) = part
-                        .trim_matches(|c: char| !c.is_digit(10) && c != '.')
+                        .trim_matches(|c: char| !c.is_ascii_digit() && c != '.')
                         .parse::<f32>()
                     {
                         // Perturb by +/- 5%

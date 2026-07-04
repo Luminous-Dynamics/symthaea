@@ -26,6 +26,9 @@ pub struct ComponentDoc {
 }
 
 pub struct LivingManifestGenerator {
+    // Held for a future manifest-generation path that queries live blueprint
+    // state; generate_manifest() doesn't read it yet.
+    #[allow(dead_code)]
     binding_engine: SubstrateBindingEngine,
 }
 

@@ -63,25 +63,24 @@ impl InverseHarvester {
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().map_or(false, |ext| ext == "nix"))
         {
-            if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                if let Some(fragment) = self.extract_high_signal_fragment(&content) {
-                    if let Some(prompt) = self.nix_kg.reverse_prompt(&fragment) {
-                        let verdict = self.scorer.score(&fragment, &fragment);
-                        if verdict.parse_error.is_none() {
-                            pairs.push(InverseHarvestPair {
-                                prompt,
-                                code: fragment,
-                                intent: "service".to_string(),
-                                channels: vec![0.0; 17], // placeholder
-                                iterations: 0,
-                                repair_steps: 0,
-                                holdout: false,
-                                valence: 0.0,
-                                arousal: 0.0,
-                                source_file: entry.path().to_string_lossy().to_string(),
-                            });
-                        }
-                    }
+            if let Ok(content) = std::fs::read_to_string(entry.path())
+                && let Some(fragment) = self.extract_high_signal_fragment(&content)
+                && let Some(prompt) = self.nix_kg.reverse_prompt(&fragment)
+            {
+                let verdict = self.scorer.score(&fragment, &fragment);
+                if verdict.parse_error.is_none() {
+                    pairs.push(InverseHarvestPair {
+                        prompt,
+                        code: fragment,
+                        intent: "service".to_string(),
+                        channels: vec![0.0; 17], // placeholder
+                        iterations: 0,
+                        repair_steps: 0,
+                        holdout: false,
+                        valence: 0.0,
+                        arousal: 0.0,
+                        source_file: entry.path().to_string_lossy().to_string(),
+                    });
                 }
             }
         }

@@ -138,15 +138,13 @@ impl ConsensusEngine {
         result: &ConsensusResult,
         memory: &mut ArchitecturalMemory,
     ) -> anyhow::Result<()> {
-        if result.consensus_reached {
-            if let Some(ref hv) = result.agreed_hv {
-                if let Some(proposals) = self.active_proposals.get(path) {
-                    if let Some(best_local) = &proposals[0].local_result {
-                        memory.commit_evolution(best_local, hv)?;
-                        println!("🧬 Multi-agent consensus reached. Committed to global memory.");
-                    }
-                }
-            }
+        if result.consensus_reached
+            && let Some(ref hv) = result.agreed_hv
+            && let Some(proposals) = self.active_proposals.get(path)
+            && let Some(best_local) = &proposals[0].local_result
+        {
+            memory.commit_evolution(best_local, hv)?;
+            println!("🧬 Multi-agent consensus reached. Committed to global memory.");
         }
         Ok(())
     }

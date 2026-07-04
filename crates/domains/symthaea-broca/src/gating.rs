@@ -1311,7 +1311,11 @@ pub struct CodeGate {
     error_handling_ids: Vec<u32>,
     /// Token IDs for algorithm scaffold words.
     algorithm_ids: Vec<u32>,
-    /// Dynamic Nix attribute tokens (populated at runtime from scorer feedback)
+    /// Dynamic Nix attribute tokens (populated at runtime from scorer feedback).
+    /// The scorer-feedback write path was never wired up, so this stays empty
+    /// today -- kept rather than removed since the field is the documented
+    /// intent for that future integration.
+    #[allow(dead_code)]
     nix_path_tokens: std::sync::Arc<parking_lot::Mutex<std::collections::HashMap<String, u32>>>,
     epistemic_cube_gate: EpistemicCubeGate,
     /// **NEW**: Language-specific gate heads (Nix, Terraform, CDK, etc.)

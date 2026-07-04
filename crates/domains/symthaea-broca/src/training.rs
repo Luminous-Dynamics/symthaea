@@ -1886,12 +1886,11 @@ pub fn train_with_adam(
                 && sequence_result
                     .as_ref()
                     .is_some_and(|result| result.backend == TrainingBackend::Gpu)
+                && let Some(output_hv) = final_output_hv
             {
-                if let Some(output_hv) = final_output_hv {
-                    let coherence = output_hv.similarity(&thought_hv);
-                    coherence_sum += coherence;
-                    coherence_count += 1;
-                }
+                let coherence = output_hv.similarity(&thought_hv);
+                coherence_sum += coherence;
+                coherence_count += 1;
             }
             if contrastive_enabled {
                 let my_intent = pair_intents[dataset_idx];
@@ -2008,92 +2007,92 @@ pub fn train_with_adam(
         }
 
         // Gradient anomaly response (end-of-epoch check)
-        if config.enable_anomaly_response {
-            if let Some(ref diag) = diagnostics {
-                let mut anomalies = diag.detect_anomalies();
+        if config.enable_anomaly_response
+            && let Some(ref diag) = diagnostics
+        {
+            let mut anomalies = diag.detect_anomalies();
 
-                // Coherence collapse detection
-                if let Some(mean_coh) = epoch_mean_coherence {
-                    if mean_coh < config.coherence_collapse_threshold {
-                        anomalies.push(GradientAnomaly::CoherenceCollapse {
-                            mean_coherence: mean_coh,
-                        });
+            // Coherence collapse detection
+            if let Some(mean_coh) = epoch_mean_coherence
+                && mean_coh < config.coherence_collapse_threshold
+            {
+                anomalies.push(GradientAnomaly::CoherenceCollapse {
+                    mean_coherence: mean_coh,
+                });
+            }
+
+            if anomalies.is_empty() {
+                consecutive_anomaly_epochs = 0;
+            } else {
+                consecutive_anomaly_epochs += 1;
+                for anomaly in &anomalies {
+                    match anomaly {
+                        GradientAnomaly::Exploding { .. } => {
+                            lr_multiplier = (lr_multiplier * 0.5).max(0.01);
+                            tracing::warn!(
+                                epoch,
+                                lr_multiplier,
+                                "Anomaly response: halved LR (exploding gradients)"
+                            );
+                        }
+                        GradientAnomaly::Vanishing { .. } => {
+                            let max_mult = 10.0 * initial_lr;
+                            lr_multiplier = (lr_multiplier * 2.0).min(max_mult / initial_lr);
+                            tracing::warn!(
+                                epoch,
+                                lr_multiplier,
+                                "Anomaly response: doubled LR (vanishing gradients)"
+                            );
+                        }
+                        GradientAnomaly::Oscillating { .. } => {
+                            effective_grad_clip *= 0.5;
+                            tracing::warn!(
+                                epoch,
+                                effective_grad_clip,
+                                "Anomaly response: tightened grad clip (oscillating)"
+                            );
+                        }
+                        GradientAnomaly::Plateau { .. } => {
+                            force_train_network = true;
+                            if let Some(ref mut report) = anomaly_report {
+                                report.plateau_forced_network_training = true;
+                            }
+                            tracing::warn!(
+                                epoch,
+                                "Anomaly response: forced CfC training on (plateau)"
+                            );
+                        }
+                        GradientAnomaly::CoherenceCollapse { mean_coherence } => {
+                            // Reduce LR to stabilize — aggressive updates may be
+                            // pushing output representations away from thought space
+                            lr_multiplier = (lr_multiplier * 0.5).max(0.01);
+                            if let Some(ref mut report) = anomaly_report {
+                                report.coherence_collapse_detected = true;
+                            }
+                            tracing::warn!(
+                                epoch,
+                                mean_coherence,
+                                lr_multiplier,
+                                "Anomaly response: halved LR (coherence collapse)"
+                            );
+                        }
                     }
                 }
-
-                if anomalies.is_empty() {
-                    consecutive_anomaly_epochs = 0;
-                } else {
-                    consecutive_anomaly_epochs += 1;
-                    for anomaly in &anomalies {
-                        match anomaly {
-                            GradientAnomaly::Exploding { .. } => {
-                                lr_multiplier = (lr_multiplier * 0.5).max(0.01);
-                                tracing::warn!(
-                                    epoch,
-                                    lr_multiplier,
-                                    "Anomaly response: halved LR (exploding gradients)"
-                                );
-                            }
-                            GradientAnomaly::Vanishing { .. } => {
-                                let max_mult = 10.0 * initial_lr;
-                                lr_multiplier = (lr_multiplier * 2.0).min(max_mult / initial_lr);
-                                tracing::warn!(
-                                    epoch,
-                                    lr_multiplier,
-                                    "Anomaly response: doubled LR (vanishing gradients)"
-                                );
-                            }
-                            GradientAnomaly::Oscillating { .. } => {
-                                effective_grad_clip *= 0.5;
-                                tracing::warn!(
-                                    epoch,
-                                    effective_grad_clip,
-                                    "Anomaly response: tightened grad clip (oscillating)"
-                                );
-                            }
-                            GradientAnomaly::Plateau { .. } => {
-                                force_train_network = true;
-                                if let Some(ref mut report) = anomaly_report {
-                                    report.plateau_forced_network_training = true;
-                                }
-                                tracing::warn!(
-                                    epoch,
-                                    "Anomaly response: forced CfC training on (plateau)"
-                                );
-                            }
-                            GradientAnomaly::CoherenceCollapse { mean_coherence } => {
-                                // Reduce LR to stabilize — aggressive updates may be
-                                // pushing output representations away from thought space
-                                lr_multiplier = (lr_multiplier * 0.5).max(0.01);
-                                if let Some(ref mut report) = anomaly_report {
-                                    report.coherence_collapse_detected = true;
-                                }
-                                tracing::warn!(
-                                    epoch,
-                                    mean_coherence,
-                                    lr_multiplier,
-                                    "Anomaly response: halved LR (coherence collapse)"
-                                );
-                            }
-                        }
-                    }
-                    // Record anomalies in report
+                // Record anomalies in report
+                if let Some(ref mut report) = anomaly_report {
+                    report.anomalous_epoch_count += 1;
+                    report.epoch_anomalies.push((epoch, anomalies));
+                }
+                if consecutive_anomaly_epochs >= 3 {
                     if let Some(ref mut report) = anomaly_report {
-                        report.anomalous_epoch_count += 1;
-                        report.epoch_anomalies.push((epoch, anomalies));
+                        report.anomaly_early_stopped = true;
                     }
-                    if consecutive_anomaly_epochs >= 3 {
-                        if let Some(ref mut report) = anomaly_report {
-                            report.anomaly_early_stopped = true;
-                        }
-                        tracing::warn!(
-                            epoch,
-                            consecutive_anomaly_epochs,
-                            "Anomaly response: early stopping (3 consecutive anomalous epochs)"
-                        );
-                        break;
-                    }
+                    tracing::warn!(
+                        epoch,
+                        consecutive_anomaly_epochs,
+                        "Anomaly response: early stopping (3 consecutive anomalous epochs)"
+                    );
+                    break;
                 }
             }
         }

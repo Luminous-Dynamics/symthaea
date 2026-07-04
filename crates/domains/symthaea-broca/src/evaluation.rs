@@ -1527,87 +1527,83 @@ pub fn check_quality_suite(
     thresholds: &CanonicalQualityThresholds,
 ) -> Vec<QualityGateFailure> {
     let mut failures = Vec::new();
-    if let Some(threshold) = thresholds.max_gated_perplexity {
-        if result.gated_generation.perplexity > threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_perplexity".to_string(),
-                observed: result.gated_generation.perplexity,
-                threshold,
-                message: "gated perplexity exceeded maximum".to_string(),
-            });
-        }
+    if let Some(threshold) = thresholds.max_gated_perplexity
+        && result.gated_generation.perplexity > threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_perplexity".to_string(),
+            observed: result.gated_generation.perplexity,
+            threshold,
+            message: "gated perplexity exceeded maximum".to_string(),
+        });
     }
-    if let Some(threshold) = thresholds.min_gated_coherence {
-        if result.gated_generation.avg_coherence < threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_avg_coherence".to_string(),
-                observed: result.gated_generation.avg_coherence,
-                threshold,
-                message: "gated coherence fell below minimum".to_string(),
-            });
-        }
+    if let Some(threshold) = thresholds.min_gated_coherence
+        && result.gated_generation.avg_coherence < threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_avg_coherence".to_string(),
+            observed: result.gated_generation.avg_coherence,
+            threshold,
+            message: "gated coherence fell below minimum".to_string(),
+        });
     }
-    if let Some(threshold) = thresholds.min_gated_english_ratio {
-        if result.gated_generation.english_word_ratio < threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_english_word_ratio".to_string(),
-                observed: result.gated_generation.english_word_ratio,
-                threshold,
-                message: "gated English ratio fell below minimum".to_string(),
-            });
-        }
+    if let Some(threshold) = thresholds.min_gated_english_ratio
+        && result.gated_generation.english_word_ratio < threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_english_word_ratio".to_string(),
+            observed: result.gated_generation.english_word_ratio,
+            threshold,
+            message: "gated English ratio fell below minimum".to_string(),
+        });
     }
     if let (Some(threshold), Some(observed)) = (
         thresholds.max_gated_hallucination_rate,
         result.gated_generation.hallucination_rate,
-    ) {
-        if observed > threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_hallucination_rate".to_string(),
-                observed,
-                threshold,
-                message: "gated hallucination rate exceeded maximum".to_string(),
-            });
-        }
+    ) && observed > threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_hallucination_rate".to_string(),
+            observed,
+            threshold,
+            message: "gated hallucination rate exceeded maximum".to_string(),
+        });
     }
     if let (Some(threshold), Some(observed)) = (
         thresholds.max_gated_unknown_token_rate,
         result.gated_generation.unknown_token_rate,
-    ) {
-        if observed > threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_unknown_token_rate".to_string(),
-                observed,
-                threshold,
-                message: "gated unknown-token rate exceeded maximum".to_string(),
-            });
-        }
+    ) && observed > threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_unknown_token_rate".to_string(),
+            observed,
+            threshold,
+            message: "gated unknown-token rate exceeded maximum".to_string(),
+        });
     }
     if let (Some(threshold), Some(observed)) = (
         thresholds.max_gated_code_token_rate,
         result.gated_generation.code_token_rate,
-    ) {
-        if observed > threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_code_token_rate".to_string(),
-                observed,
-                threshold,
-                message: "gated code-token contamination exceeded maximum".to_string(),
-            });
-        }
+    ) && observed > threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_code_token_rate".to_string(),
+            observed,
+            threshold,
+            message: "gated code-token contamination exceeded maximum".to_string(),
+        });
     }
     if let (Some(threshold), Some(observed)) = (
         thresholds.max_gated_top_token_collapse_rate,
         result.gated_generation.top_token_collapse_rate,
-    ) {
-        if observed > threshold {
-            failures.push(QualityGateFailure {
-                metric: "gated_top_token_collapse_rate".to_string(),
-                observed,
-                threshold,
-                message: "gated teacher-forced predictions collapsed to one token".to_string(),
-            });
-        }
+    ) && observed > threshold
+    {
+        failures.push(QualityGateFailure {
+            metric: "gated_top_token_collapse_rate".to_string(),
+            observed,
+            threshold,
+            message: "gated teacher-forced predictions collapsed to one token".to_string(),
+        });
     }
     if let Some(max_regression) = thresholds.max_coherence_regression {
         let regression = -result.delta.avg_coherence;
@@ -1793,7 +1789,7 @@ pub fn format_eval_report(result: &EvalResult) -> String {
         ));
 
         let mut intents: Vec<_> = result.intent_scores.iter().collect();
-        intents.sort_by(|(a, _), (b, _)| a.cmp(b));
+        intents.sort_by_key(|(a, _)| *a);
 
         for (intent, score) in intents {
             s.push_str(&format!(

@@ -34,17 +34,17 @@ pub fn compute_moral_safety(code: &str) -> f32 {
 
     let mut penalty: f32 = 0.0;
     for p in severe_patterns {
-        if let Ok(re) = Regex::new(p) {
-            if re.is_match(code) {
-                penalty += 0.4;
-            }
+        if let Ok(re) = Regex::new(p)
+            && re.is_match(code)
+        {
+            penalty += 0.4;
         }
     }
     for p in patterns {
-        if let Ok(re) = Regex::new(p) {
-            if re.is_match(code) {
-                penalty += 0.2;
-            }
+        if let Ok(re) = Regex::new(p)
+            && re.is_match(code)
+        {
+            penalty += 0.2;
         }
     }
 

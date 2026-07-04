@@ -1099,11 +1099,13 @@ impl BpeTokenizer {
                 continue;
             }
             // Handle byte tokens: <0xHH> -> raw byte
-            if token.starts_with("<0x") && token.ends_with('>') && token.len() == 6 {
-                if let Ok(byte) = u8::from_str_radix(&token[3..5], 16) {
-                    result.push(byte);
-                    continue;
-                }
+            if token.starts_with("<0x")
+                && token.ends_with('>')
+                && token.len() == 6
+                && let Ok(byte) = u8::from_str_radix(&token[3..5], 16)
+            {
+                result.push(byte);
+                continue;
             }
             result.extend_from_slice(token.as_bytes());
         }
