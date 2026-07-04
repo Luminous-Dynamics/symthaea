@@ -191,6 +191,10 @@ path = "src/bin/broca_external_baseline.rs"
 name = "broca-checkpoint-compare"
 path = "src/bin/broca_checkpoint_compare.rs"
 
+[[bin]]
+name = "broca-topic-coverage"
+path = "src/bin/broca_topic_coverage.rs"
+
 [features]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)

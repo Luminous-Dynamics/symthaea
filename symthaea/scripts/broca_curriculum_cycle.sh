@@ -85,12 +85,37 @@ fi
 
 # ── Step 2: synthesize training pairs for real ─────────────────────────────
 echo "[broca-cycle] synthesizing training pairs for new objectives..."
+mkdir -p "$CURRICULUM_DERIVED_DIR/holdout"
+shopt -s nullglob
+holdout_files_before=("$CURRICULUM_DERIVED_DIR"/holdout/*.holdout.jsonl)
+shopt -u nullglob
+
 "${sync_cmd[@]}"
 
+# holdout/ is a separate subdirectory from the training-pair jsonl files
+# specifically so this glob (used for the training merge below) can never
+# accidentally include held-out text — see broca_curriculum_sync.rs's note.
 shopt -s nullglob
 derived_jsonl_files=("$CURRICULUM_DERIVED_DIR"/*.jsonl)
 derived_manifest_files=("$CURRICULUM_DERIVED_DIR"/*.manifest.json)
+holdout_files_after=("$CURRICULUM_DERIVED_DIR"/holdout/*.holdout.jsonl)
 shopt -u nullglob
+
+# The one holdout file broca-curriculum-sync just wrote this cycle (if any
+# new objectives produced enough accepted text to spare a holdout) — used
+# later to check whether THIS cycle's new material actually landed, not
+# full history.
+new_holdout_file=""
+for f in "${holdout_files_after[@]}"; do
+  found=0
+  for old in "${holdout_files_before[@]}"; do
+    [[ "$f" == "$old" ]] && found=1 && break
+  done
+  if [[ "$found" -eq 0 ]]; then
+    new_holdout_file="$f"
+    break
+  fi
+done
 
 if [[ ${#derived_jsonl_files[@]} -eq 0 ]]; then
   echo "[broca-cycle] no curriculum-derived pairs on disk; nothing to train on"
@@ -303,6 +328,25 @@ if [[ "$promotion_passed" != "True" ]]; then
   exit 1
 fi
 
+# ── Step 7.5: topic-coverage evidence — does the NEW material actually show
+# up in generation, not just "didn't regress"? checkpoint-compare above is a
+# regression gate; it has no signal for whether newly-learned content
+# landed. This is diagnostic only (never gates promotion) — it exists so a
+# human reviewing PROMOTION_READY.json has concrete generated-vs-reference
+# examples to read, not just abstract drift/hallucination numbers. Uses only
+# this cycle's new holdout batch (not full history) since the question is
+# "did THIS cycle's learning work," not the whole corpus's.
+if [[ -n "$new_holdout_file" ]]; then
+  echo "[broca-cycle] checking topic coverage on this cycle's new material..."
+  cargo run "${cargo_locked_args[@]}" -p symthaea-broca --features simd --bin broca-topic-coverage -- \
+    --checkpoint "$candidate_checkpoint" \
+    --holdout "$new_holdout_file" \
+    --json-out "$candidate_dir/topic-coverage-report.json"
+  echo "[broca-cycle] topic coverage report: $candidate_dir/topic-coverage-report.json"
+else
+  echo "[broca-cycle] NOTE: no holdout batch from this cycle (every objective produced fewer than 2 accepted texts) — skipping topic-coverage report"
+fi
+
 # ── Step 8: write the promotion-ready marker (still touches nothing under
 # production — a human runs broca_promote_candidate.sh to act on this) ─────
 python3 - "$candidate_dir" "$candidate_checkpoint" <<'PY'
@@ -317,15 +361,34 @@ with open(f"{candidate_dir}/curriculum-derived-manifest.json") as f:
 with open(f"{candidate_dir}/measurement/checkpoint-compare.json") as f:
     compare = json.load(f)
 
+topic_coverage = None
+topic_coverage_path = f"{candidate_dir}/topic-coverage-report.json"
+try:
+    with open(topic_coverage_path) as f:
+        report = json.load(f)
+    topic_coverage = {
+        "report_path": topic_coverage_path,
+        "num_objectives": report.get("num_objectives"),
+        "avg_keyword_overlap": report.get("avg_keyword_overlap"),
+        "avg_generated_coherence": report.get("avg_generated_coherence"),
+        "veto_count": report.get("veto_count"),
+    }
+except FileNotFoundError:
+    pass
+
 promotion_ready = {
     "candidate_checkpoint": candidate_checkpoint,
     "created_at_utc": datetime.now(timezone.utc).isoformat(),
     "contributing_objective_ids": contributing,
     "checkpoint_compare": compare,
+    "topic_coverage": topic_coverage,
 }
 with open(f"{candidate_dir}/PROMOTION_READY.json", "w") as f:
     json.dump(promotion_ready, f, indent=2)
 PY
 
 echo "[broca-cycle] PASSED — candidate ready for human review: $candidate_dir"
+if [[ -n "$new_holdout_file" ]]; then
+  echo "[broca-cycle] read $candidate_dir/topic-coverage-report.json before promoting — it's evidence of what the new material actually looks like generated, not just regression-absence numbers"
+fi
 echo "[broca-cycle] to promote: scripts/broca_promote_candidate.sh $candidate_dir --i-understand-this-requires-restart"
