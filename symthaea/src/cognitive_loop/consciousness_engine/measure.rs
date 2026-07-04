@@ -21,6 +21,21 @@ impl ConsciousnessEngine {
     /// - ConsciousnessEquationV2: every 23 cycles
     /// - UnifiedConsciousnessPipeline: every 47 cycles
     ///
+    /// CAVEAT (found 2026-07-04): only SpectralMIPFinder is live in the shipped binary.
+    /// `ConsciousnessEngine::new()`'s single production call site (`constructor.rs`)
+    /// passes `None` for the other three, with no setter anywhere in production code —
+    /// their branches below always take the `else { 0.0 }` arm. `compute_unified()`
+    /// therefore collapses to `max(spectral_weight * sigmoid(spectral_mip_phi), 0.05)`,
+    /// not the four-way weighted consensus this comment describes. The other three are
+    /// real, compiled, non-stub code (constructed only in `tests.rs`), not dead ends —
+    /// just dormant.
+    ///
+    /// This `consciousness_level`/Φ is a *different* quantity from `unified_psi`/Ψ
+    /// (`cognitive_loop/helpers/cycle_extracted.rs::compute_unified_psi`, a weighted sum
+    /// of CfC coherence/voice/flow/relational/body/embodied contributions). Φ gates
+    /// motor safety; Ψ feeds ethics evaluation and Broca's generation trigger. See
+    /// `compute_unified_psi`'s doc comment for the deliberate-split rationale.
+    ///
     /// Returns proposed feedback deltas — the caller applies them.
     pub fn measure(&mut self, input: &ConsciousnessEngineInput) -> ConsciousnessEngineOutput {
         let total_start = Instant::now();

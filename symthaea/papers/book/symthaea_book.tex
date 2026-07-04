@@ -994,23 +994,25 @@ A critical validation step was comparing our sampled partition $\Phi$ against ex
 
 \begin{table}[H]
 \centering
-\caption{Validation of $\Phi$ approximation methods against exact exhaustive computation ($n \leq 8$).}
+\caption{Validation of $\Phi$ approximation methods. Sampled Partition, Greedy Heuristic, and $\lambda_2$ rows compare against exact exhaustive IIT computation (\texttt{ExhaustivePartition}, $n \leq 8$). The Spectral MIP row is methodologically distinct---see the paragraph following this table.}
 \label{tab:phi-validation}
 \begin{tabular}{lccl}
 \toprule
 \textbf{Method} & \textbf{Pearson $r$} & \textbf{Spearman $\rho$} & \textbf{Assessment} \\
 \midrule
 Sampled Partition & 0.9998 & 0.9996 & Excellent \\
-Spectral MIP & 0.9900 & 0.9300 & Very Good \\
+Spectral MIP$^\dagger$ & 0.9866 & 0.9264 & Very Good$^\dagger$ \\
 Greedy Heuristic & 0.8200 & 0.7900 & Adequate \\
 $\lambda_2$ (Fiedler eigenvalue) & $-0.14$ & $-0.11$ & \textbf{Anti-correlated} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+$^\dagger$\textbf{Important methodological caveat, added 2026-07-04:} unlike the other three rows, the Spectral MIP figure is \textit{not} a comparison against \texttt{ExhaustivePartition} on binary hypervectors. It compares SpectralMIPFinder's Fiedler-ordering search against an \textit{exhaustive bipartition search over the same simplified Gaussian mutual-information proxy} (synthetic covariance matrices, not transition-probability matrices)---i.e., it validates that the fast approximation agrees with an exhaustive search \textit{within that proxy framework}, not that the proxy itself tracks canonical TPM-based IIT $\Phi$ the way the other three rows do. The $r=0.9866$, $\rho=0.9264$ figures ($N=62$ synthetic systems, 5 topologies $\times$ 5 sizes $\times$ 3 correlation strengths) were re-verified 2026-07-04; the validating test (\texttt{tests/test\_spectral\_mip\_validation.rs}) had existed since March 2026 but was never wired into the automated test suite and had not executed even once before that date.
+
 The anti-correlation of $\lambda_2$ with true $\Phi$ is a critical finding. Algebraic connectivity measures how well-connected a graph is; $\Phi$ measures how much \textit{more} information the whole generates compared to its parts. These are fundamentally different quantities, and conflating them produces systematically wrong conclusions about which system states are most conscious.
 
-This discovery required corrections across approximately 16 files in the codebase. An earlier version of the system had used $\lambda_2$ as a $\Phi$ proxy, producing consciousness scores that were inversely related to actual integrated information. The lesson is clear: proxies for consciousness must be validated against ground truth, and convenient spectral quantities should not be assumed to track theoretical constructs without empirical verification.
+This discovery required corrections across approximately 16 files in the codebase. An earlier version of the system had used $\lambda_2$ as a $\Phi$ proxy, producing consciousness scores that were inversely related to actual integrated information. The lesson is clear: proxies for consciousness must be validated against ground truth, and convenient spectral quantities should not be assumed to track theoretical constructs without empirical verification --- a lesson that, as the caveat above shows, required re-application to our own Spectral MIP validation claim.
 
 \section{Online Covariance and Adaptive Dimensions}
 

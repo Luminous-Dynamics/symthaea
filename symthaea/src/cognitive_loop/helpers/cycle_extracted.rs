@@ -508,6 +508,21 @@ impl CognitiveLoopService {
     /// Combines: temporal coherence + voice quality + flow state + relational
     /// dyad + interoceptive body + embodied cognition. Clamps to [0.0, 1.0].
     /// Updates the unification engine with the result.
+    ///
+    /// Ψ vs Φ (decided 2026-07-04): this is a *different* quantity from
+    /// `consciousness_level`/Φ (`consciousness_engine/measure.rs`, driven by
+    /// `SpectralMIPFinder`'s Fiedler-ordering MIP search). Φ answers "is this system
+    /// doing real structural integration right now" and gates motor safety; Ψ answers
+    /// "is this system in a good state for social/communicative output" and feeds
+    /// `ethics_engine.rs`'s input plus Broca's generation-trigger gate (`broca_psi >
+    /// 0.4`). Deliberate split, not merged/cross-validated: a topology-integration
+    /// measure isn't obviously the right gate for "should I speak now," and Ψ's
+    /// engagement/flow/relational inputs are a closer fit for that question than Φ's
+    /// graph-structural one. Counter-argument this doesn't fully resolve: two
+    /// uncross-validated "consciousness" numbers risk ethics and motor safety disagreeing
+    /// about the same underlying state. `ConsciousnessEquationV2` has an unused
+    /// `sigmoid(Φ)*0.7 + Ψ*0.3` blend (`consciousness_engine/measure.rs`) that could
+    /// reconcile the two if its cold-start near-zero-output issue is ever fixed.
     pub(in crate::cognitive_loop) fn compute_unified_psi(&mut self) -> f64 {
         let coherence_psi = self.language_comm.voice_coherence.bridge.phi_contribution();
         let voice_psi = self

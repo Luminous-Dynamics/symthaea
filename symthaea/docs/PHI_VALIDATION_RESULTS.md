@@ -179,8 +179,25 @@ This is a **topology generator issue**, not a Φ calculation issue. The MIP form
 |------|----------|------------|------------|
 | **Exact** (BinaryHV) | Research validation (n≤12) | O(2^n) | ✅ Yes |
 | **Heuristic** (BinaryHV) | Large systems (n>12) | O(n) | ✅ Yes (r=0.9998 vs Exact) |
-| **SpectralMIPFinder** (ContinuousHV) | Production consciousness engine | O(n³) | ✅ MIP search validated (r=0.99) |
+| **SpectralMIPFinder** (ContinuousHV) | Production consciousness engine | O(n³) | ⚠️ See caveat below (r=0.9866, ρ=0.9264, run 2026-07-04) |
 | **SpectralConnectivity** (λ₂) | Graph connectivity only | O(n²) | ❌ NO (r=-0.14 vs Exact) |
+
+> **Caveat on the SpectralMIPFinder row (added 2026-07-04):** unlike the Heuristic row
+> above it, this number is **not** a comparison against the exact IIT MIP implementation
+> (`ExhaustivePartition`, BinaryHV). It comes from
+> `tests/test_spectral_mip_validation.rs`, which compares SpectralMIPFinder's
+> Fiedler-ordering search against an *exhaustive bipartition search over the same
+> simplified Gaussian mutual-information proxy* (covariance matrices, not
+> transition-probability matrices). It validates that the fast approximation finds
+> nearly the same partition an exhaustive search would find *within that proxy
+> framework* — it does not show agreement with canonical TPM-based IIT Φ the way the
+> Heuristic/Exact BinaryHV comparison does. Treat the ✅/❌ columns above as answering two
+> different questions, not directly comparable rigor. This test (`tests/
+> test_spectral_mip_validation.rs`) existed since March 2026 but was never added to the
+> workspace's explicit test list and had literally never executed until 2026-07-04, when
+> it was wired in and run for the first time, producing the r=0.9866/ρ=0.9264 result
+> above (N=62 synthetic covariance matrices across 5 topologies × 5 sizes × 3 correlation
+> strengths).
 
 ### API Recommendations
 
