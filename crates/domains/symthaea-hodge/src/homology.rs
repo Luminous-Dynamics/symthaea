@@ -3,6 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 //! Persistent homology and Betti number computation for moral topology.
+//!
+//! Not yet wired to any caller in this crate — kept for the moral-topology
+//! integration this was written for, rather than deleted as dead code.
+#![allow(dead_code)]
 
 use super::*;
 
@@ -386,7 +390,7 @@ pub(super) fn compute_persistent_hodge_fractions(
         critical_scale,
         // At criticality: harmonic fraction in the "Goldilocks zone" [0.2, 0.8]
         // where the system is neither fully synchronized nor fully fragmented.
-        at_criticality: harmonic_avg >= 0.2 && harmonic_avg <= 0.8,
+        at_criticality: (0.2..=0.8).contains(&harmonic_avg),
     })
 }
 
