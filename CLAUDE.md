@@ -95,7 +95,7 @@ Override per-app via `window.__HC_CONDUCTOR_URL` in index.html.
 **Do NOT start a separate conductor** — all hApps share one conductor for cross-cluster `CallTargetCell::OtherRole()` dispatch.
 
 ### Development
-1. **Direct cargo first** - `mold` and `sccache` are system-wide (NixOS). Run `cargo build`/`cargo test` directly — no `nix develop` needed for Rust builds. Use `nix develop` ONLY when you need CUDA, Python/PyPhi, or ONNX Runtime. Direct cargo preserves `CARGO_TARGET_DIR` from the session hook (Rule 5); `nix develop` does not.
+1. **Direct cargo first** - `mold` and `sccache` are system-wide (NixOS). Run `cargo build`/`cargo test` directly — no `nix develop` needed for Rust builds. Direct cargo preserves `CARGO_TARGET_DIR` from the session hook (Rule 5); `nix develop` does not. Use `nix develop` when you need CUDA, Python/PyPhi, ONNX Runtime, **or hit a missing system-library error direct cargo can't resolve** (protobuf, alsa, libclang, espeak-ng, dbus, cmake, etc.) — the symthaea flake's devShell already provides these with `LIBCLANG_PATH`/`PKG_CONFIG_PATH` pre-exported; reach for it first instead of ad-hoc `nix-shell -p` (verified 2026-07-04: a session spent hours rediscovering piecemeal via `nix-shell -p` what `nix develop` already had wired).
 2. **No workarounds** - Fix the flake, don't hack
 3. **Test what exists** - No aspirational tests
 4. **Edit, don't duplicate** - One implementation per feature
