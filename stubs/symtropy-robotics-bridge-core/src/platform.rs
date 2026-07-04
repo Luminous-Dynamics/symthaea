@@ -3,13 +3,16 @@
 //! Platform types for Symthaea robotics platforms.
 
 /// Robotic platform type -- maps to symthaea's EmbodimentPlatform.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum PlatformType {
     /// Quadrotor drone (4 actuators).
     Quadrotor,
     /// Autonomous car (3 actuators: steering, throttle, brake).
     Vehicle,
     /// Bipedal humanoid (64 DOF FullSpine core).
+    #[default]
     Humanoid,
     /// Autonomous underwater vehicle (8 thrusters).
     Auv,
@@ -25,12 +28,6 @@ pub enum PlatformType {
     Quadruped,
     /// Full-frame exoskeleton (6 powered joints, human-worn).
     Exoskeleton,
-}
-
-impl Default for PlatformType {
-    fn default() -> Self {
-        Self::Humanoid
-    }
 }
 
 impl PlatformType {
