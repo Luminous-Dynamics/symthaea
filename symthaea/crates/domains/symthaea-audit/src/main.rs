@@ -35,18 +35,33 @@ fn main() -> anyhow::Result<()> {
 
     let mut initial_context = String::new();
     if !cli.no_hints {
-        let hints = heuristics::find_none_arg_hints(&target);
-        if !hints.is_empty() {
-            eprintln!("[symthaea-audit] pre-scan found {} hint(s):", hints.len());
-            for hint in &hints {
+        let scan = heuristics::scan_repo(&target);
+        let none_hints = heuristics::none_arg_mismatch_hints(&scan);
+        let dead_fn_hints = heuristics::dead_pub_fn_hints(&scan);
+        let total = none_hints.len() + dead_fn_hints.len();
+        if total > 0 {
+            eprintln!("[symthaea-audit] pre-scan found {total} hint(s):");
+            for hint in none_hints.iter().chain(dead_fn_hints.iter()) {
                 eprintln!("  {}", hint.replace('\n', "\n  "));
             }
             initial_context.push_str(
                 "## Automated pre-scan hints (unverified — confirm before relying on them)\n\n",
             );
-            for hint in &hints {
-                initial_context.push_str(hint);
-                initial_context.push_str("\n\n");
+            if !none_hints.is_empty() {
+                initial_context.push_str(
+                    "### Functions called with None in some places, non-None in others\n\n",
+                );
+                for hint in &none_hints {
+                    initial_context.push_str(hint);
+                    initial_context.push_str("\n\n");
+                }
+            }
+            if !dead_fn_hints.is_empty() {
+                initial_context.push_str("### Public functions with no non-test usage found\n\n");
+                for hint in &dead_fn_hints {
+                    initial_context.push_str(hint);
+                    initial_context.push_str("\n\n");
+                }
             }
         }
     }
