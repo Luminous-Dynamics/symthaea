@@ -473,7 +473,7 @@ fn test_spectral_mip_vs_exhaustive_correlation() {
     let ratios: Vec<f64> = exact_phis
         .iter()
         .zip(spectral_phis.iter())
-        .filter(|(&e, _)| e > 1e-10)
+        .filter(|&(&e, _)| e > 1e-10)
         .map(|(&e, &s)| s / e)
         .collect();
     if !ratios.is_empty() {
