@@ -243,7 +243,15 @@ pub struct ConsciousnessPipeline {
     /// Optional metrics collector for observability recording
     pub(crate) metrics_collector: Option<crate::observability::SharedObserver>,
 
-    /// Optional consciousness verifier for periodic verification
+    /// Optional consciousness verifier for periodic verification.
+    ///
+    /// `ConsciousnessVerifier` is `#[deprecated]` (2026-07-03 audit: none of its three Φ
+    /// legs is a valid measurement — SpectralConnectivity and Resonator are both
+    /// r=-0.62 with true Φ, Tiered uses a testing mock). This field/`enable_verification`
+    /// are kept for API stability but should not be turned on; allowed here rather than
+    /// fixed since there is currently no valid replacement multi-method verifier to swap
+    /// in.
+    #[allow(deprecated)]
     pub(crate) verifier: Option<super::super::consciousness_verifier::ConsciousnessVerifier>,
     /// How often (in cycles) to run verification (0 = disabled)
     pub(crate) verification_interval: usize,

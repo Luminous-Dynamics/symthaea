@@ -1038,6 +1038,12 @@ impl ConsciousnessPipeline {
     ///
     /// Every `interval` cycles, the verifier produces a `VerificationReport`
     /// from the current `ConsciousnessState`.
+    ///
+    /// `ConsciousnessVerifier` is `#[deprecated]` (2026-07-03 audit: none of its three Φ
+    /// legs is a valid measurement). Calling this will produce a `VerificationReport`
+    /// whose `consensus_phi`/`verdict` should not be trusted — see
+    /// `consciousness_verifier`'s module docs before using this.
+    #[allow(deprecated)]
     pub fn enable_verification(&mut self, interval: usize) -> &mut Self {
         self.verifier = Some(super::super::consciousness_verifier::ConsciousnessVerifier::new());
         self.verification_interval = interval;

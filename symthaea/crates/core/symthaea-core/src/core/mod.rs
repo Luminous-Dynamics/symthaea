@@ -60,8 +60,11 @@ pub use crate::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSCIOUSNESS VERIFICATION — from hdc::consciousness_verifier
+// ConsciousnessVerifier is #[deprecated] (2026-07-03: none of its three Φ legs is a
+// valid measurement) — see that module's docs. Re-exported for API stability.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+#[allow(deprecated)]
 pub use crate::hdc::consciousness_verifier::{
     ConsciousnessVerdict, ConsciousnessVerifier, IITAxiomScores, VerificationReport,
 };

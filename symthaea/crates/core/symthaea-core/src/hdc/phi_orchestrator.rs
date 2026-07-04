@@ -3,27 +3,51 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Adaptive Φ Calculator Orchestrator
 //!
-//! Phase 5E Integration: Dynamically selects the optimal Φ calculation algorithm
-//! based on context, process count, and performance requirements.
+//! Phase 5E Integration: Dynamically selects a Φ calculation algorithm based on
+//! context, process count, and performance requirements.
 //!
-//! # Available Calculators
+//! # CAVEAT (2026-07-03 audit) — "Accurate"/"Real" here is not accurate
 //!
-//! - **RealPhiCalculator**: O(n³) - Most accurate, uses algebraic connectivity
-//! - **ResonatorPhiCalculator**: O(n log N) - Fast, captures consciousness dynamics
-//! - **TieredPhi**: Configurable tiers (Mock/Heuristic/Spectral/Exact)
+//! Despite the naming below (inherited from an earlier, incorrect claim — do not trust
+//! variant *names* like `PhiMode::Accurate`/`CalculatorType::Real`, only this note):
+//! neither of the two non-Tiered calculators this orchestrator selects between is a
+//! valid Φ measurement.
 //!
-//! # Adaptive Selection Strategy
+//! - **`Real`/`Accurate`** actually dispatches to `ConnectivityCalculator` (algebraic
+//!   connectivity λ₂), documented elsewhere in this crate (`hdc/tiered_phi/core.rs`) as
+//!   **"deprecated: r = -0.62 with true Φ"**. It is neither "Real" nor "Accurate."
+//! - **`Resonant`/`Fast`** dispatches to `ResonantPhiCalculator`, whose own module doc
+//!   (`hdc/phi_resonant.rs`) says outright it measures coupled-oscillator resonance
+//!   dynamics, **"NOT IIT integrated information (Φ)"**, and internally uses the same
+//!   deprecated spectral gap.
+//! - Only **`Tiered`** (this orchestrator's third option) can give a real Φ
+//!   approximation — specifically `ApproximationTier::SampledPartition` (r=0.9998 vs
+//!   exact for small N) or `ExhaustivePartition` (true IIT for n≤12). The adaptive
+//!   selection strategy below defaults to `Real`/`Resonant` for most `n`, i.e. the
+//!   *default* behavior of this orchestrator is the invalid path.
+//!
+//! # Available Calculators (see caveat above before trusting "accuracy")
+//!
+//! - **RealPhiCalculator**: O(n³) — algebraic connectivity, r=-0.62 with true Φ
+//! - **ResonatorPhiCalculator**: O(n log N) — resonance dynamics, not IIT Φ per its own docs
+//! - **TieredPhi**: Configurable tiers (Mock/Heuristic/Spectral/Exact) — the only tier
+//!   family with a real Φ approximation is `SampledPartition`/`ExhaustivePartition`
+//!
+//! # Adaptive Selection Strategy (as implemented — not a recommendation)
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────────────────┐
 //! │           ADAPTIVE Φ CALCULATOR ORCHESTRATION                        │
 //! ├──────────────────────────────────────────────────────────────────────┤
 //! │                                                                       │
-//! │   n <= 5:   RealPhiCalculator (exact algebraic connectivity)         │
-//! │   n <= 20:  Resonant OR Real (based on mode preference)              │
-//! │   n > 20:   ResonatorPhiCalculator (fast dynamics-based)             │
+//! │   n <= 5:   RealPhiCalculator (algebraic connectivity — NOT true Φ)  │
+//! │   n <= 20:  Resonant OR Real (based on mode preference — neither     │
+//! │             is a valid Φ measurement)                                │
+//! │   n > 20:   ResonatorPhiCalculator (fast dynamics-based — NOT true Φ)│
 //! │                                                                       │
-//! │   Override: Force specific calculator with PhiMode                   │
+//! │   Override: Force specific calculator with PhiMode — use             │
+//! │   PhiMode::Tiered(ApproximationTier::SampledPartition) for a real    │
+//! │   (if unvalidated for this orchestrator specifically) Φ estimate.    │
 //! │                                                                       │
 //! └──────────────────────────────────────────────────────────────────────┘
 //! ```
@@ -67,17 +91,24 @@ const CACHE_SIZE: usize = 16;
 /// Φ calculation mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PhiMode {
-    /// Automatically select best calculator based on n
+    /// Automatically select best calculator based on n — see module-level caveat,
+    /// this defaults to `Accurate`/`Fast` for most n, neither of which is a valid Φ
+    /// measurement.
     #[default]
     Adaptive,
 
-    /// Always use RealPhiCalculator (accurate, O(n³))
+    /// Always use `ConnectivityCalculator` (algebraic connectivity, O(n³)). Despite the
+    /// variant name, this is NOT accurate: documented elsewhere in this crate as
+    /// "deprecated: r = -0.62 with true Φ". Kept name for API stability; see module docs.
     Accurate,
 
-    /// Always use ResonatorPhiCalculator (fast, O(n log N))
+    /// Always use `ResonantPhiCalculator` (O(n log N)). That module's own docs say this
+    /// measures coupled-oscillator resonance dynamics, not IIT integration — despite the
+    /// variant name, not a Φ approximation. Kept name for API stability; see module docs.
     Fast,
 
-    /// Use TieredPhi with specific tier
+    /// Use TieredPhi with specific tier — the only mode capable of a real Φ
+    /// approximation; use `ApproximationTier::SampledPartition`/`ExhaustivePartition`.
     Tiered(ApproximationTier),
 
     /// Balanced: Use accurate for small n, fast for large n
@@ -112,11 +143,14 @@ pub struct PhiResult {
 /// Type of calculator used
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CalculatorType {
-    /// RealPhiCalculator - algebraic connectivity
+    /// Algebraic connectivity (λ₂). Despite the variant name, not a valid Φ
+    /// measurement — r=-0.62 with true Φ, see module docs.
     Real,
-    /// ResonatorPhiCalculator - coupled oscillator dynamics
+    /// Coupled-oscillator resonance dynamics. Not IIT integration per its own module
+    /// docs — see module-level caveat.
     Resonant,
-    /// TieredPhi with specific tier
+    /// TieredPhi with specific tier — the only variant capable of a real Φ
+    /// approximation (`SampledPartition`/`ExhaustivePartition`).
     Tiered(ApproximationTier),
 }
 
