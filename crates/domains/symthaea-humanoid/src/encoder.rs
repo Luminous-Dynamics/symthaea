@@ -82,11 +82,11 @@ impl PredictiveLayer {
         // the raw encoding changes, and PE spikes. This is the true
         // sensorimotor prediction error — "how different is this observation
         // from what I just saw?"
-        if self.tick_count >= 2 {
-            if let Some(ref prev_raw) = self.last_prediction {
-                let sim = prev_raw.similarity(raw_hv).max(0.0).min(1.0);
-                self.prediction_error = (1.0 - sim) as f32;
-            }
+        if self.tick_count >= 2
+            && let Some(ref prev_raw) = self.last_prediction
+        {
+            let sim = prev_raw.similarity(raw_hv).clamp(0.0, 1.0);
+            self.prediction_error = 1.0 - sim;
         }
 
         // Step 2: Store this raw encoding for next tick's PE comparison
@@ -690,8 +690,8 @@ impl HumanoidHdcEncoder {
         // Fast encoding: weight × normalized_value × base_vector
         // This preserves the semantic weighting and channel binding properties
         // while avoiding the O(levels) thermometer accumulation per channel.
-        for i in 0..n {
-            let normalized = self.normalize_channel(i, channels[i]);
+        for (i, &c) in channels.iter().enumerate().take(n) {
+            let normalized = self.normalize_channel(i, c);
             let weight = self.channel_weight(i) * (1.0 - self.derivative_weight);
             // Scalar-bind: the normalized value [0,1] scales the base vector contribution.
             // Higher values produce stronger contribution (same effect as thermometer).
@@ -703,24 +703,24 @@ impl HumanoidHdcEncoder {
         }
 
         // Derivative channels (skip if predictive layer handles temporal dynamics)
-        if self.predictive.is_none() {
-            if let Some(ref prev) = self.prev_channels {
-                let prev_n = n.min(prev.len());
-                for i in 0..prev_n {
-                    let delta = channels[i] - prev[i];
-                    let [min, max] = if i < self.layout.ranges.len() {
-                        self.layout.ranges[i]
-                    } else {
-                        [-2.0, 2.0]
-                    };
-                    let range = max - min;
-                    let normalized_delta = ((delta / range) + 0.5).clamp(0.0, 1.0);
-                    let weight = self.channel_weight(i) * self.derivative_weight;
-                    let scale = weight * (normalized_delta * 2.0 - 1.0);
-                    let deriv_base = self.deriv_base_vectors[i].as_slice();
-                    for j in 0..dim {
-                        result[j] += scale * deriv_base[j];
-                    }
+        if self.predictive.is_none()
+            && let Some(ref prev) = self.prev_channels
+        {
+            let prev_n = n.min(prev.len());
+            for i in 0..prev_n {
+                let delta = channels[i] - prev[i];
+                let [min, max] = if i < self.layout.ranges.len() {
+                    self.layout.ranges[i]
+                } else {
+                    [-2.0, 2.0]
+                };
+                let range = max - min;
+                let normalized_delta = ((delta / range) + 0.5).clamp(0.0, 1.0);
+                let weight = self.channel_weight(i) * self.derivative_weight;
+                let scale = weight * (normalized_delta * 2.0 - 1.0);
+                let deriv_base = self.deriv_base_vectors[i].as_slice();
+                for j in 0..dim {
+                    result[j] += scale * deriv_base[j];
                 }
             }
         }
@@ -754,8 +754,8 @@ impl HumanoidHdcEncoder {
 
         let mut result = vec![0.0f32; dim];
 
-        for i in 0..n {
-            let normalized = self.normalize_channel(i, channels[i]);
+        for (i, &c) in channels.iter().enumerate().take(n) {
+            let normalized = self.normalize_channel(i, c);
             let weight = self.channel_weight(i) * (1.0 - self.derivative_weight);
             let scale = weight * (normalized * 2.0 - 1.0);
             let base = self.base_vectors[i].as_slice();
@@ -764,24 +764,24 @@ impl HumanoidHdcEncoder {
             }
         }
 
-        if self.predictive.is_none() {
-            if let Some(ref prev) = self.prev_channels {
-                let prev_n = n.min(prev.len());
-                for i in 0..prev_n {
-                    let delta = channels[i] - prev[i];
-                    let [min, max] = if i < self.layout.ranges.len() {
-                        self.layout.ranges[i]
-                    } else {
-                        [-2.0, 2.0]
-                    };
-                    let range = max - min;
-                    let normalized_delta = ((delta / range) + 0.5).clamp(0.0, 1.0);
-                    let weight = self.channel_weight(i) * self.derivative_weight;
-                    let scale = weight * (normalized_delta * 2.0 - 1.0);
-                    let deriv_base = self.deriv_base_vectors[i].as_slice();
-                    for j in 0..dim {
-                        result[j] += scale * deriv_base[j];
-                    }
+        if self.predictive.is_none()
+            && let Some(ref prev) = self.prev_channels
+        {
+            let prev_n = n.min(prev.len());
+            for i in 0..prev_n {
+                let delta = channels[i] - prev[i];
+                let [min, max] = if i < self.layout.ranges.len() {
+                    self.layout.ranges[i]
+                } else {
+                    [-2.0, 2.0]
+                };
+                let range = max - min;
+                let normalized_delta = ((delta / range) + 0.5).clamp(0.0, 1.0);
+                let weight = self.channel_weight(i) * self.derivative_weight;
+                let scale = weight * (normalized_delta * 2.0 - 1.0);
+                let deriv_base = self.deriv_base_vectors[i].as_slice();
+                for j in 0..dim {
+                    result[j] += scale * deriv_base[j];
                 }
             }
         }

@@ -10,7 +10,6 @@ use crate::controller::HumanoidController;
 use crate::encoder::HumanoidHdcEncoder;
 use crate::fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
 use crate::gait::GaitAnalyzer;
-use crate::morphology::HumanoidMorphology;
 use crate::reward;
 use crate::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 use crate::types::*;
@@ -621,10 +620,10 @@ impl HumanoidTrainer {
 
         for ep in 0..self.config.num_episodes {
             let (current_task, _, _) = self.curriculum(ep);
-            if let Some(prev) = prev_task {
-                if prev != current_task {
-                    transition_boost_remaining = 3;
-                }
+            if let Some(prev) = prev_task
+                && prev != current_task
+            {
+                transition_boost_remaining = 3;
             }
             prev_task = Some(current_task);
 
@@ -643,11 +642,11 @@ impl HumanoidTrainer {
                 consecutive_low = 0;
             } else if metrics.avg_standing_reward < 0.5 {
                 consecutive_low += 1;
-                if consecutive_low >= 3 {
-                    if let Some((ref weights, ref bias)) = best_weights {
-                        controller.set_output_projection(weights, bias);
-                        consecutive_low = 0;
-                    }
+                if consecutive_low >= 3
+                    && let Some((ref weights, ref bias)) = best_weights
+                {
+                    controller.set_output_projection(weights, bias);
+                    consecutive_low = 0;
                 }
             } else {
                 consecutive_low = 0;
@@ -845,10 +844,10 @@ impl HumanoidTrainer {
 
         for ep in 0..self.config.num_episodes {
             let (current_task, _, _) = self.curriculum(ep);
-            if let Some(prev) = prev_task {
-                if prev != current_task {
-                    transition_boost_remaining = 3;
-                }
+            if let Some(prev) = prev_task
+                && prev != current_task
+            {
+                transition_boost_remaining = 3;
             }
             prev_task = Some(current_task);
 
@@ -867,11 +866,11 @@ impl HumanoidTrainer {
                 consecutive_low = 0;
             } else if metrics.avg_standing_reward < 0.5 {
                 consecutive_low += 1;
-                if consecutive_low >= 3 {
-                    if let Some((ref weights, ref bias)) = best_weights {
-                        controller.set_output_projection(weights, bias);
-                        consecutive_low = 0;
-                    }
+                if consecutive_low >= 3
+                    && let Some((ref weights, ref bias)) = best_weights
+                {
+                    controller.set_output_projection(weights, bias);
+                    consecutive_low = 0;
                 }
             } else {
                 consecutive_low = 0;

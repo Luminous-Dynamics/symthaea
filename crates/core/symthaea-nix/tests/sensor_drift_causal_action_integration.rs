@@ -35,7 +35,7 @@ use symthaea_nix::mind::world_model::{ActionCategory, NixWorldModel};
 
 #[test]
 fn test_integration_normal_operation_no_drift_stable_curiosity() {
-    const DIM: usize = 1024;
+    const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;
 
     // Layer 1: HDC world model tracks expected state
     let mut hdcwm = HdcWorldModel::new(DIM);
@@ -126,7 +126,7 @@ fn test_integration_normal_operation_no_drift_stable_curiosity() {
 
 #[test]
 fn test_integration_sensor_shift_propagates_safely() {
-    const DIM: usize = 1024;
+    const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;
 
     // Layer 1: sensor shifts to orthogonal state (α=1.0 for instant update)
     let mut hdcwm = HdcWorldModel::new(DIM).with_ema_alpha(1.0);
@@ -225,7 +225,7 @@ fn test_integration_sensor_shift_propagates_safely() {
 
 #[test]
 fn test_integration_missing_sensor_graceful_degradation() {
-    const DIM: usize = 512;
+    const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;
 
     // Layer 1: no observations at all (model never sees any sensor data)
     let hdcwm = HdcWorldModel::new(DIM);
@@ -283,7 +283,7 @@ fn test_integration_missing_sensor_graceful_degradation() {
 
 #[test]
 fn test_integration_multi_step_learning_loop_stays_bounded() {
-    const DIM: usize = 512;
+    const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;
     const STEPS: usize = 5;
 
     let mut hdcwm = HdcWorldModel::new(DIM).with_ema_alpha(0.2);

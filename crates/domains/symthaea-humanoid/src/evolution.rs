@@ -13,8 +13,8 @@ pub struct GaitGenome {
     pub stride_gain: f32,
 }
 
-impl GaitGenome {
-    pub fn default() -> Self {
+impl Default for GaitGenome {
+    fn default() -> Self {
         Self {
             // UPGRADED: Scaled base target values to match high-frequency liquid neural oscillations
             walk_v: 3.25,

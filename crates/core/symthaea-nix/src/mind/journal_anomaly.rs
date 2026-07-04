@@ -63,6 +63,13 @@ impl JournalAnomalyDetector {
         }
     }
 
+    /// Set the dimensionality of the detector (re-initializes the codebook with the correct dimension).
+    pub fn with_dim(mut self, dim: usize) -> Self {
+        self.dim = dim;
+        self.codebook = NixCodebook::with_dim(dim);
+        self
+    }
+
     /// Set the anomaly threshold (0.0-1.0).
     pub fn with_threshold(mut self, threshold: f32) -> Self {
         self.threshold = threshold.clamp(0.0, 1.0);
@@ -113,6 +120,142 @@ impl JournalAnomalyDetector {
         // Weight by priority (errors get amplified)
         let priority_weight = priority_to_weight(entry.priority);
         combined.scale(priority_weight)
+    }
+
+    /// Encode a single journal entry by combining its symbolic unit name
+    /// with the offline-safe semantic log embedding from the Neural Bridge.
+    #[cfg(feature = "native")]
+    pub fn encode_entry_hybrid_offline(
+        &mut self,
+        entry: &JournalEntry,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<ContinuousHV, super::neural_bridge::BridgeError> {
+        // 1. Encode symbolic unit identity
+        let unit_hv = self.codebook.get_or_create(&entry.unit).clone();
+
+        // 2. Encode semantic log message via offline deterministic bridge
+        let embed = bridge.embed_deterministic(&entry.message)?;
+        let msg_hv = embed.continuous;
+
+        // 3. Combine unit + message (bind)
+        let combined = unit_hv.bind(&msg_hv);
+
+        // 4. Scale by priority weight
+        let priority_weight = priority_to_weight(entry.priority);
+        Ok(combined.scale(priority_weight))
+    }
+
+    /// Encode a single journal entry asynchronously by combining its symbolic
+    /// unit name with the live semantic log embedding from the Neural Bridge.
+    #[cfg(feature = "native")]
+    pub async fn encode_entry_hybrid_async(
+        &mut self,
+        entry: &JournalEntry,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<ContinuousHV, super::neural_bridge::BridgeError> {
+        // 1. Encode symbolic unit identity
+        let unit_hv = self.codebook.get_or_create(&entry.unit).clone();
+
+        // 2. Encode semantic log message via live bridge (network)
+        let embed = bridge.embed_text(&entry.message).await?;
+        let msg_hv = embed.continuous;
+
+        // 3. Combine unit + message (bind)
+        let combined = unit_hv.bind(&msg_hv);
+
+        // 4. Scale by priority weight
+        let priority_weight = priority_to_weight(entry.priority);
+        Ok(combined.scale(priority_weight))
+    }
+
+    /// Process a batch of journal entries using offline-safe hybrid encoding,
+    /// updating the baseline and returning anomalies.
+    #[cfg(feature = "native")]
+    pub fn process_entries_hybrid_offline(
+        &mut self,
+        entries: &[JournalEntry],
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<Vec<JournalAnomaly>, super::neural_bridge::BridgeError> {
+        let mut anomalies = Vec::new();
+
+        for entry in entries {
+            let hv = self.encode_entry_hybrid_offline(entry, bridge)?;
+
+            // Compare against baseline
+            if let Some(ref baseline) = self.baseline {
+                let similarity = hv.similarity(baseline);
+
+                if similarity < self.threshold {
+                    let anomaly_score = 1.0 - similarity.max(0.0);
+                    let reason = classify_anomaly(entry, similarity);
+
+                    anomalies.push(JournalAnomaly {
+                        entry: entry.clone(),
+                        anomaly_score,
+                        baseline_similarity: similarity,
+                        reason,
+                    });
+                }
+            }
+
+            // Update baseline via EMA
+            self.update_baseline(&hv);
+            self.entries_processed += 1;
+        }
+
+        Ok(anomalies)
+    }
+
+    /// Process a batch of journal entries asynchronously using live hybrid encoding,
+    /// updating the baseline and returning anomalies.
+    #[cfg(feature = "native")]
+    pub async fn process_entries_hybrid_async(
+        &mut self,
+        entries: &[JournalEntry],
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<Vec<JournalAnomaly>, super::neural_bridge::BridgeError> {
+        let mut anomalies = Vec::new();
+
+        for entry in entries {
+            let hv = self.encode_entry_hybrid_async(entry, bridge).await?;
+
+            // Compare against baseline
+            if let Some(ref baseline) = self.baseline {
+                let similarity = hv.similarity(baseline);
+
+                if similarity < self.threshold {
+                    let anomaly_score = 1.0 - similarity.max(0.0);
+                    let reason = classify_anomaly(entry, similarity);
+
+                    anomalies.push(JournalAnomaly {
+                        entry: entry.clone(),
+                        anomaly_score,
+                        baseline_similarity: similarity,
+                        reason,
+                    });
+                }
+            }
+
+            // Update baseline via EMA
+            self.update_baseline(&hv);
+            self.entries_processed += 1;
+        }
+
+        Ok(anomalies)
+    }
+
+    /// Get the current baseline similarity for a given entry using offline hybrid encoding.
+    #[cfg(feature = "native")]
+    pub fn score_entry_hybrid_offline(
+        &mut self,
+        entry: &JournalEntry,
+        bridge: &super::neural_bridge::NeuralBridge,
+    ) -> Result<f32, super::neural_bridge::BridgeError> {
+        let hv = self.encode_entry_hybrid_offline(entry, bridge)?;
+        Ok(match &self.baseline {
+            Some(baseline) => hv.similarity(baseline),
+            None => 0.5, // No baseline yet
+        })
     }
 
     /// Process a batch of journal entries, updating the baseline and returning anomalies.
@@ -419,5 +562,63 @@ mod tests {
             "Similar entry should have positive similarity, got {}",
             score
         );
+    }
+
+    #[test]
+    fn test_hybrid_encode_entry_determinism() {
+        let bridge = crate::mind::neural_bridge::NeuralBridge::new();
+        // Run at 16,384-D
+        let mut detector =
+            JournalAnomalyDetector::new().with_dim(symthaea_core::hdc::HDC_DIMENSION);
+        let entry = make_entry("nginx", 6, "system initialization completed");
+
+        let hv1 = detector
+            .encode_entry_hybrid_offline(&entry, &bridge)
+            .unwrap();
+        let hv2 = detector
+            .encode_entry_hybrid_offline(&entry, &bridge)
+            .unwrap();
+
+        let sim = hv1.similarity(&hv2);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "Hybrid log encoding must be deterministic: sim={sim}"
+        );
+        assert_eq!(hv1.as_slice().len(), symthaea_core::hdc::HDC_DIMENSION);
+    }
+
+    #[test]
+    fn test_hybrid_anomaly_detection_workflow() {
+        let bridge = crate::mind::neural_bridge::NeuralBridge::new();
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut detector = JournalAnomalyDetector::new()
+            .with_dim(dim)
+            .with_threshold(0.3);
+
+        // Train baseline on normal logs
+        let normal_logs = [
+            make_entry("nginx", 6, "GET /status 200 OK"),
+            make_entry("nginx", 6, "GET /index.html 200 OK"),
+            make_entry("nginx", 6, "GET /api/v1/health 200 OK"),
+        ];
+        let _ = detector
+            .process_entries_hybrid_offline(&normal_logs, &bridge)
+            .unwrap();
+
+        // Process a very anomalous/different error log
+        let err_log = make_entry(
+            "sshd",
+            3,
+            "Failed password for invalid user admin from 192.168.1.100 port 50430",
+        );
+        let anomalies = detector
+            .process_entries_hybrid_offline(&[err_log], &bridge)
+            .unwrap();
+
+        assert!(
+            !anomalies.is_empty(),
+            "Anomalous/error log must be flagged as anomaly"
+        );
+        assert!(anomalies[0].reason.contains("Error"));
     }
 }

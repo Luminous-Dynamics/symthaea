@@ -115,6 +115,15 @@ in {
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
 
+      # StartLimitBurst/StartLimitIntervalSec are [Unit]-section directives,
+      # not [Service] — putting them under serviceConfig produces a silent
+      # "Unknown key ... ignoring" warning (hit 2026-07-04; the Restart-limit
+      # protection they provide was never actually active until this fix).
+      unitConfig = {
+        StartLimitBurst = 5;
+        StartLimitIntervalSec = 60;
+      };
+
       serviceConfig = {
         Type = "simple";
         User = cfg.user;
@@ -135,8 +144,6 @@ in {
         ExecStart = "${launcher}";
         Restart = "always";
         RestartSec = "5s";
-        StartLimitBurst = 5;
-        StartLimitIntervalSec = 60;
 
         # Hardening — mirrors mycelix-prism/nix/prism-service.nix, plus
         # ReadWritePaths for the curriculum store this daemon writes to.

@@ -76,30 +76,6 @@ impl HumanoidBodyModel {
     }
 }
 
-const JOINT_LIMITS: [[f64; 2]; NUM_ACTUATORS] = [
-    [-1.31, 0.52],
-    [-0.79, 0.79],
-    [-0.61, 0.61],
-    [-0.44, 0.09],
-    [-1.05, 0.61],
-    [-1.92, 0.35],
-    [-2.79, 0.03],
-    [-0.87, 0.87],
-    [-0.87, 0.87],
-    [-0.44, 0.09],
-    [-1.05, 0.61],
-    [-1.92, 0.35],
-    [-2.79, 0.03],
-    [-0.87, 0.87],
-    [-0.87, 0.87],
-    [-1.48, 1.05],
-    [-1.48, 1.05],
-    [-1.57, 0.87],
-    [-1.05, 1.48],
-    [-1.05, 1.48],
-    [-1.57, 0.87],
-];
-
 struct SensoryJitterBuffer {
     buffer: Vec<HumanoidState>,
     write_idx: usize,
@@ -380,10 +356,14 @@ impl DomainRandomization {
             + (baseline.total_mass - baseline_segment_total);
 
         let n = body.joint_inertias.len().min(JOINT_SEGMENT_MAP.len());
-        for i in 0..n {
-            let seg = JOINT_SEGMENT_MAP[i];
-            body.joint_inertias[i] =
-                baseline.joint_inertias[i] * mass_scales[seg] * length_scales[seg].powi(2);
+        for ((joint_inertia, &seg), &baseline_inertia) in body
+            .joint_inertias
+            .iter_mut()
+            .zip(JOINT_SEGMENT_MAP.iter())
+            .zip(baseline.joint_inertias.iter())
+            .take(n)
+        {
+            *joint_inertia = baseline_inertia * mass_scales[seg] * length_scales[seg].powi(2);
         }
 
         for i in 0..body.joint_damping.len() {
@@ -573,7 +553,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             let [lo, hi] = if i < self.joint_limits.len() {
                 self.joint_limits[i]
             } else {
-                [-3.14, 3.14]
+                [-std::f64::consts::PI, std::f64::consts::PI]
             };
             if self.state.joint_angles[i] < lo {
                 self.state.joint_angles[i] = lo;
@@ -584,7 +564,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             }
         }
 
-        let abd_y = if self.state.joint_angles.len() > 0 {
+        let abd_y = if !self.state.joint_angles.is_empty() {
             self.state.joint_angles[0]
         } else {
             0.0
@@ -932,7 +912,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             let [lo, hi] = if i < self.joint_limits.len() {
                 self.joint_limits[i]
             } else {
-                [-3.14, 3.14]
+                [-std::f64::consts::PI, std::f64::consts::PI]
             };
             let range = hi - lo;
             self.state.joint_angles[i] += perturbation * next_f64() * range * 0.03;

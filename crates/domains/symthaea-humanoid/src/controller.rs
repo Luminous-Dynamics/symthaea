@@ -117,13 +117,17 @@ impl HumanoidController {
         }
 
         let mut raw = vec![0.0f32; self.num_outputs];
-        for i in 0..self.num_outputs {
-            let row_offset = i * BOTTLENECK_DIM;
-            let mut sum = self.output_bias[i];
-            for j in 0..BOTTLENECK_DIM {
-                sum += self.output_weights[row_offset + j] * bottleneck[j];
-            }
-            raw[i] = sum;
+        for ((r, &bias), row) in raw
+            .iter_mut()
+            .zip(self.output_bias.iter())
+            .zip(self.output_weights.chunks_exact(BOTTLENECK_DIM))
+        {
+            *r = bias
+                + row
+                    .iter()
+                    .zip(bottleneck.iter())
+                    .map(|(&w, &b)| w * b)
+                    .sum::<f32>();
         }
 
         let mut torques = vec![0.0f32; self.num_outputs];
@@ -156,13 +160,17 @@ impl HumanoidController {
         }
 
         let mut raw = vec![0.0f32; self.num_outputs];
-        for i in 0..self.num_outputs {
-            let row_offset = i * BOTTLENECK_DIM;
-            let mut sum = self.output_bias[i];
-            for j in 0..BOTTLENECK_DIM {
-                sum += self.output_weights[row_offset + j] * bottleneck_activated[j];
-            }
-            raw[i] = sum;
+        for ((r, &bias), row) in raw
+            .iter_mut()
+            .zip(self.output_bias.iter())
+            .zip(self.output_weights.chunks_exact(BOTTLENECK_DIM))
+        {
+            *r = bias
+                + row
+                    .iter()
+                    .zip(bottleneck_activated.iter())
+                    .map(|(&w, &b)| w * b)
+                    .sum::<f32>();
         }
 
         let mut d_raw = vec![0.0f32; self.num_outputs];
@@ -184,13 +192,16 @@ impl HumanoidController {
             *w *= decay;
         }
 
-        for i in 0..self.num_outputs {
-            let row_offset = i * BOTTLENECK_DIM;
-            for j in 0..BOTTLENECK_DIM {
-                self.output_weights[row_offset + j] -=
-                    output_lr * d_raw[i] * bottleneck_activated[j];
+        for ((row, &dr), bias) in self
+            .output_weights
+            .chunks_exact_mut(BOTTLENECK_DIM)
+            .zip(d_raw.iter())
+            .zip(self.output_bias.iter_mut())
+        {
+            for (w, &b) in row.iter_mut().zip(bottleneck_activated.iter()) {
+                *w -= output_lr * dr * b;
             }
-            self.output_bias[i] -= output_lr * d_raw[i];
+            *bias -= output_lr * dr;
         }
     }
 
@@ -218,13 +229,17 @@ impl HumanoidController {
         }
 
         let mut raw = vec![0.0f32; self.num_outputs];
-        for i in 0..self.num_outputs {
-            let row_offset = i * BOTTLENECK_DIM;
-            let mut sum = self.output_bias[i];
-            for j in 0..BOTTLENECK_DIM {
-                sum += self.output_weights[row_offset + j] * bottleneck_activated[j];
-            }
-            raw[i] = sum;
+        for ((r, &bias), row) in raw
+            .iter_mut()
+            .zip(self.output_bias.iter())
+            .zip(self.output_weights.chunks_exact(BOTTLENECK_DIM))
+        {
+            *r = bias
+                + row
+                    .iter()
+                    .zip(bottleneck_activated.iter())
+                    .map(|(&w, &b)| w * b)
+                    .sum::<f32>();
         }
 
         let mut d_raw = vec![0.0f32; self.num_outputs];
@@ -246,21 +261,27 @@ impl HumanoidController {
             *w *= decay;
         }
 
-        for i in 0..self.num_outputs {
-            let row_offset = i * BOTTLENECK_DIM;
-            for j in 0..BOTTLENECK_DIM {
-                self.output_weights[row_offset + j] -=
-                    output_lr * d_raw[i] * bottleneck_activated[j];
+        for ((row, &dr), bias) in self
+            .output_weights
+            .chunks_exact_mut(BOTTLENECK_DIM)
+            .zip(d_raw.iter())
+            .zip(self.output_bias.iter_mut())
+        {
+            for (w, &b) in row.iter_mut().zip(bottleneck_activated.iter()) {
+                *w -= output_lr * dr * b;
             }
-            self.output_bias[i] -= output_lr * d_raw[i];
+            *bias -= output_lr * dr;
         }
 
         let dim = HDC_DIMENSION;
         let mut d_bottleneck = vec![0.0f32; BOTTLENECK_DIM];
-        for i in 0..self.num_outputs {
-            let row_offset = i * BOTTLENECK_DIM;
-            for j in 0..BOTTLENECK_DIM {
-                d_bottleneck[j] += d_raw[i] * self.output_weights[row_offset + j];
+        for (row, &dr) in self
+            .output_weights
+            .chunks_exact(BOTTLENECK_DIM)
+            .zip(d_raw.iter())
+        {
+            for (db, &w) in d_bottleneck.iter_mut().zip(row.iter()) {
+                *db += dr * w;
             }
         }
 
@@ -302,11 +323,11 @@ impl HumanoidController {
                 }
             }
 
-            if let Some(prev_output) = prev_layer_output {
-                if neuron_count > 0 {
-                    let scale = 1.0 / neuron_count as f32;
-                    target_hv = prev_output.subtract(&avg_d_input.scale(scale));
-                }
+            if let Some(prev_output) = prev_layer_output
+                && neuron_count > 0
+            {
+                let scale = 1.0 / neuron_count as f32;
+                target_hv = prev_output.subtract(&avg_d_input.scale(scale));
             }
         }
     }
@@ -388,15 +409,14 @@ impl HumanoidController {
             network_layers: config.network_layers,
             neurons_per_layer: config.neurons_per_layer,
         };
-        let json = serde_json::to_string_pretty(&checkpoint)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(&checkpoint).map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 
     pub fn load_checkpoint(path: &str) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        let checkpoint: ControllerCheckpoint = serde_json::from_str(&json)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let checkpoint: ControllerCheckpoint =
+            serde_json::from_str(&json).map_err(std::io::Error::other)?;
         let genesis = GenesisSeed::from_phrase(&checkpoint.genesis_phrase);
         let config = HumanoidConfig {
             network_layers: checkpoint.network_layers,

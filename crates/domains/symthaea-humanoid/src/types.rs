@@ -526,6 +526,9 @@ impl HumanoidPdGains {
 ///
 /// Target: all joint angles = 0 (MuJoCo default pose is approximately upright).
 /// Output: normalized torques in [-1, 1].
+// 5 parallel arrays (torques, joint_angles, joint_velocities, kp, kd) in lockstep;
+// a zip chain here is less readable than the indexed loop.
+#[allow(clippy::needless_range_loop)]
 pub fn pd_standing_baseline(state: &HumanoidState, gains: &HumanoidPdGains) -> HumanoidCommand {
     let n = state.num_actuators();
     let mut torques = vec![0.0f32; n];

@@ -141,7 +141,7 @@ impl HumanoidMorphology {
         let lim = self.joint_limits();
         let actuators_count = self.num_actuators();
 
-        out.push_str("\n");
+        out.push('\n');
         out.push_str("<mujoco model=\"flagship_humanoid\">\n");
         out.push_str(
             "  <compiler angle=\"radian\" inertiafromgeom=\"true\" coordinate=\"local\"/>\n",
@@ -373,11 +373,11 @@ impl HumanoidMorphology {
         out.push_str("  </sensor>\n");
 
         out.push_str("  <actuator>\n");
-        for i in 0..actuators_count {
+        for (i, l) in lim.iter().enumerate().take(actuators_count) {
             let gain = if i < 21 { "kp=\"650\"" } else { "kp=\"150\"" };
             out.push_str(&format!(
                 "    <position name=\"actuator_{}\" joint=\"j_{}\" {} ctrlrange=\"{} {}\"/>\n",
-                i, i, gain, lim[i][0], lim[i][1]
+                i, i, gain, l[0], l[1]
             ));
         }
         out.push_str("  </actuator>\n");

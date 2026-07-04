@@ -45,19 +45,42 @@ impl PredictionLevel {
     ///
     /// Returns the prediction error (surprise).
     fn update(&mut self, observation: &ContinuousHV) -> f64 {
-        // Compute prediction error
-        self.prediction_error = 1.0 - self.prediction.similarity(observation).max(0.0) as f64;
+        // Compute prediction error (ensure zero-norm and NaN-safe)
+        let sim = self.prediction.similarity(observation);
+        let validated_sim = if sim.is_finite() {
+            sim.clamp(-1.0, 1.0)
+        } else {
+            0.0 // Default to orthogonal (maximum surprise) if NaN/Inf
+        };
+        self.prediction_error = 1.0 - validated_sim.max(0.0) as f64;
 
         // Update state: blend current state with observation
         let lr = self.learning_rate as f32;
         let refs = [&self.state, observation];
         let weights = [1.0 - lr, lr];
-        self.state = ContinuousHV::weighted_bundle(&refs, &weights);
+        let next_state = ContinuousHV::weighted_bundle(&refs, &weights);
+
+        // Recovery regime: prevent NaN/Inf propagation
+        if next_state.as_slice().iter().all(|&x| x.is_finite()) {
+            self.state = next_state;
+        } else {
+            if observation.as_slice().iter().all(|&x| x.is_finite()) {
+                self.state = observation.clone();
+            } else {
+                self.state = ContinuousHV::zero(self.state.dim());
+            }
+        }
 
         // Update prediction toward observation
         let pred_refs = [&self.prediction, observation];
         let pred_weights = [1.0 - lr * 0.5, lr * 0.5];
-        self.prediction = ContinuousHV::weighted_bundle(&pred_refs, &pred_weights);
+        let next_pred = ContinuousHV::weighted_bundle(&pred_refs, &pred_weights);
+
+        if next_pred.as_slice().iter().all(|&x| x.is_finite()) {
+            self.prediction = next_pred;
+        } else {
+            self.prediction = ContinuousHV::zero(self.prediction.dim());
+        }
 
         self.prediction_error
     }
@@ -96,6 +119,11 @@ impl PredictiveHierarchy {
     ///
     /// Returns the total prediction error across all levels.
     pub fn process(&mut self, observation: &ContinuousHV) -> f64 {
+        // Hardening: validate observation is finite
+        if !observation.as_slice().iter().all(|&x| x.is_finite()) {
+            return 1.0; // Return maximum surprise for non-finite observations
+        }
+
         // Level 0: Direct observation
         let error_0 = self.sensory.update(observation);
 
@@ -109,7 +137,13 @@ impl PredictiveHierarchy {
         let error_3 = self.goals.update(&self.concepts.state);
 
         // Total weighted prediction error (higher levels weighted more)
-        error_0 * 0.1 + error_1 * 0.2 + error_2 * 0.3 + error_3 * 0.4
+        let total_error = error_0 * 0.1 + error_1 * 0.2 + error_2 * 0.3 + error_3 * 0.4;
+
+        if total_error.is_finite() {
+            total_error.clamp(0.0, 1.0)
+        } else {
+            1.0
+        }
     }
 
     /// Get the current understanding at a specific level.
@@ -233,5 +267,54 @@ mod tests {
 
         hierarchy.reset();
         assert!(hierarchy.sensory.state.norm() < 1e-6);
+    }
+
+    #[test]
+    fn test_nan_observation_does_not_propagate() {
+        let dim = 1024;
+        let mut hierarchy = PredictiveHierarchy::new(dim);
+
+        // Create an observation with NaN values
+        let mut invalid_vec = vec![0.5f32; dim];
+        invalid_vec[12] = f32::NAN;
+        let nan_observation = ContinuousHV::from_vec(invalid_vec);
+
+        // Process NaN observation — must not panic, and must return 1.0 (surprise)
+        let error = hierarchy.process(&nan_observation);
+        assert!(
+            (error - 1.0).abs() < 1e-6,
+            "NaN observation must yield maximum surprise error 1.0"
+        );
+
+        // Verify that the sensory state remained clean (didn't get contaminated with NaN)
+        for &val in hierarchy.sensory.state.as_slice() {
+            assert!(
+                val.is_finite(),
+                "Sensory state must remain finite after NaN observation"
+            );
+        }
+    }
+
+    #[test]
+    fn test_nan_state_recovery() {
+        let dim = 1024;
+        let mut hierarchy = PredictiveHierarchy::new(dim);
+
+        // Artificially inject NaN into sensory state
+        let mut invalid_vec = vec![0.5f32; dim];
+        invalid_vec[50] = f32::NAN;
+        hierarchy.sensory.state = ContinuousHV::from_vec(invalid_vec);
+
+        // Now update with a clean observation
+        let clean = ContinuousHV::random(dim, 42);
+        hierarchy.process(&clean);
+
+        // Sensory state must recover and be finite
+        for &val in hierarchy.sensory.state.as_slice() {
+            assert!(
+                val.is_finite(),
+                "Sensory state must recover to finite values"
+            );
+        }
     }
 }
