@@ -365,6 +365,12 @@ pub struct PgxHealthEquityEngine {
     pub cpic_guidelines: Vec<CpicGuideline>,
 }
 
+impl Default for PgxHealthEquityEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PgxHealthEquityEngine {
     /// Construct a new engine pre-loaded with reference data.
     pub fn new() -> Self {

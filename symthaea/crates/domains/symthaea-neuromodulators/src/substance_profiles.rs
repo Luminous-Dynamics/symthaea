@@ -513,7 +513,7 @@ pub fn predict_recovery_timeline(
     severity: f32,
 ) -> RecoveryTimeline {
     let severity = severity.clamp(0.0, 1.0);
-    let chronicity_factor = (duration_of_use as f32 / 100.0).min(3.0).max(0.5);
+    let chronicity_factor = (duration_of_use as f32 / 100.0).clamp(0.5, 3.0);
 
     // Acute withdrawal scales with substance's withdrawal_severity and chronicity.
     let acute_peak = (profile.withdrawal_severity * 5.0 * chronicity_factor) as u32;

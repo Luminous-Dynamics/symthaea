@@ -174,17 +174,17 @@ impl ResearchModulation {
         }
 
         // Direction B: PGx drug response → neuromodulator mapping
-        if self.pgx_active {
-            if let Some(ref resp) = self.last_pharma_response {
-                deltas.delta_serotonin += resp.neuromod_effects.delta_serotonin;
-                deltas.delta_dopamine += resp.neuromod_effects.delta_dopamine;
-                deltas.delta_noradrenaline += resp.neuromod_effects.delta_noradrenaline;
-                deltas.delta_gaba += resp.neuromod_effects.delta_gaba;
-                // Glutamate mapped to acetylcholine pathway (both excitatory,
-                // and ACh is the only non-GABA channel not covered by PNI).
-                deltas.delta_acetylcholine += resp.neuromod_effects.delta_glutamate * 0.3;
-                deltas.source_pgx = true;
-            }
+        if self.pgx_active
+            && let Some(ref resp) = self.last_pharma_response
+        {
+            deltas.delta_serotonin += resp.neuromod_effects.delta_serotonin;
+            deltas.delta_dopamine += resp.neuromod_effects.delta_dopamine;
+            deltas.delta_noradrenaline += resp.neuromod_effects.delta_noradrenaline;
+            deltas.delta_gaba += resp.neuromod_effects.delta_gaba;
+            // Glutamate mapped to acetylcholine pathway (both excitatory,
+            // and ACh is the only non-GABA channel not covered by PNI).
+            deltas.delta_acetylcholine += resp.neuromod_effects.delta_glutamate * 0.3;
+            deltas.source_pgx = true;
         }
 
         deltas
@@ -201,10 +201,10 @@ impl ResearchModulation {
             cost += self.pni.compute_consciousness_cost();
         }
 
-        if self.pgx_active {
-            if let Some(ref resp) = self.last_pharma_response {
-                cost += resp.consciousness_impact.abs() * PGX_CONSCIOUSNESS_COST_COEFF;
-            }
+        if self.pgx_active
+            && let Some(ref resp) = self.last_pharma_response
+        {
+            cost += resp.consciousness_impact.abs() * PGX_CONSCIOUSNESS_COST_COEFF;
         }
 
         cost.min(MAX_COMBINED_CONSCIOUSNESS_COST)
