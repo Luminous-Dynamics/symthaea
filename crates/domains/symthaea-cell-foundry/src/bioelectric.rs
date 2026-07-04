@@ -148,6 +148,13 @@ const REGENERATION_TIMEOUT_DAYS: u32 = 200;
 /// pattern destruction (`Perturbation::ScrambleVmem`, which leaves no
 /// surviving neighbour to copy from) possible at all.
 const POSITIONAL_HOMING_RATE: f32 = 0.05;
+/// Per-day division probability for "defected" progenitor cells — much
+/// higher than the baseline [`PROLIFERATION_RATE`] and, unlike
+/// regeneration's boosted rate, applies unconditionally every day (not
+/// gated by wound/regeneration bookkeeping). Models unregulated growth
+/// after a cell loses bioelectric coordination with its neighbours — see
+/// `NeuralOrganoid::induce_local_defection`.
+const DEFECTION_PROLIFERATION_RATE: f64 = 0.35;
 
 fn default_bio_rng() -> StdRng {
     StdRng::seed_from_u64(0)
@@ -184,6 +191,20 @@ pub struct BioelectricState {
     /// Cells currently adjacent to an unhealed amputation wound. Cleared
     /// once regeneration converges (see [`NeuralOrganoid::advance_regeneration`]).
     pub wound_boundary: Vec<bool>,
+    /// Cells that have "defected" from the collective — gap-junction
+    /// isolated and unconditionally hyperproliferative, the model's analog
+    /// of Levin's framing of cancer as a bioelectric breakdown of
+    /// multicellular coordination. See
+    /// [`NeuralOrganoid::induce_local_defection`].
+    pub defected: Vec<bool>,
+    /// Runtime-configurable gap-junction diffusion rate, defaulting to
+    /// [`GAP_JUNCTION_DIFFUSION_RATE`]. Exposed so experiments can sweep it
+    /// (e.g. a homing-rate x diffusion-rate phase diagram) without
+    /// recompiling.
+    pub gap_junction_diffusion_rate: f32,
+    /// Runtime-configurable positional-homing rate, defaulting to
+    /// [`POSITIONAL_HOMING_RATE`]. See `gap_junction_diffusion_rate`.
+    pub positional_homing_rate: f32,
     /// Seeded RNG, independent of [`MorphogeneticField`]'s own RNG so that
     /// adding this layer does not perturb the existing chemical/synaptic
     /// model's stochastic sequence (and therefore does not change any
@@ -201,6 +222,9 @@ impl BioelectricState {
             gap_junction_matrix: vec![vec![0.0f64; n]; n],
             gap_junction_permeability: 1.0,
             wound_boundary: vec![false; n],
+            defected: vec![false; n],
+            gap_junction_diffusion_rate: GAP_JUNCTION_DIFFUSION_RATE,
+            positional_homing_rate: POSITIONAL_HOMING_RATE,
             rng: StdRng::seed_from_u64(seed.wrapping_add(0xB10E_1EC7)),
         }
     }
@@ -214,6 +238,7 @@ impl BioelectricState {
         let old = self.vmem.len();
         self.vmem.resize(total, VMEM_DEPOLARIZED);
         self.wound_boundary.resize(total, false);
+        self.defected.resize(total, false);
         for row in self.gap_junction_matrix.iter_mut() {
             row.resize(total, 0.0);
         }
@@ -242,11 +267,17 @@ impl BioelectricState {
         let added = parent_indices.len();
         let total = old + added;
         let inherited: Vec<f32> = parent_indices.iter().map(|&p| self.vmem[p]).collect();
+        let inherited_defected: Vec<bool> =
+            parent_indices.iter().map(|&p| self.defected[p]).collect();
         self.vmem.resize(total, VMEM_DEPOLARIZED);
         for (k, v) in inherited.into_iter().enumerate() {
             self.vmem[old + k] = v;
         }
         self.wound_boundary.resize(total, false);
+        self.defected.resize(total, false);
+        for (k, d) in inherited_defected.into_iter().enumerate() {
+            self.defected[old + k] = d;
+        }
         for row in self.gap_junction_matrix.iter_mut() {
             row.resize(total, 0.0);
         }
@@ -262,10 +293,12 @@ impl BioelectricState {
         let n = keep.len();
         let mut new_vmem = Vec::with_capacity(next);
         let mut new_wound = Vec::with_capacity(next);
+        let mut new_defected = Vec::with_capacity(next);
         for i in 0..n {
             if keep[i] {
                 new_vmem.push(self.vmem[i]);
                 new_wound.push(self.wound_boundary[i]);
+                new_defected.push(self.defected[i]);
             }
         }
         let mut new_gj = vec![vec![0.0f64; next]; next];
@@ -282,6 +315,7 @@ impl BioelectricState {
         }
         self.vmem = new_vmem;
         self.wound_boundary = new_wound;
+        self.defected = new_defected;
         self.gap_junction_matrix = new_gj;
     }
 
@@ -334,22 +368,28 @@ impl MorphogeneticField {
     pub fn step_vmem_diffusion(&mut self, dt: f32) {
         let n = self.cells.len();
         let permeability = self.bioelectric.gap_junction_permeability;
+        let diffusion_rate = self.bioelectric.gap_junction_diffusion_rate;
         let mut new_vmem = self.bioelectric.vmem.clone();
         for i in 0..n {
+            // Defected cells are gap-junction isolated in both directions —
+            // see `NeuralOrganoid::induce_local_defection`.
+            let is_defected = self.bioelectric.defected[i];
             let row = &self.bioelectric.gap_junction_matrix[i];
             let mut weighted_sum = 0.0f64;
             let mut weight_total = 0.0f64;
-            for (j, &w) in row.iter().enumerate() {
-                if w > 0.0 {
-                    weighted_sum += w * self.bioelectric.vmem[j] as f64;
-                    weight_total += w;
+            if !is_defected {
+                for (j, &w) in row.iter().enumerate() {
+                    if w > 0.0 && !self.bioelectric.defected[j] {
+                        weighted_sum += w * self.bioelectric.vmem[j] as f64;
+                        weight_total += w;
+                    }
                 }
             }
 
             let mut v = self.bioelectric.vmem[i];
             if weight_total > 0.0 {
                 let avg = (weighted_sum / weight_total) as f32;
-                v += dt * GAP_JUNCTION_DIFFUSION_RATE * permeability * (avg - v);
+                v += dt * diffusion_rate * permeability * (avg - v);
             }
 
             let target =
@@ -400,18 +440,26 @@ impl MorphogeneticField {
     /// transient depolarizing "wound spike" to their Vmem. Returns the
     /// number of cells removed.
     pub fn amputate(&mut self, min_r: f32, max_r: f32) -> usize {
+        self.amputate_where(|p| {
+            let r = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+            r >= min_r && r < max_r
+        })
+    }
+
+    /// Remove every cell for which `remove(position)` is true, simulating
+    /// cutting away an arbitrarily-shaped region (radial shells via
+    /// [`Self::amputate`], but also axis-aligned slabs, hemispheres, or any
+    /// other spatial criterion an experiment needs). Reindexes every
+    /// per-cell array and the connectivity/gap-junction matrices, marks
+    /// surviving cells adjacent to the cut as `wound_boundary`, and applies
+    /// a transient depolarizing "wound spike." Returns the number removed.
+    pub fn amputate_where(&mut self, remove: impl Fn(&[f32; 3]) -> bool) -> usize {
         let n = self.cells.len();
         if n == 0 {
             return 0;
         }
-        let radius_of = |p: &[f32; 3]| (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
 
-        let keep: Vec<bool> = (0..n)
-            .map(|i| {
-                let r = radius_of(&self.cells[i].position);
-                !(r >= min_r && r < max_r)
-            })
-            .collect();
+        let keep: Vec<bool> = (0..n).map(|i| !remove(&self.cells[i].position)).collect();
         let removed = keep.iter().filter(|k| !**k).count();
         if removed == 0 {
             return 0;
@@ -542,6 +590,83 @@ impl MorphogeneticField {
             self.bioelectric.wound_boundary[idx] = true;
             self.bioelectric.vmem[idx] = VMEM_WOUND_SPIKE;
         }
+    }
+
+    /// Mark every cell for which `select(position)` is true as "defected" —
+    /// gap-junction isolated (see `step_vmem_diffusion`) and unconditionally
+    /// hyperproliferative (see `defective_proliferate`) — and depolarize
+    /// them, modeling the dedifferentiated state associated with loss of
+    /// bioelectric coordination with the collective. Called from
+    /// [`NeuralOrganoid::induce_local_defection`].
+    pub fn induce_local_defection(&mut self, select: impl Fn(&[f32; 3]) -> bool) -> usize {
+        let mut count = 0;
+        for i in 0..self.cells.len() {
+            if select(&self.cells[i].position) {
+                self.bioelectric.defected[i] = true;
+                self.bioelectric.vmem[i] = VMEM_DEPOLARIZED;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Number of currently-defected cells.
+    pub fn defected_cell_count(&self) -> usize {
+        self.bioelectric.defected.iter().filter(|&&d| d).count()
+    }
+
+    /// Unconditional proliferation pass for defected progenitor cells, at
+    /// [`DEFECTION_PROLIFERATION_RATE`] — unlike `regenerative_proliferate`,
+    /// this runs every day regardless of wound/regeneration state, modeling
+    /// unregulated growth. Called from `advance_day`.
+    pub(crate) fn defective_proliferate(&mut self) {
+        let n = self.cells.len();
+        if n >= MAX_CELLS {
+            return;
+        }
+        let mut new_cells = Vec::new();
+        let mut parent_indices = Vec::new();
+        for i in 0..n {
+            if !self.bioelectric.defected[i] || !self.cells[i].cell_type.is_progenitor() {
+                continue;
+            }
+            if self
+                .bioelectric
+                .rng
+                .gen_bool(DEFECTION_PROLIFERATION_RATE.min(1.0))
+            {
+                let mut daughter = self.cells[i].clone();
+                for d in 0..3 {
+                    daughter.position[d] += self.bioelectric.rng.gen_range(-0.02..0.02f32);
+                }
+                daughter.age_days = 0;
+                daughter.connectivity.clear();
+                new_cells.push(daughter);
+                parent_indices.push(i);
+                if n + new_cells.len() >= MAX_CELLS {
+                    break;
+                }
+            }
+        }
+        let added = new_cells.len();
+        if added == 0 {
+            return;
+        }
+        self.cells.extend(new_cells);
+        let total = self.cells.len();
+        self.activator.resize(total, 1.0);
+        self.inhibitor.resize(total, 1.0);
+        self.consciousness_potential.resize(total, 0.0);
+        self.local_phi.resize(total, 0.0);
+        for row in self.connectivity_matrix.iter_mut() {
+            row.resize(total, 0.0);
+        }
+        for _ in 0..added {
+            self.connectivity_matrix.push(vec![0.0; total]);
+        }
+        // Daughters inherit Vmem AND defected status from their parent —
+        // a defected clone stays defected.
+        self.bioelectric.resize_inheriting(&parent_indices);
     }
 
     /// Randomize every cell's Vmem within `[VMEM_HYPERPOLARIZED,
@@ -737,6 +862,31 @@ impl NeuralOrganoid {
         removed
     }
 
+    /// Cut away any spatial region — see [`MorphogeneticField::amputate_where`].
+    pub fn amputate_where(&mut self, remove: impl Fn(&[f32; 3]) -> bool) -> usize {
+        let removed = self.field.amputate_where(remove);
+        if removed > 0 {
+            self.days_since_wound = 0;
+        }
+        removed
+    }
+
+    /// Induce local bioelectric "defection" (Levin's framing of cancer as a
+    /// breakdown of multicellular coordination) in every cell for which
+    /// `select(position)` is true — see
+    /// [`MorphogeneticField::induce_local_defection`]. Unlike `amputate`,
+    /// this doesn't remove tissue or touch the regeneration clock; it marks
+    /// cells as gap-junction-isolated and unconditionally hyperproliferative
+    /// starting immediately. Returns the number of cells marked.
+    pub fn induce_local_defection(&mut self, select: impl Fn(&[f32; 3]) -> bool) -> usize {
+        self.field.induce_local_defection(select)
+    }
+
+    /// Number of currently-defected cells.
+    pub fn defected_cell_count(&self) -> usize {
+        self.field.defected_cell_count()
+    }
+
     /// Scramble the organoid's Vmem pattern without removing any cells —
     /// see [`MorphogeneticField::scramble_vmem`]. Resets the regeneration
     /// clock so `advance_regeneration` treats this as fresh damage to
@@ -807,12 +957,32 @@ impl NeuralOrganoid {
         if !self.positional_homing_enabled || self.target_morphology.is_none() {
             return;
         }
+        let rate = self.field.bioelectric.positional_homing_rate;
         for i in 0..self.field.num_cells() {
+            // Defected cells have opted out of the collective's instructions
+            // entirely — neither neighbour propagation nor positional
+            // homing reaches them. See `induce_local_defection`.
+            if self.field.bioelectric.defected[i] {
+                continue;
+            }
             let pos = self.field.cells[i].position;
             let goal = self.target_morphology.as_ref().unwrap().value_at(&pos);
             let v = self.field.bioelectric.vmem[i];
-            self.field.bioelectric.vmem[i] = v + POSITIONAL_HOMING_RATE * (goal - v);
+            self.field.bioelectric.vmem[i] = v + rate * (goal - v);
         }
+    }
+
+    /// Set the gap-junction diffusion rate (default
+    /// [`GAP_JUNCTION_DIFFUSION_RATE`]). Exposed for sweep experiments (e.g.
+    /// a homing-rate x diffusion-rate phase diagram).
+    pub fn set_gap_junction_diffusion_rate(&mut self, rate: f32) {
+        self.field.bioelectric.gap_junction_diffusion_rate = rate;
+    }
+
+    /// Set the positional-homing rate (default [`POSITIONAL_HOMING_RATE`]).
+    /// See `set_gap_junction_diffusion_rate`.
+    pub fn set_positional_homing_rate(&mut self, rate: f32) {
+        self.field.bioelectric.positional_homing_rate = rate;
     }
 
     /// Advance the regeneration homeostat by one day: while regenerating and
@@ -1319,5 +1489,98 @@ mod tests {
         // No capture_target_morphology() call — nothing to home toward.
         organoid.apply_positional_homing();
         assert_eq!(organoid.field.bioelectric.vmem[0], VMEM_HYPERPOLARIZED);
+    }
+
+    #[test]
+    fn induce_local_defection_marks_and_depolarizes_selected_cells() {
+        let mut organoid = NeuralOrganoid::new(50, 10);
+        organoid.field.bioelectric.vmem.fill(VMEM_HYPERPOLARIZED);
+        let marked = organoid.induce_local_defection(|p| p[0] >= 0.0);
+        assert!(marked > 0);
+        assert_eq!(organoid.defected_cell_count(), marked);
+        for i in 0..organoid.field.num_cells() {
+            if organoid.field.cells[i].position[0] >= 0.0 {
+                assert!(organoid.field.bioelectric.defected[i]);
+                assert_eq!(organoid.field.bioelectric.vmem[i], VMEM_DEPOLARIZED);
+            } else {
+                assert!(!organoid.field.bioelectric.defected[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn defective_proliferate_grows_defected_population_unconditionally() {
+        let mut organoid = NeuralOrganoid::new(30, 11);
+        organoid.induce_local_defection(|_| true); // whole organoid defects
+        let before = organoid.defected_cell_count();
+        for _ in 0..10 {
+            organoid.field.defective_proliferate();
+        }
+        assert!(
+            organoid.defected_cell_count() > before,
+            "Defected population should grow via unconditional hyperproliferation"
+        );
+    }
+
+    #[test]
+    fn defected_cells_are_gap_junction_isolated() {
+        // Both cells are Progenitors, so the unconditional fate-drift term
+        // pulls them toward the same depolarized target regardless of
+        // defection — that alone causes some convergence. So, as with the
+        // gap-junction-blocker test above, isolate the *incremental*
+        // contribution of gap-junction coupling by comparing a defected vs.
+        // non-defected neighbour under otherwise identical dynamics.
+        let final_diff = |defect_neighbour: bool| {
+            let mut field = MorphogeneticField::new(2, 12);
+            field.cells[0].position = [0.0, 0.0, 0.0];
+            field.cells[1].position = [0.05, 0.0, 0.0];
+            field.bioelectric.vmem[0] = VMEM_HYPERPOLARIZED;
+            if defect_neighbour {
+                field.induce_local_defection(|p| p[0] > 0.02); // marks + depolarizes cell 1
+            }
+            field.form_gap_junctions();
+            for _ in 0..30 {
+                field.step_vmem_diffusion(0.2);
+            }
+            (field.bioelectric.vmem[0] - field.bioelectric.vmem[1]).abs()
+        };
+
+        let diff_coupled = final_diff(false);
+        let diff_defected = final_diff(true);
+        assert!(
+            diff_coupled < diff_defected,
+            "A coupled neighbour should equalize Vmem more than a defected \
+             (isolated) one: coupled={diff_coupled}, defected={diff_defected}"
+        );
+    }
+
+    #[test]
+    fn configurable_rates_affect_dynamics() {
+        let mut fast = MorphogeneticField::new(2, 13);
+        fast.cells[0].position = [0.0, 0.0, 0.0];
+        fast.cells[1].position = [0.05, 0.0, 0.0];
+        fast.bioelectric.vmem[0] = VMEM_DEPOLARIZED;
+        fast.bioelectric.vmem[1] = VMEM_HYPERPOLARIZED;
+        fast.bioelectric.gap_junction_diffusion_rate = 1.0;
+        fast.form_gap_junctions();
+
+        let mut slow = MorphogeneticField::new(2, 13);
+        slow.cells[0].position = [0.0, 0.0, 0.0];
+        slow.cells[1].position = [0.05, 0.0, 0.0];
+        slow.bioelectric.vmem[0] = VMEM_DEPOLARIZED;
+        slow.bioelectric.vmem[1] = VMEM_HYPERPOLARIZED;
+        slow.bioelectric.gap_junction_diffusion_rate = 0.01;
+        slow.form_gap_junctions();
+
+        fast.step_vmem_diffusion(0.2);
+        slow.step_vmem_diffusion(0.2);
+
+        let fast_diff = (fast.bioelectric.vmem[0] - fast.bioelectric.vmem[1]).abs();
+        let slow_diff = (slow.bioelectric.vmem[0] - slow.bioelectric.vmem[1]).abs();
+        assert!(
+            fast_diff < slow_diff,
+            "A higher configured diffusion rate should equalize faster: \
+             fast={fast_diff}, slow={slow_diff}"
+        );
     }
 }

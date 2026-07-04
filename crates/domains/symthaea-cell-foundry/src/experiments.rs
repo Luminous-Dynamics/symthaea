@@ -75,10 +75,21 @@ use crate::morphogenetic_consciousness::NeuralOrganoid;
 pub enum Perturbation {
     /// Cut away all cells with radius in `[min_r, max_r)`.
     Amputate { min_r: f32, max_r: f32 },
+    /// Cut away all cells with x-coordinate in `[min_x, max_x)` — an
+    /// axis-aligned slab, for testing recovery along a directional (e.g.
+    /// anterior-posterior) identity axis rather than a radial one. See
+    /// [`build_linear_axis_template`].
+    AmputateAxis { min_x: f32, max_x: f32 },
     /// Randomize Vmem across all surviving cells without removing tissue —
     /// see module docs for why this is expected to *not* recover under this
     /// model (no surviving template).
     ScrambleVmem { seed: u64 },
+    /// Induce bioelectric "defection" (Levin's framing of cancer) in every
+    /// cell with radius in `[min_r, max_r)` — see
+    /// [`crate::bioelectric::MorphogeneticField::induce_local_defection`].
+    /// Unlike the other variants this doesn't test *recovery*; pair it with
+    /// `defected_cell_count` trajectories instead of discrepancy.
+    InduceDefection { min_r: f32, max_r: f32 },
 }
 
 impl Perturbation {
@@ -87,7 +98,13 @@ impl Perturbation {
             Perturbation::Amputate { min_r, max_r } => {
                 format!("amputate[{min_r:.2},{max_r:.2})")
             }
+            Perturbation::AmputateAxis { min_x, max_x } => {
+                format!("amputate_axis[{min_x:.2},{max_x:.2})")
+            }
             Perturbation::ScrambleVmem { seed } => format!("scramble_vmem(seed={seed})"),
+            Perturbation::InduceDefection { min_r, max_r } => {
+                format!("defect[{min_r:.2},{max_r:.2})")
+            }
         }
     }
 
@@ -96,8 +113,17 @@ impl Perturbation {
             Perturbation::Amputate { min_r, max_r } => {
                 organoid.amputate(min_r, max_r);
             }
+            Perturbation::AmputateAxis { min_x, max_x } => {
+                organoid.amputate_where(|p| p[0] >= min_x && p[0] < max_x);
+            }
             Perturbation::ScrambleVmem { seed } => {
                 organoid.scramble_vmem(seed);
+            }
+            Perturbation::InduceDefection { min_r, max_r } => {
+                organoid.induce_local_defection(|p| {
+                    let r = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+                    r >= min_r && r < max_r
+                });
             }
         }
     }
@@ -216,6 +242,99 @@ pub fn build_radial_bipolar_template(
     });
     organoid.capture_target_morphology();
     organoid
+}
+
+/// "Head" identity Vmem for [`build_linear_axis_template`] — deliberately
+/// close to [`VMEM_DEPOLARIZED`] (the universal progenitor fate-drift
+/// target), so that in the absence of any patterning signal (gap junctions
+/// blocked, no surviving posterior template) tissue defaults toward
+/// head-like identity — the model's analog of Levin lab findings that
+/// un-patterned/un-signaled regenerate tends toward head, not tail.
+pub const AXIS_HEAD_VMEM: f32 = -0.2;
+/// "Tail" identity Vmem for [`build_linear_axis_template`] — strongly
+/// hyperpolarized, clearly distinct from both head identity and the
+/// universal depolarized default.
+pub const AXIS_TAIL_VMEM: f32 = VMEM_HYPERPOLARIZED;
+
+/// Build an organism with a linear anterior(x<0, head)-posterior(x>=0,
+/// tail) Vmem identity axis instead of a radial one — for testing whether
+/// amputating and regrowing the posterior end recovers correct (tail-like)
+/// polarity only when gap junctions are open, versus defaulting toward
+/// head-like identity when blocked (this model's analog of the classic
+/// finding that gap-junction blockade during planarian regeneration can
+/// produce double-headed animals: cut tissue with no bioelectric patterning
+/// signal defaults toward head fate).
+pub fn build_linear_axis_template(seed: u64, cells: usize, maturation_days: u32) -> NeuralOrganoid {
+    let mut organoid = NeuralOrganoid::new(cells, seed);
+    for _ in 0..maturation_days {
+        organoid.advance_day();
+    }
+    organoid.impose_vmem_pattern(|p| {
+        if p[0] < 0.0 {
+            AXIS_HEAD_VMEM
+        } else {
+            AXIS_TAIL_VMEM
+        }
+    });
+    organoid.capture_target_morphology();
+    organoid
+}
+
+/// Mean Vmem of surviving cells with x-coordinate in `[min_x, max_x)` —
+/// used to check what identity a specific region (e.g. a regenerated
+/// posterior cut face) actually settled into.
+pub fn mean_vmem_in_x_band(organoid: &NeuralOrganoid, min_x: f32, max_x: f32) -> Option<f32> {
+    let mut sum = 0.0f64;
+    let mut count = 0usize;
+    for i in 0..organoid.field.num_cells() {
+        let x = organoid.field.cells[i].position[0];
+        if x >= min_x && x < max_x {
+            sum += organoid.field.bioelectric.vmem[i] as f64;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        None
+    } else {
+        Some((sum / count as f64) as f32)
+    }
+}
+
+/// Run a single perturbation across a range of gap-junction permeability
+/// values (rather than just fully open/blocked), recording the final
+/// discrepancy at each — a dose-response curve, analogous to varying a
+/// pharmacological gap-junction blocker's concentration.
+pub fn run_dose_response_experiment(
+    template: &NeuralOrganoid,
+    perturbation: &Perturbation,
+    recovery_days: u32,
+    homing: bool,
+    permeabilities: &[f32],
+) -> Vec<ConditionResult> {
+    permeabilities
+        .iter()
+        .map(|&permeability| {
+            let mut organoid = template.clone();
+            organoid.set_gap_junction_permeability(permeability);
+            organoid.set_positional_homing(homing);
+            perturbation.apply(&mut organoid);
+
+            let mut trajectory = Vec::with_capacity(recovery_days as usize);
+            for day in 1..=recovery_days {
+                organoid.advance_day();
+                let d = organoid.morphology_discrepancy().unwrap_or(0.0);
+                trajectory.push((day, d));
+            }
+            let final_discrepancy = trajectory.last().map(|&(_, d)| d).unwrap_or(0.0);
+
+            ConditionResult {
+                perturbation_label: perturbation.label(),
+                gap_junction_permeability: permeability,
+                discrepancy_trajectory: trajectory,
+                final_discrepancy,
+            }
+        })
+        .collect()
 }
 
 /// Run the equifinality experiment: for each perturbation in
@@ -379,5 +498,62 @@ mod tests {
             "Positional homing should recover the target from total scramble even with \
              gap junctions blocked: no_homing={blocked_no_homing}, with_homing={blocked_with_homing}"
         );
+    }
+
+    #[test]
+    fn axis_amputation_recovers_better_when_open() {
+        // Same equifinality claim as the radial tests, on a linear
+        // anterior-posterior identity axis instead: cut off the tail,
+        // recover under open vs. blocked gap junctions.
+        let template = build_linear_axis_template(31, 200, 20);
+        let perturbations = [Perturbation::AmputateAxis {
+            min_x: 0.4,
+            max_x: 2.0,
+        }];
+        let result = run_equifinality_experiment(&template, &perturbations, 40, false);
+        let (open_mean, blocked_mean) = result.mean_final_by_permeability();
+        assert!(
+            open_mean < blocked_mean,
+            "open (discrepancy={open_mean}) should recover axis identity better than \
+             blocked (discrepancy={blocked_mean})"
+        );
+    }
+
+    #[test]
+    fn blocked_axis_regeneration_defaults_toward_head_identity() {
+        // The double-headed-worm-style claim: without gap-junction-carried
+        // patterning info, the region near a posterior cut face should
+        // trend toward head-like identity (close to AXIS_HEAD_VMEM) rather
+        // than correctly re-establishing tail identity (AXIS_TAIL_VMEM),
+        // while open gap junctions correctly read the surviving tail
+        // template and pull that region back toward tail identity.
+        let template = build_linear_axis_template(31, 200, 20);
+        let cut_x = 0.4;
+
+        let mut open = template.clone();
+        open.set_gap_junction_permeability(1.0);
+        open.amputate_where(|p| p[0] >= cut_x && p[0] < 2.0);
+
+        let mut blocked = template.clone();
+        blocked.set_gap_junction_permeability(0.0);
+        blocked.amputate_where(|p| p[0] >= cut_x && p[0] < 2.0);
+
+        for _ in 0..40 {
+            open.advance_day();
+            blocked.advance_day();
+        }
+
+        let band = (cut_x - 0.2, cut_x);
+        let open_band = mean_vmem_in_x_band(&open, band.0, band.1);
+        let blocked_band = mean_vmem_in_x_band(&blocked, band.0, band.1);
+
+        if let (Some(open_v), Some(blocked_v)) = (open_band, blocked_band) {
+            assert!(
+                open_v < blocked_v,
+                "Open gap junctions should leave the cut-face region more hyperpolarized \
+                 (tail-like, correct) than blocked (which should skew toward the depolarized \
+                 head-like default): open={open_v}, blocked={blocked_v}"
+            );
+        }
     }
 }

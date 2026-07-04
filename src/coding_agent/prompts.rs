@@ -18,11 +18,31 @@ impl CodingAgent {
             let detector = CodeTaskDetector::new();
             let task_type = detector.detect_task_type(&self.task);
             let guidance = match task_type {
+                // CREATE guidance is language-specific (unlike Debug/Refactor below,
+                // which don't mention any language's syntax) — was previously
+                // hardcoded to Rust conventions (`use` statements, `<T>` generics,
+                // `pub` items) and injected unconditionally, contradicting
+                // `codegen_system_prompt()`'s language-aware instructions for
+                // non-Rust targets.
                 crate::cognitive_loop::routing::CodeTaskType::Create => {
-                    "Type: CREATE — Write a complete, compilable Rust implementation.\n\
-                     Rules: Output ONLY the code (no fn main wrapper for library items). \
-                     Include all necessary `use` statements. Declare generic type parameters \
-                     explicitly (e.g., `<T>` on struct/fn/impl). Add `pub` to public items.\n"
+                    match self.target_language() {
+                        "python" => {
+                            "Type: CREATE — Write a complete, correct Python implementation.\n\
+                         Rules: Output ONLY the function (matching the exact signature given). \
+                         Include any necessary `import` statements. Match the type hints already \
+                         present in the signature — do not invent new ones.\n"
+                        }
+                        "nix" => {
+                            "Type: CREATE — Write a complete, correct Nix expression.\n\
+                         Rules: Output ONLY the code.\n"
+                        }
+                        _ => {
+                            "Type: CREATE — Write a complete, compilable Rust implementation.\n\
+                         Rules: Output ONLY the code (no fn main wrapper for library items). \
+                         Include all necessary `use` statements. Declare generic type parameters \
+                         explicitly (e.g., `<T>` on struct/fn/impl). Add `pub` to public items.\n"
+                        }
+                    }
                 }
                 crate::cognitive_loop::routing::CodeTaskType::Debug => {
                     "Type: DEBUG — Fix the broken code.\n\

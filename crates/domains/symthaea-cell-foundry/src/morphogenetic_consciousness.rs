@@ -640,6 +640,11 @@ impl NeuralOrganoid {
         //     target morphology (see `amputate` / `capture_target_morphology`).
         self.advance_regeneration();
 
+        // 1.6 Defection: unconditional hyperproliferation for any
+        //     bioelectrically-isolated ("defected") cells, independent of
+        //     regeneration state — see `induce_local_defection`.
+        self.field.defective_proliferate();
+
         // 2. Migrate toward morphogen gradients.
         self.field.migrate();
 

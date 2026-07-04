@@ -102,16 +102,26 @@ in {
 
     systemd.services.broca-curriculum-cycle = {
       description = "Broca curriculum fine-tuning cycle (never promotes; writes PROMOTION_READY.json for human review)";
-      path = with pkgs; [ bash cargo git flock coreutils gnugrep gawk python3 nix ];
       serviceConfig = {
         Type = "oneshot";
         User = cfg.user;
         WorkingDirectory = repoRoot;
         ExecStart = "${repoRoot}/scripts/broca_curriculum_cycle.sh";
+        # PATH includes /run/current-system/sw/bin, not just a curated tool
+        # list: the repo's own .cargo/config.toml sets rustc-wrapper =
+        # "sccache" and relies on the mold linker, both of which live in the
+        # system-wide profile (per CLAUDE.md: "mold and sccache are
+        # pre-configured system-wide (NixOS)"), not in any individually-
+        # listed nix package. Discovered 2026-07-04 the hard way: a curated
+        # `path = [ cargo git flock ... ]` list (missing sccache/mold/cc)
+        # let bash resolve but made `cargo run` fail building the sync bin
+        # (exit 101). /etc/profiles/per-user/<user>/bin covers home-manager
+        # user packages (e.g. git resolves there, not the system profile).
         Environment = [
           "BROCA_TRAIN_BACKEND=${cfg.trainBackend}"
           "BROCA_CURRICULUM_MIN_NEW_OBJECTIVES=${toString cfg.minNewObjectives}"
           "SYMTHAEA_CURRICULUM_PATH=${cfg.curriculumPath}"
+          "PATH=/run/current-system/sw/bin:/etc/profiles/per-user/${cfg.user}/bin:/nix/var/nix/profiles/default/bin"
         ];
         # No Restart= — a failed cycle should surface as a failed unit, not
         # silently retry and potentially mask a real problem (fail-closed,

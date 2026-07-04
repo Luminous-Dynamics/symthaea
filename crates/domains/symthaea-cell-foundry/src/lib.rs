@@ -40,8 +40,9 @@ pub use culture_controller::{CultureAdjustment, CultureController};
 pub use epigenetics::{encode_methylation_pattern, methylation_similarity, validate_imprinting};
 pub use ethics_gate::EthicsGate;
 pub use experiments::{
-    ConditionResult, EquifinalityResult, Perturbation, build_radial_bipolar_template,
-    run_equifinality_experiment,
+    AXIS_HEAD_VMEM, AXIS_TAIL_VMEM, ConditionResult, EquifinalityResult, Perturbation,
+    build_linear_axis_template, build_radial_bipolar_template, mean_vmem_in_x_band,
+    run_dose_response_experiment, run_equifinality_experiment,
 };
 pub use fep_agent::{CultureAction, CultureFepAgent};
 pub use ivg_protocol::IvgProtocol;
