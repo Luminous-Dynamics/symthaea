@@ -24,10 +24,6 @@
 
 #[cfg(feature = "webrtc")]
 mod implementation {
-    use std::collections::HashMap;
-
-    use tokio::sync::mpsc;
-
     use crate::config::NetworkConfig;
     use crate::peer::PeerId;
     use crate::signaling::{SignalData, SignalingClient, SignalingEvent};
@@ -84,9 +80,16 @@ mod implementation {
 
             match tokio::runtime::Handle::try_current() {
                 Ok(handle) => {
-                    let (tx, rx) = std::sync::mpsc::channel();
+                    // KNOWN GAP: this fallback path spawns the connect future but
+                    // never stores the result on `self` (the receiving end `_rx` is
+                    // dropped) and never sends `room` to join once connected — so
+                    // `self.signaling` stays `None` and no room is ever joined via
+                    // this path. Untested/unfixed as part of the webrtc-compiles
+                    // fix; use `connect_async()` directly instead of this sync
+                    // fallback until it's wired up for real.
+                    let (tx, _rx) = std::sync::mpsc::channel();
                     let url = url.clone();
-                    let room = room.clone();
+                    let _room = room.clone();
                     handle.spawn(async move {
                         let result = SignalingClient::connect(&url).await;
                         let _ = tx.send(result);
