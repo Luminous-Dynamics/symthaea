@@ -220,7 +220,7 @@ impl SwarmAggregator {
     /// If two laws conflict (e.g. Performance vs. Safety), this method uses SMT
     /// relaxation to find the absolute maximum performance that exactly satisfies the safety invariant.
     pub fn reconcile_constitutional_conflict(&self, core: &[String]) -> Option<(String, String)> {
-        let z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
+        let _z3 = symthaea_runtime::formal::z3_bridge::Z3Bridge::new();
         tracing::info!(
             "⚖️  Supreme Court: Reconciling conflict between {} laws...",
             core.len()
