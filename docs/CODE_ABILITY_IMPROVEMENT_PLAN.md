@@ -1386,17 +1386,41 @@ problems, `--llm` mode, `cargo test -p symthaea --features code_generation codin
   declaration exists, is unchanged from the earlier fix).
 
 **Verified**: `cargo check` clean, all 52 existing `coding_agent` unit tests
-pass. Partial live re-run confirms the fix is taking effect — per-problem
+pass. Partial live re-run confirmed the fix was taking effect — per-problem
 latency jumped from ~40-80s (native fast-path, no LLM call) to 650-1000s+
-(now genuinely reaching the LLM) — but a full 15-problem pass@1 number was
-**not obtained**: the monorepo hit severe concurrent-session load (avg 46-62)
-immediately after, and repeated benchmark runs were killed by the
-environment before completing. Re-run once load drops:
+(now genuinely reaching the LLM) — but the full 15-problem run initially hit
+severe concurrent-session load (avg 46-62) and was killed twice.
+
+### Confirmed final result (`docs/HUMANEVAL_AGENT_FIXED_RESULTS.json`, load avg ~21-33)
+
 ```
 cargo run --example humaneval_benchmark --features code_generation -- --llm --limit 15
 ```
-and compare against `docs/HUMANEVAL_AGENT_POSTFIX_RESULTS.json` (0/15, pre
-this fix) for the real before/after number.
+
+- **Pass@1: 3/15 (20.0%)**, compiled 13/15 (86.7%) — up from the broken
+  0/15 this whole investigation started from, and now roughly in line with
+  the Direct-mode raw-LLM baseline (22.5%/40, 37.5% effective — see the
+  2026-07-03 entry above).
+- `code_len` is now varied per problem (66–288 chars) instead of the
+  suspiciously uniform ~100-130 range every prior run showed — direct
+  confirmation that real, differentiated LLM generations are happening
+  per-problem rather than a native template short-circuit.
+- Residual issue noticed, not yet investigated: 4 of the 15 results
+  (`HumanEval/1`, `/6`, `/9`, `/10`) show `compiled: true` with `code_len: 0`
+  — an empty solution file trivially "compiles" in Python but obviously
+  fails every test. Worth a follow-up pass to find why the pipeline
+  sometimes writes an empty file despite recording success.
+
+**Summary of this whole investigation** (2026-07-03 → 2026-07-04): three
+real bugs found and fixed in the Agent pipeline's Python code-generation
+path (Rust-syntax leakage from a keyword-matched template bank, a
+prose/declaration collision in function-name extraction, and a fuzzy
+HDC-similarity false-positive that silently bypassed the LLM entirely),
+taking the full pipeline from a 0/15 regression back to parity with the
+raw LLM baseline. The **CodeOrchestrator/MAGI/FEP-fast-fail stack remains
+untested on Python** (see the 2026-07-04 Rust-only-verification finding
+above) — that thesis still needs a Rust-native benchmark before it can be
+fairly judged.
 
 ---
 

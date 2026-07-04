@@ -440,7 +440,7 @@ impl SimulationRegistry {
     pub fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
         let backend = self
             .find_backend(request.solver)
-            .ok_or_else(|| SimulationError::SolverUnavailable(request.solver))?;
+            .ok_or(SimulationError::SolverUnavailable(request.solver))?;
         backend.run(request)
     }
 
@@ -451,7 +451,7 @@ impl SimulationRegistry {
     ) -> Result<Option<std::process::Child>, SimulationError> {
         let backend = self
             .find_backend(request.solver)
-            .ok_or_else(|| SimulationError::SolverUnavailable(request.solver))?;
+            .ok_or(SimulationError::SolverUnavailable(request.solver))?;
         backend.spawn_daemon(request)
     }
 }

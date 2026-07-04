@@ -1,0 +1,164 @@
+{
+  "benchmark": "humaneval",
+  "mode": "Agent",
+  "use_orchestrator": false,
+  "hard_geodesic_rejection": false,
+  "geodesic_rejection_shadow": false,
+  "model": "qwen2.5-coder:7b",
+  "total": 15,
+  "passed": 3,
+  "pass_at_1": 0.2,
+  "compiled": 13,
+  "results": [
+    {
+      "task_id": "HumanEval/0",
+      "entry_point": "has_close_elements",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-0/generated.py\", line 1, in <module>\n    def has_close_elements(numbers: List[float], threshold: float) -> bool:\n                                    ^^^^\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 340280,
+      "code_len": 288
+    },
+    {
+      "task_id": "HumanEval/1",
+      "entry_point": "separate_paren_groups",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-1/generated.py\", line 38, in <module>\n    check(separate_paren_groups)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1320367-1/generated.py\", line 26, in check\n    assert candidate('(()()) ((())) () ((())()())') == [\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        '(()())', '((()))', '()', '((())()())'\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ]\n    ^\nAssertionError\n",
+      "mode": "Agent",
+      "elapsed_ms": 176287,
+      "code_len": 0
+    },
+    {
+      "task_id": "HumanEval/2",
+      "entry_point": "truncate_number",
+      "passed": true,
+      "compiled": true,
+      "error": null,
+      "mode": "Agent",
+      "elapsed_ms": 145701,
+      "code_len": 66
+    },
+    {
+      "task_id": "HumanEval/3",
+      "entry_point": "below_zero",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-3/generated.py\", line 1, in <module>\n    def below_zero(operations: List[int]) -> bool:\n                               ^^^^\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 284567,
+      "code_len": 175
+    },
+    {
+      "task_id": "HumanEval/4",
+      "entry_point": "mean_absolute_deviation",
+      "passed": false,
+      "compiled": false,
+      "error": "Traceback (most recent call last):\n  File \"/nix/store/l9k0anq0z7zz81zcwy035jfwap9ga6rl-python3-3.13.13/lib/python3.13/py_compile.py\", line 144, in compile\n    code = loader.source_to_code(source_bytes, dfile or file,\n                                 _optimize=optimize)\n  File \"<frozen importlib._bootstrap_external>\", line 1087, in source_to_code\n  File \"<frozen importlib._bootstrap>\", line 488, in _call_with_frames_removed\n  File \"/tmp/symthaea-code-exec-1320367-4/generated.py\", line 19\n    mean = sum(numbers) / len(numbers)\n                                      ^\nIndentationError: unindent does not match any outer indentation level\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import py_compile; py_compile.compile('/tmp/symthaea-code-exec-1320367-4/generated.py', doraise=True)\n                       ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/nix/store/l9k0anq0z7zz81zcwy035jfwap9ga6rl-python3-3.13.13/lib/python3.13/py_compile.py\", line 150, in compile\n    raise py_exc\npy_compile.PyCompileError: Sorry: IndentationError: unindent does not match any outer indentation level (generated.py, line 19)\n",
+      "mode": "Agent",
+      "elapsed_ms": 443569,
+      "code_len": 247
+    },
+    {
+      "task_id": "HumanEval/5",
+      "entry_point": "intersperse",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-5/generated.py\", line 1, in <module>\n    def intersperse(numbers: List[int], delimeter: int) -> List[int]:\n                             ^^^^\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 514058,
+      "code_len": 256
+    },
+    {
+      "task_id": "HumanEval/6",
+      "entry_point": "parse_nested_parens",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-6/generated.py\", line 31, in <module>\n    check(parse_nested_parens)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1320367-6/generated.py\", line 26, in check\n    assert candidate('(()()) ((())) () ((())()())') == [2, 3, 1, 3]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "mode": "Agent",
+      "elapsed_ms": 333241,
+      "code_len": 0
+    },
+    {
+      "task_id": "HumanEval/7",
+      "entry_point": "filter_by_substring",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-7/generated.py\", line 1, in <module>\n    def filter_by_substring(strings: List[str], substring: str) -> List[str]:\n                                     ^^^^\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 136647,
+      "code_len": 123
+    },
+    {
+      "task_id": "HumanEval/8",
+      "entry_point": "sum_product",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-8/generated.py\", line 1, in <module>\n    def sum_product(numbers: List[int]) -> Tuple[int, int]:\n                             ^^^^\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 205254,
+      "code_len": 266
+    },
+    {
+      "task_id": "HumanEval/9",
+      "entry_point": "rolling_max",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-9/generated.py\", line 30, in <module>\n    check(rolling_max)\n    ~~~~~^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1320367-9/generated.py\", line 24, in check\n    assert candidate([]) == []\n           ^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "mode": "Agent",
+      "elapsed_ms": 247990,
+      "code_len": 0
+    },
+    {
+      "task_id": "HumanEval/10",
+      "entry_point": "make_palindrome",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-10/generated.py\", line 41, in <module>\n    check(make_palindrome)\n    ~~~~~^^^^^^^^^^^^^^^^^\n  File \"/tmp/symthaea-code-exec-1320367-10/generated.py\", line 34, in check\n    assert candidate('') == ''\n           ^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "mode": "Agent",
+      "elapsed_ms": 237256,
+      "code_len": 0
+    },
+    {
+      "task_id": "HumanEval/11",
+      "entry_point": "string_xor",
+      "passed": true,
+      "compiled": true,
+      "error": null,
+      "mode": "Agent",
+      "elapsed_ms": 179834,
+      "code_len": 223
+    },
+    {
+      "task_id": "HumanEval/12",
+      "entry_point": "longest",
+      "passed": false,
+      "compiled": false,
+      "error": "Traceback (most recent call last):\n  File \"/nix/store/l9k0anq0z7zz81zcwy035jfwap9ga6rl-python3-3.13.13/lib/python3.13/py_compile.py\", line 144, in compile\n    code = loader.source_to_code(source_bytes, dfile or file,\n                                 _optimize=optimize)\n  File \"<frozen importlib._bootstrap_external>\", line 1087, in source_to_code\n  File \"<frozen importlib._bootstrap>\", line 488, in _call_with_frames_removed\n  File \"/tmp/symthaea-code-exec-1320367-12/generated.py\", line 18\n    return None\n    ^^^^^^^^^^^\nSyntaxError: 'return' outside function\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import py_compile; py_compile.compile('/tmp/symthaea-code-exec-1320367-12/generated.py', doraise=True)\n                       ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/nix/store/l9k0anq0z7zz81zcwy035jfwap9ga6rl-python3-3.13.13/lib/python3.13/py_compile.py\", line 150, in compile\n    raise py_exc\npy_compile.PyCompileError:   File \"/tmp/symthaea-code-exec-1320367-12/generated.py\", line 18\n    return None\n    ^^^^^^^^^^^\nSyntaxError: 'return' outside function\n\n",
+      "mode": "Agent",
+      "elapsed_ms": 227409,
+      "code_len": 42
+    },
+    {
+      "task_id": "HumanEval/13",
+      "entry_point": "greatest_common_divisor",
+      "passed": true,
+      "compiled": true,
+      "error": null,
+      "mode": "Agent",
+      "elapsed_ms": 225717,
+      "code_len": 131
+    },
+    {
+      "task_id": "HumanEval/14",
+      "entry_point": "all_prefixes",
+      "passed": false,
+      "compiled": true,
+      "error": "Traceback (most recent call last):\n  File \"/tmp/symthaea-code-exec-1320367-14/generated.py\", line 1, in <module>\n    def all_prefixes(string: str) -> List[str]:\n                                     ^^^^\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+      "mode": "Agent",
+      "elapsed_ms": 115287,
+      "code_len": 161
+    }
+  ]
+}
