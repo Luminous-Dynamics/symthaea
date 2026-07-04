@@ -429,6 +429,9 @@ mod tests {
             openai_base_url: None,
             max_turns: 40,
             allow_exec: None,
+            single_shot_paths: None,
+            verify: false,
+            no_hints: false,
         }
     }
 

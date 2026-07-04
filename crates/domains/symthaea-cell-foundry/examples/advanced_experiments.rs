@@ -190,15 +190,21 @@ fn main() {
     let mut defection_growth = vec![(0u32, cancer.defected_cell_count())];
     // Unregulated growth compounds fast (both the defected population at
     // DEFECTION_PROLIFERATION_RATE=0.35/day and the rest of the tissue at
-    // the baseline 0.10/day) -- cap the window and bail early if the whole
-    // organoid gets too large for the O(n^2) daily cost to stay reasonable
-    // in a demo run. The trend is visible well before this triggers.
-    for day in 1..=14 {
+    // the baseline 0.10/day). This used to be capped at 3,000 cells / 14
+    // days because `neighbours()` was an O(n) brute-force scan called
+    // O(n) times per day -- O(n^2) daily cost that made a demo run
+    // impractically slow past that point. `neighbours()` is now backed
+    // by `crate::spatial_grid` (O(1)-amortized per query), so the same
+    // window now runs a much larger population comfortably; the cap
+    // below is a generous safety net, not a workaround for a performance
+    // wall.
+    let cancer_start = std::time::Instant::now();
+    for day in 1..=30 {
         cancer.advance_day();
         if day % 2 == 0 {
             defection_growth.push((day, cancer.defected_cell_count()));
         }
-        if cancer.field.num_cells() > 3000 {
+        if cancer.field.num_cells() > 8000 {
             println!(
                 "  (stopping early at day {day}: {} total cells)",
                 cancer.field.num_cells()
@@ -206,6 +212,12 @@ fn main() {
             break;
         }
     }
+    println!(
+        "  ({} days, {} final cells, {:.2}s wall-clock)",
+        defection_growth.last().map(|(d, _)| *d).unwrap_or(0),
+        cancer.field.num_cells(),
+        cancer_start.elapsed().as_secs_f64()
+    );
     for (day, count) in &defection_growth {
         println!(
             "  day {day:3}: {count} defected cells (total {})",
