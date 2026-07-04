@@ -590,6 +590,12 @@ pub struct NeuralOrganoid {
     /// regeneration bookkeeping). Irrelevant while `target_morphology` is
     /// `None`.
     pub(crate) days_since_wound: u32,
+    /// Whether positional homing (pulling each cell's Vmem toward the
+    /// target's value at its own position, independent of gap junctions) is
+    /// active. See `NeuralOrganoid::set_positional_homing`. Defaults to
+    /// `false` so existing behavior/tests are unaffected unless explicitly
+    /// opted in.
+    pub(crate) positional_homing_enabled: bool,
 }
 
 impl NeuralOrganoid {
@@ -604,6 +610,7 @@ impl NeuralOrganoid {
             ethics_status: OrganoidEthicsStatus::PreConscious,
             target_morphology: None,
             days_since_wound: 0,
+            positional_homing_enabled: false,
         }
     }
 
@@ -651,6 +658,11 @@ impl NeuralOrganoid {
         for _ in 0..5 {
             self.field.step_vmem_diffusion(0.2);
         }
+
+        // 4.6 Positional homing (opt-in): pull each cell's Vmem toward the
+        //     captured target's value at its own position, independent of
+        //     gap-junction state. See `crate::bioelectric` docs.
+        self.apply_positional_homing();
 
         // 5. Run several sub-steps of reaction-diffusion per day.
         for _ in 0..10 {

@@ -65,7 +65,7 @@ fn main() {
         "Running {} perturbations x 2 permeability conditions x {recovery_days} recovery days...",
         perturbations.len()
     );
-    let result = run_equifinality_experiment(&template, &perturbations, recovery_days);
+    let result = run_equifinality_experiment(&template, &perturbations, recovery_days, false);
     println!();
 
     println!("Perturbation                | Permeability | Final Discrepancy");
@@ -96,9 +96,9 @@ fn main() {
     );
 
     println!();
-    println!("=== Note on the scramble_vmem condition ===");
-    println!("Scrambling destroys the ENTIRE surviving template, so recovery in this");
-    println!("model (which propagates pattern from surviving neighbours, not from an");
+    println!("=== Note on the scramble_vmem condition (no homing) ===");
+    println!("Scrambling destroys the ENTIRE surviving template, so recovery via");
+    println!("neighbour-propagation alone (which reads surviving neighbours' Vmem, not an");
     println!("independent per-cell positional identity) is not expected -- open and");
     println!("blocked should look similar there. See experiments.rs module docs.");
 
@@ -108,5 +108,54 @@ fn main() {
     println!(
         "Full trajectories written to basal_cognition_results.json ({} bytes)",
         json.len()
+    );
+
+    // ---- Positional homing: does a second, non-electrical memory channel
+    // rescue recovery from total scramble? ----
+    println!();
+    println!("======================================================");
+    println!("   Positional Homing: rescuing total-scramble recovery");
+    println!("======================================================");
+    println!("  Same scramble as above, but now comparing WITHOUT vs. WITH");
+    println!("  positional homing (a per-cell pull toward the target's value");
+    println!("  at that cell's own position -- NOT gated by gap junctions).");
+    println!();
+
+    let scramble = [Perturbation::ScrambleVmem { seed: 555 }];
+    let without_homing = run_equifinality_experiment(&template, &scramble, recovery_days, false);
+    let with_homing = run_equifinality_experiment(&template, &scramble, recovery_days, true);
+
+    println!("Condition                        | Final Discrepancy");
+    println!("----------------------------------|-------------------");
+    for (label, result) in [
+        ("no homing, open", &without_homing),
+        ("homing, open", &with_homing),
+    ] {
+        let c = result
+            .conditions
+            .iter()
+            .find(|c| c.gap_junction_permeability > 0.0)
+            .unwrap();
+        println!("{label:34}| {:.4}", c.final_discrepancy);
+    }
+    for (label, result) in [
+        ("no homing, blocked", &without_homing),
+        ("homing, blocked", &with_homing),
+    ] {
+        let c = result
+            .conditions
+            .iter()
+            .find(|c| c.gap_junction_permeability == 0.0)
+            .unwrap();
+        println!("{label:34}| {:.4}", c.final_discrepancy);
+    }
+
+    let json2 = serde_json::to_string_pretty(&(without_homing.clone(), with_homing.clone()))
+        .expect("serialize homing result");
+    std::fs::write("basal_cognition_homing_results.json", &json2).expect("write homing json");
+    println!();
+    println!(
+        "Homing comparison written to basal_cognition_homing_results.json ({} bytes)",
+        json2.len()
     );
 }
