@@ -4,5 +4,6 @@ target = "wasm32-unknown-unknown"
 [target.wasm32-unknown-unknown]
 rustflags = [
     "-C", "opt-level=z",
-    "--cfg", "getrandom_backend=\"wasm_js\"",
+    "--cfg", "getrandom_backend=\"custom\"",
+    "-C", "link-args=--import-undefined",
 ]

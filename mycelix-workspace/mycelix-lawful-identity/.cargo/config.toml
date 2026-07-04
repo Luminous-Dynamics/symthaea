@@ -1,4 +1,4 @@
 # Cargo configuration for mycelix-lawful-identity
 # Handles WASM builds with proper getrandom backend for Holochain
 [target.wasm32-unknown-unknown]
-rustflags = ['--cfg', 'getrandom_backend="custom"']
+rustflags = ['--cfg', 'getrandom_backend="custom"', '-C', 'link-args=--import-undefined']

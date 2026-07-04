@@ -8,7 +8,7 @@
 # HDK 0.6 provides __getrandom_v03_custom.
 
 [target.wasm32-unknown-unknown]
-rustflags = ['--cfg', 'getrandom_backend="custom"']
+rustflags = ['--cfg', 'getrandom_backend="custom"', '-C', 'link-args=--import-undefined']
 
 [build]
 # Set the default target for this workspace
