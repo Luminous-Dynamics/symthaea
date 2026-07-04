@@ -168,3 +168,75 @@ Commit: `a88fafaeab` — `symthaea-nix: Phase 2.9 — world model hardening + en
 >
 > **Not verified:** real sensor data distributions, hardware-specific
 > timing, or concurrent multi-agent operation.
+
+## Phase 2.9-B — Episodic Memory Boundary Tests
+
+### What Was Hardened
+
+The Φ-gating path that controls what the system remembers:
+
+```
+Φ-gate → NixEpisodicMemory::record → consolidate → predict_valence
+```
+
+### Test Inventory (`episodic_memory.rs`)
+
+| Test | Failure Mode Covered |
+|---|---|
+| `test_phi_zero_never_writes` | 50 Φ=0 submissions: gate holds absolutely, memory stays empty |
+| `test_phi_exactly_at_threshold_is_stored` | ≥ threshold stored; < threshold rejected |
+| `test_capacity_eviction_respects_max_episodes` | max=5, 8 submissions → exactly 5 remain with finite importance |
+| `test_predict_valence_all_failures_gives_negative_finite` | All-failure history → finite negative, never NaN or zero |
+| `test_predict_valence_always_in_unit_interval` | 20 mixed-outcome episodes × 7 seeds → always in [-1, 1] |
+| `test_consolidation_idempotent` | consolidate() on non-overflowing memory changes nothing |
+
+### Result
+
+19/19 `mind::episodic_memory` tests pass.
+
+Commit: `a0c4ae1d71` — `symthaea: Phase 2.9-B + hygiene`
+
+### Precise Verification Boundary
+
+> **Verified:** Φ-gate is a strict ≥ comparison — Φ=0 is always rejected.
+> Capacity eviction keeps exactly `max_episodes` after overflow.
+> `predict_valence` is always finite and in [-1, 1] for all tested outcome
+> combinations and query states.
+>
+> **Not verified:** the emotional_valence weights (Success=1.0, Failure=-1.0,
+> PartialSuccess=0.3, RolledBack=-0.5) are calibrated for production use.
+> Not verified: Φ values in production are well-distributed relative to
+> the default threshold of 0.3.
+
+---
+
+## Hygiene Summary (commit `a0c4ae1d71`)
+
+### 1. Broken test fixed — 0 known failures
+
+`sovereign_conversation::tests::test_greeting_acknowledges_hardware`
+was asserting `greeting.message.contains("TPM")` but the greeting said
+`"Security chip: available"`. Fixed by updating the greeting to
+`"TPM 2.0: available (can auto-unlock disk encryption at boot)"`.
+The test intent (acknowledge TPM presence to the user) was always correct.
+
+### 2. Validation script extended
+
+`scripts/validate_ltc_runtime_hardening.sh` now covers all 9 phases:
+
+| Step | What |
+|---|---|
+| 1–4 | Original: HDC-LTC, probe-stream, replay example, Z3 |
+| 5 | Phase 2.7: active_inference (mind::active_inference) |
+| 6 | Phase 2.8: causal graph (mind::causal_graph) |
+| 7 | Phase 2.8: drift detection (mind::hdc_world_model) |
+| 8 | Phase 2.9-A: world model (mind::world_model) |
+| 9 | Phase 2.9-C: end-to-end integration harness |
+
+Run with: `./scripts/validate_ltc_runtime_hardening.sh`
+
+### 3. Evidence ledger linked from README
+
+`README.md` now has a **Runtime Verification** section with direct links
+to this ledger and the validation script. A reviewer reading the README
+can now find the evidence in one click.

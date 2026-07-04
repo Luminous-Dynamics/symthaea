@@ -472,4 +472,172 @@ mod tests {
             "predict_valence on zero vector should be finite"
         );
     }
+
+    // ── Phase 2.9-B: Episodic Memory Boundary Tests ─────────────────────────
+    // Covers the Φ-gating path, capacity eviction, and predict_valence
+    // invariants that the existing tests don't exercise adversarially.
+
+    /// Φ = 0 must NEVER write to memory, regardless of how many episodes
+    /// are submitted. The gate must hold absolutely.
+    #[test]
+    fn test_phi_zero_never_writes() {
+        let mut mem = NixEpisodicMemory::with_phi_threshold(0.3);
+
+        for i in 0u64..50 {
+            let ep = make_episode(i, EpisodeOutcome::Success, 0.0);
+            let stored = mem.record(ep);
+            assert!(!stored, "Φ=0 must never be stored (step {i})");
+        }
+
+        assert_eq!(
+            mem.len(),
+            0,
+            "memory must be empty after 50 Φ=0 submissions"
+        );
+    }
+
+    /// Episode exactly at the Φ threshold must be stored (>= not >).
+    #[test]
+    fn test_phi_exactly_at_threshold_is_stored() {
+        let mut mem = NixEpisodicMemory::with_phi_threshold(0.5);
+
+        // Exactly at threshold
+        let ep = make_episode(1, EpisodeOutcome::Success, 0.5);
+        assert!(
+            mem.record(ep),
+            "episode at exactly the threshold must be stored"
+        );
+        assert_eq!(mem.len(), 1);
+
+        // Just below threshold
+        let ep2 = make_episode(2, EpisodeOutcome::Success, 0.4999);
+        assert!(
+            !mem.record(ep2),
+            "episode just below threshold must not be stored"
+        );
+        assert_eq!(mem.len(), 1);
+    }
+
+    /// When memory is at capacity, adding a lower-importance episode must
+    /// trigger eviction and the resulting set must still respect max_episodes.
+    #[test]
+    fn test_capacity_eviction_respects_max_episodes() {
+        let max = 5usize;
+        let mut mem = NixEpisodicMemory {
+            episodes: Vec::new(),
+            phi_threshold: 0.1,
+            max_episodes: max,
+        };
+
+        // Fill to capacity + 3 extras (each with increasing prediction_error)
+        for i in 0u64..(max as u64 + 3) {
+            let mut ep = make_episode(i, EpisodeOutcome::Success, 0.5);
+            ep.prediction_error = (i + 1) as f64 * 0.1;
+            mem.record(ep);
+        }
+
+        assert_eq!(
+            mem.len(),
+            max,
+            "memory must not exceed max_episodes after overflow"
+        );
+
+        // All remaining episodes must have finite, non-negative importance
+        for ep in &mem.episodes {
+            let importance = ep.prediction_error * ep.phi_at_encoding;
+            assert!(
+                importance.is_finite() && importance >= 0.0,
+                "evicted episode importance must be finite and non-negative: {importance}"
+            );
+        }
+    }
+
+    /// predict_valence on an all-failure history must return a finite
+    /// negative value — not NaN, not +inf, not zero.
+    #[test]
+    fn test_predict_valence_all_failures_gives_negative_finite() {
+        let mut mem = NixEpisodicMemory::new();
+        let query_state = make_hv(1);
+
+        // Record 10 failures near the query state
+        for i in 0u64..10 {
+            let mut ep = make_episode(1 + i, EpisodeOutcome::Failure("build error".into()), 0.5);
+            // Use state_before = query to guarantee similarity ≈ 1
+            ep.state_before = query_state.clone();
+            mem.record(ep);
+        }
+
+        let val = mem.predict_valence(&query_state);
+        assert!(val.is_finite(), "all-failure valence must be finite: {val}");
+        assert!(val < 0.0, "all-failure valence must be negative: {val}");
+        assert!(val >= -1.0, "valence must not go below -1.0: {val}");
+    }
+
+    /// predict_valence must always be in [-1, 1] regardless of outcome mix,
+    /// because emotional_valence is bounded at encoding time.
+    #[test]
+    fn test_predict_valence_always_in_unit_interval() {
+        let mut mem = NixEpisodicMemory::new();
+
+        // Mix all four outcome types
+        for i in 0u64..20 {
+            let outcome = match i % 4 {
+                0 => EpisodeOutcome::Success,
+                1 => EpisodeOutcome::Failure("err".into()),
+                2 => EpisodeOutcome::PartialSuccess("partial".into()),
+                _ => EpisodeOutcome::RolledBack("reverted".into()),
+            };
+            mem.record(make_episode(i, outcome, 0.5));
+        }
+
+        // Query with many diverse states
+        for seed in [1u64, 5, 10, 15, 20, 99, 999] {
+            let val = mem.predict_valence(&make_hv(seed));
+            assert!(
+                val.is_finite(),
+                "predict_valence must be finite for seed {seed}: {val}"
+            );
+            assert!(
+                val >= -1.0 && val <= 1.0,
+                "predict_valence out of [-1,1] for seed {seed}: {val}"
+            );
+        }
+    }
+
+    /// Consolidation must be stable: running it on already-consolidated
+    /// memory must not change the set or corrupt it.
+    #[test]
+    fn test_consolidation_idempotent() {
+        let max = 3usize;
+        let mut mem = NixEpisodicMemory {
+            episodes: Vec::new(),
+            phi_threshold: 0.1,
+            max_episodes: max,
+        };
+
+        // Add exactly max episodes — no eviction needed
+        for i in 0u64..max as u64 {
+            let mut ep = make_episode(i, EpisodeOutcome::Success, 0.5);
+            ep.prediction_error = (i + 1) as f64 * 0.2;
+            mem.record(ep);
+        }
+
+        let len_before = mem.len();
+
+        // Manually call consolidate again — must be idempotent
+        mem.consolidate();
+        assert_eq!(
+            mem.len(),
+            len_before,
+            "consolidation on non-overflowing memory must not remove episodes"
+        );
+
+        // All episodes must still have finite importance
+        for ep in &mem.episodes {
+            assert!(
+                (ep.prediction_error * ep.phi_at_encoding).is_finite(),
+                "importance must be finite after duplicate consolidation"
+            );
+        }
+    }
 }

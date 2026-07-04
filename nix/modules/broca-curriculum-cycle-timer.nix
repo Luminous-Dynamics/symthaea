@@ -67,6 +67,19 @@ in {
       description = "BROCA_CURRICULUM_MIN_NEW_OBJECTIVES passed to the cycle script.";
     };
 
+    curriculumPath = mkOption {
+      type = types.str;
+      default = "/srv/luminous-dynamics/.symthaea/curriculum.json";
+      description = ''
+        SYMTHAEA_CURRICULUM_PATH passed to the cycle script. Without this,
+        broca-curriculum-sync falls back to its own XDG-based default
+        (~/.local/share/symthaea/curriculum.json), which is NOT where
+        CurriculumExtender writes on this host — .symthaea/ at the monorepo
+        root is the real local-state convention (gitignored, alongside
+        consciousness.db and curriculum_failures/). Confirmed 2026-07-04.
+      '';
+    };
+
     user = mkOption {
       type = types.str;
       default = "tstoltz";
@@ -89,7 +102,7 @@ in {
 
     systemd.services.broca-curriculum-cycle = {
       description = "Broca curriculum fine-tuning cycle (never promotes; writes PROMOTION_READY.json for human review)";
-      path = with pkgs; [ cargo git flock coreutils gnugrep gawk python3 nix ];
+      path = with pkgs; [ bash cargo git flock coreutils gnugrep gawk python3 nix ];
       serviceConfig = {
         Type = "oneshot";
         User = cfg.user;
@@ -98,6 +111,7 @@ in {
         Environment = [
           "BROCA_TRAIN_BACKEND=${cfg.trainBackend}"
           "BROCA_CURRICULUM_MIN_NEW_OBJECTIVES=${toString cfg.minNewObjectives}"
+          "SYMTHAEA_CURRICULUM_PATH=${cfg.curriculumPath}"
         ];
         # No Restart= — a failed cycle should surface as a failed unit, not
         # silently retry and potentially mask a real problem (fail-closed,

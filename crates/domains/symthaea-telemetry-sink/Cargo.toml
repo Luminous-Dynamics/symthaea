@@ -20,7 +20,7 @@ tracing.workspace = true
 
 symthaea-projection = { path = "../symthaea-projection" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
-symthaea-phi-oracle = { path = "../../symthaea-phi-oracle" }
+symthaea-phi-oracle = { path = "../symthaea-phi-oracle" }
 symthaea-workspace = { path = "../../core/symthaea-workspace" }
 
 [dev-dependencies]

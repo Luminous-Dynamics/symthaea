@@ -137,6 +137,17 @@ const MORPHOLOGY_CONVERGENCE_TOLERANCE: f64 = 0.05;
 /// Days after which regeneration bookkeeping times out even if the target
 /// was never reached (avoids an unbounded regenerating state).
 const REGENERATION_TIMEOUT_DAYS: u32 = 200;
+/// Per-day rate pulling a cell's Vmem toward the captured target's value at
+/// its own position, when positional homing is enabled (see
+/// `NeuralOrganoid::set_positional_homing`). Deliberately slow and — unlike
+/// gap-junction diffusion — *not* gated by `gap_junction_permeability`: this
+/// models a durable, cell-intrinsic positional/regulatory memory distinct
+/// from the fast electrical coupling channel (Levin's own framing treats
+/// acutely-readable Vmem as downstream of, and coupled to, a deeper and more
+/// robust regulatory memory). It is what makes recovery from *total*
+/// pattern destruction (`Perturbation::ScrambleVmem`, which leaves no
+/// surviving neighbour to copy from) possible at all.
+const POSITIONAL_HOMING_RATE: f32 = 0.05;
 
 fn default_bio_rng() -> StdRng {
     StdRng::seed_from_u64(0)
@@ -690,6 +701,17 @@ impl TargetMorphology {
 
         VMEM_PATTERN_WEIGHT * vmem_rms_normalized + (1.0 - VMEM_PATTERN_WEIGHT) * composition_rms
     }
+
+    /// The target Vmem for whatever spatial bin `position` falls into —
+    /// this organoid's own captured "goal" pattern, read out independent of
+    /// any cell's current dynamic state. See
+    /// [`NeuralOrganoid::set_positional_homing`] for why this matters: it's
+    /// the mechanism that can recover a pattern even after it's been
+    /// destroyed everywhere at once (no surviving neighbour to copy from),
+    /// which gap-junction propagation alone cannot do.
+    pub fn value_at(&self, position: &[f32; 3]) -> f32 {
+        self.bin_mean_vmem[bin_index(position)]
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -760,6 +782,37 @@ impl NeuralOrganoid {
     /// Current global gap-junction permeability.
     pub fn gap_junction_permeability(&self) -> f32 {
         self.field.bioelectric.gap_junction_permeability
+    }
+
+    /// Enable or disable positional homing — pulling each cell's Vmem
+    /// toward the captured target's value at its own position, at
+    /// [`POSITIONAL_HOMING_RATE`], regardless of gap-junction permeability.
+    /// This is the mechanism that can recover a target pattern even after
+    /// it's been destroyed *everywhere at once*
+    /// ([`crate::experiments::Perturbation::ScrambleVmem`]), which
+    /// neighbour-propagation alone cannot do — see module docs. No-op if no
+    /// target morphology has been captured yet.
+    pub fn set_positional_homing(&mut self, enabled: bool) {
+        self.positional_homing_enabled = enabled;
+    }
+
+    /// Whether positional homing is currently enabled.
+    pub fn positional_homing_enabled(&self) -> bool {
+        self.positional_homing_enabled
+    }
+
+    /// Apply one day's positional-homing pull, if enabled and a target has
+    /// been captured. Called automatically from `advance_day`.
+    pub(crate) fn apply_positional_homing(&mut self) {
+        if !self.positional_homing_enabled || self.target_morphology.is_none() {
+            return;
+        }
+        for i in 0..self.field.num_cells() {
+            let pos = self.field.cells[i].position;
+            let goal = self.target_morphology.as_ref().unwrap().value_at(&pos);
+            let v = self.field.bioelectric.vmem[i];
+            self.field.bioelectric.vmem[i] = v + POSITIONAL_HOMING_RATE * (goal - v);
+        }
     }
 
     /// Advance the regeneration homeostat by one day: while regenerating and
@@ -1214,5 +1267,57 @@ mod tests {
             discrepancy > 0.0,
             "Same composition, different Vmem pattern should show nonzero discrepancy"
         );
+    }
+
+    #[test]
+    fn value_at_returns_captured_bin_mean() {
+        let mut field = MorphogeneticField::new(1, 5);
+        field.cells[0].position = [0.9, 0.0, 0.0];
+        field.bioelectric.vmem[0] = VMEM_HYPERPOLARIZED;
+        let target = TargetMorphology::capture(&field);
+        assert_eq!(target.value_at(&[0.9, 0.0, 0.0]), VMEM_HYPERPOLARIZED);
+    }
+
+    #[test]
+    fn positional_homing_disabled_by_default() {
+        let organoid = NeuralOrganoid::new(10, 6);
+        assert!(!organoid.positional_homing_enabled());
+    }
+
+    #[test]
+    fn positional_homing_pulls_toward_target_regardless_of_permeability() {
+        // A single cell, far from any neighbour, blocked gap junctions —
+        // neighbour propagation is entirely unavailable here. Only
+        // positional homing can move it toward the target.
+        let mut organoid = NeuralOrganoid::new(1, 8);
+        organoid.field.cells[0].position = [0.5, 0.5, 0.5];
+        organoid.field.bioelectric.vmem[0] = VMEM_DEPOLARIZED;
+        organoid.capture_target_morphology(); // target = depolarized here
+
+        // Now the target says "depolarized" at this position; scramble the
+        // cell to hyperpolarized and see if homing pulls it back.
+        organoid.field.bioelectric.vmem[0] = VMEM_HYPERPOLARIZED;
+        organoid.set_gap_junction_permeability(0.0);
+        organoid.set_positional_homing(true);
+
+        let before = organoid.field.bioelectric.vmem[0];
+        organoid.apply_positional_homing();
+        let after = organoid.field.bioelectric.vmem[0];
+
+        assert!(
+            after > before,
+            "Positional homing should pull Vmem toward the target (depolarized) \
+             even with gap junctions blocked: before={before}, after={after}"
+        );
+    }
+
+    #[test]
+    fn positional_homing_is_noop_without_target() {
+        let mut organoid = NeuralOrganoid::new(1, 9);
+        organoid.field.bioelectric.vmem[0] = VMEM_HYPERPOLARIZED;
+        organoid.set_positional_homing(true);
+        // No capture_target_morphology() call — nothing to home toward.
+        organoid.apply_positional_homing();
+        assert_eq!(organoid.field.bioelectric.vmem[0], VMEM_HYPERPOLARIZED);
     }
 }

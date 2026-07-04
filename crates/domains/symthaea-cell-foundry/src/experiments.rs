@@ -43,17 +43,25 @@
 //! (`HYPERPOLARIZATION_DRIFT` = 0.05/day) — so new tissue growing at a wound
 //! edge adjacent to *surviving* target-consistent tissue gets pulled toward
 //! the correct pattern by its neighbours, while blocked tissue just drifts
-//! to its generic default. This means recovery in this model depends on
-//! adjacent surviving tissue acting as a template — which is itself
-//! faithful to Levin's actual mechanism (gap junctions let a cell "read" its
-//! neighbours' accumulated state) — but it also means a perturbation that
+//! to its generic default. This means recovery via neighbour-template
+//! propagation alone depends on adjacent surviving tissue — faithful to
+//! Levin's actual mechanism (gap junctions let a cell "read" its neighbours'
+//! accumulated state), but unable to recover from a perturbation that
 //! destroys the *entire* pattern with no surviving template
-//! ([`Perturbation::ScrambleVmem`]) is **not** expected to recover under
-//! this model. That's an honest limitation, not a hidden failure: a full
-//! positional-identity system (each cell independently "knowing" its target
-//! Vmem from a French-flag-style morphogen readout) would be a legitimate
-//! future extension. `run_equifinality_experiment` runs `ScrambleVmem`
-//! anyway so this boundary is visible in results rather than swept away.
+//! ([`Perturbation::ScrambleVmem`]).
+//!
+//! ## Positional homing: recovering from total pattern destruction
+//!
+//! `run_equifinality_experiment`'s `homing` parameter enables
+//! `NeuralOrganoid::set_positional_homing` — a second, independent channel
+//! that pulls each cell's Vmem toward the captured target's value at its
+//! own position, *not gated by gap-junction permeability*. This models a
+//! durable, cell-intrinsic positional/regulatory memory distinct from the
+//! fast electrical coupling channel (Levin's framing treats acutely
+//! readable Vmem as downstream of, and coupled to, a deeper and more robust
+//! regulatory memory). With homing enabled, recovery from total scramble
+//! becomes possible — even with gap junctions fully blocked — because
+//! there's no longer any dependency on a surviving neighbour to copy from.
 //!
 //! References: see `crate::bioelectric` module docs.
 
@@ -214,7 +222,10 @@ pub fn build_radial_bipolar_template(
 /// `perturbations`, clone `template` (which must already have a captured
 /// target morphology — see [`build_radial_bipolar_template`]), run it under
 /// both open and fully-blocked gap-junction permeability for
-/// `recovery_days`, and record discrepancy-from-target each day.
+/// `recovery_days`, and record discrepancy-from-target each day. `homing`
+/// enables positional homing (see module docs) on every run — pass `false`
+/// to test neighbour-propagation alone, `true` to also give cells a
+/// position-based memory of their own target.
 ///
 /// Reusable for other experiment designs: build any template with a
 /// captured target (via `capture_target_morphology`, possibly after
@@ -224,12 +235,14 @@ pub fn run_equifinality_experiment(
     template: &NeuralOrganoid,
     perturbations: &[Perturbation],
     recovery_days: u32,
+    homing: bool,
 ) -> EquifinalityResult {
     let mut conditions = Vec::new();
     for perturbation in perturbations {
         for &permeability in &[1.0f32, 0.0f32] {
             let mut organoid = template.clone();
             organoid.set_gap_junction_permeability(permeability);
+            organoid.set_positional_homing(homing);
             perturbation.apply(&mut organoid);
 
             let mut trajectory = Vec::with_capacity(recovery_days as usize);
@@ -262,7 +275,7 @@ mod tests {
             min_r: 0.8,
             max_r: 2.0,
         }];
-        let result = run_equifinality_experiment(&template, &perturbations, 40);
+        let result = run_equifinality_experiment(&template, &perturbations, 40, false);
 
         let (open_mean, blocked_mean) = result.mean_final_by_permeability();
         assert!(
@@ -292,7 +305,7 @@ mod tests {
                 max_r: 2.0,
             },
         ];
-        let result = run_equifinality_experiment(&template, &perturbations, 40);
+        let result = run_equifinality_experiment(&template, &perturbations, 40, false);
 
         for perturbation in &perturbations {
             let label = perturbation.label();
@@ -334,5 +347,37 @@ mod tests {
         assert_eq!(result.open_run_spread(), 0.0);
         assert_eq!(result.blocked_run_spread(), 0.0);
         assert!(!result.open_beats_blocked());
+    }
+
+    #[test]
+    fn positional_homing_recovers_total_scramble_even_when_blocked() {
+        // The claim neighbour-propagation alone cannot make: with gap
+        // junctions fully blocked and every cell's Vmem randomized (no
+        // surviving template anywhere), positional homing alone should
+        // still recover something closer to the target than no homing does.
+        let template = build_radial_bipolar_template(21, 200, 20, 0.2);
+        let perturbations = [Perturbation::ScrambleVmem { seed: 555 }];
+
+        let without_homing = run_equifinality_experiment(&template, &perturbations, 40, false);
+        let with_homing = run_equifinality_experiment(&template, &perturbations, 40, true);
+
+        let blocked_no_homing = without_homing
+            .conditions
+            .iter()
+            .find(|c| c.gap_junction_permeability == 0.0)
+            .unwrap()
+            .final_discrepancy;
+        let blocked_with_homing = with_homing
+            .conditions
+            .iter()
+            .find(|c| c.gap_junction_permeability == 0.0)
+            .unwrap()
+            .final_discrepancy;
+
+        assert!(
+            blocked_with_homing < blocked_no_homing,
+            "Positional homing should recover the target from total scramble even with \
+             gap junctions blocked: no_homing={blocked_no_homing}, with_homing={blocked_with_homing}"
+        );
     }
 }

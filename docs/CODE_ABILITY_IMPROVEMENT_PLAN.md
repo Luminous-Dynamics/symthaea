@@ -1258,6 +1258,106 @@ whether the "verified, self-improving" orchestrator path actually beats the
 raw dispatcher on held-out problems, rather than just having tests that pass
 in isolation.
 
+## 2026-07-04 Update: Agent-pipeline regression + CodeOrchestrator is Rust-only
+
+Follow-up to the above — added a `--orchestrator` flag to `examples/humaneval_benchmark.rs`
+(sets `CodingAgentConfig.use_orchestrator`/`enable_self_modification`) and ran the
+full `--llm` Agent pipeline (not `--direct`) on the same first-15 HumanEval problems,
+with and without the orchestrator, to get the three-way comparison the architecture
+review called for.
+
+**Finding 1 — the full Agent pipeline currently regresses vs. raw LLM calls.**
+`--llm` (no orchestrator): **0/15 pass@1**, 8/15 compiled
+(`docs/HUMANEVAL_AGENT_BASELINE_RESULTS.json`) — worse than the Direct-LLM
+baseline's 22.5%. Root cause, visible directly in the compile errors: generated
+Python is picking up **Rust idioms** — `/// Return the absolute value.` (a Rust
+triple-slash doc comment) emitted as the first line of a `.py` file, and
+`def is(v: list, n: int) -> list:` (`is` is a Python reserved keyword, produced
+by the same signature-templating path). This is a live regression in the
+legacy `IntelligentDispatcher`/native-template path when the target language is
+Python, distinct from the orchestrator work above.
+
+**Finding 2 — `use_orchestrator=true` was a complete no-op on this benchmark,
+root-caused, not just observed.** `--llm --orchestrator`: also 0/15 pass@1,
+and **every single problem's `code_len` was byte-identical** to the
+non-orchestrator run (`docs/HUMANEVAL_AGENT_ORCHESTRATOR_RESULTS.json`) —
+meaning `try_orchestrator_generation()` rejected every candidate and fell
+through to the exact same legacy path, unchanged, on all 15 problems. Traced
+to `src/language/verified_generation.rs:493`:
+```rust
+_ => executor.execute_rust_with_inline_tests(&full_source),
+```
+This is the sole compiler-verification fallback for every `CodeIntent` other
+than `Solve`, and it **always compiles the candidate as Rust regardless of
+`request.language`**. For a Python request this fails unconditionally, so
+`response.accepted` is always `false` and the orchestrator can never accept a
+non-Rust candidate. This is a bigger, more fundamental gap than the
+call-site wiring done on 2026-07-03: even with a live call site, the
+orchestrator/MAGI/FEP-fast-fail machinery upstream of this line is currently
+**Rust-only end to end**. The third planned variant (orchestrator +
+`SYMTHAEA_HARD_GEODESIC_REJECTION`/`SYMTHAEA_GEODESIC_REJECTION_SHADOW`) was
+skipped rather than run, since both env-gated behaviors live inside this same
+always-failing verification call and would necessarily reproduce the same
+no-op.
+
+**What this means for "should we compete with LLMs or not"**: for Symthaea's
+actual primary domain (Rust, the monorepo's own language) this may be a
+non-issue — the orchestrator was plausibly never meant to verify Python. But
+it means HumanEval (Python) is currently the wrong benchmark for measuring
+the orchestrator/FEP/geodesic stack's real value; a **Rust-native coding
+benchmark** (e.g. small Rust katas with `cargo test` verification, or driving
+this same harness against the monorepo's own crates) is needed before any of
+that machinery can be fairly evaluated. Two independent tracks now exist:
+
+1. Fix the Python-target regression in the legacy path (Finding 1) —
+   language-template leakage is a concrete, scoped bug.
+2. Either make `verified_generation.rs` genuinely multi-language (branch on
+   `request.language` to `execute_python`/`execute_rust_with_inline_tests`),
+   or stand up a Rust-native benchmark to evaluate the orchestrator on the
+   language it actually supports today. (2) is probably higher-leverage:
+   it's the only way to find out whether the "verified, self-improving"
+   thesis holds up at all, on the language where the machinery is real.
+
+### Fixed same day: the two Finding-1 bugs, root-caused precisely
+
+- `prompts.rs::native_code_template()` called `match_native_pattern()`
+  unconditionally — that function returns **hardcoded Rust source strings**
+  keyed on task keywords (e.g. `task.contains("absolute")` returns
+  `"/// Return the absolute value.\npub fn absolute(...)..."` verbatim).
+  HumanEval/4 (`mean_absolute_deviation`) hit this exact keyword and got Rust
+  source stuffed into a `.py` file. Fix: gate this phase behind
+  `self.target_language() == "rust"`.
+- `prompts.rs::extract_function_name()`'s prose-heuristic fallback scanned
+  for the substring `"function "` anywhere in the task text and took the
+  *next word* as the function name — with no way to distinguish a real
+  declaration from English prose. HumanEval/1's docstring contains
+  "...to this **function is** a string containing..." — matched, took `is`
+  (a Python reserved word) as the function name, emitted `def is(...)`.
+  Fix: scan for an actual `def name(`/`fn name(` declaration first (which
+  HumanEval-style prompts always embed) and only fall back to the prose
+  heuristic — now with `"is"/"are"/"was"/"were"` also added to the
+  stop-word list as defense in depth — when no real declaration exists.
+
+**Verified impact** (`docs/HUMANEVAL_AGENT_POSTFIX_RESULTS.json`, same 15
+problems, `--llm` mode, `cargo test -p symthaea --features code_generation coding_agent::`
+— all 52 existing tests still pass):
+
+- **Compiled: 8/15 → 15/15 (100%)**. Every syntax error from the Rust-idiom
+  leakage is gone.
+- **Pass@1: still 0/15.** Code now compiles but is logically wrong — the
+  underlying cause is different again: e.g. HumanEval/2 generated
+  `def truncate_number(v: list, f: callable) -> value:`. The literal string
+  `"callable"` does not appear anywhere in Symthaea's source (checked via
+  grep across `src/`), so this is not a template bug — it's the LLM itself
+  producing a generic, hallucinated signature. Direct mode passes the raw
+  HumanEval prompt (which already contains the correct signature) straight
+  to the LLM; the Agent pipeline's own prompt-construction evidently doesn't
+  preserve signature fidelity as reliably. This is a **third, distinct,
+  more open-ended issue** (prompt fidelity through the Understanding/Planning
+  phases) — not yet fixed, flagged here rather than pursued further without
+  checking in, since it's architecturally bigger than the two scoped bugs
+  above.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*
