@@ -37,7 +37,6 @@
 use std::io::Write as _;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::time::Duration;
 
 use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition};
 
@@ -197,10 +196,10 @@ impl Z3Bridge {
 
             let mut conflicting = Vec::new();
             for name in names {
-                if let Ok(idx) = name[1..].parse::<usize>() {
-                    if let Some(original) = assertions.get(idx) {
-                        conflicting.push(original.clone());
-                    }
+                if let Ok(idx) = name[1..].parse::<usize>()
+                    && let Some(original) = assertions.get(idx)
+                {
+                    conflicting.push(original.clone());
                 }
             }
             Some(conflicting)
@@ -968,14 +967,14 @@ fn detect_z3() -> (bool, Option<PathBuf>) {
     }
 
     // 2. PATH lookup via `which`
-    if let Ok(output) = Command::new("which").arg("z3").output() {
-        if output.status.success() {
-            let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path_str.is_empty() {
-                let p = PathBuf::from(path_str);
-                if p.exists() {
-                    return (true, Some(p));
-                }
+    if let Ok(output) = Command::new("which").arg("z3").output()
+        && output.status.success()
+    {
+        let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !path_str.is_empty() {
+            let p = PathBuf::from(path_str);
+            if p.exists() {
+                return (true, Some(p));
             }
         }
     }
@@ -1058,16 +1057,16 @@ fn build_validity_check(smt: &str) -> String {
 /// Parse Z3 stdout into a VerificationResult.
 fn parse_sat_result(output: &str) -> VerificationResult {
     let trimmed = output.trim();
-    if trimmed.starts_with("sat") {
-        let model = if trimmed.len() > 3 {
-            Some(trimmed[3..].trim().to_string())
+    if let Some(stripped) = trimmed.strip_prefix("sat") {
+        let model = if !stripped.is_empty() {
+            Some(stripped.trim().to_string())
         } else {
             None
         };
         VerificationResult::Sat { witness: model }
-    } else if trimmed.starts_with("unsat") {
-        let core = if trimmed.len() > 5 {
-            Some(trimmed[5..].trim().to_string())
+    } else if let Some(stripped) = trimmed.strip_prefix("unsat") {
+        let core = if !stripped.is_empty() {
+            Some(stripped.trim().to_string())
         } else {
             None
         };

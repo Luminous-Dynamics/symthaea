@@ -302,9 +302,21 @@ impl OllamaBackend {
     }
 
     /// Create with custom URL and model.
+    ///
+    /// Response timeout defaults to 180s but can be raised via
+    /// `SYMTHAEA_LLM_TIMEOUT_SECS` — measured 2026-07-04 under real host load
+    /// (load average ~43 on 12 cores, from concurrent cargo builds): a
+    /// curriculum-synthesis prompt (which embeds aggregated scraped web
+    /// content, much larger than a typical translation prompt) reliably
+    /// exceeded 180s and fell back to a non-JSON simulation response every
+    /// time, silently failing `CurriculumExtender`'s research cycle.
     pub fn with_config(base_url: &str, model: &str) -> Self {
+        let timeout_secs = std::env::var("SYMTHAEA_LLM_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(180);
         let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(180)) // 3 minutes for longer prompts
+            .timeout(std::time::Duration::from_secs(timeout_secs))
             .build()
             .unwrap_or_else(|e| {
                 tracing::warn!(error = %e, "Failed to build HTTP client with custom config, falling back to default");
