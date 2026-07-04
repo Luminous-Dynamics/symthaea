@@ -54,11 +54,7 @@ pub fn expr_to_smtlib2(expr: &Expr) -> Option<String> {
         },
         Expr::Path(ep) => {
             // Treat paths as variables
-            if let Some(ident) = ep.path.get_ident() {
-                Some(ident.to_string())
-            } else {
-                None
-            }
+            ep.path.get_ident().map(|ident| ident.to_string())
         }
         Expr::Paren(ep) => expr_to_smtlib2(&ep.expr),
         _ => None,

@@ -509,14 +509,19 @@ impl ProbabilisticHV {
         let config = PHVConfig::default();
         let obs_var = obs_variance.max(config.min_variance);
 
-        for i in 0..self.dim {
-            let sp = self.variance[i].max(config.min_variance);
+        for ((m, v), &obs) in self
+            .mean
+            .iter_mut()
+            .zip(self.variance.iter_mut())
+            .zip(observation.iter())
+        {
+            let sp = v.max(config.min_variance);
             let denom = sp + obs_var;
 
             // Posterior mean: weighted combination of prior and observation
-            self.mean[i] = (obs_var * self.mean[i] + sp * observation[i]) / denom;
+            *m = (obs_var * *m + sp * obs) / denom;
             // Posterior variance: harmonic-mean-like reduction
-            self.variance[i] = (sp * obs_var) / denom;
+            *v = (sp * obs_var) / denom;
         }
     }
 
