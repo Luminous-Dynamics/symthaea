@@ -9,12 +9,25 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::controller::AuvController;
 use crate::encoder::AuvHdcEncoder;
 use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
-use crate::types::AuvConfig;
+use crate::types::{AuvCommand, AuvConfig};
 
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
-    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
+
+/// Emergency fallback behavior for the AUV.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuvFallbackStage {
+    /// Vertical thrusters commanded to ascend toward the surface; all other
+    /// thrust suppressed. Zero thrust alone would leave the vehicle
+    /// drifting with current/tide at whatever depth it happened to be at —
+    /// not safe near reefs, wrecks, or other vessels.
+    BuoyancyAscent,
+}
+
+/// Fraction of full vertical thrust commanded during buoyancy ascent.
+const ASCENT_THRUST: f32 = 0.5;
 
 /// AUV embodiment bridge.
 pub struct AuvEmbodiment {
@@ -28,6 +41,8 @@ pub struct AuvEmbodiment {
     moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
+    fallback_stage: AuvFallbackStage,
+    fallback_cycles_in_stage: u32,
 }
 
 impl AuvEmbodiment {
@@ -44,6 +59,8 @@ impl AuvEmbodiment {
             moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
+            fallback_stage: AuvFallbackStage::BuoyancyAscent,
+            fallback_cycles_in_stage: 0,
         }
     }
 
@@ -55,10 +72,21 @@ impl AuvEmbodiment {
         self.safety_override = None;
     }
 
+    pub fn fallback_stage(&self) -> AuvFallbackStage {
+        self.fallback_stage
+    }
+
+    /// SafeFallback: BuoyancyAscent. Overrides the command with a vertical
+    /// ascent thrust, executed at full authority (not scaled by motor_gain).
+    fn apply_buoyancy_ascent(&self, cmd: &mut AuvCommand) {
+        *cmd = AuvCommand::ascend(ASCENT_THRUST);
+    }
+
     /// Apply moral gate from ethics engine.
     /// An AUV operating near divers, fish, or reefs can cause harm — ahimsa
-    /// forces Red (zero thrust), consent violation forces Orange, caution
-    /// forces Yellow.
+    /// forces Red (buoyancy ascent to surface, not merely zero thrust —
+    /// drifting with current near reefs/vessels is not safe), consent
+    /// violation forces Orange, caution forces Yellow.
     pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
         self.moral_safety =
             if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {

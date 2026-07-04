@@ -77,6 +77,23 @@ impl SimpleManipulatorSimulator {
         }
         tau
     }
+
+    /// Normalized gravity-compensation torque command for the current pose.
+    ///
+    /// Returns, per joint, the commanded torque (in the same normalized
+    /// [-1, 1] range as [`ManipulatorCommand::joint_torques`]) that exactly
+    /// cancels gravity at the joint's current angle — i.e. the torque that
+    /// holds the arm still against gravity without driving it toward any
+    /// new target. Used by the `SafeFallback` GravityHold behavior: at Red
+    /// safety tier the arm must hold its current pose, not go limp.
+    pub fn gravity_compensation_torques(&self) -> [f32; NUM_JOINTS] {
+        let mut out = [0.0f32; NUM_JOINTS];
+        for i in 0..NUM_JOINTS {
+            let g = self.gravity_torque_at(i);
+            out[i] = (g / self.max_torques[i]) as f32;
+        }
+        out
+    }
 }
 
 impl Default for SimpleManipulatorSimulator {

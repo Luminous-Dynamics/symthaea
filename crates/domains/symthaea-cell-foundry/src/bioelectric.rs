@@ -594,16 +594,24 @@ impl MorphogeneticField {
 
     /// Mark every cell for which `select(position)` is true as "defected" —
     /// gap-junction isolated (see `step_vmem_diffusion`) and unconditionally
-    /// hyperproliferative (see `defective_proliferate`) — and depolarize
-    /// them, modeling the dedifferentiated state associated with loss of
-    /// bioelectric coordination with the collective. Called from
-    /// [`NeuralOrganoid::induce_local_defection`].
+    /// hyperproliferative (see `defective_proliferate`) — depolarize them,
+    /// and reset them to `Progenitor` identity. That last part matters
+    /// mechanically, not just narratively: `defective_proliferate` only
+    /// fires on progenitor-type cells, and a cell selected purely by
+    /// position may already have differentiated or dropped to
+    /// `Undifferentiated` (ineligible either way) during normal
+    /// development. Forcing progenitor identity is also the biologically
+    /// motivated choice: oncogenic transformation is widely associated with
+    /// *dedifferentiation* to a stem/progenitor-like state, not just loss
+    /// of electrical coupling — this models both halves of that at once.
+    /// Called from [`NeuralOrganoid::induce_local_defection`].
     pub fn induce_local_defection(&mut self, select: impl Fn(&[f32; 3]) -> bool) -> usize {
         let mut count = 0;
         for i in 0..self.cells.len() {
             if select(&self.cells[i].position) {
                 self.bioelectric.defected[i] = true;
                 self.bioelectric.vmem[i] = VMEM_DEPOLARIZED;
+                self.cells[i].cell_type = OrganoidCellType::Progenitor;
                 count += 1;
             }
         }
@@ -615,19 +623,30 @@ impl MorphogeneticField {
         self.bioelectric.defected.iter().filter(|&&d| d).count()
     }
 
-    /// Unconditional proliferation pass for defected progenitor cells, at
+    /// Unconditional proliferation pass for defected cells, at
     /// [`DEFECTION_PROLIFERATION_RATE`] — unlike `regenerative_proliferate`,
     /// this runs every day regardless of wound/regeneration state, modeling
     /// unregulated growth. Called from `advance_day`.
+    ///
+    /// Defected cells are re-asserted as `Progenitor` every call, overriding
+    /// whatever the ordinary Turing-driven `differentiate()` step would
+    /// otherwise do to them: escaping normal differentiation control (not
+    /// just gap-junction coupling) is itself a hallmark of the pathology
+    /// being modeled, not an oversight.
     pub(crate) fn defective_proliferate(&mut self) {
         let n = self.cells.len();
         if n >= MAX_CELLS {
             return;
         }
+        for i in 0..n {
+            if self.bioelectric.defected[i] {
+                self.cells[i].cell_type = OrganoidCellType::Progenitor;
+            }
+        }
         let mut new_cells = Vec::new();
         let mut parent_indices = Vec::new();
         for i in 0..n {
-            if !self.bioelectric.defected[i] || !self.cells[i].cell_type.is_progenitor() {
+            if !self.bioelectric.defected[i] {
                 continue;
             }
             if self

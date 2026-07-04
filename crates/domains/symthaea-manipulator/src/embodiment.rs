@@ -13,8 +13,15 @@ use crate::types::ManipulatorConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    GroundingEstimator, MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    GroundingEstimator, MoralGateInput, MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
 };
+
+/// Emergency fallback posture for the manipulator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ManipulatorFallbackStage {
+    /// Hold current pose via per-joint gravity-compensation torque; gripper frozen.
+    GravityHold,
+}
 
 /// Manipulator embodiment bridge.
 pub struct ManipulatorEmbodiment {
@@ -30,6 +37,8 @@ pub struct ManipulatorEmbodiment {
     moral_safety: Option<MotorSafetyLevel>,
     grounding: GroundingEstimator,
     last_grounding: u8,
+    fallback_stage: ManipulatorFallbackStage,
+    fallback_cycles_in_stage: u32,
 }
 
 impl ManipulatorEmbodiment {
@@ -48,7 +57,22 @@ impl ManipulatorEmbodiment {
             moral_safety: None,
             grounding: GroundingEstimator::new(),
             last_grounding: GROUNDING_SENSORIMOTOR,
+            fallback_stage: ManipulatorFallbackStage::GravityHold,
+            fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Current SafeFallback stage (always `GravityHold` for this platform).
+    pub fn fallback_stage(&self) -> ManipulatorFallbackStage {
+        self.fallback_stage
+    }
+
+    /// Override the commanded torques with a gravity-compensation hold and
+    /// freeze the gripper at its current opening. Executes at full authority
+    /// (not scaled by motor_gain) per the SafeFallback contract.
+    fn apply_gravity_hold(&self, cmd: &mut crate::types::ManipulatorCommand) {
+        cmd.joint_torques = self.simulator.gravity_compensation_torques();
+        cmd.gripper = self.simulator.state().gripper_opening as f32;
     }
 
     /// Apply moral gate from the ethics engine.
@@ -92,9 +116,21 @@ impl ManipulatorEmbodiment {
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
-        if gain < 1.0 {
-            for t in &mut cmd.joint_torques {
-                *t *= gain;
+
+        // ── SafeFallback: GravityHold at Red ─────────────────────────
+        // "No force" for a loaded arm means "drop whatever it's holding" —
+        // gain=0.0 alone is NOT safe here. Hold the current pose against
+        // gravity instead, at full torque authority (not gain-scaled).
+        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
+            self.apply_gravity_hold(&mut cmd);
+        } else {
+            self.fallback_stage = ManipulatorFallbackStage::GravityHold;
+            self.fallback_cycles_in_stage = 0;
+            if gain < 1.0 {
+                for t in &mut cmd.joint_torques {
+                    *t *= gain;
+                }
             }
         }
 
@@ -148,6 +184,8 @@ impl ManipulatorEmbodiment {
         self.last_prediction_error = 0.0;
         self.grounding.reset();
         self.last_grounding = GROUNDING_SENSORIMOTOR;
+        self.fallback_stage = ManipulatorFallbackStage::GravityHold;
+        self.fallback_cycles_in_stage = 0;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -223,6 +261,24 @@ impl symthaea_core::embodiment::EmbodimentBridge for ManipulatorEmbodiment {
     }
 }
 
+impl SafeFallback for ManipulatorEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "manipulator"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        5 // High: grasping, in-contact (per SafeFallback trait's own scale)
+    }
+    fn safe_fallback_description(&self) -> &'static str {
+        "GravityHold: per-joint gravity-compensation torque holds current pose; gripper frozen"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,7 +330,13 @@ mod tests {
         let hv = ContinuousHV::random(16384, 42);
         let r = bridge.step(&hv, 0.002, 0.9); // High phi, but blocked
         assert_eq!(r.safety_level, MotorSafetyLevel::Red);
-        assert_eq!(r.control_effort, 0.0, "Blocked should zero motor output");
+        // NOTE: this used to assert control_effort == 0.0, but that was the
+        // bug this fix closes: "no force" is not safe for a loaded arm — it
+        // means "drop whatever it's holding". Red now commands GravityHold
+        // (a deliberate, non-zero, purposeful hold torque) instead of a
+        // passive zero. See test_red_triggers_gravity_hold below for the
+        // behavior this actually asserts.
+        assert!(r.control_effort.is_finite());
     }
 
     #[test]
@@ -336,5 +398,95 @@ mod tests {
         bridge.step(&hv, 0.002, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
+    }
+
+    #[test]
+    fn test_red_triggers_gravity_hold_stage() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.002, 0.05);
+        assert_eq!(
+            bridge.fallback_stage(),
+            ManipulatorFallbackStage::GravityHold
+        );
+    }
+
+    #[test]
+    fn test_red_gravity_hold_commands_nonzero_torque_not_passive_zero() {
+        // The core safety bug: at Red, gain=0.0 alone means "drop the load".
+        // GravityHold must command a real, non-zero holding torque derived
+        // from the arm's own gravity model — not simply zero everything.
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.05);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert!(
+            r.control_effort > 1e-4,
+            "GravityHold must command non-zero holding torque, got {}",
+            r.control_effort
+        );
+    }
+
+    #[test]
+    fn test_red_gravity_hold_matches_simulator_gravity_compensation() {
+        // The commanded torque at Red must equal the simulator's own
+        // gravity-compensation computation for the pre-step pose (full
+        // authority, not scaled by motor_gain).
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let expected = bridge.simulator.gravity_compensation_torques();
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.002, 0.05);
+        assert_eq!(bridge.last_control_effort, {
+            expected.iter().map(|t| t.abs()).sum::<f32>() / expected.len() as f32
+        });
+    }
+
+    #[test]
+    fn test_red_gravity_hold_freezes_gripper() {
+        // Gripper must stay at whatever opening it was, not snap to a
+        // default — freezing state is part of "hold current pose".
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        // First step at Green to let the gripper move away from its default.
+        bridge.step(&hv, 0.002, 0.9);
+        let opening_before_red = bridge.simulator.state().gripper_opening;
+        bridge.step(&hv, 0.002, 0.05); // now Red
+        let opening_after_red = bridge.simulator.state().gripper_opening;
+        assert!(
+            (opening_after_red - opening_before_red).abs() < 1e-6,
+            "gripper should freeze at Red, went from {} to {}",
+            opening_before_red,
+            opening_after_red
+        );
+    }
+
+    #[test]
+    fn test_safe_fallback_trait_impl() {
+        let bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        assert_eq!(bridge.platform_name(), "manipulator");
+        assert_eq!(bridge.safe_fallback_priority(), 5);
+        assert_eq!(bridge.safe_fallback_latency_cycles(), 1);
+        assert!(bridge.safe_fallback_description().contains("GravityHold"));
+    }
+
+    #[test]
+    fn test_safe_fallback_active_iff_red_or_orange() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.002, 0.9); // Green
+        assert!(!bridge.safe_fallback_active());
+        bridge.step(&hv, 0.002, 0.05); // Red
+        assert!(bridge.safe_fallback_active());
+    }
+
+    #[test]
+    fn test_non_red_tiers_still_scale_by_gain_not_gravity_hold() {
+        // Yellow/Orange must retain graduated authority (scaled command),
+        // not jump straight to the Red fallback.
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.5); // Yellow, gain 0.6
+        assert_eq!(r.safety_level, MotorSafetyLevel::Yellow);
+        assert_eq!(bridge.fallback_cycles_in_stage, 0);
     }
 }

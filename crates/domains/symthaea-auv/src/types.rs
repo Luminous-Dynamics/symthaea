@@ -273,6 +273,18 @@ impl AuvCommand {
         cmd
     }
 
+    /// Ascend toward the surface (vertical thrusters, opposite sign of `descend`).
+    ///
+    /// Used by the SafeFallback buoyancy-ascent behavior: at Red safety tier
+    /// the AUV must actively surface rather than merely stop thrusting (zero
+    /// thrust in open water means drifting with current/tides, not safety).
+    pub fn ascend(thrust: f32) -> Self {
+        let mut cmd = Self::zero();
+        cmd.thrusters[4] = thrust;
+        cmd.thrusters[5] = thrust;
+        cmd
+    }
+
     /// Clamp all thrusters to [-1, 1].
     pub fn clamped(mut self) -> Self {
         for t in &mut self.thrusters {
@@ -382,6 +394,18 @@ mod tests {
         let cmd = AuvCommand::forward(0.5);
         assert!(cmd.control_effort() > 0.0);
         assert_eq!(cmd.thrusters[0], 0.5);
+    }
+
+    #[test]
+    fn test_command_ascend() {
+        let cmd = AuvCommand::ascend(0.6);
+        assert!(cmd.control_effort() > 0.0);
+        assert_eq!(cmd.thrusters[4], 0.6);
+        assert_eq!(cmd.thrusters[5], 0.6);
+        // Opposite sign of the equivalent descend() call.
+        let d = AuvCommand::descend(0.6);
+        assert_eq!(cmd.thrusters[4], -d.thrusters[4]);
+        assert_eq!(cmd.thrusters[5], -d.thrusters[5]);
     }
 
     #[test]
