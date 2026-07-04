@@ -11,7 +11,7 @@ bevy = { version = "0.15", default-features = false, features = ["bevy_winit", "
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 symthaea-workspace = { path = "../../core/symthaea-workspace" }
-symthaea-phi-oracle = { path = "../../symthaea-phi-oracle" }
+symthaea-phi-oracle = { path = "../../domains/symthaea-phi-oracle" }
 symthaea-digital-twin = { path = "../../domains/symthaea-digital-twin" }
 symthaea-subterranean = { path = "../../domains/symthaea-subterranean" }
 symthaea-telemetry-grpc = { path = "../symthaea-telemetry-grpc" }

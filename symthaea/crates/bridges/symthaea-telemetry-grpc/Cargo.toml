@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-phi-oracle = { path = "../../symthaea-phi-oracle" }
+symthaea-phi-oracle = { path = "../../domains/symthaea-phi-oracle" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 tonic = "0.12"
 prost = "0.13"
