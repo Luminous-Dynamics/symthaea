@@ -2,6 +2,19 @@
 
 > **Status:** stub — full derivation, empirical data, and publication in Phase 5.
 
+> **Terminology caveat (added 2026-07-03):** the `Φ(t)` in this metric is **not** a
+> computed IIT (Integrated Information Theory) quantity. It's the fused output of
+> Symtropy's Master Consciousness Equation (`symthaea-consciousness-equation`), whose
+> own Φ input slot is filled at every call site in this codebase by a locally-defined
+> heuristic (e.g. `1.0 - danger_level` in `symtropy-robotics-bridge`, oscillator
+> coherence in the Bevy pendulum-swarm examples, or a constant `0.5`) — not by any of
+> symthaea-core's IIT-inspired calculators (`SpectralMIPFinder`, `TieredPhi`,
+> `ConnectivityCalculator`). So J/Φ measures energy cost per unit of *this equation's
+> output*, not per bit of integrated information in the IIT sense. The metric and its
+> convergence finding below may still be real and interesting — but read "integrated
+> information" throughout this page as "the Master Consciousness Equation's fused
+> output," not as a validated Φ.
+
 ## Definition
 
 `J/Φ` = Joules per bit of integrated information. A ratio between the **thermodynamic cost** of maintaining a system and the **amount of integration** that system sustains.
