@@ -409,7 +409,7 @@ impl VisionManifold {
         // (need to establish initial object tracks) OR object memory has no tracks
         // (need to discover objects). The 0.01 threshold is very conservative —
         // only skip clustering for truly static, fully-predicted scenes.
-        let has_tracks = self.object_memory.as_ref().map_or(false, |m| !m.is_empty());
+        let has_tracks = self.object_memory.as_ref().is_some_and(|m| !m.is_empty());
         let scene_changed = self.prediction_error > 0.01 || self.frame_count < 10 || !has_tracks;
 
         // P3-E: Object-level binding — replace the bag-of-words frame HV with
@@ -606,6 +606,11 @@ impl VisionManifold {
     /// * `channels` — Channels for the left frame (use 1 for grayscale stereo)
     /// * `max_disparity` — Maximum stereo search range (default: 16 pixels)
     /// * `dt` — Time step in seconds
+    // One over clippy's default 7-arg threshold; grouping into a param
+    // struct would be an API-breaking change for one public function with
+    // a single call shape (frame geometry + stereo params + timestep), not
+    // worth it for this. Allowed rather than crate-wide.
+    #[allow(clippy::too_many_arguments)]
     pub fn observe_frame_stereo(
         &mut self,
         left: &[u8],
@@ -719,12 +724,10 @@ impl VisionManifold {
             let should_train = !self.learning_frozen
                 && (self.prediction_error > self.config.training.error_threshold
                     || (self.frame_count > 2 && self.prediction_error > spike_threshold));
-            if should_train {
-                if let Some(last_input) = self.last_frame_hv.clone() {
-                    let result = self.train_step_inner(&last_input, &predicted, frame_hv, dt);
-                    training_triggered = true;
-                    training_loss = Some(result.loss);
-                }
+            if should_train && let Some(last_input) = self.last_frame_hv.clone() {
+                let result = self.train_step_inner(&last_input, &predicted, frame_hv, dt);
+                training_triggered = true;
+                training_loss = Some(result.loss);
             }
         }
 
@@ -1262,7 +1265,7 @@ impl VisionManifold {
         let sim = a.similarity(b);
         let binding_strength = a.bind(b).norm() / (a.norm() * b.norm()).sqrt();
 
-        (sim * 0.6 + binding_strength * 0.4).clamp(0.0, 1.0) as f32
+        (sim * 0.6 + binding_strength * 0.4).clamp(0.0, 1.0)
     }
 
     /// Compute the thermodynamic energy required for a manifold transition.
@@ -1607,7 +1610,7 @@ impl VisionManifold {
 
     /// Number of color channels in the last observed frame.
     pub fn last_frame_channels(&self) -> usize {
-        self.last_frame_channels as usize
+        self.last_frame_channels
     }
 
     /// Mutable access to the spatial surprise map (for top-down priming).
@@ -2556,18 +2559,17 @@ impl VisualWorkingMemory {
                 a.1.saliency
                     .partial_cmp(&b.1.saliency)
                     .unwrap_or(std::cmp::Ordering::Equal)
-            }) {
-                if saliency > weakest.1.saliency {
-                    let idx = weakest.0;
-                    self.slots[idx] = WorkingMemorySlot {
-                        track_id: track.track_id,
-                        hv: track.identity_hv.clone(),
-                        saliency,
-                        centroid_row: track.centroid_row,
-                        centroid_col: track.centroid_col,
-                        entered_at_frame: current_frame,
-                    };
-                }
+            }) && saliency > weakest.1.saliency
+            {
+                let idx = weakest.0;
+                self.slots[idx] = WorkingMemorySlot {
+                    track_id: track.track_id,
+                    hv: track.identity_hv.clone(),
+                    saliency,
+                    centroid_row: track.centroid_row,
+                    centroid_col: track.centroid_col,
+                    entered_at_frame: current_frame,
+                };
             }
         }
 
