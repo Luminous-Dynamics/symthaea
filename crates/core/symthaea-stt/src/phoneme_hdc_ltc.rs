@@ -20,8 +20,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
-    UnifiedNetworkConfig,
+    HdcLtcUnifiedNetwork, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
 };
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
@@ -107,7 +106,7 @@ impl PhonemeHdcLtc {
         #[cfg(feature = "gpu")]
         let gpu_protos = Self::build_gpu_cache(&prototypes);
 
-        let mut result = Self {
+        let result = Self {
             network,
             prototypes,
             logit_scale: 20.0,

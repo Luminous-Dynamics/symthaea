@@ -219,20 +219,20 @@ impl BatchProcessor {
                     // Update progress
                     let count = processed.fetch_add(1, Ordering::SeqCst) + 1;
 
-                    if let Some(ref cb) = callback {
-                        if count.is_multiple_of(progress_interval) || count == total {
-                            cb(count, total, path.to_string_lossy().as_ref());
-                        }
+                    if let Some(ref cb) = callback
+                        && (count.is_multiple_of(progress_interval) || count == total)
+                    {
+                        cb(count, total, path.to_string_lossy().as_ref());
                     }
 
                     // Check if we should stop on error
                     if !continue_on_error {
                         // Check last result
                         let results = results.lock().unwrap_or_else(|e| e.into_inner());
-                        if let Some(last) = results.last() {
-                            if last.status.is_err() {
-                                break;
-                            }
+                        if let Some(last) = results.last()
+                            && last.status.is_err()
+                        {
+                            break;
                         }
                     }
                 }
@@ -452,10 +452,10 @@ impl BatchTrainer {
 
                     // Progress callback
                     let count = processed.fetch_add(1, Ordering::SeqCst) + 1;
-                    if let Some(ref cb) = callback {
-                        if count.is_multiple_of(progress_interval) || count == total {
-                            cb(count, total, path.to_string_lossy().as_ref());
-                        }
+                    if let Some(ref cb) = callback
+                        && (count.is_multiple_of(progress_interval) || count == total)
+                    {
+                        cb(count, total, path.to_string_lossy().as_ref());
                     }
                 }
             }));
@@ -655,10 +655,10 @@ impl BatchTrainer {
 
                     // Progress callback
                     let count = processed.fetch_add(1, Ordering::SeqCst) + 1;
-                    if let Some(ref cb) = callback {
-                        if count.is_multiple_of(progress_interval) || count == total {
-                            cb(count, total, path.to_string_lossy().as_ref());
-                        }
+                    if let Some(ref cb) = callback
+                        && (count.is_multiple_of(progress_interval) || count == total)
+                    {
+                        cb(count, total, path.to_string_lossy().as_ref());
                     }
                 }
             }));
@@ -891,10 +891,10 @@ impl BatchDiscovery {
 
                     // Progress
                     let count = processed.fetch_add(1, Ordering::SeqCst) + 1;
-                    if let Some(ref cb) = callback {
-                        if count.is_multiple_of(progress_interval) || count == total {
-                            cb(count, total, path.to_string_lossy().as_ref());
-                        }
+                    if let Some(ref cb) = callback
+                        && (count.is_multiple_of(progress_interval) || count == total)
+                    {
+                        cb(count, total, path.to_string_lossy().as_ref());
                     }
                 }
             }));

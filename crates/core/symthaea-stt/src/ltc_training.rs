@@ -241,7 +241,7 @@ pub fn train_utterance(
         total_grads.accumulate(&step_grads);
 
         // Truncate BPTT: zero out recurrent gradient every bptt_length steps
-        if t > 0 && (n - t) % config.bptt_length == 0 {
+        if t > 0 && (n - t).is_multiple_of(config.bptt_length) {
             dl_dh_next = vec![0.0f32; h];
         } else {
             dl_dh_next = dl_dprev;

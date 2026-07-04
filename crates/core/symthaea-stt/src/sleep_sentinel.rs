@@ -460,8 +460,8 @@ impl ConsciousnessSentinel {
             return 0.0;
         }
         // RMS of high-passed signal
-        let rms = (emg.iter().map(|x| x.powi(2)).sum::<f32>() / emg.len() as f32).sqrt();
-        rms
+
+        (emg.iter().map(|x| x.powi(2)).sum::<f32>() / emg.len() as f32).sqrt()
     }
 
     /// Detect EMG atonia (muscle relaxation during REM)

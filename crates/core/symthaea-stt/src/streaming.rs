@@ -382,11 +382,11 @@ impl StreamProcessor {
         let mut last_phoneme: Option<String> = None;
 
         for frame in &self.recent_frames {
-            if let Some(ref phoneme) = frame.phoneme {
-                if last_phoneme.as_ref() != Some(phoneme) {
-                    phonemes.push(phoneme.clone());
-                    last_phoneme = Some(phoneme.clone());
-                }
+            if let Some(ref phoneme) = frame.phoneme
+                && last_phoneme.as_ref() != Some(phoneme)
+            {
+                phonemes.push(phoneme.clone());
+                last_phoneme = Some(phoneme.clone());
             }
         }
 

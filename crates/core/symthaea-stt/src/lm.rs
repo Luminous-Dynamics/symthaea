@@ -310,10 +310,10 @@ impl NgramLM {
                         let log_prob = prob * 10.0_f32.ln(); // Convert from log10
                         lm.unigrams.insert(word.clone(), log_prob);
 
-                        if parts.len() >= 3 {
-                            if let Ok(backoff) = parts[2].parse::<f32>() {
-                                lm.bigram_backoff.insert(word, backoff * 10.0_f32.ln());
-                            }
+                        if parts.len() >= 3
+                            && let Ok(backoff) = parts[2].parse::<f32>()
+                        {
+                            lm.bigram_backoff.insert(word, backoff * 10.0_f32.ln());
                         }
                     }
                 }
@@ -325,11 +325,11 @@ impl NgramLM {
                         let log_prob = prob * 10.0_f32.ln();
                         lm.bigrams.insert((w1.clone(), w2), log_prob);
 
-                        if parts.len() >= 4 {
-                            if let Ok(backoff) = parts[3].parse::<f32>() {
-                                lm.trigram_backoff
-                                    .insert((w1, parts[2].to_string()), backoff * 10.0_f32.ln());
-                            }
+                        if parts.len() >= 4
+                            && let Ok(backoff) = parts[3].parse::<f32>()
+                        {
+                            lm.trigram_backoff
+                                .insert((w1, parts[2].to_string()), backoff * 10.0_f32.ln());
                         }
                     }
                 }
@@ -662,11 +662,11 @@ impl PhonemeToWordDecoder {
             for len in (1..=(phonemes.len() - i).min(15)).rev() {
                 let seq: Vec<String> = phonemes[i..i + len].to_vec();
 
-                if let Some(word_list) = self.reverse_dict.get(&seq) {
-                    if let Some(word) = word_list.first() {
-                        best_match = Some((word.clone(), len));
-                        break;
-                    }
+                if let Some(word_list) = self.reverse_dict.get(&seq)
+                    && let Some(word) = word_list.first()
+                {
+                    best_match = Some((word.clone(), len));
+                    break;
                 }
             }
 

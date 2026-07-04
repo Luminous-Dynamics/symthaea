@@ -322,26 +322,26 @@ impl AdaptivePrototype {
         }
 
         // 2. Decision: Merge or Spawn
-        if let Some(idx) = best_match_idx {
-            if best_sim > self.threshold {
-                let count = self.variant_counts[idx];
+        if let Some(idx) = best_match_idx
+            && best_sim > self.threshold
+        {
+            let count = self.variant_counts[idx];
 
-                // CRYSTALLIZATION: Stop updating after enough samples
-                // The prototype has "learned enough" and should not drift further
-                if count >= CRYSTALLIZE_AFTER {
-                    self.variant_counts[idx] += 1; // Still count for statistics
-                    return; // But don't modify the prototype!
-                }
-
-                // BOUNDED WEIGHT: Cap weight to prevent early samples from
-                // being completely overwritten
-                let weight = (1.0 / (count + 1) as f32).max(0.05);
-
-                // Weighted combination: new_variant = (1-w)*old + w*new
-                self.variants[idx] = weighted_blend(&self.variants[idx], observation, weight);
-                self.variant_counts[idx] += 1;
-                return;
+            // CRYSTALLIZATION: Stop updating after enough samples
+            // The prototype has "learned enough" and should not drift further
+            if count >= CRYSTALLIZE_AFTER {
+                self.variant_counts[idx] += 1; // Still count for statistics
+                return; // But don't modify the prototype!
             }
+
+            // BOUNDED WEIGHT: Cap weight to prevent early samples from
+            // being completely overwritten
+            let weight = (1.0 / (count + 1) as f32).max(0.05);
+
+            // Weighted combination: new_variant = (1-w)*old + w*new
+            self.variants[idx] = weighted_blend(&self.variants[idx], observation, weight);
+            self.variant_counts[idx] += 1;
+            return;
         }
 
         // NO MATCH: Attempt to spawn new variant
@@ -575,15 +575,15 @@ impl AdaptivePrototypeSet {
                         // No cap - push as hard as needed
                         let repulsion_strength = (similarity - min_separation) * 0.6;
 
-                        if let Some(p) = self.prototypes.get_mut(label_i) {
-                            if let Some(primary) = p.variants.first_mut() {
-                                *primary = contrastive_repel(primary, &proto_j, repulsion_strength);
-                            }
+                        if let Some(p) = self.prototypes.get_mut(label_i)
+                            && let Some(primary) = p.variants.first_mut()
+                        {
+                            *primary = contrastive_repel(primary, &proto_j, repulsion_strength);
                         }
-                        if let Some(p) = self.prototypes.get_mut(label_j) {
-                            if let Some(primary) = p.variants.first_mut() {
-                                *primary = contrastive_repel(primary, &proto_i, repulsion_strength);
-                            }
+                        if let Some(p) = self.prototypes.get_mut(label_j)
+                            && let Some(primary) = p.variants.first_mut()
+                        {
+                            *primary = contrastive_repel(primary, &proto_i, repulsion_strength);
                         }
                     }
                 }

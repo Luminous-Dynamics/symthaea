@@ -359,7 +359,8 @@ pub mod curriculum;
 pub mod differential_equations; // ODE/PDE solvers: RK4, shooting, heat eq, wave eq
 pub mod diophantine;
 pub mod eml; // Pure EML IR, compiler, evaluation, and verification
-pub mod eml_regressor; // EML-based gradient symbolic regression
+#[cfg(feature = "parallel")]
+pub mod eml_regressor; // EML-based gradient symbolic regression (rayon-parallel seed search)
 pub mod fem; // Finite Element Method: Galerkin weak forms, assembly, Poisson solver
 pub mod fft; // Fast Fourier Transform: Cooley-Tukey radix-2, convolution
 pub mod fol_ext_smt; // Phase 2: SMT-LIB2 serializer + fragment detection for FolFormulaExt

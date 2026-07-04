@@ -383,17 +383,17 @@ impl OnlineClusterer {
 
         // Track transitions
         if self.config.track_transitions {
-            if let Some(ref prev_id) = self.previous_unit {
-                if prev_id != &unit_id {
-                    // Record A → B transition
-                    if let Some(prev_unit) = self.units.get_mut(prev_id) {
-                        prev_unit.record_following(&unit_id);
-                    }
-                    if let Some(curr_unit) = self.units.get_mut(&unit_id) {
-                        curr_unit.record_preceding(prev_id);
-                    }
-                    self.stats.transitions_recorded += 1;
+            if let Some(ref prev_id) = self.previous_unit
+                && prev_id != &unit_id
+            {
+                // Record A → B transition
+                if let Some(prev_unit) = self.units.get_mut(prev_id) {
+                    prev_unit.record_following(&unit_id);
                 }
+                if let Some(curr_unit) = self.units.get_mut(&unit_id) {
+                    curr_unit.record_preceding(prev_id);
+                }
+                self.stats.transitions_recorded += 1;
             }
             self.previous_unit = Some(unit_id.clone());
         }
@@ -452,19 +452,19 @@ impl OnlineClusterer {
                 (id2, id1)
             };
 
-            if let Some(removed) = self.units.remove(&remove) {
-                if let Some(keeper) = self.units.get_mut(&keep) {
-                    // Add instances from removed unit
-                    for inst in removed.instances {
-                        keeper.add_instance(inst, removed.mean_duration_ms);
-                    }
-                    // Merge transition stats
-                    for (k, v) in removed.following_units {
-                        *keeper.following_units.entry(k).or_insert(0) += v;
-                    }
-                    for (k, v) in removed.preceding_units {
-                        *keeper.preceding_units.entry(k).or_insert(0) += v;
-                    }
+            if let Some(removed) = self.units.remove(&remove)
+                && let Some(keeper) = self.units.get_mut(&keep)
+            {
+                // Add instances from removed unit
+                for inst in removed.instances {
+                    keeper.add_instance(inst, removed.mean_duration_ms);
+                }
+                // Merge transition stats
+                for (k, v) in removed.following_units {
+                    *keeper.following_units.entry(k).or_insert(0) += v;
+                }
+                for (k, v) in removed.preceding_units {
+                    *keeper.preceding_units.entry(k).or_insert(0) += v;
                 }
             }
         }

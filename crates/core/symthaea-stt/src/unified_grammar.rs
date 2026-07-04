@@ -744,13 +744,13 @@ impl UnifiedGrammar {
 
         // Load cluster memories
         for (name, memory_bytes, train_count) in model.cluster_memories {
-            if let Some(cluster) = clusters.iter_mut().find(|c| c.name == name) {
-                if memory_bytes.len() == 256 {
-                    let mut bytes = [0u8; 256];
-                    bytes.copy_from_slice(&memory_bytes);
-                    cluster.memory = HV16::from_bytes(&bytes);
-                    cluster.training_count = train_count;
-                }
+            if let Some(cluster) = clusters.iter_mut().find(|c| c.name == name)
+                && memory_bytes.len() == 256
+            {
+                let mut bytes = [0u8; 256];
+                bytes.copy_from_slice(&memory_bytes);
+                cluster.memory = HV16::from_bytes(&bytes);
+                cluster.training_count = train_count;
             }
         }
 

@@ -166,17 +166,17 @@ impl SpeakerProfile {
 
     /// Get phoneme-specific adapted prototype if available
     pub fn get_adapted_phoneme(&self, phoneme: &str, base_prototype: &HV16) -> HV16 {
-        if let Some(acc) = self.accumulators.get(phoneme) {
-            if self.counts.get(phoneme).copied().unwrap_or(0) >= 3 {
-                // Have enough speaker-specific examples
-                let speaker_proto = acc.finalize();
+        if let Some(acc) = self.accumulators.get(phoneme)
+            && self.counts.get(phoneme).copied().unwrap_or(0) >= 3
+        {
+            // Have enough speaker-specific examples
+            let speaker_proto = acc.finalize();
 
-                // Blend base prototype with speaker-specific
-                let mut blend_acc = BundleAccumulator::new();
-                blend_acc.add_weighted(base_prototype, 1.0 - self.adaptation_weight);
-                blend_acc.add_weighted(&speaker_proto, self.adaptation_weight);
-                return blend_acc.finalize();
-            }
+            // Blend base prototype with speaker-specific
+            let mut blend_acc = BundleAccumulator::new();
+            blend_acc.add_weighted(base_prototype, 1.0 - self.adaptation_weight);
+            blend_acc.add_weighted(&speaker_proto, self.adaptation_weight);
+            return blend_acc.finalize();
         }
 
         // Fall back to general adaptation
@@ -247,12 +247,11 @@ impl AdaptationEngine {
     pub fn get_adapted_prototype(&self, phoneme: &str) -> Option<HV16> {
         let base = self.base_prototypes.get(phoneme)?;
 
-        if let Some(ref speaker_id) = self.active_speaker {
-            if let Some(profile) = self.profiles.get(speaker_id) {
-                if profile.total_observations() >= self.min_observations {
-                    return Some(profile.get_adapted_phoneme(phoneme, base));
-                }
-            }
+        if let Some(ref speaker_id) = self.active_speaker
+            && let Some(profile) = self.profiles.get(speaker_id)
+            && profile.total_observations() >= self.min_observations
+        {
+            return Some(profile.get_adapted_phoneme(phoneme, base));
         }
 
         Some(*base)
@@ -260,33 +259,33 @@ impl AdaptationEngine {
 
     /// Observe phoneme from current speaker (online learning)
     pub fn observe(&mut self, phoneme: &str, acoustic_hv: &HV16) {
-        if let Some(ref speaker_id) = self.active_speaker {
-            if let Some(profile) = self.profiles.get_mut(speaker_id) {
-                profile.observe_phoneme(phoneme, acoustic_hv);
+        if let Some(ref speaker_id) = self.active_speaker
+            && let Some(profile) = self.profiles.get_mut(speaker_id)
+        {
+            profile.observe_phoneme(phoneme, acoustic_hv);
 
-                // Periodically update transform
-                if profile.total_observations() % 50 == 0 {
-                    profile.finalize_transform();
-                }
+            // Periodically update transform
+            if profile.total_observations() % 50 == 0 {
+                profile.finalize_transform();
             }
         }
     }
 
     /// Observe features for normalization
     pub fn observe_features(&mut self, features: &[f32]) {
-        if let Some(ref speaker_id) = self.active_speaker {
-            if let Some(profile) = self.profiles.get_mut(speaker_id) {
-                profile.observe_features(features);
-            }
+        if let Some(ref speaker_id) = self.active_speaker
+            && let Some(profile) = self.profiles.get_mut(speaker_id)
+        {
+            profile.observe_features(features);
         }
     }
 
     /// Normalize features for current speaker
     pub fn normalize_features(&self, features: &[f32]) -> Vec<f32> {
-        if let Some(ref speaker_id) = self.active_speaker {
-            if let Some(profile) = self.profiles.get(speaker_id) {
-                return profile.normalize_features(features);
-            }
+        if let Some(ref speaker_id) = self.active_speaker
+            && let Some(profile) = self.profiles.get(speaker_id)
+        {
+            return profile.normalize_features(features);
         }
         features.to_vec()
     }
@@ -294,8 +293,8 @@ impl AdaptationEngine {
     /// Get all adapted prototypes for current speaker
     pub fn get_all_adapted(&self) -> Vec<(String, HV16)> {
         self.base_prototypes
-            .iter()
-            .filter_map(|(phoneme, _base)| {
+            .keys()
+            .filter_map(|phoneme| {
                 self.get_adapted_prototype(phoneme)
                     .map(|adapted| (phoneme.clone(), adapted))
             })

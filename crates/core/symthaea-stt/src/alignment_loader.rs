@@ -109,65 +109,61 @@ pub fn load_alignments<P: AsRef<Path>>(
             let mut phonemes = Vec::new();
 
             // Try to extract phonemes from nested structure
-            if let Some(col) = phonemes_col {
-                if let Some(list_array) = col.as_list_opt::<i32>() {
-                    // It's a list column - extract the nested phonemes
-                    if !list_array.is_null(row_idx) {
-                        let phoneme_list = list_array.value(row_idx);
+            if let Some(col) = phonemes_col
+                && let Some(list_array) = col.as_list_opt::<i32>()
+            {
+                // It's a list column - extract the nested phonemes
+                if !list_array.is_null(row_idx) {
+                    let phoneme_list = list_array.value(row_idx);
 
-                        // The list elements should be structs with phoneme, start, end
-                        if let Some(struct_array) =
-                            phoneme_list.as_any().downcast_ref::<StructArray>()
-                        {
-                            phonemes = extract_phonemes_from_struct(struct_array);
-                        }
+                    // The list elements should be structs with phoneme, start, end
+                    if let Some(struct_array) = phoneme_list.as_any().downcast_ref::<StructArray>()
+                    {
+                        phonemes = extract_phonemes_from_struct(struct_array);
                     }
                 }
             }
 
             // If phonemes column didn't work, try individual nested columns
             // The schema might have top-level phoneme/start/end columns that are lists
-            if phonemes.is_empty() {
-                if let (Some(ph_col), Some(start_col), Some(end_col)) = (
+            if phonemes.is_empty()
+                && let (Some(ph_col), Some(start_col), Some(end_col)) = (
                     batch.column_by_name("phoneme").cloned(),
                     get_nested_column(&batch, &["phonemes", "start"])
                         .or_else(|| batch.column_by_name("start").cloned()),
                     get_nested_column(&batch, &["phonemes", "end"])
                         .or_else(|| batch.column_by_name("end").cloned()),
+                )
+            {
+                // Try as list arrays (one list per utterance)
+                if let (Some(ph_list), Some(start_list), Some(end_list)) = (
+                    ph_col.as_list_opt::<i32>(),
+                    start_col.as_list_opt::<i32>(),
+                    end_col.as_list_opt::<i32>(),
                 ) {
-                    // Try as list arrays (one list per utterance)
-                    if let (Some(ph_list), Some(start_list), Some(end_list)) = (
-                        ph_col.as_list_opt::<i32>(),
-                        start_col.as_list_opt::<i32>(),
-                        end_col.as_list_opt::<i32>(),
-                    ) {
-                        if !ph_list.is_null(row_idx) {
-                            let ph_values = ph_list.value(row_idx);
-                            let start_values = start_list.value(row_idx);
-                            let end_values = end_list.value(row_idx);
+                    if !ph_list.is_null(row_idx) {
+                        let ph_values = ph_list.value(row_idx);
+                        let start_values = start_list.value(row_idx);
+                        let end_values = end_list.value(row_idx);
 
-                            phonemes = extract_phonemes_from_arrays(
-                                &ph_values,
-                                &start_values,
-                                &end_values,
-                            );
-                        }
+                        phonemes =
+                            extract_phonemes_from_arrays(&ph_values, &start_values, &end_values);
                     }
-                    // Try as scalar arrays (flat format, same row has single phoneme)
-                    else if let (Some(ph_arr), Some(start_arr), Some(end_arr)) = (
-                        ph_col.as_string_opt::<i32>(),
-                        start_col.as_primitive_opt::<arrow::datatypes::Float64Type>(),
-                        end_col.as_primitive_opt::<arrow::datatypes::Float64Type>(),
-                    ) {
-                        let phoneme = ph_arr.value(row_idx).to_string();
-                        let start = start_arr.value(row_idx);
-                        let end = end_arr.value(row_idx);
-                        phonemes.push(PhonemeSegment {
-                            phoneme,
-                            start,
-                            end,
-                        });
-                    }
+                }
+                // Try as scalar arrays (flat format, same row has single phoneme)
+                else if let (Some(ph_arr), Some(start_arr), Some(end_arr)) = (
+                    ph_col.as_string_opt::<i32>(),
+                    start_col.as_primitive_opt::<arrow::datatypes::Float64Type>(),
+                    end_col.as_primitive_opt::<arrow::datatypes::Float64Type>(),
+                ) {
+                    let phoneme = ph_arr.value(row_idx).to_string();
+                    let start = start_arr.value(row_idx);
+                    let end = end_arr.value(row_idx);
+                    phonemes.push(PhonemeSegment {
+                        phoneme,
+                        start,
+                        end,
+                    });
                 }
             }
 
@@ -245,20 +241,20 @@ fn extract_phonemes_from_struct(struct_array: &StructArray) -> Vec<PhonemeSegmen
     let start_col = struct_array.column_by_name("start");
     let end_col = struct_array.column_by_name("end");
 
-    if let (Some(ph), Some(st), Some(en)) = (phoneme_col, start_col, end_col) {
-        if let (Some(ph_arr), Some(st_arr), Some(en_arr)) = (
+    if let (Some(ph), Some(st), Some(en)) = (phoneme_col, start_col, end_col)
+        && let (Some(ph_arr), Some(st_arr), Some(en_arr)) = (
             ph.as_string_opt::<i32>(),
             st.as_primitive_opt::<arrow::datatypes::Float64Type>(),
             en.as_primitive_opt::<arrow::datatypes::Float64Type>(),
-        ) {
-            for i in 0..struct_array.len() {
-                if !ph_arr.is_null(i) {
-                    phonemes.push(PhonemeSegment {
-                        phoneme: ph_arr.value(i).to_string(),
-                        start: st_arr.value(i),
-                        end: en_arr.value(i),
-                    });
-                }
+        )
+    {
+        for i in 0..struct_array.len() {
+            if !ph_arr.is_null(i) {
+                phonemes.push(PhonemeSegment {
+                    phoneme: ph_arr.value(i).to_string(),
+                    start: st_arr.value(i),
+                    end: en_arr.value(i),
+                });
             }
         }
     }
