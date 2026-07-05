@@ -582,10 +582,8 @@ impl InoculationOrchestrator {
         }
 
         match &self.mode {
-            InoculationMode::UsbForge => {
-                if self.usb_device.is_none() {
-                    return Err("No USB device selected. Plug in a USB drive.".into());
-                }
+            InoculationMode::UsbForge if self.usb_device.is_none() => {
+                return Err("No USB device selected. Plug in a USB drive.".into());
             }
             InoculationMode::LanInoculate | InoculationMode::Wsl2Pivot
                 if self.ssh_target.is_none() =>
