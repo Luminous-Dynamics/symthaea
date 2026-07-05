@@ -695,7 +695,10 @@ impl VocalTractPipeline {
         phoneme: Option<&str>,
     ) -> FormantFrame {
         // Cognitive tick (10Hz)
-        if self.motor_frame_count % self.frames_per_cognitive_tick == 0 {
+        if self
+            .motor_frame_count
+            .is_multiple_of(self.frames_per_cognitive_tick)
+        {
             self.cached_hv = self.encoder.encode(cognitive_state);
             self.cached_cognitive_channels = Some(cognitive_state.to_channels());
 
@@ -723,7 +726,8 @@ impl VocalTractPipeline {
         // a cognitive re-encode frame. Saves ~0.5-1ms for ~90% of frames.
         let effective_hv = if let Some(ph) = phoneme {
             let is_same = self.prev_phoneme.as_deref() == Some(ph);
-            let is_reencode = (self.motor_frame_count - 1) % self.frames_per_cognitive_tick == 0;
+            let is_reencode =
+                (self.motor_frame_count - 1).is_multiple_of(self.frames_per_cognitive_tick);
 
             let new_bound = if is_same
                 && !is_reencode
@@ -800,10 +804,10 @@ impl VocalTractPipeline {
             if let Some(&manner) = self.phoneme_manner_map.get(ph) {
                 frame.source_type = manner;
             }
-            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph) {
-                if !is_voiced {
-                    frame.voicing = 0.0;
-                }
+            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph)
+                && !is_voiced
+            {
+                frame.voicing = 0.0;
             }
         }
 
@@ -845,7 +849,10 @@ impl VocalTractPipeline {
         prosody: &ProsodyContext,
     ) -> FormantFrame {
         // Cognitive tick (10Hz)
-        if self.motor_frame_count % self.frames_per_cognitive_tick == 0 {
+        if self
+            .motor_frame_count
+            .is_multiple_of(self.frames_per_cognitive_tick)
+        {
             self.cached_hv = self.encoder.encode(cognitive_state);
             self.cached_cognitive_channels = Some(cognitive_state.to_channels());
 
@@ -866,7 +873,8 @@ impl VocalTractPipeline {
         // Build effective HV with carryover coarticulation (same as tick_phoneme)
         let effective_hv = if let Some(ph) = phoneme {
             let is_same = self.prev_phoneme.as_deref() == Some(ph);
-            let is_reencode = (self.motor_frame_count - 1) % self.frames_per_cognitive_tick == 0;
+            let is_reencode =
+                (self.motor_frame_count - 1).is_multiple_of(self.frames_per_cognitive_tick);
 
             let new_bound = if is_same
                 && !is_reencode
@@ -958,10 +966,10 @@ impl VocalTractPipeline {
             if let Some(&manner) = self.phoneme_manner_map.get(ph) {
                 frame.source_type = manner;
             }
-            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph) {
-                if !is_voiced {
-                    frame.voicing = 0.0;
-                }
+            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph)
+                && !is_voiced
+            {
+                frame.voicing = 0.0;
             }
         }
 

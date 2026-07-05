@@ -589,11 +589,11 @@ impl VocalTractController {
                 }
             }
 
-            if let Some(prev_output) = prev_layer_output {
-                if neuron_count > 0 {
-                    let scale = 1.0 / neuron_count as f32;
-                    target_hv = prev_output.subtract(&avg_d_input.scale(scale));
-                }
+            if let Some(prev_output) = prev_layer_output
+                && neuron_count > 0
+            {
+                let scale = 1.0 / neuron_count as f32;
+                target_hv = prev_output.subtract(&avg_d_input.scale(scale));
             }
         }
     }

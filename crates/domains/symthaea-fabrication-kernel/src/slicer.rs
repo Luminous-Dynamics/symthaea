@@ -143,13 +143,13 @@ impl SliceConfig {
         if self.nozzle_diameter <= 0.0 {
             warnings.push("nozzle_diameter must be positive".into());
         }
-        if let Some(ref infill) = self.infill {
-            if infill.density <= 0.0 || infill.density > 1.0 {
-                warnings.push(format!(
-                    "infill density {} is outside (0.0, 1.0] — will be clamped",
-                    infill.density
-                ));
-            }
+        if let Some(ref infill) = self.infill
+            && (infill.density <= 0.0 || infill.density > 1.0)
+        {
+            warnings.push(format!(
+                "infill density {} is outside (0.0, 1.0] — will be clamped",
+                infill.density
+            ));
         }
         warnings
     }

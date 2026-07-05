@@ -20,6 +20,10 @@ pub struct BlueprintEngine;
 
 impl BlueprintEngine {
     /// Generate a 2D technical blueprint from a geometric thought.
+    // The elements are built up across ~40 lines of multi-field struct
+    // literals and function calls; a vec![] literal here would be far
+    // less readable than the sequential pushes.
+    #[allow(clippy::vec_init_then_push)]
     pub fn generate_blueprint(thought: &GeometricThought) -> String {
         let mut elements = Vec::new();
 

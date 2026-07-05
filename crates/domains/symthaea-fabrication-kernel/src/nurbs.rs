@@ -85,11 +85,11 @@ pub fn basis_function(knots: &[f32], i: usize, degree: u32, t: f32) -> f32 {
     // Right term: (t_{i+p+1} - t) / (t_{i+p+1} - t_{i+1})  *  N_{i+1, p-1}(t)
     let denom_right = knots.get(i + degree as usize + 1).copied().unwrap_or(0.0)
         - knots.get(i + 1).copied().unwrap_or(0.0);
-    if denom_right.abs() > 1e-10 {
-        if let Some(&k) = knots.get(i + degree as usize + 1) {
-            let right = (k - t) / denom_right;
-            result += right * basis_function(knots, i + 1, degree - 1, t);
-        }
+    if denom_right.abs() > 1e-10
+        && let Some(&k) = knots.get(i + degree as usize + 1)
+    {
+        let right = (k - t) / denom_right;
+        result += right * basis_function(knots, i + 1, degree - 1, t);
     }
 
     result
