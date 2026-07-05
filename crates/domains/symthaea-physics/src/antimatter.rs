@@ -25,9 +25,6 @@ const PP_ANNIHILATION_MEV: f64 = 1876.544;
 /// Charged pion fraction (directable energy)
 const CHARGED_FRACTION: f64 = 0.40;
 
-/// Average pion multiplicity in p-pbar annihilation
-const AVG_PION_MULTIPLICITY: f64 = 5.0;
-
 // ── Physics Functions ──────────────────────────────────────────────────
 
 /// Energy released per proton-antiproton annihilation event (MeV).

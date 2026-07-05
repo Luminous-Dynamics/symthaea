@@ -285,15 +285,15 @@ impl PlasmaReading {
     /// Check if value is in critical range
     pub fn is_critical(&self) -> bool {
         if let Some((low, high)) = self.sensor.critical_thresholds() {
-            if let Some(low_thresh) = low {
-                if self.value < low_thresh {
-                    return true;
-                }
+            if let Some(low_thresh) = low
+                && self.value < low_thresh
+            {
+                return true;
             }
-            if let Some(high_thresh) = high {
-                if self.value > high_thresh {
-                    return true;
-                }
+            if let Some(high_thresh) = high
+                && self.value > high_thresh
+            {
+                return true;
             }
         }
         false
@@ -591,18 +591,18 @@ impl PlasmaHdcEncoder {
         let state_hv = BinaryHV::bundle_safe(&encoded);
 
         // Optionally add derivative encoding
-        if self.config.encode_derivatives {
-            if let Some(ref prev) = self.prev_state {
-                let derivative_hv = self.encode_derivatives(prev, state);
-                // Weighted bundle of state and derivatives
-                let weighted = BinaryHV::bundle_safe(&[
-                    state_hv,
-                    state_hv, // 2x weight for state
-                    derivative_hv,
-                ]);
-                self.prev_state = Some(state.clone());
-                return weighted;
-            }
+        if self.config.encode_derivatives
+            && let Some(ref prev) = self.prev_state
+        {
+            let derivative_hv = self.encode_derivatives(prev, state);
+            // Weighted bundle of state and derivatives
+            let weighted = BinaryHV::bundle_safe(&[
+                state_hv,
+                state_hv, // 2x weight for state
+                derivative_hv,
+            ]);
+            self.prev_state = Some(state.clone());
+            return weighted;
         }
 
         self.prev_state = Some(state.clone());

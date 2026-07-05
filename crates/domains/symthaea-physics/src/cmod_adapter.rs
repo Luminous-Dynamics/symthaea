@@ -562,10 +562,10 @@ pub fn compute_statistics(shots: &[CModShot]) -> DatasetStats {
             wmhd_vals.push(sample.wmhd);
             beta_vals.push(sample.beta);
 
-            if let Some(ttd) = sample.time_to_disruption_ms {
-                if ttd > 0.0 {
-                    ttd_vals.push(ttd as f32);
-                }
+            if let Some(ttd) = sample.time_to_disruption_ms
+                && ttd > 0.0
+            {
+                ttd_vals.push(ttd as f32);
             }
         }
     }
