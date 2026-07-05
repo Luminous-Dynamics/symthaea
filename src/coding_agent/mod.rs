@@ -842,7 +842,7 @@ impl CodingAgent {
     // Can't collapse the Fixing arm's inner `if` into a match guard: guards only
     // get an immutable borrow of the scrutinee, but try_structured_auto_fix()
     // needs &mut self.
-    #[allow(clippy::collapsible_if)]
+    #[allow(clippy::collapsible_if, clippy::collapsible_match)]
     fn pre_cycle_action(&mut self) {
         match self.phase {
             TaskPhase::Understanding => {

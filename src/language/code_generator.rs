@@ -2034,23 +2034,29 @@ impl CodeGenerator {
                     }
                 }
                 // .dedup() on iterator → restructure to Vec method
-                "wrong_method" if stderr.contains("dedup") && fixed.contains(".dedup()") => {
-                    // Check if dedup is chained on an iterator (not on a Vec binding)
-                    if fixed.contains(".iter()") && fixed.contains(".dedup()") {
-                        // Cannot auto-fix complex chains — flag for regeneration
-                    }
+                // Check if dedup is chained on an iterator (not on a Vec binding)
+                "wrong_method"
+                    if stderr.contains("dedup")
+                        && fixed.contains(".dedup()")
+                        && fixed.contains(".iter()")
+                        && fixed.contains(".dedup()") =>
+                {
+                    // Cannot auto-fix complex chains — flag for regeneration
                 }
                 // &T vs T: add .copied() or .cloned() before .collect()
-                "type_mismatch" if stderr.contains("expected") && fixed.contains(".iter()") => {
-                    if !fixed.contains(".cloned()") && !fixed.contains(".copied()") {
-                        fixed = fixed.replace(".iter().collect()", ".iter().cloned().collect()");
-                        fixed = fixed.replace(
-                            ".iter().enumerate().collect()",
-                            ".into_iter().enumerate().collect()",
-                        );
-                        fixed = fixed.replace(".iter().zip(", ".into_iter().zip(");
-                        applied = true;
-                    }
+                "type_mismatch"
+                    if stderr.contains("expected")
+                        && fixed.contains(".iter()")
+                        && !fixed.contains(".cloned()")
+                        && !fixed.contains(".copied()") =>
+                {
+                    fixed = fixed.replace(".iter().collect()", ".iter().cloned().collect()");
+                    fixed = fixed.replace(
+                        ".iter().enumerate().collect()",
+                        ".into_iter().enumerate().collect()",
+                    );
+                    fixed = fixed.replace(".iter().zip(", ".into_iter().zip(");
+                    applied = true;
                 }
                 // Replace empty closures |x| ) with a default
                 "empty_closure" if fixed.contains("|x| )") || fixed.contains("|x| /* ") => {

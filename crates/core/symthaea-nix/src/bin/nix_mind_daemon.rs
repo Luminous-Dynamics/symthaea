@@ -371,15 +371,39 @@ impl DaemonState {
                 );
             }
 
+            // Query root causes from the causal graph
+            let causal_analysis = self.causal_graph.analyze_root_causes(&anomaly.entry.unit);
+            let causal_suggestion = if !causal_analysis.root_causes.is_empty() {
+                let causes: Vec<String> = causal_analysis
+                    .root_causes
+                    .iter()
+                    .take(3)
+                    .map(|rc| format!("{} ({:.1}%)", rc.variable, rc.confidence * 100.0))
+                    .collect();
+                Some(format!("Causal analysis suspects: {}", causes.join(", ")))
+            } else {
+                None
+            };
+
             // Enrich anomaly with NixOS domain diagnosis (AS/AW)
             let diag = self.nix_plugin.diagnose_error(&anomaly.entry.message);
+
+            let suggestion = match (
+                diag.as_ref().and_then(|d| d.suggestion.clone()),
+                causal_suggestion,
+            ) {
+                (Some(s), Some(cs)) => Some(format!("{}. {}", s, cs)),
+                (Some(s), None) => Some(s),
+                (None, Some(cs)) => Some(cs),
+                (None, None) => None,
+            };
 
             self.recent_anomalies.push(AnomalyEntry {
                 score: anomaly.anomaly_score as f64,
                 reason: anomaly.reason.clone(),
                 unit: anomaly.entry.unit.clone(),
                 error_type: diag.as_ref().map(|d| d.error_type.clone()),
-                suggestion: diag.as_ref().and_then(|d| d.suggestion.clone()),
+                suggestion,
             });
         }
 
@@ -1618,5 +1642,34 @@ mod tests {
         );
         // Should return empty alerts
         assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_anomaly_remediation_enriched_with_causal_graph_suggestions() {
+        let mut causal_graph = NixCausalGraph::new(42);
+
+        // Inject a causal edge: "services.postgresql.enable" causes "postgresql"
+        causal_graph.add_structural_edge("services.postgresql.enable", "postgresql", 0.85);
+
+        // Analyze root causes of postgresql symptom
+        let analysis = causal_graph.analyze_root_causes("postgresql");
+        assert_eq!(analysis.root_causes.len(), 1);
+        assert_eq!(
+            analysis.root_causes[0].variable,
+            "services.postgresql.enable"
+        );
+        assert!((analysis.root_causes[0].confidence - 0.85).abs() < 1e-6);
+
+        // Construct suggestion
+        let causes: Vec<String> = analysis
+            .root_causes
+            .iter()
+            .take(3)
+            .map(|rc| format!("{} ({:.1}%)", rc.variable, rc.confidence * 100.0))
+            .collect();
+        let causal_suggestion = format!("Causal analysis suspects: {}", causes.join(", "));
+
+        assert!(causal_suggestion.contains("services.postgresql.enable"));
+        assert!(causal_suggestion.contains("85.0%"));
     }
 }
