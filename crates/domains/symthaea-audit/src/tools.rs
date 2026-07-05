@@ -317,6 +317,31 @@ impl Sandbox {
         run_git(cmd)
     }
 
+    /// Diffs an arbitrary git ref range (e.g. `main..HEAD`, `HEAD~3..HEAD`), for
+    /// reviewing a set of commits rather than just uncommitted working-tree changes.
+    /// `range` is operator-supplied (a CLI flag, not something the model chooses), so
+    /// passing it straight to `git diff` as a single discrete argument is the same
+    /// trust boundary as `--allow-exec`: the human running the tool controls it, the
+    /// model never does. `git` itself validates the range syntax.
+    pub fn git_diff_range(&self, range: &str) -> Result<String, SandboxViolation> {
+        let mut cmd = Command::new("git");
+        cmd.arg("-C").arg(&self.root).arg("diff").arg(range);
+        run_git(cmd)
+    }
+
+    /// Lists just the changed file paths (not full diff content) for a ref range —
+    /// used to scope the pre-scan and give the model a quick manifest before the full
+    /// diff text.
+    pub fn git_diff_name_status(&self, range: &str) -> Result<String, SandboxViolation> {
+        let mut cmd = Command::new("git");
+        cmd.arg("-C")
+            .arg(&self.root)
+            .arg("diff")
+            .arg("--name-status")
+            .arg(range);
+        run_git(cmd)
+    }
+
     pub fn loc_count(&self, path: Option<&str>) -> Result<String, SandboxViolation> {
         let scope = self.resolve(path.unwrap_or(""))?;
         let mut by_ext: std::collections::BTreeMap<String, usize> =
@@ -573,5 +598,57 @@ mod tests {
         let sandbox = Sandbox::new(&fixture.root, vec!["true".to_string()]).unwrap();
         let result = sandbox.run_check("true");
         assert!(result.is_ok());
+    }
+
+    fn build_git_repo_with_two_commits() -> (tempfile::TempDir, PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("repo");
+        fs::create_dir_all(&root).unwrap();
+        let git = |args: &[&str]| {
+            let status = Command::new("git")
+                .arg("-C")
+                .arg(&root)
+                .args(args)
+                .env("GIT_AUTHOR_NAME", "t")
+                .env("GIT_AUTHOR_EMAIL", "t@t.com")
+                .env("GIT_COMMITTER_NAME", "t")
+                .env("GIT_COMMITTER_EMAIL", "t@t.com")
+                .status()
+                .unwrap();
+            assert!(status.success(), "git {args:?} failed");
+        };
+        git(&["init", "-q"]);
+        fs::write(root.join("a.rs"), "fn a() {}\n").unwrap();
+        git(&["add", "a.rs"]);
+        git(&["commit", "-q", "-m", "first"]);
+        fs::write(root.join("a.rs"), "fn a() { /* changed */ }\n").unwrap();
+        fs::write(root.join("b.rs"), "fn b() {}\n").unwrap();
+        git(&["add", "-A"]);
+        git(&["commit", "-q", "-m", "second"]);
+        let root = root.canonicalize().unwrap();
+        (tmp, root)
+    }
+
+    #[test]
+    fn git_diff_range_shows_changes_between_commits() {
+        let (_tmp, root) = build_git_repo_with_two_commits();
+        let sandbox = Sandbox::new(&root, vec![]).unwrap();
+        let diff = sandbox.git_diff_range("HEAD~1..HEAD").unwrap();
+        assert!(diff.contains("a.rs"));
+        assert!(diff.contains("b.rs"));
+        assert!(diff.contains("changed"));
+    }
+
+    #[test]
+    fn git_diff_name_status_lists_changed_files_only() {
+        let (_tmp, root) = build_git_repo_with_two_commits();
+        let sandbox = Sandbox::new(&root, vec![]).unwrap();
+        let out = sandbox.git_diff_name_status("HEAD~1..HEAD").unwrap();
+        assert!(out.contains("a.rs"));
+        assert!(out.contains("b.rs"));
+        assert!(
+            !out.contains("/* changed */"),
+            "name-status should not include diff bodies"
+        );
     }
 }

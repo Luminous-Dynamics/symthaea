@@ -1511,6 +1511,55 @@ predating this fix, doesn't fail the suite). Hand-verified against
 (`test_wrap_for_return_option`, `test_wrap_for_return_result`) — neither
 touches any of the new guard conditions, unaffected.
 
+**Operational note**: partway through committing this fix, `git log` briefly
+showed unfamiliar history — traced (not reverted) to the fix having been
+scooped, byte-for-byte, into a concurrent session's much larger commit
+(`3bce715b81`, confirmed via `git show`). Nothing was lost, but it's a real
+gap in this repo's safety tooling: the pre-commit hook catches cross-project
+scoops but not same-project ones (per `.claude/rules/CONCURRENT_SESSIONS.md`'s
+own "what still doesn't protect you" section).
+
+## 2026-07-05 Update: Rust-native orchestrator test + two more bugs found
+
+Built `examples/rust_orchestrator_benchmark.rs` (kept, registered
+permanently) — the first fair, Rust-native comparison of `CodingAgent` with
+`use_orchestrator: false` vs `true`, reusing 3 of `code_generation_benchmark.rs`'s
+`expects_llm` cases (knapsack, http_parse, binary_tree_traversal) with real
+correctness assertions (not just fragment checks) verified via
+`execute_rust_with_inline_tests` — which, unlike Python, this stack can
+actually verify.
+
+**Result: inconclusive on the core question, but two more real bugs found.**
+Neither `use_orchestrator` setting passed any of the 3 (genuinely hard for a
+local 7B model) — not yet the clean signal needed to judge the orchestrator's
+value. But:
+
+- **`strip_code_fences()` bug** (`coding_agent/code_utils.rs`): required the
+  closing `` ``` `` to be the literal string suffix — any trailing LLM prose
+  after it ("```\n\nThis solution uses...") silently no-opped the whole
+  strip, leaving a raw `` ```rust `` marker in code that then failed to
+  compile. Fixed: now finds the first closing fence via `.find()` instead of
+  requiring an exact suffix match. Caught this in `orchestrator=true`'s
+  `knapsack` failure.
+- **`coding_agent/tests.rs` is entirely disconnected from compilation** —
+  `mod.rs`'s `mod tests;` has been commented out since commit `af48722c00`,
+  with only a vague note ("pre-existing broken imports"). Attempted to
+  re-enable it to give the `strip_code_fences` fix real regression coverage;
+  found **384 concrete compile errors** (E0422/E0425/E0433 — stale references
+  to renamed/removed APIs accumulated while disconnected). This is a
+  substantial standalone effort, not a quick unblock — left disabled, noted
+  precisely (previously just "pre-existing broken imports", no count).
+  Instead added a small working `#[cfg(test)] mod tests` directly in
+  `code_utils.rs` for `strip_code_fences` specifically (6 cases, including a
+  regression test for the trailing-prose bug), verified passing.
+
+**Recommendation for whoever picks up the Rust-orchestrator question next**:
+`examples/rust_orchestrator_benchmark.rs` is ready to extend — add more
+`expects_llm`-style cases with real assertions (the existing 5
+`build_complex_llm_cases()` only have weak "function exists" checks; 2 of
+the 3 tried here needed real assertions written from scratch) until a clean
+sample size gives a trustworthy pass-rate delta between orchestrator on/off.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*

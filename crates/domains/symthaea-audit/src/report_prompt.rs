@@ -6,6 +6,7 @@
 /// Baked into the binary via `include_str!` — no runtime file dependency.
 const TEMPLATE: &str = include_str!("../templates/audit_system_prompt.md");
 const VERIFY_TEMPLATE: &str = include_str!("../templates/verify_system_prompt.md");
+const DIFF_REVIEW_TEMPLATE: &str = include_str!("../templates/diff_review_prompt.md");
 
 const RUN_CHECK_DOC: &str = "- `run_check` — `{\"type\": \"run_check\", \"cmd\": \"...\"}` — run a \
     whitelisted read-only command (e.g. a compile check). Only the exact commands the operator \
@@ -35,6 +36,26 @@ pub fn build_system_prompt(focus: Option<&str>, run_check_enabled: bool) -> Stri
 pub fn build_verification_prompt(run_check_enabled: bool) -> String {
     let run_check_doc = if run_check_enabled { RUN_CHECK_DOC } else { "" };
     VERIFY_TEMPLATE.replace("{run_check_doc}", run_check_doc)
+}
+
+/// Builds the diff-review system prompt. Like [`build_system_prompt`], `focus` adds an
+/// optional framing clause; unlike it, the diff content itself is seeded into the
+/// initial user turn by the caller (same pattern as [`build_verification_prompt`]'s
+/// draft report), so this prompt stays generic and reusable across different diffs.
+pub fn build_diff_review_prompt(focus: Option<&str>, run_check_enabled: bool) -> String {
+    let focus_clause = match focus {
+        Some(f) => format!(
+            "Additional context on what this change is supposed to do: {f}. Use this to \
+             judge SCOPE — does the diff actually match this stated purpose?"
+        ),
+        None => "No additional context on the change's intended purpose was given — judge \
+                 SCOPE from the diff and commit history alone."
+            .to_string(),
+    };
+    let run_check_doc = if run_check_enabled { RUN_CHECK_DOC } else { "" };
+    DIFF_REVIEW_TEMPLATE
+        .replace("{focus_clause}", &focus_clause)
+        .replace("{run_check_doc}", run_check_doc)
 }
 
 #[cfg(test)]
@@ -95,5 +116,33 @@ mod tests {
     fn verification_prompt_documents_run_check_when_enabled() {
         let prompt = build_verification_prompt(true);
         assert!(prompt.contains("run_check"));
+    }
+
+    #[test]
+    fn diff_review_prompt_has_five_sections_and_no_placeholders() {
+        let prompt = build_diff_review_prompt(None, false);
+        for section in [
+            "SCOPE",
+            "SAFETY-CRITICAL SURFACE",
+            "TEST COVERAGE OF THE CHANGE",
+            "DOCS VS. THE NEW REALITY",
+            "RELEASE GATE",
+        ] {
+            assert!(prompt.contains(section), "missing section: {section}");
+        }
+        assert!(!prompt.contains("{focus_clause}"));
+        assert!(!prompt.contains("{run_check_doc}"));
+    }
+
+    #[test]
+    fn diff_review_prompt_interpolates_focus() {
+        let prompt = build_diff_review_prompt(Some("fixes the login bug"), false);
+        assert!(prompt.contains("fixes the login bug"));
+    }
+
+    #[test]
+    fn diff_review_prompt_hides_run_check_when_disabled() {
+        let prompt = build_diff_review_prompt(None, false);
+        assert!(!prompt.contains("run_check"));
     }
 }

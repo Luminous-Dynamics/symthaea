@@ -39,11 +39,17 @@ fn test_goal_setting() {
 fn test_consciousness_update() {
     let mut mind = ContinuousMind::default();
 
-    for i in 0..5 {
+    // 15 ticks, not 5: ConsciousnessCore's default min_samples is 5, so a
+    // 5-tick test hits the window threshold on its very last tick, switching
+    // from the nonzero pairwise-dissimilarity fallback to the real spectral
+    // MIP Phi computation for the first time -- with only 5 samples that
+    // covariance-based computation can legitimately land at ~0.0. Ticking
+    // well past the threshold gives the real measurement room to stabilize.
+    for i in 0..15 {
         mind.perceive(ContinuousHV::random(512, 42 + i as u64));
     }
 
-    for _ in 0..5 {
+    for _ in 0..15 {
         mind.tick();
     }
 

@@ -45,19 +45,27 @@ impl CodingAgent {
     /// LLM and template outputs sometimes wrap code in ```rust ... ``` blocks.
     pub(super) fn strip_code_fences(code: &str) -> String {
         let trimmed = code.trim();
-        // Check for ```rust or ``` at start
+        // Check for ```rust or ``` at start. Look for the closing fence via
+        // `find` (first occurrence after the opener) rather than requiring it
+        // to be the literal string suffix — LLMs routinely append trailing
+        // prose after the closing fence ("```\n\nThis solution uses...."),
+        // which previously made the whole strip silently no-op, leaving the
+        // raw fence marker in code that then failed to compile.
         if let Some(rest) = trimmed.strip_prefix("```rust") {
-            if let Some(inner) = rest.strip_suffix("```") {
-                return inner.trim().to_string();
-            }
+            let rest = rest.strip_prefix('\n').unwrap_or(rest);
+            return match rest.find("```") {
+                Some(close_idx) => rest[..close_idx].trim().to_string(),
+                None => rest.trim().to_string(),
+            };
         }
         if let Some(rest) = trimmed.strip_prefix("```") {
             // Could be ```\n...``` or ```rs\n...```
             let rest = rest.strip_prefix("rs").unwrap_or(rest);
             let rest = rest.strip_prefix('\n').unwrap_or(rest);
-            if let Some(inner) = rest.strip_suffix("```") {
-                return inner.trim().to_string();
-            }
+            return match rest.find("```") {
+                Some(close_idx) => rest[..close_idx].trim().to_string(),
+                None => rest.trim().to_string(),
+            };
         }
         code.to_string()
     }
@@ -465,5 +473,49 @@ impl CodingAgent {
         } else {
             normalized.trim().to_string()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CodingAgent;
+
+    // Mirrors tests.rs::test_strip_code_fences (that file is currently
+    // disconnected from compilation — see mod.rs's `mod tests` comment —
+    // so this gives strip_code_fences real, running coverage).
+    #[test]
+    fn test_strip_code_fences() {
+        assert_eq!(
+            CodingAgent::strip_code_fences("fn main() {}"),
+            "fn main() {}"
+        );
+        assert_eq!(
+            CodingAgent::strip_code_fences("```rust\nfn main() {}\n```"),
+            "fn main() {}"
+        );
+        assert_eq!(
+            CodingAgent::strip_code_fences("```\nfn main() {}\n```"),
+            "fn main() {}"
+        );
+        assert_eq!(
+            CodingAgent::strip_code_fences("```rs\nfn main() {}\n```"),
+            "fn main() {}"
+        );
+        assert_eq!(
+            CodingAgent::strip_code_fences("  ```rust\n  fn main() {}\n  ```  "),
+            "fn main() {}"
+        );
+        // Trailing prose after the closing fence (common LLM behavior) must
+        // not prevent stripping — previously required the closing fence to
+        // be the literal string suffix, so trailing text silently no-opped
+        // the whole strip, leaving the raw ```rust marker in code that then
+        // failed to compile (found via the Rust-native orchestrator
+        // benchmark, 2026-07-05).
+        assert_eq!(
+            CodingAgent::strip_code_fences(
+                "```rust\nfn main() {}\n```\n\nThis solution uses a simple approach."
+            ),
+            "fn main() {}"
+        );
     }
 }

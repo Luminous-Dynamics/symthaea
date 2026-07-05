@@ -33,6 +33,7 @@ pub mod nuclear_transfer;
 pub mod organoid_pipeline;
 mod packing;
 pub mod quality_control;
+mod regeneration_agent;
 pub mod reprogramming;
 mod spatial_grid;
 pub mod types;

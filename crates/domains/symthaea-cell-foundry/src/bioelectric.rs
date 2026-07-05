@@ -642,22 +642,25 @@ impl MorphogeneticField {
 
     /// Extra proliferation pass restricted to wound-boundary progenitors,
     /// at a boosted rate — models blastema-like accelerated regenerative
-    /// growth. Called from [`NeuralOrganoid::advance_regeneration`].
-    pub(crate) fn regenerative_proliferate(&mut self) {
+    /// growth. Called from [`NeuralOrganoid::advance_regeneration`], which
+    /// always passes `boost_multiplier = 1.0` (reproducing the legacy flat
+    /// rate exactly) unless the opt-in active-inference regeneration agent
+    /// (`crate::regeneration_agent::RegenerationAgent`) is enabled, in which
+    /// case the agent's chosen multiplier is passed instead. `boost_multiplier`
+    /// scales [`REGENERATION_PROLIFERATION_BOOST`] (clamped into `[0.0,
+    /// 1.0]` after scaling, since it's used as a `rng.gen_bool` probability).
+    pub(crate) fn regenerative_proliferate_with_boost(&mut self, boost_multiplier: f64) {
         let n = self.cells.len();
         if n >= MAX_CELLS {
             return;
         }
+        let effective_rate = (REGENERATION_PROLIFERATION_BOOST * boost_multiplier).clamp(0.0, 1.0);
         let mut new_cells = Vec::new();
         for i in 0..n {
             if !self.bioelectric.wound_boundary[i] || !self.cells[i].cell_type.is_progenitor() {
                 continue;
             }
-            if self
-                .bioelectric
-                .rng
-                .gen_bool(REGENERATION_PROLIFERATION_BOOST.min(1.0))
-            {
+            if self.bioelectric.rng.gen_bool(effective_rate) {
                 let mut daughter = self.cells[i].clone();
                 for d in 0..3 {
                     daughter.position[d] += self.bioelectric.rng.gen_range(-0.02..0.02f32);
@@ -1160,7 +1163,40 @@ impl NeuralOrganoid {
         if self.is_regenerating() {
             let discrepancy = self.morphology_discrepancy().unwrap_or(0.0);
             if discrepancy > MORPHOLOGY_CONVERGENCE_TOLERANCE {
-                self.field.regenerative_proliferate();
+                let boost_multiplier = if self.fep_regeneration_enabled {
+                    let n = self.field.num_cells().max(1) as f64;
+                    let defected_fraction = self
+                        .field
+                        .bioelectric
+                        .defected
+                        .iter()
+                        .filter(|&&d| d)
+                        .count() as f64
+                        / n;
+                    let wound_boundary_fraction = self
+                        .field
+                        .bioelectric
+                        .wound_boundary
+                        .iter()
+                        .filter(|&&w| w)
+                        .count() as f64
+                        / n;
+                    let days_since_wound_frac =
+                        (self.days_since_wound as f64 / REGENERATION_TIMEOUT_DAYS as f64).min(1.0);
+                    let agent = self
+                        .regeneration_agent
+                        .get_or_insert_with(crate::regeneration_agent::RegenerationAgent::new);
+                    agent.decide(
+                        discrepancy,
+                        days_since_wound_frac,
+                        defected_fraction,
+                        wound_boundary_fraction,
+                    )
+                } else {
+                    1.0
+                };
+                self.field
+                    .regenerative_proliferate_with_boost(boost_multiplier);
             } else {
                 for w in self.field.bioelectric.wound_boundary.iter_mut() {
                     *w = false;
@@ -1168,6 +1204,22 @@ impl NeuralOrganoid {
             }
         }
         self.days_since_wound = self.days_since_wound.saturating_add(1);
+    }
+
+    /// Enable or disable the opt-in active-inference regeneration agent
+    /// (`crate::regeneration_agent`), which replaces the flat-rate
+    /// proliferation-boost rule in `advance_regeneration` with genuine
+    /// free-energy-minimizing action selection. Defaults to `false` --
+    /// disabled, `advance_regeneration` behaves exactly as before this
+    /// existed.
+    pub fn set_fep_regeneration_enabled(&mut self, enabled: bool) {
+        self.fep_regeneration_enabled = enabled;
+    }
+
+    /// Whether the active-inference regeneration agent is currently
+    /// enabled.
+    pub fn fep_regeneration_enabled(&self) -> bool {
+        self.fep_regeneration_enabled
     }
 }
 
@@ -1818,5 +1870,34 @@ mod tests {
                 "Vmem should stay bounded under the ion-channel model, got {v}"
             );
         }
+    }
+
+    #[test]
+    fn fep_regeneration_disabled_by_default() {
+        let organoid = NeuralOrganoid::new(10, 24);
+        assert!(!organoid.fep_regeneration_enabled());
+    }
+
+    #[test]
+    fn fep_regeneration_produces_valid_boost_and_does_not_panic() {
+        let mut organoid = NeuralOrganoid::new(60, 25);
+        organoid.set_fep_regeneration_enabled(true);
+        for _ in 0..20 {
+            organoid.advance_day();
+        }
+        organoid.capture_target_morphology();
+        organoid.amputate(0.6, 2.0);
+
+        // Several days of an active regeneration episode -- this is the
+        // window advance_regeneration actually calls into the FEP agent.
+        for _ in 0..15 {
+            organoid.advance_day();
+        }
+
+        assert!(
+            organoid.regeneration_agent.is_some(),
+            "the regeneration agent should have been lazily constructed once \
+             an active regeneration episode ran with fep_regeneration_enabled"
+        );
     }
 }

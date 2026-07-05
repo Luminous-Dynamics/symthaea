@@ -1691,6 +1691,18 @@ fn test_strip_code_fences() {
         CodingAgent::strip_code_fences("  ```rust\n  fn main() {}\n  ```  "),
         "fn main() {}"
     );
+
+    // Trailing prose after the closing fence (common LLM behavior) must not
+    // prevent stripping — previously required the closing fence to be the
+    // literal string suffix, so any trailing text silently no-opped the
+    // whole strip, leaving the raw ```rust marker in code that then failed
+    // to compile (found via the Rust-native orchestrator benchmark, 2026-07-05).
+    assert_eq!(
+        CodingAgent::strip_code_fences(
+            "```rust\nfn main() {}\n```\n\nThis solution uses a simple approach."
+        ),
+        "fn main() {}"
+    );
 }
 
 // ── Sanitizer Tests ──────────────────────────────────────────────

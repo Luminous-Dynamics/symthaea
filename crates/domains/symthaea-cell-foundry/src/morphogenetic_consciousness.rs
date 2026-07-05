@@ -661,6 +661,19 @@ pub struct NeuralOrganoid {
     /// `NeuralOrganoid::set_packing_enabled`. Defaults to `false` for the
     /// same reason as `positional_homing_enabled`.
     pub(crate) packing_enabled: bool,
+    /// Whether the opt-in active-inference regeneration agent
+    /// (`crate::regeneration_agent`) drives proliferation-boost rate during
+    /// regeneration, replacing the default flat-rate rule. See
+    /// `NeuralOrganoid::set_fep_regeneration_enabled`. Defaults to `false`
+    /// for the same reason as `positional_homing_enabled`.
+    pub(crate) fep_regeneration_enabled: bool,
+    /// Lazily-constructed regeneration agent, only ever `Some` once
+    /// regeneration has actually run with `fep_regeneration_enabled` set.
+    /// Not serialized -- `ActiveInferenceAgent` doesn't derive
+    /// `Serialize`/`Deserialize` (same reasoning as skipping the seeded RNG
+    /// fields elsewhere in this crate).
+    #[serde(skip)]
+    pub(crate) regeneration_agent: Option<crate::regeneration_agent::RegenerationAgent>,
 }
 
 impl NeuralOrganoid {
@@ -677,6 +690,8 @@ impl NeuralOrganoid {
             days_since_wound: 0,
             positional_homing_enabled: false,
             packing_enabled: false,
+            fep_regeneration_enabled: false,
+            regeneration_agent: None,
         }
     }
 

@@ -14,6 +14,7 @@
 
 pub mod agent_loop;
 pub mod cli;
+pub mod diff_review;
 pub mod heuristics;
 pub mod llm_client;
 pub mod prefetch;

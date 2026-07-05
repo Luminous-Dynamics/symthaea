@@ -25,8 +25,21 @@ BASELINE_ROOT="${BROCA_BASELINE_ROOT:-target/broca-baselines}"
 BASELINE_POINTER="$BROCA_DATA_DIR/models/measurements/CURRENT_BASELINE"
 
 MIN_NEW_OBJECTIVES="${BROCA_CURRICULUM_MIN_NEW_OBJECTIVES:-20}"
-CYCLE_EPOCHS="${BROCA_CYCLE_EPOCHS:-3}"
-CYCLE_LR="${BROCA_CYCLE_LR:-0.0002}"
+# Defaults lowered 2026-07-05 after the first real cycle (177 real objectives,
+# candidate 20260705T094221Z): 3 epochs @ lr=0.0002 drove val_loss from a
+# healthy start to 17.87 (train loss looked fine at 2.54) -- the gate's
+# automated metrics didn't catch it (known blind spot, see
+# fuzzy-beaming-brook.md), but manual inspection of topic-coverage-report.json
+# showed the candidate had collapsed to repeating the same degenerate string
+# regardless of input topic. Training data itself was verified coherent, so
+# this is a hyperparameter problem, not a data-quality one: --resume starts
+# from an already-converged model, and the original epochs/lr (tuned for
+# training from scratch) are too aggressive for continued fine-tuning on a
+# comparatively small new slice. NOT re-validated with a fresh run this
+# session (that's itself a multi-hour job) -- treat as a first evidence-based
+# adjustment, not a proven-correct value.
+CYCLE_EPOCHS="${BROCA_CYCLE_EPOCHS:-1}"
+CYCLE_LR="${BROCA_CYCLE_LR:-0.00003}"
 
 cargo_locked_args=()
 if [[ "${BROCA_CARGO_UNLOCKED:-0}" != "1" ]]; then

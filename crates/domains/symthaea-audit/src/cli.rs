@@ -72,6 +72,15 @@ pub struct Cli {
     /// this tool's highest-value finding shape.
     #[arg(long, default_value_t = false)]
     pub no_hints: bool,
+
+    /// Review a diff instead of auditing the whole repo — a git ref range, e.g.
+    /// "main..HEAD" or "HEAD~3..HEAD". Switches to the five-section diff-review report
+    /// (SCOPE / SAFETY-CRITICAL SURFACE / TEST COVERAGE / DOCS VS. THE NEW REALITY /
+    /// RELEASE GATE) instead of the six-section whole-repo audit. The model still has
+    /// full read-only tool access to the target's current state, not just the diff
+    /// text. `--focus` becomes framing for the change's intended purpose in this mode.
+    #[arg(long)]
+    pub review_diff: Option<String>,
 }
 
 impl Cli {
@@ -134,6 +143,7 @@ mod tests {
             single_shot_paths: None,
             verify: false,
             no_hints: false,
+            review_diff: None,
         };
         assert_eq!(
             cli.allow_exec_list(),
@@ -159,6 +169,7 @@ mod tests {
             single_shot_paths: None,
             verify: false,
             no_hints: false,
+            review_diff: None,
         };
         assert!(cli.allow_exec_list().is_empty());
     }

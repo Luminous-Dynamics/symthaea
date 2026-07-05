@@ -432,6 +432,7 @@ mod tests {
             single_shot_paths: None,
             verify: false,
             no_hints: false,
+            review_diff: None,
         }
     }
 

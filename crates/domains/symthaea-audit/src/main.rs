@@ -5,7 +5,8 @@
 
 use clap::Parser;
 use symthaea_audit::{
-    agent_loop, cli::Cli, heuristics, llm_client, prefetch, report_prompt, tools::Sandbox, verify,
+    agent_loop, cli::Cli, diff_review, heuristics, llm_client, prefetch, report_prompt,
+    tools::Sandbox, verify,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -31,6 +32,34 @@ fn main() -> anyhow::Result<()> {
             "[symthaea-audit] run_check enabled for: {:?}",
             sandbox.allow_exec()
         );
+    }
+
+    if let Some(range) = cli.review_diff.as_deref() {
+        eprintln!("[symthaea-audit] reviewing diff: {range}");
+        let outcome = diff_review::run_diff_review(
+            client.as_ref(),
+            &sandbox,
+            range,
+            cli.focus.as_deref(),
+            cli.max_turns,
+        )?;
+        eprintln!(
+            "[symthaea-audit] done in {} turn(s){}",
+            outcome.turns_used,
+            if outcome.truncated_by_turn_budget {
+                " (truncated)"
+            } else {
+                ""
+            }
+        );
+        let final_report = maybe_verify(&cli, client.as_ref(), &sandbox, outcome.report);
+        let out_path = cli
+            .out
+            .clone()
+            .unwrap_or_else(|| default_report_path(&target));
+        std::fs::write(&out_path, &final_report)?;
+        eprintln!("[symthaea-audit] report written to {}", out_path.display());
+        return Ok(());
     }
 
     let mut initial_context = String::new();
@@ -91,33 +120,7 @@ fn main() -> anyhow::Result<()> {
         }
     );
 
-    let mut final_report = outcome.report;
-    if cli.verify {
-        eprintln!("[symthaea-audit] running verification pass");
-        match verify::run_verification_pass(client.as_ref(), &sandbox, &final_report, cli.max_turns)
-        {
-            Ok(verify_outcome) => {
-                eprintln!(
-                    "[symthaea-audit] verification done in {} turn(s){}",
-                    verify_outcome.turns_used,
-                    if verify_outcome.truncated_by_turn_budget {
-                        " (truncated)"
-                    } else {
-                        ""
-                    }
-                );
-                final_report.push_str("\n\n---\n\n");
-                final_report.push_str(&verify_outcome.report);
-            }
-            Err(e) => {
-                eprintln!(
-                    "[symthaea-audit] verification pass failed, keeping original report: {e}"
-                );
-                final_report.push_str(&format!("\n\n---\n\n(verification pass failed: {e})\n"));
-            }
-        }
-    }
-
+    let final_report = maybe_verify(&cli, client.as_ref(), &sandbox, outcome.report);
     let out_path = cli
         .out
         .clone()
@@ -126,6 +129,40 @@ fn main() -> anyhow::Result<()> {
     eprintln!("[symthaea-audit] report written to {}", out_path.display());
 
     Ok(())
+}
+
+/// Runs the verification pass if `--verify` was set, appending (never replacing) its
+/// output to `report`. Shared by both whole-repo audit mode and diff-review mode.
+fn maybe_verify(
+    cli: &Cli,
+    client: &dyn llm_client::LlmClient,
+    sandbox: &Sandbox,
+    mut report: String,
+) -> String {
+    if !cli.verify {
+        return report;
+    }
+    eprintln!("[symthaea-audit] running verification pass");
+    match verify::run_verification_pass(client, sandbox, &report, cli.max_turns) {
+        Ok(verify_outcome) => {
+            eprintln!(
+                "[symthaea-audit] verification done in {} turn(s){}",
+                verify_outcome.turns_used,
+                if verify_outcome.truncated_by_turn_budget {
+                    " (truncated)"
+                } else {
+                    ""
+                }
+            );
+            report.push_str("\n\n---\n\n");
+            report.push_str(&verify_outcome.report);
+        }
+        Err(e) => {
+            eprintln!("[symthaea-audit] verification pass failed, keeping original report: {e}");
+            report.push_str(&format!("\n\n---\n\n(verification pass failed: {e})\n"));
+        }
+    }
+    report
 }
 
 fn default_report_path(target: &std::path::Path) -> std::path::PathBuf {
