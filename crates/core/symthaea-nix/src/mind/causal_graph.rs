@@ -1537,6 +1537,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "native")]
     fn test_bootstrap_from_schemas() {
         use crate::parser::option_schema::parse_nixos_options;
 

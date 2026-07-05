@@ -660,7 +660,11 @@ jobs:
             elif [ "$FEATURES" = "ssm_language" ]; then
               # ssm_language is mutually exclusive with default-mind's broca_lite
               # (src/lib.rs's compile_error! guard) -- default features must be off.
-              cargo test --lib --no-default-features --features "$FEATURES"
+              # Scoped to -p symthaea: workspace default-members include
+              # crates/core/*, and a bare --no-default-features (no -p) disables
+              # every default-member's own defaults too -- e.g. symthaea-nix's
+              # `default = ["native"]`, breaking its native-gated tests.
+              cargo test -p symthaea --lib --no-default-features --features "$FEATURES"
             else
               cargo test --lib --features "$FEATURES"
             fi
@@ -818,7 +822,8 @@ jobs:
             *,ssm_language,*)
               # ssm_language is mutually exclusive with default-mind's broca_lite
               # (src/lib.rs's compile_error! guard) -- default features must be off.
-              cargo check --no-default-features --features "$FEATURES"
+              # Scoped to -p symthaea (see Test Feature Combinations job for why).
+              cargo check -p symthaea --no-default-features --features "$FEATURES"
               ;;
             *)
               cargo check --features "$FEATURES"
