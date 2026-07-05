@@ -6,8 +6,10 @@ use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::shell::ipc_server::MetricsProvider;
 
 fn main() {
-    let mut config = CognitiveLoopConfig::default();
-    config.enable_vision_manifold = true;
+    let config = CognitiveLoopConfig {
+        enable_vision_manifold: true,
+        ..Default::default()
+    };
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     println!("🚀 Starting Imagination Smoke Test...");

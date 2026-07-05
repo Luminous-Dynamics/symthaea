@@ -421,17 +421,17 @@ impl SentinelDemo {
             println!("║  Learned Patterns                                            ║");
             println!("╠══════════════════════════════════════════════════════════════╣");
             for key in learned {
-                if let Some(p) = self.get_pattern_def(key) {
-                    if let Some(freq) = self.detector.get_pattern_frequency_signature(key) {
-                        println!(
-                            "║  {} - {:16}                                     ║",
-                            key, p.name
-                        );
-                        println!(
-                            "║      Freq: 0.5Hz={:.2} 1Hz={:.2} 2Hz={:.2} 4Hz={:.2}        ║",
-                            freq[0], freq[1], freq[2], freq[3]
-                        );
-                    }
+                if let Some(p) = self.get_pattern_def(key)
+                    && let Some(freq) = self.detector.get_pattern_frequency_signature(key)
+                {
+                    println!(
+                        "║  {} - {:16}                                     ║",
+                        key, p.name
+                    );
+                    println!(
+                        "║      Freq: 0.5Hz={:.2} 1Hz={:.2} 2Hz={:.2} 4Hz={:.2}        ║",
+                        freq[0], freq[1], freq[2], freq[3]
+                    );
                 }
             }
             println!("╚══════════════════════════════════════════════════════════════╝");

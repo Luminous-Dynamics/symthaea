@@ -13,8 +13,10 @@ use symthaea_swarm::SwarmStateMsg;
 fn main() {
     #[cfg(all(feature = "vision-manifold", feature = "swarm"))]
     {
-        let mut config = CognitiveLoopConfig::default();
-        config.enable_vision_manifold = true;
+        let config = CognitiveLoopConfig {
+            enable_vision_manifold: true,
+            ..Default::default()
+        };
 
         println!("🌐 Starting Swarm Imagination (Collective Dreaming) Test...");
         println!("Goal: Node B dreams on behalf of an overloaded Node A.\n");
@@ -48,6 +50,7 @@ fn main() {
         // 3. Extract Node A's "Telepathic SOS" (SwarmStateMsg)
         let sos_msg = SwarmStateMsg {
             node_id: id_a,
+            platform_type: Default::default(),
             local_phi: 0.88,
             consciousness_hv: node_a.consciousness_hv().unwrap(),
             intent_hv: node_a.last_intent_hv().unwrap(),

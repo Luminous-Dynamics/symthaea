@@ -1138,10 +1138,10 @@ impl ServiceState {
 
                     {
                         let mut voice = self.voice.lock().await;
-                        if let Some(ref mut voice) = *voice {
-                            if let Err(e) = voice.speak(&assistant_said) {
-                                warn!("TTS error (continuing): {}", e);
-                            }
+                        if let Some(ref mut voice) = *voice
+                            && let Err(e) = voice.speak(&assistant_said)
+                        {
+                            warn!("TTS error (continuing): {}", e);
                         }
                     }
 
@@ -1820,7 +1820,7 @@ async fn process_request_line(
         return Ok(None);
     }
 
-    if line.as_bytes().len() > MAX_REQUEST_LINE_BYTES {
+    if line.len() > MAX_REQUEST_LINE_BYTES {
         state.record_audit(
             "request_too_large",
             "unknown",
@@ -1852,47 +1852,47 @@ async fn process_request_line(
         }
     };
 
-    if let Some(version) = wire_request.protocol_version {
-        if version != SERVICE_PROTOCOL_VERSION {
-            state.record_audit(
-                "protocol_version_rejected",
-                request_name(&wire_request.request),
-                &format!(
-                    "client sent protocol_version={}, supported={}",
+    if let Some(version) = wire_request.protocol_version
+        && version != SERVICE_PROTOCOL_VERSION
+    {
+        state.record_audit(
+            "protocol_version_rejected",
+            request_name(&wire_request.request),
+            &format!(
+                "client sent protocol_version={}, supported={}",
+                version, SERVICE_PROTOCOL_VERSION
+            ),
+        );
+        return Ok(Some(ProcessedRequestOutcome {
+            response: Response::Error {
+                message: format!(
+                    "Unsupported protocol_version {} (supported: {})",
                     version, SERVICE_PROTOCOL_VERSION
                 ),
+            },
+            shutdown: false,
+        }));
+    }
+
+    if request_requires_auth(&wire_request.request)
+        && let Some(expected_token) = security.bearer_token.as_deref()
+    {
+        let provided_token = wire_request
+            .authorization
+            .as_deref()
+            .and_then(parse_bearer_token);
+        if provided_token != Some(expected_token) {
+            state.record_audit(
+                "auth_failed",
+                request_name(&wire_request.request),
+                "missing or invalid bearer token",
             );
             return Ok(Some(ProcessedRequestOutcome {
                 response: Response::Error {
-                    message: format!(
-                        "Unsupported protocol_version {} (supported: {})",
-                        version, SERVICE_PROTOCOL_VERSION
-                    ),
+                    message: service_auth_error_message(),
                 },
                 shutdown: false,
             }));
-        }
-    }
-
-    if request_requires_auth(&wire_request.request) {
-        if let Some(expected_token) = security.bearer_token.as_deref() {
-            let provided_token = wire_request
-                .authorization
-                .as_deref()
-                .and_then(parse_bearer_token);
-            if provided_token != Some(expected_token) {
-                state.record_audit(
-                    "auth_failed",
-                    request_name(&wire_request.request),
-                    "missing or invalid bearer token",
-                );
-                return Ok(Some(ProcessedRequestOutcome {
-                    response: Response::Error {
-                        message: service_auth_error_message(),
-                    },
-                    shutdown: false,
-                }));
-            }
         }
     }
 

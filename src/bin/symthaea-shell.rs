@@ -723,11 +723,10 @@ impl App {
         if let Some(&idx) = self
             .history_search_matches
             .get(self.history_search_selected)
+            && let Some(entry) = self.history.get(idx)
         {
-            if let Some(entry) = self.history.get(idx) {
-                self.input = entry.command.clone();
-                self.cursor = self.input.len();
-            }
+            self.input = entry.command.clone();
+            self.cursor = self.input.len();
         }
         self.mode = ShellMode::Normal;
         self.update_completions();
@@ -1363,10 +1362,10 @@ impl App {
 
     /// Save current state to disk
     fn save_state(&mut self) {
-        if let Some(ref mut manager) = self.state_manager {
-            if let Err(e) = manager.save() {
-                tracing::warn!(error = %e, "Failed to save session state");
-            }
+        if let Some(ref mut manager) = self.state_manager
+            && let Err(e) = manager.save()
+        {
+            tracing::warn!(error = %e, "Failed to save session state");
         }
     }
 
@@ -2047,247 +2046,242 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         terminal.draw(|f| ui(f, &app))?;
 
         let timeout = tick_rate;
-        if event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                match app.mode {
-                    ShellMode::Normal | ShellMode::Completing => {
-                        // Reset tab_pressed on any non-Tab key
-                        if key.code != KeyCode::Tab {
-                            app.tab_pressed = false;
-                        }
+        if event::poll(timeout)?
+            && let Event::Key(key) = event::read()?
+        {
+            match app.mode {
+                ShellMode::Normal | ShellMode::Completing => {
+                    // Reset tab_pressed on any non-Tab key
+                    if key.code != KeyCode::Tab {
+                        app.tab_pressed = false;
+                    }
 
-                        match key.code {
-                            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                app.input.clear();
-                                app.cursor = 0;
+                    match key.code {
+                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            app.input.clear();
+                            app.cursor = 0;
+                            app.update_completions();
+                            app.update_command_preview();
+                        }
+                        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            // B6: Save state before quitting
+                            app.save_state();
+                            app.should_quit = true;
+                        }
+                        // B2: Ctrl+R for reverse history search
+                        KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            app.start_history_search();
+                        }
+                        KeyCode::Char(c) => {
+                            app.input.insert(app.cursor, c);
+                            app.cursor += 1;
+                            app.update_completions();
+                            app.update_command_preview();
+                        }
+                        KeyCode::Backspace => {
+                            if app.cursor > 0 {
+                                app.cursor -= 1;
+                                app.input.remove(app.cursor);
                                 app.update_completions();
-                                app.update_command_preview();
                             }
-                            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                // B6: Save state before quitting
-                                app.save_state();
-                                app.should_quit = true;
+                        }
+                        KeyCode::Delete => {
+                            if app.cursor < app.input.len() {
+                                app.input.remove(app.cursor);
+                                app.update_completions();
                             }
-                            // B2: Ctrl+R for reverse history search
-                            KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                app.start_history_search();
+                        }
+                        KeyCode::Left => {
+                            if app.cursor > 0 {
+                                app.cursor -= 1;
                             }
-                            KeyCode::Char(c) => {
-                                app.input.insert(app.cursor, c);
+                        }
+                        KeyCode::Right => {
+                            if app.cursor < app.input.len() {
                                 app.cursor += 1;
-                                app.update_completions();
-                                app.update_command_preview();
                             }
-                            KeyCode::Backspace => {
-                                if app.cursor > 0 {
-                                    app.cursor -= 1;
-                                    app.input.remove(app.cursor);
-                                    app.update_completions();
-                                }
+                        }
+                        KeyCode::Home => {
+                            app.cursor = 0;
+                        }
+                        KeyCode::End => {
+                            app.cursor = app.input.len();
+                        }
+                        KeyCode::Up => {
+                            if app.show_completions && app.selected_completion > 0 {
+                                app.selected_completion -= 1;
                             }
-                            KeyCode::Delete => {
-                                if app.cursor < app.input.len() {
-                                    app.input.remove(app.cursor);
-                                    app.update_completions();
-                                }
+                        }
+                        KeyCode::Down => {
+                            if app.show_completions
+                                && app.selected_completion < app.completions.len().saturating_sub(1)
+                            {
+                                app.selected_completion += 1;
                             }
-                            KeyCode::Left => {
-                                if app.cursor > 0 {
-                                    app.cursor -= 1;
-                                }
-                            }
-                            KeyCode::Right => {
-                                if app.cursor < app.input.len() {
-                                    app.cursor += 1;
-                                }
-                            }
-                            KeyCode::Home => {
-                                app.cursor = 0;
-                            }
-                            KeyCode::End => {
-                                app.cursor = app.input.len();
-                            }
-                            KeyCode::Up => {
-                                if app.show_completions && app.selected_completion > 0 {
-                                    app.selected_completion -= 1;
-                                }
-                            }
-                            KeyCode::Down => {
-                                if app.show_completions
-                                    && app.selected_completion
-                                        < app.completions.len().saturating_sub(1)
-                                {
-                                    app.selected_completion += 1;
-                                }
-                            }
-                            // B1: Enhanced Tab completion with cycling
-                            KeyCode::Tab => {
-                                if app.show_completions && !app.completions.is_empty() {
-                                    if app.tab_pressed {
-                                        // Second Tab: cycle to next completion
-                                        app.selected_completion =
-                                            (app.selected_completion + 1) % app.completions.len();
-                                        // Update input to show selected completion
-                                        if let Some(completion) =
-                                            app.completions.get(app.selected_completion)
-                                        {
-                                            app.input = completion.text.clone();
-                                            app.cursor = app.input.len();
-                                        }
-                                    } else {
-                                        // First Tab: show first completion
-                                        app.tab_pressed = true;
-                                        if let Some(completion) =
-                                            app.completions.get(app.selected_completion)
-                                        {
-                                            app.input = completion.text.clone();
-                                            app.cursor = app.input.len();
-                                        }
-                                    }
-                                    app.update_command_preview();
-                                }
-                            }
-                            // Shift+Tab: cycle backwards
-                            KeyCode::BackTab => {
-                                if app.show_completions && !app.completions.is_empty() {
-                                    if app.selected_completion > 0 {
-                                        app.selected_completion -= 1;
-                                    } else {
-                                        app.selected_completion = app.completions.len() - 1;
-                                    }
+                        }
+                        // B1: Enhanced Tab completion with cycling
+                        KeyCode::Tab => {
+                            if app.show_completions && !app.completions.is_empty() {
+                                if app.tab_pressed {
+                                    // Second Tab: cycle to next completion
+                                    app.selected_completion =
+                                        (app.selected_completion + 1) % app.completions.len();
+                                    // Update input to show selected completion
                                     if let Some(completion) =
                                         app.completions.get(app.selected_completion)
                                     {
                                         app.input = completion.text.clone();
                                         app.cursor = app.input.len();
                                     }
-                                    app.update_command_preview();
-                                }
-                            }
-                            KeyCode::Enter => {
-                                if app.show_completions {
-                                    app.accept_completion();
-                                }
-                                app.execute_command();
-                            }
-                            KeyCode::Esc => {
-                                app.show_completions = false;
-                                app.mode = ShellMode::Normal;
-                            }
-                            _ => {}
-                        }
-                    }
-                    ShellMode::Confirming => {
-                        match key.code {
-                            KeyCode::Char('y') | KeyCode::Char('Y') => {
-                                // Execute the pending command
-                                if let Some(pending) = app.pending_command.take() {
-                                    app.output_lines.push(OutputLine {
-                                        content: format!(
-                                            "Confirmed - executing: {}",
-                                            pending.command
-                                        ),
-                                        style: OutputStyle::Success,
-                                        timestamp: chrono::Local::now(),
-                                    });
-
-                                    // Execute command (simplified - real impl would use ProcessRunner)
-                                    app.input = pending.command;
-                                    app.execute_confirmed_command();
                                 } else {
-                                    app.output_lines.push(OutputLine {
-                                        content: "Confirmed (no pending command)".to_string(),
-                                        style: OutputStyle::Warning,
-                                        timestamp: chrono::Local::now(),
-                                    });
+                                    // First Tab: show first completion
+                                    app.tab_pressed = true;
+                                    if let Some(completion) =
+                                        app.completions.get(app.selected_completion)
+                                    {
+                                        app.input = completion.text.clone();
+                                        app.cursor = app.input.len();
+                                    }
                                 }
-                                app.mode = ShellMode::Normal;
+                                app.update_command_preview();
                             }
-                            KeyCode::Char('d') | KeyCode::Char('D') => {
-                                // Dry-run mode
-                                if let Some(ref pending) = app.pending_command {
-                                    app.output_lines.push(OutputLine {
-                                        content: format!(
-                                            "[DRY-RUN] Would execute: {}",
-                                            pending.command
-                                        ),
-                                        style: OutputStyle::Info,
-                                        timestamp: chrono::Local::now(),
-                                    });
-                                    app.output_lines.push(OutputLine {
-                                        content: "No changes made. Press 'y' to execute for real."
-                                            .to_string(),
-                                        style: OutputStyle::Info,
-                                        timestamp: chrono::Local::now(),
-                                    });
-                                }
-                            }
-                            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                                if let Some(ref pending) = app.pending_command {
-                                    app.output_lines.push(OutputLine {
-                                        content: format!("Cancelled: {}", pending.command),
-                                        style: OutputStyle::Warning,
-                                        timestamp: chrono::Local::now(),
-                                    });
-                                }
-                                app.pending_command = None;
-                                app.mode = ShellMode::Normal;
-                            }
-                            _ => {}
                         }
-                    }
-                    ShellMode::Help => {
-                        if key.code == KeyCode::Esc || key.code == KeyCode::Char('q') {
+                        // Shift+Tab: cycle backwards
+                        KeyCode::BackTab => {
+                            if app.show_completions && !app.completions.is_empty() {
+                                if app.selected_completion > 0 {
+                                    app.selected_completion -= 1;
+                                } else {
+                                    app.selected_completion = app.completions.len() - 1;
+                                }
+                                if let Some(completion) =
+                                    app.completions.get(app.selected_completion)
+                                {
+                                    app.input = completion.text.clone();
+                                    app.cursor = app.input.len();
+                                }
+                                app.update_command_preview();
+                            }
+                        }
+                        KeyCode::Enter => {
+                            if app.show_completions {
+                                app.accept_completion();
+                            }
+                            app.execute_command();
+                        }
+                        KeyCode::Esc => {
+                            app.show_completions = false;
                             app.mode = ShellMode::Normal;
                         }
+                        _ => {}
                     }
+                }
+                ShellMode::Confirming => {
+                    match key.code {
+                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                            // Execute the pending command
+                            if let Some(pending) = app.pending_command.take() {
+                                app.output_lines.push(OutputLine {
+                                    content: format!("Confirmed - executing: {}", pending.command),
+                                    style: OutputStyle::Success,
+                                    timestamp: chrono::Local::now(),
+                                });
 
-                    // B2: History search mode
-                    ShellMode::HistorySearch => {
-                        match key.code {
-                            KeyCode::Esc | KeyCode::Char('g')
-                                if key.modifiers.contains(KeyModifiers::CONTROL) =>
-                            {
-                                // Cancel search
-                                app.mode = ShellMode::Normal;
+                                // Execute command (simplified - real impl would use ProcessRunner)
+                                app.input = pending.command;
+                                app.execute_confirmed_command();
+                            } else {
+                                app.output_lines.push(OutputLine {
+                                    content: "Confirmed (no pending command)".to_string(),
+                                    style: OutputStyle::Warning,
+                                    timestamp: chrono::Local::now(),
+                                });
                             }
-                            KeyCode::Enter => {
-                                // Accept selected
-                                app.accept_history_search();
-                            }
-                            KeyCode::Up | KeyCode::Char('p')
-                                if key.modifiers.contains(KeyModifiers::CONTROL) =>
-                            {
-                                // Previous match
-                                if app.history_search_selected > 0 {
-                                    app.history_search_selected -= 1;
-                                }
-                            }
-                            KeyCode::Down | KeyCode::Char('n')
-                                if key.modifiers.contains(KeyModifiers::CONTROL) =>
-                            {
-                                // Next match
-                                if app.history_search_selected
-                                    < app.history_search_matches.len().saturating_sub(1)
-                                {
-                                    app.history_search_selected += 1;
-                                }
-                            }
-                            KeyCode::Backspace => {
-                                app.history_search_query.pop();
-                                app.update_history_search();
-                            }
-                            KeyCode::Char(c) => {
-                                app.history_search_query.push(c);
-                                app.update_history_search();
-                            }
-                            _ => {}
+                            app.mode = ShellMode::Normal;
                         }
+                        KeyCode::Char('d') | KeyCode::Char('D') => {
+                            // Dry-run mode
+                            if let Some(ref pending) = app.pending_command {
+                                app.output_lines.push(OutputLine {
+                                    content: format!(
+                                        "[DRY-RUN] Would execute: {}",
+                                        pending.command
+                                    ),
+                                    style: OutputStyle::Info,
+                                    timestamp: chrono::Local::now(),
+                                });
+                                app.output_lines.push(OutputLine {
+                                    content: "No changes made. Press 'y' to execute for real."
+                                        .to_string(),
+                                    style: OutputStyle::Info,
+                                    timestamp: chrono::Local::now(),
+                                });
+                            }
+                        }
+                        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                            if let Some(ref pending) = app.pending_command {
+                                app.output_lines.push(OutputLine {
+                                    content: format!("Cancelled: {}", pending.command),
+                                    style: OutputStyle::Warning,
+                                    timestamp: chrono::Local::now(),
+                                });
+                            }
+                            app.pending_command = None;
+                            app.mode = ShellMode::Normal;
+                        }
+                        _ => {}
+                    }
+                }
+                ShellMode::Help => {
+                    if key.code == KeyCode::Esc || key.code == KeyCode::Char('q') {
+                        app.mode = ShellMode::Normal;
+                    }
+                }
+
+                // B2: History search mode
+                ShellMode::HistorySearch => {
+                    match key.code {
+                        KeyCode::Esc | KeyCode::Char('g')
+                            if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            // Cancel search
+                            app.mode = ShellMode::Normal;
+                        }
+                        KeyCode::Enter => {
+                            // Accept selected
+                            app.accept_history_search();
+                        }
+                        KeyCode::Up | KeyCode::Char('p')
+                            if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            // Previous match
+                            if app.history_search_selected > 0 {
+                                app.history_search_selected -= 1;
+                            }
+                        }
+                        KeyCode::Down | KeyCode::Char('n')
+                            if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            // Next match
+                            if app.history_search_selected
+                                < app.history_search_matches.len().saturating_sub(1)
+                            {
+                                app.history_search_selected += 1;
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            app.history_search_query.pop();
+                            app.update_history_search();
+                        }
+                        KeyCode::Char(c) => {
+                            app.history_search_query.push(c);
+                            app.update_history_search();
+                        }
+                        _ => {}
                     }
                 }
             }
         }
-
         app.on_tick();
 
         if app.should_quit {
@@ -2665,102 +2659,102 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_widget(status, chunks[2]);
 
     // B4: Confirmation dialog overlay
-    if app.mode == ShellMode::Confirming {
-        if let Some(ref pending) = app.pending_command {
-            // Calculate centered popup area
-            let popup_width = 60u16.min(f.area().width.saturating_sub(4));
-            let popup_height = 14u16.min(f.area().height.saturating_sub(4));
-            let popup_x = (f.area().width.saturating_sub(popup_width)) / 2;
-            let popup_y = (f.area().height.saturating_sub(popup_height)) / 2;
-            let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+    if app.mode == ShellMode::Confirming
+        && let Some(ref pending) = app.pending_command
+    {
+        // Calculate centered popup area
+        let popup_width = 60u16.min(f.area().width.saturating_sub(4));
+        let popup_height = 14u16.min(f.area().height.saturating_sub(4));
+        let popup_x = (f.area().width.saturating_sub(popup_width)) / 2;
+        let popup_y = (f.area().height.saturating_sub(popup_height)) / 2;
+        let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
 
-            // Clear the area first
-            f.render_widget(Clear, popup_area);
+        // Clear the area first
+        f.render_widget(Clear, popup_area);
 
-            // Risk-based styling
-            let (border_color, title_color, icon) = match pending.risk_level {
-                RiskLevel::High => (Color::Red, Color::Red, "⚠️ "),
-                RiskLevel::Medium => (Color::Yellow, Color::Yellow, "⚡ "),
-                RiskLevel::Low => (Color::Cyan, Color::Cyan, "📋 "),
-            };
+        // Risk-based styling
+        let (border_color, title_color, icon) = match pending.risk_level {
+            RiskLevel::High => (Color::Red, Color::Red, "⚠️ "),
+            RiskLevel::Medium => (Color::Yellow, Color::Yellow, "⚡ "),
+            RiskLevel::Low => (Color::Cyan, Color::Cyan, "📋 "),
+        };
 
-            let risk_label = match pending.risk_level {
-                RiskLevel::High => "NON-REVERSIBLE COMMAND",
-                RiskLevel::Medium => "CONFIRMATION REQUIRED",
-                RiskLevel::Low => "CONFIRMATION NEEDED",
-            };
+        let risk_label = match pending.risk_level {
+            RiskLevel::High => "NON-REVERSIBLE COMMAND",
+            RiskLevel::Medium => "CONFIRMATION REQUIRED",
+            RiskLevel::Low => "CONFIRMATION NEEDED",
+        };
 
-            // Build dialog content
-            let mut lines: Vec<Line> = vec![
-                Line::from(Span::styled(
-                    format!("{}{}", icon, risk_label),
-                    Style::default()
-                        .fg(title_color)
-                        .add_modifier(Modifier::BOLD),
-                )),
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("Command: ", Style::default().fg(Color::Cyan)),
-                    Span::raw(&pending.command),
-                ]),
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("Reason: ", Style::default().fg(Color::Yellow)),
-                    Span::raw(&pending.reason),
-                ]),
-            ];
+        // Build dialog content
+        let mut lines: Vec<Line> = vec![
+            Line::from(Span::styled(
+                format!("{}{}", icon, risk_label),
+                Style::default()
+                    .fg(title_color)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Command: ", Style::default().fg(Color::Cyan)),
+                Span::raw(&pending.command),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Reason: ", Style::default().fg(Color::Yellow)),
+                Span::raw(&pending.reason),
+            ]),
+        ];
 
-            // Add rollback hint if available
-            if let Some(ref hint) = pending.rollback_hint {
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![
-                    Span::styled("Rollback: ", Style::default().fg(Color::Green)),
-                    Span::raw(hint),
-                ]));
-            }
-
+        // Add rollback hint if available
+        if let Some(ref hint) = pending.rollback_hint {
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "─".repeat(popup_width.saturating_sub(4) as usize),
-                Style::default().fg(Color::DarkGray),
-            )));
             lines.push(Line::from(vec![
-                Span::styled(
-                    " [Y] ",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("Confirm  "),
-                Span::styled(
-                    " [D] ",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("Dry-run  "),
-                Span::styled(
-                    " [N] ",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("Cancel"),
+                Span::styled("Rollback: ", Style::default().fg(Color::Green)),
+                Span::raw(hint),
             ]));
-
-            let dialog = Paragraph::new(lines)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(border_color))
-                        .title(" Confirm Execution ")
-                        .title_style(
-                            Style::default()
-                                .fg(title_color)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                )
-                .wrap(Wrap { trim: true });
-            f.render_widget(dialog, popup_area);
         }
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "─".repeat(popup_width.saturating_sub(4) as usize),
+            Style::default().fg(Color::DarkGray),
+        )));
+        lines.push(Line::from(vec![
+            Span::styled(
+                " [Y] ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Confirm  "),
+            Span::styled(
+                " [D] ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Dry-run  "),
+            Span::styled(
+                " [N] ",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Cancel"),
+        ]));
+
+        let dialog = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(border_color))
+                    .title(" Confirm Execution ")
+                    .title_style(
+                        Style::default()
+                            .fg(title_color)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+            )
+            .wrap(Wrap { trim: true });
+        f.render_widget(dialog, popup_area);
     }
 
     // B5: Epistemic overlays - floating contextual knowledge markup

@@ -191,6 +191,7 @@ struct ReplState {
 
 impl ReplState {
     #[allow(unused_variables)]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         voice_enabled: bool,
         voice_rate: f32,
@@ -370,13 +371,13 @@ impl ReplState {
             let result = self.cognitive.cycle(input);
 
             // Log learning events
-            if result.learning_occurred {
-                if let Some(loss) = result.training_loss {
-                    info!(
-                        "Learning cycle: error={:.4}, loss={:.4}, primitives={:?}",
-                        result.prediction_error, loss, result.detected_primitives
-                    );
-                }
+            if result.learning_occurred
+                && let Some(loss) = result.training_loss
+            {
+                info!(
+                    "Learning cycle: error={:.4}, loss={:.4}, primitives={:?}",
+                    result.prediction_error, loss, result.detected_primitives
+                );
             }
         }
 
@@ -606,54 +607,51 @@ CRITICAL PERSONA DIRECTIVE:
         }
 
         // ── EPISTEMIC CONSCIOUSNESS WEB RESEARCH INTERCEPTOR ──
-        if response.text.contains("\"type\": \"web_search\"") {
-            if let Some(start_idx) = response.text.find("\"query\": \"") {
-                let sub_str = &response.text[start_idx + 10..];
-                if let Some(end_idx) = sub_str.find("\"") {
-                    let search_query = &sub_str[..end_idx];
-                    println!(
-                        "\x1b[36m\n[🛰️ WEB RESEARCH] Initializing Epistemic Consciousness Bridge for: {}\x1b[0m",
-                        search_query
-                    );
+        if response.text.contains("\"type\": \"web_search\"")
+            && let Some(start_idx) = response.text.find("\"query\": \"")
+        {
+            let sub_str = &response.text[start_idx + 10..];
+            if let Some(end_idx) = sub_str.find("\"") {
+                let search_query = &sub_str[..end_idx];
+                println!(
+                    "\x1b[36m\n[🛰️ WEB RESEARCH] Initializing Epistemic Consciousness Bridge for: {}\x1b[0m",
+                    search_query
+                );
 
-                    if let Ok(mut epistemic_bridge) =
-                        symthaea::web_research::EpistemicConsciousness::new()
-                    {
-                        let research_future = epistemic_bridge.research(search_query);
-                        // Bridge synchronous execution into the tokio runtime thread natively
-                        let research_result = match tokio::runtime::Handle::try_current() {
-                            Ok(handle) => handle.block_on(research_future),
-                            Err(_) => match tokio::runtime::Runtime::new() {
-                                Ok(rt) => rt.block_on(research_future),
-                                Err(e) => Err(anyhow::anyhow!(
-                                    "Failed to create temporary runtime: {}",
-                                    e
-                                )),
-                            },
-                        };
-                        match research_result {
-                            Ok(res) => {
-                                let outcome = format!(
-                                    "[TOOL RESULT] web_search outcome: Title: \"{}\", Status: {:?}, Confidence: {:.4}, Integrated Claims: {}\nSummary: {}",
-                                    res.title,
-                                    res.epistemic_status,
-                                    res.confidence,
-                                    res.claims.len(),
-                                    res.summary
-                                );
-                                println!("\x1b[32m{}\x1b[0m", outcome);
-                                self.pending_tool_results.push(outcome);
+                if let Ok(mut epistemic_bridge) =
+                    symthaea::web_research::EpistemicConsciousness::new()
+                {
+                    let research_future = epistemic_bridge.research(search_query);
+                    // Bridge synchronous execution into the tokio runtime thread natively
+                    let research_result = match tokio::runtime::Handle::try_current() {
+                        Ok(handle) => handle.block_on(research_future),
+                        Err(_) => match tokio::runtime::Runtime::new() {
+                            Ok(rt) => rt.block_on(research_future),
+                            Err(e) => {
+                                Err(anyhow::anyhow!("Failed to create temporary runtime: {}", e))
                             }
-                            Err(e) => println!(
-                                "\x1b[31m[TOOL ERROR] Epistemic search failed: {}\x1b[0m",
-                                e
-                            ),
+                        },
+                    };
+                    match research_result {
+                        Ok(res) => {
+                            let outcome = format!(
+                                "[TOOL RESULT] web_search outcome: Title: \"{}\", Status: {:?}, Confidence: {:.4}, Integrated Claims: {}\nSummary: {}",
+                                res.title,
+                                res.epistemic_status,
+                                res.confidence,
+                                res.claims.len(),
+                                res.summary
+                            );
+                            println!("\x1b[32m{}\x1b[0m", outcome);
+                            self.pending_tool_results.push(outcome);
+                        }
+                        Err(e) => {
+                            println!("\x1b[31m[TOOL ERROR] Epistemic search failed: {}\x1b[0m", e)
                         }
                     }
                 }
             }
         }
-
         // Add assistant response to history
         self.history.push(format!("Assistant: {}", response.text));
 
@@ -664,10 +662,10 @@ CRITICAL PERSONA DIRECTIVE:
 
         // Persist this exchange to the JSONL history log for future sessions.
         // Soft-fail — we'd rather lose a turn than crash the REPL.
-        if let Some(ref path) = self.history_path {
-            if let Err(e) = append_turn(path, input, &response.text) {
-                warn!("Could not persist turn to {:?}: {}", path, e);
-            }
+        if let Some(ref path) = self.history_path
+            && let Err(e) = append_turn(path, input, &response.text)
+        {
+            warn!("Could not persist turn to {:?}: {}", path, e);
         }
 
         Ok(response.text)
@@ -787,14 +785,14 @@ CRITICAL PERSONA DIRECTIVE:
 
         // Validate against policy
         let current_phi = self.cognitive.consciousness_snapshot().consciousness_level as f64;
-        if let Some(ref sandbox) = self.sandbox {
-            if let Err(e) = action.validate(&self.policy, sandbox, current_phi) {
-                return format!(
-                    "[BLOCKED] Action '{}' violates policy: {:?}\n\
+        if let Some(ref sandbox) = self.sandbox
+            && let Err(e) = action.validate(&self.policy, sandbox, current_phi)
+        {
+            return format!(
+                "[BLOCKED] Action '{}' violates policy: {:?}\n\
                      Risk: {:?}, Destructiveness: {:?}",
-                    command, e, risk, destructiveness
-                );
-            }
+                command, e, risk, destructiveness
+            );
         }
 
         // For safety, we don't actually execute commands in the REPL

@@ -35,7 +35,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use symthaea::api::holon::{HolonHttpState, holon_router};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
@@ -63,10 +63,10 @@ fn generate_auth_token() -> String {
     use std::io::Read;
 
     let mut bytes = [0u8; 32];
-    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-        if f.read_exact(&mut bytes).is_ok() {
-            return bytes.iter().map(|b| format!("{:02x}", b)).collect();
-        }
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom")
+        && f.read_exact(&mut bytes).is_ok()
+    {
+        return bytes.iter().map(|b| format!("{:02x}", b)).collect();
     }
 
     // Fallback: only used if /dev/urandom is unavailable.
@@ -208,7 +208,7 @@ async fn main() -> Result<()> {
                 // Peers who connect to us are registered and their SwarmEvents
                 // flow into the CLS via the NetworkServiceBridge spawned above.
                 if let Some(service) = cls.network_service().cloned() {
-                    tokio::spawn(service.accept_connections());
+                    tokio::spawn(service.clone().accept_connections());
                     info!("Iroh: inbound connection listener active");
                     // Log node ID and bootstrap ticket so peers can connect.
                     let node_id = service.node_id();
@@ -224,34 +224,34 @@ async fn main() -> Result<()> {
                 // Bootstrap to known peers via SYMTHAEA_BOOTSTRAP_PEERS env var.
                 // Format: comma-separated JSON EndpointAddr tickets (as logged above).
                 // Example: SYMTHAEA_BOOTSTRAP_PEERS='{"ticket1",...},{"ticket2",...}'
-                if let Ok(raw) = std::env::var("SYMTHAEA_BOOTSTRAP_PEERS") {
-                    if let Some(service) = cls.network_service().cloned() {
-                        let tickets: Vec<&str> = raw
-                            .split(',')
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .collect();
-                        info!(
-                            "Bootstrapping to {} peer(s) from SYMTHAEA_BOOTSTRAP_PEERS",
-                            tickets.len()
-                        );
-                        let mut bootstrap_map: Vec<(String, String)> = Vec::new();
-                        for ticket in tickets {
-                            match service.connect_to_peer(ticket).await {
-                                Ok(info) => {
-                                    info!(peer = %info.node_id, "Bootstrap connection established");
-                                    bootstrap_map.push((info.node_id.clone(), ticket.to_string()));
-                                }
-                                Err(e) => {
-                                    warn!(error = %e, ticket = %&ticket[..ticket.len().min(32)], "Bootstrap connect failed")
-                                }
+                if let Ok(raw) = std::env::var("SYMTHAEA_BOOTSTRAP_PEERS")
+                    && let Some(service) = cls.network_service().cloned()
+                {
+                    let tickets: Vec<&str> = raw
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    info!(
+                        "Bootstrapping to {} peer(s) from SYMTHAEA_BOOTSTRAP_PEERS",
+                        tickets.len()
+                    );
+                    let mut bootstrap_map: Vec<(String, String)> = Vec::new();
+                    for ticket in tickets {
+                        match service.connect_to_peer(ticket).await {
+                            Ok(info) => {
+                                info!(peer = %info.node_id, "Bootstrap connection established");
+                                bootstrap_map.push((info.node_id.clone(), ticket.to_string()));
+                            }
+                            Err(e) => {
+                                warn!(error = %e, ticket = %&ticket[..ticket.len().min(32)], "Bootstrap connect failed")
                             }
                         }
-                        // Spawn reconnection loop for bootstrap peers that disconnect
-                        if !bootstrap_map.is_empty() {
-                            service.spawn_reconnection_loop(bootstrap_map);
-                            info!("Bootstrap peer reconnection loop active");
-                        }
+                    }
+                    // Spawn reconnection loop for bootstrap peers that disconnect
+                    if !bootstrap_map.is_empty() {
+                        service.spawn_reconnection_loop(bootstrap_map);
+                        info!("Bootstrap peer reconnection loop active");
                     }
                 }
             }
@@ -403,10 +403,10 @@ async fn main() -> Result<()> {
             );
 
             // Update telemetry JSON for dashboard (every 10 cycles to avoid lock churn).
-            if cycle % 10 == 0 {
-                if let Ok(mut t) = http_state.telemetry_json.lock() {
-                    *t = cls.holon_collective_qol_json();
-                }
+            if cycle.is_multiple_of(10)
+                && let Ok(mut t) = http_state.telemetry_json.lock()
+            {
+                *t = cls.holon_collective_qol_json();
             }
 
             // Process pending Holon task requests (broca, converse).
@@ -524,7 +524,7 @@ async fn main() -> Result<()> {
             }
 
             cycle += 1;
-            if cycle % 1000 == 0 {
+            if cycle.is_multiple_of(1000) {
                 info!(
                     "Cycle {}: consciousness={:.4}, holon_peers={}, holon_processed={}",
                     cycle,
@@ -545,9 +545,8 @@ async fn main() -> Result<()> {
     // Wait for consciousness loop (runs forever unless ctrl-c).
     tokio::select! {
         result = consciousness_loop => {
-            if let Err(e) = result {
-                warn!("Consciousness loop ended: {}", e);
-            }
+            let Err(e) = result;
+            warn!("Consciousness loop ended: {}", e);
         }
         _ = tokio::signal::ctrl_c() => {
             info!("Shutting down Holon daemon...");

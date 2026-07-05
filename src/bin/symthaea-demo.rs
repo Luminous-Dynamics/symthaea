@@ -58,8 +58,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("  addr: {}", addr);
     }
 
-    let mut config = symthaea::api::ApiConfig::default();
-    config.bearer_token = bearer_token;
+    let mut config = symthaea::api::ApiConfig {
+        bearer_token,
+        ..Default::default()
+    };
 
     if let Ok(origins) = env::var("SYMTHAEA_DEMO_ALLOWED_ORIGINS") {
         config.allowed_origins = origins
