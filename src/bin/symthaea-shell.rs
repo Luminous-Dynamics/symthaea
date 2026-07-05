@@ -2236,22 +2236,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             app.accept_history_search();
                         }
                         KeyCode::Up | KeyCode::Char('p')
-                            if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                            if key.modifiers.contains(KeyModifiers::CONTROL)
+                                && app.history_search_selected > 0 =>
                         {
                             // Previous match
-                            if app.history_search_selected > 0 {
-                                app.history_search_selected -= 1;
-                            }
+                            app.history_search_selected -= 1;
                         }
                         KeyCode::Down | KeyCode::Char('n')
-                            if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                            if key.modifiers.contains(KeyModifiers::CONTROL)
+                                && app.history_search_selected
+                                    < app.history_search_matches.len().saturating_sub(1) =>
                         {
                             // Next match
-                            if app.history_search_selected
-                                < app.history_search_matches.len().saturating_sub(1)
-                            {
-                                app.history_search_selected += 1;
-                            }
+                            app.history_search_selected += 1;
                         }
                         KeyCode::Backspace => {
                             app.history_search_query.pop();
