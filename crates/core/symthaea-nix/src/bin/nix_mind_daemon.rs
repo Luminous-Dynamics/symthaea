@@ -119,7 +119,8 @@ impl DaemonState {
             causal_graph,
             episodic_memory: NixEpisodicMemory::new(),
             working_memory: WorkingMemory::new(),
-            anomaly_detector: JournalAnomalyDetector::new(),
+            anomaly_detector: JournalAnomalyDetector::new()
+                .with_dim(symthaea_core::hdc::HDC_DIMENSION),
             health_assessor: HealthAssessor::default(),
             predictive_monitor: PredictiveMonitor::with_defaults(),
             prev_snapshot: None,
@@ -333,11 +334,18 @@ impl DaemonState {
             Err(_) => return,
         };
 
-        let anomalies = self.anomaly_detector.process_entries(&entries);
+        let bridge = symthaea_nix::mind::neural_bridge::NeuralBridge::new();
+        let anomalies = self
+            .anomaly_detector
+            .process_entries_hybrid_offline(&entries, &bridge)
+            .unwrap_or_else(|_| self.anomaly_detector.process_entries(&entries));
         for anomaly in &anomalies {
             self.anomaly_count += 1;
 
-            let concern_hv = self.anomaly_detector.encode_entry(&anomaly.entry);
+            let concern_hv = self
+                .anomaly_detector
+                .encode_entry_hybrid_offline(&anomaly.entry, &bridge)
+                .unwrap_or_else(|_| self.anomaly_detector.encode_entry(&anomaly.entry));
 
             // Retrieve similar past episodes before moving concern_hv
             let similar_context = if anomaly.anomaly_score > 0.7 {

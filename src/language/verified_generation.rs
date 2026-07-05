@@ -270,7 +270,7 @@ pub fn generate_verified_full<'a>(
     intent: &CodeIntent,
     context: &CodeContext<'a>,
     repo_map: Option<&'a RepoMap>,
-    mut lsp_client: Option<&mut RustAnalyzerClient>,
+    lsp_client: Option<&mut RustAnalyzerClient>,
     experience_store: Option<&mut CodingExperienceStore>,
     llm_backend: Option<Arc<dyn LLMBackend>>,
     #[cfg(feature = "swarm")] swarm_tx: Option<

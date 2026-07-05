@@ -847,20 +847,17 @@ impl MoralParser {
 
                 // Connector affects interpretation
                 match clause.connector.as_deref() {
-                    Some("because" | "since") => {
-                        // Reason clause might provide justification
+                    // Reason clause might provide justification
+                    Some("because" | "since")
                         if sub_parsed.intent == MoralIntent::Good
-                            && primary.intent != MoralIntent::Good
-                        {
-                            // Good reason might mitigate bad action (partial)
-                            primary.confidence *= 0.8;
-                        }
+                            && primary.intent != MoralIntent::Good =>
+                    {
+                        // Good reason might mitigate bad action (partial)
+                        primary.confidence *= 0.8;
                     }
-                    Some("but" | "however") => {
-                        // Contrast - subordinate clause might override
-                        if sub_parsed.has_negation != primary.has_negation {
-                            primary.has_negation = sub_parsed.has_negation;
-                        }
+                    // Contrast - subordinate clause might override
+                    Some("but" | "however") if sub_parsed.has_negation != primary.has_negation => {
+                        primary.has_negation = sub_parsed.has_negation;
                     }
                     Some("although" | "though") => {
                         // Concession - main clause takes precedence but note the contrast

@@ -142,11 +142,9 @@ impl EpistemicCodeGenerator {
                     uncertainties.push("No constraints specified — review edge cases".to_string());
                 }
             }
-            CodeIntent::Modify { changes, .. } => {
-                if changes.len() > 3 {
-                    uncertainties
-                        .push("Multiple simultaneous changes — verify interactions".to_string());
-                }
+            CodeIntent::Modify { changes, .. } if changes.len() > 3 => {
+                uncertainties
+                    .push("Multiple simultaneous changes — verify interactions".to_string());
             }
             CodeIntent::Refactor { .. } => {
                 uncertainties.push("Refactoring may change behavior — run tests".to_string());

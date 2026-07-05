@@ -254,8 +254,15 @@ impl NixActiveInference {
 
         // Expected free energy (lower = better)
         // EFE = -(pragmatic + curiosity * epistemic + episodic_weight * episodic)
-        let efe =
+        let mut efe =
             -(pragmatic + self.curiosity_weight * epistemic + self.episodic_weight * episodic);
+
+        // Gating Boundary / Safety Override: If past experience indicates catastrophic
+        // failure in similar states (valence < -0.7), apply a severe EFE penalty.
+        // This ensures dangerous actions are pruned/gated below safe alternatives.
+        if episodic < -0.7 {
+            efe += 10.0;
+        }
 
         ScoredAction {
             action: action.clone(),
@@ -264,7 +271,8 @@ impl NixActiveInference {
             epistemic_value: epistemic,
             episodic_valence: episodic,
             rationale: format!(
-                "{action} scored from pragmatic={pragmatic:.3}, epistemic={epistemic:.3}, episodic={episodic:.3}"
+                "{action} scored from pragmatic={pragmatic:.3}, epistemic={epistemic:.3}, episodic={episodic:.3} (gated={})",
+                episodic < -0.7
             ),
         }
     }
@@ -703,5 +711,54 @@ mod tests {
 
         assert!(plan_a.current_free_energy.is_finite());
         assert!(!plan_a.actions.is_empty());
+    }
+
+    #[test]
+    fn test_episodic_safety_override_gates_unsafe_actions() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::new();
+
+        // 1. Observe a state
+        let state = ContinuousHV::random(dim, 100);
+        engine.observe_state(state.clone());
+
+        // 2. Populate episodic memory with catastrophic failures for Rebuild
+        // (valence = -1.0) under this exact state.
+        for i in 0..5 {
+            let episode = crate::mind::episodic_memory::SystemEpisode {
+                state_before: state.clone(),
+                action: format!("{:?}", ActionCategory::Rebuild),
+                state_after: ContinuousHV::random(dim, 200 + i),
+                outcome: EpisodeOutcome::Failure("segfault".into()),
+                phi_at_encoding: 0.8,
+                prediction_error: 0.8,
+                emotional_valence: -1.0,
+                timestamp: 0,
+            };
+            engine.episodic_memory_mut().record(episode);
+        }
+
+        // 3. Process goal for this state.
+        // Even if Rebuild is predicted to lead to the goal, the safety override
+        // must penalize it because predicted valence is highly negative (< -0.7).
+        let goal_state = ContinuousHV::random(dim, 300);
+        let plan = engine.process_goal(&goal_state);
+
+        // Find the scored action for Rebuild
+        let rebuild_score = plan
+            .actions
+            .iter()
+            .find(|a| a.action == ActionCategory::Rebuild)
+            .expect("Rebuild action must be scored");
+
+        assert!(
+            rebuild_score.expected_free_energy > 8.0,
+            "Rebuild EFE must be heavily penalized (got {})",
+            rebuild_score.expected_free_energy
+        );
+        assert!(
+            rebuild_score.rationale.contains("gated=true"),
+            "Rationale must report that the action was gated"
+        );
     }
 }

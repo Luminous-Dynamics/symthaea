@@ -1243,28 +1243,26 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                 }
             }
 
-            ErrorCategory::BorrowError => {
-                if error.message.contains("cannot move out of") {
-                    if let Some(var) = extract_between(&error.message, "`", "`") {
-                        let var_clean = var.trim_start_matches('*');
-                        if let Some(idx) = target_line {
-                            if idx < lines.len() {
-                                let line = &lines[idx];
-                                let pattern = var_clean;
-                                if let Some(pos) = line.find(pattern) {
-                                    let after_var = pos + pattern.len();
-                                    let after = &line[after_var..];
-                                    if !after.starts_with(".clone()") {
-                                        let next_char = after.chars().next();
-                                        if matches!(next_char, Some(')' | ',' | ';' | ' ' | '.')) {
-                                            let new_line = format!(
-                                                "{}.clone(){}",
-                                                &line[..after_var],
-                                                &line[after_var..]
-                                            );
-                                            lines[idx] = new_line;
-                                            any_fix = true;
-                                        }
+            ErrorCategory::BorrowError if error.message.contains("cannot move out of") => {
+                if let Some(var) = extract_between(&error.message, "`", "`") {
+                    let var_clean = var.trim_start_matches('*');
+                    if let Some(idx) = target_line {
+                        if idx < lines.len() {
+                            let line = &lines[idx];
+                            let pattern = var_clean;
+                            if let Some(pos) = line.find(pattern) {
+                                let after_var = pos + pattern.len();
+                                let after = &line[after_var..];
+                                if !after.starts_with(".clone()") {
+                                    let next_char = after.chars().next();
+                                    if matches!(next_char, Some(')' | ',' | ';' | ' ' | '.')) {
+                                        let new_line = format!(
+                                            "{}.clone(){}",
+                                            &line[..after_var],
+                                            &line[after_var..]
+                                        );
+                                        lines[idx] = new_line;
+                                        any_fix = true;
                                     }
                                 }
                             }
@@ -1273,42 +1271,42 @@ pub fn try_auto_fix_structured(source: &str, errors: &[CompileError]) -> Option<
                 }
             }
 
-            ErrorCategory::LifetimeError => {
-                if error.message.contains("missing lifetime specifier") {
-                    if let Some(idx) = target_line {
-                        if idx < lines.len() {
-                            let line = &lines[idx];
-                            if line.contains("fn ") && line.contains("-> &") {
-                                let mut new_line = line.clone();
-                                if !new_line.contains("<'") {
-                                    if let Some(paren) = new_line.find('(') {
-                                        new_line.insert_str(paren, "<'a>");
-                                    }
+            ErrorCategory::LifetimeError
+                if error.message.contains("missing lifetime specifier") =>
+            {
+                if let Some(idx) = target_line {
+                    if idx < lines.len() {
+                        let line = &lines[idx];
+                        if line.contains("fn ") && line.contains("-> &") {
+                            let mut new_line = line.clone();
+                            if !new_line.contains("<'") {
+                                if let Some(paren) = new_line.find('(') {
+                                    new_line.insert_str(paren, "<'a>");
                                 }
-                                if let Some(arrow) = new_line.find("-> &") {
-                                    let rest = &new_line[arrow..];
-                                    if !rest.contains("-> &'") {
-                                        new_line = new_line.replacen("-> &", "-> &'a ", 1);
-                                    }
+                            }
+                            if let Some(arrow) = new_line.find("-> &") {
+                                let rest = &new_line[arrow..];
+                                if !rest.contains("-> &'") {
+                                    new_line = new_line.replacen("-> &", "-> &'a ", 1);
                                 }
-                                let params_start = new_line.find('(').unwrap_or(0);
-                                let params_end = new_line.find(')').unwrap_or(new_line.len());
-                                if params_start < params_end {
-                                    let params = new_line[params_start..=params_end].to_string();
-                                    let fixed_params = params.replace(": &", ": &'a ");
-                                    if fixed_params != params {
-                                        new_line = format!(
-                                            "{}{}{}",
-                                            &new_line[..params_start],
-                                            fixed_params,
-                                            &new_line[params_end + 1..]
-                                        );
-                                    }
+                            }
+                            let params_start = new_line.find('(').unwrap_or(0);
+                            let params_end = new_line.find(')').unwrap_or(new_line.len());
+                            if params_start < params_end {
+                                let params = new_line[params_start..=params_end].to_string();
+                                let fixed_params = params.replace(": &", ": &'a ");
+                                if fixed_params != params {
+                                    new_line = format!(
+                                        "{}{}{}",
+                                        &new_line[..params_start],
+                                        fixed_params,
+                                        &new_line[params_end + 1..]
+                                    );
                                 }
-                                if new_line != *line {
-                                    lines[idx] = new_line;
-                                    any_fix = true;
-                                }
+                            }
+                            if new_line != *line {
+                                lines[idx] = new_line;
+                                any_fix = true;
                             }
                         }
                     }

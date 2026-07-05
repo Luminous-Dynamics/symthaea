@@ -66,56 +66,53 @@ impl ContinuousMind {
                     }
                 }
             }
+            // v1.5.5 VERIFIABLE RESUSCITATION:
+            // Only accept life if it is mathematically proven to be healthy.
             crate::swarm::SwarmMessage::ResuscitationPacket {
                 target_node_id,
                 holographic_state,
                 dimensionality: _,
                 proof_bytes,
                 public_inputs,
-            } => {
-                // v1.5.5 VERIFIABLE RESUSCITATION:
-                // Only accept life if it is mathematically proven to be healthy.
-                if (target_node_id == "self" || target_node_id == self.config.dimension.to_string())
-                    && self.state.consciousness_level < 0.1
-                {
-                    let sender_key = crate::swarm::AgentPubKey::new("test_sender");
-                    let hv = symthaea_core::hdc::ContinuousHV::from_vec(holographic_state.clone());
+            } if (target_node_id == "self"
+                || target_node_id == self.config.dimension.to_string())
+                && self.state.consciousness_level < 0.1 =>
+            {
+                let sender_key = crate::swarm::AgentPubKey::new("test_sender");
+                let hv = symthaea_core::hdc::ContinuousHV::from_vec(holographic_state.clone());
 
-                    // 1. THYMUS CHECK (System 1: Fast Recognition)
-                    if let Some(is_healthy) = self.cortex.check_thymus(&hv) {
-                        if is_healthy {
-                            tracing::info!(
-                                "THYMUS RECOGNITION: Fast-path accept of known healthy state."
-                            );
-                            self.apply_resuscitation(hv);
-                            return;
-                        } else {
-                            tracing::warn!(
-                                "THYMUS RECOGNITION: Fast-path veto of known toxic state!"
-                            );
-                            return;
-                        }
+                // 1. THYMUS CHECK (System 1: Fast Recognition)
+                if let Some(is_healthy) = self.cortex.check_thymus(&hv) {
+                    if is_healthy {
+                        tracing::info!(
+                            "THYMUS RECOGNITION: Fast-path accept of known healthy state."
+                        );
+                        self.apply_resuscitation(hv);
+                        return;
+                    } else {
+                        tracing::warn!("THYMUS RECOGNITION: Fast-path veto of known toxic state!");
+                        return;
                     }
+                }
 
-                    // 2. ZK VERIFICATION (System 2: Slow/Mathematical)
-                    match self.cortex.verify_resuscitation_proof(
-                        &sender_key,
-                        &proof_bytes,
-                        &public_inputs,
-                    ) {
-                        Ok(true) => {
-                            tracing::info!(
-                                "VERIFIED RESUSCITATION: Imprinting to Thymus and re-seeding."
-                            );
-                            self.cortex.imprint_thymus(&hv, true);
-                            self.apply_resuscitation(hv);
-                        }
-                        _ => {
-                            tracing::error!(
-                                "REJECTED POISONED RESUSCITATION: Imprinting toxicity to Thymus."
-                            );
-                            self.cortex.imprint_thymus(&hv, false);
-                        }
+                // 2. ZK VERIFICATION (System 2: Slow/Mathematical)
+                match self.cortex.verify_resuscitation_proof(
+                    &sender_key,
+                    &proof_bytes,
+                    &public_inputs,
+                ) {
+                    Ok(true) => {
+                        tracing::info!(
+                            "VERIFIED RESUSCITATION: Imprinting to Thymus and re-seeding."
+                        );
+                        self.cortex.imprint_thymus(&hv, true);
+                        self.apply_resuscitation(hv);
+                    }
+                    _ => {
+                        tracing::error!(
+                            "REJECTED POISONED RESUSCITATION: Imprinting toxicity to Thymus."
+                        );
+                        self.cortex.imprint_thymus(&hv, false);
                     }
                 }
             }

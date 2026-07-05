@@ -596,22 +596,20 @@ impl CodingAgent {
                     }
                 }
 
-                ErrorCategory::BorrowError => {
-                    // "cannot borrow `x` as mutable, as it is not declared as mutable"
-                    if error.message.contains("not declared as mutable") {
-                        if let Some(var_name) = Self::extract_between_backticks(&error.message) {
-                            // Find the `let x` binding and add `mut`
-                            let let_pattern = format!("let {}", var_name);
-                            for line in &mut lines {
-                                if line.contains(&let_pattern) && !line.contains("let mut ") {
-                                    *line = line.replacen(
-                                        &let_pattern,
-                                        &format!("let mut {}", var_name),
-                                        1,
-                                    );
-                                    any_fix = true;
-                                    break;
-                                }
+                // "cannot borrow `x` as mutable, as it is not declared as mutable"
+                ErrorCategory::BorrowError if error.message.contains("not declared as mutable") => {
+                    if let Some(var_name) = Self::extract_between_backticks(&error.message) {
+                        // Find the `let x` binding and add `mut`
+                        let let_pattern = format!("let {}", var_name);
+                        for line in &mut lines {
+                            if line.contains(&let_pattern) && !line.contains("let mut ") {
+                                *line = line.replacen(
+                                    &let_pattern,
+                                    &format!("let mut {}", var_name),
+                                    1,
+                                );
+                                any_fix = true;
+                                break;
                             }
                         }
                     }

@@ -64,12 +64,10 @@ impl PythonParser {
                     return;
                 }
             }
-            "assignment" => {
-                // Module-level assignments (constants, type aliases)
-                if depth <= 1 {
-                    if let Some(entity) = self.parse_assignment(node, source) {
-                        entities.push(entity);
-                    }
+            // Module-level assignments (constants, type aliases)
+            "assignment" if depth <= 1 => {
+                if let Some(entity) = self.parse_assignment(node, source) {
+                    entities.push(entity);
                 }
             }
             "match_statement" => {

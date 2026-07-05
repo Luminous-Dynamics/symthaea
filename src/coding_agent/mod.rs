@@ -839,6 +839,10 @@ impl CodingAgent {
     ///
     /// - Understanding: gathers context via molecule (ReadFile, ListDir, experience hints)
     /// - Generating/Fixing: calls IntelligentDispatcher to generate code
+    // Can't collapse the Fixing arm's inner `if` into a match guard: guards only
+    // get an immutable borrow of the scrutinee, but try_structured_auto_fix()
+    // needs &mut self.
+    #[allow(clippy::collapsible_if)]
     fn pre_cycle_action(&mut self) {
         match self.phase {
             TaskPhase::Understanding => {

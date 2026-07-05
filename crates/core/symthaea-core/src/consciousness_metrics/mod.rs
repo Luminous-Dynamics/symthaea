@@ -38,6 +38,7 @@ mod approximate;
 mod bounds;
 mod calculator;
 mod conceptual;
+mod consciousness_core;
 mod entropy;
 mod iit4;
 #[cfg(feature = "parallel")]
@@ -55,6 +56,7 @@ pub use approximate::*;
 pub use bounds::*;
 pub use calculator::*;
 pub use conceptual::*;
+pub use consciousness_core::*;
 pub use entropy::*;
 pub use iit4::*;
 #[cfg(feature = "parallel")]

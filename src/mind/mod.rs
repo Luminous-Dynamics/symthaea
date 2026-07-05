@@ -72,6 +72,11 @@ pub struct ContinuousMind {
     pub(crate) working_memory_verified: Vec<bool>,
     /// Metadata for each working memory item.
     pub(crate) working_memory_metadata: Vec<std::collections::HashMap<String, String>>,
+    /// Shared Φ measurement core (same `SpectralMIPFinder` algorithm the
+    /// cognitive loop's `ConsciousnessEngine` uses for motor safety), owned
+    /// independently since the facade's per-call cadence is not the loop's
+    /// tick cadence. See `symthaea_core::consciousness_metrics::ConsciousnessCore`.
+    pub(crate) consciousness_core: symthaea_core::consciousness_metrics::ConsciousnessCore,
     /// Goal stack
     pub(crate) goals: Vec<Goal>,
     /// Input queue
@@ -263,6 +268,8 @@ impl ContinuousMind {
             working_memory_sources: Vec::new(),
             working_memory_verified: Vec::new(),
             working_memory_metadata: Vec::new(),
+            consciousness_core:
+                symthaea_core::consciousness_metrics::ConsciousnessCore::with_defaults(),
             goals: Vec::new(),
             input_queue: Vec::new(),
             stats: MindStats::default(),

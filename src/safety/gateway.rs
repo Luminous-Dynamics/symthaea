@@ -192,21 +192,17 @@ impl SafetyGateway {
     /// Safety check for planned side-effects (ActionIR)
     fn check_action(&mut self, action: &ActionIR) -> SafetyDecision {
         match action {
-            ActionIR::DeleteFile { path } => {
-                if is_forbidden_path(path) {
-                    return SafetyDecision::blocked(
-                        format!("Blocked: Cannot delete system path '{}'", path.display()),
-                        Some(ForbiddenCategory::DangerousCommand),
-                    );
-                }
+            ActionIR::DeleteFile { path } if is_forbidden_path(path) => {
+                return SafetyDecision::blocked(
+                    format!("Blocked: Cannot delete system path '{}'", path.display()),
+                    Some(ForbiddenCategory::DangerousCommand),
+                );
             }
-            ActionIR::WriteFile { path, .. } => {
-                if is_forbidden_path(path) {
-                    return SafetyDecision::blocked(
-                        format!("Blocked: Cannot write to system path '{}'", path.display()),
-                        Some(ForbiddenCategory::SecurityRisk),
-                    );
-                }
+            ActionIR::WriteFile { path, .. } if is_forbidden_path(path) => {
+                return SafetyDecision::blocked(
+                    format!("Blocked: Cannot write to system path '{}'", path.display()),
+                    Some(ForbiddenCategory::SecurityRisk),
+                );
             }
             ActionIR::RunCommand { program, args, .. } => {
                 // Check the program name

@@ -2015,11 +2015,11 @@ impl Symthaea {
                         let mut action = action;
                         match &mut action {
                             crate::action::ActionIR::ReadFile { path, .. }
-                            | crate::action::ActionIR::ListDirectory { path, .. } => {
-                                if !path.is_absolute() {
-                                    let relative = path.clone();
-                                    *path = sandbox.root().join(relative);
-                                }
+                            | crate::action::ActionIR::ListDirectory { path, .. }
+                                if !path.is_absolute() =>
+                            {
+                                let relative = path.clone();
+                                *path = sandbox.root().join(relative);
                             }
                             crate::action::ActionIR::RunCommand {
                                 program,

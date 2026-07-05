@@ -338,16 +338,16 @@ impl LiveLearningRouter {
         let lr = self.learning_rate;
 
         match rule {
-            "high_noise_nonlin" => {
-                // If this rule failed, maybe threshold too low
-                if meta.noise_ratio < self.threshold_adjustments.noise_threshold + 0.1 {
-                    self.threshold_adjustments.noise_threshold += lr * 0.05;
-                }
+            // If this rule failed, maybe threshold too low
+            "high_noise_nonlin"
+                if meta.noise_ratio < self.threshold_adjustments.noise_threshold + 0.1 =>
+            {
+                self.threshold_adjustments.noise_threshold += lr * 0.05;
             }
-            "high_correlation" => {
-                if meta.correlation.abs() < self.threshold_adjustments.corr_threshold + 0.1 {
-                    self.threshold_adjustments.corr_threshold += lr * 0.05;
-                }
+            "high_correlation"
+                if meta.correlation.abs() < self.threshold_adjustments.corr_threshold + 0.1 =>
+            {
+                self.threshold_adjustments.corr_threshold += lr * 0.05;
             }
             "heavy_tails" => {
                 let max_kurt = meta.kurtosis_x.max(meta.kurtosis_y);

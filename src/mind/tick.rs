@@ -320,23 +320,40 @@ impl ContinuousMind {
     }
 
     /// Update consciousness level based on working memory integration.
+    ///
+    /// Prefers `ConsciousnessCore` — the same `SpectralMIPFinder`-based Φ
+    /// approximation the cognitive loop's `ConsciousnessEngine` uses to gate
+    /// motor safety — pushed from `current_thought` each call. Before its
+    /// window has enough samples (`ConsciousnessCore::measure` returns
+    /// `None`, typically the first few calls of a session), falls back to a
+    /// cheap pairwise-dissimilarity estimate over `working_memory` so
+    /// `consciousness_level` isn't pinned at a fixed cold-start value for
+    /// several turns. Once the window warms up, the fallback is no longer
+    /// consulted for the base value. See Seam A,
+    /// `SYMTHAEA_IMPROVEMENT_PLAN_2026-07.md` Phase 1.
     pub(crate) fn update_consciousness(&mut self) {
         if self.working_memory.is_empty() {
             self.state.consciousness_level = 0.1;
             return;
         }
 
-        let mut total_integration = 0.0;
-        for i in 0..self.working_memory.len() {
-            for j in (i + 1)..self.working_memory.len() {
-                let similarity = self.working_memory[i].similarity(&self.working_memory[j]);
-                total_integration += (1.0 - similarity.abs()) as f64;
-            }
-        }
+        let spectral_phi = self.consciousness_core.measure(&self.state.current_thought);
 
-        let pairs = self.working_memory.len() * self.working_memory.len().saturating_sub(1) / 2;
-        if pairs > 0 {
-            self.state.consciousness_level = (total_integration / pairs as f64).clamp(0.0, 1.0);
+        if let Some(phi) = spectral_phi {
+            self.state.consciousness_level = phi.clamp(0.0, 1.0);
+        } else {
+            let mut total_integration = 0.0;
+            for i in 0..self.working_memory.len() {
+                for j in (i + 1)..self.working_memory.len() {
+                    let similarity = self.working_memory[i].similarity(&self.working_memory[j]);
+                    total_integration += (1.0 - similarity.abs()) as f64;
+                }
+            }
+
+            let pairs = self.working_memory.len() * self.working_memory.len().saturating_sub(1) / 2;
+            if pairs > 0 {
+                self.state.consciousness_level = (total_integration / pairs as f64).clamp(0.0, 1.0);
+            }
         }
 
         // Relational Ψ boost: partnership quality lifts consciousness.

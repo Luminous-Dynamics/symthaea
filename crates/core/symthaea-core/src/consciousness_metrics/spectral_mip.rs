@@ -173,6 +173,7 @@ pub struct HierarchicalMIPResult {
 /// Fiedler ordering to concentrate tracked dimensions around the MIP boundary where
 /// they are most informative, while maintaining exploration via evenly-spaced and
 /// random dimensions. Adaptation flushes the window (new dims = new column semantics).
+#[derive(Debug, Clone)]
 pub struct SpectralMIPFinder {
     window: VecDeque<Vec<f64>>,
     config: SpectralMIPConfig,

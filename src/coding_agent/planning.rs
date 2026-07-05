@@ -384,31 +384,29 @@ impl CodingAgent {
                         );
                     }
                 }
-                MotorCommandType::ReflectionInitiate => {
+                MotorCommandType::ReflectionInitiate
                     if self.phase != TaskPhase::Planning
                         && self.phase != TaskPhase::Understanding
-                        && !(has_code && in_action_phase)
-                    {
-                        tracing::info!(
-                            target: "symthaea::coding_agent",
-                            from = %self.phase,
-                            "FEP ReflectionInitiate -> Planning"
-                        );
-                        self.phase = TaskPhase::Planning;
-                        self.phase_failures = 0;
-                        return;
-                    }
+                        && !(has_code && in_action_phase) =>
+                {
+                    tracing::info!(
+                        target: "symthaea::coding_agent",
+                        from = %self.phase,
+                        "FEP ReflectionInitiate -> Planning"
+                    );
+                    self.phase = TaskPhase::Planning;
+                    self.phase_failures = 0;
+                    return;
                 }
-                MotorCommandType::ExpectationReset => {
+                MotorCommandType::ExpectationReset
                     if (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
-                        && !has_code
-                    {
-                        self.observations
-                            .push("FEP ExpectationReset: model mismatch, re-planning".into());
-                        self.phase = TaskPhase::Planning;
-                        self.phase_failures = 0;
-                        return;
-                    }
+                        && !has_code =>
+                {
+                    self.observations
+                        .push("FEP ExpectationReset: model mismatch, re-planning".into());
+                    self.phase = TaskPhase::Planning;
+                    self.phase_failures = 0;
+                    return;
                 }
                 MotorCommandType::MemoryConsolidate => {
                     self.observations

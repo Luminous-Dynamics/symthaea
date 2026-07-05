@@ -238,11 +238,9 @@ impl VisitMut for LifetimeFixVisitor {
 
 fn inject_lifetime_if_missing(ty: &mut syn::Type, lt: &syn::Lifetime) -> bool {
     match ty {
-        syn::Type::Reference(tr) => {
-            if tr.lifetime.is_none() {
-                tr.lifetime = Some(lt.clone());
-                return true;
-            }
+        syn::Type::Reference(tr) if tr.lifetime.is_none() => {
+            tr.lifetime = Some(lt.clone());
+            return true;
         }
         syn::Type::Path(tp) => {
             // Check for Result<T, E> or Option<T>

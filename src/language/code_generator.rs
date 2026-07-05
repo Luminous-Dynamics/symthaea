@@ -2025,38 +2025,31 @@ impl CodeGenerator {
 
         for fix in &fixes {
             match fix.category {
-                "type_inference" => {
-                    // Add turbofish to bare .parse() calls
-                    if fixed.contains(".parse()") && !fixed.contains(".parse::<") {
-                        // Try to infer type from context: look for -> Type or : Type
-                        if let Some(ret) = Self::extract_return_type_from_source(&fixed) {
-                            fixed = fixed.replace(".parse()", &format!(".parse::<{}>()", ret));
-                            applied = true;
-                        }
+                // Add turbofish to bare .parse() calls
+                "type_inference" if fixed.contains(".parse()") && !fixed.contains(".parse::<") => {
+                    // Try to infer type from context: look for -> Type or : Type
+                    if let Some(ret) = Self::extract_return_type_from_source(&fixed) {
+                        fixed = fixed.replace(".parse()", &format!(".parse::<{}>()", ret));
+                        applied = true;
                     }
                 }
-                "wrong_method" => {
-                    // .dedup() on iterator → restructure to Vec method
-                    if stderr.contains("dedup") && fixed.contains(".dedup()") {
-                        // Check if dedup is chained on an iterator (not on a Vec binding)
-                        if fixed.contains(".iter()") && fixed.contains(".dedup()") {
-                            // Cannot auto-fix complex chains — flag for regeneration
-                        }
+                // .dedup() on iterator → restructure to Vec method
+                "wrong_method" if stderr.contains("dedup") && fixed.contains(".dedup()") => {
+                    // Check if dedup is chained on an iterator (not on a Vec binding)
+                    if fixed.contains(".iter()") && fixed.contains(".dedup()") {
+                        // Cannot auto-fix complex chains — flag for regeneration
                     }
                 }
-                "type_mismatch" => {
-                    // &T vs T: add .copied() or .cloned() before .collect()
-                    if stderr.contains("expected") && fixed.contains(".iter()") {
-                        if !fixed.contains(".cloned()") && !fixed.contains(".copied()") {
-                            fixed =
-                                fixed.replace(".iter().collect()", ".iter().cloned().collect()");
-                            fixed = fixed.replace(
-                                ".iter().enumerate().collect()",
-                                ".into_iter().enumerate().collect()",
-                            );
-                            fixed = fixed.replace(".iter().zip(", ".into_iter().zip(");
-                            applied = true;
-                        }
+                // &T vs T: add .copied() or .cloned() before .collect()
+                "type_mismatch" if stderr.contains("expected") && fixed.contains(".iter()") => {
+                    if !fixed.contains(".cloned()") && !fixed.contains(".copied()") {
+                        fixed = fixed.replace(".iter().collect()", ".iter().cloned().collect()");
+                        fixed = fixed.replace(
+                            ".iter().enumerate().collect()",
+                            ".into_iter().enumerate().collect()",
+                        );
+                        fixed = fixed.replace(".iter().zip(", ".into_iter().zip(");
+                        applied = true;
                     }
                 }
                 // Replace empty closures |x| ) with a default

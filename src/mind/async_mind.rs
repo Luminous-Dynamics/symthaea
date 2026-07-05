@@ -271,11 +271,11 @@ impl AsyncMind {
                             let phase = mind.state.biorhythm.as_ref().map(|b| b.phase).unwrap_or(crate::chronobiology::CircadianPhase::Day);
 
                             match phase {
-                                crate::chronobiology::CircadianPhase::Night => {
-                                    if mind.state.holocell.dimensionality != symthaea_core::hdc::HdcDimensionality::Rest {
-                                        tracing::info!("CIRCADIAN RHYTHM: Night phase. Constricting to 2^13 (Rest)");
-                                        mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Rest);
-                                    }
+                                crate::chronobiology::CircadianPhase::Night
+                                    if mind.state.holocell.dimensionality != symthaea_core::hdc::HdcDimensionality::Rest =>
+                                {
+                                    tracing::info!("CIRCADIAN RHYTHM: Night phase. Constricting to 2^13 (Rest)");
+                                    mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Rest);
                                 }
                                 crate::chronobiology::CircadianPhase::Dawn
                                     if mind.state.holocell.dimensionality == symthaea_core::hdc::HdcDimensionality::Rest =>
