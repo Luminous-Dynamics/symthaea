@@ -12,11 +12,11 @@ rand = { workspace = true }
 proptest = "1"
 
 [dependencies.symtropy-physics]
-version = "0.1.0"
+version = "0.2.1"
 optional = true
 
 [dependencies.symtropy-math]
-version = "0.1.0"
+version = "0.2.1"
 optional = true
 
 [dependencies.nalgebra]

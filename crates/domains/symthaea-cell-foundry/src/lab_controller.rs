@@ -271,18 +271,18 @@ impl<I: InstrumentAdapter> LabController<I> {
         let environment = self.instrument.read_environment();
 
         // Check ethics gate
-        if step.requires_ethics_check {
-            if let Err(reason) = self.ethics.check_manipulation(&step.name) {
-                return LabControllerStepResult {
-                    step_index,
-                    step_name: step.name.clone(),
-                    selected_action: CultureAction::AbortProtocol,
-                    action_executed: false,
-                    failure_reason: Some(format!("Ethics gate: {}", reason)),
-                    predicted_state_similarity: 0.0,
-                    viability: cell_state.viability,
-                };
-            }
+        if step.requires_ethics_check
+            && let Err(reason) = self.ethics.check_manipulation(&step.name)
+        {
+            return LabControllerStepResult {
+                step_index,
+                step_name: step.name.clone(),
+                selected_action: CultureAction::AbortProtocol,
+                action_executed: false,
+                failure_reason: Some(format!("Ethics gate: {}", reason)),
+                predicted_state_similarity: 0.0,
+                viability: cell_state.viability,
+            };
         }
 
         // Check viability floor

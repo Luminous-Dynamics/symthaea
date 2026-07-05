@@ -886,7 +886,7 @@ impl TargetMorphology {
     pub fn capture(field: &MorphogeneticField) -> Self {
         let mut vmem_sum = vec![0.0f64; N_BINS];
         let mut counts = vec![[0u32; 4]; N_BINS];
-        let mut totals = vec![0u32; N_BINS];
+        let mut totals = [0u32; N_BINS];
         for (i, cell) in field.cells.iter().enumerate() {
             let bin = bin_index(&cell.position);
             vmem_sum[bin] += field.bioelectric.vmem[i] as f64;

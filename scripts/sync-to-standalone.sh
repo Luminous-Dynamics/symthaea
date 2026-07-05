@@ -357,11 +357,25 @@ if ! $DRY_RUN; then
     # path can just use the published version instead of being stripped.
     # Handle both `dep = { path = "..." }` (inline) and
     # `[dependencies.dep]\npath = "..."` (table) forms.
-    for symtropy_dep in symtropy-math symtropy-physics symtropy-consciousness-physics; do
+    # Versions must track the CLAUDE.md published-crates table -- pinning
+    # to a stale version here silently forks the API the standalone repo
+    # compiles against from the API the monorepo path-dep actually has
+    # (found 2026-07-05: symtropy-math/physics were stuck at 0.1.0 while
+    # 0.2.1 had shipped, so Point<D> gained an Index impl and
+    # RigidBody::position() changed from `&Point<D>` to `SVector<f64, D>`
+    # by value -- symthaea-cell-foundry's packing.rs, written against the
+    # current path dep, failed to compile against the stale pin).
+    declare -A symtropy_dep_versions=(
+        [symtropy-math]="0.2.1"
+        [symtropy-physics]="0.2.1"
+        [symtropy-consciousness-physics]="0.2.0"
+    )
+    for symtropy_dep in "${!symtropy_dep_versions[@]}"; do
+        dep_version="${symtropy_dep_versions[$symtropy_dep]}"
         find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
-            sed -i "s|^${symtropy_dep}\\s*=\\s*{\\s*path\\s*=\\s*\"[^\"]*\"\\s*}|${symtropy_dep} = \"0.1.0\"|" {} \;
+            sed -i "s|^${symtropy_dep}\\s*=\\s*{\\s*path\\s*=\\s*\"[^\"]*\"\\s*}|${symtropy_dep} = \"${dep_version}\"|" {} \;
         find "${STANDALONE_REPO}/crates" -name "Cargo.toml" -exec \
-            sed -i "s|^path = \"\\.\\./\\.\\./\\.\\./\\.\\./symtropy/crates/[a-z]*/${symtropy_dep}\"|version = \"0.1.0\"|" {} \;
+            sed -i "s|^path = \"\\.\\./\\.\\./\\.\\./\\.\\./symtropy/crates/[a-z]*/${symtropy_dep}\"|version = \"${dep_version}\"|" {} \;
     done
 
     # Strip external deps that escape the workspace (prism, positioning)

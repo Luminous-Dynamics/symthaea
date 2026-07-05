@@ -261,10 +261,10 @@ impl MorphogeneticField {
     /// standalone/unit-test usage (which never calls `advance_day`, and
     /// therefore never builds a grid) is completely unaffected.
     pub(crate) fn neighbours(&self, idx: usize, radius: f32) -> Vec<usize> {
-        if let Some((grid, positions)) = &self.spatial_grid {
-            if radius <= grid.cell_size() {
-                return grid.query_radius(positions, &self.cells[idx].position, radius, Some(idx));
-            }
+        if let Some((grid, positions)) = &self.spatial_grid
+            && radius <= grid.cell_size()
+        {
+            return grid.query_radius(positions, &self.cells[idx].position, radius, Some(idx));
         }
         self.neighbours_brute_force(idx, radius)
     }
@@ -378,7 +378,7 @@ impl MorphogeneticField {
                     cell.cell_type = OrganoidCellType::NeuralProgenitor;
                 } else if cell.cell_type == OrganoidCellType::NeuralProgenitor {
                     // Determine neuron subtype from gene expression balance.
-                    let excitatory_weight = cell.gene_expression.get(0).copied().unwrap_or(0.5);
+                    let excitatory_weight = cell.gene_expression.first().copied().unwrap_or(0.5);
                     let inhibitory_weight = cell.gene_expression.get(1).copied().unwrap_or(0.5);
                     if excitatory_weight > inhibitory_weight + 0.1 {
                         cell.cell_type = OrganoidCellType::Neuron(NeuronSubtype::Excitatory);

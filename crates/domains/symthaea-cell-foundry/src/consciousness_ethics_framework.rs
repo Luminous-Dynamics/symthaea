@@ -247,21 +247,11 @@ pub struct TrendAnalysis {
 // ---------------------------------------------------------------------------
 
 /// Per-tier configuration.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct EthicsTierConfig {
     pub max_experiment_duration_days: Option<u32>,
     pub requires_external_review: bool,
     pub pain_mitigation_required: bool,
-}
-
-impl Default for EthicsTierConfig {
-    fn default() -> Self {
-        Self {
-            max_experiment_duration_days: None,
-            requires_external_review: false,
-            pain_mitigation_required: false,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

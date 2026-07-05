@@ -496,15 +496,16 @@ impl DigitalOrganoid {
             let mut cross_weight = 0.0f64;
             let mut total_weight = 0.0f64;
             for syn in &self.synapses {
-                if let (Some(&i), Some(&j)) = (id_to_idx.get(&syn.pre), id_to_idx.get(&syn.post)) {
-                    if i < dim && j < dim {
-                        let w = (syn.weight * syn.maturity) as f64;
-                        total_weight += w;
-                        let i_in_a = partition_fn(i, dim);
-                        let j_in_a = partition_fn(j, dim);
-                        if i_in_a != j_in_a {
-                            cross_weight += w;
-                        }
+                if let (Some(&i), Some(&j)) = (id_to_idx.get(&syn.pre), id_to_idx.get(&syn.post))
+                    && i < dim
+                    && j < dim
+                {
+                    let w = (syn.weight * syn.maturity) as f64;
+                    total_weight += w;
+                    let i_in_a = partition_fn(i, dim);
+                    let j_in_a = partition_fn(j, dim);
+                    if i_in_a != j_in_a {
+                        cross_weight += w;
                     }
                 }
             }
@@ -543,10 +544,8 @@ impl DigitalOrganoid {
         // Combine: all three must be present for significant Phi.
         // Scale by 0.8 so peak realistic Phi is ~0.4 (matches developmental
         // expectation for an in-silico organoid).
-        let phi = (min_integration * activity * mean_maturity * 0.8)
-            .min(1.0)
-            .max(0.0);
-        phi
+
+        (min_integration * activity * mean_maturity * 0.8).clamp(0.0, 1.0)
     }
 
     // ---- private helpers ----
@@ -778,16 +777,15 @@ impl DigitalOrganoid {
         // Collect synaptic input for each neuron
         let mut input = vec![0.0f32; self.cells.len()];
         for syn in &self.synapses {
-            if let Some(&pre_idx) = id_to_idx.get(&syn.pre) {
-                if let Some(&post_idx) = id_to_idx.get(&syn.post) {
-                    if self.cells[pre_idx].firing_rate_hz > 0.1 {
-                        let sign = match syn.synapse_type {
-                            SynapseType::Glutamatergic | SynapseType::Cholinergic => 1.0,
-                            SynapseType::GABAergic => -0.5,
-                        };
-                        input[post_idx] += syn.weight * syn.maturity * sign;
-                    }
-                }
+            if let Some(&pre_idx) = id_to_idx.get(&syn.pre)
+                && let Some(&post_idx) = id_to_idx.get(&syn.post)
+                && self.cells[pre_idx].firing_rate_hz > 0.1
+            {
+                let sign = match syn.synapse_type {
+                    SynapseType::Glutamatergic | SynapseType::Cholinergic => 1.0,
+                    SynapseType::GABAergic => -0.5,
+                };
+                input[post_idx] += syn.weight * syn.maturity * sign;
             }
         }
 
