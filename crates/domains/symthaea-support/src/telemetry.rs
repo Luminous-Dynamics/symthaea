@@ -43,10 +43,10 @@ fn get_process_rss_mb() -> f64 {
         if line.starts_with("VmRSS:") {
             // Format: "VmRSS:    <number> kB"
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                if let Ok(kb) = parts[1].parse::<f64>() {
-                    return kb / 1024.0;
-                }
+            if parts.len() >= 2
+                && let Ok(kb) = parts[1].parse::<f64>()
+            {
+                return kb / 1024.0;
             }
         }
     }

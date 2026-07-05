@@ -158,7 +158,7 @@ impl fmt::Display for MaterialityLevel {
 
 /// Prismatic epistemic context — different knowledge traditions apply
 /// legitimately different weights to E/N/M axes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum EpistemicContext {
     Scientific,
     Governance,
@@ -166,6 +166,7 @@ pub enum EpistemicContext {
     Indigenous,
     Contemplative,
     Emergency,
+    #[default]
     Standard,
 }
 
@@ -195,12 +196,6 @@ impl EpistemicContext {
     }
 }
 
-impl Default for EpistemicContext {
-    fn default() -> Self {
-        Self::Standard
-    }
-}
-
 // ==============================================================================
 // EPISTEMIC COORDINATE (the full 3D+context position)
 // ==============================================================================
@@ -224,7 +219,7 @@ pub enum GroundingLevel {
     Social,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum EpistemicProvenance {
     Embodied {
         level: GroundingLevel,
@@ -239,13 +234,8 @@ pub enum EpistemicProvenance {
         corroboration_count: u32,
         network_coverage: f32,
     },
+    #[default]
     Unknown,
-}
-
-impl Default for EpistemicProvenance {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 // ==============================================================================
