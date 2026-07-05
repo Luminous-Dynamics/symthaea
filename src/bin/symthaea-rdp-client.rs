@@ -75,7 +75,7 @@ fn main() -> Result<()> {
         let start = Instant::now();
 
         let updated = client.poll();
-        if updated && cycle % 100 == 0 {
+        if updated && cycle.is_multiple_of(100) {
             info!(
                 "Frame {} applied | {}x{} | {:.1} FPS | Server Φ={:.2}",
                 client.frame_buffer.last_frame_id,

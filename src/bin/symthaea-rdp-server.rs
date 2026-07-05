@@ -88,7 +88,7 @@ fn main() -> Result<()> {
         }
 
         cycle += 1;
-        if cycle % 500 == 0 {
+        if cycle.is_multiple_of(500) {
             info!(
                 "Cycle {}: frame_id={}, sessions={}, injected_events={}",
                 cycle,

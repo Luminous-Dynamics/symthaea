@@ -20,7 +20,7 @@ struct DiscoveredParam {
 
 fn compile_workspace() -> bool {
     let build_output = Command::new("cargo")
-        .args(&["build", "--release", "--workspace"])
+        .args(["build", "--release", "--workspace"])
         .output();
 
     match build_output {
@@ -41,18 +41,17 @@ fn auto_discover_parameters() -> Vec<DiscoveredParam> {
         {
             let marker = "// FORGE_PARAM:";
             for line in content.lines() {
-                if line.contains(marker) {
-                    if let Some(marker_idx) = line.find(marker) {
-                        if let Some(colon_idx) = line.find(':') {
-                            let param_id = line[marker_idx + marker.len()..].trim().to_string();
-                            let field_key = line[..colon_idx].trim().to_string();
-                            if !param_id.is_empty() && !field_key.is_empty() {
-                                params.push(DiscoveredParam {
-                                    id: param_id,
-                                    field_key,
-                                });
-                            }
-                        }
+                if line.contains(marker)
+                    && let Some(marker_idx) = line.find(marker)
+                    && let Some(colon_idx) = line.find(':')
+                {
+                    let param_id = line[marker_idx + marker.len()..].trim().to_string();
+                    let field_key = line[..colon_idx].trim().to_string();
+                    if !param_id.is_empty() && !field_key.is_empty() {
+                        params.push(DiscoveredParam {
+                            id: param_id,
+                            field_key,
+                        });
                     }
                 }
             }
@@ -70,7 +69,7 @@ fn profile_target_tri_objective() -> Option<(Duration, f64, f64)> {
         let start = Instant::now();
         // Profile against our active domestic validation harness
         let exec_output = Command::new("cargo")
-            .args(&["check", "-p", "symthaea-domotic"])
+            .args(["check", "-p", "symthaea-domotic"])
             .output();
         let duration = start.elapsed();
 
@@ -80,17 +79,15 @@ fn profile_target_tri_objective() -> Option<(Duration, f64, f64)> {
                 if pass == 0 {
                     let stderr_str = String::from_utf8_lossy(&out.stderr);
                     for line in stderr_str.lines() {
-                        if line.contains("Temp:") {
-                            if let Some(idx) = line.find("Temp:") {
-                                if let Some(val) = line[idx + 5..]
-                                    .split_whitespace()
-                                    .next()
-                                    .and_then(|s| s.parse::<f64>().ok())
-                                {
-                                    filter_error = (val - 21.0).abs(); // Calculate tracking error delta from 21°C target
-                                    break;
-                                }
-                            }
+                        if line.contains("Temp:")
+                            && let Some(idx) = line.find("Temp:")
+                            && let Some(val) = line[idx + 5..]
+                                .split_whitespace()
+                                .next()
+                                .and_then(|s| s.parse::<f64>().ok())
+                        {
+                            filter_error = (val - 21.0).abs(); // Calculate tracking error delta from 21°C target
+                            break;
                         }
                     }
                 }
@@ -139,19 +136,19 @@ fn mutate_generic_parameter(
                     found = true;
                     break;
                 }
-            } else if let Some(eq_idx) = line.find('=') {
-                if let Some(semi_idx) = line.find(';') {
-                    let val_str = line[eq_idx + 1..semi_idx].trim();
-                    let old_val: f32 = val_str.parse().unwrap_or(0.35);
-                    updated_val = (old_val + delta).clamp(0.005, 1.95);
+            } else if let Some(eq_idx) = line.find('=')
+                && let Some(semi_idx) = line.find(';')
+            {
+                let val_str = line[eq_idx + 1..semi_idx].trim();
+                let old_val: f32 = val_str.parse().unwrap_or(0.35);
+                updated_val = (old_val + delta).clamp(0.005, 1.95);
 
-                    let indent = line.len() - line.trim_start().len();
-                    let spaces = &line[..indent];
+                let indent = line.len() - line.trim_start().len();
+                let spaces = &line[..indent];
 
-                    *line = format!("{}let {} = {:.4}; {}", spaces, field_key, updated_val, tag);
-                    found = true;
-                    break;
-                }
+                *line = format!("{}let {} = {:.4}; {}", spaces, field_key, updated_val, tag);
+                found = true;
+                break;
             }
         }
     }
@@ -256,9 +253,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             baseline_surp = mutated_surp;
                             baseline_filter = mutated_filter;
 
-                            let _ = Command::new("git").args(&["add", "."]).output()?;
+                            let _ = Command::new("git").args(["add", "."]).output()?;
                             let _ = Command::new("git")
-                                .args(&[
+                                .args([
                                     "commit",
                                     "-m",
                                     &format!(

@@ -375,11 +375,11 @@ fn best_line_from_text(text: &str, keywords: &[String]) -> Option<String> {
 
 fn extract_title(html: &str) -> Option<String> {
     let lower = html.to_ascii_lowercase();
-    if let Some(start) = lower.find("<title>") {
-        if let Some(end) = lower[start + 7..].find("</title>") {
-            let title = &html[start + 7..start + 7 + end];
-            return Some(title.trim().to_string());
-        }
+    if let Some(start) = lower.find("<title>")
+        && let Some(end) = lower[start + 7..].find("</title>")
+    {
+        let title = &html[start + 7..start + 7 + end];
+        return Some(title.trim().to_string());
     }
     None
 }
@@ -395,10 +395,8 @@ fn collect_numbers(text: &str) -> Vec<f64> {
         if is_number_char {
             if (ch == '-' || ch == '+') && prev.map(|p| p.is_ascii_digit()).unwrap_or(false) {
                 // treat sign after digit as separator
-                if has_digit {
-                    if let Ok(val) = current.parse::<f64>() {
-                        numbers.push(val);
-                    }
+                if has_digit && let Ok(val) = current.parse::<f64>() {
+                    numbers.push(val);
                 }
                 current.clear();
                 has_digit = false;
@@ -408,20 +406,16 @@ fn collect_numbers(text: &str) -> Vec<f64> {
                 has_digit = true;
             }
         } else {
-            if has_digit {
-                if let Ok(val) = current.parse::<f64>() {
-                    numbers.push(val);
-                }
+            if has_digit && let Ok(val) = current.parse::<f64>() {
+                numbers.push(val);
             }
             current.clear();
             has_digit = false;
         }
         prev = Some(ch);
     }
-    if has_digit {
-        if let Ok(val) = current.parse::<f64>() {
-            numbers.push(val);
-        }
+    if has_digit && let Ok(val) = current.parse::<f64>() {
+        numbers.push(val);
     }
     numbers
 }
@@ -838,39 +832,37 @@ async fn main() {
     let allow_web = env::var("SYMTHAEA_AGENT_ALLOW_WEB")
         .map(|v| v == "1")
         .unwrap_or(false);
-    if allow_web {
-        if let Some(url) = urls.first() {
-            let action = ActionIR::RunCommand {
-                program: "curl".to_string(),
-                args: vec!["-fsSL".to_string(), url.to_string()],
-                env: BTreeMap::new(),
-                working_dir: None,
-            };
-            match executor.execute(&action, &policy, &sandbox, action_phi) {
-                Ok(outcome) => {
-                    if let ActionOutcome::CommandOutput { stdout, .. } = &outcome.outcome {
-                        let text = String::from_utf8_lossy(stdout).to_string();
-                        web_content = Some(text);
-                    }
-                    action_logs.push(summarize_action(&action, &outcome.outcome));
+    if allow_web && let Some(url) = urls.first() {
+        let action = ActionIR::RunCommand {
+            program: "curl".to_string(),
+            args: vec!["-fsSL".to_string(), url.to_string()],
+            env: BTreeMap::new(),
+            working_dir: None,
+        };
+        match executor.execute(&action, &policy, &sandbox, action_phi) {
+            Ok(outcome) => {
+                if let ActionOutcome::CommandOutput { stdout, .. } = &outcome.outcome {
+                    let text = String::from_utf8_lossy(stdout).to_string();
+                    web_content = Some(text);
                 }
-                Err(err) => action_logs.push(ActionLog {
-                    action: format!("RunCommand(curl {})", url),
-                    status: "error".to_string(),
-                    detail: Some(err.to_string()),
-                }),
+                action_logs.push(summarize_action(&action, &outcome.outcome));
             }
+            Err(err) => action_logs.push(ActionLog {
+                action: format!("RunCommand(curl {})", url),
+                status: "error".to_string(),
+                detail: Some(err.to_string()),
+            }),
         }
     }
 
     let mut computed_answer: Option<String> = None;
     let mut used_math = false;
 
-    if let Some(expr) = extract_expression(&task_text) {
-        if let Some(value) = eval_expression(&expr) {
-            computed_answer = Some(format_number(value));
-            used_math = true;
-        }
+    if let Some(expr) = extract_expression(&task_text)
+        && let Some(value) = eval_expression(&expr)
+    {
+        computed_answer = Some(format_number(value));
+        used_math = true;
     }
 
     let has_files = !file_contents.is_empty();
@@ -896,11 +888,11 @@ async fn main() {
                 let first = content.lines().next().unwrap_or("");
                 computed_answer = Some(first.to_string());
             }
-        } else if lower.contains("character count") || lower.contains("characters") {
-            if let Some((_, content)) = file_contents.first() {
-                let count = content.chars().count();
-                computed_answer = Some(count.to_string());
-            }
+        } else if (lower.contains("character count") || lower.contains("characters"))
+            && let Some((_, content)) = file_contents.first()
+        {
+            let count = content.chars().count();
+            computed_answer = Some(count.to_string());
         }
     }
 
@@ -924,31 +916,32 @@ async fn main() {
         }
     }
 
-    if computed_answer.is_none() && has_web {
-        if let Some(html) = &web_content {
-            if find_keyword(&task_text, &["title", "page title"]) {
-                if let Some(title) = extract_title(html) {
-                    computed_answer = Some(title);
-                }
-            }
+    if computed_answer.is_none()
+        && has_web
+        && let Some(html) = &web_content
+        && find_keyword(&task_text, &["title", "page title"])
+        && let Some(title) = extract_title(html)
+    {
+        computed_answer = Some(title);
+    }
+
+    if computed_answer.is_none()
+        && has_web
+        && let Some(html) = &web_content
+    {
+        let keywords = tokenize_keywords(&task_text);
+        if let Some(line) = best_line_from_text(html, &keywords) {
+            computed_answer = Some(line);
         }
     }
 
-    if computed_answer.is_none() && has_web {
-        if let Some(html) = &web_content {
-            let keywords = tokenize_keywords(&task_text);
-            if let Some(line) = best_line_from_text(html, &keywords) {
-                computed_answer = Some(line);
-            }
-        }
-    }
-
-    if computed_answer.is_none() && has_web {
-        if let Some(html) = &web_content {
-            let numbers = collect_numbers(html);
-            if let Some(answer) = summarize_numeric(&task_text, &numbers) {
-                computed_answer = Some(answer);
-            }
+    if computed_answer.is_none()
+        && has_web
+        && let Some(html) = &web_content
+    {
+        let numbers = collect_numbers(html);
+        if let Some(answer) = summarize_numeric(&task_text, &numbers) {
+            computed_answer = Some(answer);
         }
     }
 

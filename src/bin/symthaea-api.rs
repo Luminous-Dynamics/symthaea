@@ -57,15 +57,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("  addr: {}", addr);
     }
 
-    let mut config = symthaea::api::ApiConfig::default();
-    config.bearer_token = bearer_token;
-    config.audit_log_path = env::var("SYMTHAEA_API_AUDIT_LOG_PATH").ok().and_then(|p| {
-        if p.trim().is_empty() {
-            None
-        } else {
-            Some(std::path::PathBuf::from(p))
-        }
-    });
+    let mut config = symthaea::api::ApiConfig {
+        bearer_token,
+        audit_log_path: env::var("SYMTHAEA_API_AUDIT_LOG_PATH").ok().and_then(|p| {
+            if p.trim().is_empty() {
+                None
+            } else {
+                Some(std::path::PathBuf::from(p))
+            }
+        }),
+        ..Default::default()
+    };
 
     if let Some(path) = config.audit_log_path.as_ref() {
         info!("API audit log persistence enabled at {}", path.display());

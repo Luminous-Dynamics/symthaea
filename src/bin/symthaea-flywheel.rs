@@ -28,7 +28,7 @@ fn interleave_and_shuffle_dataset<P: AsRef<Path> + Clone>(path: P) -> anyhow::Re
     );
     let file = File::open(path.clone())?;
     let reader = BufReader::new(file);
-    let mut records: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+    let mut records: Vec<String> = reader.lines().map_while(Result::ok).collect();
 
     // Native in-place slice shuffling via rand thread-rng
     let mut rng = rand::thread_rng();
@@ -43,6 +43,9 @@ fn interleave_and_shuffle_dataset<P: AsRef<Path> + Clone>(path: P) -> anyhow::Re
     Ok(())
 }
 
+// Deliberately fire-and-forget: this spawns a long background training pass
+// (cargo test --release) and returns immediately without blocking on it.
+#[allow(clippy::zombie_processes)]
 fn trigger_background_retrain() {
     println!("\n[Flywheel] 🚀 Retrain threshold breached. Spawning background compiler...");
 
