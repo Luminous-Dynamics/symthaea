@@ -231,13 +231,18 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::CollectVec => {
-                // A bare identifier (no method-call dot at all) is already a concrete
-                // value — e.g. a Vec built up via in-place `.sort()`/`.dedup()` — not
-                // an iterator chain needing `.collect()`. Appending it produced
-                // "no method named `collect` found for struct `Vec<T>`" (E0599).
+                // A bare identifier as the TAIL expression (no method-call dot on its
+                // own line) is already a concrete value — e.g. a Vec built up via
+                // in-place `.sort()`/`.dedup()` over several statements, ending in a
+                // bare `result` — not an iterator chain needing `.collect()`.
+                // Appending it produced "no method named `collect` found for struct
+                // `Vec<T>`" (E0599). Must check only the tail line, not the whole
+                // (possibly multi-statement) body — those earlier statements contain
+                // plenty of dots (`.to_vec()`, `.sort()`, ...) that don't apply here.
+                let tail = trimmed.lines().last().unwrap_or(trimmed).trim();
                 if body.contains(".collect()")
                     || body.contains(".collect::<")
-                    || !trimmed.contains('.')
+                    || !tail.contains('.')
                 {
                     body.to_string()
                 } else {

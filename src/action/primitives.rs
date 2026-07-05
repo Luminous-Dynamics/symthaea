@@ -1150,16 +1150,13 @@ pub fn select_best_plan(
     // Free energy = energy_cost / step_efficiency
     // Lower is better — more information per energy unit
     // step_count acts as proxy for information gain (more steps = more info)
-    let best = pool
-        .iter()
+    pool.iter()
         .min_by(|(_, a), (_, b)| {
             let fa = free_energy(&a.profile);
             let fb = free_energy(&b.profile);
             fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal)
         })
-        .map(|(idx, _)| *idx);
-
-    best
+        .map(|(idx, _)| *idx)
 }
 
 /// Select the best plan using FEP free energy minimization with historical recipe success rates.
@@ -1202,8 +1199,7 @@ pub fn select_best_plan_with_history(
     // Free energy modulated by historical success rate:
     // F = base_free_energy / (0.5 + recipe_rate)
     // Higher past success → lower free energy → preferred
-    let best = pool
-        .iter()
+    pool.iter()
         .min_by(|(idx_a, a), (idx_b, b)| {
             let fa = free_energy(&a.profile);
             let fb = free_energy(&b.profile);
@@ -1215,9 +1211,7 @@ pub fn select_best_plan_with_history(
                 .partial_cmp(&adjusted_b)
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
-        .map(|(idx, _)| *idx);
-
-    best
+        .map(|(idx, _)| *idx)
 }
 
 /// Compute expected free energy for a plan.

@@ -684,8 +684,7 @@ impl ContinuousMind {
         if self.mesh_inbox.len() > super::MAX_OUTBOX_SIZE {
             let excess = self.mesh_inbox.len() - super::MAX_OUTBOX_SIZE;
             // Sort by priority ascending (lowest-priority first), stable to preserve order within tier
-            self.mesh_inbox
-                .sort_by(|a, b| a.payload_type.priority().cmp(&b.payload_type.priority()));
+            self.mesh_inbox.sort_by_key(|a| a.payload_type.priority());
             self.mesh_inbox.drain(..excess);
             self.mesh_stats.packets_dropped += excess as u64;
         }

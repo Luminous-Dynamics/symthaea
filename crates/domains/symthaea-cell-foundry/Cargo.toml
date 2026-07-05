@@ -27,6 +27,14 @@ serde_json = { workspace = true }
 symtropy-physics = "0.2.1"
 symtropy-math = "0.2.1"
 nalgebra = { workspace = true }
+# Real, tested black-box optimizer (Particle Swarm) for the opt-in
+# anatomical-compiler intervention search -- see src/anatomical_compiler.rs.
+# Already resolved in the workspace lockfile via symthaea-fep's dependency;
+# this just wires it up directly for this crate to use. argmin itself builds
+# argmin-math with default-features=false (only "primitives"), so Vec<f64>
+# parameter support ("vec" feature) must be requested directly here too.
+argmin = { workspace = true }
+argmin-math = { version = "0.4", features = ["vec"] }
 
 [dev-dependencies]
 proptest = "1.4"

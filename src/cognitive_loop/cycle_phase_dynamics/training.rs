@@ -837,6 +837,7 @@ impl CognitiveLoopService {
                 // ── Factcheck bridge: extract claims from Broca output ──
                 #[cfg(all(feature = "mycelix", feature = "ssm_language"))]
                 if let Some(ref broca_text) = self.language_comm.last_broca_text {
+                    let cycle_num = self.stats.total_cycles as u64;
                     // Epistemic: prioritize claims before submitting for validation.
                     // High-stakes domains (health, safety) checked first; low-priority skipped.
                     #[cfg(feature = "epistemic")]

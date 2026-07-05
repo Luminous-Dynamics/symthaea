@@ -399,12 +399,6 @@ pub use symthaea_embeddings as embeddings;
 #[cfg(feature = "benchmarks")]
 pub mod benchmarks;
 
-// Integration (cfg-gated for build isolation)
-// ConsciousPipeline depends on ExecutionStrategy from language module
-// and pulls in heavyweight nix-mind dependencies.
-#[cfg(any(feature = "integration_module", feature = "nix-mind"))]
-pub mod integration;
-
 // Action (depends on consciousness module - now enabled)
 pub mod action;
 pub mod control_plane;

@@ -118,9 +118,7 @@ impl CodeAntibody {
         let dim = self.hv.values.len();
         let (start, end) = seg.range(dim);
         let mut values = vec![0.0f32; dim];
-        for i in start..end {
-            values[i] = self.hv.values[i];
-        }
+        values[start..end].copy_from_slice(&self.hv.values[start..end]);
         ContinuousHV::from_values(values)
     }
 
@@ -446,15 +444,9 @@ impl ImmuneCodeEvolver {
         let (d_start, d_end) = CodeSegment::D.range(dim);
         let (j_start, j_end) = CodeSegment::J.range(dim);
 
-        for i in v_start..v_end {
-            child_values[i] = v_donor.hv.values[i];
-        }
-        for i in d_start..d_end {
-            child_values[i] = d_donor.hv.values[i];
-        }
-        for i in j_start..j_end {
-            child_values[i] = j_donor.hv.values[i];
-        }
+        child_values[v_start..v_end].copy_from_slice(&v_donor.hv.values[v_start..v_end]);
+        child_values[d_start..d_end].copy_from_slice(&d_donor.hv.values[d_start..d_end]);
+        child_values[j_start..j_end].copy_from_slice(&j_donor.hv.values[j_start..j_end]);
 
         let child_hv = ContinuousHV::from_values(child_values);
 

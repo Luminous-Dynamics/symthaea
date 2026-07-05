@@ -227,7 +227,7 @@ pub fn score(generated: &str, golden: &str) -> ComposeVerdict {
     };
 
     for path in &intersection {
-        let key: &String = **path;
+        let key: &String = path;
         let got = &gen_map[key];
         let want = &gold_map[key];
         // MapMarker → MapMarker is "both sides have a sub-map here".

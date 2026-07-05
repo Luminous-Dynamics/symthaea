@@ -63,6 +63,8 @@ fn test_iroh_bridge_drains_inbox_on_tick() {
         context: ContinuousHV::random(512, 0xCAFE),
         interaction_outcome: None,
         bath_state: None,
+        #[cfg(feature = "swarm")]
+        swarm_state: None,
     });
 
     mind.tick();

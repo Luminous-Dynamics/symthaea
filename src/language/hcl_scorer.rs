@@ -133,7 +133,7 @@ pub fn score(generated: &str, golden: &str) -> HclVerdict {
     };
 
     for path in &intersection {
-        let key: &String = **path;
+        let key: &String = path;
         let got = &gen_map[key];
         let want = &gold_map[key];
         if got != want {

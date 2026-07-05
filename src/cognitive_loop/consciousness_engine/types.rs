@@ -322,6 +322,13 @@ impl Default for MoralConsciousnessCoupling {
 #[derive(Debug, Clone)]
 pub struct ConsciousnessEngineCache {
     pub(crate) last_spectral_mip_phi: Option<f64>,
+    /// Whether `SpectralMIPFinder::adapt()` has run at least once. Added 2026-07-05 to
+    /// close an observability gap: `is_adapted()`/`active_dim_indices()` had zero
+    /// non-test call sites even though `adapt()` itself runs every 94 cycles in
+    /// production (see the call site in `measure.rs`).
+    pub(crate) last_spectral_mip_adapted: bool,
+    /// Count of currently-tracked dimensions after the most recent `adapt()`, if any.
+    pub(crate) last_spectral_mip_active_dim_count: Option<usize>,
     pub(crate) last_hierarchical_mip_phi: Option<f64>,
     pub(crate) last_structural_phi: Option<StructuralPhiResult>,
     pub(crate) last_sigma: Option<f64>,
@@ -350,6 +357,8 @@ impl Default for ConsciousnessEngineCache {
     fn default() -> Self {
         Self {
             last_spectral_mip_phi: None,
+            last_spectral_mip_adapted: false,
+            last_spectral_mip_active_dim_count: None,
             last_hierarchical_mip_phi: None,
             last_structural_phi: None,
             last_sigma: None,

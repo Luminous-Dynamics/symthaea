@@ -2059,12 +2059,10 @@ impl CodeGenerator {
                         }
                     }
                 }
-                "empty_closure" => {
-                    // Replace empty closures |x| ) with a default
-                    if fixed.contains("|x| )") || fixed.contains("|x| /* ") {
-                        fixed = fixed.replace("|x| )", "|x| true)");
-                        applied = true;
-                    }
+                // Replace empty closures |x| ) with a default
+                "empty_closure" if fixed.contains("|x| )") || fixed.contains("|x| /* ") => {
+                    fixed = fixed.replace("|x| )", "|x| true)");
+                    applied = true;
                 }
                 _ => {}
             }

@@ -277,11 +277,11 @@ impl AsyncMind {
                                         mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Rest);
                                     }
                                 }
-                                crate::chronobiology::CircadianPhase::Dawn => {
-                                    if mind.state.holocell.dimensionality == symthaea_core::hdc::HdcDimensionality::Rest {
-                                        tracing::info!("CIRCADIAN RHYTHM: Dawn phase. Awakening to 2^14 (Standard)");
-                                        mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Standard);
-                                    }
+                                crate::chronobiology::CircadianPhase::Dawn
+                                    if mind.state.holocell.dimensionality == symthaea_core::hdc::HdcDimensionality::Rest =>
+                                {
+                                    tracing::info!("CIRCADIAN RHYTHM: Dawn phase. Awakening to 2^14 (Standard)");
+                                    mind.state.holocell.dilate(symthaea_core::hdc::HdcDimensionality::Standard);
                                 }
                                 _ => {}
                             }

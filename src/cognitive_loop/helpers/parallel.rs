@@ -655,7 +655,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
         epistemic_conflict_count,
         epistemic_conflict_timing,
         new_harmonic_coherence: new_harmonic,
-        new_phi_eff: new_phi_eff,
+        new_phi_eff,
         new_epistemic_conflict_count: new_conflict_count,
         epistemic_reasoning_override: epi_override,
         deferred,

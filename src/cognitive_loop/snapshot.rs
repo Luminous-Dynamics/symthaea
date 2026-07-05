@@ -200,6 +200,21 @@ pub struct ConsciousnessSnapshot {
     /// Spectral MIP Phi — O(n³) Minimum Information Partition (None = not yet computed).
     pub spectral_mip_phi: Option<f64>,
 
+    /// Whether `SpectralMIPFinder` has adapted its tracked dimension selection at
+    /// least once (`adapt()` runs every 94 cycles in production, per `measure.rs`).
+    /// Added 2026-07-05: `is_adapted()`/`active_dim_indices()` had zero non-test call
+    /// sites anywhere — the adaptation ran silently in production with no telemetry
+    /// visibility since the mechanism was added. This closes that gap; it does not
+    /// change adaptation behavior itself.
+    pub spectral_mip_adapted: bool,
+
+    /// How many of the full HDC dimension space are currently tracked by the adapted
+    /// selection, if adaptation has happened yet (`None` before the first `adapt()`).
+    /// A count, not the full index list — this is a snapshot for telemetry/dashboards,
+    /// not a debugging dump; use `SpectralMIPFinder::active_dim_indices()` directly if
+    /// the exact indices are ever needed.
+    pub spectral_mip_active_dim_count: Option<usize>,
+
     /// Harmonies alignment score (0.0–1.0) from Eight Harmonies integrator.
     pub harmonies_alignment: f32,
 
@@ -395,6 +410,8 @@ mod tests {
             fep_free_energy: 1.0,
             fep_precision: 0.5,
             spectral_mip_phi: None,
+            spectral_mip_adapted: false,
+            spectral_mip_active_dim_count: None,
             harmonies_alignment: 0.5,
             empathic_compassion: 0.5,
             sigma: None,

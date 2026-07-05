@@ -280,8 +280,7 @@ impl LookaheadEngine {
             return 0.0;
         }
 
-        let accuracy = recent.iter().filter(|&&a| a).count() as f32 / recent.len() as f32;
-        accuracy
+        recent.iter().filter(|&&a| a).count() as f32 / recent.len() as f32
     }
 
     /// Generate a learning recommendation

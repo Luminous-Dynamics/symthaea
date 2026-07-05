@@ -80,6 +80,11 @@ impl ConsciousnessEngine {
             if input.cycle % 94 == 0 {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
+                    self.cache.last_spectral_mip_adapted = self.spectral_mip_finder.is_adapted();
+                    self.cache.last_spectral_mip_active_dim_count = self
+                        .spectral_mip_finder
+                        .active_dim_indices()
+                        .map(|d| d.len());
                 }
                 if let Some(hier) = self.spectral_mip_finder.compute_hierarchical() {
                     self.cache.last_hierarchical_mip_phi = Some(hier.phi);

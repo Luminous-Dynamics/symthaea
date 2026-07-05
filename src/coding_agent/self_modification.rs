@@ -292,7 +292,7 @@ impl FixRuleGenerator {
                     .push(context_snippet.chars().take(200).collect());
             }
         } else {
-            let mut new_cluster = ErrorCluster {
+            let new_cluster = ErrorCluster {
                 error_code: error_code.to_string(),
                 category: category.to_string(),
                 pattern_signature: pattern_signature.to_string(),

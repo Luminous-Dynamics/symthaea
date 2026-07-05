@@ -295,13 +295,10 @@ impl CognitiveLoopService {
                 let predicted = match pattern {
                     "Rising" | "Spike" => "Critical",
                     "Oscillating" => "Normal",
-                    "Falling" | "Stable" => {
-                        if self.carryover.urgency.consecutive_low_error > 15 {
-                            "Cruise"
-                        } else {
-                            "Normal"
-                        }
+                    "Falling" | "Stable" if self.carryover.urgency.consecutive_low_error > 15 => {
+                        "Cruise"
                     }
+                    "Falling" | "Stable" => "Normal",
                     _ => "Normal",
                 };
                 (pattern, predicted, slope, oscillation_ratio)

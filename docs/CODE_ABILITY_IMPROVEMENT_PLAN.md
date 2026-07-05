@@ -1462,11 +1462,54 @@ required-features = ["code_generation"]`, next to the other
 This is a real defect in the native `CodeGenerator`'s Rust body-emission
 logic for these specific patterns, distinct from and deeper than everything
 fixed so far this week (which was all in `coding_agent`'s Python path).
-**Not yet fixed** — flagged here as the next concrete, scoped target rather
-than pursued further in this same session, since it requires tracing
-`code_generator.rs`'s (~2000+ LOC) per-pattern body templates for 7
-different cases, a meaningfully different piece of the system than the
-`coding_agent` pipeline this whole week's investigation has focused on.
+
+### Fixed same day: all 7 traced to one function, `TypeCausalModel::wrap_for_return()`
+
+Wrote a throwaway debug example (`examples/debug_codegen_compile_regression.rs`,
+deleted after use — printed the raw source `CodeGenerator` emits for each of
+the 7 failing cases directly, faster than reading ~2000 unfamiliar LOC blind)
+and found all 7 share **one root cause**: `wrap_for_return()`
+(`src/language/type_causal_model.rs`) wraps a body expression to match a
+function's declared return type (`Option<T>` → `Some(...)`, `Result<T,E>` →
+`Ok(...)`, `Vec<T>` → `.collect()`, `String` → `.to_string()`), and its
+"don't double-wrap" guards checked only for literal substrings (`"Some("`,
+`"Ok("`, `.collect()`, `.to_string()`) — missing the case where the body
+*already* evaluates to the target type via a trailing method call:
+
+- `max_vec`/`min_vec`/`find_first_even`: body already ends in `.copied()`/
+  `.cloned()` (converting `Option<&T>` from `.max()`/`.min()`/`.find(...)`
+  to `Option<T>`) — but the guard didn't recognize this, so it wrapped in
+  another `Some(...)`, producing `Option<Option<T>>` (E0308).
+- `parse_integer`: body already ends in `.map_err(...)` (only callable on
+  `Result`) — guard didn't recognize it, wrapped in another `Ok(...)`,
+  producing `Result<Result<T,E>,_>` (E0308).
+- `sort`/`unique`: body is a bare tail identifier (`result`, built up via
+  in-place `.sort()`/`.dedup()` over several prior statements) — guard
+  checked the whole (multi-statement) body string for a `.`, found one from
+  the earlier statements, and appended `.collect()` to the bare tail
+  variable anyway — "no method named `collect` found for struct `Vec<i32>`"
+  (E0599). First fix attempt checked the whole body for a `.` and still
+  failed for exactly this reason; corrected to check only the tail line.
+- `reverse`: body already ends in a bare `.collect()` (type-infers to the
+  function's declared `String` return type as the tail expression) — guard
+  didn't recognize this, appended `.to_string()` after it, making
+  `.collect()`'s target type ambiguous — E0282 "type annotations needed".
+
+Fix: added targeted checks to each of the four `ReturnWrapping` match arms
+in `wrap_for_return()` for these exact signals (trailing `.copied()`/
+`.cloned()`, `.map_err(`, tail-line-only bare-identifier check, trailing
+bare `.collect()`).
+
+**Verified**: `benchmark_compile_verification` now passes at **40/40 (100%)**,
+up from 33/40 (82%). Full suite: **11/11 tests pass** (was 10/11).
+`benchmark_code_generation`'s own fragment-level report separately notes
+69/70 (one soft, non-blocking, pre-existing gap: `parse_integer`'s required
+fragment is the bare substring `.parse(`, but the generator has always
+correctly used `.parse::<i32>()` with a turbofish — unrelated to and
+predating this fix, doesn't fail the suite). Hand-verified against
+`type_causal_model.rs`'s own two dedicated `wrap_for_return` unit tests
+(`test_wrap_for_return_option`, `test_wrap_for_return_result`) — neither
+touches any of the new guard conditions, unaffected.
 
 ---
 

@@ -1926,9 +1926,9 @@ impl CodeOrchestrator {
                 is_verified = true;
             } else {
                 rejection = Some(format!(
-                    "Similarity {:.3} below {} threshold {:.3}",
+                    "Similarity {:.3} below {:?} threshold {:.3}",
                     verification.semantic_similarity,
-                    format!("{:?}", self.verification_policy),
+                    self.verification_policy,
                     self.verification_policy.threshold(),
                 ));
             }

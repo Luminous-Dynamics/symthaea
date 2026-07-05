@@ -897,10 +897,9 @@ impl KosmicSong {
 
         // If all same dominant → high maturation; if varied → low
         let mode = dominant_indices[0];
-        let agreement = dominant_indices.iter().filter(|&&idx| idx == mode).count() as f32
-            / dominant_indices.len().max(1) as f32;
-
-        agreement // 1.0 = perfectly stable, 0.1 = very unstable
+        // 1.0 = perfectly stable, 0.1 = very unstable
+        dominant_indices.iter().filter(|&&idx| idx == mode).count() as f32
+            / dominant_indices.len().max(1) as f32
     }
 
     /// Generate an epistemic summary for the EpistemicMesh.

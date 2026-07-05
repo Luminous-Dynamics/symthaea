@@ -429,7 +429,7 @@ impl MoralUncertainty {
         }
 
         // Sort by priority (highest first)
-        recs.sort_by(|a, b| b.priority.cmp(&a.priority));
+        recs.sort_by_key(|b| std::cmp::Reverse(b.priority));
         recs
     }
 

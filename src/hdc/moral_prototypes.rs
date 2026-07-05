@@ -968,6 +968,11 @@ impl ExemplarStore {
     pub fn len(&self) -> usize {
         self.exemplars.len()
     }
+
+    /// Whether the store has no exemplars.
+    pub fn is_empty(&self) -> bool {
+        self.exemplars.is_empty()
+    }
 }
 
 // ============================================================================

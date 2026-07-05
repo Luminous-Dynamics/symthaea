@@ -386,7 +386,7 @@ impl ConfigChangeDetector {
                             self.previous_content
                                 .insert(event.path.clone(), new_content);
 
-                            (Some(diff), added.max(0), removed.max(0))
+                            (Some(diff), added, removed)
                         } else {
                             (None, 0, 0)
                         };

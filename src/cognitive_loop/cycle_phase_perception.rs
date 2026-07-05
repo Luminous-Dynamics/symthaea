@@ -196,8 +196,7 @@ impl CognitiveLoopService {
                 .sensorimotor
                 .vision_sensory
                 .vision_frame_buffer
-                .as_ref()
-                .map(|f| f.as_slice())
+                .as_deref()
                 .unwrap_or(&[]);
             let w = self.config.vision_frame_width;
             let h = self.config.vision_frame_height;

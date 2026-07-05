@@ -182,7 +182,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]
-            assurance_level: crate::identity::AssuranceLevel::Minimal,
+            assurance_level: crate::identity::AssuranceLevel::E0Anonymous,
             #[cfg(feature = "vision-manifold")]
             mental_movie: None,
         })

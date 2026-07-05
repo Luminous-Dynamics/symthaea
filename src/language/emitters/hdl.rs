@@ -77,8 +77,6 @@ impl HdlEmitter {
         expr.replace("&&", "&")
             .replace("||", "|")
             .replace("!", "~")
-            .replace("==", "==")
-            .replace("!=", "!=")
             .replace("let ", "") // strip Rust let
             .replace(";", "")
     }

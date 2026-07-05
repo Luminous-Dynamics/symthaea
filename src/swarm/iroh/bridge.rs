@@ -451,6 +451,8 @@ mod tests {
                 context: ContinuousHV::zero(64),
                 interaction_outcome: None,
                 bath_state: None,
+                #[cfg(feature = "swarm")]
+                swarm_state: None,
             })
             .collect();
 
@@ -508,6 +510,8 @@ mod tests {
             context: ContinuousHV::zero(64),
             interaction_outcome: None,
             bath_state: None,
+            #[cfg(feature = "swarm")]
+            swarm_state: None,
         }];
         handle.flush_outbox(messages);
 

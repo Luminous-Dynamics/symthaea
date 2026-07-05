@@ -26,6 +26,11 @@ pub struct ConsciousnessCache {
     pub(crate) last_sigma: Option<f64>,
     /// Last spectral MIP Phi — cached for inter-cycle use.
     pub(crate) last_spectral_mip_phi: Option<f64>,
+    /// Whether `SpectralMIPFinder::adapt()` has run at least once (added 2026-07-05,
+    /// see `ConsciousnessEngineCache::last_spectral_mip_adapted`).
+    pub(crate) last_spectral_mip_adapted: bool,
+    /// Count of currently-tracked dimensions after the most recent `adapt()`, if any.
+    pub(crate) last_spectral_mip_active_dim_count: Option<usize>,
     /// Last harmonic field coherence (cached, updated every 10 cycles).
     pub(crate) last_harmonic_coherence: f64,
     /// Last holographic unity score (0.0–1.0, cached from last analyze).
@@ -70,6 +75,8 @@ impl Default for ConsciousnessCache {
             quantum_coherence: 0.0,
             last_sigma: None,
             last_spectral_mip_phi: None,
+            last_spectral_mip_adapted: false,
+            last_spectral_mip_active_dim_count: None,
             last_harmonic_coherence: 0.0,
             last_holographic_unity: 0.0,
             last_multimodal_phi: 0.0,

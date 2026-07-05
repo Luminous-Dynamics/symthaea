@@ -596,11 +596,10 @@ impl GpuCfcNetwork {
             total_steps: self.total_steps,
             total_forward_time_us: self.total_forward_time_us,
             total_backward_time_us: self.total_backward_time_us,
-            avg_forward_us: if self.total_steps > 0 {
-                self.total_forward_time_us / self.total_steps
-            } else {
-                0
-            },
+            avg_forward_us: self
+                .total_forward_time_us
+                .checked_div(self.total_steps)
+                .unwrap_or(0),
             num_parameters: self.num_parameters(),
         }
     }

@@ -10,6 +10,7 @@
 //! Uses 16,384D HDC holographic cell state encoding and O(1) CfC closed-form
 //! temporal jumps to predict cell behavior from 1 hour to 9 months.
 
+mod anatomical_compiler;
 pub mod bioelectric;
 pub mod cell_encoder;
 pub mod consciousness_ethics_framework;
@@ -37,6 +38,7 @@ mod spatial_grid;
 pub mod types;
 
 // Re-export key types
+pub use anatomical_compiler::search_intervention;
 pub use bioelectric::{BioelectricState, TargetMorphology};
 pub use cell_encoder::encode_cell_state;
 pub use culture_controller::{CultureAdjustment, CultureController};

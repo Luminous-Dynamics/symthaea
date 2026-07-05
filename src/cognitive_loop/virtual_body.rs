@@ -128,7 +128,7 @@ impl VirtualBody {
         self.error_history.push_back(signals.prediction_error);
         let error_velocity = if self.error_history.len() >= 2 {
             let recent = self.error_history.back().copied().unwrap_or(0.0);
-            let older = self.error_history[self.error_history.len().saturating_sub(5).max(0)];
+            let older = self.error_history[self.error_history.len().saturating_sub(5)];
             (recent - older).abs()
         } else {
             0.0

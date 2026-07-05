@@ -1567,12 +1567,9 @@ pub fn train_cfc_sequencer(epochs: usize, learning_rate: f32) -> CfcTrainingRepo
         for pair in train.iter() {
             let target_plan = class_to_plan(pair.class, &pair.channels);
             let projected = projection.project(&pair.hv);
-            match sequencer.train_sequence(&projected, &target_plan, learning_rate) {
-                Ok(loss) => {
-                    epoch_loss += loss;
-                    count += 1;
-                }
-                Err(_) => {}
+            if let Ok(loss) = sequencer.train_sequence(&projected, &target_plan, learning_rate) {
+                epoch_loss += loss;
+                count += 1;
             }
         }
 
@@ -1905,7 +1902,7 @@ pub fn generate_with_repair_hybrid(
     let mut error_history = Vec::new();
     let mut current_code = String::new();
     let mut compiles = false;
-    let mut class;
+    let class;
 
     // Iteration -1: Try class+signature idiom (highest priority — emits real algorithms)
     {

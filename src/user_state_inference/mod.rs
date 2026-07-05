@@ -436,10 +436,8 @@ impl UserStateInference {
             ContextKind::Help | ContextKind::Troubleshooting => {
                 self.current_state.confidence = (self.current_state.confidence - 0.1).max(0.0);
             }
-            ContextKind::Task | ContextKind::Development => {
-                if !had_error {
-                    self.current_state.confidence = (self.current_state.confidence + 0.05).min(1.0);
-                }
+            ContextKind::Task | ContextKind::Development if !had_error => {
+                self.current_state.confidence = (self.current_state.confidence + 0.05).min(1.0);
             }
             _ => {}
         }

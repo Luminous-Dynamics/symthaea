@@ -251,7 +251,7 @@ impl CodePrimitiveEvolver {
 
         // Also seed with mutations of the hybrid
         for i in 0..5 {
-            let mut mutant = hybrid_target.clone();
+            let mutant = hybrid_target.clone();
             mutant.perturb(0.1 * (i as f32 + 1.0));
             let concept = EvolvingConcept::new(
                 100 + i as u64,

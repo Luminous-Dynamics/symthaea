@@ -134,7 +134,7 @@ impl NeuralVocoderChannel {
             .name("symthaea-neural-vocoder".into())
             .spawn(move || {
                 // Build ONNX session — optionally with GPU execution provider
-                let mut builder = match ort::session::Session::builder() {
+                let builder = match ort::session::Session::builder() {
                     Ok(b) => b,
                     Err(e) => {
                         warn!("Failed to create session builder: {}. Thread exiting.", e);

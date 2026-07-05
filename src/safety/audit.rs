@@ -108,7 +108,7 @@ impl SafetyAuditReport {
 
         // Top reasons by frequency
         let mut top_reasons: Vec<(String, usize)> = reason_counts.into_iter().collect();
-        top_reasons.sort_by(|a, b| b.1.cmp(&a.1));
+        top_reasons.sort_by_key(|b| std::cmp::Reverse(b.1));
         top_reasons.truncate(10);
 
         Self {

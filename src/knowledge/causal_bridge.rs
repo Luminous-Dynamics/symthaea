@@ -427,7 +427,7 @@ impl CausalKnowledgeBridge {
             *freq.entry(edge.effect.as_str()).or_default() += 1;
         }
         let mut entities: Vec<_> = freq.into_iter().collect();
-        entities.sort_by(|a, b| b.1.cmp(&a.1));
+        entities.sort_by_key(|b| std::cmp::Reverse(b.1));
         entities
             .into_iter()
             .map(|(name, _)| name.to_string())

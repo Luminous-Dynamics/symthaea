@@ -16,9 +16,7 @@ pub use symthaea_coding_feedback::{
 pub use symthaea_coding_feedback::repair_hint_for_rejection_category as repair_hint_for_category;
 
 pub fn forced_geodesic_rejection(constraints: &[String]) -> Option<&str> {
-    if std::env::var_os(FORCE_REPAIR_BENCH_ENV).is_none() {
-        return None;
-    }
+    std::env::var_os(FORCE_REPAIR_BENCH_ENV)?;
     constraints
         .iter()
         .find_map(|constraint| constraint.strip_prefix(FORCE_GEODESIC_REJECTION_PREFIX))
@@ -27,9 +25,7 @@ pub fn forced_geodesic_rejection(constraints: &[String]) -> Option<&str> {
 }
 
 pub fn forced_geodesic_rejection_unless_repair_memory(constraints: &[String]) -> Option<&str> {
-    if std::env::var_os(FORCE_REPAIR_BENCH_ENV).is_none() {
-        return None;
-    }
+    std::env::var_os(FORCE_REPAIR_BENCH_ENV)?;
     constraints
         .iter()
         .find_map(|constraint| {

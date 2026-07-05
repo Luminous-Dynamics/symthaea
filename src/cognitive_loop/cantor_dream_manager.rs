@@ -102,17 +102,6 @@ impl CantorDreamManager {
         }
     }
 
-    /// Compute adaptive dream consolidation interval based on current learning rate boost.
-    ///
-    /// When `lr_boost` is high (system is learning rapidly), the interval shortens so
-    /// consolidation keeps pace with incoming experience. At low LR, consolidation
-    /// is infrequent — the system is in a stable state with little to integrate.
-    ///
-    /// Formula: `max(DREAM_MIN_INTERVAL, DREAM_BASE_INTERVAL / (1 + DREAM_LR_INTERVAL_SCALE * |lr_boost|))`
-    ///
-    /// Science: Diekelmann & Born (2010) — sleep consolidation scales with learning load;
-    ///          Walker (2017) — consolidation need correlates with encoding intensity.
-
     /// Advance dream phase and return the current phase.
     ///
     /// Called once per dream cycle. Alternates NREM→REM at 3:1 ratio
@@ -145,6 +134,16 @@ impl CantorDreamManager {
         self.dream_phase == DreamPhase::Rem
     }
 
+    /// Compute adaptive dream consolidation interval based on current learning rate boost.
+    ///
+    /// When `lr_boost` is high (system is learning rapidly), the interval shortens so
+    /// consolidation keeps pace with incoming experience. At low LR, consolidation
+    /// is infrequent — the system is in a stable state with little to integrate.
+    ///
+    /// Formula: `max(DREAM_MIN_INTERVAL, DREAM_BASE_INTERVAL / (1 + DREAM_LR_INTERVAL_SCALE * |lr_boost|))`
+    ///
+    /// Science: Diekelmann & Born (2010) — sleep consolidation scales with learning load;
+    ///          Walker (2017) — consolidation need correlates with encoding intensity.
     pub fn adaptive_interval(&self, lr_boost: f64) -> u64 {
         use super::thresholds::{DREAM_BASE_INTERVAL, DREAM_LR_INTERVAL_SCALE, DREAM_MIN_INTERVAL};
         let divisor = 1.0 + DREAM_LR_INTERVAL_SCALE * lr_boost.abs();

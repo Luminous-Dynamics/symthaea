@@ -103,7 +103,7 @@ strsim = "0.11"
 tree-sitter = "0.24"
 tree-sitter-nix = "0.3"
 hex = "0.4"
-ed25519-dalek = "=2.1.0"
+ed25519-dalek = { version = "=2.1.0", features = ["rand_core"] }
 syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
@@ -711,7 +711,7 @@ integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
-# [standalone-stripped] prism_search = ["dep:prism-common", "dep:prism-search"]  # Prism epistemic search (local, offline)
+prism_search = []  # [standalone-neutered] deps stripped, kept declared for check-cfg
 unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
 
 # ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────
@@ -1091,7 +1091,7 @@ name = "code_generation_benchmark"
 required-features = ["code_generation"]
 
 [[example]]
-name = "debug_codegen_compile_regression"
+name = "rust_orchestrator_benchmark"
 required-features = ["code_generation"]
 
 [[test]]

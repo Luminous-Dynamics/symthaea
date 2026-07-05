@@ -387,8 +387,14 @@ if ! $DRY_RUN; then
     # Rewrite positioning to stub (required dep, not optional)
     sed -i 's|^\(positioning\s*=\s*{\s*path\s*=\s*\)"[^"]*"|\1"stubs/positioning"|' \
         "${STANDALONE_REPO}/Cargo.toml"
-    # Strip feature flags that reference stripped deps
-    sed -i '/^prism_search\s*=/s/^/# [standalone-stripped] /' \
+    # Neuter (don't fully strip) the prism_search feature flag: cargo's
+    # check-cfg lint validates #[cfg(feature = "prism_search")] call sites
+    # (e.g. src/api/holon.rs) against the Cargo.toml feature list regardless
+    # of whether the feature is enabled, so commenting the declaration out
+    # entirely makes every cfg(feature = "prism_search") site an
+    # "unexpected cfg condition value" error under -D warnings. Keep the
+    # feature declared but empty so it's a known-but-always-off feature.
+    sed -i 's|^prism_search\s*=.*|prism_search = []  # [standalone-neutered] deps stripped, kept declared for check-cfg|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
     # Also strip from sub-crate Cargo.tomls (paths escaping workspace with ../../..)

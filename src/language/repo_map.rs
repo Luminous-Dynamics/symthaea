@@ -540,7 +540,7 @@ impl RepoMap {
                 candidates
                     .into_iter()
                     .rev()
-                    .find(|symbol| symbol.span.start_line + 1 <= line)
+                    .find(|symbol| symbol.span.start_line < line)
             })
     }
 }

@@ -646,11 +646,11 @@ impl CognitiveSubsystem for GovernanceManager {
                         output.flags |= output_flags::REQUEST_EXPLORATION;
                     }
                 }
-                GovernanceEventKind::VoteCast { voter_phi, .. } => {
-                    // High-phi voters boost confidence slightly
-                    if *voter_phi > thresholds::GOV_COLLECTIVE_PHI_HIGH {
-                        output.confidence_delta += thresholds::GOV_HIGH_PHI_VOTER_CONFIDENCE;
-                    }
+                // High-phi voters boost confidence slightly
+                GovernanceEventKind::VoteCast { voter_phi, .. }
+                    if *voter_phi > thresholds::GOV_COLLECTIVE_PHI_HIGH =>
+                {
+                    output.confidence_delta += thresholds::GOV_HIGH_PHI_VOTER_CONFIDENCE;
                 }
                 _ => {}
             }

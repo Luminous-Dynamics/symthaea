@@ -190,6 +190,8 @@ impl ConsciousnessEngine {
     /// carryover fields.
     pub fn update_cache(&self, cache: &mut ConsciousnessCache) {
         cache.last_spectral_mip_phi = self.cache.last_spectral_mip_phi;
+        cache.last_spectral_mip_adapted = self.cache.last_spectral_mip_adapted;
+        cache.last_spectral_mip_active_dim_count = self.cache.last_spectral_mip_active_dim_count;
         cache.last_sigma = self.cache.last_sigma;
         cache.last_multimodal_phi = self.cache.last_multimodal_phi;
         cache.last_equation_v2_consciousness = self.cache.last_equation_v2_consciousness;

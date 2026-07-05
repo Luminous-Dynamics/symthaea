@@ -1446,7 +1446,7 @@ pub fn try_nix_parse(expr: &str) -> NixVerdict {
 }
 
 #[cfg(feature = "ssm_language")]
-use symthaea_broca::encoder::ThoughtChannels;
+pub use symthaea_broca::encoder::ThoughtChannels;
 
 #[cfg(not(feature = "ssm_language"))]
 #[derive(Debug, Clone)]
@@ -1782,9 +1782,9 @@ pub struct UnknownOption {
     pub nearest_known_prefix: Option<String>,
 }
 
-/// Top-level NixOS option roots — sourced from `shared_nix_kg().option_roots`.
-/// Replaces the previous `KNOWN_OPTION_ROOTS` constant array; see
-/// `language::nix_kg` for the canonical list and how user overrides extend it.
+// Top-level NixOS option roots — sourced from `shared_nix_kg().option_roots`.
+// Replaces the previous `KNOWN_OPTION_ROOTS` constant array; see
+// `language::nix_kg` for the canonical list and how user overrides extend it.
 
 /// Extract candidate NixOS option paths from a Nix source fragment.
 ///

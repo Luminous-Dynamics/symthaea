@@ -1095,11 +1095,10 @@ impl IntentClassifier {
         let memory_resonance = if working_memory.is_empty() {
             0.0
         } else {
-            let max_sim = working_memory
+            working_memory
                 .iter()
                 .map(|m| input_hv.similarity(m).abs())
-                .fold(0.0f32, |a, b| a.max(b));
-            max_sim
+                .fold(0.0f32, |a, b| a.max(b))
         };
 
         // Calculate base familiarity (combines known prototype + memory resonance)

@@ -236,8 +236,7 @@ impl SolutionLibrary {
                 // Extract first meaningful paragraph
                 instructions
                     .lines()
-                    .filter(|l| !l.trim().starts_with('#') && !l.trim().is_empty())
-                    .next()
+                    .find(|l| !l.trim().starts_with('#') && !l.trim().is_empty())
                     .unwrap_or(&name)
                     .to_string()
             } else {
@@ -328,7 +327,7 @@ fn parameter_renames(donor_fn: &ItemFn, target_fn: &ItemFn) -> HashMap<String, I
         .zip(target_fn.sig.inputs.iter().filter_map(fn_arg_ident))
         .filter_map(|(from, to)| {
             let from_name = from.to_string();
-            if from_name == to.to_string() {
+            if *to == from_name {
                 None
             } else {
                 Some((from_name, to.clone()))

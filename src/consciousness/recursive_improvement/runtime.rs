@@ -383,11 +383,7 @@ impl MagiLoopRuntime {
 
         let tick_count = self.tick_count.load(Ordering::Relaxed);
         let total_us = self.total_tick_us.load(Ordering::Relaxed);
-        let avg_tick_us = if tick_count > 0 {
-            total_us / tick_count
-        } else {
-            0
-        };
+        let avg_tick_us = total_us.checked_div(tick_count).unwrap_or(0);
 
         // Get domain briers
         let domain_briers: Vec<_> = current

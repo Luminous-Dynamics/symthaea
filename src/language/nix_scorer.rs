@@ -449,7 +449,7 @@ pub fn score(generated: &str, golden: &str) -> StructuralVerdict {
     };
 
     for path in &intersection {
-        let key: &String = **path;
+        let key: &String = path;
         let got = &gen_map[key];
         let want = &gold_map[key];
         // `satisfies` is directional: for package lists, extras on the

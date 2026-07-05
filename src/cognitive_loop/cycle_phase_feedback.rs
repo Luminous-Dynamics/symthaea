@@ -687,7 +687,7 @@ impl CognitiveLoopService {
             if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support.memory.knowledge_manager {
+                if let Some(ref manager) = self.support.knowledge_manager {
                     let category_str = result.suggested_category.as_str();
                     let articles = manager.search(category_str, 3);
                     if !articles.is_empty() {
@@ -728,7 +728,7 @@ impl CognitiveLoopService {
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support.memory.knowledge_manager {
+                    if let Some(ref manager) = self.support.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);

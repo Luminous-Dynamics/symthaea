@@ -256,11 +256,11 @@ impl PayloadClassifier {
             .transport
             .priority_order()
             .into_iter()
-            .filter_map(|transport| match transport {
-                DomainTransportClass::LocalMesh => Some(RadioTier::Local),
-                DomainTransportClass::MetroRelay => Some(RadioTier::Metro),
-                DomainTransportClass::RegionalRelay => Some(RadioTier::Regional),
-                DomainTransportClass::InterplanetaryRelay => Some(RadioTier::Interplanetary),
+            .map(|transport| match transport {
+                DomainTransportClass::LocalMesh => RadioTier::Local,
+                DomainTransportClass::MetroRelay => RadioTier::Metro,
+                DomainTransportClass::RegionalRelay => RadioTier::Regional,
+                DomainTransportClass::InterplanetaryRelay => RadioTier::Interplanetary,
             })
             .collect()
     }
@@ -690,27 +690,6 @@ impl CompressionStrategy {
     }
 }
 
-/// Spectrum Manager — electromagnetic environment as sensory modality.
-///
-/// Implements `CognitiveSubsystem` at interval 53 (co-prime with all existing
-/// manager intervals: 7, 11, 13, 19, 29, 37, 41).
-///
-/// Treats spectrum congestion as prediction error that drives frequency hopping
-/// via the FEP Active Inference engine.
-///
-/// ## Signals Modeled
-///
-/// 1. **Bandwidth pressure**: Available capacity → confidence modulation
-/// 2. **Jamming detection**: SNR collapse → arousal spike + exploration (frequency search)
-/// 3. **Tier degradation**: Radio failures → safety escalation proposal
-/// 4. **Spectrum prediction error**: Expected vs observed noise floor → surprise
-///
-/// ## Hardware Integration
-///
-/// When a `RadioHardware` implementation is attached via `set_hardware()`,
-/// the manager polls real SNR and availability from hardware each cycle.
-/// Without hardware, it relies on manually-fed `SpectrumObservation`s.
-
 // ── Role seeds for SpectrumObservation HDC encoding (perception_hv) ─────
 // Four stable u64s identify each observation dimension. Role XOR Value
 // gives a bound pair; bundling four pairs forms the observation HV.
@@ -746,6 +725,26 @@ fn encode_observation(obs: &SpectrumObservation) -> symthaea_core::hdc::BinaryHV
     BinaryHV::bundle(&[freq_pair, noise_pair, snr_pair, jammed_pair])
 }
 
+/// Spectrum Manager — electromagnetic environment as sensory modality.
+///
+/// Implements `CognitiveSubsystem` at interval 53 (co-prime with all existing
+/// manager intervals: 7, 11, 13, 19, 29, 37, 41).
+///
+/// Treats spectrum congestion as prediction error that drives frequency hopping
+/// via the FEP Active Inference engine.
+///
+/// ## Signals Modeled
+///
+/// 1. **Bandwidth pressure**: Available capacity → confidence modulation
+/// 2. **Jamming detection**: SNR collapse → arousal spike + exploration (frequency search)
+/// 3. **Tier degradation**: Radio failures → safety escalation proposal
+/// 4. **Spectrum prediction error**: Expected vs observed noise floor → surprise
+///
+/// ## Hardware Integration
+///
+/// When a `RadioHardware` implementation is attached via `set_hardware()`,
+/// the manager polls real SNR and availability from hardware each cycle.
+/// Without hardware, it relies on manually-fed `SpectrumObservation`s.
 pub struct SpectrumManager {
     // ── Tier state ───────────────────────────────────────────────────────
     /// Current tier availability.
@@ -1206,7 +1205,7 @@ impl SpectrumManager {
         self.tier_budget
             .iter()
             .zip(self.tier_available.iter())
-            .filter(|(_, &avail)| avail)
+            .filter(|&(_, &avail)| avail)
             .map(|(&budget, _)| budget)
             .sum()
     }

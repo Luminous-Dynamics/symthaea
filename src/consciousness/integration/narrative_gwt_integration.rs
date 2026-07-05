@@ -1021,7 +1021,7 @@ impl NarrativeGWTIntegration {
         }
 
         // Construct result with predictive and temporal stats
-        let result = NarrativeGWTProcessResult {
+        NarrativeGWTProcessResult {
             gwt_result,
             self_phi: self.narrative_self.self_phi(),
             phi_delta: self.phi_history.back().map(|r| r.phi_delta).unwrap_or(0.0),
@@ -1057,9 +1057,7 @@ impl NarrativeGWTIntegration {
                 .temporal_analyzer
                 .as_ref()
                 .map(|t| t.is_temporally_healthy()),
-        };
-
-        result
+        }
     }
 
     /// Verify pending predictions against actual outcomes

@@ -290,7 +290,7 @@ pub fn generate_verified_full<'a>(
         intent,
         context,
         repo_map,
-        lsp_client.as_deref_mut(),
+        lsp_client,
         experience_store,
         llm_backend,
         #[cfg(feature = "swarm")]

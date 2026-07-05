@@ -44,6 +44,8 @@ fn test_social_inbox_processed_on_tick() {
         context: ContinuousHV::random(512, 0xBEEF_0002),
         interaction_outcome: None,
         bath_state: None,
+        #[cfg(feature = "swarm")]
+        swarm_state: None,
     });
 
     assert_eq!(mind.social_inbox.len(), 1);
@@ -70,6 +72,8 @@ fn test_social_interaction_builds_relationship() {
         context: ContinuousHV::random(512, 0xA11E_0002),
         interaction_outcome: Some(0.9),
         bath_state: None,
+        #[cfg(feature = "swarm")]
+        swarm_state: None,
     });
     mind.tick();
 
@@ -116,6 +120,8 @@ fn test_social_no_processing_when_disabled() {
         context: ContinuousHV::random(512, 0xDEAD),
         interaction_outcome: None,
         bath_state: None,
+        #[cfg(feature = "swarm")]
+        swarm_state: None,
     });
     mind.tick();
 

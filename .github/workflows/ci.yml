@@ -51,6 +51,15 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
+  cls-field-count:
+    name: CLS Field-Count Ratchet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check CognitiveLoopService field count
+        run: bash scripts/check-cls-field-count.sh
+
   doc-tests:
     name: Documentation Tests
     runs-on: ubuntu-latest
@@ -118,13 +127,17 @@ jobs:
           #   vision-manifold-camera, foveation-perception, humanoid-mujoco,
           #   humanoid-viewer, flight-mujoco, flight-mujoco-renderer,
           #   flight-swarm, live-voice, ssm-power-hal, gui, full
+          # Also excluded: ssm_language -- mutually exclusive with default-mind's
+          #   broca_lite (src/lib.rs's compile_error! guard), and default
+          #   features are always on here. Tested in isolation instead by the
+          #   "ssm_language" entry in Test Feature Combinations (--no-default-features).
           CI_FEATURES="parallel,service,shell,demo,api_module,\
           voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
           embeddings,vision,perception,vision-manifold,foveation,\
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
-          flight,humanoid,hal,ssm-power,ssm_language,\
+          flight,humanoid,hal,ssm-power,\
           lancedb-backend,multi_agent,full_consciousness,full_perception,\
           full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
@@ -472,9 +485,13 @@ jobs:
             features: >-
               benchmarks,all_benchmarks
           - group: science-infra
+            # ssm_language excluded -- mutually exclusive with default-mind's
+            # broca_lite (default features are always on in this job); tested
+            # in isolation by the "ssm_language" entry in Test Feature
+            # Combinations (--no-default-features).
             features: >-
               physics,physics-bridge,flight,humanoid,hal,
-              ssm-power,ssm_language,lancedb-backend,
+              ssm-power,lancedb-backend,
               integration_module,observability_module,support,web_research_module
           - group: genesis
             features: >-
@@ -640,6 +657,10 @@ jobs:
               # school_learning is very slow on free-tier runners — limit parallelism
               # to reduce memory pressure and avoid 6h timeout
               cargo test --lib --features "$FEATURES" -- --test-threads=1
+            elif [ "$FEATURES" = "ssm_language" ]; then
+              # ssm_language is mutually exclusive with default-mind's broca_lite
+              # (src/lib.rs's compile_error! guard) -- default features must be off.
+              cargo test --lib --no-default-features --features "$FEATURES"
             else
               cargo test --lib --features "$FEATURES"
             fi
@@ -791,7 +812,18 @@ jobs:
             libv4l-dev
 
       - name: Check feature combination ${{ matrix.features }}
-        run: cargo check --features "${{ matrix.features }}"
+        run: |
+          FEATURES="${{ matrix.features }}"
+          case ",$FEATURES," in
+            *,ssm_language,*)
+              # ssm_language is mutually exclusive with default-mind's broca_lite
+              # (src/lib.rs's compile_error! guard) -- default features must be off.
+              cargo check --no-default-features --features "$FEATURES"
+              ;;
+            *)
+              cargo check --features "$FEATURES"
+              ;;
+          esac
 
   wasm-compat:
     name: WASM Compatibility (Spore)

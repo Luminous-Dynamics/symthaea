@@ -119,6 +119,11 @@ impl CognitiveLoopService {
                 .unwrap_or(0.0),
             fep_precision: self.fep.agent.precision.perceptual_precision(),
             spectral_mip_phi: self.carryover.consciousness.last_spectral_mip_phi,
+            spectral_mip_adapted: self.carryover.consciousness.last_spectral_mip_adapted,
+            spectral_mip_active_dim_count: self
+                .carryover
+                .consciousness
+                .last_spectral_mip_active_dim_count,
             harmonies_alignment: self
                 .ethics_engine
                 .harmonies_integrator()

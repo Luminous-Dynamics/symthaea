@@ -122,12 +122,7 @@ impl LlmLanguageChannel {
         };
         let mut organ = crate::language::llm_organ::LLMOrgan::with_backend(config, backend);
 
-        loop {
-            let request = match request_rx.recv() {
-                Ok(r) => r,
-                Err(_) => break,
-            };
-
+        while let Ok(request) = request_rx.recv() {
             // Skip to latest request if multiple queued
             let mut latest = request;
             while let Ok(newer) = request_rx.try_recv() {

@@ -100,13 +100,8 @@ impl VoiceSynthesisChannel {
 
         let mut orchestrator = VoiceOrchestrator::new();
 
-        loop {
-            // Block waiting for next request
-            let request = match request_rx.recv() {
-                Ok(r) => r,
-                Err(_) => break, // Channel closed, exit thread
-            };
-
+        // Block waiting for next request
+        while let Ok(request) = request_rx.recv() {
             // If multiple requests queued, skip to the latest (latest-wins)
             let mut latest = request;
             while let Ok(newer) = request_rx.try_recv() {

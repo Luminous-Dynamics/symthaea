@@ -536,7 +536,7 @@ impl CognitiveLoopService {
                                     // Consciousness-Aware Router: extract peer consciousness from events.
                                     #[cfg(feature = "mesh")]
                                     if let SwarmEvent::PeerJoined {
-                                        ref peer_id,
+                                        peer_id,
                                         trust_level: trust_score,
                                         ..
                                     } = &event

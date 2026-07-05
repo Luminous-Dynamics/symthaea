@@ -1883,7 +1883,7 @@ pub fn lesson_from_failure(
 /// Generate lessons from a batch of failure patterns, sorted by frequency.
 pub fn lessons_from_failures(failures: &[(String, String, usize)], max: usize) -> Vec<CodeLesson> {
     let mut sorted: Vec<_> = failures.to_vec();
-    sorted.sort_by(|a, b| b.2.cmp(&a.2));
+    sorted.sort_by_key(|b| std::cmp::Reverse(b.2));
     sorted
         .iter()
         .filter_map(|(pattern, task, count)| lesson_from_failure(pattern, task, *count))
