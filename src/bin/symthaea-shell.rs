@@ -2078,28 +2078,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             app.update_completions();
                             app.update_command_preview();
                         }
-                        KeyCode::Backspace => {
-                            if app.cursor > 0 {
-                                app.cursor -= 1;
-                                app.input.remove(app.cursor);
-                                app.update_completions();
-                            }
+                        KeyCode::Backspace if app.cursor > 0 => {
+                            app.cursor -= 1;
+                            app.input.remove(app.cursor);
+                            app.update_completions();
                         }
-                        KeyCode::Delete => {
-                            if app.cursor < app.input.len() {
-                                app.input.remove(app.cursor);
-                                app.update_completions();
-                            }
+                        KeyCode::Delete if app.cursor < app.input.len() => {
+                            app.input.remove(app.cursor);
+                            app.update_completions();
                         }
-                        KeyCode::Left => {
-                            if app.cursor > 0 {
-                                app.cursor -= 1;
-                            }
+                        KeyCode::Left if app.cursor > 0 => {
+                            app.cursor -= 1;
                         }
-                        KeyCode::Right => {
-                            if app.cursor < app.input.len() {
-                                app.cursor += 1;
-                            }
+                        KeyCode::Right if app.cursor < app.input.len() => {
+                            app.cursor += 1;
                         }
                         KeyCode::Home => {
                             app.cursor = 0;
@@ -2107,61 +2099,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::End => {
                             app.cursor = app.input.len();
                         }
-                        KeyCode::Up => {
-                            if app.show_completions && app.selected_completion > 0 {
-                                app.selected_completion -= 1;
-                            }
+                        KeyCode::Up if app.show_completions && app.selected_completion > 0 => {
+                            app.selected_completion -= 1;
                         }
-                        KeyCode::Down => {
+                        KeyCode::Down
                             if app.show_completions
-                                && app.selected_completion < app.completions.len().saturating_sub(1)
-                            {
-                                app.selected_completion += 1;
-                            }
+                                && app.selected_completion
+                                    < app.completions.len().saturating_sub(1) =>
+                        {
+                            app.selected_completion += 1;
                         }
                         // B1: Enhanced Tab completion with cycling
-                        KeyCode::Tab => {
-                            if app.show_completions && !app.completions.is_empty() {
-                                if app.tab_pressed {
-                                    // Second Tab: cycle to next completion
-                                    app.selected_completion =
-                                        (app.selected_completion + 1) % app.completions.len();
-                                    // Update input to show selected completion
-                                    if let Some(completion) =
-                                        app.completions.get(app.selected_completion)
-                                    {
-                                        app.input = completion.text.clone();
-                                        app.cursor = app.input.len();
-                                    }
-                                } else {
-                                    // First Tab: show first completion
-                                    app.tab_pressed = true;
-                                    if let Some(completion) =
-                                        app.completions.get(app.selected_completion)
-                                    {
-                                        app.input = completion.text.clone();
-                                        app.cursor = app.input.len();
-                                    }
-                                }
-                                app.update_command_preview();
-                            }
-                        }
-                        // Shift+Tab: cycle backwards
-                        KeyCode::BackTab => {
-                            if app.show_completions && !app.completions.is_empty() {
-                                if app.selected_completion > 0 {
-                                    app.selected_completion -= 1;
-                                } else {
-                                    app.selected_completion = app.completions.len() - 1;
-                                }
+                        KeyCode::Tab if app.show_completions && !app.completions.is_empty() => {
+                            if app.tab_pressed {
+                                // Second Tab: cycle to next completion
+                                app.selected_completion =
+                                    (app.selected_completion + 1) % app.completions.len();
+                                // Update input to show selected completion
                                 if let Some(completion) =
                                     app.completions.get(app.selected_completion)
                                 {
                                     app.input = completion.text.clone();
                                     app.cursor = app.input.len();
                                 }
-                                app.update_command_preview();
+                            } else {
+                                // First Tab: show first completion
+                                app.tab_pressed = true;
+                                if let Some(completion) =
+                                    app.completions.get(app.selected_completion)
+                                {
+                                    app.input = completion.text.clone();
+                                    app.cursor = app.input.len();
+                                }
                             }
+                            app.update_command_preview();
+                        }
+                        // Shift+Tab: cycle backwards
+                        KeyCode::BackTab if app.show_completions && !app.completions.is_empty() => {
+                            if app.selected_completion > 0 {
+                                app.selected_completion -= 1;
+                            } else {
+                                app.selected_completion = app.completions.len() - 1;
+                            }
+                            if let Some(completion) = app.completions.get(app.selected_completion) {
+                                app.input = completion.text.clone();
+                                app.cursor = app.input.len();
+                            }
+                            app.update_command_preview();
                         }
                         KeyCode::Enter => {
                             if app.show_completions {
