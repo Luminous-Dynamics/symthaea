@@ -314,6 +314,9 @@ impl DaemonSnapshot {
             maintenance_plan_count: 0,
             load_average_1m: Some(0.5),
             swap_used_percent: Some(10.0),
+            anomaly_volatility_ema: 0.1,
+            active_anomaly_threshold: 0.5,
+            last_plan_efe: None,
         }
     }
 }
