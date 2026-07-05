@@ -144,14 +144,14 @@ impl PeerFusion3D {
         let mut w_total = 0.0;
         for p in &self.peers {
             let w = p.trust_weight;
-            for i in 0..3 {
-                mean[i] += w * p.estimate.mean[i];
+            for (m, pm) in mean.iter_mut().zip(p.estimate.mean.iter()) {
+                *m += w * pm;
             }
             w_total += w;
         }
         if w_total > 0.0 {
-            for i in 0..3 {
-                mean[i] /= w_total;
+            for m in &mut mean {
+                *m /= w_total;
             }
         }
         Some(GaussianEstimate3D::new(mean, [1.0, 1.0, 1.0]))
