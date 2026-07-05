@@ -416,16 +416,16 @@ impl HippocampusActor {
                 }
             }
 
-            if let Some(min_val) = query.min_valence {
-                if memory.valence.to_f64() < min_val.to_f64() {
-                    continue;
-                }
+            if let Some(min_val) = query.min_valence
+                && memory.valence.to_f64() < min_val.to_f64()
+            {
+                continue;
             }
 
-            if let Some((start_time, end_time)) = query.time_range {
-                if memory.timestamp < start_time || memory.timestamp > end_time {
-                    continue;
-                }
+            if let Some((start_time, end_time)) = query.time_range
+                && (memory.timestamp < start_time || memory.timestamp > end_time)
+            {
+                continue;
             }
 
             results.push((memory.clone(), similarity));

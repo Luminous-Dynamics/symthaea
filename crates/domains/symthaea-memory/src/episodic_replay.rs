@@ -978,7 +978,7 @@ impl EpisodicMemory {
         }
         let mut all: Vec<PrioritizedEpisode> = self.episodes.drain().collect();
         // Boost the 3 most recent episodes (by timestamp)
-        all.sort_by(|a, b| b.episode.timestamp.cmp(&a.episode.timestamp));
+        all.sort_by_key(|a| std::cmp::Reverse(a.episode.timestamp));
         for pe in all.iter_mut().take(3) {
             pe.episode.consolidation_strength =
                 (pe.episode.consolidation_strength + boost).min(5.0);

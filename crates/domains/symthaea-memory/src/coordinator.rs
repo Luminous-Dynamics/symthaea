@@ -317,7 +317,7 @@ impl MemoryCoordinator {
             .map(|(&hash, &count)| (hash, count))
             .collect();
         // Sort descending by count (stable so ties preserve HashMap order)
-        pairs.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        pairs.sort_unstable_by_key(|p| std::cmp::Reverse(p.1));
         pairs.truncate(k);
         pairs
     }

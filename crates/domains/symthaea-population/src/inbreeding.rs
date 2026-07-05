@@ -64,15 +64,15 @@ fn find_ancestors(pedigree: &Pedigree, id: u64, max_depth: u32) -> HashMap<u64, 
         ancestors.entry(current_id).or_insert(depth);
 
         if let Some(entry) = pedigree.find(current_id) {
-            if let Some(parent_a) = entry.parent_a_id {
-                if depth < max_depth {
-                    queue.push((parent_a, depth + 1));
-                }
+            if let Some(parent_a) = entry.parent_a_id
+                && depth < max_depth
+            {
+                queue.push((parent_a, depth + 1));
             }
-            if let Some(parent_b) = entry.parent_b_id {
-                if depth < max_depth {
-                    queue.push((parent_b, depth + 1));
-                }
+            if let Some(parent_b) = entry.parent_b_id
+                && depth < max_depth
+            {
+                queue.push((parent_b, depth + 1));
             }
         }
     }

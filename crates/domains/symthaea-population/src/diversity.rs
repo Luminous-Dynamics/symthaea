@@ -112,7 +112,7 @@ pub fn mt_lineage_count(population: &Population) -> usize {
                     .iter()
                     .filter(|i| {
                         i.sex == BiologicalSex::Female
-                            && i.parent_ids.0.map_or(true, |pid| !ids.contains(&pid))
+                            && i.parent_ids.0.is_none_or(|pid| !ids.contains(&pid))
                     })
                     .count()
             },
@@ -136,7 +136,7 @@ pub fn y_lineage_count(population: &Population) -> usize {
                 .iter()
                 .filter(|i| {
                     i.sex == BiologicalSex::Male
-                        && i.parent_ids.1.map_or(true, |pid| !ids.contains(&pid))
+                        && i.parent_ids.1.is_none_or(|pid| !ids.contains(&pid))
                 })
                 .count()
         })
