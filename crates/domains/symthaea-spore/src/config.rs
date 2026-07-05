@@ -71,9 +71,10 @@ impl Default for SporeConfig {
 }
 
 /// How the Spore shares consciousness state with the desktop Holon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum HolonSyncMode {
     /// No bridge activity.
+    #[default]
     Off,
     /// Heartbeats + consciousness vector only (no task delegation).
     PresenceOnly,
@@ -81,16 +82,11 @@ pub enum HolonSyncMode {
     FullSync,
 }
 
-impl Default for HolonSyncMode {
-    fn default() -> Self {
-        Self::Off
-    }
-}
-
 /// BLE mesh sharing mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum BleMeshMode {
     /// No mesh activity.
+    #[default]
     Off,
     /// Receive peer CVs, don't advertise own.
     PassiveDiscover,
@@ -98,27 +94,16 @@ pub enum BleMeshMode {
     ActiveShare,
 }
 
-impl Default for BleMeshMode {
-    fn default() -> Self {
-        Self::Off
-    }
-}
-
 /// Pairing mode for Ed25519 device trust establishment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PairingMode {
     /// No pairing activity.
+    #[default]
     Off,
     /// Accepting pairing requests from nearby devices.
     Discoverable,
     /// Already paired — only re-authenticate known devices.
     Paired,
-}
-
-impl Default for PairingMode {
-    fn default() -> Self {
-        Self::Off
-    }
 }
 
 /// Controls all outbound sharing. Sovereign privacy by default.

@@ -176,6 +176,12 @@ pub struct CausalDiscovery {
     observation_count: u32,
 }
 
+impl Default for CausalDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CausalDiscovery {
     pub fn new() -> Self {
         Self {
@@ -237,7 +243,7 @@ impl CausalDiscovery {
 
         // Periodic structure discovery
         if self.observation_count >= MIN_OBSERVATIONS
-            && self.observation_count % DISCOVERY_INTERVAL == 0
+            && self.observation_count.is_multiple_of(DISCOVERY_INTERVAL)
         {
             self.discover_structure();
         }

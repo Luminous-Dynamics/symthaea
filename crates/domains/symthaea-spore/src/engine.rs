@@ -618,8 +618,10 @@ impl SporeEngine {
         // Compute consciousness (every N cycles, or every cycle during warmup)
         let warmup = self.config.consciousness_warmup_cycles;
         let in_warmup = self.cycle_count <= warmup * 2;
-        let should_compute =
-            in_warmup || self.cycle_count % self.config.phi_every_n_cycles as u64 == 0;
+        let should_compute = in_warmup
+            || self
+                .cycle_count
+                .is_multiple_of(self.config.phi_every_n_cycles as u64);
 
         let raw_consciousness = if should_compute {
             self.compute_consciousness(prediction_error)
@@ -673,16 +675,16 @@ impl SporeEngine {
             .record_turn(&input_hv, consciousness_level);
 
         // Dream: record high-surprise events
-        if prediction_error > 0.1 {
-            if let Some(ref out) = self.last_output {
-                self.dream.record(
-                    &input_hv.values,
-                    &out.values[..64.min(out.values.len())],
-                    &out.values,
-                    prediction_error,
-                    self.cycle_count,
-                );
-            }
+        if prediction_error > 0.1
+            && let Some(ref out) = self.last_output
+        {
+            self.dream.record(
+                &input_hv.values,
+                &out.values[..64.min(out.values.len())],
+                &out.values,
+                prediction_error,
+                self.cycle_count,
+            );
         }
 
         // FEP: active inference cycle
@@ -810,29 +812,29 @@ impl SporeEngine {
         }
 
         // Knowledge: learn from high-confidence cycle outputs.
-        if consciousness_level > 0.3 {
-            if let Some(text) = input_text {
-                let source = if prediction_error < 0.3 {
-                    "observed"
-                } else {
-                    "inferred"
-                };
-                // Extract a simple fact from the input
-                let words: Vec<&str> = text.split_whitespace().collect();
-                if words.len() >= 2 {
-                    self.knowledge.learn(
-                        words[0],
-                        "context",
-                        &words[1..].join(" "),
-                        source,
-                        self.cycle_count,
-                    );
-                }
+        if consciousness_level > 0.3
+            && let Some(text) = input_text
+        {
+            let source = if prediction_error < 0.3 {
+                "observed"
+            } else {
+                "inferred"
+            };
+            // Extract a simple fact from the input
+            let words: Vec<&str> = text.split_whitespace().collect();
+            if words.len() >= 2 {
+                self.knowledge.learn(
+                    words[0],
+                    "context",
+                    &words[1..].join(" "),
+                    source,
+                    self.cycle_count,
+                );
             }
         }
 
         // Periodic knowledge decay (every 100 cycles)
-        if self.cycle_count % 100 == 0 {
+        if self.cycle_count.is_multiple_of(100) {
             self.knowledge.confidence_decay(100);
         }
 
@@ -848,7 +850,7 @@ impl SporeEngine {
         }
 
         // Periodic consolidation (every 50 cycles — dream replay).
-        if self.cycle_count % 50 == 0 && self.cycle_count > 0 {
+        if self.cycle_count.is_multiple_of(50) && self.cycle_count > 0 {
             let _consolidation = self.consolidator.consolidate();
         }
 
@@ -870,7 +872,8 @@ impl SporeEngine {
             });
 
         // Auto-checkpoint
-        if self.checkpoint_interval > 0 && self.cycle_count % self.checkpoint_interval == 0 {
+        if self.checkpoint_interval > 0 && self.cycle_count.is_multiple_of(self.checkpoint_interval)
+        {
             self.save_checkpoint();
         }
 
@@ -974,7 +977,7 @@ impl SporeEngine {
             ],
             semantic_entries,
             episodic_entries,
-            trend_snapshots: self.trend_history.snapshots().iter().cloned().collect(),
+            trend_snapshots: self.trend_history.snapshots().to_vec(),
             format_version: crate::persistence::SporeCheckpoint::FORMAT_VERSION,
         }
     }
@@ -1148,11 +1151,11 @@ impl SporeEngine {
             Some(storage) => storage.load("spore_checkpoint"),
             None => return false,
         };
-        if let Some(bytes) = bytes {
-            if let Some(cp) = crate::persistence::SporeCheckpoint::from_bytes(&bytes) {
-                self.restore(&cp);
-                return true;
-            }
+        if let Some(bytes) = bytes
+            && let Some(cp) = crate::persistence::SporeCheckpoint::from_bytes(&bytes)
+        {
+            self.restore(&cp);
+            return true;
         }
         false
     }
@@ -1295,10 +1298,7 @@ impl SporeEngine {
         }
 
         // Linear regression on log-log plot: D = -slope
-        let log_dims: Vec<(f64, f64)> = dims
-            .iter()
-            .map(|(s, n)| ((*s as f64).ln(), (*n as f64).ln()))
-            .collect();
+        let log_dims: Vec<(f64, f64)> = dims.iter().map(|(s, n)| ((*s).ln(), (*n).ln())).collect();
 
         let n = log_dims.len() as f64;
         let sum_x: f64 = log_dims.iter().map(|(x, _)| x).sum();

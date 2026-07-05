@@ -465,21 +465,15 @@ pub enum StepValidation {
 // ============================================================================
 
 /// The two consent paths — system sovereignty vs network participation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum InoculationPath {
     /// Sovereign Hermit: hardened OS + local intelligence, no network broadcast.
     /// Iroh/Holochain installed but in offline-mode.
+    #[default]
     Inoculate,
     /// Mycelial Node: everything above + mesh binding + phone pairing + DHT.
     /// Consents to sharing context, pooling compute, building trust fabric.
     InoculateAndAttune,
-}
-
-impl Default for InoculationPath {
-    fn default() -> Self {
-        // Sovereign by default — attunement is opt-in.
-        Self::Inoculate
-    }
 }
 
 // ============================================================================
@@ -593,10 +587,10 @@ impl InoculationOrchestrator {
                     return Err("No USB device selected. Plug in a USB drive.".into());
                 }
             }
-            InoculationMode::LanInoculate | InoculationMode::Wsl2Pivot => {
-                if self.ssh_target.is_none() {
-                    return Err("SSH target not configured.".into());
-                }
+            InoculationMode::LanInoculate | InoculationMode::Wsl2Pivot
+                if self.ssh_target.is_none() =>
+            {
+                return Err("SSH target not configured.".into());
             }
             _ => {}
         }

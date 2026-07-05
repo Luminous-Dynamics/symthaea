@@ -213,6 +213,12 @@ pub struct ImmuneSystem {
     clean_cycles: u32,
 }
 
+impl Default for ImmuneSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImmuneSystem {
     pub fn new() -> Self {
         Self {
@@ -253,7 +259,7 @@ impl ImmuneSystem {
             if hits > 0 {
                 let match_ratio = hits as f32 / pattern.keywords.len() as f32;
                 let confidence = match_ratio * pattern.weight;
-                if best_match.map_or(true, |(_, c)| confidence > c) {
+                if best_match.is_none_or(|(_, c)| confidence > c) {
                     best_match = Some((pattern.threat_type, confidence));
                 }
             }
@@ -267,7 +273,7 @@ impl ImmuneSystem {
         for (mem_hash, severity) in &self.threat_memory {
             if *mem_hash == input_hash && *severity > 0.5 {
                 let tt = ThreatType::Unknown;
-                if best_match.map_or(true, |(_, c)| *severity > c) {
+                if best_match.is_none_or(|(_, c)| *severity > c) {
                     best_match = Some((tt, *severity));
                 }
             }

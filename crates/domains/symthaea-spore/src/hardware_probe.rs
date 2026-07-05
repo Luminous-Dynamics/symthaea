@@ -260,11 +260,9 @@ impl NixHardwareConfig {
         // --- Substrate recommendation ---
         let recommended_substrate = if has_npu {
             "NeuromorphicChip".to_string()
-        } else if enable_cuda || enable_rocm {
-            "SiliconDigital".to_string()
-        } else if profile.is_mobile {
-            "SiliconDigital".to_string()
         } else {
+            // CUDA/ROCm, mobile, and the default case all currently
+            // recommend the same substrate -- no distinct heuristic yet.
             "SiliconDigital".to_string()
         };
 
@@ -458,11 +456,7 @@ fn generate_hardware_nix(
          \x20 #   hdc_dim      = {hdc_dim}\n\
          \x20 #   neurons      = {neurons}\n\
          \x20 #   target_hz    = {hz}\n",
-        substrate = if enable_cuda || enable_rocm {
-            "SiliconDigital"
-        } else {
-            "SiliconDigital"
-        },
+        substrate = "SiliconDigital",
         hdc_dim = if profile.estimated_ram_gb() >= 8.0 {
             16_384
         } else {

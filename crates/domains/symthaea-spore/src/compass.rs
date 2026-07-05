@@ -31,6 +31,7 @@ impl CompassSnapshot {
     ///
     /// `neuromods`: [DA, NE, 5-HT, OT]
     /// Valence derived from DA + OT, arousal from NE.
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         consciousness_level: f32,
         dominant_harmony: &str,

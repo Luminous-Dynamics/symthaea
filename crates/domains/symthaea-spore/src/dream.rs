@@ -245,7 +245,7 @@ impl DreamEngine {
                 // Confidence based on similarity between counterfactual and
                 // original action — small perturbations yield higher confidence.
                 let sim = cosine_similarity(&cf_action, &event.action);
-                let confidence = sim.max(0.0).min(1.0);
+                let confidence = sim.clamp(0.0, 1.0);
 
                 self.wisdoms.push(Wisdom {
                     context_state: event.state.clone(),

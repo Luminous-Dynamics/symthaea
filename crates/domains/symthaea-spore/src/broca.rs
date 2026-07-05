@@ -206,6 +206,12 @@ pub const PAD_ID: u32 = 2;
 pub const UNK_ID: u32 = 3;
 pub const THOUGHT_ID: u32 = 4;
 
+impl Default for MiniTokenizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MiniTokenizer {
     pub fn new() -> Self {
         Self {
@@ -860,7 +866,7 @@ pub fn select_resonant_glyph(
     let mut best_idx = 0;
     let mut best_score = f32::NEG_INFINITY;
 
-    for (i, &(_, _, ref affinity)) in GLYPH_TABLE.iter().enumerate() {
+    for (i, (_, _, affinity)) in GLYPH_TABLE.iter().enumerate() {
         // Resonance = 1 - normalized euclidean distance
         let dist_sq: f32 = state
             .iter()
@@ -1713,6 +1719,12 @@ pub struct EpistemicGate {
     factual_ids: Vec<u32>,
 }
 
+impl Default for EpistemicGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EpistemicGate {
     pub fn new() -> Self {
         // Hedging: perhaps(198), maybe(199), possibly(200), likely(201),
@@ -1823,14 +1835,21 @@ impl BrocaController {
 
         // input = thought + token_emb + pos_emb
         let mut input = vec![0.0f32; EMBED_DIM];
-        for i in 0..EMBED_DIM {
-            input[i] = thought_hv[i] + tok_emb[i] + pos_emb[i];
+        for ((v, t), tok) in input.iter_mut().zip(thought_hv.iter()).zip(tok_emb.iter()) {
+            *v = t + tok;
+        }
+        for (v, pos) in input.iter_mut().zip(pos_emb.iter()) {
+            *v += pos;
         }
 
         // Element-wise gated recurrence
-        for i in 0..EMBED_DIM {
-            let gate = sigmoid(input[i] * self.gate_weight[i]);
-            self.hidden[i] = gate * input[i].tanh() + (1.0 - gate) * self.hidden[i];
+        for ((&inp, &gw), h) in input
+            .iter()
+            .zip(self.gate_weight.iter())
+            .zip(self.hidden.iter_mut())
+        {
+            let gate = sigmoid(inp * gw);
+            *h = gate * inp.tanh() + (1.0 - gate) * *h;
         }
 
         // Logits: cosine similarity of hidden state with each token embedding
@@ -2196,7 +2215,7 @@ impl BrocaLite {
             let curiosity_eligible: Vec<usize> = eligible
                 .iter()
                 .copied()
-                .filter(|&i| i >= CURIOSITY_PATTERN_START && i < CURIOSITY_PATTERN_END)
+                .filter(|&i| (CURIOSITY_PATTERN_START..CURIOSITY_PATTERN_END).contains(&i))
                 .collect();
             if !curiosity_eligible.is_empty() {
                 // 60% chance to pick a curiosity pattern

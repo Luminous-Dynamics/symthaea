@@ -154,45 +154,45 @@ impl FoveationManager {
         }
 
         // Dispatch highest-priority pending request
-        if let Some(prioritized) = self.pending.pop() {
-            if let Some(ref frame) = self.frame_buffer {
-                let (crop_pixels, crop_width, crop_height) = extract_crop(
-                    frame,
-                    prioritized.grid_row,
-                    prioritized.grid_col,
-                    self.patch_size,
-                    1, // 1 patch padding for context
-                    self.config.max_crop_pixels,
-                );
+        if let Some(prioritized) = self.pending.pop()
+            && let Some(ref frame) = self.frame_buffer
+        {
+            let (crop_pixels, crop_width, crop_height) = extract_crop(
+                frame,
+                prioritized.grid_row,
+                prioritized.grid_col,
+                self.patch_size,
+                1, // 1 patch padding for context
+                self.config.max_crop_pixels,
+            );
 
-                if crop_width > 0 && crop_height > 0 {
-                    let id = self.next_id;
-                    self.next_id += 1;
+            if crop_width > 0 && crop_height > 0 {
+                let id = self.next_id;
+                self.next_id += 1;
 
-                    let request = FoveationRequest {
-                        id,
-                        crop_pixels,
-                        crop_width,
-                        crop_height,
-                        channels: frame.channels,
-                        grid_row: prioritized.grid_row,
-                        grid_col: prioritized.grid_col,
-                        surprise_value: prioritized.surprise,
-                        frame_id: prioritized.frame_id,
-                        timestamp_us: prioritized.timestamp_us,
-                        velocity: prioritized.velocity,
-                    };
+                let request = FoveationRequest {
+                    id,
+                    crop_pixels,
+                    crop_width,
+                    crop_height,
+                    channels: frame.channels,
+                    grid_row: prioritized.grid_row,
+                    grid_col: prioritized.grid_col,
+                    surprise_value: prioritized.surprise,
+                    frame_id: prioritized.frame_id,
+                    timestamp_us: prioritized.timestamp_us,
+                    velocity: prioritized.velocity,
+                };
 
-                    match self.channel.request(request) {
-                        Ok(rx) => {
-                            self.in_flight.push(rx);
-                            self.last_dispatch_us = now_us;
-                            self.total_dispatched += 1;
-                        }
-                        Err(_) => {
-                            // Channel full — re-enqueue
-                            self.pending.push(prioritized);
-                        }
+                match self.channel.request(request) {
+                    Ok(rx) => {
+                        self.in_flight.push(rx);
+                        self.last_dispatch_us = now_us;
+                        self.total_dispatched += 1;
+                    }
+                    Err(_) => {
+                        // Channel full — re-enqueue
+                        self.pending.push(prioritized);
                     }
                 }
             }

@@ -118,6 +118,12 @@ pub struct ReasoningEngine {
     last_consciousness: f32,
 }
 
+impl Default for ReasoningEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReasoningEngine {
     pub fn new() -> Self {
         Self {
@@ -170,7 +176,7 @@ impl ReasoningEngine {
         // Desktop computes reliability R and effective Phi = Phi × R^gamma.
         // Simplified: reliability from prediction error stability.
         let pe_delta = (prediction_error - self.last_prediction_error).abs();
-        let reliability = (1.0 - pe_delta).max(0.1).min(1.0);
+        let reliability = (1.0 - pe_delta).clamp(0.1, 1.0);
         let effective_phi = consciousness * reliability;
         let phi_change_assess = effective_phi - phi_base;
         steps.push(ReasoningStepResult {

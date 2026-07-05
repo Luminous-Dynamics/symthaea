@@ -29,6 +29,12 @@ pub struct DreamJournal {
     fragments: VecDeque<DreamFragment>,
 }
 
+impl Default for DreamJournal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DreamJournal {
     pub fn new() -> Self {
         Self {

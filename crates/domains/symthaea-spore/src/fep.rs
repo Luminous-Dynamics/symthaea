@@ -239,6 +239,10 @@ pub struct GenerativeModel {
     pub obs_dim: usize,
 }
 
+// Matrix rows/cols are stored as Vec<Vec<f32>>, and every loop below uses the
+// index itself (i == j diagonal checks, row/col position) rather than purely
+// for element access, so a zip/enumerate rewrite would be less readable.
+#[allow(clippy::needless_range_loop)]
 impl GenerativeModel {
     /// Create a new model with identity-like (diagonal-dominant) matrices.
     pub fn new(state_dim: usize, obs_dim: usize) -> Self {
@@ -478,16 +482,20 @@ impl ActiveInferenceAgent {
 
         // Prediction error weighted by observation precision
         let mut weighted_error = vec![0.0f32; self.config.obs_dim];
-        for j in 0..self.config.obs_dim.min(obs.values.len()) {
-            weighted_error[j] = (obs.values[j] - predicted[j]) * obs.precision;
+        for ((we, &val), &pred) in weighted_error
+            .iter_mut()
+            .zip(obs.values.iter())
+            .zip(predicted.iter())
+        {
+            *we = (val - pred) * obs.precision;
         }
 
         // Gradient w.r.t. belief mean: dF/dmu = A^T * weighted_error + prior_pull
         for i in 0..self.config.state_dim {
             let mut grad = 0.0f32;
-            for j in 0..self.config.obs_dim {
-                if i < self.model.observation.len() && j < self.model.observation[i].len() {
-                    grad += self.model.observation[i][j] * weighted_error[j];
+            if let Some(row) = self.model.observation.get(i) {
+                for (&obs_ij, &we_j) in row.iter().zip(weighted_error.iter()) {
+                    grad += obs_ij * we_j;
                 }
             }
             // Prior pull toward 0.5

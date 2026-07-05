@@ -166,7 +166,7 @@ impl TrendHistory {
     /// Record a QolSnapshot by converting to TrendSnapshot. Called every cycle.
     pub fn maybe_record(&mut self, qol: QolSnapshot) {
         // Only record every 100 cycles to avoid bloat
-        if qol.cycle % 100 != 0 && self.snapshots.len() > 10 {
+        if !qol.cycle.is_multiple_of(100) && self.snapshots.len() > 10 {
             return;
         }
         self.record(TrendSnapshot {

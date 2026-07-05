@@ -26,9 +26,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Named wellbeing profile.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum WellbeingProfile {
     /// No modifications — baseline consciousness dynamics.
+    #[default]
     Default,
     /// Elevated dopamine, faster temporal dynamics, focus gamification.
     /// Designed for users who benefit from novelty and structured engagement.
@@ -75,12 +76,7 @@ impl WellbeingProfile {
 
     /// Parse from a string name (case-insensitive, underscore/hyphen tolerant).
     pub fn from_name(name: &str) -> Option<Self> {
-        match name
-            .to_lowercase()
-            .replace('-', "_")
-            .replace(' ', "_")
-            .as_str()
-        {
+        match name.to_lowercase().replace(['-', ' '], "_").as_str() {
             "default" => Some(Self::Default),
             "adhd_support" | "adhd" => Some(Self::AdhdSupport),
             "anxiety_buffer" | "anxiety" => Some(Self::AnxietyBuffer),
@@ -101,12 +97,6 @@ impl WellbeingProfile {
             Self::SensoryGentle,
             Self::FocusFlow,
         ]
-    }
-}
-
-impl Default for WellbeingProfile {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

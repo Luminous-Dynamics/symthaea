@@ -1050,7 +1050,7 @@ impl BootChainStatus {
 /// Rather than modifying sovereign.rs directly (which would risk merge
 /// conflicts), this struct owns the Secure Boot subsystem and can be
 /// stored alongside the orchestrator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SecureBootOrchestration {
     /// Result of the Secure Boot probe (SSH modes) or Socratic guide (USB Forge).
     pub probe_result: Option<SecureBootProbeResult>,
@@ -1062,18 +1062,6 @@ pub struct SecureBootOrchestration {
     pub socratic_guide: Option<SecureBootGuide>,
     /// Boot chain visualization.
     pub boot_chain: Option<BootChainStatus>,
-}
-
-impl Default for SecureBootOrchestration {
-    fn default() -> Self {
-        Self {
-            probe_result: None,
-            lanzaboote: LanzabooteConfig::default(),
-            mok_guide: None,
-            socratic_guide: None,
-            boot_chain: None,
-        }
-    }
 }
 
 impl SecureBootOrchestration {

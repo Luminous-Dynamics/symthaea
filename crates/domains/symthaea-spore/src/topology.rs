@@ -520,8 +520,12 @@ impl TopologyAnalyzer {
             for j in (i + 1)..packets.len() {
                 // Check overlap: midpoint between centers.
                 let mut midpoint = [0.0f64; 7];
-                for d in 0..7 {
-                    midpoint[d] = (packets[i].center[d] + packets[j].center[d]) / 2.0;
+                for ((m, &ci), &cj) in midpoint
+                    .iter_mut()
+                    .zip(packets[i].center.iter())
+                    .zip(packets[j].center.iter())
+                {
+                    *m = (ci + cj) / 2.0;
                 }
 
                 let time = latest_cycle as f64;
