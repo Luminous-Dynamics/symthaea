@@ -161,18 +161,17 @@ impl NixActiveInference {
             .into_iter()
             .map(|action| {
                 let mut scored_act = self.score_action(&action, goal_state);
-                if !causal_options.is_empty() {
-                    if matches!(
+                if !causal_options.is_empty()
+                    && matches!(
                         action,
                         ActionCategory::Rebuild
                             | ActionCategory::Rollback
                             | ActionCategory::Configure
-                    ) {
-                        scored_act.expected_free_energy -=
-                            0.5 * (causal_options.len() as f64).min(3.0);
-                        let old_rationale = scored_act.rationale.clone();
-                        scored_act.rationale = format!("{} [Causal Bias Applied]", old_rationale);
-                    }
+                    )
+                {
+                    scored_act.expected_free_energy -= 0.5 * (causal_options.len() as f64).min(3.0);
+                    let old_rationale = scored_act.rationale.clone();
+                    scored_act.rationale = format!("{} [Causal Bias Applied]", old_rationale);
                 }
                 scored_act
             })
