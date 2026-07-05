@@ -855,13 +855,13 @@ impl Qwen3Embedder {
         );
 
         // Check cache first
-        if let Ok(cache) = model_cache().lock() {
-            if let Some(cached) = cache.get(&cache_key) {
-                self.inference = Some(Arc::clone(cached));
-                self.model_loaded = true;
-                tracing::info!("Reusing cached Qwen3 model for {}", model_dir);
-                return Ok(());
-            }
+        if let Ok(cache) = model_cache().lock()
+            && let Some(cached) = cache.get(&cache_key)
+        {
+            self.inference = Some(Arc::clone(cached));
+            self.model_loaded = true;
+            tracing::info!("Reusing cached Qwen3 model for {}", model_dir);
+            return Ok(());
         }
 
         // Load fresh model based on device selection
@@ -1064,26 +1064,26 @@ impl Qwen3Embedder {
 
         if !self.config.use_simulated {
             #[cfg(feature = "burn")]
-            if self.inference.is_some() {
-                if let Ok(embeddings) = self.burn_embed_batch(texts) {
-                    let start = Instant::now();
-                    let results: Result<Vec<_>> = embeddings
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, emb)| {
-                            let text = texts[i];
-                            self.stats.total_embeddings += 1;
-                            self.stats.total_chars += text.len() as u64;
-                            self.cache.put(text.to_string(), emb.clone());
-                            Ok(EmbeddingResult::new(emb, "qwen3-embedding"))
-                        })
-                        .collect();
-                    let elapsed = start.elapsed().as_secs_f32() * 1000.0;
-                    let n = self.stats.total_embeddings as f32;
-                    self.stats.avg_time_ms =
-                        (self.stats.avg_time_ms * (n - texts.len() as f32) + elapsed) / n;
-                    return results;
-                }
+            if self.inference.is_some()
+                && let Ok(embeddings) = self.burn_embed_batch(texts)
+            {
+                let start = Instant::now();
+                let results: Result<Vec<_>> = embeddings
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, emb)| {
+                        let text = texts[i];
+                        self.stats.total_embeddings += 1;
+                        self.stats.total_chars += text.len() as u64;
+                        self.cache.put(text.to_string(), emb.clone());
+                        Ok(EmbeddingResult::new(emb, "qwen3-embedding"))
+                    })
+                    .collect();
+                let elapsed = start.elapsed().as_secs_f32() * 1000.0;
+                let n = self.stats.total_embeddings as f32;
+                self.stats.avg_time_ms =
+                    (self.stats.avg_time_ms * (n - texts.len() as f32) + elapsed) / n;
+                return results;
             }
         }
         // Fallback: sequential per-text embedding
