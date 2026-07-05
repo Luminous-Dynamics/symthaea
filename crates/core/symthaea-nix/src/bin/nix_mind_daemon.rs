@@ -84,6 +84,9 @@ struct DaemonState {
     last_recommended_action: Option<(String, ActionCategory, ContinuousHV, f64)>,
     /// Cooldowns for recently failed actions: (target_name, action_category) -> remaining_cycles
     failed_action_cooldowns: HashMap<(String, ActionCategory), u32>,
+    /// Rolling EMA of recent anomaly scores — drives the adaptive surprise threshold (allostasis).
+    /// Range [0, 1]: near 1 = turbulent system, near 0 = calm. Initialised to 0.5 (neutral).
+    anomaly_volatility_ema: f64,
 }
 
 /// Tracks alert continuity across IPC cycles.
@@ -148,6 +151,7 @@ impl DaemonState {
             persist_error_count: 0,
             last_recommended_action: None,
             failed_action_cooldowns: HashMap::new(),
+            anomaly_volatility_ema: 0.5,
         }
     }
 
@@ -347,6 +351,19 @@ impl DaemonState {
                 false
             }
         });
+
+        // Update allostatic volatility EMA from recent anomaly scores.
+        // EMA alpha = 0.2 gives ~5-cycle memory. We average current anomaly
+        // scores and blend toward that value each snapshot.
+        const VOLATILITY_ALPHA: f64 = 0.2;
+        let current_volatility = if self.recent_anomalies.is_empty() {
+            0.0
+        } else {
+            self.recent_anomalies.iter().map(|a| a.score).sum::<f64>()
+                / self.recent_anomalies.len() as f64
+        };
+        self.anomaly_volatility_ema = VOLATILITY_ALPHA * current_volatility
+            + (1.0 - VOLATILITY_ALPHA) * self.anomaly_volatility_ema;
 
         // Feed the state to the active inference engine
         self.active_inference.observe_state(state_hv.clone());
@@ -605,7 +622,9 @@ impl DaemonState {
 
     /// Formulate maintenance goals for persistent high-confidence alerts and anomalies,
     /// prioritizing them to select the single most urgent plan to recommend.
-    fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) {
+    ///
+    /// Returns `(active_threshold, last_plan_efe)` for TUI observability.
+    fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) -> (f64, Option<f64>) {
         let mut candidates = Vec::new();
 
         // 1. Collect candidates from persistent alerts
@@ -631,9 +650,18 @@ impl DaemonState {
             }
         }
 
-        // 2. Collect candidates from recent high-score journal anomalies
+        // 2. Collect candidates from recent high-score journal anomalies.
+        // Use an adaptive allostatic threshold rather than a hard-coded 0.7:
+        //   - BASE_THRESHOLD = 0.7 (the historical fixed value)
+        //   - When the system is calm (low ema) the threshold rises → fewer false alarms
+        //   - When the system is turbulent (high ema) the threshold drops → higher vigilance
+        const BASE_ANOMALY_THRESHOLD: f64 = 0.7;
+        const ALLOSTASIS_K: f64 = 0.2;
+        let dynamic_threshold = (BASE_ANOMALY_THRESHOLD
+            + ALLOSTASIS_K * (1.0 - self.anomaly_volatility_ema))
+            .clamp(0.4, 0.9);
         for anomaly in &self.recent_anomalies {
-            if anomaly.score > 0.7 {
+            if anomaly.score > dynamic_threshold {
                 let goal_description = format!(
                     "Resolve service failure in '{}' (reason: {})",
                     anomaly.unit, anomaly.reason
@@ -685,9 +713,13 @@ impl DaemonState {
                         state_before,
                         *initial_val,
                     ));
+
+                    return (dynamic_threshold, Some(best_action.expected_free_energy));
                 }
             }
         }
+
+        (dynamic_threshold, None)
     }
 
     /// Build telemetry from hardware info and system snapshot.
@@ -755,7 +787,7 @@ impl DaemonState {
             .record_predictions(&predictions_for_tracking);
 
         // Active inference: formulate maintenance goals (AO)
-        self.run_active_inference_plans(&alerts);
+        let (active_threshold, last_plan_efe) = self.run_active_inference_plans(&alerts);
 
         // Export top-10 strongest causal edges
         let top_causal_edges: Vec<CausalEdgeEntry> = self
@@ -804,6 +836,9 @@ impl DaemonState {
                     None
                 }
             }),
+            anomaly_volatility_ema: self.anomaly_volatility_ema,
+            active_anomaly_threshold: active_threshold,
+            last_plan_efe,
         }
     }
 }
@@ -2005,6 +2040,74 @@ mod tests {
         assert!(
             biased_rebuild.rationale.contains("[Causal Bias Applied]"),
             "Rationale should note that the causal bias was applied"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_threshold_adapts_to_volatility() {
+        let config = test_config();
+
+        // -- Scenario A: calm system (EMA near 0) → high threshold (≈ 0.88..0.9)
+        let mut calm_state = DaemonState::new(&config);
+        calm_state.anomaly_volatility_ema = 0.05; // nearly calm
+
+        // An anomaly with score 0.75 — above the old hard-coded 0.7
+        let below_threshold_anomaly = AnomalyEntry {
+            unit: "nginx".into(),
+            reason: "connection reset".into(),
+            score: 0.75,
+            error_type: None,
+            suggestion: None,
+        };
+        calm_state.recent_anomalies = vec![below_threshold_anomaly];
+
+        // With EMA = 0.05: threshold = (0.7 + 0.2*(1-0.05)).clamp(0.4, 0.9) ≈ 0.89
+        // → score 0.75 is BELOW the calm threshold, no plan should be generated
+        calm_state.run_active_inference_plans(&[]);
+        assert!(
+            calm_state.last_recommended_action.is_none(),
+            "Calm system: a 0.75-score anomaly should NOT trigger a plan (threshold ~0.89)"
+        );
+
+        // -- Scenario B: turbulent system (EMA near 1) → low threshold (≈ 0.7)
+        let mut turbulent_state = DaemonState::new(&config);
+        turbulent_state.anomaly_volatility_ema = 0.95; // nearly turbulent
+
+        // Same anomaly — same score 0.75
+        let above_threshold_anomaly = AnomalyEntry {
+            unit: "postgresql".into(),
+            reason: "FATAL: connection refused".into(),
+            score: 0.75,
+            error_type: None,
+            suggestion: None,
+        };
+        turbulent_state.recent_anomalies = vec![above_threshold_anomaly];
+
+        // With EMA = 0.95: threshold = (0.7 + 0.2*(1-0.95)).clamp(0.4, 0.9) ≈ 0.71
+        // → score 0.75 is ABOVE the turbulent threshold, a plan SHOULD be generated
+        turbulent_state.run_active_inference_plans(&[]);
+        assert!(
+            turbulent_state.last_recommended_action.is_some(),
+            "Turbulent system: a 0.75-score anomaly SHOULD trigger a plan (threshold ~0.71)"
+        );
+
+        // -- Scenario C: verify EMA converges from neutral after calm cycles
+        let mut state = DaemonState::new(&config);
+        assert!(
+            (state.anomaly_volatility_ema - 0.5).abs() < 1e-9,
+            "Initial EMA should be 0.5 (neutral)"
+        );
+
+        // Inject 10 calm snapshots (no anomalies) → EMA should drift toward 0
+        for _ in 0..10 {
+            state.recent_anomalies = vec![];
+            let snapshot = SystemStateSnapshot::default();
+            state.process_snapshot(snapshot, &config);
+        }
+        assert!(
+            state.anomaly_volatility_ema < 0.5,
+            "After 10 calm cycles EMA ({:.4}) should be below 0.5",
+            state.anomaly_volatility_ema
         );
     }
 }

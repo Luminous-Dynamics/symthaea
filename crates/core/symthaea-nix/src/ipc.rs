@@ -54,7 +54,7 @@ impl From<serde_json::Error> for IpcError {
 }
 
 /// Current IPC schema version. Increment when adding/removing fields.
-pub const SNAPSHOT_VERSION: u32 = 2;
+pub const SNAPSHOT_VERSION: u32 = 3;
 
 /// Snapshot of daemon cognitive state, serialized to disk for TUI consumption.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,6 +121,18 @@ pub struct DaemonSnapshot {
     /// Swap usage percentage.
     #[serde(default)]
     pub swap_used_percent: Option<f64>,
+    /// Rolling EMA of recent anomaly scores (0 = calm, 1 = turbulent).
+    /// Drives the adaptive allostatic threshold each cycle.
+    #[serde(default)]
+    pub anomaly_volatility_ema: f64,
+    /// Active anomaly planning threshold this cycle (allostatic setpoint).
+    /// Anomalies with score above this value triggered a plan.
+    #[serde(default)]
+    pub active_anomaly_threshold: f64,
+    /// Expected free energy of the most recently recommended action (lower = more preferred).
+    /// None if no plan was generated this cycle.
+    #[serde(default)]
+    pub last_plan_efe: Option<f64>,
 }
 
 /// A causal edge entry for IPC (lightweight copy of CausalEdge).

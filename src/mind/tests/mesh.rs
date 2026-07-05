@@ -306,13 +306,23 @@ fn test_swarm_phi_boosts_consciousness() {
     use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
     use symthaea_core::hdc::BinaryHV;
 
+    // Interleave perceive+tick (one new perception per tick) with a
+    // correlated (perturbed) sequence rather than queuing independent draws
+    // before any tick. process_inputs() (src/mind/tick.rs) drains the whole
+    // input_queue in a single tick, and current_thought only updates while
+    // there's something to process -- queuing all perceptions up front left
+    // current_thought frozen after tick 1, so ConsciousnessCore's spectral
+    // window degenerated to near-zero variance and both minds' base Phi
+    // collapsed toward the same value, making `swarm > solo` fail whenever
+    // both landed at ~0.0. See src/mind/tests/core.rs's test_consciousness_update
+    // for the same root cause.
+    let base = ContinuousHV::random(512, 42);
+
     // Mind without peers
     let mut mind_solo = ContinuousMind::default();
     mind_solo.activate();
-    for i in 0..5 {
-        mind_solo.perceive(ContinuousHV::random(512, 42 + i as u64));
-    }
     for _ in 0..5 {
+        mind_solo.perceive(base.perturb(0.2));
         mind_solo.tick();
     }
     let solo_consciousness = mind_solo.state.consciousness_level;
@@ -320,9 +330,6 @@ fn test_swarm_phi_boosts_consciousness() {
     // Mind with peers (inject a high-phi peer into registry)
     let mut mind_swarm = ContinuousMind::default();
     mind_swarm.activate();
-    for i in 0..5 {
-        mind_swarm.perceive(ContinuousHV::random(512, 42 + i as u64));
-    }
     // Inject peer before ticking
     mind_swarm.mesh_peers.update(&WisdomPacket {
         source_id: [0xFF; 8],
@@ -336,6 +343,7 @@ fn test_swarm_phi_boosts_consciousness() {
         wisdom: BinaryHV([0; 2048]),
     });
     for _ in 0..5 {
+        mind_swarm.perceive(base.perturb(0.2));
         mind_swarm.tick();
     }
     let swarm_consciousness = mind_swarm.state.consciousness_level;

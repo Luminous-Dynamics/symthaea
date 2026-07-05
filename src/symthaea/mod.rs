@@ -2792,9 +2792,16 @@ impl Symthaea {
                 );
             });
         } else if let Some(ref mut bridge) = self.neural_bridge {
-            match bridge.encode_to_hdc(text) {
-                Ok(packed) => {
-                    let bipolar = packed.to_bipolar();
+            match bridge.encode_epistemic(text) {
+                Ok(epistemic) => {
+                    tracing::debug!(
+                        target: "symthaea::perception",
+                        confidence = %epistemic.confidence,
+                        stability = ?epistemic.stability,
+                        encode_time_us = %epistemic.encode_time_us,
+                        "Neural bridge epistemic encoding complete"
+                    );
+                    let bipolar = epistemic.vector.to_bipolar();
                     let mut values = vec![0.0f32; self.hdc_dim];
                     for (i, &val) in bipolar.iter().take(self.hdc_dim).enumerate() {
                         values[i] = val as f32;
@@ -2805,7 +2812,7 @@ impl Symthaea {
                     tracing::warn!(
                         target: "symthaea::perception",
                         error = %e,
-                        "Neural bridge encoding failed, falling back to hash"
+                        "Neural bridge epistemic encoding failed, falling back to hash"
                     );
                 }
             }
