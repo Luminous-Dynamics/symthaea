@@ -1087,6 +1087,14 @@ name = "polyglot_executor_honesty"
 required-features = ["code_generation"]
 
 [[test]]
+name = "code_generation_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "debug_codegen_compile_regression"
+required-features = ["code_generation"]
+
+[[test]]
 name = "hardware_stress"
 required-features = ["code_generation"]
 

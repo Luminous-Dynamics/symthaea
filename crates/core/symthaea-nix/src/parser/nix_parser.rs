@@ -262,14 +262,14 @@ impl NixParser {
     /// Extract import statements
     fn extract_imports(&self, node: &Node, source: &str, config: &mut NixConfig) {
         // Look for imports = [ ... ] pattern
-        if node.kind() == "binding" {
-            if let Some(attr_path) = node.child_by_field_name("attrpath") {
-                let path_text = source[attr_path.byte_range()].to_string();
-                if path_text == "imports" {
-                    if let Some(value) = node.child_by_field_name("expression") {
-                        self.extract_import_paths(&value, source, config);
-                    }
-                }
+        if node.kind() == "binding"
+            && let Some(attr_path) = node.child_by_field_name("attrpath")
+        {
+            let path_text = source[attr_path.byte_range()].to_string();
+            if path_text == "imports"
+                && let Some(value) = node.child_by_field_name("expression")
+            {
+                self.extract_import_paths(&value, source, config);
             }
         }
 
@@ -294,37 +294,37 @@ impl NixParser {
 
     /// Extract options from attribute sets
     fn extract_options(&self, node: &Node, source: &str, prefix: &str, config: &mut NixConfig) {
-        if node.kind() == "binding" {
-            if let Some(attr_path) = node.child_by_field_name("attrpath") {
-                let path_text = source[attr_path.byte_range()].to_string();
-                let full_path = if prefix.is_empty() {
-                    path_text.clone()
+        if node.kind() == "binding"
+            && let Some(attr_path) = node.child_by_field_name("attrpath")
+        {
+            let path_text = source[attr_path.byte_range()].to_string();
+            let full_path = if prefix.is_empty() {
+                path_text.clone()
+            } else {
+                format!("{prefix}.{path_text}")
+            };
+
+            // Skip imports (handled separately)
+            if path_text == "imports" {
+                return;
+            }
+
+            if let Some(value_node) = node.child_by_field_name("expression") {
+                let start = node.start_position();
+                let raw_value = source[value_node.byte_range()].to_string();
+                let value = self.parse_value(&value_node, source);
+
+                // If it's an attrset, recurse into it
+                if value_node.kind() == "attrset_expression" {
+                    self.extract_options(&value_node, source, &full_path, config);
                 } else {
-                    format!("{prefix}.{path_text}")
-                };
-
-                // Skip imports (handled separately)
-                if path_text == "imports" {
-                    return;
-                }
-
-                if let Some(value_node) = node.child_by_field_name("expression") {
-                    let start = node.start_position();
-                    let raw_value = source[value_node.byte_range()].to_string();
-                    let value = self.parse_value(&value_node, source);
-
-                    // If it's an attrset, recurse into it
-                    if value_node.kind() == "attrset_expression" {
-                        self.extract_options(&value_node, source, &full_path, config);
-                    } else {
-                        config.options.push(NixOption {
-                            path: full_path,
-                            value,
-                            line: start.row + 1,
-                            column: start.column + 1,
-                            raw_value,
-                        });
-                    }
+                    config.options.push(NixOption {
+                        path: full_path,
+                        value,
+                        line: start.row + 1,
+                        column: start.column + 1,
+                        raw_value,
+                    });
                 }
             }
         }
@@ -378,12 +378,12 @@ impl NixParser {
                 let mut attrs = HashMap::new();
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
-                    if child.kind() == "binding" {
-                        if let Some(path) = child.child_by_field_name("attrpath") {
-                            let key = source[path.byte_range()].to_string();
-                            if let Some(val) = child.child_by_field_name("expression") {
-                                attrs.insert(key, self.parse_value(&val, source));
-                            }
+                    if child.kind() == "binding"
+                        && let Some(path) = child.child_by_field_name("attrpath")
+                    {
+                        let key = source[path.byte_range()].to_string();
+                        if let Some(val) = child.child_by_field_name("expression") {
+                            attrs.insert(key, self.parse_value(&val, source));
                         }
                     }
                 }
@@ -575,10 +575,10 @@ impl NixConfig {
             }
             // Also capture top-level bindings in attrset expressions
             // (for module-style Nix like { x = 1; })
-            else if node.kind() == "binding" {
-                if let Some((name, value)) = self.extract_single_binding(&node) {
-                    bindings.push((name, value));
-                }
+            else if node.kind() == "binding"
+                && let Some((name, value)) = self.extract_single_binding(&node)
+            {
+                bindings.push((name, value));
             }
         }
 
@@ -589,10 +589,10 @@ impl NixConfig {
     fn extract_bindings_from_set(&self, node: &Node<'_>, bindings: &mut Vec<(String, String)>) {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if child.kind() == "binding" {
-                if let Some((name, value)) = self.extract_single_binding(&child) {
-                    bindings.push((name, value));
-                }
+            if child.kind() == "binding"
+                && let Some((name, value)) = self.extract_single_binding(&child)
+            {
+                bindings.push((name, value));
             }
         }
     }

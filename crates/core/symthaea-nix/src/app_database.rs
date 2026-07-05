@@ -226,6 +226,12 @@ pub struct AppDatabase {
     name_index: HashMap<String, usize>,
 }
 
+impl Default for AppDatabase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AppDatabase {
     /// Build the database with all known apps.
     pub fn new() -> Self {
@@ -269,11 +275,7 @@ impl AppDatabase {
         }
 
         // Fuzzy: try removing version numbers, publishers, etc.
-        let cleaned = lower
-            .split(|c: char| c == '(' || c == '[' || c == '-')
-            .next()
-            .unwrap_or(&lower)
-            .trim();
+        let cleaned = lower.split(['(', '[', '-']).next().unwrap_or(&lower).trim();
         if let Some(&idx) = self.name_index.get(cleaned) {
             return Some(self.entries[idx]);
         }
@@ -394,11 +396,10 @@ impl AppDatabase {
 
         // Detect format
         if raw_text.contains("---APPS---") || raw_text.contains("---BREW---") {
-            // macOS companion script format
-            let mut section = "";
+            // macOS companion script format: combines app + brew entries into
+            // one flat list regardless of section.
             for line in &lines {
                 if line.starts_with("---") {
-                    section = line.trim_matches('-');
                     continue;
                 }
                 let name = line.trim();
@@ -442,12 +443,12 @@ impl AppDatabase {
         {
             // dpkg --list output
             for line in &lines {
-                if line.starts_with("ii ") {
-                    if let Some(pkg) = line.split_whitespace().nth(1) {
-                        // Remove architecture suffix
-                        let name = pkg.split(':').next().unwrap_or(pkg);
-                        apps.push(name.to_string());
-                    }
+                if line.starts_with("ii ")
+                    && let Some(pkg) = line.split_whitespace().nth(1)
+                {
+                    // Remove architecture suffix
+                    let name = pkg.split(':').next().unwrap_or(pkg);
+                    apps.push(name.to_string());
                 }
             }
         } else if lines

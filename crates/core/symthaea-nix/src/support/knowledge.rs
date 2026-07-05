@@ -243,14 +243,13 @@ impl KnowledgeBase {
 
         // Increment hit counts for dynamic matches
         for m in &scored {
-            if let AnyKnowledgeMatch::Dynamic { article, .. } = m {
-                if let Some(da) = self
+            if let AnyKnowledgeMatch::Dynamic { article, .. } = m
+                && let Some(da) = self
                     .dynamic_articles
                     .iter_mut()
                     .find(|a| a.id == article.id)
-                {
-                    da.hit_count += 1;
-                }
+            {
+                da.hit_count += 1;
             }
         }
 

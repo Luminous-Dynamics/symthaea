@@ -720,7 +720,9 @@ fn build_advanced_rust_cases() -> Vec<BenchmarkCase> {
             name: "count_word_frequencies",
             language: "rust",
             purpose: "Count word frequencies in a list of words using a HashMap",
-            signature: Some("fn count_word_frequencies(words: Vec<&str>) -> std::collections::HashMap<String, usize>"),
+            signature: Some(
+                "fn count_word_frequencies(words: Vec<&str>) -> std::collections::HashMap<String, usize>",
+            ),
             required_fragments: vec!["pub fn count_word_frequencies"],
             forbidden_fragments: vec![],
             expects_llm: true,
@@ -770,7 +772,9 @@ fn build_advanced_rust_cases() -> Vec<BenchmarkCase> {
             name: "get_or_default",
             language: "rust",
             purpose: "Get value at index or return a default value using unwrap_or",
-            signature: Some("fn get_or_default(items: Vec<i32>, index: usize, default: i32) -> i32"),
+            signature: Some(
+                "fn get_or_default(items: Vec<i32>, index: usize, default: i32) -> i32",
+            ),
             required_fragments: vec!["pub fn get_or_default"],
             forbidden_fragments: vec![],
             expects_llm: true,

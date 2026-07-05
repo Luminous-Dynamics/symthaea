@@ -97,7 +97,26 @@ const GAP_JUNCTION_RADIUS: f32 = 0.4;
 const GAP_JUNCTION_DIFFUSION_RATE: f32 = 0.35;
 /// Per-day drift rate pulling Vmem toward the fate-appropriate resting
 /// potential (hyperpolarized once differentiated, depolarized otherwise).
+/// Used only when the opt-in ion-channel model
+/// (`NeuralOrganoid::set_ion_channel_model_enabled`) is disabled (the
+/// default) -- see [`crate::ion_channels`] for the alternative,
+/// Nernst-derived dynamics.
 const HYPERPOLARIZATION_DRIFT: f32 = 0.05;
+/// Baseline per-cell K+ (hyperpolarizing) leak conductance for
+/// undifferentiated cells, used only by the opt-in ion-channel model. Paired
+/// with [`NA_CHANNEL_BASELINE_CONDUCTANCE`] below, this ratio keeps an
+/// undifferentiated cell's conductance-weighted resting potential near
+/// `VMEM_DEPOLARIZED` -- see [`crate::ion_channels`].
+const K_CHANNEL_BASELINE_CONDUCTANCE: f32 = 0.03;
+/// Baseline per-cell Na+-like (depolarizing) leak conductance, present in
+/// all cells regardless of fate. See [`K_CHANNEL_BASELINE_CONDUCTANCE`].
+const NA_CHANNEL_BASELINE_CONDUCTANCE: f32 = 0.04;
+/// K+ conductance added when a cell commits to Neuron/Glial fate under the
+/// ion-channel model -- models real Kv-channel upregulation driving
+/// differentiation-associated hyperpolarization (the finding
+/// `crate::ion_channels`'s module docs cite). See
+/// `crate::morphogenetic_consciousness::differentiate`.
+pub(crate) const K_CHANNEL_DIFFERENTIATION_BUMP: f32 = 2.0;
 /// Weight of the Vmem-hyperpolarization bias added into the neural gene
 /// expression signal during differentiation.
 const VMEM_DIFFERENTIATION_DRIVE: f32 = 0.20;
@@ -205,6 +224,27 @@ pub struct BioelectricState {
     /// Runtime-configurable positional-homing rate, defaulting to
     /// [`POSITIONAL_HOMING_RATE`]. See `gap_junction_diffusion_rate`.
     pub positional_homing_rate: f32,
+    /// Per-cell K+ (hyperpolarizing) leak channel conductance. Only used by
+    /// the opt-in ion-channel model (`ion_channel_model_enabled` below) --
+    /// see [`crate::ion_channels`].
+    pub k_channel_conductance: Vec<f32>,
+    /// Per-cell Na+-like (depolarizing) leak channel conductance. Only used
+    /// by the opt-in ion-channel model. See [`crate::ion_channels`].
+    pub na_channel_conductance: Vec<f32>,
+    /// Pharmacological K+-channel blocker multiplier in `[0, 1]` (1.0 =
+    /// fully open/control, 0.0 = fully blocked) -- e.g. Levin-lab tool
+    /// compounds like valinomycin/ivermectin. Distinct from
+    /// `gap_junction_permeability`: this targets ion-channel expression
+    /// directly, not electrical coupling between cells. Only has an effect
+    /// when `ion_channel_model_enabled` is `true`. See
+    /// `NeuralOrganoid::set_potassium_channel_block`.
+    pub potassium_channel_block: f32,
+    /// Whether the opt-in ion-channel conductance model drives Vmem
+    /// dynamics in [`MorphogeneticField::step_vmem_diffusion`], replacing
+    /// the default ad hoc fate-drift term. Defaults to `false` so existing
+    /// behavior/tests are unaffected. See
+    /// `NeuralOrganoid::set_ion_channel_model_enabled`.
+    pub ion_channel_model_enabled: bool,
     /// Seeded RNG, independent of [`MorphogeneticField`]'s own RNG so that
     /// adding this layer does not perturb the existing chemical/synaptic
     /// model's stochastic sequence (and therefore does not change any
@@ -225,6 +265,10 @@ impl BioelectricState {
             defected: vec![false; n],
             gap_junction_diffusion_rate: GAP_JUNCTION_DIFFUSION_RATE,
             positional_homing_rate: POSITIONAL_HOMING_RATE,
+            k_channel_conductance: vec![K_CHANNEL_BASELINE_CONDUCTANCE; n],
+            na_channel_conductance: vec![NA_CHANNEL_BASELINE_CONDUCTANCE; n],
+            potassium_channel_block: 1.0,
+            ion_channel_model_enabled: false,
             rng: StdRng::seed_from_u64(seed.wrapping_add(0xB10E_1EC7)),
         }
     }
@@ -239,6 +283,10 @@ impl BioelectricState {
         self.vmem.resize(total, VMEM_DEPOLARIZED);
         self.wound_boundary.resize(total, false);
         self.defected.resize(total, false);
+        self.k_channel_conductance
+            .resize(total, K_CHANNEL_BASELINE_CONDUCTANCE);
+        self.na_channel_conductance
+            .resize(total, NA_CHANNEL_BASELINE_CONDUCTANCE);
         for row in self.gap_junction_matrix.iter_mut() {
             row.resize(total, 0.0);
         }
@@ -269,6 +317,14 @@ impl BioelectricState {
         let inherited: Vec<f32> = parent_indices.iter().map(|&p| self.vmem[p]).collect();
         let inherited_defected: Vec<bool> =
             parent_indices.iter().map(|&p| self.defected[p]).collect();
+        let inherited_k: Vec<f32> = parent_indices
+            .iter()
+            .map(|&p| self.k_channel_conductance[p])
+            .collect();
+        let inherited_na: Vec<f32> = parent_indices
+            .iter()
+            .map(|&p| self.na_channel_conductance[p])
+            .collect();
         self.vmem.resize(total, VMEM_DEPOLARIZED);
         for (k, v) in inherited.into_iter().enumerate() {
             self.vmem[old + k] = v;
@@ -277,6 +333,16 @@ impl BioelectricState {
         self.defected.resize(total, false);
         for (k, d) in inherited_defected.into_iter().enumerate() {
             self.defected[old + k] = d;
+        }
+        self.k_channel_conductance
+            .resize(total, K_CHANNEL_BASELINE_CONDUCTANCE);
+        for (k, g) in inherited_k.into_iter().enumerate() {
+            self.k_channel_conductance[old + k] = g;
+        }
+        self.na_channel_conductance
+            .resize(total, NA_CHANNEL_BASELINE_CONDUCTANCE);
+        for (k, g) in inherited_na.into_iter().enumerate() {
+            self.na_channel_conductance[old + k] = g;
         }
         for row in self.gap_junction_matrix.iter_mut() {
             row.resize(total, 0.0);
@@ -294,11 +360,15 @@ impl BioelectricState {
         let mut new_vmem = Vec::with_capacity(next);
         let mut new_wound = Vec::with_capacity(next);
         let mut new_defected = Vec::with_capacity(next);
+        let mut new_k_channel = Vec::with_capacity(next);
+        let mut new_na_channel = Vec::with_capacity(next);
         for i in 0..n {
             if keep[i] {
                 new_vmem.push(self.vmem[i]);
                 new_wound.push(self.wound_boundary[i]);
                 new_defected.push(self.defected[i]);
+                new_k_channel.push(self.k_channel_conductance[i]);
+                new_na_channel.push(self.na_channel_conductance[i]);
             }
         }
         let mut new_gj = vec![vec![0.0f64; next]; next];
@@ -316,6 +386,8 @@ impl BioelectricState {
         self.vmem = new_vmem;
         self.wound_boundary = new_wound;
         self.defected = new_defected;
+        self.k_channel_conductance = new_k_channel;
+        self.na_channel_conductance = new_na_channel;
         self.gap_junction_matrix = new_gj;
     }
 
@@ -374,10 +446,25 @@ impl MorphogeneticField {
     /// One step of gap-junction-mediated Vmem equilibration, plus a
     /// fate-dependent drift toward the appropriate resting potential
     /// (hyperpolarized once differentiated, depolarized otherwise).
+    ///
+    /// The fate-drift term (last step below) has two mutually exclusive
+    /// implementations, selected by `ion_channel_model_enabled` (default
+    /// `false`, in which case this method's behavior is unchanged from
+    /// before the ion-channel model existed): an ad hoc drift toward one of
+    /// two hardcoded target voltages, or a per-cell conductance-weighted sum
+    /// against real Nernst-derived reversal potentials. See
+    /// `NeuralOrganoid::set_ion_channel_model_enabled` and
+    /// [`crate::ion_channels`].
     pub fn step_vmem_diffusion(&mut self, dt: f32) {
         let n = self.cells.len();
         let permeability = self.bioelectric.gap_junction_permeability;
         let diffusion_rate = self.bioelectric.gap_junction_diffusion_rate;
+        let ion_channel_model_enabled = self.bioelectric.ion_channel_model_enabled;
+        let (e_k, e_na) = if ion_channel_model_enabled {
+            crate::ion_channels::reversal_potentials_normalized()
+        } else {
+            (0.0, 0.0)
+        };
         let mut new_vmem = self.bioelectric.vmem.clone();
         for i in 0..n {
             // Defected cells are gap-junction isolated in both directions —
@@ -401,13 +488,20 @@ impl MorphogeneticField {
                 v += dt * diffusion_rate * permeability * (avg - v);
             }
 
-            let target =
-                if self.cells[i].cell_type.is_neuron() || self.cells[i].cell_type.is_glial() {
-                    VMEM_HYPERPOLARIZED
-                } else {
-                    VMEM_DEPOLARIZED
-                };
-            v += dt * HYPERPOLARIZATION_DRIFT * (target - v);
+            if ion_channel_model_enabled {
+                let g_k = self.bioelectric.k_channel_conductance[i]
+                    * self.bioelectric.potassium_channel_block;
+                let g_na = self.bioelectric.na_channel_conductance[i];
+                v += dt * (g_k * (e_k - v) + g_na * (e_na - v));
+            } else {
+                let target =
+                    if self.cells[i].cell_type.is_neuron() || self.cells[i].cell_type.is_glial() {
+                        VMEM_HYPERPOLARIZED
+                    } else {
+                        VMEM_DEPOLARIZED
+                    };
+                v += dt * HYPERPOLARIZATION_DRIFT * (target - v);
+            }
 
             new_vmem[i] = v;
         }
@@ -988,6 +1082,36 @@ impl NeuralOrganoid {
     /// Whether the packing correction pass is currently enabled.
     pub fn packing_enabled(&self) -> bool {
         self.packing_enabled
+    }
+
+    /// Enable or disable the opt-in ion-channel conductance model for Vmem
+    /// dynamics, replacing the default ad hoc fate-drift term with a
+    /// per-cell conductance-weighted sum against real Nernst-derived
+    /// reversal potentials -- see [`crate::ion_channels`] for what it does
+    /// and why it's off by default.
+    pub fn set_ion_channel_model_enabled(&mut self, enabled: bool) {
+        self.field.bioelectric.ion_channel_model_enabled = enabled;
+    }
+
+    /// Whether the ion-channel conductance model is currently enabled.
+    pub fn ion_channel_model_enabled(&self) -> bool {
+        self.field.bioelectric.ion_channel_model_enabled
+    }
+
+    /// Pharmacological K+-channel blocker multiplier in `[0, 1]` (1.0 =
+    /// fully open/control, 0.0 = fully blocked) -- e.g. Levin-lab tool
+    /// compounds like valinomycin/ivermectin. Distinct from
+    /// `set_gap_junction_permeability`: this targets ion-channel expression
+    /// directly, not electrical coupling between cells. Only has an effect
+    /// when the ion-channel model is enabled
+    /// (`set_ion_channel_model_enabled`).
+    pub fn set_potassium_channel_block(&mut self, block: f32) {
+        self.field.bioelectric.potassium_channel_block = block.clamp(0.0, 1.0);
+    }
+
+    /// Current K+-channel blocker multiplier.
+    pub fn potassium_channel_block(&self) -> f32 {
+        self.field.bioelectric.potassium_channel_block
     }
 
     /// Apply one day's positional-homing pull, if enabled and a target has
@@ -1621,5 +1745,78 @@ mod tests {
             "A higher configured diffusion rate should equalize faster: \
              fast={fast_diff}, slow={slow_diff}"
         );
+    }
+
+    #[test]
+    fn ion_channel_model_disabled_by_default() {
+        let organoid = NeuralOrganoid::new(10, 23);
+        assert!(!organoid.ion_channel_model_enabled());
+    }
+
+    #[test]
+    fn differentiated_cell_hyperpolarizes_under_ion_channel_model() {
+        let mut field = MorphogeneticField::new(1, 20);
+        field.bioelectric.ion_channel_model_enabled = true;
+        field.bioelectric.vmem[0] = VMEM_DEPOLARIZED;
+        // Simulate having differentiated into a neuron: bump K+ conductance
+        // the same way `differentiate()` does.
+        field.bioelectric.k_channel_conductance[0] += K_CHANNEL_DIFFERENTIATION_BUMP;
+
+        let before = field.bioelectric.vmem[0];
+        for _ in 0..20 {
+            field.step_vmem_diffusion(0.2);
+        }
+        let after = field.bioelectric.vmem[0];
+
+        assert!(
+            after < before,
+            "A cell with upregulated K+ conductance should hyperpolarize \
+             under the ion-channel model: before={before}, after={after}"
+        );
+    }
+
+    #[test]
+    fn potassium_channel_block_prevents_hyperpolarization() {
+        let run = |block: f32| {
+            let mut organoid = NeuralOrganoid::new(1, 21);
+            organoid.set_ion_channel_model_enabled(true);
+            organoid.field.bioelectric.vmem[0] = VMEM_DEPOLARIZED;
+            organoid.field.bioelectric.k_channel_conductance[0] += K_CHANNEL_DIFFERENTIATION_BUMP;
+            organoid.set_potassium_channel_block(block);
+            for _ in 0..20 {
+                organoid.field.step_vmem_diffusion(0.2);
+            }
+            organoid.field.bioelectric.vmem[0]
+        };
+
+        let open = run(1.0);
+        let blocked = run(0.0);
+        assert!(
+            open < blocked,
+            "Blocking K+ channels should prevent the hyperpolarization a \
+             differentiated cell would otherwise show: open={open}, blocked={blocked}"
+        );
+    }
+
+    #[test]
+    fn ion_channel_model_keeps_vmem_bounded() {
+        let mut field = MorphogeneticField::new(30, 22);
+        field.bioelectric.ion_channel_model_enabled = true;
+        // A range of conductances, including some large ones, to stress-test
+        // for divergence.
+        for i in 0..field.num_cells() {
+            field.bioelectric.k_channel_conductance[i] = 0.5 + i as f32 * 0.1;
+            field.bioelectric.na_channel_conductance[i] = 0.3;
+        }
+        field.form_gap_junctions();
+        for _ in 0..100 {
+            field.step_vmem_diffusion(0.2);
+        }
+        for &v in &field.bioelectric.vmem {
+            assert!(
+                v.is_finite() && v.abs() < 5.0,
+                "Vmem should stay bounded under the ion-channel model, got {v}"
+            );
+        }
     }
 }

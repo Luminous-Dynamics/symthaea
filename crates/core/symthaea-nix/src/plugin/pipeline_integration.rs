@@ -299,12 +299,12 @@ impl NixPipelineProcessor {
     #[tracing::instrument(skip(self), fields(phi = %phi, confidence = %confidence))]
     pub fn process(&mut self, input: &str, phi: f64, confidence: f64) -> NixPipelineResult {
         // Stage 1: Observe (skip if configured, e.g. in tests)
-        if !self.skip_observe {
-            if let Ok(snapshot) = crate::observe::SystemObserver::snapshot() {
-                let mut encoder = crate::encoding::SystemStateEncoder::new(&mut self.codebook);
-                let state_hv = encoder.encode_snapshot(&snapshot);
-                self.engine.observe_state(state_hv);
-            }
+        if !self.skip_observe
+            && let Ok(snapshot) = crate::observe::SystemObserver::snapshot()
+        {
+            let mut encoder = crate::encoding::SystemStateEncoder::new(&mut self.codebook);
+            let state_hv = encoder.encode_snapshot(&snapshot);
+            self.engine.observe_state(state_hv);
         }
 
         // Stage 2+3: Infer goal + plan actions

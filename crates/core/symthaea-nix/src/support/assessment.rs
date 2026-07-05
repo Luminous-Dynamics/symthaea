@@ -158,7 +158,7 @@ impl SupportAssessor {
         }
 
         // 4. Sort recommendations by urgency (Critical first)
-        recommendations.sort_by(|a, b| b.urgency.cmp(&a.urgency));
+        recommendations.sort_by_key(|r| std::cmp::Reverse(r.urgency));
 
         SupportAssessment {
             overall_status,

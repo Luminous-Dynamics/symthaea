@@ -847,6 +847,18 @@ impl EthicsEngine {
                 .map(|s| s.rule_name.clone())
                 .collect();
 
+            // Record this cycle's violations BEFORE checking is_restored() below.
+            // is_restored() defaults to `true` when there's no tracker entry yet
+            // (nothing to restore), so a violation's first-ever occurrence would
+            // otherwise never trip the ahimsa gate — only relapses would.
+            for v in &viols {
+                if self.restoration_tracker.entries.contains_key(v) {
+                    self.restoration_tracker.record_relapse(v);
+                } else {
+                    self.restoration_tracker.record_violation(v, input.cycle);
+                }
+            }
+
             let ahimsa_violated = viols.iter().any(|name| {
                 let is_ahimsa = name.starts_with("ahimsa_")
                     || name == "prevent_suffering"
@@ -895,20 +907,12 @@ impl EthicsEngine {
         let moral_us = t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════
-        // RESTORATIVE JUSTICE: Track violations and corrections
+        // RESTORATIVE JUSTICE: Track corrections
         //
-        // For each new violation, start a restoration window. For each
-        // satisfaction of a previously-violated obligation, accumulate
-        // corrective credit. Relapses penalize progress.
+        // Violations were already recorded above (before the ahimsa_violated
+        // check, so first-ever occurrences aren't exempted). Here we only
+        // need to accumulate corrective credit for satisfactions.
         // ═══════════════════════════════════════════════════════════════════
-        for v in &violations {
-            if self.restoration_tracker.entries.contains_key(v) {
-                // Already tracking this violation — it's a relapse
-                self.restoration_tracker.record_relapse(v);
-            } else {
-                self.restoration_tracker.record_violation(v, input.cycle);
-            }
-        }
         for s in &satisfactions {
             self.restoration_tracker.record_correction(s);
         }

@@ -194,14 +194,21 @@ impl TypeCausalModel {
     /// the necessary wrapping (Some(), Ok(), .collect(), etc.)
     pub fn wrap_for_return(body: &str, return_type: &str) -> String {
         let wrapping = Self::required_wrapping(return_type);
+        let trimmed = body.trim_end();
         match wrapping {
             ReturnWrapping::Direct => body.to_string(),
             ReturnWrapping::OptionSome => {
-                // Don't double-wrap if body already returns Option
+                // Don't double-wrap if body already returns Option — either textually,
+                // or because it ends in `.copied()`/`.cloned()`, which are only ever
+                // chained to convert an already-Option<&T> (from `.max()`/`.min()`/
+                // `.find(...)`/etc.) into Option<T>. Missing this produced
+                // Option<Option<T>> (E0308) for every max/min/find-style case.
                 if body.contains("None")
                     || body.contains("Some(")
                     || body.contains("return None")
                     || body.contains("return Some")
+                    || trimmed.ends_with(".copied()")
+                    || trimmed.ends_with(".cloned()")
                 {
                     body.to_string()
                 } else {
@@ -209,10 +216,14 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::ResultOk => {
+                // `.map_err(...)` is only callable on Result — its presence means the
+                // body already evaluates to a Result, so wrapping in another Ok(...)
+                // produced Result<Result<T, E>, _> (E0308).
                 if body.contains("Err(")
                     || body.contains("Ok(")
                     || body.contains("return Err")
                     || body.contains("return Ok")
+                    || body.contains(".map_err(")
                 {
                     body.to_string()
                 } else {
@@ -220,16 +231,29 @@ impl TypeCausalModel {
                 }
             }
             ReturnWrapping::CollectVec => {
-                if body.contains(".collect()") || body.contains(".collect::<") {
+                // A bare identifier (no method-call dot at all) is already a concrete
+                // value — e.g. a Vec built up via in-place `.sort()`/`.dedup()` — not
+                // an iterator chain needing `.collect()`. Appending it produced
+                // "no method named `collect` found for struct `Vec<T>`" (E0599).
+                if body.contains(".collect()")
+                    || body.contains(".collect::<")
+                    || !trimmed.contains('.')
+                {
                     body.to_string()
                 } else {
                     format!("{}.collect()", body)
                 }
             }
             ReturnWrapping::ToString => {
+                // A bare trailing `.collect()` already type-infers to the function's
+                // declared return type (String) as the tail expression — appending
+                // `.to_string()` after it makes `.collect()`'s target type ambiguous
+                // (E0282 "type annotations needed").
                 if body.contains(".to_string()")
                     || body.contains("String::")
                     || body.contains("format!(")
+                    || body.contains(".collect::<")
+                    || trimmed.ends_with(".collect()")
                 {
                     body.to_string()
                 } else {

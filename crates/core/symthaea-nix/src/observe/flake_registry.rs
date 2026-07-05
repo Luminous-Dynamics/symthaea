@@ -213,13 +213,12 @@ impl FlakeRegistry {
     fn extract_inputs_from_locks(value: &serde_json::Value) -> Vec<String> {
         let mut inputs = Vec::new();
 
-        if let Some(root) = Self::locks_root(value) {
-            if let Some(root_inputs) = root.get("inputs") {
-                if let Some(obj) = root_inputs.as_object() {
-                    for key in obj.keys() {
-                        inputs.push(key.clone());
-                    }
-                }
+        if let Some(root) = Self::locks_root(value)
+            && let Some(root_inputs) = root.get("inputs")
+            && let Some(obj) = root_inputs.as_object()
+        {
+            for key in obj.keys() {
+                inputs.push(key.clone());
             }
         }
 

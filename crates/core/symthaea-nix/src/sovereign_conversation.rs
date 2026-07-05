@@ -19,10 +19,8 @@
 use crate::app_database::{AppDatabase, MigrationReport};
 use crate::encoding::codebook::NixCodebook;
 use crate::encoding::user_input_encoder::UserInputEncoder;
-use crate::mind::active_inference::NixActiveInference;
 use crate::sovereign_config::{
-    ConfigDecision, HardwareProfile, MigrationData, SovereignConfig, SovereignConfigGenerator,
-    UserChoices,
+    ConfigDecision, HardwareProfile, MigrationData, SovereignConfigGenerator, UserChoices,
 };
 
 /// What Symthaea knows about the user's intent so far.
@@ -307,20 +305,17 @@ impl SovereignConversation {
                 crate::app_database::AppCategory::Creative2D
                 | crate::app_database::AppCategory::Creative3D
                 | crate::app_database::AppCategory::Video
-                | crate::app_database::AppCategory::Photo => {
-                    if !self.state.known_use_cases.contains(&"creative".to_string()) {
-                        self.state.known_use_cases.push("creative".into());
-                    }
+                | crate::app_database::AppCategory::Photo
+                    if !self.state.known_use_cases.contains(&"creative".to_string()) =>
+                {
+                    self.state.known_use_cases.push("creative".into());
                 }
                 _ => {}
             }
 
             // Add specific packages to migration data
-            match matched.entry.category {
-                crate::app_database::AppCategory::Container => {
-                    self.migration.docker_images = 1;
-                }
-                _ => {}
+            if matched.entry.category == crate::app_database::AppCategory::Container {
+                self.migration.docker_images = 1;
             }
         }
 
@@ -366,7 +361,7 @@ impl SovereignConversation {
             .iter()
             .filter(|m| {
                 let c = m.entry.primary.quality.confidence();
-                c >= 0.5 && c < 0.9
+                (0.5..0.9).contains(&c)
             })
             .count();
         let no_equiv = report
@@ -768,7 +763,7 @@ impl SovereignConversation {
                     self.migration.detected_apps.push(pkg);
                 }
                 // Also add alternatives for important apps
-                for alt in matched.entry.alternatives {
+                for _alt in matched.entry.alternatives {
                     // Only add the primary recommendation to the package list
                     // Alternatives are shown but not auto-installed
                 }

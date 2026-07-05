@@ -159,10 +159,10 @@ impl StoreObserver {
                 continue;
             }
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() >= 2 {
-                if let Ok(size) = parts[1].parse::<u64>() {
-                    return Ok(size);
-                }
+            if parts.len() >= 2
+                && let Ok(size) = parts[1].parse::<u64>()
+            {
+                return Ok(size);
             }
         }
 

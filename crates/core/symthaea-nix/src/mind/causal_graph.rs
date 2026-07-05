@@ -299,15 +299,15 @@ impl NixCausalGraph {
 
             if let Some(targets) = self.from_index.get(&current) {
                 for to in targets {
-                    if to != variable {
-                        if let Some(edge) = self.causal_graph.get(&(current.clone(), to.clone())) {
-                            effects.push(SideEffectPrediction {
-                                affected_variable: to.clone(),
-                                direction: "change".to_string(),
-                                confidence: edge.confidence,
-                            });
-                            to_visit.push(to.clone());
-                        }
+                    if to != variable
+                        && let Some(edge) = self.causal_graph.get(&(current.clone(), to.clone()))
+                    {
+                        effects.push(SideEffectPrediction {
+                            affected_variable: to.clone(),
+                            direction: "change".to_string(),
+                            confidence: edge.confidence,
+                        });
+                        to_visit.push(to.clone());
                     }
                 }
             }

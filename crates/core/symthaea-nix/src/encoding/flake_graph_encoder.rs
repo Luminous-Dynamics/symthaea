@@ -166,14 +166,13 @@ impl<'a> FlakeGraphEncoder<'a> {
                 None
             };
 
-            if let Some(target_name) = target {
-                if target_name != updated_input
-                    && !affected.iter().any(|(name, _)| name == target_name)
-                {
-                    let sim = updated_hv.similarity(edge_hv).abs();
-                    let effective_sim = sim.max(threshold + 0.01); // Ensure structurally-connected inputs appear
-                    affected.push((target_name.to_string(), effective_sim));
-                }
+            if let Some(target_name) = target
+                && target_name != updated_input
+                && !affected.iter().any(|(name, _)| name == target_name)
+            {
+                let sim = updated_hv.similarity(edge_hv).abs();
+                let effective_sim = sim.max(threshold + 0.01); // Ensure structurally-connected inputs appear
+                affected.push((target_name.to_string(), effective_sim));
             }
         }
 

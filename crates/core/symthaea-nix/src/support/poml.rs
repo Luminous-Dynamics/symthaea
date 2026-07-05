@@ -526,10 +526,10 @@ impl PomlProcessor {
         if let Ok(entries) = std::fs::read_dir(&self.template_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().is_some_and(|e| e == "poml") {
-                    if let Some(stem) = path.file_stem() {
-                        templates.push(stem.to_string_lossy().to_string());
-                    }
+                if path.extension().is_some_and(|e| e == "poml")
+                    && let Some(stem) = path.file_stem()
+                {
+                    templates.push(stem.to_string_lossy().to_string());
                 }
             }
         }

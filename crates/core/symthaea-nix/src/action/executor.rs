@@ -424,14 +424,13 @@ impl NixOSExecutor {
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         for line in stdout.lines() {
-            if line.contains("(current)") {
-                if let Some(gen_str) = line.split_whitespace().next() {
-                    if let Ok(r#gen) = gen_str.trim().parse::<u32>() {
-                        self.current_generation = Some(r#gen);
-                        info!(generation = r#gen, "Captured current NixOS generation");
-                        return Ok(r#gen);
-                    }
-                }
+            if line.contains("(current)")
+                && let Some(gen_str) = line.split_whitespace().next()
+                && let Ok(r#gen) = gen_str.trim().parse::<u32>()
+            {
+                self.current_generation = Some(r#gen);
+                info!(generation = r#gen, "Captured current NixOS generation");
+                return Ok(r#gen);
             }
         }
 

@@ -228,10 +228,11 @@ fn extract_related_packages(name: &str, description: &str) -> Vec<String> {
     // Look for `pkgs.X` references in description
     for word in description.split_whitespace() {
         let trimmed = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '-');
-        if let Some(pkg) = trimmed.strip_prefix("pkgs.") {
-            if !pkg.is_empty() && !packages.contains(&pkg.to_string()) {
-                packages.push(pkg.to_string());
-            }
+        if let Some(pkg) = trimmed.strip_prefix("pkgs.")
+            && !pkg.is_empty()
+            && !packages.contains(&pkg.to_string())
+        {
+            packages.push(pkg.to_string());
         }
     }
 

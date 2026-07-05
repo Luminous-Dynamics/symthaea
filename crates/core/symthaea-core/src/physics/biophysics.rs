@@ -350,7 +350,11 @@ impl BiophysicsEncoder {
     // ============================================================
 
     /// Nernst potential: E = (RT/zF) ln([out]/[in])
-    pub fn nernst_potential_mv(&self, z: i32, conc_out: f64, conc_in: f64, temp_k: f64) -> f64 {
+    ///
+    /// A pure scalar calculation with no dependence on encoder state —
+    /// callable as `BiophysicsEncoder::nernst_potential_mv(...)` without
+    /// constructing an encoder instance.
+    pub fn nernst_potential_mv(z: i32, conc_out: f64, conc_in: f64, temp_k: f64) -> f64 {
         let rt_f = R_GAS * temp_k / F_FARADAY; // R*T/F in volts
         1000.0 * rt_f / (z as f64) * (conc_out / conc_in).ln()
     }
@@ -427,10 +431,8 @@ mod tests {
 
     #[test]
     fn test_nernst_potential() {
-        let encoder = setup();
-
         // K+ at 37°C: [out]=5mM, [in]=140mM
-        let e_k = encoder.nernst_potential_mv(1, 5.0, 140.0, 310.0);
+        let e_k = BiophysicsEncoder::nernst_potential_mv(1, 5.0, 140.0, 310.0);
 
         // Should be around -90 mV
         assert!((e_k - (-90.0)).abs() < 10.0);

@@ -218,10 +218,10 @@ impl ModuleParser {
         if let Some(pos) = raw.find("mkEnableOption") {
             let after = &raw[pos + "mkEnableOption".len()..].trim_start();
             // Look for a quoted string
-            if let Some(inner) = after.strip_prefix('"') {
-                if let Some(end) = inner.find('"') {
-                    return Some(inner[..end].to_string());
-                }
+            if let Some(inner) = after.strip_prefix('"')
+                && let Some(end) = inner.find('"')
+            {
+                return Some(inner[..end].to_string());
             }
         }
         None

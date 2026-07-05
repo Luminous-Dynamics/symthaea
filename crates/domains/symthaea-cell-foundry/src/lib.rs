@@ -21,6 +21,7 @@ pub mod experiment_planner;
 pub mod experiments;
 pub mod fep_agent;
 pub mod hydrology;
+mod ion_channels;
 pub mod ivg_protocol;
 pub mod lab_controller;
 pub mod meiosis_monitor;

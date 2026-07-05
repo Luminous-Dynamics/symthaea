@@ -1422,6 +1422,52 @@ untested on Python** (see the 2026-07-04 Rust-only-verification finding
 above) — that thesis still needs a Rust-native benchmark before it can be
 fairly judged.
 
+## 2026-07-05 Update: the existing 50-case benchmark (Phase 3f.5) was dead — registered it, found a real regression
+
+While scoping what a "Rust-native benchmark" (needed to fairly evaluate the
+orchestrator, per the above) would require, checked whether one already
+exists first, per this project's standing rule against building things that
+already exist. Phase 3f.5 above already describes exactly this:
+`tests/code_generation_benchmark.rs`, 50 cases across 6 categories, testing
+`CodeGenerator` (the native template generator) directly with real
+`rustc`/compile verification.
+
+**It was never actually runnable.** The workspace sets `autotests = false`
+(Cargo.toml:140), which requires every test file to have an explicit
+`[[test]]` registration — `code_generation_benchmark` didn't have one. The
+file's own top-of-file doc comment says `cargo test --test
+code_generation_benchmark --features code_generation` "just works"; it
+silently never has. Same pattern as everything else found this week:
+real, tested-in-isolation, invisible in the actual pipeline.
+
+**Registered it** (`[[test]] name = "code_generation_benchmark"
+required-features = ["code_generation"]`, next to the other
+`code_generation`-gated test entries) **and ran it for the first time**:
+
+- The 50-case fragment/functional check (`benchmark_code_generation` and
+  friends): **49/50 (98%)** — consistent with the March 100% claim, no
+  regression here.
+- A separate, stricter sub-test, `benchmark_compile_verification`, actually
+  invokes `rustc --edition 2021` on each generated case and asserts ≥85%
+  compile — **this one fails: 33/40 (82%)**, below its own threshold. Real,
+  concrete compile errors on 7 canonical patterns:
+  - `reverse` — E0282 type annotations needed
+  - `sort`, `unique` — E0599 `no method named 'collect' found for struct
+    'Vec<i32>'` (i.e. `.collect()` is being called directly on a `Vec`, not
+    an iterator — missing an `.into_iter()`/`.iter()` somewhere in the
+    generated body)
+  - `max_vec`, `min_vec`, `parse_integer`, `find_first_even` — E0308
+    mismatched types
+
+This is a real defect in the native `CodeGenerator`'s Rust body-emission
+logic for these specific patterns, distinct from and deeper than everything
+fixed so far this week (which was all in `coding_agent`'s Python path).
+**Not yet fixed** — flagged here as the next concrete, scoped target rather
+than pursued further in this same session, since it requires tracing
+`code_generator.rs`'s (~2000+ LOC) per-pattern body templates for 7
+different cases, a meaningfully different piece of the system than the
+`coding_agent` pipeline this whole week's investigation has focused on.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*

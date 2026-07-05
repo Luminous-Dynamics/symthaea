@@ -435,16 +435,15 @@ impl HealthAssessor {
         let mut worst_path = String::new();
 
         for flake in flakes {
-            if let Some(ref modified_str) = flake.last_modified {
-                if let Ok(modified) =
+            if let Some(ref modified_str) = flake.last_modified
+                && let Ok(modified) =
                     chrono::NaiveDateTime::parse_from_str(modified_str, "%Y-%m-%d %H:%M:%S UTC")
-                {
-                    let modified_utc = modified.and_utc();
-                    let age_days = (now - modified_utc).num_days();
-                    if age_days > worst_age_days {
-                        worst_age_days = age_days;
-                        worst_path = flake.path.clone();
-                    }
+            {
+                let modified_utc = modified.and_utc();
+                let age_days = (now - modified_utc).num_days();
+                if age_days > worst_age_days {
+                    worst_age_days = age_days;
+                    worst_path = flake.path.clone();
                 }
             }
         }

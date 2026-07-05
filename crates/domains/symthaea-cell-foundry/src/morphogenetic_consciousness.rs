@@ -27,7 +27,7 @@ use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-use crate::bioelectric::{BioelectricState, TargetMorphology};
+use crate::bioelectric::{BioelectricState, K_CHANNEL_DIFFERENTIATION_BUMP, TargetMorphology};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -389,6 +389,12 @@ impl MorphogeneticField {
                     }
                     // Neurons acquire a baseline firing rate.
                     cell.firing_rate = self.rng.gen_range(1.0..10.0);
+                    // Real Kv-channel upregulation on neural commitment --
+                    // only has an effect if the opt-in ion-channel model is
+                    // enabled (see `crate::bioelectric`/`crate::ion_channels`);
+                    // inert otherwise since nothing reads
+                    // `k_channel_conductance` when the model is off.
+                    self.bioelectric.k_channel_conductance[i] += K_CHANNEL_DIFFERENTIATION_BUMP;
                 }
             } else if a > 0.8 && neural_expr > 0.3 {
                 // Moderate → glial
@@ -400,6 +406,9 @@ impl MorphogeneticField {
                 } else {
                     OrganoidCellType::Glial(GlialSubtype::Microglia)
                 };
+                // Same Kv-channel upregulation as neural commitment above --
+                // glia also hyperpolarize as part of differentiation.
+                self.bioelectric.k_channel_conductance[i] += K_CHANNEL_DIFFERENTIATION_BUMP;
             } else if a < 0.3 {
                 cell.cell_type = OrganoidCellType::Undifferentiated;
             }

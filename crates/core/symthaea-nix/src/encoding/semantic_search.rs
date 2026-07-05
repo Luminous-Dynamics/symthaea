@@ -57,13 +57,13 @@ pub fn search_options(
     for (token, sim) in &token_results {
         // Find paths containing this token
         for path in known_paths {
-            if path.contains(token.as_str()) {
-                if let Some(existing) = matches.iter_mut().find(|m| m.path == *path) {
-                    // Boost the similarity if a token match reinforces it
-                    if *sim > 0.1 {
-                        existing.similarity = (existing.similarity + sim * 0.3).min(1.0);
-                        existing.match_reason = format!("HDC + token '{token}' match");
-                    }
+            if path.contains(token.as_str())
+                && let Some(existing) = matches.iter_mut().find(|m| m.path == *path)
+            {
+                // Boost the similarity if a token match reinforces it
+                if *sim > 0.1 {
+                    existing.similarity = (existing.similarity + sim * 0.3).min(1.0);
+                    existing.match_reason = format!("HDC + token '{token}' match");
                 }
             }
         }
