@@ -672,16 +672,15 @@ impl PhiArchitectureSearch {
         // Track global best
         let mut global_best: Option<Individual> = None;
         for island in &islands {
-            if let Some(best) = island.first() {
-                if global_best.is_none()
+            if let Some(best) = island.first()
+                && (global_best.is_none()
                     || best.fitness
                         > global_best
                             .as_ref()
                             .expect("global_best must be set after first island")
-                            .fitness
-                {
-                    global_best = Some(best.clone());
-                }
+                            .fitness)
+            {
+                global_best = Some(best.clone());
             }
         }
 
@@ -705,15 +704,14 @@ impl PhiArchitectureSearch {
 
             // Update global best
             for island in &islands {
-                if let Some(best) = island.first() {
-                    if best.fitness
+                if let Some(best) = island.first()
+                    && best.fitness
                         > global_best
                             .as_ref()
                             .expect("global_best must be set after first island")
                             .fitness
-                    {
-                        global_best = Some(best.clone());
-                    }
+                {
+                    global_best = Some(best.clone());
                 }
             }
 

@@ -478,7 +478,7 @@ impl ArchitectureGenome {
             *s ^= *s << 13;
             *s ^= *s >> 7;
             *s ^= *s << 17;
-            *s as usize % 2 == 0
+            (*s as usize).is_multiple_of(2)
         };
 
         Self {
