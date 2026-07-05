@@ -285,22 +285,21 @@ impl SovereignConversation {
                     self.migration.has_daw = true;
                 }
                 crate::app_database::AppCategory::Gaming
-                | crate::app_database::AppCategory::GamingTools => {
-                    if !self.state.known_use_cases.contains(&"gaming".to_string()) {
-                        self.state.known_use_cases.push("gaming".into());
-                    }
+                | crate::app_database::AppCategory::GamingTools
+                    if !self.state.known_use_cases.contains(&"gaming".to_string()) =>
+                {
+                    self.state.known_use_cases.push("gaming".into());
                 }
                 crate::app_database::AppCategory::IDE
                 | crate::app_database::AppCategory::Editor
                 | crate::app_database::AppCategory::Container
-                | crate::app_database::AppCategory::DevTools => {
+                | crate::app_database::AppCategory::DevTools
                     if !self
                         .state
                         .known_use_cases
-                        .contains(&"development".to_string())
-                    {
-                        self.state.known_use_cases.push("development".into());
-                    }
+                        .contains(&"development".to_string()) =>
+                {
+                    self.state.known_use_cases.push("development".into());
                 }
                 crate::app_database::AppCategory::Creative2D
                 | crate::app_database::AppCategory::Creative3D
