@@ -18220,6 +18220,7 @@ dependencies = [
  "tree-sitter-python",
  "tree-sitter-rust",
  "ureq 2.12.1",
+ "urlencoding",
  "uuid",
  "wasmtime",
 ]

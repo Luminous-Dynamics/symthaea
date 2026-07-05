@@ -730,26 +730,12 @@ pub struct LiquidMambaGenerator {
     /// NEW: Real-time wattage draw based on resolution and load.
     pub current_wattage: f32,
     /// NEW: Persistent background worker for asynchronous Hodge processing.
-    /// NEW: Physical Verifier for SimBridge-based validation.
-    pub physical_verifier: crate::simulation_bridge::PhysicalVerifier,
-    /// NEW: Formal Bridge for mathematical proof verification (Z3/Lean).
-    pub formal_bridge: crate::formal_bridge::FormalBridge,
-    /// NEW: Swarm Bridge for P2P memetic propagation via Iroh.
-    pub swarm_bridge: crate::swarm_bridge::SwarmBridge,
-    /// NEW: Codebase Bridge for self-authoring codebase improvements.
-    pub codebase_bridge: crate::codebase_bridge::CodebaseBridge,
     /// NEW: Liquid-HDC Bottleneck for CfC-LTC temporal dynamics.
     pub liquid_bottleneck: Option<symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork>,
-    /// NEW: Cognitive Ledger for auditing her self-evolution.
-    pub cognitive_ledger: crate::cognitive_ledger::CognitiveLedger,
     hodge_sender: std::sync::mpsc::SyncSender<Vec<ContinuousHV>>,
     /// NEW: Bridge to Geodesic for topological program synthesis.
     #[cfg(feature = "code-sheaf-eval")]
     pub geodesic_bridge: crate::geodesic_bridge::GeodesicBridge,
-    /// NEW: Bridge to Mycelix ZKP for proofs of coherence and intent.
-    pub sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge,
-    /// NEW: Substrate Rewriter for direct source code modification.
-    pub substrate_rewriter: crate::substrate_rewriter::SubstrateRewriter,
     /// NEW: Optional handle to the Global Workspace for conscious broadcast.
     pub workspace_handle: Option<Arc<Mutex<symthaea_core::hdc::global_workspace::GlobalWorkspace>>>,
     /// Per-generation cache for token embedding back-projections used by the semantic attractor.
@@ -922,11 +908,7 @@ impl LiquidMambaGenerator {
             epistemic_cube_gate,
             goal_hv: None,
             unsaid_tangent: None,
-            physical_verifier: crate::simulation_bridge::PhysicalVerifier::new(config.hdc_dim),
-            formal_bridge: crate::formal_bridge::FormalBridge::new(),
-            swarm_bridge: crate::swarm_bridge::SwarmBridge::new(),
             physical_constraint: None,
-            codebase_bridge: crate::codebase_bridge::CodebaseBridge::new("."),
             liquid_bottleneck: if config.enable_liquid_bottleneck {
                 Some(
                     symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork::from_genesis(
@@ -938,7 +920,6 @@ impl LiquidMambaGenerator {
                 None
             },
             recent_semantic_history: VecDeque::with_capacity(32),
-            cognitive_ledger: crate::cognitive_ledger::CognitiveLedger::new(".").unwrap(),
             topological_coherence,
             betti_history,
             spectral_entropy,
@@ -947,10 +928,6 @@ impl LiquidMambaGenerator {
             hodge_sender: tx,
             #[cfg(feature = "code-sheaf-eval")]
             geodesic_bridge: crate::geodesic_bridge::GeodesicBridge::new(genesis),
-            sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge::new(
-                genesis.timeline_id(),
-            ),
-            substrate_rewriter: crate::substrate_rewriter::SubstrateRewriter::new("."),
             workspace_handle: None, // Can be injected later
             semantic_attractor_cache: HashMap::new(),
             sampling_rng: sampling_seed.map(StdRng::seed_from_u64),
@@ -1064,42 +1041,6 @@ impl LiquidMambaGenerator {
         }
     }
 
-    /// Generate a cryptographic 'Proof of Reason' for a completed monologue.
-    pub fn prove_narrative_sovereignty(
-        &self,
-        sequence: &ThoughtChunkSequence,
-    ) -> Result<crate::sovereignty_bridge::CoherenceProof> {
-        let nucleus = self.recursive_fold(sequence);
-
-        // Extract the full trajectory of reasoning metrics
-        let coherence_history: Vec<f32> = sequence
-            .chunks
-            .iter()
-            .map(|c| c.confidence) // Per-chunk coherence snapshot
-            .collect();
-
-        let gap_history: Vec<f32> = sequence
-            .chunks
-            .iter()
-            .map(|c| c.spectral_entropy) // True time-series telemetry
-            .collect();
-
-        self.sovereignty_bridge
-            .prove_coherence(&coherence_history, &gap_history, &nucleus)
-    }
-
-    /// Synthesize a Leptos dashboard component representing her current cognitive state.
-    #[cfg(feature = "code-sheaf-eval")]
-    pub fn emit_leptos_dashboard(&self) -> Result<String> {
-        let nucleus = if let Some(last) = self.chunk_history.back() {
-            last.thought_hv.clone()
-        } else {
-            self.encoder.encode(&ThoughtChannels::with_intent(0))
-        };
-
-        self.geodesic_bridge.synthesize_leptos_dashboard(&nucleus)
-    }
-
     /// Perform 'Substrate Metamorphosis': use synthesized code to self-modify her own weights.
     /// This is a foundational step for Self-Authoring Intelligence.
     pub fn apply_substrate_metamorphosis(&mut self, code: &str) -> Result<()> {
@@ -1147,16 +1088,6 @@ impl LiquidMambaGenerator {
     /// Revert the system to a previous cognitive state.
     pub fn revert_weights(&mut self, snapshot: &[f32]) -> Result<()> {
         self.projection.revert_to_snapshot(snapshot)
-    }
-
-    /// Verify the physical safety of a synthesized tool logic using SimBridge.
-    pub fn verify_physical_safety(
-        &self,
-        name: &str,
-        intent_nucleus: &ContinuousHV,
-    ) -> Result<ContinuousHV> {
-        self.physical_verifier
-            .verify_tool_impact(name, intent_nucleus)
     }
 
     /// Recursively decompose a high-entropy intent into a hierarchical sheaf of sub-intents.

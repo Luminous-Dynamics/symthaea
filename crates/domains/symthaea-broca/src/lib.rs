@@ -31,6 +31,8 @@ pub mod evolutionary_scaffolder;
 pub mod formal_logic_scorer;
 pub mod gating;
 pub mod generator;
+#[cfg(feature = "code-sheaf-eval")]
+pub mod geodesic_bridge;
 #[cfg(feature = "gpu")]
 pub mod gpu_cfc;
 pub mod highway_projection;

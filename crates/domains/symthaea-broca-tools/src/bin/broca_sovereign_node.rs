@@ -10,6 +10,7 @@ use anyhow::Result;
 use std::sync::Arc;
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
+use symthaea_broca_tools::liquid_mamba_architect::LiquidMambaArchitect;
 use symthaea_core::genesis::GenesisSeed;
 use tokio::sync::Mutex;
 
@@ -21,8 +22,12 @@ async fn main() -> Result<()> {
     let mut config = LiquidMambaConfig::default();
     config.enable_gating = true;
     config.enable_veto = true;
+    let hdc_dim = config.hdc_dim;
 
-    let generator = Arc::new(Mutex::new(LiquidMambaGenerator::new(&genesis, config)?));
+    let inner = LiquidMambaGenerator::new(&genesis, config)?;
+    let generator = Arc::new(Mutex::new(LiquidMambaArchitect::new(
+        inner, hdc_dim, &genesis,
+    )));
 
     println!("🌌 Symthaea Sovereign Node Online.");
     println!("================================");
@@ -44,7 +49,7 @@ async fn main() -> Result<()> {
         loop {
             let mut r#gen = gen_dream.lock().await;
             let channels = ThoughtChannels::with_intent(rand::random::<usize>() % 1000);
-            let _ = r#gen.generate_semantic_monologue(&channels, 3);
+            let _ = r#gen.generator.generate_semantic_monologue(&channels, 3);
             drop(r#gen);
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
@@ -58,7 +63,7 @@ async fn main() -> Result<()> {
             let mut r#gen = gen_meta.lock().await;
 
             // 1. Scan for "Architectural Debt"
-            let report = r#gen.profile_performance().unwrap_or(
+            let report = r#gen.generator.profile_performance().unwrap_or(
                 symthaea_broca::liquid_mamba::PerformanceReport {
                     ops_per_ms: 300.0,
                     latency_ms: 0.1,
@@ -72,7 +77,7 @@ async fn main() -> Result<()> {
                 );
             } else {
                 // 2. Real-World Hardware Safety Pass
-                let _ = r#gen.update_hardware_thermodynamics();
+                let _ = r#gen.generator.update_hardware_thermodynamics();
 
                 // 3. Scan for "Logical Debt"
                 let diagnostics = r#gen
@@ -146,6 +151,7 @@ async fn main() -> Result<()> {
                             let r#gen = gen_clone.lock().await;
                             let val = f32::from_bits(
                                 r#gen
+                                    .generator
                                     .topological_coherence
                                     .load(std::sync::atomic::Ordering::Relaxed),
                             );
@@ -155,6 +161,7 @@ async fn main() -> Result<()> {
                             let r#gen = gen_clone.lock().await;
                             let val = f32::from_bits(
                                 r#gen
+                                    .generator
                                     .spectral_entropy
                                     .load(std::sync::atomic::Ordering::Relaxed),
                             );

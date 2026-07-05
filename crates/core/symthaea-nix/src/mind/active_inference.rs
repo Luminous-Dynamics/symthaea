@@ -121,6 +121,72 @@ impl NixActiveInference {
         }
     }
 
+    /// Process user input synchronously, applying a Hebbian causal bias for suspected option dependencies.
+    pub fn process_input_with_causal_bias(
+        &mut self,
+        input: &str,
+        causal_options: &[String],
+    ) -> ActionPlan {
+        let goal = self.goal_inference.infer(input, &mut self.codebook);
+        let current_fe = self.world_model.compute_free_energy(&goal.goal_state);
+
+        if goal.needs_clarification {
+            return ActionPlan {
+                actions: Vec::new(),
+                current_free_energy: current_fe,
+                goal,
+                needs_clarification: true,
+            };
+        }
+
+        let candidates = self.score_candidates_with_causal_bias(&goal.goal_state, causal_options);
+
+        ActionPlan {
+            actions: candidates,
+            current_free_energy: current_fe,
+            needs_clarification: false,
+            goal,
+        }
+    }
+
+    /// Score all candidate action categories against the goal, applying a Hebbian causal bias.
+    fn score_candidates_with_causal_bias(
+        &self,
+        goal_state: &ContinuousHV,
+        causal_options: &[String],
+    ) -> Vec<ScoredAction> {
+        let candidates = Self::all_standard_actions();
+
+        let mut scored: Vec<ScoredAction> = candidates
+            .into_iter()
+            .map(|action| {
+                let mut scored_act = self.score_action(&action, goal_state);
+                if !causal_options.is_empty() {
+                    if matches!(
+                        action,
+                        ActionCategory::Rebuild
+                            | ActionCategory::Rollback
+                            | ActionCategory::Configure
+                    ) {
+                        scored_act.expected_free_energy -=
+                            0.5 * (causal_options.len() as f64).min(3.0);
+                        let old_rationale = scored_act.rationale.clone();
+                        scored_act.rationale = format!("{} [Causal Bias Applied]", old_rationale);
+                    }
+                }
+                scored_act
+            })
+            .collect();
+
+        scored.sort_by(|a, b| {
+            a.expected_free_energy
+                .partial_cmp(&b.expected_free_energy)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        scored
+    }
+
     /// Process a pre-encoded goal vector directly.
     pub fn process_goal(&mut self, goal_state: &ContinuousHV) -> ActionPlan {
         let current_fe = self.world_model.compute_free_energy(goal_state);

@@ -615,7 +615,27 @@ impl CodeOrchestrator {
         if jsonl.is_empty() {
             return Ok(());
         }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(path, jsonl)
+    }
+
+    /// Default persistence path for the distillation buffer — mirrors
+    /// `FixRuleGenerator::default_rules_path()`'s convention (checks
+    /// `SYMTHAEA_DATA_DIR`, falls back to `~/.local/share/symthaea/`, falls
+    /// back to a relative path). A stable, user-level (not working-dir-scoped)
+    /// path so the buffer survives across process runs and across different
+    /// working directories, since it's a general "verified code shapes"
+    /// memory, not project-specific state.
+    pub fn default_distillation_path() -> std::path::PathBuf {
+        if let Ok(data_dir) = std::env::var("SYMTHAEA_DATA_DIR") {
+            std::path::PathBuf::from(data_dir).join("distillation.jsonl")
+        } else if let Ok(home) = std::env::var("HOME") {
+            std::path::PathBuf::from(home).join(".local/share/symthaea/distillation.jsonl")
+        } else {
+            std::path::PathBuf::from("distillation.jsonl")
+        }
     }
 
     /// Import verified code-shape memory from distillation JSONL.

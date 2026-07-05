@@ -21,6 +21,7 @@ pub mod go_walker;
 pub mod iac_harvester;
 pub mod iac_repair;
 pub mod invariant_guard;
+pub mod liquid_mamba_architect;
 pub mod memory_kernel;
 pub mod memory_ring;
 pub mod mission_tree;
@@ -39,4 +40,6 @@ pub use generic_structural_scorer_integration::{
     GenericStructuralScorer, StructuralVerdict as GenericStructuralVerdict,
 };
 pub use go_walker::GoWalker;
+#[cfg(feature = "mamba-cpu")]
+pub use liquid_mamba_architect::LiquidMambaArchitect;
 pub use python_walker::PythonWalker;

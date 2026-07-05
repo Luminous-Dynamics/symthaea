@@ -15,6 +15,7 @@ use std::time::Duration;
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
 use symthaea_broca_tools::foraging_bridge::ForagingBridge;
+use symthaea_broca_tools::liquid_mamba_architect::LiquidMambaArchitect;
 use symthaea_core::genesis::GenesisSeed;
 
 /// Tracks her "Epistemic Curiosity" — sectors with low coherence.
@@ -73,8 +74,10 @@ async fn main() -> Result<()> {
     let mut config = LiquidMambaConfig::default();
     config.enable_gating = true;
     config.enable_veto = true;
+    let hdc_dim = config.hdc_dim;
 
-    let mut generator = LiquidMambaGenerator::new(&genesis, config)?;
+    let generator = LiquidMambaGenerator::new(&genesis, config)?;
+    let mut architect = LiquidMambaArchitect::new(generator, hdc_dim, &genesis);
     let mut curiosity = CuriosityLedger::new(1000);
     let foraging = ForagingBridge::new("http://localhost:8080");
 
@@ -86,7 +89,7 @@ async fn main() -> Result<()> {
 
     loop {
         // Snapshot current state before dreaming
-        let pre_dream_weights = generator.commit_weights();
+        let pre_dream_weights = architect.generator.commit_weights();
 
         // 1. Select a sector based on curiosity (Topological Heat)
         let intent_id = curiosity.sample_sector();
@@ -102,7 +105,7 @@ async fn main() -> Result<()> {
         // Before foraging SearXNG, query the collective for existing kernels.
         let mut peer_kernel = None;
         if current_heat > 0.9 {
-            if let Ok(Some(kernel)) = generator
+            if let Ok(Some(kernel)) = architect
                 .swarm_bridge
                 .request_semantic_kernel(intent_id)
                 .await
@@ -122,18 +125,22 @@ async fn main() -> Result<()> {
         }
 
         // 2. Generate a semantic monologue
-        let monologue = generator.generate_semantic_monologue(&channels, 5)?;
+        let monologue = architect
+            .generator
+            .generate_semantic_monologue(&channels, 5)?;
 
         // (If we had a peer kernel, we'd blend it here)
 
         // 3. Evaluate her own dream
         let coherence = f32::from_bits(
-            generator
+            architect
+                .generator
                 .topological_coherence
                 .load(std::sync::atomic::Ordering::Relaxed),
         );
         let spectral_entropy = f32::from_bits(
-            generator
+            architect
+                .generator
                 .spectral_entropy
                 .load(std::sync::atomic::Ordering::Relaxed),
         );
@@ -163,17 +170,20 @@ async fn main() -> Result<()> {
             println!("   ✅ Dream Aligned. Refining projection...");
 
             for chunk in &monologue.chunks {
-                generator.distill_step(&chunk.thought_hv, &chunk.token_ids, weight)?;
+                architect
+                    .generator
+                    .distill_step(&chunk.thought_hv, &chunk.token_ids, weight)?;
             }
 
             // 🌀 High-Heat Metamorphosis Check
             if curiosity.heat_map[&intent_id] > 0.9 {
                 println!("   🌀 Initiating Substrate Metamorphosis...");
-                let final_nucleus = generator.recursive_fold(&monologue);
-                if let Ok(code) =
-                    generator.synthesize_program(&final_nucleus, "architectural_evolution")
+                let final_nucleus = architect.generator.recursive_fold(&monologue);
+                if let Ok(code) = architect
+                    .generator
+                    .synthesize_program(&final_nucleus, "architectural_evolution")
                 {
-                    if let Err(e) = generator.apply_substrate_metamorphosis(&code) {
+                    if let Err(e) = architect.generator.apply_substrate_metamorphosis(&code) {
                         println!("   ❌ Metamorphosis REJECTED: {}", e);
                     } else {
                         println!("   └─ Metamorphosis SUCCESS.");
@@ -183,32 +193,33 @@ async fn main() -> Result<()> {
 
             // --- IMPROVEMENT: Self-Auditing Reversion Logic ---
             let post_dream_coherence = f32::from_bits(
-                generator
+                architect
+                    .generator
                     .topological_coherence
                     .load(std::sync::atomic::Ordering::Relaxed),
             );
             if post_dream_coherence < (coherence * 0.8) {
                 println!("   🚨 Cognitive Decay Detected! Reverting to pre-dream state...");
-                generator.revert_weights(&pre_dream_weights)?;
+                architect.generator.revert_weights(&pre_dream_weights)?;
             } else {
                 // Growth was stable: Commit to history
                 if commit_history.len() > 10 {
                     commit_history.remove(0);
                 }
                 let commit = CognitiveCommit {
-                    weights: generator.commit_weights(),
+                    weights: architect.generator.commit_weights(),
                     score: post_dream_coherence,
                     entropy: spectral_entropy,
                 };
                 commit_history.push(commit);
 
                 // --- IMPROVEMENT: Memetic Swarm Propagation ---
-                let final_nucleus = generator.recursive_fold(&monologue);
+                let final_nucleus = architect.generator.recursive_fold(&monologue);
                 let label = format!("breakthrough_{}", intent_id);
 
                 // Generate a proof for the successful breakthrough
-                if let Ok(proof) = generator.prove_narrative_sovereignty(&monologue) {
-                    let swarm_clone = generator.swarm_bridge.clone();
+                if let Ok(proof) = architect.prove_narrative_sovereignty(&monologue) {
+                    let swarm_clone = architect.swarm_bridge.clone();
                     let kernel = final_nucleus.as_slice().to_vec();
                     tokio::spawn(async move {
                         let _ = swarm_clone
@@ -222,7 +233,7 @@ async fn main() -> Result<()> {
         }
 
         // 5. Periodic Checkpoint
-        let cycle_count = generator.generation_count();
+        let cycle_count = architect.generator.generation_count();
         if cycle_count > 0 && cycle_count % 50 == 0 {
             println!("💾 Cycle {}: Saving evolved checkpoint...", cycle_count);
         }

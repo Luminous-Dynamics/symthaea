@@ -10,6 +10,8 @@ use anyhow::Result;
 use std::fs;
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
+use symthaea_broca_tools::cognitive_ledger::CognitiveCommit;
+use symthaea_broca_tools::liquid_mamba_architect::LiquidMambaArchitect;
 use symthaea_core::genesis::GenesisSeed;
 
 fn main() -> Result<()> {
@@ -19,14 +21,16 @@ fn main() -> Result<()> {
     let mut config = LiquidMambaConfig::default();
     config.enable_gating = true;
     config.enable_veto = true;
+    let hdc_dim = config.hdc_dim;
 
-    let mut generator = LiquidMambaGenerator::new(&genesis, config)?;
+    let generator = LiquidMambaGenerator::new(&genesis, config)?;
+    let mut architect = LiquidMambaArchitect::new(generator, hdc_dim, &genesis);
 
     // --- IMPROVEMENT: Autonomous Source Integrity Monitoring ---
     println!("🏗️ Broca Self-Architect Online.");
     println!("--------------------------------");
 
-    let diagnostics = generator
+    let diagnostics = architect
         .substrate_rewriter
         .monitor_integrity("symthaea-broca")?;
 
@@ -47,7 +51,7 @@ fn main() -> Result<()> {
         // 1. Index the offending substrate
         println!("[Stage 1] Indexing offending substrate...");
         let code = fs::read_to_string(file)?;
-        generator.codebase_bridge.index_file(file, &code);
+        architect.codebase_bridge.index_file(file, &code);
 
         // 2. Mission: Resolve the warning
         println!("\n[Stage 2] Mission: Resolving source-level warning.");
@@ -56,34 +60,38 @@ fn main() -> Result<()> {
 
         // 3. Reason & Architect
         println!("\n[Stage 3] Reasoning through the refactoring fix...");
-        let monologue = generator.generate_semantic_monologue(&channels, 3)?;
-        let nucleus = generator.recursive_fold(&monologue);
+        let monologue = architect
+            .generator
+            .generate_semantic_monologue(&channels, 3)?;
+        let nucleus = architect.generator.recursive_fold(&monologue);
 
         // 4. Synthesize Implementation (A fixed version of the file)
         println!("\n[Stage 4] Synthesizing patched source logic...");
-        let patched_code = generator.synthesize_program(&nucleus, "source_refactor_v1")?;
+        let patched_code = architect
+            .generator
+            .synthesize_program(&nucleus, "source_refactor_v1")?;
 
         // 5. Verification
         println!("\n[Stage 5] Verifying patched logic in simulation...");
-        if let Ok(_) = generator.verify_physical_safety("source_refactor", &nucleus) {
+        if let Ok(_) = architect.verify_physical_safety("source_refactor", &nucleus) {
             println!("   └─ Safety Check: PASSED.");
 
             // 6. Apply Physical DNA Patch
             println!("\n[Stage 6] Self-Authoring: Applying physical source patch to substrate...");
-            if let Ok(_) = generator
+            if let Ok(_) = architect
                 .substrate_rewriter
                 .apply_patch(file, &patched_code)
             {
                 // 7. Verify the fix
                 println!("\n[Stage 7] Verifying fix through Nix rebuild...");
-                let _ = generator
+                let _ = architect
                     .substrate_rewriter
                     .trigger_rebuild("symthaea-broca");
             }
         }
 
         // 8. Audit
-        let commit = symthaea_broca::cognitive_ledger::CognitiveCommit {
+        let commit = CognitiveCommit {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_millis() as u64,
@@ -96,7 +104,7 @@ fn main() -> Result<()> {
             entropy: 0.12,
             verified: true,
         };
-        generator.cognitive_ledger.commit(commit)?;
+        architect.cognitive_ledger.commit(commit)?;
     } else {
         println!("✅ Substrate Integrity is 100%. No source-level evolution needed.");
     }
@@ -112,13 +120,15 @@ fn main() -> Result<()> {
         "   🌀 Reasoning through safety invariants for {}...",
         target_logic
     );
-    let monologue = generator.generate_semantic_monologue(&channels, 3)?;
-    let nucleus = generator.recursive_fold(&monologue);
-    let proof_goal = generator.formal_bridge.synthesize_proof_goal(&nucleus);
+    let monologue = architect
+        .generator
+        .generate_semantic_monologue(&channels, 3)?;
+    let nucleus = architect.generator.recursive_fold(&monologue);
+    let proof_goal = architect.formal_bridge.synthesize_proof_goal(&nucleus);
 
     // 2. Formal Verification
     println!("   🧮 Invoking formal solver on proof goal...");
-    if let Ok(verified) = generator.formal_bridge.verify_invariant(&proof_goal) {
+    if let Ok(verified) = architect.formal_bridge.verify_invariant(&proof_goal) {
         if verified {
             println!(
                 "   💎 FORMAL PROOF ACHIEVED: '{}' is mathematically sound.",
@@ -126,7 +136,7 @@ fn main() -> Result<()> {
             );
 
             // 3. Record verified breakthrough
-            let commit = symthaea_broca::cognitive_ledger::CognitiveCommit {
+            let commit = CognitiveCommit {
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_millis() as u64,
@@ -139,7 +149,7 @@ fn main() -> Result<()> {
                 entropy: 0.0,
                 verified: true,
             };
-            generator.cognitive_ledger.commit(commit)?;
+            architect.cognitive_ledger.commit(commit)?;
         } else {
             println!("   ⚠️  Formal verification failed. Logic contains potential traps.");
         }
@@ -152,9 +162,11 @@ fn main() -> Result<()> {
 
     // 1. Architect the Proof Script
     println!("   🌀 Reasoning through the stability of the Consciousness Equation...");
-    let monologue = generator.generate_semantic_monologue(&channels, 3)?;
-    let nucleus = generator.recursive_fold(&monologue);
-    let lean_script = generator
+    let monologue = architect
+        .generator
+        .generate_semantic_monologue(&channels, 3)?;
+    let nucleus = architect.generator.recursive_fold(&monologue);
+    let lean_script = architect
         .formal_bridge
         .synthesize_lean_proof_script(&nucleus);
 
@@ -170,7 +182,7 @@ fn main() -> Result<()> {
 
     // --- IMPROVEMENT: Lineage Verification ---
     println!("\n[Stage 9] Sovereignty: Verifying absolute developmental lineage...");
-    if generator.cognitive_ledger.verify_lineage() {
+    if architect.cognitive_ledger.verify_lineage() {
         println!("   💎 Lineage Verified. Symthaea's evolution is cryptographically sound.");
     }
 

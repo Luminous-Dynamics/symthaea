@@ -31,6 +31,7 @@ tree-sitter-rust = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
 ureq = { version = "2.9" }
+urlencoding = "2.1"
 bincode = { workspace = true }
 md5 = "0.7"
 wasmtime = { version = "44.0.1", optional = true }
@@ -50,7 +51,7 @@ required-features = ["mamba-cpu", "code-sheaf-eval", "networking"]
 [[bin]]
 name = "broca-dreamer"
 path = "src/bin/broca_dreamer.rs"
-required-features = ["mamba-cpu"]
+required-features = ["mamba-cpu", "code-sheaf-eval"]
 
 [[bin]]
 name = "fused_cognitive_node"
@@ -62,5 +63,5 @@ default = []
 # symthaea_broca::liquid_mamba, which only exists when that feature is on.
 mamba-cpu = ["symthaea-broca/mamba-cpu"]
 networking = ["symthaea-broca/networking"]
-code-sheaf-eval = ["dep:symthaea-geodesic"]
+code-sheaf-eval = ["dep:symthaea-geodesic", "symthaea-broca/code-sheaf-eval"]
 wasm-sandbox = ["dep:wasmtime"]

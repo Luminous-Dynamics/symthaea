@@ -557,7 +557,15 @@ impl CodingAgent {
             gcs_violations: Vec::new(),
             #[cfg(feature = "code_generation")]
             orchestrator: if use_orchestrator {
-                Some(CodeOrchestrator::new())
+                let orch = CodeOrchestrator::new();
+                // Seed from any prior accumulated distillation memory — without
+                // this, the "self-improving flywheel" only ever improved within
+                // a single process run and forgot everything afterward, since
+                // every CodingAgent previously started with a fresh, empty
+                // CodeOrchestrator. Missing file on first-ever run is expected
+                // and silently ignored.
+                let _ = orch.load_distillation(&CodeOrchestrator::default_distillation_path());
+                Some(orch)
             } else {
                 None
             },
@@ -706,6 +714,23 @@ impl CodingAgent {
 
         // Flush any pending experience writes (fix strategies, templates) to disk
         self.flush_experience_store();
+
+        // Persist any newly-captured distillation memory (verified code shapes
+        // from this run) so it survives past this process — the other half of
+        // the load at construction time above. Best-effort: a write failure
+        // here shouldn't fail the whole task.
+        #[cfg(feature = "code_generation")]
+        if let Some(ref orchestrator) = self.orchestrator {
+            if let Err(e) =
+                orchestrator.save_distillation(&CodeOrchestrator::default_distillation_path())
+            {
+                tracing::warn!(
+                    target: "symthaea::coding_agent",
+                    error = %e,
+                    "Failed to persist distillation buffer"
+                );
+            }
+        }
 
         let result = self.build_result();
         self.emit_event(AgentEvent::Done(result.clone()));

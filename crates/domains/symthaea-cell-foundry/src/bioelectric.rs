@@ -919,6 +919,17 @@ impl TargetMorphology {
     /// downstream cell-type composition (see [`VMEM_PATTERN_WEIGHT`]).
     /// 0.0 = exact match.
     pub fn discrepancy(&self, field: &MorphogeneticField) -> f64 {
+        let (vmem_rms_normalized, composition_rms) = self.discrepancy_components(field);
+        VMEM_PATTERN_WEIGHT * vmem_rms_normalized + (1.0 - VMEM_PATTERN_WEIGHT) * composition_rms
+    }
+
+    /// The two components [`Self::discrepancy`] blends together, exposed
+    /// separately: `(vmem_rms_normalized, composition_rms)`. Useful for
+    /// diagnosing *why* a discrepancy trajectory behaves a given way (e.g.
+    /// whether a plateau is driven by Vmem-pattern drift, cell-type-
+    /// composition drift, or both) without needing to reverse-engineer the
+    /// blend from the single scalar `discrepancy()` returns.
+    pub fn discrepancy_components(&self, field: &MorphogeneticField) -> (f64, f64) {
         let current = Self::capture(field);
 
         let vmem_span = (VMEM_DEPOLARIZED - VMEM_HYPERPOLARIZED).abs() as f64;
@@ -949,7 +960,7 @@ impl TargetMorphology {
             (sum_sq / count as f64).sqrt()
         };
 
-        VMEM_PATTERN_WEIGHT * vmem_rms_normalized + (1.0 - VMEM_PATTERN_WEIGHT) * composition_rms
+        (vmem_rms_normalized, composition_rms)
     }
 
     /// The target Vmem for whatever spatial bin `position` falls into —

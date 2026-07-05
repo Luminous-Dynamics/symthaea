@@ -39,24 +39,22 @@ fn test_goal_setting() {
 fn test_consciousness_update() {
     let mut mind = ContinuousMind::default();
 
-    // Perceive a *correlated* sequence (perturbed variants of one base
-    // vector), not independent draws. Once ConsciousnessCore's window
-    // reaches min_samples (5), update_consciousness() switches from the
-    // nonzero pairwise-dissimilarity fallback to the real spectral-MIP Phi
-    // measurement (ConsciousnessCore/SpectralMIPFinder), which estimates
-    // genuine statistical integration -- not raw difference. Feeding it
-    // fully independent random vectors (the previous version of this test)
-    // has no cross-sample correlation for that measure to detect, so Phi
-    // legitimately settles near 0.0; that's correct behavior for the
-    // algorithm, not a bug. A perturbed sequence shares structure across
-    // samples the way a real train of thought would, giving the covariance
-    // matrix something genuine to integrate.
+    // Interleave perceive+tick, one new perception per tick -- NOT two
+    // separate loops. process_inputs() drains the *entire* input_queue with
+    // `while let Some(input) = self.input_queue.pop()` in a single tick, and
+    // current_thought only updates while there's something in the queue to
+    // process. Queuing all perceptions up front (the previous two versions
+    // of this test) means tick 1 drains everything and computes
+    // current_thought once; every later tick finds an empty queue, so
+    // current_thought never changes again and ConsciousnessCore's spectral
+    // window fills with repeated copies of one frozen vector -- a
+    // zero-variance, degenerate covariance matrix that correctly integrates
+    // to ~0.0 Phi. That's the real bug neither prior fix (more ticks, then
+    // correlated content) touched. Interleaving gives the window a genuinely
+    // evolving (but still correlated, via perturb) sequence to integrate.
     let base = ContinuousHV::random(512, 42);
     for _ in 0..15 {
         mind.perceive(base.perturb(0.2));
-    }
-
-    for _ in 0..15 {
         mind.tick();
     }
 

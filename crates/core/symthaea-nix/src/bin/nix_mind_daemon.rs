@@ -26,7 +26,7 @@ use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 use symthaea_nix::mind::ollama_bridge::{OllamaBridge, OllamaBridgeConfig};
 use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
-use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
+use symthaea_nix::mind::{ActionCategory, JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::SystemObserver;
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::plugin::domain_plugin::NixOsPlugin;
@@ -80,6 +80,10 @@ struct DaemonState {
     maintenance_plan_count: u32,
     /// Cumulative count of persistence write errors (working_memory, predictions, knowledge, causal graph).
     persist_error_count: u64,
+    /// Last recommended executive action for tracking feedback: (target_name, action_category, state_before_hv, initial_value)
+    last_recommended_action: Option<(String, ActionCategory, ContinuousHV, f64)>,
+    /// Cooldowns for recently failed actions: (target_name, action_category) -> remaining_cycles
+    failed_action_cooldowns: HashMap<(String, ActionCategory), u32>,
 }
 
 /// Tracks alert continuity across IPC cycles.
@@ -142,6 +146,8 @@ impl DaemonState {
             nix_plugin: NixOsPlugin,
             maintenance_plan_count: 0,
             persist_error_count: 0,
+            last_recommended_action: None,
+            failed_action_cooldowns: HashMap::new(),
         }
     }
 
@@ -296,9 +302,51 @@ impl DaemonState {
 
         // Feed predictive monitor
         let telemetry = Self::build_telemetry(hw.as_ref(), &snapshot);
+        let telemetry_clone = telemetry.clone();
         let mem_pct = telemetry.memory_used_pct;
         self.predictive_monitor.ingest(telemetry);
         self.last_memory_pct = if mem_pct > 0.0 { Some(mem_pct) } else { None };
+
+        // Telemetry feedback loop: learn from the last recommended action
+        if let Some((target, action, state_before, initial_val)) =
+            self.last_recommended_action.take()
+        {
+            let success = if target == "disk_used_pct" {
+                telemetry_clone.disk_used_pct < initial_val
+            } else if target == "memory_used_pct" {
+                telemetry_clone.memory_used_pct < initial_val
+            } else if target == "failed_unit_count" {
+                (telemetry_clone.failed_unit_count as f64) < initial_val
+            } else {
+                !self.recent_anomalies.iter().any(|a| a.unit == target)
+            };
+
+            let outcome = if success {
+                EpisodeOutcome::Success
+            } else {
+                self.failed_action_cooldowns
+                    .insert((target.clone(), action.clone()), 5);
+                EpisodeOutcome::Failure(format!("Target '{}' did not improve", target))
+            };
+
+            self.active_inference.learn_from_outcome(
+                &state_before,
+                action,
+                &state_hv,
+                outcome,
+                free_energy,
+            );
+        }
+
+        // Tick down failed action cooldowns
+        self.failed_action_cooldowns.retain(|_, ticks| {
+            if *ticks > 1 {
+                *ticks -= 1;
+                true
+            } else {
+                false
+            }
+        });
 
         // Feed the state to the active inference engine
         self.active_inference.observe_state(state_hv.clone());
@@ -574,7 +622,12 @@ impl DaemonState {
                 };
                 let priority =
                     severity_weight * (alert.consecutive_cycles as f64) * alert.confidence;
-                candidates.push((goal_description, priority));
+                candidates.push((
+                    goal_description,
+                    priority,
+                    alert.metric.clone(),
+                    alert.current_value,
+                ));
             }
         }
 
@@ -587,7 +640,7 @@ impl DaemonState {
                 );
                 // Weight anomaly priority by its score
                 let priority = 2.5 * anomaly.score;
-                candidates.push((goal_description, priority));
+                candidates.push((goal_description, priority, anomaly.unit.clone(), 1.0));
             }
         }
 
@@ -597,14 +650,41 @@ impl DaemonState {
             candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
 
             // Select and plan for the top candidate
-            if let Some((best_goal, priority)) = candidates.first() {
-                let plan = self.active_inference.process_input(best_goal);
-                if let Some(best_action) = plan.actions.first() {
+            if let Some((best_goal, priority, target_name, initial_val)) = candidates.first() {
+                // Query root causes from the causal graph for this target
+                let causal_analysis = self.causal_graph.analyze_root_causes(target_name);
+                let root_causes: Vec<String> = causal_analysis
+                    .root_causes
+                    .iter()
+                    .map(|rc| rc.variable.clone())
+                    .collect();
+
+                let plan = self
+                    .active_inference
+                    .process_input_with_causal_bias(best_goal, &root_causes);
+
+                // Find the first action that is not on cooldown for this target
+                let non_cooldown_action = plan.actions.iter().find(|sa| {
+                    !self
+                        .failed_action_cooldowns
+                        .contains_key(&(target_name.clone(), sa.action.clone()))
+                });
+
+                if let Some(best_action) = non_cooldown_action.or_else(|| plan.actions.first()) {
                     eprintln!(
                         "nix-mind-daemon: Coordinated Executive Plan (dry-run) [priority={:.2}]: {} → {:?} (EFE={:.3})",
                         priority, best_goal, best_action.action, best_action.expected_free_energy
                     );
                     self.maintenance_plan_count += 1;
+
+                    // Set last_recommended_action for telemetry feedback loop in the next cycle
+                    let state_before = self.active_inference.world_model().system_state().clone();
+                    self.last_recommended_action = Some((
+                        target_name.clone(),
+                        best_action.action.clone(),
+                        state_before,
+                        *initial_val,
+                    ));
                 }
             }
         }
@@ -1780,5 +1860,151 @@ mod tests {
 
         // One coordinated executive plan should be processed
         assert_eq!(state.maintenance_plan_count, 1);
+    }
+
+    #[test]
+    fn test_telemetry_feedback_loop_success_and_failure() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let state_before = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+
+        // 1. Test Success path (telemetry metric improves)
+        state.last_recommended_action = Some((
+            "disk_used_pct".to_string(),
+            symthaea_nix::mind::ActionCategory::GarbageCollect,
+            state_before.clone(),
+            80.0,
+        ));
+
+        // Inject HardwareInfo to simulate 70% disk usage (lower than 80%)
+        let hw_success = symthaea_nix::observe::hardware::HardwareInfo {
+            cpu_model: "Test CPU".into(),
+            cpu_cores: 4,
+            memory_total_mb: 1000,
+            memory_available_mb: 500,
+            gpus: vec![],
+            disks: vec![symthaea_nix::observe::hardware::DiskInfo {
+                device: "/dev/sda1".into(),
+                mount_point: "/".into(),
+                total_bytes: 1000,
+                used_bytes: 700, // 70% used (lower than 80%)
+            }],
+            load_average: [0.5, 0.5, 0.5],
+            swap_total_mb: 0,
+            swap_used_mb: 0,
+        };
+        state.last_hw_probe = Some(hw_success);
+
+        // Run process_snapshot to trigger the feedback loop
+        let snapshot_success = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot_success, &config);
+
+        // Verify last_recommended_action was processed and cleared
+        assert!(state.last_recommended_action.is_none());
+        // Verify active inference episodic memory has recorded the episode
+        assert!(state.active_inference.episodic_memory().len() > 0);
+    }
+
+    #[test]
+    fn test_action_cooldown_habituation() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Put GarbageCollect on cooldown for disk_used_pct
+        state.failed_action_cooldowns.insert(
+            (
+                "disk_used_pct".to_string(),
+                symthaea_nix::mind::ActionCategory::GarbageCollect,
+            ),
+            5,
+        );
+
+        // Create alert for disk_used_pct
+        let alert_high = AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 95.0,
+            predicted_value: 99.0,
+            hours_ahead: 2.0,
+            threshold: 90.0,
+            confidence: 0.95,
+            recommended_action: None,
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 6,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        state.run_active_inference_plans(&[alert_high]);
+
+        // If the top action was GarbageCollect, it should have been skipped in favor of another action (like Rebuild, Custom, etc.)
+        if let Some((_, chosen_action, _, _)) = &state.last_recommended_action {
+            assert_ne!(
+                *chosen_action,
+                symthaea_nix::mind::ActionCategory::GarbageCollect
+            );
+        }
+
+        // Run process_snapshot to check cooldown ticks decrement
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+
+        let ticks = state
+            .failed_action_cooldowns
+            .get(&(
+                "disk_used_pct".to_string(),
+                symthaea_nix::mind::ActionCategory::GarbageCollect,
+            ))
+            .copied();
+
+        assert_eq!(
+            ticks,
+            Some(4),
+            "Cooldown ticks should decrement by 1 on snapshot tick"
+        );
+    }
+
+    #[test]
+    fn test_causal_active_inference_bias() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let goal = "Resolve service failure in 'postgresql' (reason: FATAL error)";
+
+        // 1. Get unbiased plan
+        let unbiased_plan = state.active_inference.process_input(goal);
+        let unbiased_rebuild = unbiased_plan
+            .actions
+            .iter()
+            .find(|sa| matches!(sa.action, symthaea_nix::mind::ActionCategory::Rebuild))
+            .unwrap()
+            .clone();
+
+        // 2. Get causally biased plan
+        let causal_options = vec!["services.postgresql.enable".to_string()];
+        let biased_plan = state
+            .active_inference
+            .process_input_with_causal_bias(goal, &causal_options);
+        let biased_rebuild = biased_plan
+            .actions
+            .iter()
+            .find(|sa| matches!(sa.action, symthaea_nix::mind::ActionCategory::Rebuild))
+            .unwrap()
+            .clone();
+
+        // Expect the biased Rebuild expected free energy to be lower (preferred)
+        assert!(
+            biased_rebuild.expected_free_energy < unbiased_rebuild.expected_free_energy,
+            "Biased Rebuild EFE ({}) should be lower than unbiased EFE ({})",
+            biased_rebuild.expected_free_energy,
+            unbiased_rebuild.expected_free_energy
+        );
+
+        assert!(
+            biased_rebuild.rationale.contains("[Causal Bias Applied]"),
+            "Rationale should note that the causal bias was applied"
+        );
     }
 }

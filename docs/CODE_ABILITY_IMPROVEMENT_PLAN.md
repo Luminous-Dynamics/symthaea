@@ -1560,6 +1560,43 @@ value. But:
 the 3 tried here needed real assertions written from scratch) until a clean
 sample size gives a trustworthy pass-rate delta between orchestrator on/off.
 
+### Same day, follow-up: the "384 errors" turned out to be a 2-line fix
+
+Before accepting "384 errors, substantial standalone effort" above, clustered
+the actual error messages instead of just counting them:
+```
+grep "^error" | sed -E 's/^error(\[E[0-9]+\])?: //' | sort | uniq -c | sort -rn
+```
+All 384 were variants of exactly one message — **"cannot find type X in this
+scope"** (`CodingAgent` ×161, `CodingAgentConfig` ×87, `PathBuf` ×51,
+`TaskPhase` ×20, `BackendTier` ×10, ...). `tests.rs` had **zero `use`
+statements** — every other `coding_agent` submodule starts with
+`use super::*;`. Adding that one line plus `use std::path::PathBuf;`
+resolved all 384 errors to zero.
+
+Running the newly-compiling suite: **200/203 passed immediately.** The
+3 failures were a real, coherent architectural fact, not bugs: `step()`
+(`mod.rs`) has two early `return`s (reasoning deferral/diagnosis during the
+Generating phase) that skip `self.phi_trace.push(phi)` while `run()`'s outer
+loop always increments `self.iteration` regardless — so `phi_trace.len() <=
+iterations_used` is the true invariant, not the exact equality (or "±1 at
+phase boundaries") the old assertions checked. Fixed 4 assertions total (the
+3 failures plus one more, `test_warm_up_runs_without_consuming_iterations`,
+that was passing but relied on the same wrong assumption by luck, given its
+small `max_iterations: 3`) to check `<=` instead. **Result: 203/203 passing.**
+
+`mod.rs`'s `mod tests;` is now genuinely re-enabled (not just documented as
+disabled) — `coding_agent`'s test count goes from 53 to 203 real, running
+tests. The workaround test module added to `code_utils.rs` earlier this
+session was removed as redundant now that its canonical home works.
+
+**Lesson, stated plainly since it's the theme of this entire week**: every
+time something in this subsystem looked like "N independent problems," it
+was actually 1 root cause with N symptoms — the Rust-idiom leakage, the
+native-pattern false positive, `wrap_for_return`'s 4 sub-cases, and now a
+384-error test file that was a missing `use` statement. Cluster error
+messages before estimating effort.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*
