@@ -49,9 +49,7 @@ use crate::query::{PhysicsSearchEngine, SearchWeights};
 use crate::symmetry_inference::infer_symmetry;
 #[allow(unused_imports)] // DimensionalSignature is used in rustdoc links
 use crate::types::DimensionalSignature;
-use crate::types::{
-    DiffOperator, EquationNode, PhysicsDomain, PhysicsEquation, SearchResult, SymmetryDescriptor,
-};
+use crate::types::{DiffOperator, EquationNode, PhysicsDomain, PhysicsEquation, SearchResult};
 
 /// Convert a ConjectureEngine [`Expr`] into a physics-bridge [`EquationNode`].
 ///

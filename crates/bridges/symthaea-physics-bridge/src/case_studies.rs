@@ -345,12 +345,12 @@ pub fn get_paired_studies() -> Vec<(CaseStudy, CaseStudy)> {
         if used.contains(&study.id) {
             continue;
         }
-        if let Some(ref pair_id) = study.pair_with {
-            if let Some(partner) = studies.iter().find(|s| &s.id == pair_id) {
-                pairs.push((study.clone(), partner.clone()));
-                used.insert(study.id.clone());
-                used.insert(partner.id.clone());
-            }
+        if let Some(ref pair_id) = study.pair_with
+            && let Some(partner) = studies.iter().find(|s| &s.id == pair_id)
+        {
+            pairs.push((study.clone(), partner.clone()));
+            used.insert(study.id.clone());
+            used.insert(partner.id.clone());
         }
     }
 

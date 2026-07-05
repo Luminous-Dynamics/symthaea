@@ -13,7 +13,7 @@
 //! This enables the Mycelix DeSci protocol to track, fact-check, and market
 //! physics predictions alongside human scientific claims.
 
-use crate::types::{PhysicsDomain, SearchResult, SimilarityBreakdown};
+use crate::types::{PhysicsDomain, SearchResult};
 use serde::{Deserialize, Serialize};
 
 /// A physics prediction packaged as a DeSci-compatible claim.
@@ -185,6 +185,7 @@ pub fn classify_arts_parts_waveguide(catalog_results: &[SearchResult]) -> Physic
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::SimilarityBreakdown;
 
     fn mock_results(scores: &[(&str, f64, PhysicsDomain)]) -> Vec<SearchResult> {
         scores

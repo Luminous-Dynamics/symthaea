@@ -39,10 +39,10 @@ use crate::types::{LieGroup, SymmetryDescriptor};
 
 /// Infer a best-effort symmetry descriptor from a discovered expression.
 pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
-    if let Some(n) = detect_sum_of_squares(expr) {
-        if n >= 2 && n <= 10 {
-            return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false);
-        }
+    if let Some(n) = detect_sum_of_squares(expr)
+        && (2..=10).contains(&n)
+    {
+        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false);
     }
     if detect_2d_antisymmetric_cross(expr) {
         return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false);
@@ -94,10 +94,10 @@ fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
 fn squared_var(expr: &Expr) -> Option<String> {
     match expr {
         Expr::BinOp(BinOp::Pow, base, exp) => {
-            if let (Expr::Var(name), Expr::Const(k)) = (base.as_ref(), exp.as_ref()) {
-                if (*k - 2.0).abs() < 1e-12 {
-                    return Some(name.clone());
-                }
+            if let (Expr::Var(name), Expr::Const(k)) = (base.as_ref(), exp.as_ref())
+                && (*k - 2.0).abs() < 1e-12
+            {
+                return Some(name.clone());
             }
             None
         }

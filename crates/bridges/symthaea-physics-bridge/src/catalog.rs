@@ -159,6 +159,9 @@ fn simple_eq(
 }
 
 /// Build all landmark equations for the catalog.
+// ~160 pushes across ~1200 lines, one per named equation constructor call --
+// a vec![] literal here would be far less readable than the sequential pushes.
+#[allow(clippy::vec_init_then_push)]
 fn build_all_equations() -> Vec<PhysicsEquation> {
     let mut eqs = Vec::with_capacity(160);
 
@@ -3571,7 +3574,7 @@ fn newton_second_law() -> PhysicsEquation {
 
 /// F = GMm/r² — Newton's law of universal gravitation
 fn newton_gravitation() -> PhysicsEquation {
-    let euc3 = MetricSignature::Euclidean(3);
+    let _euc3 = MetricSignature::Euclidean(3);
     PhysicsEquation {
         name: "Newton Gravitation".to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
