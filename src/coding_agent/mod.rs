@@ -932,11 +932,6 @@ impl CodingAgent {
     }
 }
 
-// NOTE: tests.rs has pre-existing broken imports (384 compile errors as of
-// 2026-07-05 — E0422/E0425/E0433, stale references to renamed/removed APIs
-// accumulated while this file was disconnected from compilation; a real fix
-// is a substantial standalone effort, not a quick unblock). Tests live in
-// submodules instead — see docs/CODE_ABILITY_IMPROVEMENT_PLAN.md.
-// #[cfg(test)]
-// #[path = "tests.rs"]
-// mod tests;
+#[cfg(test)]
+#[path = "tests.rs"]
+mod tests;

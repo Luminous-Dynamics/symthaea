@@ -555,19 +555,54 @@ impl DaemonState {
         alerts
     }
 
-    /// Formulate maintenance goals for persistent high-confidence alerts (dry-run only).
+    /// Formulate maintenance goals for persistent high-confidence alerts and anomalies,
+    /// prioritizing them to select the single most urgent plan to recommend.
     fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) {
+        let mut candidates = Vec::new();
+
+        // 1. Collect candidates from persistent alerts
         for alert in alerts {
             if alert.consecutive_cycles >= 3 && alert.confidence > 0.6 {
                 let goal_description = format!(
                     "Maintain {} below {} (currently {} predicted {})",
                     alert.metric, alert.threshold, alert.current_value, alert.predicted_value
                 );
-                let plan = self.active_inference.process_input(&goal_description);
-                if let Some(best) = plan.actions.first() {
+                let severity_weight = match alert.severity {
+                    AlertSeverity::Critical => 3.0,
+                    AlertSeverity::Warning => 1.0,
+                    AlertSeverity::Info => 0.5,
+                };
+                let priority =
+                    severity_weight * (alert.consecutive_cycles as f64) * alert.confidence;
+                candidates.push((goal_description, priority));
+            }
+        }
+
+        // 2. Collect candidates from recent high-score journal anomalies
+        for anomaly in &self.recent_anomalies {
+            if anomaly.score > 0.7 {
+                let goal_description = format!(
+                    "Resolve service failure in '{}' (reason: {})",
+                    anomaly.unit, anomaly.reason
+                );
+                // Weight anomaly priority by its score
+                let priority = 2.5 * anomaly.score;
+                candidates.push((goal_description, priority));
+            }
+        }
+
+        // 3. Evaluate and prioritize candidate plans
+        if !candidates.is_empty() {
+            // Sort by priority descending (most urgent first)
+            candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+            // Select and plan for the top candidate
+            if let Some((best_goal, priority)) = candidates.first() {
+                let plan = self.active_inference.process_input(best_goal);
+                if let Some(best_action) = plan.actions.first() {
                     eprintln!(
-                        "nix-mind-daemon: maintenance plan (dry-run): {} → {:?} (EFE={:.3})",
-                        alert.metric, best.action, best.expected_free_energy
+                        "nix-mind-daemon: Coordinated Executive Plan (dry-run) [priority={:.2}]: {} → {:?} (EFE={:.3})",
+                        priority, best_goal, best_action.action, best_action.expected_free_energy
                     );
                     self.maintenance_plan_count += 1;
                 }
@@ -1671,5 +1706,79 @@ mod tests {
 
         assert!(causal_suggestion.contains("services.postgresql.enable"));
         assert!(causal_suggestion.contains("85.0%"));
+    }
+
+    #[test]
+    fn test_self_healing_plan_generated_for_high_score_anomaly() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        assert_eq!(state.maintenance_plan_count, 0);
+
+        // Formulate a recovery goal for postgresql service failure
+        let goal_description = "Resolve service failure in 'postgresql' (reason: FATAL error)";
+        let plan = state.active_inference.process_input(goal_description);
+
+        assert!(
+            !plan.actions.is_empty(),
+            "Active inference should generate a plan to resolve service failure"
+        );
+        assert!(plan.current_free_energy.is_finite());
+    }
+
+    #[test]
+    fn test_multi_goal_prioritization() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        assert_eq!(state.maintenance_plan_count, 0);
+
+        // 1. Alert A: Low priority warning
+        let alert_low = AlertEntry {
+            metric: "memory_used_pct".into(),
+            current_value: 85.0,
+            predicted_value: 90.0,
+            hours_ahead: 12.0,
+            threshold: 80.0,
+            confidence: 0.7,
+            recommended_action: None,
+            severity: AlertSeverity::Warning,
+            first_seen: 1700000000,
+            last_seen: 1700000000,
+            consecutive_cycles: 3,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        // 2. Alert B: Critical high priority
+        let alert_high = AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 95.0,
+            predicted_value: 99.0,
+            hours_ahead: 2.0,
+            threshold: 90.0,
+            confidence: 0.95,
+            recommended_action: None,
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 6,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        // 3. High-score anomaly in recent_anomalies
+        state.recent_anomalies.push(AnomalyEntry {
+            score: 0.9,
+            reason: "OOM killer invoked".into(),
+            unit: "postgresql.service".into(),
+            error_type: Some("OOM".into()),
+            suggestion: None,
+        });
+
+        // Run prioritization
+        let alerts = vec![alert_low, alert_high];
+        state.run_active_inference_plans(&alerts);
+
+        // One coordinated executive plan should be processed
+        assert_eq!(state.maintenance_plan_count, 1);
     }
 }

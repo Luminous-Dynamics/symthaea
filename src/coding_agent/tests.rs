@@ -1,6 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+use super::*;
+use std::path::PathBuf;
+
 #[test]
 fn test_coding_agent_creation() {
     let config = CodingAgentConfig::default();
@@ -113,8 +116,20 @@ fn test_agent_result_phi_trace_bounded() {
             "phi must be in [0,1], got {phi}"
         );
     }
-    // iterations_used should match phi_trace length
-    assert_eq!(result.iterations_used, result.phi_trace.len());
+    // phi_trace grows by at most one entry per iteration: step() can return
+    // early (reasoning deferral/diagnosis during the Generating phase, see
+    // mod.rs's two early `return`s before phi_trace.push()) without ever
+    // reaching the push, while run()'s outer loop always increments
+    // iterations_used regardless of how step() returned. So the true
+    // invariant is <=, not exact equality (found + corrected 2026-07-05,
+    // re-enabling this file after it was fully disconnected from
+    // compilation — see docs/CODE_ABILITY_IMPROVEMENT_PLAN.md).
+    assert!(
+        result.phi_trace.len() <= result.iterations_used,
+        "phi_trace ({}) must not exceed iterations_used ({})",
+        result.phi_trace.len(),
+        result.iterations_used
+    );
 }
 
 #[test]
@@ -131,8 +146,9 @@ fn test_100_cycle_stress() {
 
     // Should complete without panic
     assert!(result.iterations_used > 0);
-    // Phi trace length == iterations
-    assert_eq!(result.phi_trace.len(), result.iterations_used);
+    // phi_trace.len() <= iterations_used, not equal — see the comment on
+    // test_agent_result_phi_trace_bounded above for why.
+    assert!(result.phi_trace.len() <= result.iterations_used);
     // All phi bounded
     for phi in &result.phi_trace {
         assert!(phi.is_finite() && *phi >= 0.0 && *phi <= 1.0);
@@ -188,11 +204,16 @@ fn test_run_reset_clears_state() {
     // Second run should start fresh — iteration counter and phi trace reset
     let r2 = agent.run("add function bar");
     assert!(r2.iterations_used > 0);
-    // Phi trace should track iterations (±1 for retry strategies)
-    let diff1 = (r1.phi_trace.len() as isize - r1.iterations_used as isize).unsigned_abs();
-    let diff2 = (r2.phi_trace.len() as isize - r2.iterations_used as isize).unsigned_abs();
-    assert!(diff1 <= 1, "Run 1 phi trace should track iterations");
-    assert!(diff2 <= 1, "Run 2 phi trace should track iterations");
+    // phi_trace.len() <= iterations_used, not "within 1" (see the comment on
+    // test_agent_result_phi_trace_bounded).
+    assert!(
+        r1.phi_trace.len() <= r1.iterations_used,
+        "Run 1 phi trace must not exceed iterations"
+    );
+    assert!(
+        r2.phi_trace.len() <= r2.iterations_used,
+        "Run 2 phi trace must not exceed iterations"
+    );
     // Run 2 should not accumulate phi from run 1
     assert!(
         r2.phi_trace.len() <= r2.iterations_used + 1,
@@ -816,12 +837,13 @@ fn test_100_cycle_stress_no_unbounded_growth() {
         result.iterations_used
     );
 
-    // Phi trace length should approximately match iterations used
-    // (retry strategies may cause ±1 discrepancy at phase boundaries)
-    let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
+    // phi_trace.len() <= iterations_used, not "within 1" — over 100
+    // iterations, reasoning deferral/diagnosis (see the comment on
+    // test_agent_result_phi_trace_bounded above) can skip the push on many
+    // iterations, not just at rare phase boundaries.
     assert!(
-        diff <= 1,
-        "phi_trace length ({}) should be within 1 of iterations_used ({})",
+        result.phi_trace.len() <= result.iterations_used,
+        "phi_trace length ({}) must not exceed iterations_used ({})",
         result.phi_trace.len(),
         result.iterations_used
     );
@@ -1585,9 +1607,15 @@ fn test_warm_up_runs_without_consuming_iterations() {
         "Should use at most max_iterations (3), not more. Got: {}",
         result.iterations_used
     );
-    // Phi trace should only contain entries from real iterations, not warm-up
-    let diff = (result.phi_trace.len() as isize - result.iterations_used as isize).unsigned_abs();
-    assert!(diff <= 1, "Phi trace should track real iterations");
+    // Phi trace should only contain entries from real iterations, not
+    // warm-up — and phi_trace.len() <= iterations_used, not "within 1" (see
+    // the comment on test_agent_result_phi_trace_bounded).
+    assert!(
+        result.phi_trace.len() <= result.iterations_used,
+        "Phi trace ({}) must not exceed iterations_used ({})",
+        result.phi_trace.len(),
+        result.iterations_used
+    );
 }
 
 #[test]

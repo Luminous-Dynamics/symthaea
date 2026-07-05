@@ -731,17 +731,9 @@ pub struct LiquidMambaGenerator {
     pub current_wattage: f32,
     /// NEW: Persistent background worker for asynchronous Hodge processing.
     /// NEW: Physical Verifier for SimBridge-based validation.
-    /// NEW: Morphological Bridge for autonomous physical form evolution.
-    pub morphological_bridge: crate::morphological_bridge::MorphologicalBridge,
     pub physical_verifier: crate::simulation_bridge::PhysicalVerifier,
-    /// NEW: Foraging Bridge for global SearXNG missions.
-    pub foraging_bridge: crate::foraging_bridge::ForagingBridge,
     /// NEW: Formal Bridge for mathematical proof verification (Z3/Lean).
     pub formal_bridge: crate::formal_bridge::FormalBridge,
-    /// NEW: Law Registry for constitutional topological & physical auditing.
-    pub sovereign_law_registry: crate::sovereign_law::LawRegistry,
-    /// NEW: Somatic Bridge for bridging intent to kinetic motor control.
-    pub somatic_bridge: crate::somatic_bridge::SomaticBridge,
     /// NEW: Swarm Bridge for P2P memetic propagation via Iroh.
     pub swarm_bridge: crate::swarm_bridge::SwarmBridge,
     /// NEW: Codebase Bridge for self-authoring codebase improvements.
@@ -750,16 +742,12 @@ pub struct LiquidMambaGenerator {
     pub liquid_bottleneck: Option<symthaea_core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork>,
     /// NEW: Cognitive Ledger for auditing her self-evolution.
     pub cognitive_ledger: crate::cognitive_ledger::CognitiveLedger,
-    /// NEW: Compiler Feedback Bridge for iterative source-level grounding.
-    pub compiler_feedback: crate::compiler_feedback_bridge::CompilerFeedbackBridge,
     hodge_sender: std::sync::mpsc::SyncSender<Vec<ContinuousHV>>,
     /// NEW: Bridge to Geodesic for topological program synthesis.
     #[cfg(feature = "code-sheaf-eval")]
     pub geodesic_bridge: crate::geodesic_bridge::GeodesicBridge,
     /// NEW: Bridge to Mycelix ZKP for proofs of coherence and intent.
     pub sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge,
-    /// NEW: WASM Architect for automated plugin compilation and execution.
-    pub wasm_architect: crate::wasm_architect::WasmArchitect,
     /// NEW: Substrate Rewriter for direct source code modification.
     pub substrate_rewriter: crate::substrate_rewriter::SubstrateRewriter,
     /// NEW: Optional handle to the Global Workspace for conscious broadcast.
@@ -848,16 +836,6 @@ impl LiquidMambaGenerator {
         let spectral_entropy = Arc::new(AtomicU32::new(0.5f32.to_bits()));
         let betti_history = Arc::new(Mutex::new(VecDeque::with_capacity(64)));
 
-        // --- IMPROVEMENT: DID Sovereignty Integration ---
-        // Deriving her local post-quantum keypair from her Genesis timeline.
-        let seed_bytes = genesis.timeline_id().as_bytes();
-        let mut key_seed = [0u8; 32];
-        for (i, &b) in seed_bytes.iter().take(32).enumerate() {
-            key_seed[i] = b;
-        }
-        // (In real: we use a real secure derivation. Here we use random as a proxy for demo)
-        let keypair = mycelix_zkp_core::dilithium::DilithiumKeypair::generate();
-
         // Spawn a single long-lived thread for sub-cortical processing
         let coherence_worker = Arc::clone(&topological_coherence);
         let gap_worker = Arc::clone(&spectral_entropy);
@@ -942,14 +920,10 @@ impl LiquidMambaGenerator {
             fep_agent: None,
             epistemic_gate,
             epistemic_cube_gate,
-            morphological_bridge: crate::morphological_bridge::MorphologicalBridge::new("."),
             goal_hv: None,
             unsaid_tangent: None,
             physical_verifier: crate::simulation_bridge::PhysicalVerifier::new(config.hdc_dim),
-            foraging_bridge: crate::foraging_bridge::ForagingBridge::new("http://localhost:8080"),
             formal_bridge: crate::formal_bridge::FormalBridge::new(),
-            sovereign_law_registry: crate::sovereign_law::LawRegistry::new(),
-            somatic_bridge: crate::somatic_bridge::SomaticBridge::new(config.hdc_dim),
             swarm_bridge: crate::swarm_bridge::SwarmBridge::new(),
             physical_constraint: None,
             codebase_bridge: crate::codebase_bridge::CodebaseBridge::new("."),
@@ -965,9 +939,6 @@ impl LiquidMambaGenerator {
             },
             recent_semantic_history: VecDeque::with_capacity(32),
             cognitive_ledger: crate::cognitive_ledger::CognitiveLedger::new(".").unwrap(),
-            compiler_feedback: crate::compiler_feedback_bridge::CompilerFeedbackBridge::new(
-                config.hdc_dim,
-            ),
             topological_coherence,
             betti_history,
             spectral_entropy,
@@ -979,11 +950,6 @@ impl LiquidMambaGenerator {
             sovereignty_bridge: crate::sovereignty_bridge::SovereigntyBridge::new(
                 genesis.timeline_id(),
             ),
-            wasm_architect: crate::wasm_architect::WasmArchitect::new(
-                "/tmp/symthaea-broca-wasm",
-                keypair,
-            )
-            .unwrap(),
             substrate_rewriter: crate::substrate_rewriter::SubstrateRewriter::new("."),
             workspace_handle: None, // Can be injected later
             semantic_attractor_cache: HashMap::new(),
@@ -1120,28 +1086,6 @@ impl LiquidMambaGenerator {
 
         self.sovereignty_bridge
             .prove_coherence(&coherence_history, &gap_history, &nucleus)
-    }
-
-    /// Execute a synthesized code module in a WASM sandbox.
-    /// This is the final step in the 'Self-Authoring Architect' loop.
-    pub fn execute_synthesized_plugin(&self, code: &str, name: &str, func: &str) -> Result<()> {
-        let artifact = self.wasm_architect.compile_to_wasm(code, name)?;
-        self.wasm_architect.execute_plugin(&artifact, func)
-    }
-
-    /// Execute a synthesized WASM plugin directly on her active thought manifold.
-    /// This uses the Zero-Copy FFI Arena for maximum performance.
-    #[cfg(feature = "wasm-sandbox")]
-    pub fn execute_plugin_on_thought(
-        &self,
-        code: &str,
-        name: &str,
-        func: &str,
-        hv: &mut ContinuousHV,
-    ) -> Result<()> {
-        let artifact = self.wasm_architect.compile_to_wasm(code, name)?;
-        self.wasm_architect
-            .execute_with_hypervector(&artifact, hv, func, &self.projection)
     }
 
     /// Synthesize a Leptos dashboard component representing her current cognitive state.
@@ -2225,18 +2169,6 @@ impl LiquidMambaGenerator {
         Ok((tokens, hvs, coherence_monitor.current_coherence()))
     }
 
-    /// Compress a generated chunk's thought HV into a sparse SemanticKernel.
-    /// This implements 'Holographic Compression' for efficient long-term storage.
-    pub fn compress_chunk_to_kernel(
-        &self,
-        chunk_idx: usize,
-        top_n: usize,
-    ) -> Option<crate::memory_kernel::SemanticKernel> {
-        self.chunk_history
-            .get(chunk_idx)
-            .map(|chunk| crate::memory_kernel::SemanticKernel::compress(&chunk.thought_hv, top_n))
-    }
-
     /// Condense an entire monologue into a single Macro-HV (Semantic Nucleus).
     /// This enables hierarchical reasoning over multi-chunk experiences.
     pub fn recursive_fold(&self, sequence: &ThoughtChunkSequence) -> ContinuousHV {
@@ -2312,30 +2244,6 @@ impl LiquidMambaGenerator {
         self.apply_harmonic_nudge()?;
 
         println!("   🛡️ RESILIENCE: Topological smoothing applied to adversarial noise.");
-        Ok(())
-    }
-
-    /// Feed somatic (motor) telemetry back into her cognitive state.
-    /// Physical fumbles (high PE) trigger hierarchical curiosity and refactoring.
-    pub fn update_from_soma(&mut self, somatic_pe: f32) -> Result<()> {
-        let curiosity_spike = self.somatic_bridge.interpret_somatic_pe(somatic_pe);
-
-        // Boost her spectral entropy (curiosity) based on physical failure
-        let current_bits = self.spectral_entropy.load(Ordering::Relaxed);
-        let current_entropy = f32::from_bits(current_bits);
-
-        // EMA update: entropy = entropy * 0.8 + spike * 0.2
-        let new_entropy = (current_entropy * 0.8) + (curiosity_spike * 0.2);
-        self.spectral_entropy
-            .store(new_entropy.to_bits(), Ordering::Relaxed);
-
-        if curiosity_spike > 0.7 {
-            println!(
-                "🦾 SOMATIC: Physical fumble detected (PE: {:.4}). Triggering hierarchical curiosity spike.",
-                somatic_pe
-            );
-        }
-
         Ok(())
     }
 

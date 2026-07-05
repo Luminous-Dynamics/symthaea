@@ -344,9 +344,13 @@ fi
 # ── Step 7.5: topic-coverage evidence — does the NEW material actually show
 # up in generation, not just "didn't regress"? checkpoint-compare above is a
 # regression gate; it has no signal for whether newly-learned content
-# landed. This is diagnostic only (never gates promotion) — it exists so a
-# human reviewing PROMOTION_READY.json has concrete generated-vs-reference
-# examples to read, not just abstract drift/hallucination numbers. Uses only
+# landed. Most of what this produces is diagnostic only — a human reviewing
+# PROMOTION_READY.json gets concrete generated-vs-reference examples to
+# read, not just abstract drift/hallucination numbers — but the
+# collapse/repetition check below it (added 2026-07-05) DOES gate: it's the
+# one signal available that catches a model that has stopped distinguishing
+# inputs, which checkpoint-compare's regression metrics provably cannot (see
+# fuzzy-beaming-brook.md for the incident this was added after). Uses only
 # this cycle's new holdout batch (not full history) since the question is
 # "did THIS cycle's learning work," not the whole corpus's.
 if [[ -n "$new_holdout_file" ]]; then
@@ -356,6 +360,59 @@ if [[ -n "$new_holdout_file" ]]; then
     --holdout "$new_holdout_file" \
     --json-out "$candidate_dir/topic-coverage-report.json"
   echo "[broca-cycle] topic coverage report: $candidate_dir/topic-coverage-report.json"
+
+  # ── Collapse/repetition gate — NOT diagnostic-only, this one actually
+  # blocks promotion. Added 2026-07-05 after candidate 20260705T094221Z
+  # passed checkpoint-compare's regression gate (decoder-ab metrics: the
+  # structured path is checkpoint-independent by design, and the direct
+  # path's coherence/hallucination metrics don't detect degenerate output)
+  # while its topic-coverage-report.json showed it had actually collapsed —
+  # dozens of unrelated objectives all generating the exact same garbage
+  # string. checkpoint-compare.json has no signal for this failure mode at
+  # all; this is the cheapest real check that would have caught it: if a
+  # large fraction of distinct objectives produce byte-identical generated
+  # text, the model isn't distinguishing inputs anymore.
+  collapse_check_status=0
+  python3 - "$candidate_dir/topic-coverage-report.json" <<'PY' || collapse_check_status=$?
+import json, sys
+from collections import Counter
+
+path = sys.argv[1]
+with open(path) as f:
+    report = json.load(f)
+
+cases = report.get("cases", [])
+if not cases:
+    print("[broca-cycle] collapse check: no cases in topic-coverage report, skipping")
+    sys.exit(0)
+
+texts = [c.get("generated_text", "") for c in cases]
+counts = Counter(texts)
+most_common_text, most_common_count = counts.most_common(1)[0]
+duplicate_ratio = most_common_count / len(texts)
+
+print(
+    f"[broca-cycle] collapse check: {len(texts)} cases, "
+    f"most-repeated generated_text appears {most_common_count} times "
+    f"(ratio {duplicate_ratio:.2f})"
+)
+
+MAX_DUPLICATE_RATIO = 0.25
+if duplicate_ratio > MAX_DUPLICATE_RATIO and most_common_text.strip():
+    print(
+        f"[broca-cycle] FAIL: {most_common_count}/{len(texts)} objectives "
+        f"produced byte-identical generated text (ratio {duplicate_ratio:.2f} "
+        f"> {MAX_DUPLICATE_RATIO}) -- candidate has likely collapsed to "
+        "repeating one degenerate output regardless of input. Example: "
+        f"{most_common_text[:200]!r}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
+  if [[ "$collapse_check_status" -ne 0 ]]; then
+    echo "[broca-cycle] FAIL: collapse/repetition check failed (see above) — refusing to write PROMOTION_READY.json" >&2
+    exit 1
+  fi
 else
   echo "[broca-cycle] NOTE: no holdout batch from this cycle (every objective produced fewer than 2 accepted texts) — skipping topic-coverage report"
 fi

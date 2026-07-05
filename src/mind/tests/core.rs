@@ -39,14 +39,21 @@ fn test_goal_setting() {
 fn test_consciousness_update() {
     let mut mind = ContinuousMind::default();
 
-    // 15 ticks, not 5: ConsciousnessCore's default min_samples is 5, so a
-    // 5-tick test hits the window threshold on its very last tick, switching
-    // from the nonzero pairwise-dissimilarity fallback to the real spectral
-    // MIP Phi computation for the first time -- with only 5 samples that
-    // covariance-based computation can legitimately land at ~0.0. Ticking
-    // well past the threshold gives the real measurement room to stabilize.
-    for i in 0..15 {
-        mind.perceive(ContinuousHV::random(512, 42 + i as u64));
+    // Perceive a *correlated* sequence (perturbed variants of one base
+    // vector), not independent draws. Once ConsciousnessCore's window
+    // reaches min_samples (5), update_consciousness() switches from the
+    // nonzero pairwise-dissimilarity fallback to the real spectral-MIP Phi
+    // measurement (ConsciousnessCore/SpectralMIPFinder), which estimates
+    // genuine statistical integration -- not raw difference. Feeding it
+    // fully independent random vectors (the previous version of this test)
+    // has no cross-sample correlation for that measure to detect, so Phi
+    // legitimately settles near 0.0; that's correct behavior for the
+    // algorithm, not a bug. A perturbed sequence shares structure across
+    // samples the way a real train of thought would, giving the covariance
+    // matrix something genuine to integrate.
+    let base = ContinuousHV::random(512, 42);
+    for _ in 0..15 {
+        mind.perceive(base.perturb(0.2));
     }
 
     for _ in 0..15 {
