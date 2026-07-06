@@ -196,6 +196,19 @@ pub struct MorphogeneticField {
     /// that never calls `advance_day` is completely unaffected.
     #[serde(skip)]
     spatial_grid: Option<(crate::spatial_grid::SpatialGrid, Vec<[f32; 3]>)>,
+    /// Multiplier applied to the neural/glial differentiation thresholds in
+    /// `differentiate()` (the activator-concentration cutoffs, not the
+    /// separate reversion-to-undifferentiated check). Defaults to `1.0`,
+    /// reproducing the existing thresholds exactly -- zero behavior change
+    /// unless explicitly opted into. Values `> 1.0` make differentiation
+    /// harder to trigger, keeping cells in progenitor state longer; see
+    /// `NeuralOrganoid::set_differentiation_threshold_multiplier`. Added
+    /// after `progenitor_fraction_probe.rs` found this model's default
+    /// differentiation dynamics crash the tissue-wide progenitor count from
+    /// 150 to 0 within 8 days, which left the regeneration agent's
+    /// proliferation-boost mechanism with no eligible cells to ever act on
+    /// in any of this crate's standard-maturation-window demos.
+    pub(crate) differentiation_threshold_multiplier: f32,
 }
 
 fn default_rng() -> StdRng {
@@ -233,6 +246,7 @@ impl MorphogeneticField {
             bioelectric,
             rng,
             spatial_grid: None,
+            differentiation_threshold_multiplier: 1.0,
         }
     }
 
@@ -372,7 +386,9 @@ impl MorphogeneticField {
             let neural_expr: f32 =
                 (cell.gene_expression.iter().take(4).sum::<f32>() / 4.0 + vmem_bias).min(1.0);
 
-            if a > 1.5 && neural_expr > 0.5 {
+            let neural_threshold = 1.5 * self.differentiation_threshold_multiplier;
+            let glial_threshold = 0.8 * self.differentiation_threshold_multiplier;
+            if a > neural_threshold && neural_expr > 0.5 {
                 // High activator + neural gene expression → neural lineage
                 if cell.cell_type == OrganoidCellType::Progenitor {
                     cell.cell_type = OrganoidCellType::NeuralProgenitor;
@@ -396,7 +412,7 @@ impl MorphogeneticField {
                     // `k_channel_conductance` when the model is off.
                     self.bioelectric.k_channel_conductance[i] += K_CHANNEL_DIFFERENTIATION_BUMP;
                 }
-            } else if a > 0.8 && neural_expr > 0.3 {
+            } else if a > glial_threshold && neural_expr > 0.3 {
                 // Moderate → glial
                 let glial_gene = cell.gene_expression.get(5).copied().unwrap_or(0.5);
                 cell.cell_type = if glial_gene > 0.7 {
@@ -674,6 +690,12 @@ pub struct NeuralOrganoid {
     /// fields elsewhere in this crate).
     #[serde(skip)]
     pub(crate) regeneration_agent: Option<crate::regeneration_agent::RegenerationAgent>,
+    /// The seed this organoid was created with, retained so opt-in
+    /// sub-agents constructed later (e.g. the regeneration agent) can be
+    /// independently, reproducibly seeded from it rather than sharing one
+    /// hardcoded default seed across every organoid instance -- see
+    /// `crate::regeneration_agent::RegenerationAgent::new`.
+    pub(crate) creation_seed: u64,
 }
 
 impl NeuralOrganoid {
@@ -692,6 +714,7 @@ impl NeuralOrganoid {
             packing_enabled: false,
             fep_regeneration_enabled: false,
             regeneration_agent: None,
+            creation_seed: seed,
         }
     }
 

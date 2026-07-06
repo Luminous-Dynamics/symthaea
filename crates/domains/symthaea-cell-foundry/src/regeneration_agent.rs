@@ -32,7 +32,15 @@ pub(crate) struct RegenerationAgent {
 }
 
 impl RegenerationAgent {
-    pub(crate) fn new() -> Self {
+    /// `seed` re-seeds the agent's internal action-selection RNG (via
+    /// `symthaea_fep::ActiveInferenceAgent::set_rng_seed`, added
+    /// specifically for this) so independent `NeuralOrganoid` instances get
+    /// independently-random agent decisions -- `ActiveInferenceAgent::new`
+    /// alone always starts from the same hardcoded golden-ratio constant,
+    /// which would otherwise make every organoid's regeneration agent
+    /// follow an identical decision sequence regardless of which organoid
+    /// (or seed) constructed it.
+    pub(crate) fn new(seed: u64) -> Self {
         let config = ActiveInferenceAgentConfig {
             state_dim: 4,
             obs_dim: 4,
@@ -40,6 +48,7 @@ impl RegenerationAgent {
             ..Default::default()
         };
         let mut agent = ActiveInferenceAgent::new(config);
+        agent.set_rng_seed(seed);
         // Prefer low discrepancy, low defected fraction, low wound-boundary
         // fraction, and fast healing (low days-since-wound fraction) -- all
         // four observation channels' preferred value is 0.0.
@@ -82,7 +91,7 @@ mod tests {
 
     #[test]
     fn decide_returns_a_valid_multiplier() {
-        let mut agent = RegenerationAgent::new();
+        let mut agent = RegenerationAgent::new(42);
         for _ in 0..10 {
             let m = agent.decide(0.3, 0.1, 0.0, 0.2);
             assert!(
@@ -100,7 +109,7 @@ mod tests {
         // regardless of input, something in the perceive/select_action
         // wiring is broken (verified once, manually, against this exact
         // sweep: real variety across steps).
-        let mut agent = RegenerationAgent::new();
+        let mut agent = RegenerationAgent::new(42);
         let mut seen = std::collections::HashSet::new();
         for i in 0..30 {
             let discrepancy = 0.1 + (i as f64 * 0.05) % 0.8;

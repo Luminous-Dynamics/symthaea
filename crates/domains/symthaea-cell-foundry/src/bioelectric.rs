@@ -1194,9 +1194,15 @@ impl NeuralOrganoid {
                         / n;
                     let days_since_wound_frac =
                         (self.days_since_wound as f64 / REGENERATION_TIMEOUT_DAYS as f64).min(1.0);
-                    let agent = self
-                        .regeneration_agent
-                        .get_or_insert_with(crate::regeneration_agent::RegenerationAgent::new);
+                    // Independent of the tissue's own RNG (BioelectricState
+                    // already salts its own seed by 0xB10E_1EC7 for the same
+                    // reason -- see its constructor) so the agent's action
+                    // selection varies independently across organoids
+                    // instead of every instance sharing one hardcoded seed.
+                    let agent_seed = self.creation_seed.wrapping_add(0xA6E7_FEB0);
+                    let agent = self.regeneration_agent.get_or_insert_with(|| {
+                        crate::regeneration_agent::RegenerationAgent::new(agent_seed)
+                    });
                     agent.decide(
                         discrepancy,
                         days_since_wound_frac,
@@ -1231,6 +1237,22 @@ impl NeuralOrganoid {
     /// enabled.
     pub fn fep_regeneration_enabled(&self) -> bool {
         self.fep_regeneration_enabled
+    }
+
+    /// Set the multiplier applied to `differentiate()`'s neural/glial
+    /// activator thresholds (default `1.0`, reproducing today's thresholds
+    /// exactly). Values `> 1.0` make differentiation harder to trigger,
+    /// keeping cells in progenitor state for longer -- see
+    /// `MorphogeneticField::differentiation_threshold_multiplier` for why
+    /// this exists. Clamped to `>= 0.0` since a negative multiplier would
+    /// flip the comparison's sign.
+    pub fn set_differentiation_threshold_multiplier(&mut self, multiplier: f32) {
+        self.field.differentiation_threshold_multiplier = multiplier.max(0.0);
+    }
+
+    /// Current differentiation-threshold multiplier.
+    pub fn differentiation_threshold_multiplier(&self) -> f32 {
+        self.field.differentiation_threshold_multiplier
     }
 }
 

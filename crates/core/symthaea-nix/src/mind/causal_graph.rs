@@ -105,6 +105,16 @@ impl NixCausalGraph {
         self
     }
 
+    /// Dynamically update the learning rate of the causal graph.
+    pub fn set_learning_rate(&mut self, rate: f64) {
+        self.learning_rate = rate.clamp(0.001, 1.0);
+    }
+
+    /// Access the current causal learning rate.
+    pub fn learning_rate(&self) -> f64 {
+        self.learning_rate
+    }
+
     /// Observe an execution outcome and update causal edges via Hebbian learning.
     ///
     /// When action A is followed by outcome effects \[B, C, ...\]:
@@ -427,6 +437,25 @@ impl NixCausalGraph {
     /// Number of edges in the causal graph.
     pub fn edge_count(&self) -> usize {
         self.causal_graph.len()
+    }
+
+    /// Apply a global decay to all edges in the causal graph to simulate forgetting/pruning.
+    pub fn decay_all(&mut self, factor: f64) {
+        for edge in self.causal_graph.values_mut() {
+            edge.confidence *= factor;
+        }
+
+        let min_conf = self.min_confidence;
+        self.causal_graph.retain(|(from, to), edge| {
+            if edge.confidence >= min_conf {
+                true
+            } else {
+                if let Some(targets) = self.from_index.get_mut(from) {
+                    targets.remove(to);
+                }
+                false
+            }
+        });
     }
 
     /// Return the top-N strongest causal edges, sorted by descending confidence.

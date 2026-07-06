@@ -201,6 +201,52 @@ impl NixEpisodicMemory {
         if result.is_finite() { result } else { 0.0 }
     }
 
+    /// Compute the average outcome valence for episodes similar to a state, filtering by action category.
+    pub fn predict_valence_for_action(&self, state: &ContinuousHV, action_cat: &str) -> f64 {
+        let similar: Vec<&SystemEpisode> = self
+            .retrieve_similar(state, 10)
+            .into_iter()
+            .filter(|ep| {
+                let ep_action_lower = ep.action.to_lowercase();
+                let target_lower = action_cat.to_lowercase();
+                ep_action_lower.contains(&target_lower) || target_lower.contains(&ep_action_lower)
+            })
+            .take(5)
+            .collect();
+
+        if similar.is_empty() {
+            // If no action-specific memory exists, return 0.0 (neutral)
+            return 0.0;
+        }
+
+        let total_weight: f64 = similar
+            .iter()
+            .map(|ep| {
+                let sim = ep.state_before.similarity(state).max(0.0) as f64;
+                if sim.is_finite() { sim } else { 0.0 }
+            })
+            .sum();
+
+        if !total_weight.is_finite() || total_weight < 1e-6 {
+            return 0.0;
+        }
+
+        let weighted_valence: f64 = similar
+            .iter()
+            .map(|ep| {
+                let sim = ep.state_before.similarity(state).max(0.0) as f64;
+                if sim.is_finite() {
+                    sim * ep.emotional_valence
+                } else {
+                    0.0
+                }
+            })
+            .sum();
+
+        let result = weighted_valence / total_weight;
+        if result.is_finite() { result } else { 0.0 }
+    }
+
     /// Consolidate memory — keep high-importance episodes, evict low ones.
     fn consolidate(&mut self) {
         // Sort by importance: prediction_error * phi (surprising, conscious moments)

@@ -63,6 +63,8 @@ pub struct NixActiveInference {
     curiosity_weight: f64,
     /// Weight for episodic memory influence.
     episodic_weight: f64,
+    /// Recent action outcome history (true = success, false = failure). Capped at 5 entries.
+    recent_outcomes: std::collections::VecDeque<bool>,
 }
 
 impl NixActiveInference {
@@ -75,6 +77,7 @@ impl NixActiveInference {
             codebook: NixCodebook::new(),
             curiosity_weight: 0.3,
             episodic_weight: 0.2,
+            recent_outcomes: std::collections::VecDeque::new(),
         }
     }
 
@@ -312,10 +315,11 @@ impl NixActiveInference {
             1.0
         };
 
-        // Episodic valence: past outcomes for similar states
+        // Episodic valence: past outcomes for similar states, filtered by action category
+        let action_str = format!("{:?}", action);
         let episodic = self
             .episodic_memory
-            .predict_valence(self.world_model.system_state());
+            .predict_valence_for_action(self.world_model.system_state(), &action_str);
 
         // Expected free energy (lower = better)
         // EFE = -(pragmatic + curiosity * epistemic + episodic_weight * episodic)
@@ -367,6 +371,25 @@ impl NixActiveInference {
         } else {
             self.curiosity_weight = (self.curiosity_weight - 0.02).max(0.1);
         }
+
+        // Mood modulation: track recent successes/failures to adjust episodic risk aversion weight.
+        let success = matches!(outcome, EpisodeOutcome::Success);
+        self.recent_outcomes.push_back(success);
+        if self.recent_outcomes.len() > 5 {
+            self.recent_outcomes.pop_front();
+        }
+
+        let success_rate = if self.recent_outcomes.is_empty() {
+            1.0
+        } else {
+            let successes = self.recent_outcomes.iter().filter(|&&s| s).count();
+            successes as f64 / self.recent_outcomes.len() as f64
+        };
+
+        // Dynamically scale risk sensitivity (episodic_weight):
+        // Success rate = 1.0 (optimistic) -> episodic_weight = 0.05
+        // Success rate = 0.0 (pessimistic / risk-averse) -> episodic_weight = 0.60
+        self.episodic_weight = 0.60 - 0.55 * success_rate;
 
         self.world_model
             .learn_transition(state_before, action.clone(), state_after);
@@ -429,7 +452,7 @@ impl NixActiveInference {
     }
 
     /// All standard NixOS action categories.
-    fn all_standard_actions() -> Vec<ActionCategory> {
+    pub fn all_standard_actions() -> Vec<ActionCategory> {
         vec![
             ActionCategory::Install,
             ActionCategory::Remove,
@@ -441,6 +464,13 @@ impl NixActiveInference {
             ActionCategory::GarbageCollect,
             ActionCategory::Update,
         ]
+    }
+
+    /// Returns the first standard action category that the world model has not yet fully learned/explored.
+    pub fn next_unexplored_action(&self) -> Option<ActionCategory> {
+        Self::all_standard_actions()
+            .into_iter()
+            .find(|action| !self.world_model.has_learned(action))
     }
 
     /// Access the world model.
@@ -498,6 +528,11 @@ impl NixActiveInference {
     /// Exposed primarily for testing the epistemic modulation behaviour.
     pub fn curiosity_weight(&self) -> f64 {
         self.curiosity_weight
+    }
+
+    /// Access the current risk aversion level (dynamic episodic memory weight).
+    pub fn risk_aversion(&self) -> f64 {
+        self.episodic_weight
     }
 
     /// Reset the inference engine (new conversation).
@@ -824,6 +859,57 @@ mod tests {
         assert!(
             rebuild_score.rationale.contains("gated=true"),
             "Rationale must report that the action was gated"
+        );
+    }
+
+    #[test]
+    fn test_meta_mood_modulation() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::new();
+
+        let state_before = ContinuousHV::random(dim, 100);
+        let state_after = ContinuousHV::random(dim, 200);
+
+        let risk_initial = engine.risk_aversion();
+        assert_eq!(risk_initial, 0.2, "Initial risk aversion should be 0.2");
+
+        // 1. Simulate failure outcome -> risk aversion should increase
+        engine.learn_from_outcome(
+            &state_before,
+            ActionCategory::Rebuild,
+            &state_after,
+            EpisodeOutcome::Failure("segfault".into()),
+            0.5,
+        );
+        let risk_after_fail = engine.risk_aversion();
+        assert!(
+            risk_after_fail > risk_initial,
+            "Risk aversion ({}) should increase after failure (before: {})",
+            risk_after_fail,
+            risk_initial
+        );
+
+        // 2. Simulate success outcomes -> risk aversion should decrease (optimism)
+        for _ in 0..5 {
+            engine.learn_from_outcome(
+                &state_before,
+                ActionCategory::Rebuild,
+                &state_after,
+                EpisodeOutcome::Success,
+                0.5,
+            );
+        }
+        let risk_after_success = engine.risk_aversion();
+        assert!(
+            risk_after_success < risk_after_fail,
+            "Risk aversion ({}) should decrease after consecutive successes (before: {})",
+            risk_after_success,
+            risk_after_fail
+        );
+        assert!(
+            risk_after_success < 0.1,
+            "With 100% recent success, risk aversion ({}) should be low",
+            risk_after_success
         );
     }
 }

@@ -292,6 +292,53 @@ fn verify_canonical(problem: &HumanEvalProblem) -> bool {
     result.compiled && result.runtime_error.is_none()
 }
 
+/// Write the JSON report so far. Called after every problem (incremental
+/// save, so a killed run still leaves a usable partial report — see the
+/// comment at `report_path`'s definition in `main()`) and once more at the
+/// very end with the complete result set. `is_final` only affects nothing
+/// functionally today, but documents intent at call sites.
+fn write_report(
+    mode: BenchMode,
+    use_orchestrator: bool,
+    results: &[EvalResult],
+    report_path: &std::path::Path,
+    _is_final: bool,
+) {
+    let total = results.len();
+    let passed = results.iter().filter(|r| r.passed).count();
+    let compiled = results.iter().filter(|r| r.compiled).count();
+
+    let json_results: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "task_id": r.task_id, "entry_point": r.entry_point,
+                "passed": r.passed, "compiled": r.compiled,
+                "error": r.error, "mode": r.mode,
+                "elapsed_ms": r.elapsed_ms, "code_len": r.code_len,
+            })
+        })
+        .collect();
+
+    let json_report = serde_json::json!({
+        "benchmark": "humaneval",
+        "mode": format!("{:?}", mode),
+        "use_orchestrator": use_orchestrator,
+        "hard_geodesic_rejection": std::env::var_os("SYMTHAEA_HARD_GEODESIC_REJECTION").is_some(),
+        "geodesic_rejection_shadow": std::env::var_os("SYMTHAEA_GEODESIC_REJECTION_SHADOW").is_some(),
+        "model": "qwen2.5-coder:7b",
+        "total": total, "passed": passed,
+        "pass_at_1": if total > 0 { passed as f64 / total as f64 } else { 0.0 },
+        "compiled": compiled,
+        "results": json_results,
+    });
+
+    let _ = std::fs::write(
+        report_path,
+        serde_json::to_string_pretty(&json_report).unwrap(),
+    );
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -366,6 +413,17 @@ fn main() {
         eprintln!("  Canonical: {}/{} pass\n", canonical_pass, problems.len());
     }
 
+    // Computed up front so incremental saves (below) and the final save at
+    // the end of main() write to the same path — a run killed partway
+    // through (this benchmark takes long enough, especially in Agent mode,
+    // that it has repeatedly been killed by concurrent-session build
+    // contention on this shared machine) still leaves a usable partial
+    // report instead of losing every result gathered so far.
+    let report_suffix =
+        format!("{:?}{}", mode, if use_orchestrator { "_orch" } else { "" }).to_lowercase();
+    let report_path =
+        std::env::temp_dir().join(format!("symthaea_humaneval_{}.json", report_suffix));
+
     let mut results = Vec::new();
     for (i, problem) in problems.iter().enumerate() {
         let start = Instant::now();
@@ -410,6 +468,8 @@ fn main() {
             elapsed_ms: elapsed,
             code_len: solution.len(),
         });
+
+        write_report(mode, use_orchestrator, &results, &report_path, false);
     }
 
     // Summary
@@ -458,39 +518,6 @@ fn main() {
         }
     }
 
-    // JSON report
-    let json_results: Vec<serde_json::Value> = results
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "task_id": r.task_id, "entry_point": r.entry_point,
-                "passed": r.passed, "compiled": r.compiled,
-                "error": r.error, "mode": r.mode,
-                "elapsed_ms": r.elapsed_ms, "code_len": r.code_len,
-            })
-        })
-        .collect();
-
-    let json_report = serde_json::json!({
-        "benchmark": "humaneval",
-        "mode": format!("{:?}", mode),
-        "use_orchestrator": use_orchestrator,
-        "hard_geodesic_rejection": std::env::var_os("SYMTHAEA_HARD_GEODESIC_REJECTION").is_some(),
-        "geodesic_rejection_shadow": std::env::var_os("SYMTHAEA_GEODESIC_REJECTION_SHADOW").is_some(),
-        "model": "qwen2.5-coder:7b",
-        "total": total, "passed": passed,
-        "pass_at_1": passed as f64 / total as f64,
-        "compiled": compiled,
-        "results": json_results,
-    });
-
-    let report_suffix =
-        format!("{:?}{}", mode, if use_orchestrator { "_orch" } else { "" }).to_lowercase();
-    let report_path =
-        std::env::temp_dir().join(format!("symthaea_humaneval_{}.json", report_suffix));
-    let _ = std::fs::write(
-        &report_path,
-        serde_json::to_string_pretty(&json_report).unwrap(),
-    );
+    write_report(mode, use_orchestrator, &results, &report_path, true);
     eprintln!("\nJSON report: {}", report_path.display());
 }

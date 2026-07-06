@@ -54,7 +54,7 @@ impl From<serde_json::Error> for IpcError {
 }
 
 /// Current IPC schema version. Increment when adding/removing fields.
-pub const SNAPSHOT_VERSION: u32 = 3;
+pub const SNAPSHOT_VERSION: u32 = 7;
 
 /// Snapshot of daemon cognitive state, serialized to disk for TUI consumption.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,6 +133,35 @@ pub struct DaemonSnapshot {
     /// None if no plan was generated this cycle.
     #[serde(default)]
     pub last_plan_efe: Option<f64>,
+    /// Whether the daemon is currently in a low-power deep sleep / hibernation state.
+    #[serde(default)]
+    pub hibernating: bool,
+    /// Metacognitive journal of actions taken and their outcomes.
+    #[serde(default)]
+    pub metacognitive_journal: Vec<MetacognitiveEntry>,
+    /// Metacognitive risk aversion (weight of episodic failure memories in EFE).
+    #[serde(default)]
+    pub risk_aversion: f64,
+    /// Curiosity exploration drive weight.
+    #[serde(default)]
+    pub curiosity_weight: f64,
+    /// Precision-weighted causal learning rate.
+    #[serde(default)]
+    pub causal_learning_rate: f64,
+}
+
+/// A record of a metacognitive event (action planned, executed, and verified).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetacognitiveEntry {
+    pub timestamp: u64,
+    pub symptom: String,
+    pub root_causes: Vec<String>,
+    pub action: String,
+    pub expected_free_energy: f64,
+    pub rationale: String,
+    pub outcome: String, // "Success", "Failure", or "Pending"
+    pub allostatic_threshold: f64,
+    pub volatility_ema: f64,
 }
 
 /// A causal edge entry for IPC (lightweight copy of CausalEdge).
@@ -317,6 +346,11 @@ impl DaemonSnapshot {
             anomaly_volatility_ema: 0.1,
             active_anomaly_threshold: 0.5,
             last_plan_efe: None,
+            hibernating: false,
+            metacognitive_journal: vec![],
+            risk_aversion: 0.2,
+            curiosity_weight: 0.3,
+            causal_learning_rate: 0.1,
         }
     }
 }

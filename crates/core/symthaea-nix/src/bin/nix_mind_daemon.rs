@@ -87,6 +87,12 @@ struct DaemonState {
     /// Rolling EMA of recent anomaly scores — drives the adaptive surprise threshold (allostasis).
     /// Range [0, 1]: near 1 = turbulent system, near 0 = calm. Initialised to 0.5 (neutral).
     anomaly_volatility_ema: f64,
+    /// Number of consecutive cycles the system has been calm.
+    calm_cycles: u64,
+    /// Whether the daemon has entered deep sleep/hibernation mode.
+    hibernating: bool,
+    /// Metacognitive journal of actions taken and their outcomes.
+    metacognitive_journal: Vec<symthaea_nix::ipc::MetacognitiveEntry>,
 }
 
 /// Tracks alert continuity across IPC cycles.
@@ -152,6 +158,9 @@ impl DaemonState {
             last_recommended_action: None,
             failed_action_cooldowns: HashMap::new(),
             anomaly_volatility_ema: 0.5,
+            calm_cycles: 0,
+            hibernating: false,
+            metacognitive_journal: Vec::new(),
         }
     }
 
@@ -315,7 +324,10 @@ impl DaemonState {
         if let Some((target, action, state_before, initial_val)) =
             self.last_recommended_action.take()
         {
-            let success = if target == "disk_used_pct" {
+            let success = if target.starts_with("explore:") {
+                // Epistemic exploration is always considered a success for world model learning
+                true
+            } else if target == "disk_used_pct" {
                 telemetry_clone.disk_used_pct < initial_val
             } else if target == "memory_used_pct" {
                 telemetry_clone.memory_used_pct < initial_val
@@ -332,6 +344,33 @@ impl DaemonState {
                     .insert((target.clone(), action.clone()), 5);
                 EpisodeOutcome::Failure(format!("Target '{}' did not improve", target))
             };
+
+            // Update outcome in the metacognitive journal
+            if let Some(entry) = self
+                .metacognitive_journal
+                .iter_mut()
+                .rfind(|e| e.outcome == "Pending")
+            {
+                entry.outcome = if target.starts_with("explore:") {
+                    "Exploration completed: transition mapped.".to_string()
+                } else if success {
+                    "Success".to_string()
+                } else {
+                    format!("Failure (Target '{}' did not improve)", target)
+                };
+            }
+
+            // Causal learning: associate the corrective action with the target metric improvement or failure
+            let action_node = format!("action:{:?}", action);
+            if success {
+                // Strengthen edge between action and target variable
+                self.causal_graph
+                    .observe_outcome(&action_node, &[&target], &[]);
+            } else {
+                // Weaken/decay edge between action and target variable
+                self.causal_graph
+                    .observe_outcome(&action_node, &[], &[&target]);
+            }
 
             self.active_inference.learn_from_outcome(
                 &state_before,
@@ -365,8 +404,39 @@ impl DaemonState {
         self.anomaly_volatility_ema = VOLATILITY_ALPHA * current_volatility
             + (1.0 - VOLATILITY_ALPHA) * self.anomaly_volatility_ema;
 
+        // Surprise-modulated causal learning rate adaptation (precision-weighted):
+        // Highly turbulent state -> speed up learning (up to 0.3) to quickly map new failure dependencies
+        // Stable, calm state -> slow down learning (down to 0.05) to avoid spurious correlation noise
+        let dynamic_learning_rate = (0.05 + 0.25 * self.anomaly_volatility_ema).clamp(0.05, 0.3);
+        self.causal_graph.set_learning_rate(dynamic_learning_rate);
+
         // Feed the state to the active inference engine
         self.active_inference.observe_state(state_hv.clone());
+
+        // Deep sleep / hibernation entry and exit:
+        // Calm criteria: low volatility (EMA < 0.1) AND no recent predictive alerts.
+        let is_currently_calm = self.anomaly_volatility_ema < 0.1 && self.alert_state.is_empty();
+        if is_currently_calm {
+            self.calm_cycles += 1;
+            if self.calm_cycles >= 15 {
+                if !self.hibernating {
+                    eprintln!("nix-mind-daemon: entering cognitive deep sleep/hibernation mode");
+                    self.hibernating = true;
+                }
+            }
+        } else {
+            self.calm_cycles = 0;
+            if self.hibernating {
+                eprintln!("nix-mind-daemon: system activity detected; waking up from hibernation");
+                self.hibernating = false;
+            }
+        }
+
+        // Causal graph self-optimization:
+        // Apply global decay to prune weak Hebbian connections every 50 cycles
+        if self.observation_count % 50 == 0 {
+            self.causal_graph.decay_all(0.98);
+        }
 
         self.prev_snapshot = Some(snapshot);
         self.prev_state_hv = Some(state_hv);
@@ -625,6 +695,7 @@ impl DaemonState {
     ///
     /// Returns `(active_threshold, last_plan_efe)` for TUI observability.
     fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) -> (f64, Option<f64>) {
+        let now = now_secs();
         let mut candidates = Vec::new();
 
         // 1. Collect candidates from persistent alerts
@@ -672,6 +743,24 @@ impl DaemonState {
             }
         }
 
+        // 3. Proactive epistemic exploration (curiosity drive):
+        // If there are no alerts or anomalies, and we are in calm state,
+        // periodically explore unexplored actions to build the world model.
+        if candidates.is_empty() && self.anomaly_volatility_ema < 0.15 {
+            if self.observation_count > 0 && self.observation_count % 100 == 0 {
+                if let Some(unexplored) = self.active_inference.next_unexplored_action() {
+                    let goal_description =
+                        format!("Explore consequences of action {:?}", unexplored);
+                    candidates.push((
+                        goal_description,
+                        0.2, // low priority
+                        format!("explore:{:?}", unexplored),
+                        0.0,
+                    ));
+                }
+            }
+        }
+
         // 3. Evaluate and prioritize candidate plans
         if !candidates.is_empty() {
             // Sort by priority descending (most urgent first)
@@ -713,6 +802,23 @@ impl DaemonState {
                         state_before,
                         *initial_val,
                     ));
+
+                    // Add entry to metacognitive journal (cap at 20 entries)
+                    let entry = symthaea_nix::ipc::MetacognitiveEntry {
+                        timestamp: now,
+                        symptom: best_goal.clone(),
+                        root_causes: root_causes.clone(),
+                        action: format!("{:?}", best_action.action),
+                        expected_free_energy: best_action.expected_free_energy,
+                        rationale: best_action.rationale.clone(),
+                        outcome: "Pending".to_string(),
+                        allostatic_threshold: dynamic_threshold,
+                        volatility_ema: self.anomaly_volatility_ema,
+                    };
+                    self.metacognitive_journal.push(entry);
+                    if self.metacognitive_journal.len() > 20 {
+                        self.metacognitive_journal.remove(0);
+                    }
 
                     return (dynamic_threshold, Some(best_action.expected_free_energy));
                 }
@@ -839,6 +945,11 @@ impl DaemonState {
             anomaly_volatility_ema: self.anomaly_volatility_ema,
             active_anomaly_threshold: active_threshold,
             last_plan_efe,
+            hibernating: self.hibernating,
+            metacognitive_journal: self.metacognitive_journal.clone(),
+            risk_aversion: self.active_inference.risk_aversion(),
+            curiosity_weight: self.active_inference.curiosity_weight(),
+            causal_learning_rate: self.causal_graph.learning_rate(),
         }
     }
 }
@@ -1331,7 +1442,20 @@ fn main() -> ! {
         #[cfg(feature = "observability")]
         Metrics::global().inc_consciousness_cycles();
 
-        thread::sleep(Duration::from_secs(config.poll_interval));
+        // Allostatic sleep cycle modulation / deep sleep hibernation:
+        // Adjust sleep interval based on anomaly_volatility_ema and hibernation state.
+        let volatility = state.anomaly_volatility_ema;
+        let sleep_factor = if state.hibernating {
+            5.0 // scale sleep by 5x in deep sleep/hibernation
+        } else {
+            1.5 - volatility // range: 0.5 to 1.5
+        };
+        let sleep_secs = ((config.poll_interval as f64) * sleep_factor)
+            .round()
+            .max(1.0)
+            .min(120.0) as u64;
+
+        thread::sleep(Duration::from_secs(sleep_secs));
     }
 }
 
@@ -2108,6 +2232,227 @@ mod tests {
             state.anomaly_volatility_ema < 0.5,
             "After 10 calm cycles EMA ({:.4}) should be below 0.5",
             state.anomaly_volatility_ema
+        );
+    }
+
+    #[test]
+    fn test_action_specific_episodic_valence() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let state_hv = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+
+        // Record a catastrophic failure specifically for action "Rebuild"
+        let failure_episode = SystemEpisode {
+            state_before: state_hv.clone(),
+            action: "Rebuild".to_string(),
+            state_after: state_hv.clone(),
+            outcome: EpisodeOutcome::Failure("Rebuild broke the system".to_string()),
+            phi_at_encoding: 0.9,
+            prediction_error: 0.9,
+            emotional_valence: -1.0, // catastrophic
+            timestamp: 1700000000,
+        };
+
+        state
+            .active_inference
+            .episodic_memory_mut()
+            .record(failure_episode);
+
+        // Predict valence for Rebuild - should be highly negative
+        let rebuild_val = state
+            .active_inference
+            .episodic_memory()
+            .predict_valence_for_action(&state_hv, "Rebuild");
+        assert!(
+            rebuild_val < -0.7,
+            "Expected negative valence for Rebuild: {}",
+            rebuild_val
+        );
+
+        // Predict valence for Rollback - should not be negative
+        let rollback_val = state
+            .active_inference
+            .episodic_memory()
+            .predict_valence_for_action(&state_hv, "Rollback");
+        assert!(
+            rollback_val >= 0.0,
+            "Expected non-negative valence for Rollback: {}",
+            rollback_val
+        );
+    }
+
+    #[test]
+    fn test_hibernation_entry_and_wakeup() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        state.anomaly_volatility_ema = 0.05; // very calm
+
+        // 1. Process 15 calm snapshots
+        for _ in 0..15 {
+            let snapshot = SystemStateSnapshot::default();
+            state.process_snapshot(snapshot, &config);
+        }
+
+        // Verify state is in hibernation
+        assert!(
+            state.hibernating,
+            "Daemon should enter hibernation after 15 calm cycles"
+        );
+
+        // 2. Inject an alert to trigger wakeup
+        state.alert_state.insert(
+            "disk_used_pct_1h".to_string(),
+            AlertTracking {
+                first_seen: 1700000000,
+                consecutive_cycles: 5,
+                prev_predicted_value: 95.0,
+            },
+        );
+
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+
+        // Verify state exited hibernation
+        assert!(
+            !state.hibernating,
+            "Daemon should wake up immediately when alert is present"
+        );
+    }
+
+    #[test]
+    fn test_causal_graph_global_decay() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Add a causal edge
+        state.causal_graph.add_structural_edge("A", "B", 0.8);
+        let conf_before = state.causal_graph.edge_confidence("A", "B").unwrap();
+        assert_eq!(conf_before, 0.8);
+
+        // Set observation_count to 50 (triggering decay check in process_snapshot)
+        state.observation_count = 49; // it will become 50 in process_snapshot
+
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+
+        // Verify confidence decayed
+        let conf_after = state.causal_graph.edge_confidence("A", "B").unwrap();
+        assert!(
+            conf_after < conf_before,
+            "Confidence ({}) should be decayed from before ({})",
+            conf_after,
+            conf_before
+        );
+    }
+
+    #[test]
+    fn test_metacognitive_journaling() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Verify initial state is empty
+        assert!(state.metacognitive_journal.is_empty());
+
+        // Create alert for disk_used_pct
+        let alert_high = AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 95.0,
+            predicted_value: 99.0,
+            hours_ahead: 2.0,
+            threshold: 90.0,
+            confidence: 0.95,
+            recommended_action: None,
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 6,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        state.run_active_inference_plans(&[alert_high]);
+
+        // Verify journal has 1 pending entry
+        assert_eq!(state.metacognitive_journal.len(), 1);
+        assert_eq!(state.metacognitive_journal[0].outcome, "Pending");
+        assert_eq!(
+            state.metacognitive_journal[0].symptom,
+            "Maintain disk_used_pct below 90 (currently 95 predicted 99)"
+        );
+
+        // Process a snapshot where disk_used_pct has improved to 85.0 (success criteria: < 95.0)
+        let mut snapshot_success = SystemStateSnapshot::default();
+        snapshot_success.store_path_count = Some(100);
+        state.process_snapshot(snapshot_success, &config);
+
+        // Verify journal entry has transitioned to Success
+        assert_eq!(state.metacognitive_journal[0].outcome, "Success");
+    }
+
+    #[test]
+    fn test_proactive_epistemic_exploration() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        state.anomaly_volatility_ema = 0.05; // calm state
+        state.observation_count = 100; // multiple of 100
+
+        // Run active inference plans with no alerts/anomalies
+        state.run_active_inference_plans(&[]);
+
+        // A proactive plan should be generated
+        assert!(state.last_recommended_action.is_some());
+        let (target, _action, _, _) = state.last_recommended_action.clone().unwrap();
+        assert!(target.starts_with("explore:"));
+
+        // Verify metacognitive journal pending entry
+        assert_eq!(state.metacognitive_journal.len(), 1);
+        assert_eq!(state.metacognitive_journal[0].outcome, "Pending");
+        assert!(
+            state.metacognitive_journal[0]
+                .symptom
+                .starts_with("Explore consequences of action")
+        );
+
+        // Tick process_snapshot
+        let mut snapshot = SystemStateSnapshot::default();
+        snapshot.store_path_count = Some(100);
+        state.process_snapshot(snapshot, &config);
+
+        // Verify outcome is marked as explored
+        assert_eq!(
+            state.metacognitive_journal[0].outcome,
+            "Exploration completed: transition mapped."
+        );
+    }
+
+    #[test]
+    fn test_surprise_modulated_learning_rate() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // 1. Test calm state -> low learning rate
+        state.anomaly_volatility_ema = 0.02;
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+        let rate_calm = state.causal_graph.learning_rate();
+        assert!(
+            rate_calm < 0.1,
+            "Expected low learning rate in calm state: {}",
+            rate_calm
+        );
+
+        // 2. Test turbulent state -> high learning rate
+        state.anomaly_volatility_ema = 0.95;
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+        let rate_turbulent = state.causal_graph.learning_rate();
+        assert!(
+            rate_turbulent > 0.2,
+            "Expected high learning rate in turbulent state: {}",
+            rate_turbulent
         );
     }
 }

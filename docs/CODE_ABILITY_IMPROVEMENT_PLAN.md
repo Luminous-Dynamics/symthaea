@@ -1597,6 +1597,62 @@ native-pattern false positive, `wrap_for_return`'s 4 sub-cases, and now a
 384-error test file that was a missing `use` statement. Cluster error
 messages before estimating effort.
 
+## 2026-07-06 Update: auditing the actual "verified, self-improving" differentiator
+
+Everything above was making the existing LLM-dispatch pipeline work
+correctly. That's not the project's stated thesis, though — per this doc's
+own framing (and memory): *"don't compete with LLMs at 'write me a
+function' — compete at verified, epistemically honest, self-improving code
+generation with machine-verifiable certificates."* Audited the two pieces
+that are supposed to deliver that promise, which hadn't been checked all
+week.
+
+**`CodeCertificate`** (`src/language/code_certificate.rs`, Phase 4A):
+real cryptographic bookkeeping (BLAKE3 hash, topology/oracle/sheaf
+metadata), genuinely called 4x in the live `code_orchestrator.rs` synthesis
+path (lines 1216/1325/1432/1554) — but its own doc comment states plainly
+it's *"deliberately post-acceptance metadata: compiler/test verification
+remains the acceptance gate"* (line 962-964). It verifies nothing and
+blocks nothing. Worse: `orch.certificates()` (line 576) has exactly one
+caller anywhere in `src/` — the orchestrator's own unit test. Certificates
+are generated, held in an in-memory `Vec`, and discarded when the
+orchestrator drops; no file write, no API, no CLI surface reads them back.
+The file's own doc-comment claim — "Symthaea's competitive moat... no LLM
+API can replicate" (line 39-40) — is aspirational marketing over a receipt
+nobody collects. **Not fixed** — this needs a product decision (what should
+actually consume a certificate: a CLI flag to print it? A gate that refuses
+low-confidence topology results? Left for a deliberate follow-up, not a
+quick patch.
+
+**Distillation flywheel** (Phase 3G): more real than expected — capture and
+in-session retrieval genuinely work (`capture_distillation()`/
+`structural_success_examples_for_request()`, 4 live call sites each),
+feeding verified past successes back into generation prompts. But
+persistence was never wired: `CodingAgent` built a fresh
+`CodeOrchestrator::new()` every time, so the buffer reset to empty every
+process start. **Fixed** (commit `ec07f1e8d5`): `default_distillation_path()`
+(mirrors `FixRuleGenerator::default_rules_path()`'s existing
+`SYMTHAEA_DATA_DIR`/`~/.local/share/symthaea/` convention),
+`load_distillation()` at construction, `save_distillation()` at the end of
+`run()`. Only active when `use_orchestrator=true` (default off, unchanged).
+Verified: `cargo check -p symthaea` clean, full `coding_agent` suite
+202/202 passing.
+
+**Related, not fixed**: `FixRuleGenerator` has the identical unwired-
+persistence shape (`persist_rules`/`load_persisted_rules`, also zero
+callers) — but its "promoted" status depends on `record_rule_outcome`,
+itself never called from the live path, so persisting it now would just
+save an always-empty list every time. Needs outcome-recording wired first;
+a separate, deeper design question (when exactly should an outcome be
+recorded — after a Fixing-phase retry succeeds/fails?) left for later.
+
+**Where this leaves the original thesis**: the self-improving half is now
+genuinely real (in-session retrieval + cross-run persistence). The
+"verified/certified" half is still theater — real crypto, zero consumers.
+Highest-leverage next step for whoever picks this up: decide what actually
+reads a `CodeCertificate` and wire that, or delete the "competitive moat"
+claim if nothing ever will.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*

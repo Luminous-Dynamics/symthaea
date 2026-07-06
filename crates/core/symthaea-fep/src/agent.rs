@@ -133,6 +133,23 @@ impl ActiveInferenceAgent {
         }
     }
 
+    /// Re-seed this agent's internal action-selection RNG.
+    ///
+    /// `new()` always starts from the same fixed golden-ratio constant, so
+    /// by default every agent instance's stochastic action selection
+    /// follows an identical sequence regardless of anything caller-specific
+    /// -- fine for a single agent, but a real confound for experiments that
+    /// construct many independent agent instances and expect their
+    /// stochastic decisions to vary independently (e.g. one agent per
+    /// simulation replicate, seeded from that replicate's own seed). Purely
+    /// additive: existing callers that never call this see no change in
+    /// behavior.
+    pub fn set_rng_seed(&mut self, seed: u64) {
+        // xorshift64 requires a non-zero state; a zero seed would silently
+        // produce a degenerate all-zero stream.
+        self.rng_state = if seed == 0 { 0x9E3779B97F4A7C15 } else { seed };
+    }
+
     /// Perception step: Update beliefs to minimize free energy
     ///
     /// This implements variational inference:
