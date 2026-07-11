@@ -278,12 +278,13 @@ impl CognitiveLoopService {
         // ── Broca SSM language generation + feedback ─────────────────────────
         #[cfg(feature = "ssm_language")]
         self.run_broca_generation(
+            input,
+            perception,
             prediction_error,
             surprise_triggered,
             coherence,
             effective_lr,
             math_result,
-            &perception.encoding.encoding_result.detected_primitives,
             fep_surprise,
             fep_pragmatic_value,
         );
@@ -535,15 +536,17 @@ impl CognitiveLoopService {
     #[cfg(feature = "ssm_language")]
     fn run_broca_generation(
         &mut self,
+        input: &str,
+        perception: &PerceptionPhaseResult,
         prediction_error: f32,
         surprise_triggered: bool,
         coherence: f32,
         effective_lr: f32,
         math_result: &DynMath,
-        detected_primitives: &[String],
         fep_surprise: f32,
         fep_pragmatic_value: f32,
     ) {
+        let detected_primitives = &perception.encoding.encoding_result.detected_primitives;
         let broca_psi = self.unification_engine.psi as f32;
         let broca_novelty = prediction_error > self.config.learning_threshold || surprise_triggered;
         // Attention fatigue → Broca cadence gating.
@@ -636,7 +639,7 @@ impl CognitiveLoopService {
                 + quality_spacing_boost
         };
         let broca_should_generate =
-            broca_psi > 0.4 && broca_novelty && self.stats.total_cycles % broca_min_spacing != 0;
+            broca_psi > 0.1 && broca_novelty && self.stats.total_cycles % broca_min_spacing != 0;
         if !broca_should_generate {
             return;
         }
@@ -796,6 +799,22 @@ impl CognitiveLoopService {
                 code_channels: self.language_comm.broca_code_channels.take(),
                 fep_surprise,
                 fep_pragmatic_value,
+                social_context: if self.behavior.social_mgr.partner_model.is_some()
+                    && !input.trim().is_empty()
+                {
+                    0.8
+                } else {
+                    0.0
+                },
+                social_trust: self.behavior.social_mgr.social.social_trust,
+                partner_belief_hv: if self.behavior.social_mgr.partner_model.is_some()
+                    && !input.trim().is_empty()
+                {
+                    Some(perception.encoding.hv16_cached.to_continuous().normalize())
+                } else {
+                    None
+                },
+                ..Default::default()
             };
 
             // ── Epistemic: Sacred Stillness modulates confidence ──

@@ -6,7 +6,6 @@
 //! Demonstrates the full DESIGN -> SIMULATE -> PROVE -> MAKE loop
 //! with Causal Interventions, Sim-to-Real Calibration, and Amodal Fusion.
 
-use symthaea_broca::{BrocaConfig, BrocaGenerator};
 use symthaea_causal_reasoning::causal_calculus::{CausalDAG, StructuralCausalModel};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_engineering::{EngineeringAssistant, EngineeringConcept, EngineeringManager};
@@ -14,7 +13,7 @@ use symthaea_fabrication_kernel::cincinnati_live::SensorReading;
 use symthaea_fabrication_kernel::csg::CSGNode;
 use symthaea_fabrication_kernel::thought::GeometricThought;
 use symthaea_mujoco_bridge::MuJoCoBridge;
-use symthaea_sim_bridge::{EngineeringDomain, MetricEncoder, SimulationRequest, SolverKind};
+use symthaea_sim_bridge::{EngineeringDomain, SimulationRequest, SolverKind};
 
 fn run_iteration(
     iteration: usize,
@@ -31,7 +30,7 @@ fn run_iteration(
     }
 
     // 1. Propose Requirements
-    let mut requirements = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
+    let requirements = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
     println!(
         "✅ Step 1: Broca synthesized {} requirements.",
         requirements.len()

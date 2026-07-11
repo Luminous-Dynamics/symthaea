@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-use symthaea_core::hdc::autodiff::{GenericVar, Scalar, ad_begin_f64, ad_end};
-use symthaea_core::hdc::eml_regressor::{EmlMasterNode, EmlRegressor};
+use symthaea_core::hdc::eml_regressor::EmlRegressor;
 
 // IGNORED 2026-07-06: these are stochastic EML *convergence* tests, not
 // checks of shipped behavior. `parallel_train` picks the best of N random

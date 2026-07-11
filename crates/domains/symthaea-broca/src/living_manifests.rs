@@ -28,13 +28,14 @@ pub struct ComponentDoc {
 pub struct LivingManifestGenerator {
     // Held for a future manifest-generation path that queries live blueprint
     // state; generate_manifest() doesn't read it yet.
-    #[allow(dead_code)]
-    binding_engine: SubstrateBindingEngine,
+    _binding_engine: SubstrateBindingEngine,
 }
 
 impl LivingManifestGenerator {
     pub fn new(binding_engine: SubstrateBindingEngine) -> Self {
-        Self { binding_engine }
+        Self {
+            _binding_engine: binding_engine,
+        }
     }
 
     /// Generate a beautiful, living manifest from the current blueprint.

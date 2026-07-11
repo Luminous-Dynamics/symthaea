@@ -108,6 +108,12 @@ fn run_fixture(
     let mut tests_passed = false;
     let mut attempts = 0usize;
 
+    let signature = if fixture.prompt.starts_with("// Implement:") {
+        Some(fixture.prompt.trim_start_matches("// Implement:").trim())
+    } else {
+        None
+    };
+
     let channels = ThoughtChannels::with_intent(stable_intent_id(fixture.slug));
     for attempt in 1..=opts.max_attempts {
         attempts = attempt;
@@ -116,7 +122,7 @@ fn run_fixture(
             .context("generating semantic monologue")?;
         let nucleus = generator.recursive_fold(&monologue);
         let synthesized_code = generator
-            .synthesize_program(&nucleus, fixture.slug)
+            .synthesize_program_with_signature(&nucleus, fixture.slug, signature)
             .context("synthesizing exercise program")?;
         write_crate(temp.path(), fixture, &synthesized_code)?;
 

@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod manifest;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -30,6 +31,16 @@ enum Commands {
         policies: String,
         #[arg(long, default_value = "reports/rhn_v011_sweep")]
         out: PathBuf,
+    },
+    RhnFinalize {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    GenerateManifest {
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
     },
 }
 
@@ -67,6 +78,17 @@ fn main() -> anyhow::Result<()> {
                 policies,
                 out,
             )?;
+        }
+        Commands::RhnFinalize { input, out } => {
+            rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::GenerateManifest { root } => {
+            let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
+            manifest::generate_manifest(&root, &files)?;
+            println!(
+                "Manifest generated at {}",
+                root.join("manifest.json").display()
+            );
         }
     }
     Ok(())

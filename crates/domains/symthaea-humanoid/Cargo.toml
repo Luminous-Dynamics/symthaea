@@ -20,7 +20,7 @@ rand = { workspace = true }
 anyhow = { workspace = true }
 
 # MuJoCo bindings (optional — required for full contact dynamics)
-mujoco-rs = { version = "2.3", optional = true, default-features = false }
+mujoco-rs = { version = "4.0.1", optional = true, features = ["auto-download-mujoco"] }
 symthaea-vision-manifold = { version = "0.1.0", path = "../symthaea-vision-manifold" }
 
 [dev-dependencies]
@@ -30,3 +30,7 @@ approx = "0.5"
 default = []
 mujoco = ["dep:mujoco-rs"]
 viewer = ["mujoco", "mujoco-rs/viewer"]
+
+[[example]]
+name = "run_perception_climb"
+required-features = ["mujoco"]

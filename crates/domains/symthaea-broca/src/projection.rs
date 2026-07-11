@@ -35,6 +35,28 @@ use symthaea_core::hdc::ContinuousHV;
 /// Ensures gradient flow even through saturated regions.
 const RESIDUAL_ALPHA: f32 = 0.1;
 
+/// Modal experts for multi-task projection (Pillar 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ProjectionExpert {
+    /// Default generic projection weights.
+    Default,
+    /// Weights trained on logical reasoning and formal code.
+    Logic,
+    /// Weights trained on high-arousal narrative prose.
+    Narrative,
+    /// Weights focused on alignment and safety constraints.
+    Safety,
+}
+
+/// Stored weight matrices for an expert projection modality.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProjectionExpertWeights {
+    pub w_down: Vec<f32>,
+    pub w_up: Vec<f32>,
+    pub w_back_down: Vec<f32>,
+    pub w_back_up: Vec<f32>,
+}
+
 /// GELU activation: `x * Φ(x)` via tanh approximation.
 #[inline]
 fn gelu(x: f32) -> f32 {
@@ -117,6 +139,10 @@ pub struct HdcSsmProjection {
     pub hdc_dim: usize,
     pub bottleneck: usize,
     pub ssm_dim: usize,
+    /// Expert weights stored for dynamic routing (Multi-Task Highway Experts).
+    pub experts: std::collections::HashMap<ProjectionExpert, ProjectionExpertWeights>,
+    /// The currently active expert.
+    pub active_expert: ProjectionExpert,
 }
 
 /// Metrics from a single gradient application step.
@@ -490,6 +516,17 @@ impl HdcSsmProjection {
             scale,
         );
 
+        let mut experts = std::collections::HashMap::new();
+        experts.insert(
+            ProjectionExpert::Default,
+            ProjectionExpertWeights {
+                w_down: w_down.clone(),
+                w_up: w_up.clone(),
+                w_back_down: w_back_down.clone(),
+                w_back_up: w_back_up.clone(),
+            },
+        );
+
         Self {
             grad_down: vec![0.0; bottleneck * hdc_dim],
             grad_up: vec![0.0; ssm_dim * bottleneck],
@@ -521,6 +558,8 @@ impl HdcSsmProjection {
             ssm_dim,
             diagnostics: None,
             last_diag_recovery_gen: 0,
+            experts,
+            active_expert: ProjectionExpert::Default,
         }
     }
 
@@ -594,6 +633,17 @@ impl HdcSsmProjection {
             inner_scale,
         );
 
+        let mut experts = std::collections::HashMap::new();
+        experts.insert(
+            ProjectionExpert::Default,
+            ProjectionExpertWeights {
+                w_down: w_down.clone(),
+                w_up: w_up.clone(),
+                w_back_down: w_back_down.clone(),
+                w_back_up: w_back_up.clone(),
+            },
+        );
+
         Self {
             grad_down: vec![0.0; bottleneck * hdc_dim],
             grad_up: vec![0.0; ssm_dim * bottleneck],
@@ -624,6 +674,8 @@ impl HdcSsmProjection {
             ssm_dim,
             diagnostics: None,
             last_diag_recovery_gen: 0,
+            experts,
+            active_expert: ProjectionExpert::Default,
         }
     }
 
@@ -1450,6 +1502,51 @@ impl HdcSsmProjection {
             self.w_up2.copy_from_slice(&flat[offset..offset + n]);
             let _ = offset; // suppress unused assignment warning
         }
+
+        // Sync active expert weights in the map if the map is initialized
+        if self.experts.contains_key(&self.active_expert) {
+            let active = ProjectionExpertWeights {
+                w_down: self.w_down.clone(),
+                w_up: self.w_up.clone(),
+                w_back_down: self.w_back_down.clone(),
+                w_back_up: self.w_back_up.clone(),
+            };
+            self.experts.insert(self.active_expert, active);
+        }
+    }
+
+    /// Swap to a different projection expert (Multi-Task Highway Experts).
+    /// If the expert does not exist yet, it is initialized by copying the current weights.
+    pub fn select_expert(&mut self, expert: ProjectionExpert) {
+        if self.active_expert == expert {
+            return;
+        }
+
+        // Save current active weights into the experts map
+        let current_weights = ProjectionExpertWeights {
+            w_down: self.w_down.clone(),
+            w_up: self.w_up.clone(),
+            w_back_down: self.w_back_down.clone(),
+            w_back_up: self.w_back_up.clone(),
+        };
+        self.experts.insert(self.active_expert, current_weights);
+
+        // Load the new expert weights (or initialize if not found)
+        if let Some(w) = self.experts.get(&expert) {
+            self.w_down = w.w_down.clone();
+            self.w_up = w.w_up.clone();
+            self.w_back_down = w.w_back_down.clone();
+            self.w_back_up = w.w_back_up.clone();
+        } else {
+            // Initialize from default expert weights if available, otherwise keep current
+            if let Some(default_w) = self.experts.get(&ProjectionExpert::Default) {
+                self.w_down = default_w.w_down.clone();
+                self.w_up = default_w.w_up.clone();
+                self.w_back_down = default_w.w_back_down.clone();
+                self.w_back_up = default_w.w_back_up.clone();
+            }
+        }
+        self.active_expert = expert;
     }
 
     /// Total number of learnable parameters.

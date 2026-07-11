@@ -1302,7 +1302,7 @@ impl EpistemicCubeGate {
 #[derive(Clone)]
 pub struct CodeGate {
     config: GatingConfig,
-    tokenizer: std::sync::Arc<BpeTokenizer>,
+    _tokenizer: std::sync::Arc<BpeTokenizer>,
     /// Token IDs for Rust structural keywords.
     structural_ids: Vec<u32>,
     /// Token IDs for concrete type words.
@@ -1315,8 +1315,7 @@ pub struct CodeGate {
     /// The scorer-feedback write path was never wired up, so this stays empty
     /// today -- kept rather than removed since the field is the documented
     /// intent for that future integration.
-    #[allow(dead_code)]
-    nix_path_tokens: std::sync::Arc<parking_lot::Mutex<std::collections::HashMap<String, u32>>>,
+    _nix_path_tokens: std::sync::Arc<parking_lot::Mutex<std::collections::HashMap<String, u32>>>,
     epistemic_cube_gate: EpistemicCubeGate,
     /// **NEW**: Language-specific gate heads (Nix, Terraform, CDK, etc.)
     language_gate_registry: crate::language_gates::LanguageGateRegistry,
@@ -1346,12 +1345,12 @@ impl CodeGate {
 
         Self {
             config: config.clone(),
-            tokenizer: std::sync::Arc::new(tokenizer.clone()),
+            _tokenizer: std::sync::Arc::new(tokenizer.clone()),
             structural_ids: resolve(CANONICAL_RUST_STRUCTURAL_WORDS),
             type_ids: resolve(CANONICAL_TYPE_WORDS),
             error_handling_ids: resolve(CANONICAL_ERROR_HANDLING_WORDS),
             algorithm_ids: resolve(CANONICAL_ALGORITHM_SCAFFOLD_WORDS),
-            nix_path_tokens: std::sync::Arc::new(parking_lot::Mutex::new(
+            _nix_path_tokens: std::sync::Arc::new(parking_lot::Mutex::new(
                 std::collections::HashMap::new(),
             )),
             epistemic_cube_gate: EpistemicCubeGate::new(tokenizer),
@@ -1475,7 +1474,7 @@ impl CodeGate {
 
         // 7. Hallucination suppression via Epistemic Cube
         self.epistemic_cube_gate
-            .apply_strict_code_gate(logits, channels, &self.tokenizer);
+            .apply_strict_code_gate(logits, channels, &self._tokenizer);
     }
 }
 

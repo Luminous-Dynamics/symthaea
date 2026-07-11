@@ -167,3 +167,6 @@ pillars/
 
 # Standalone demo experiments
 demos/infin-love/
+
+# Exceptions for code synthesis
+!crates/domains/symthaea-geodesic/src/token_codebook.rs

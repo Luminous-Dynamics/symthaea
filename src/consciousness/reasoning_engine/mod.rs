@@ -173,7 +173,7 @@ impl ConsciousReasoningEngine {
         }
 
         // Create budget tracker
-        let budget = ReasoningBudget::new(ctx.available_budget_us, r);
+        let budget = ReasoningBudget::new(ctx.available_budget_us, r, ctx.phi);
 
         // ── STEP 5 (early, for Tier 0): GATE ───────────────────────────
         let gate = ctx.tool.as_ref().map(|tool| {
@@ -225,7 +225,10 @@ impl ConsciousReasoningEngine {
         event.evs = evs_val;
 
         // ── STEP 4: PLAN ────────────────────────────────────────────────
-        let plan = if evs_val > thresholds::EVS_THRESHOLD && !ctx.available_actions.is_empty() {
+        let plan = if evs_val > thresholds::EVS_THRESHOLD
+            && !ctx.available_actions.is_empty()
+            && budget.tier != BudgetTier::Tier1
+        {
             let sim_state = self
                 .simulation_state
                 .as_ref()

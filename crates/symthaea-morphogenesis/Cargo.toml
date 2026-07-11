@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-morphogenesis"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Experimental morphogenesis sandbox using HDC tissue encodings"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+csv = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea = { path = "../.." }
+
+[[example]]
+name = "planarian_tas_sim"
+path = "examples/planarian_tas_sim.rs"

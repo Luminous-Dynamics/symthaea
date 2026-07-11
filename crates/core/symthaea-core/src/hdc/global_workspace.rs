@@ -447,6 +447,47 @@ impl GlobalWorkspace {
                 }
             });
         }
+        // ── Coalition ignition (Dehaene & Changeux 2011 §2.1) ────────────────
+        // The amplitude-threshold path fails for text cognition because
+        // PE≈0.9 keeps individual activation below the sigmoid knee.
+        // Coalition ignition fires when ≥2 distinct representations
+        // enter the workspace simultaneously — regardless of amplitude.
+        // "Distinct" = Hamming similarity < 0.70 on the first BinaryHV
+        // (XOR popcount / 16384 bits → measures actual content divergence).
+        // Science: ignition is defined by all-or-none *broadcasting*, not
+        // by the amplitude of any single representation.
+        if !ignition && new_contents.len() >= 2 {
+            'coalition: for i in 0..new_contents.len() {
+                for j in (i + 1)..new_contents.len() {
+                    let rep_a = &new_contents[i].representation;
+                    let rep_b = &new_contents[j].representation;
+                    // Compare first BinaryHV from each representation
+                    if let (Some(a), Some(b)) = (rep_a.first(), rep_b.first()) {
+                        let xor_bits: u32 =
+                            a.0.iter()
+                                .zip(b.0.iter())
+                                .map(|(x, y)| (x ^ y).count_ones())
+                                .sum();
+                        // Hamming similarity = 1 - (xor_bits / total_bits)
+                        let total_bits = (a.0.len() * 8) as f32;
+                        let hamming_sim = 1.0 - (xor_bits as f32 / total_bits);
+                        if hamming_sim < 0.70 {
+                            ignition = true;
+                            #[cfg(feature = "ctc_wiring")]
+                            {
+                                self.ignition_hysteresis = true;
+                                // Coalition ignition strength 0.6: weaker than full
+                                // sigmoid ignition (0.65+) to preserve ordering.
+                                if self.last_ignition_strength < 0.6 {
+                                    self.last_ignition_strength = 0.6;
+                                }
+                            }
+                            break 'coalition;
+                        }
+                    }
+                }
+            }
+        }
 
         (new_contents, ignition)
     }
@@ -1001,5 +1042,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_coalition_ignition_fires_for_distinct_representations() {
+        // Two distinct BinaryHVs (different seeds → ~50% Hamming distance)
+        // submitted at sub-threshold activation should still ignite via coalition.
+        let mut ws = GlobalWorkspace::new(WorkspaceConfig {
+            entry_threshold: 0.3, // low enough that both sub-0.65 entries can enter
+            winner_takes_all: false,
+            max_capacity: 4,
+            ..Default::default()
+        });
+
+        // Activation 0.45 — below the sigmoid ignition knee at 0.65
+        let content_a =
+            WorkspaceContent::new(vec![BinaryHV::random(1)], 0.45, "modality_a".to_string());
+        let content_b =
+            WorkspaceContent::new(vec![BinaryHV::random(2)], 0.45, "modality_b".to_string());
+
+        ws.submit(content_a);
+        ws.submit(content_b);
+        let assessment = ws.process();
+
+        // Coalition ignition should fire because the two random HVs are distinct
+        // (Hamming similarity ≈ 0.50 < 0.70 threshold)
+        assert!(
+            assessment.ignition_detected,
+            "Coalition ignition should fire when ≥2 distinct representations enter workspace"
+        );
+    }
+
+    #[test]
+    fn test_coalition_ignition_does_not_fire_for_identical_representations() {
+        // Two IDENTICAL BinaryHVs submitted at sub-threshold activation.
+        // Hamming similarity = 1.0 ≥ 0.70, so coalition ignition should NOT fire.
+        let mut ws = GlobalWorkspace::new(WorkspaceConfig {
+            entry_threshold: 0.3,
+            winner_takes_all: false,
+            max_capacity: 4,
+            ..Default::default()
+        });
+
+        let hv = BinaryHV::random(42);
+        let content_a = WorkspaceContent::new(vec![hv.clone()], 0.45, "source_a".to_string());
+        let content_b = WorkspaceContent::new(vec![hv.clone()], 0.45, "source_b".to_string());
+
+        ws.submit(content_a);
+        ws.submit(content_b);
+        let assessment = ws.process();
+
+        // Both entries share the same HV → Hamming sim = 1.0, no coalition ignition
+        // (and activation 0.45 < sigmoid threshold 0.65, so no amplitude ignition)
+        assert!(
+            !assessment.ignition_detected,
+            "Coalition ignition should NOT fire for identical representations (Hamming sim = 1.0)"
+        );
     }
 }

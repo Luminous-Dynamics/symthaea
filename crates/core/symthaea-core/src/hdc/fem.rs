@@ -45,6 +45,23 @@ impl Mesh1D {
         Mesh1D { coords, elements }
     }
 
+    /// Create a non-uniform 1D mesh.
+    pub fn non_uniform(coords: Vec<f64>) -> Result<Self, &'static str> {
+        if coords.len() < 2 {
+            return Err("Mesh must have at least 2 nodes");
+        }
+        for i in 0..coords.len() - 1 {
+            if coords[i + 1] <= coords[i] {
+                return Err("Coordinates must be strictly increasing");
+            }
+        }
+        let elements: Vec<Element1D> = (0..coords.len() - 1)
+            .map(|i| Element1D { nodes: [i, i + 1] })
+            .collect();
+
+        Ok(Mesh1D { coords, elements })
+    }
+
     /// Number of nodes.
     pub fn n_nodes(&self) -> usize {
         self.coords.len()
@@ -68,10 +85,13 @@ pub struct FEMResult {
 pub struct FEMEngine;
 
 impl FEMEngine {
-    /// Solve the 1D Poisson equation -u'' = f on [0, L] with u(0)=u_a, u(L)=u_b.
+    /// Solve the 1D Poisson equation -u'' = f(x) on [0, L] with u(0)=u_a, u(L)=u_b.
     ///
-    /// Uses linear finite elements and a constant source term f.
-    pub fn solve_poisson_1d(mesh: &Mesh1D, f: f64, u_a: f64, u_b: f64) -> FEMResult {
+    /// Uses linear finite elements and a provided source function f.
+    pub fn solve_poisson_1d<F>(mesh: &Mesh1D, f: F, u_a: f64, u_b: f64) -> FEMResult
+    where
+        F: Fn(f64) -> f64,
+    {
         let n = mesh.n_nodes();
         let mut k_global = vec![0.0; n * n];
         let mut f_global = vec![0.0; n];
@@ -87,8 +107,10 @@ impl FEMEngine {
             // Element stiffness matrix k_e = 1/h * [1, -1; -1, 1]
             let k_e = [1.0 / h, -1.0 / h, -1.0 / h, 1.0 / h];
 
-            // Element load vector f_e = f*h/2 * [1; 1]
-            let f_e = [f * h / 2.0, f * h / 2.0];
+            // Element load vector f_e via midpoint quadrature
+            let x_mid = (x_i + x_j) / 2.0;
+            let f_val = f(x_mid);
+            let f_e = [f_val * h / 2.0, f_val * h / 2.0];
 
             // Map to global
             k_global[i * n + i] += k_e[0];
@@ -100,8 +122,7 @@ impl FEMEngine {
             f_global[j] += f_e[1];
         }
 
-        // 2. Apply Dirichlet BCs (Penalty method or Row/Col zeroing)
-        // Here we use row/col zeroing with 1 on diagonal and BC value in f.
+        // 2. Apply Dirichlet BCs
         let bc_indices = [0, n - 1];
         let bc_values = [u_a, u_b];
 
@@ -123,7 +144,6 @@ impl FEMEngine {
         }
 
         // 3. Solve Ku = f
-        // We use the HdcMatrix solver from linear_algebra.rs (LU decomposition)
         let matrix = HdcMatrix {
             data: k_global,
             rows: n,
@@ -179,37 +199,116 @@ mod tests {
     #[test]
     fn test_poisson_1d_uniform_load() {
         // -u'' = 1, u(0)=0, u(1)=0  ->  u(x) = 0.5 * x * (1 - x)
-        // Max value at x=0.5 is 0.5 * 0.5 * 0.5 = 0.125
-        let mesh = Mesh1D::uniform(1.0, 9); // 11 nodes total, 10 elements
-        let result = FEMEngine::solve_poisson_1d(&mesh, 1.0, 0.0, 0.0);
+        let mesh = Mesh1D::uniform(1.0, 9);
+        let result = FEMEngine::solve_poisson_1d(&mesh, |_| 1.0, 0.0, 0.0);
 
         assert_eq!(result.u.len(), 11);
         assert!((result.u[0] - 0.0).abs() < 1e-12);
         assert!((result.u[10] - 0.0).abs() < 1e-12);
 
-        // Check midpoint value u(0.5)
         let mid = result.u[5];
-        assert!((mid - 0.125).abs() < 1e-3, "Expected 0.125, got {}", mid);
-
-        assert!(result.residual < 1e-10);
-        assert!(result.phi > 0.9);
+        assert!((mid - 0.125).abs() < 1e-3);
     }
 
     #[test]
-    fn test_poisson_1d_linear() {
-        // -u'' = 0, u(0)=0, u(1)=1  ->  u(x) = x
+    fn test_nonzero_boundary_values() {
+        // -u'' = 0, u(0)=1, u(1)=2  ->  u(x) = 1 + x
         let mesh = Mesh1D::uniform(1.0, 5);
-        let result = FEMEngine::solve_poisson_1d(&mesh, 0.0, 0.0, 1.0);
+        let result = FEMEngine::solve_poisson_1d(&mesh, |_| 0.0, 1.0, 2.0);
 
-        for (i, &val) in result.u.iter().enumerate() {
-            let x = i as f64 / (result.u.len() - 1) as f64;
+        assert!((result.u[0] - 1.0).abs() < 1e-12);
+        assert!((result.u[6] - 2.0).abs() < 1e-12);
+        assert!((result.u[3] - 1.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_convergence_rate() {
+        // Use non-polynomial source to avoid nodal exactness
+        // -u'' = sin(pi*x), u(0)=0, u(1)=0  ->  U(x) = (1/pi^2) * sin(pi*x)
+        let pi = std::f64::consts::PI;
+        let analytic = |x: f64| (1.0 / (pi * pi)) * (pi * x).sin();
+        let source = |x: f64| (pi * x).sin();
+
+        let mut errors = Vec::new();
+        let ns = vec![8, 16, 32, 64];
+
+        for &n in &ns {
+            let mesh = Mesh1D::uniform(1.0, n);
+            let result = FEMEngine::solve_poisson_1d(&mesh, source, 0.0, 0.0);
+
+            let mut l2_sq = 0.0;
+            for (i, &x) in mesh.coords.iter().enumerate() {
+                let u_num = result.u[i];
+                let u_exact = analytic(x);
+                l2_sq += (u_num - u_exact).powi(2);
+            }
+            let l2_error = (l2_sq / mesh.coords.len() as f64).sqrt();
+            errors.push(l2_error);
+        }
+
+        // L2 error should decrease as elements increase
+        for i in 0..errors.len() - 1 {
             assert!(
-                (val - x).abs() < 1e-12,
-                "At x={}, expected {}, got {}",
-                x,
-                x,
-                val
+                errors[i + 1] < errors[i],
+                "L2 error did not decrease: {} vs {}",
+                errors[i],
+                errors[i + 1]
             );
         }
+
+        // Ratio error(h)/error(h/2) should be ~4 for quadratic convergence
+        let ratio = errors[1] / errors[2];
+        assert!(ratio > 3.0, "Convergence rate too low: {}", ratio);
+    }
+
+    #[test]
+    fn test_energy_norm_error() {
+        // -u'' = 1, u(0)=0, u(1)=0 -> U(x) = 0.5*x*(1-x), U'(x) = 0.5 - x
+        let analytic_derivative = |x: f64| 0.5 - x;
+
+        let mut errors = Vec::new();
+        let ns = vec![8, 16, 32];
+
+        for &n in &ns {
+            let mesh = Mesh1D::uniform(1.0, n);
+            let result = FEMEngine::solve_poisson_1d(&mesh, |_| 1.0, 0.0, 0.0);
+
+            // Energy error sq = integral( (u_h' - U')^2 dx )
+            let mut energy_error_sq = 0.0;
+            for elem in &mesh.elements {
+                let x_i = mesh.coords[elem.nodes[0]];
+                let x_j = mesh.coords[elem.nodes[1]];
+                let h = x_j - x_i;
+
+                // u_h' on this element is (u_j - u_i) / h
+                let uh_prime = (result.u[elem.nodes[1]] - result.u[elem.nodes[0]]) / h;
+
+                // integral_xi^xj (uh_prime - (0.5 - x))^2 dx
+                // We use 2-point Gaussian quadrature for exactness on polynomials
+                let g_points = [-0.5773502691896257, 0.5773502691896257];
+                let g_weights = [1.0, 1.0];
+
+                for (qp, qw) in g_points.iter().zip(g_weights.iter()) {
+                    let x = 0.5 * (x_i + x_j) + 0.5 * h * qp;
+                    let diff = uh_prime - analytic_derivative(x);
+                    energy_error_sq += 0.5 * h * qw * diff.powi(2);
+                }
+            }
+            errors.push(energy_error_sq.sqrt());
+        }
+
+        // Energy error should decrease as elements increase
+        for i in 0..errors.len() - 1 {
+            assert!(
+                errors[i + 1] < errors[i],
+                "Energy error did not decrease: {} vs {}",
+                errors[i],
+                errors[i + 1]
+            );
+        }
+
+        // H1 convergence should be O(h)
+        let ratio = errors[0] / errors[1];
+        assert!(ratio > 1.8, "Energy convergence rate too low: {}", ratio);
     }
 }

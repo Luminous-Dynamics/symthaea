@@ -552,7 +552,6 @@ pub struct ComparisonResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::binary_hv::BinaryHV;
 
     fn create_test_state(conscious: bool) -> ConsciousnessState {
         use crate::hdc::consciousness_integration::*;

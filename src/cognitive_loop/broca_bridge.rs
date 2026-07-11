@@ -85,6 +85,12 @@ pub struct BrocaConsciousnessSignals {
     pub fep_surprise: f32,
     /// FEP pragmatic value (0..1). High = action is expected to reduce future surprise.
     pub fep_pragmatic_value: f32,
+    /// Social context level (0..1). High context indicates interaction with an active partner.
+    pub social_context: f32,
+    /// Social trust level (0..1). High trust allows more open/unfiltered alignment.
+    pub social_trust: f32,
+    /// Stance/belief hypervector of the conversation partner.
+    pub partner_belief_hv: Option<symthaea_core::hdc::ContinuousHV>,
 }
 
 // Re-export telemetry type from the types module.
@@ -178,6 +184,13 @@ impl BrocaManager {
         let generator = Self::try_load_checkpoint(checkpoint_path, genesis)
             .unwrap_or_else(|| BrocaGenerator::new(genesis, config));
 
+        let partner_belief_init = symthaea_core::hdc::ContinuousHV::from_genesis(
+            genesis,
+            "partner_belief_default",
+            16384,
+        )
+        .normalize();
+
         Self {
             generator,
             last_telemetry: BrocaGenerationTelemetry::default(),
@@ -186,7 +199,12 @@ impl BrocaManager {
             turn_count: 0,
             context_window: std::collections::VecDeque::new(),
             discourse_memory: std::collections::VecDeque::new(),
-            theory_of_mind: TheoryOfMindState::default(),
+            theory_of_mind: TheoryOfMindState {
+                partner_belief_hv: partner_belief_init,
+                alignment_score: 0.0,
+                familiarity: 0.0,
+                interaction_count: 0,
+            },
         }
     }
 
@@ -316,12 +334,97 @@ impl BrocaManager {
             channels.set_code(sc, tc, ap, el);
         }
 
+        // Select active expert dynamically based on active goals/drives (Pillar 3).
+        #[cfg(feature = "liquid-mamba")]
+        {
+            let expert = if signals.ethics_blocked {
+                symthaea_broca::projection::ProjectionExpert::Safety
+            } else if signals.code_channels.is_some() {
+                symthaea_broca::projection::ProjectionExpert::Logic
+            } else if signals.emotional_arousal > 0.6 {
+                symthaea_broca::projection::ProjectionExpert::Narrative
+            } else {
+                symthaea_broca::projection::ProjectionExpert::Default
+            };
+            self.generator.select_projection_expert(expert);
+        }
+
+        // Active thought HV from channels (Pillar 2).
+        let thought_hv = self.generator.encoder().encode(&channels);
+
+        // Update Theory of Mind Model stance and alignment score (Pillar 2).
+        if signals.social_context > 0.0 {
+            if let Some(ref incoming_pb) = signals.partner_belief_hv {
+                let trust_blend = signals.social_trust.clamp(0.0, 1.0);
+                self.theory_of_mind.partner_belief_hv.lerp_in_place(
+                    incoming_pb,
+                    1.0 - trust_blend,
+                    trust_blend,
+                );
+                self.theory_of_mind.partner_belief_hv =
+                    self.theory_of_mind.partner_belief_hv.normalize();
+            }
+
+            let similarity = self
+                .theory_of_mind
+                .partner_belief_hv
+                .similarity(&thought_hv);
+            self.theory_of_mind.alignment_score = similarity;
+
+            let update_rate =
+                (0.05 + 0.15 * signals.social_context * signals.social_trust).clamp(0.01, 0.20);
+            self.theory_of_mind.partner_belief_hv.lerp_in_place(
+                &thought_hv,
+                1.0 - update_rate,
+                update_rate,
+            );
+            self.theory_of_mind.partner_belief_hv =
+                self.theory_of_mind.partner_belief_hv.normalize();
+
+            self.theory_of_mind.interaction_count += 1;
+            self.theory_of_mind.familiarity =
+                (self.theory_of_mind.familiarity + 0.05).clamp(0.0, 1.0);
+        }
+
+        // Blend partner stance into semantic context (Pillar 2).
+        let mut local_semantic_hv = signals.semantic_hv.clone();
+        if signals.social_context > 0.0 {
+            let blend_weight = (0.10 + 0.15 * signals.social_context).clamp(0.10, 0.25);
+            if let Some(ref mut sem_hv) = local_semantic_hv {
+                sem_hv.lerp_in_place(
+                    &self.theory_of_mind.partner_belief_hv,
+                    1.0 - blend_weight,
+                    blend_weight,
+                );
+                *sem_hv = sem_hv.normalize();
+            } else {
+                local_semantic_hv = Some(self.theory_of_mind.partner_belief_hv.clone());
+            }
+        }
+
+        // Save original configuration to restore after generation
+        let orig_base_max = self.generator.config().gating.base_max_tokens;
+        let orig_sampling = self.generator.config().sampling.clone();
+
+        // Apply continuous quality scaling based on consciousness level C
+        if signals.consciousness_level > 0.7 {
+            self.generator.config_mut().gating.base_max_tokens =
+                (orig_base_max as f32 * 1.5) as usize;
+            self.generator.config_mut().sampling = symthaea_broca::SamplingStrategy::TopP {
+                p: 0.9,
+                temperature: 0.8,
+            };
+        } else if signals.consciousness_level < 0.4 {
+            self.generator.config_mut().gating.base_max_tokens = (orig_base_max / 2).max(8);
+            self.generator.config_mut().sampling = symthaea_broca::SamplingStrategy::Greedy;
+        }
+
         // Multi-turn context: use generate_continuing() after the first turn
         // to preserve CfC temporal context.
         // Pass NSM semantic HV and active primes through when available.
         let reset_state = !(self.multi_turn_depth > 0 && self.turn_count > 0);
         let sem_hv = if reset_state {
-            signals.semantic_hv.as_ref()
+            local_semantic_hv.as_ref()
         } else {
             None
         };
@@ -358,6 +461,10 @@ impl BrocaManager {
         if self.multi_turn_depth > 0 && self.turn_count >= self.multi_turn_depth {
             self.turn_count = 0;
         }
+
+        // Restore original configuration
+        self.generator.config_mut().gating.base_max_tokens = orig_base_max;
+        self.generator.config_mut().sampling = orig_sampling;
 
         let elapsed = start.elapsed();
 
@@ -695,5 +802,34 @@ mod tests {
         let second_belief = mgr.theory_of_mind.partner_belief_hv.clone();
         // Belief vector should change / drift
         assert!(first_belief.similarity(&second_belief) < 1.0);
+    }
+
+    #[test]
+    fn test_theory_of_mind_social_blending() {
+        let mut mgr = test_manager();
+
+        let partner_vector = symthaea_core::hdc::ContinuousHV::random_default(1234).normalize();
+
+        let signals = BrocaConsciousnessSignals {
+            consciousness_level: 0.8,
+            coherence: 0.5,
+            social_context: 0.8,
+            social_trust: 0.5,
+            partner_belief_hv: Some(partner_vector.clone()),
+            ..Default::default()
+        };
+
+        // Constructor now initializes alignment_score to 0.0 (see
+        // test_turn_based_belief_updates), not 1.0 as originally written here.
+        assert_eq!(mgr.theory_of_mind.alignment_score, 0.0);
+        assert_eq!(mgr.theory_of_mind.interaction_count, 0);
+
+        let _ = mgr.generate(signals);
+
+        assert_eq!(mgr.theory_of_mind.interaction_count, 1);
+        assert!(
+            mgr.theory_of_mind.alignment_score >= -1.0 && mgr.theory_of_mind.alignment_score <= 1.0
+        );
+        assert!(mgr.theory_of_mind.familiarity > 0.0);
     }
 }

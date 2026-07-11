@@ -22,7 +22,7 @@ pub struct IaCHarvestPair {
 }
 
 pub struct IaCHarvester {
-    registry: LanguageGateRegistry,
+    _registry: LanguageGateRegistry,
     scorer: GenericStructuralScorer,
     max_pairs: usize,
     min_diversity_threshold: f32,
@@ -32,7 +32,7 @@ pub struct IaCHarvester {
 impl IaCHarvester {
     pub fn new(tokenizer: &BpeTokenizer) -> Self {
         IaCHarvester {
-            registry: LanguageGateRegistry::new(tokenizer),
+            _registry: LanguageGateRegistry::new(tokenizer),
             scorer: GenericStructuralScorer::new_with_all(), // from earlier module
             max_pairs: 500,
             min_diversity_threshold: 0.75,

@@ -443,14 +443,13 @@ mod tests {
     fn test_neutral_prediction_matches_analytical() {
         let h0 = 0.75;
         let ne = 100.0;
-        for r#gen in [1, 10, 50, 100, 500] {
+        for generation in [1, 10, 50, 100, 500] {
             let predicted =
-                PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, r#gen);
-            let expected = crate::diversity::heterozygosity_after_generations(h0, ne, r#gen);
+                PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, generation);
+            let expected = crate::diversity::heterozygosity_after_generations(h0, ne, generation);
             assert!(
                 (predicted - expected).abs() < 1e-12,
-                "neutral prediction at gen {gen}: {predicted} vs {expected}",
-                gen = r#gen
+                "neutral prediction at gen {generation}: {predicted} vs {expected}"
             );
         }
     }
@@ -460,12 +459,12 @@ mod tests {
         let h0 = 0.8;
         let ne = 50.0;
         let mut prev = h0;
-        for r#gen in 1..=20 {
-            let h = PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, r#gen);
+        for generation in 1..=20 {
+            let h =
+                PopulationTrajectoryPredictor::predict_heterozygosity_neutral(h0, ne, generation);
             assert!(
                 h <= prev + 1e-12,
-                "should decay: gen {gen}, {h} > {prev}",
-                gen = r#gen
+                "should decay: gen {generation}, {h} > {prev}"
             );
             assert!(h >= 0.0);
             prev = h;
@@ -477,13 +476,12 @@ mod tests {
         let pop = make_test_population(50);
         let ne = 25.0;
         let mut pred = PopulationTrajectoryPredictor::new();
-        for r#gen in [1, 5, 10, 20] {
-            let h = pred.predict_heterozygosity_calibrated(&pop, ne, r#gen);
+        for generation in [1, 5, 10, 20] {
+            let h = pred.predict_heterozygosity_calibrated(&pop, ne, generation);
             pred.reset();
             assert!(
                 (0.0..=1.0).contains(&h),
-                "calibrated at gen {gen} should be in [0,1]: got {h}",
-                gen = r#gen
+                "calibrated at gen {generation} should be in [0,1]: got {h}"
             );
         }
     }

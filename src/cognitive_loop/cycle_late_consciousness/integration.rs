@@ -1155,7 +1155,7 @@ impl CognitiveLoopService {
             let consolidation_threshold = (*ema - 0.1 - moral_ease).max(0.2); // floor at 0.2
             if level > consolidation_threshold {
                 // Trigger demand-driven consolidation at above-average consciousness
-                self.fep.episodic_memory.consolidate_recent();
+                self.fep.episodic_memory.consolidate_recent(level);
 
                 // NARRATIVE WIRING: Consolidation events ARE narrative episodes.
                 // When consciousness exceeds its rolling average, the system is in a

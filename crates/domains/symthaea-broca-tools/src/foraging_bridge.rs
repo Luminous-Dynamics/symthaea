@@ -13,6 +13,7 @@ use std::time::Duration;
 #[cfg(feature = "mamba-cpu")]
 use ureq;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 struct SearxResult {
     pub title: String,
@@ -20,6 +21,7 @@ struct SearxResult {
     pub url: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 struct SearxResponse {
     pub results: Vec<SearxResult>,

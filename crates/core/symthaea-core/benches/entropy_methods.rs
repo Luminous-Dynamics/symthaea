@@ -18,7 +18,7 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::consciousness_metrics::{
-    ContinuousEntropyEstimator, EntropyMethod, IIT4Calculator, ParallelEntropyCalculator,
+    ContinuousEntropyEstimator, IIT4Calculator, ParallelEntropyCalculator,
     QuantumEntropyCalculator, TruePhiCalculator,
 };
 use symthaea_core::hdc::unified_hv::ContinuousHV;

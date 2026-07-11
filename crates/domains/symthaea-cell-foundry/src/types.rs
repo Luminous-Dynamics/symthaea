@@ -58,6 +58,38 @@ pub enum DifferentiatedType {
     Mesenchymal,
 }
 
+/// A developmental signal emitted by the cognitive loop.
+/// Science: Allostatic load (stress) and integration-driven plasticity (focus).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DevelopmentalSignal {
+    /// Cumulative stress on the system (0-1). Derived from ThermodynamicManager.
+    pub allostatic_load: f32,
+    /// Peak cognitive integration (0-1). Derived from ConsciousnessEngine.
+    pub integration_peak: f32,
+    /// Time delta for this signal (hours).
+    pub dt_hours: f32,
+}
+
+/// Aggregated developmental telemetry from a lifecycle.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DevelopmentalTelemetry {
+    /// Total cumulative allostatic load.
+    pub cumulative_stress: f64,
+    /// Maximum integration peak reached.
+    pub max_phi_peak: f32,
+    /// Number of developmental signals processed.
+    pub signal_count: u64,
+}
+
+impl DevelopmentalTelemetry {
+    /// Update telemetry from a new signal.
+    pub fn record(&mut self, signal: &DevelopmentalSignal) {
+        self.cumulative_stress += signal.allostatic_load as f64 * signal.dt_hours as f64;
+        self.max_phi_peak = self.max_phi_peak.max(signal.integration_peak);
+        self.signal_count += 1;
+    }
+}
+
 /// Snapshot of a single cell's biological state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CellState {

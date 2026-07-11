@@ -27,11 +27,11 @@ pub enum BudgetTier {
 }
 
 impl BudgetTier {
-    /// Select tier based on available budget and reliability.
-    pub fn select(available_us: u64, reliability: f64) -> Self {
-        if available_us < 2_000 || reliability < 0.2 {
+    /// Select tier based on available budget, reliability, and consciousness level (phi).
+    pub fn select(available_us: u64, reliability: f64, phi: f64) -> Self {
+        if phi < 0.3 || available_us < 2_000 || reliability < 0.2 {
             BudgetTier::Tier0
-        } else if available_us < 8_000 || reliability < 0.5 {
+        } else if phi <= 0.6 || available_us < 8_000 || reliability < 0.5 {
             BudgetTier::Tier1
         } else {
             BudgetTier::Tier2
@@ -65,8 +65,8 @@ pub struct ReasoningBudget {
 
 impl ReasoningBudget {
     /// Create a new budget for a reasoning cycle.
-    pub fn new(available_us: u64, reliability: f64) -> Self {
-        let tier = BudgetTier::select(available_us, reliability);
+    pub fn new(available_us: u64, reliability: f64, phi: f64) -> Self {
+        let tier = BudgetTier::select(available_us, reliability, phi);
         Self {
             tier,
             start_us: Self::now_us(),
@@ -268,22 +268,25 @@ mod tests {
 
     #[test]
     fn test_budget_tier_selection() {
-        assert_eq!(BudgetTier::select(1_000, 0.8), BudgetTier::Tier0);
-        assert_eq!(BudgetTier::select(5_000, 0.8), BudgetTier::Tier1);
-        assert_eq!(BudgetTier::select(15_000, 0.8), BudgetTier::Tier2);
+        assert_eq!(BudgetTier::select(1_000, 0.8, 0.8), BudgetTier::Tier0);
+        assert_eq!(BudgetTier::select(5_000, 0.8, 0.8), BudgetTier::Tier1);
+        assert_eq!(BudgetTier::select(15_000, 0.8, 0.8), BudgetTier::Tier2);
         // Low reliability forces Tier0 even with budget
-        assert_eq!(BudgetTier::select(20_000, 0.1), BudgetTier::Tier0);
+        assert_eq!(BudgetTier::select(20_000, 0.1, 0.8), BudgetTier::Tier0);
+        // Low phi forces Tier0/Tier1
+        assert_eq!(BudgetTier::select(20_000, 0.8, 0.2), BudgetTier::Tier0);
+        assert_eq!(BudgetTier::select(20_000, 0.8, 0.5), BudgetTier::Tier1);
     }
 
     #[test]
     fn test_reasoning_budget() {
-        let budget = ReasoningBudget::new(10_000, 0.8);
-        assert_eq!(budget.tier, BudgetTier::Tier2); // 10ms budget + high R → Tier2
+        let budget = ReasoningBudget::new(10_000, 0.8, 0.8);
+        assert_eq!(budget.tier, BudgetTier::Tier2); // 10ms budget + high R + high phi → Tier2
         assert!(!budget.exceeded());
         assert!(budget.remaining_us() > 0);
 
         // Tier1 with lower budget
-        let budget1 = ReasoningBudget::new(5_000, 0.8);
+        let budget1 = ReasoningBudget::new(5_000, 0.8, 0.8);
         assert_eq!(budget1.tier, BudgetTier::Tier1);
     }
 

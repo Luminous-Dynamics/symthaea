@@ -638,7 +638,7 @@ mod tests {
 
     #[test]
     fn test_inverse_2x2() {
-        let mut m = MetricTensor::new(vec![2.0, 1.0, 1.0, 3.0], 2);
+        let m = MetricTensor::new(vec![2.0, 1.0, 1.0, 3.0], 2);
         let inv = m.inverse();
         // det = 6 - 1 = 5; inverse = [[3,-1],[-1,2]] / 5
         assert!((inv.g(0, 0) - 0.6).abs() < 1e-10);

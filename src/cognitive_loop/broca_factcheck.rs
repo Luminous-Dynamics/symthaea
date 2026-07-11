@@ -488,20 +488,117 @@ impl FactcheckConductorTask {
             .expect("failed to spawn factcheck conductor thread")
     }
 
-    /// Blocking event loop: drain claims, query conductor, send verdicts.
-    fn run_blocking(channels: FactcheckChannels, _conductor_url: &str, _app_id: &str) {
-        // TODO: Connect to HolochainConductor via WebSocket when conductor is available.
-        // For now, this provides the scaffolding — claims are received, and Unknown
-        // verdicts are returned so the bridge pipeline is exercised end-to-end.
-        //
-        // When the conductor is wired:
-        //   let conductor = HolochainConductor::new(conductor_url, app_id);
-        //   conductor.connect().await;
-        //   let result = conductor.call_zome("knowledge", "factcheck", "fact_check", payload).await;
+    /// Blocking event loop: drain claims, query conductor via WebSocket, send verdicts.
+    fn run_blocking(channels: FactcheckChannels, conductor_url: &str, _app_id: &str) {
+        use futures_util::{SinkExt, StreamExt};
+        use serde_json::json;
+        use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!(target: "cognitive_loop::factcheck", "Failed to build tokio runtime: {}", e);
+                Self::run_mock_fallback(channels);
+                return;
+            }
+        };
+
+        rt.block_on(async {
+            // Connect to Holochain conductor WebSocket
+            let mut ws_stream = match connect_async(conductor_url).await {
+                Ok((ws, _)) => ws,
+                Err(e) => {
+                    tracing::error!(target: "cognitive_loop::factcheck", "Failed to connect to factcheck conductor WebSocket at {}: {}", conductor_url, e);
+                    // Fall back to offline mock mode
+                    Self::run_mock_fallback(channels);
+                    return;
+                }
+            };
+
+            tracing::info!(target: "cognitive_loop::factcheck", "Connected to factcheck conductor at {}", conductor_url);
+
+            let mut request_id = 0u64;
+
+            while let Ok(claim) = channels.claim_rx.recv() {
+                request_id += 1;
+
+                // Holochain AppWebsocket call_zome request structure
+                let request_payload = json!({
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "call_zome",
+                    "params": {
+                        "cell_id": null,
+                        "role_name": "knowledge",
+                        "zome_name": "factcheck",
+                        "fn_name": "fact_check",
+                        "payload": {
+                            "claim": claim
+                        },
+                        "provenance": "did:mycelix:factcheck",
+                    }
+                });
+
+                let request_str = serde_json::to_string(&request_payload).unwrap();
+
+                if let Err(e) = ws_stream.send(Message::Text(request_str.into())).await {
+                    tracing::error!(target: "cognitive_loop::factcheck", "Failed to send claim to conductor: {}", e);
+                    break;
+                }
+
+                // Wait for the response
+                let mut verdict = FactCheckVerdict::Unknown;
+                let mut confidence = 0.0;
+                let mut source_ids = Vec::new();
+
+                if let Some(Ok(response_msg)) = ws_stream.next().await {
+                    if let Ok(text) = response_msg.into_text() {
+                        if let Ok(res_json) = serde_json::from_str::<serde_json::Value>(&text) {
+                            if let Some(result) = res_json.get("result") {
+                                // Parse verdict
+                                if let Some(v_str) = result.get("verdict").and_then(|v| v.as_str()) {
+                                    verdict = match v_str {
+                                        "True" => FactCheckVerdict::True,
+                                        "False" => FactCheckVerdict::False,
+                                        "Mixed" => FactCheckVerdict::Mixed,
+                                        _ => FactCheckVerdict::Unknown,
+                                    };
+                                }
+                                // Parse confidence
+                                if let Some(c_num) = result.get("confidence").and_then(|c| c.as_f64()) {
+                                    confidence = c_num as f32;
+                                }
+                                // Parse source_ids
+                                if let Some(ids_array) = result.get("source_ids").and_then(|ids| ids.as_array()) {
+                                    source_ids = ids_array.iter()
+                                        .filter_map(|v| v.as_str().map(String::from))
+                                        .collect();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let result = FactCheckResult {
+                    claim,
+                    verdict,
+                    confidence,
+                    source_ids,
+                };
+
+                if channels.verdict_tx.send(result).is_err() {
+                    break;
+                }
+            }
+        });
+    }
+
+    /// Offline mock fallback path if conductor connection fails.
+    fn run_mock_fallback(channels: FactcheckChannels) {
         while let Ok(claim) = channels.claim_rx.recv() {
-            // Construct the verdict — currently a pass-through Unknown.
-            // Replace with real conductor call when available.
             let result = FactCheckResult {
                 claim,
                 verdict: FactCheckVerdict::Unknown,
@@ -509,7 +606,6 @@ impl FactcheckConductorTask {
                 source_ids: Vec::new(),
             };
 
-            // Send verdict back to bridge; stop if receiver dropped
             if channels.verdict_tx.send(result).is_err() {
                 break;
             }

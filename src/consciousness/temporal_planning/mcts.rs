@@ -378,7 +378,7 @@ mod tests {
         let state = test_state();
         let actions = test_actions();
         let config = MctsConfig::tier1();
-        let budget = ReasoningBudget::new(10_000, 0.8);
+        let budget = ReasoningBudget::new(10_000, 0.8, 0.8);
 
         let result = MctsPlanner::plan(
             &state,
@@ -397,7 +397,7 @@ mod tests {
     fn test_mcts_no_actions() {
         let state = test_state();
         let config = MctsConfig::tier1();
-        let budget = ReasoningBudget::new(10_000, 0.8);
+        let budget = ReasoningBudget::new(10_000, 0.8, 0.8);
 
         let result = MctsPlanner::plan(
             &state,
@@ -420,7 +420,7 @@ mod tests {
             ..MctsConfig::tier1()
         };
         // Very tight budget
-        let budget = ReasoningBudget::new(1_000, 0.8);
+        let budget = ReasoningBudget::new(1_000, 0.8, 0.8);
 
         let start = std::time::Instant::now();
         let result = MctsPlanner::plan(
@@ -447,7 +447,7 @@ mod tests {
     fn test_epistemic_rollout() {
         let state = test_state();
         let actions = test_actions();
-        let budget = ReasoningBudget::new(10_000, 0.8);
+        let budget = ReasoningBudget::new(10_000, 0.8, 0.8);
 
         let result = MctsPlanner::epistemic_rollout(&state, &actions, &budget);
         assert!(result.did_plan);

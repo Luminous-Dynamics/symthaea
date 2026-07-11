@@ -1028,9 +1028,20 @@ impl LiquidMambaGenerator {
     /// Uses the Geodesic bridge to ensure topological isomorphism.
     #[cfg(feature = "code-sheaf-eval")]
     pub fn synthesize_program(&self, nucleus: &ContinuousHV, name: &str) -> Result<String> {
+        self.synthesize_program_with_signature(nucleus, name, None)
+    }
+
+    /// Synthesize a program from a semantic nucleus with an optional expected signature.
+    #[cfg(feature = "code-sheaf-eval")]
+    pub fn synthesize_program_with_signature(
+        &self,
+        nucleus: &ContinuousHV,
+        name: &str,
+        signature: Option<&str>,
+    ) -> Result<String> {
         let synthesis_result = self
             .geodesic_bridge
-            .synthesize_from_nucleus(nucleus, name)?;
+            .synthesize_from_nucleus(nucleus, name, signature)?;
 
         if let Some(code) = synthesis_result.emitted_code {
             Ok(code)

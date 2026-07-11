@@ -255,7 +255,7 @@ impl NetworkService {
         let nid = iroh.node_id();
         info!(
             "NetworkService started with Iroh node: {}",
-            &nid[..nid.len().min(16)]
+            safe_truncate(&nid, 16)
         );
 
         Ok(Self {
@@ -580,7 +580,7 @@ impl NetworkService {
         for node_ticket in bootstrap_config.all_nodes() {
             debug!(
                 "Attempting bootstrap connection to: {}",
-                &node_ticket[..32.min(node_ticket.len())]
+                safe_truncate(node_ticket, 32)
             );
 
             match self.connect_to_peer(node_ticket).await {
@@ -1047,7 +1047,7 @@ impl NetworkService {
                 .await
                 .unwrap_or_else(|e| {
                     tracing::warn!(
-                        peer = %&peer_id[..peer_id.len().min(16)],
+                        peer = %safe_truncate(&peer_id, 16),
                         error = %e,
                         "Inbound handshake failed — using LocalTrust (QUIC NodeId already verified)"
                     );
@@ -1069,7 +1069,7 @@ impl NetworkService {
             let _ = self.peer_event_tx.send(PeerEvent::Connected(peer_info));
 
             tracing::info!(
-                peer = %&peer_id[..peer_id.len().min(16)],
+                peer = %safe_truncate(&peer_id, 16),
                 trust = ?trust_level,
                 "Inbound peer registered"
             );
@@ -1310,7 +1310,7 @@ impl NetworkService {
                             }
                             tokio::time::sleep(delay).await;
                             tracing::info!(
-                                peer = %&pid[..pid.len().min(16)],
+                                peer = %safe_truncate(&pid, 16),
                                 attempt,
                                 "Reconnecting to bootstrap peer"
                             );
@@ -1326,7 +1326,7 @@ impl NetworkService {
                                 Err(e) => {
                                     tracing::debug!(
                                         error = %e,
-                                        peer = %&pid[..pid.len().min(16)],
+                                        peer = %safe_truncate(&pid, 16),
                                         attempt,
                                         "Reconnect attempt failed"
                                     );
@@ -1335,7 +1335,7 @@ impl NetworkService {
                             delay = (delay * 2).min(max_delay);
                         }
                         tracing::warn!(
-                            peer = %&pid[..pid.len().min(16)],
+                            peer = %safe_truncate(&pid, 16),
                             "Gave up reconnecting after {max_retries} attempts"
                         );
                     });
@@ -1466,6 +1466,13 @@ pub struct CollectiveConsciousness {
 
     /// Total messages exchanged
     pub total_messages: u64,
+}
+
+fn safe_truncate(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
 }
 
 #[cfg(test)]

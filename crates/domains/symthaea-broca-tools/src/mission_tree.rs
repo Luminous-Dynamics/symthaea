@@ -6,7 +6,6 @@
 //! Allows Broca to manage 'Mission Trees' where a global intent is recursively
 //! broken down into verifiable sub-missions.
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
 

@@ -147,7 +147,9 @@ impl CognitiveLoopService {
             // FEEDBACK: WM overload triggers emergency consolidation (Baddeley 2000)
             // Science: Working memory overflow should push items to long-term storage,
             // not just block exploration. Force episodic consolidation to free WM slots.
-            self.fep.episodic_memory.consolidate_recent();
+            self.fep
+                .episodic_memory
+                .consolidate_recent(self.unification_engine.psi);
         }
 
         // FEEDBACK: Dual-veto freeze detection and recovery (Fuchs 2008 multistability)

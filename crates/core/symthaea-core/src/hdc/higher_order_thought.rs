@@ -625,7 +625,7 @@ mod tests {
         let first = MentalState::first_order(vec![BinaryHV::ones(); 10], "perception".to_string());
 
         // HOT misrepresents (very different content)
-        let mut hot = MentalState::higher_order(
+        let hot = MentalState::higher_order(
             first,
             vec![BinaryHV::zero(); 10], // Completely different
             "introspection".to_string(),

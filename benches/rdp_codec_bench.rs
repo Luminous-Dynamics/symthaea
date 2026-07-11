@@ -12,8 +12,8 @@
 
 use std::time::Instant;
 
-use symthaea::swarm::rdp_capture::{CapturedFrame, ScreenCapture, TestCapture};
-use symthaea::swarm::rdp_codec::{HybridCodec, TILE_SIZE};
+use symthaea::swarm::rdp_capture::{ScreenCapture, TestCapture};
+use symthaea::swarm::rdp_codec::HybridCodec;
 
 fn make_frame(width: u32, height: u32, seed: u8) -> Vec<u8> {
     let n = width as usize * height as usize;

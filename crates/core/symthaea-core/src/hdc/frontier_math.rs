@@ -1911,7 +1911,7 @@ mod tests {
         // 4. Class numbers h(-d) for squarefree d
         let class_nums: Vec<f64> = (1..=200u64)
             .filter(|&d| {
-                let mut m = d;
+                let m = d;
                 let mut p = 2u64;
                 while p * p <= m {
                     if m % (p * p) == 0 {

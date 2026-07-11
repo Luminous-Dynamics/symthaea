@@ -24,7 +24,7 @@ rand = { workspace = true }
 anyhow = { workspace = true }
 
 # MuJoCo bindings (optional, behind `mujoco` feature)
-mujoco-rs = { version = "2.3", optional = true, default-features = false }
+mujoco-rs = { version = "4.0.1", optional = true, features = ["auto-download-mujoco"] }
 
 # Parallel swarm training (optional, behind `swarm` feature)
 rayon = { version = "1.10", optional = true }

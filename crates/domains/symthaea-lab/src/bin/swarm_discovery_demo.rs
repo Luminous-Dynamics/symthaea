@@ -77,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("📜 Received Collective Proof: {} (Verified={})", proof.label, proof.verified);
                         aggregator.ingest_peer_proof(proof);
                     }
+                    _ => {}
                 }
 
                 let hive_norm = aggregator.hive_mind_vector().norm();

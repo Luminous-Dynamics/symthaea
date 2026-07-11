@@ -1,6 +1,6 @@
 use std::net::UdpSocket;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 fn main() -> std::io::Result<()> {
     println!("🚀 Closed-Loop Domotic Telemetry Simulator Engine Active.");

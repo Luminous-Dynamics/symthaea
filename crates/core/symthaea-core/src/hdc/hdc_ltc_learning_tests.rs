@@ -18,7 +18,7 @@
 //! 3. **STDP**: Timing-dependent plasticity improves temporal learning
 //! 4. **Momentum**: Accelerates convergence without sacrificing stability
 
-use super::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
+use super::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use super::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════

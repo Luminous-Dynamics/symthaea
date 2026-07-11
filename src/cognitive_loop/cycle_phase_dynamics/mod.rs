@@ -2842,7 +2842,9 @@ impl CognitiveLoopService {
                 }
                 MotorCommandType::MemoryConsolidate => {
                     if enhanced_result.motor_command.intensity > 0.5 {
-                        self.fep.episodic_memory.consolidate_recent();
+                        self.fep
+                            .episodic_memory
+                            .consolidate_recent(self.unification_engine.psi);
                         // Also increase world model plasticity to lock in patterns
                         self.fep
                             .world_model

@@ -1,0 +1,32 @@
+name: Showroom Integrity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-ring0:
+    name: Ring 0 Buildability Audit
+    runs-on: ubuntu-latest
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Verify Metadata
+        run: cargo metadata --no-deps --format-version 1
+
+      - name: Verify Build
+        run: cargo check -p symthaea-core --lib
+
+      - name: Hygiene Scan
+        run: |
+          # Ensure no forbidden dependencies
+          ! rg -i 'mycelix|prism|holochain|swarm|robotics|symtropy-robotics|zero.?knowledge|zkp|pqc|private monorepo|internal only' .
+          
+          # Check license
+          head -n 5 LICENSE | grep "GNU AFFERO GENERAL PUBLIC LICENSE"

@@ -56,6 +56,12 @@ log = "0.4"
 url = "2.5"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 getrandom = "0.2"
+
+# Mycelix Shared Deps (Bundled Standalone)
+sha2 = { version = "0.10", features = ["oid"] }
+pqcrypto-traits = "0.3"
+pqcrypto-dilithium = "0.5"
+subtle = "2.5"
 no-panic = "0.1"
 parry3d = "0.17"
 uom = { version = "0.36", features = ["f64", "si"] }
@@ -647,7 +653,7 @@ mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Po
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 # REMOVED: secure-mesh (0 cfg gates; pure convenience bundle — enable identity + mesh-key-exchange + swarm directly)
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
-mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
+mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor", "dep:tokio-tungstenite", "dep:futures-util"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 # Compile the legacy bridge-common integration test only from the isolated
 # Mycelix/Holochain workspace. This feature intentionally has no dependencies
@@ -933,6 +939,7 @@ default-mind = [
 
 
 [dev-dependencies]
+symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry" }
 symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety" }
 
 criterion = "0.5"
@@ -1080,6 +1087,10 @@ name = "engineering_school_benchmarks"
 path = "examples/engineering_school_benchmarks.rs"
 
 [[example]]
+name = "gwt_ignition_shadow_benchmark"
+path = "examples/gwt_ignition_shadow_benchmark.rs"
+
+[[example]]
 name = "sovereign_design_loop"
 path = "examples/sovereign_design_loop.rs"
 
@@ -1195,6 +1206,9 @@ name = "test_spectral_mip_validation"
 [[test]]
 name = "cls_threshold_promotion_e2e"
 required-features = ["neuroevolution"]
+
+[[test]]
+name = "genesis_feedback_telemetry"
 
 [[example]]
 name = "helicopter_phi_benchmark"
@@ -1390,6 +1404,9 @@ required-features = ["perception"]
 
 [[example]]
 name = "nixos_assistant_demo"
+
+[[example]]
+name = "evaluate_consciousness_runtime"
 
 [[example]]
 name = "school_o1_benchmark"

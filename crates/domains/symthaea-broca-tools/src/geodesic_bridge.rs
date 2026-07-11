@@ -35,12 +35,12 @@ impl GeodesicBridge {
             proto_recursion: genesis.hv("topo-recursion", 16384),
         }
     }
-
     /// Synthesize a program skeleton from a semantic nucleus.
     pub fn synthesize_from_nucleus(
         &self,
         nucleus: &ContinuousHV,
         name: &str,
+        signature: Option<&str>,
     ) -> Result<ActiveInferenceResult> {
         // 1. Infer topology from nucleus similarity to prototypes
         let sim_branch = nucleus.similarity(&self.proto_branch);
@@ -78,10 +78,12 @@ impl GeodesicBridge {
         );
 
         // 3. Post-process: Fill defaults if manifold was empty (for demo stability)
+        let default_sig = format!("fn {}(items: &[i32]) -> i32", name.replace("-", "_"));
+        let target_sig_str = signature.unwrap_or(&default_sig);
         if result.emitted_code.is_none() {
             symthaea_geodesic::skeleton_synthesis::fill_skeleton_defaults_for_signature(
                 &mut result.skeleton,
-                Some(&format!("fn {}(items: &[i32]) -> i32", name)),
+                Some(target_sig_str),
             );
             result.emitted_code = result.skeleton.emit_rust(1);
         }
@@ -89,18 +91,18 @@ impl GeodesicBridge {
         // 4. Wrap in WASM FFI Shims (The Hardening Layer)
         if let Some(ref mut code) = result.emitted_code {
             let safe_name = name.replace("-", "_");
-            let wrapped_code = format!(
+            let mut wrapped_code = format!(
                 r#"
 #[unsafe(no_mangle)]
 static mut HV_BUFFER: [f32; 65536] = [0.0; 65536];
 
 #[unsafe(no_mangle)]
 pub extern "C" fn get_hypervector_buffer_ptr() -> *mut f32 {{
-    unsafe {{ HV_BUFFER.as_mut_ptr() }}
+    unsafe {{ std::ptr::addr_of_mut!(HV_BUFFER) as *mut f32 }}
 }}
 
 #[unsafe(no_mangle)]
-pub extern "C" fn {}(ptr: *mut f32, len: i32) {{
+pub extern "C" fn {}_ffi(ptr: *mut f32, len: i32) {{
     let _slice = unsafe {{ std::slice::from_raw_parts_mut(ptr, len as usize) }};
 
     // --- Synthesized Logic Start ---
@@ -112,6 +114,21 @@ pub extern "C" fn {}(ptr: *mut f32, len: i32) {{
 "#,
                 safe_name, code
             );
+
+            // Add the high-level FFI Signature Adapter Layer if requested
+            if let Some(sig) = signature {
+                let adapter = format!(
+                    r#"
+// FFI Signature Adapter Layer
+{} {{
+    {}
+}}
+"#,
+                    sig, code
+                );
+                wrapped_code.push_str(&adapter);
+            }
+
             *code = wrapped_code;
         }
 

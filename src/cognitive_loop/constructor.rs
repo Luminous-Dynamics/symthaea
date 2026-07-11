@@ -1087,7 +1087,16 @@ impl CognitiveLoopService {
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
             #[cfg(feature = "mycelix")]
-            factcheck_bridge: super::broca_factcheck::BrocaFactcheckBridge::new(),
+            factcheck_bridge: {
+                let mut bridge = super::broca_factcheck::BrocaFactcheckBridge::new();
+                let channels = bridge.create_channels();
+                let url = std::env::var("MYCELIX_CONDUCTOR_URL")
+                    .unwrap_or_else(|_| "ws://localhost:8888".to_string());
+                let app_id = std::env::var("MYCELIX_APP_ID")
+                    .unwrap_or_else(|_| "mycelix-unified".to_string());
+                super::broca_factcheck::FactcheckConductorTask::spawn(channels, url, app_id);
+                bridge
+            },
             #[cfg(feature = "epistemic")]
             known_unknowns: Some(crate::consciousness::sacred_stillness::KnownUnknowns::new()),
             swarm_manager: super::managers::SwarmManager::default(),
@@ -1192,10 +1201,12 @@ impl CognitiveLoopService {
             #[cfg(feature = "safety-agents")]
             safety_supervisor: super::safety_supervisor::SafetySupervisor::new(),
             tracer: super::observability::CognitiveTracer::new(1000),
+            innate_traits: super::genesis_bridge::InnateTraits::default(),
             #[cfg(feature = "scientific_method")]
             scientific_method_engine: crate::scientific_method::ScientificMethodEngine::new(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: None,
+            metabolic_conductor: None,
         };
 
         Ok(service)

@@ -1389,6 +1389,152 @@ fn test_convergence_state_equal_variance_is_oscillating() {
     );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// PR 2: High-Fidelity Substrate Stress Tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[derive(Debug, Clone, Copy)]
+pub struct SubstrateStress {
+    pub power_available: f64,
+    pub thermal_headroom: f64,
+    pub memory_integrity: f64,
+    pub sensor_integrity: f64,
+    pub timing_stability: f64,
+    pub compute_throughput: f64,
+}
+
+impl SubstrateStress {
+    pub fn perfect() -> Self {
+        Self {
+            power_available: 1.0,
+            thermal_headroom: 1.0,
+            memory_integrity: 1.0,
+            sensor_integrity: 1.0,
+            timing_stability: 1.0,
+            compute_throughput: 1.0,
+        }
+    }
+
+    /// Compute aggregate substrate feasibility [0, 1]
+    pub fn feasibility(&self) -> f64 {
+        // Multiplicative model: any zero axis collapses the whole
+        let raw = self.power_available
+            * self.thermal_headroom
+            * self.memory_integrity
+            * self.sensor_integrity
+            * self.timing_stability
+            * self.compute_throughput;
+        raw.clamp(0.0, 1.0)
+    }
+}
+
+#[test]
+fn test_substrate_stress_multi_axis() {
+    let config = SpectralMIPConfig::default();
+    let mut engine = ConsciousnessEngine::new(
+        SpectralMIPFinder::new(config),
+        None,
+        Some(ConsciousnessEquationV2::default()),
+        None,
+    );
+
+    /// Create a dummy input with stable references for testing
+    fn make_input<'a>(
+        hdv: &'a ContinuousHV,
+        hv16: &'a BinaryHV,
+        cycle: u64,
+        substrate: f64,
+    ) -> ConsciousnessEngineInput<'a> {
+        ConsciousnessEngineInput {
+            hdv,
+            hv16,
+            cycle,
+            unified_psi: 0.8,
+            coherence: 0.8,
+            prediction_error: 0.1,
+            phi_attention_weight: 0.8,
+            epistemic_quality: 0.8,
+            phi_validation_correlation: 0.8,
+            bath_entropy: 0.1,
+            attractor_detected: true,
+            sht_2a_signal: 0.0,
+            gaba_a_signal: 0.0,
+            substrate_feasibility: substrate,
+            binding_capability: 1.0,
+            workspace_capability: 1.0,
+            attention_capability: 1.0,
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
+            hot_depth: 0.5,
+            cpg_sync_index: 1.0,
+            cantor_metacognitive_depth: 0.5,
+            governance_collective_phi: 0.0,
+            gwt_broadcast_occurred: true,
+            gwt_coalition_size: 10,
+            prediction_precision: 1.0,
+            knowledge_grounding: 0.8,
+            knowledge_coherence: 0.8,
+            glyph_coherence: 0.8,
+            temporal_coherence_phi: 0.5,
+        }
+    }
+
+    // 1. Baseline: Perfect Hardware
+    let stress_perfect = SubstrateStress::perfect();
+    let hdv_p = ContinuousHV::random(16384, 1);
+    let hv16_p = BinaryHV::random(1);
+    let input_perfect = make_input(&hdv_p, &hv16_p, 23, stress_perfect.feasibility());
+    let out_perfect = engine.measure(&input_perfect).equation_v2_consciousness;
+
+    // 2. Scenario: Thermal Throttling (80% performance hit)
+    let mut stress_thermal = SubstrateStress::perfect();
+    stress_thermal.thermal_headroom = 0.2;
+    stress_thermal.compute_throughput = 0.5;
+    let input_thermal = make_input(&hdv_p, &hv16_p, 23, stress_thermal.feasibility());
+    let out_thermal = engine.measure(&input_thermal).equation_v2_consciousness;
+    assert!(
+        out_thermal < out_perfect,
+        "Thermal stress should reduce consciousness"
+    );
+
+    // 3. Scenario: Memory Bandwidth / Bit-flip noise (High integrity loss)
+    let mut stress_mem = SubstrateStress::perfect();
+    stress_mem.memory_integrity = 0.3;
+    let input_mem = make_input(&hdv_p, &hv16_p, 23, stress_mem.feasibility());
+    let out_mem = engine.measure(&input_mem).equation_v2_consciousness;
+    assert!(
+        out_mem < out_perfect * 0.5,
+        "Severe memory integrity loss should collapse consciousness"
+    );
+
+    // 4. Scenario: Clock Jitter / Timing Instability
+    let mut stress_jitter = SubstrateStress::perfect();
+    stress_jitter.timing_stability = 0.1;
+    let input_jitter = make_input(&hdv_p, &hv16_p, 23, stress_jitter.feasibility());
+    let out_jitter = engine.measure(&input_jitter).equation_v2_consciousness;
+    assert!(
+        out_jitter < 0.1,
+        "Extreme timing instability should make consciousness intractable"
+    );
+
+    // 5. Monotonicity check over power sweep
+    let mut prev_c = out_perfect;
+    for i in (0..10).rev() {
+        let mut stress = SubstrateStress::perfect();
+        stress.power_available = i as f64 / 10.0;
+        let input = make_input(&hdv_p, &hv16_p, 23, stress.feasibility());
+        let c = engine.measure(&input).equation_v2_consciousness;
+        assert!(
+            c <= prev_c + 1e-10,
+            "Power loss must not increase consciousness: c({})={} vs prev={}",
+            stress.power_available,
+            c,
+            prev_c
+        );
+        prev_c = c;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // HOT (Higher-Order Thought) Recursion Depth Tests
 // ═══════════════════════════════════════════════════════════════════

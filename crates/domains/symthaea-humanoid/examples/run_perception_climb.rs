@@ -286,12 +286,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let obs_vel = ((state.root_linear_velocity[0] as f32 + 2.0f32) / 4.0f32)
                             .clamp(0.0, 1.0);
                         let obs_z = (state.root_height / 1.5).clamp(0.0, 1.0);
-                        let next_stair_x = if current_x < 1.25 {
-                            1.25
+                        let next_stair_x = if current_x < 1.25_f32 {
+                            1.25_f32
                         } else {
-                            1.25 + ((current_x - 1.25) / 0.50).floor() * 0.50 + 0.50
+                            1.25_f32
+                                + ((current_x - 1.25_f32) / 0.50_f32).floor() * 0.50_f32
+                                + 0.50_f32
                         };
-                        let obs_dist = (next_stair_x - current_x).clamp(0.0, 1.0);
+                        let obs_dist = (next_stair_x - current_x).clamp(0.0_f32, 1.0_f32);
                         let obs_stress = current_stress as f64;
 
                         let current_hypervector = thread_hdc.encode(&state);
@@ -547,12 +549,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let obs_pitch = state.joint_angles[0].abs().min(1.0);
                 let obs_vel = ((actual_vel_x + 2.0f32) / 4.0f32).clamp(0.0, 1.0);
                 let obs_z = (state.root_height / 1.5).clamp(0.0, 1.0);
-                let next_stair_x = if current_x_pos < 1.25 {
-                    1.25
+                let next_stair_x = if current_x_pos < 1.25_f32 {
+                    1.25_f32
                 } else {
-                    1.25 + ((current_x_pos - 1.25) / 0.50).floor() * 0.50 + 0.50
+                    1.25_f32 + ((current_x_pos - 1.25_f32) / 0.50_f32).floor() * 0.50_f32 + 0.50_f32
                 };
-                let obs_dist = (next_stair_x - current_x_pos).clamp(0.0, 1.0);
+                let obs_dist = (next_stair_x - current_x_pos).clamp(0.0_f32, 1.0_f32);
                 let obs_stress = current_stress as f64;
 
                 let current_hypervector = hdc.encode(&state);

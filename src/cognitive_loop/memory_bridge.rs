@@ -235,14 +235,46 @@ impl EpisodicMemoryBridge {
     ///
     /// Triggered by motor commands to strengthen recent experiences.
     /// This forces consolidation of high-strength short-term memories.
-    pub fn consolidate_recent(&mut self) {
+    pub fn consolidate_recent(&mut self, level: f64) {
+        if level < 0.3 {
+            // C < 0.3: no consolidation (matches clinical anesthesia)
+            return;
+        }
+
         // Find strong short-term memories and move to long-term
-        let strong_memories: Vec<EpisodicMemory> = self
+        let mut strong_memories: Vec<EpisodicMemory> = self
             .short_term
             .iter()
             .filter(|m| m.strength >= self.consolidation_threshold * 0.8) // Slightly lower threshold
             .cloned()
             .collect();
+
+        // Apply graded depth based on consciousness level C
+        for memory in &mut strong_memories {
+            if level > 0.7 {
+                // C > 0.7: deep encoding (episodic + semantic + emotional tags)
+                let mut tags = Vec::new();
+                if !memory.content.contains("[EPISODIC]") {
+                    tags.push("[EPISODIC]");
+                }
+                if !memory.content.contains("[SEMANTIC]") {
+                    tags.push("[SEMANTIC]");
+                }
+                if !memory.content.contains("[EMOTIONAL]") {
+                    tags.push("[EMOTIONAL]");
+                }
+                if !tags.is_empty() {
+                    memory.content = format!("{} {}", memory.content, tags.join(" "));
+                }
+                memory.strength = 1.0;
+            } else {
+                // C 0.3-0.7: standard episodic encoding
+                if !memory.content.contains("[EPISODIC]") {
+                    memory.content = format!("{} [EPISODIC]", memory.content);
+                }
+                memory.strength = (memory.strength + 0.1).min(1.0);
+            }
+        }
 
         for memory in strong_memories {
             // Check if not already in long-term
@@ -250,11 +282,6 @@ impl EpisodicMemoryBridge {
                 self.long_term.push(memory);
                 self.stats.consolidations += 1;
             }
-        }
-
-        // Boost strength of recently consolidated memories
-        for mem in self.long_term.iter_mut().rev().take(5) {
-            mem.strength = (mem.strength + 0.1).min(1.0);
         }
 
         // Trim long-term if needed

@@ -816,6 +816,7 @@ pub fn default_expression_for_type(type_name: &str) -> &'static str {
         "()" => "()",
         "bool" => "false",
         "String" => "String::new()",
+        type_name if type_name.contains("&str") => "\"\"",
         "usize" | "u8" | "u16" | "u32" | "u64" | "u128" | "isize" | "i8" | "i16" | "i32"
         | "i64" | "i128" => "0",
         "f32" => "0.0",

@@ -8,11 +8,11 @@
 
 use anyhow::Result;
 use lru::LruCache;
-use mycelix_zkp_core::dilithium::{DilithiumKeypair, verify_signature};
+use mycelix_zkp_core::dilithium::DilithiumKeypair;
 use parking_lot::Mutex;
 use std::fs;
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 

@@ -376,7 +376,9 @@ impl CognitiveLoopService {
             }
 
             if integrated.has_flag(output_flags::REQUEST_CONSOLIDATION) {
-                self.fep.episodic_memory.consolidate_recent();
+                self.fep
+                    .episodic_memory
+                    .consolidate_recent(self.unification_engine.psi);
                 tracing::trace!(
                     cycle = self.stats.total_cycles,
                     "Subsystem REQUEST_CONSOLIDATION: episodic consolidation triggered"

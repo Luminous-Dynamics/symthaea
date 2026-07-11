@@ -618,6 +618,14 @@ impl BrocaGenerator {
         checkpoint.save_to_file(path)
     }
 
+    /// Swap the active projection expert (Multi-Task Highway Experts).
+    #[cfg(feature = "mamba-cpu")]
+    pub fn select_projection_expert(&mut self, expert: crate::projection::ProjectionExpert) {
+        if let Some(ref mut lm) = self.controller.liquid_mamba {
+            lm.projection.select_expert(expert);
+        }
+    }
+
     /// Generate text from thought channels.
     pub fn generate(&mut self, channels: &ThoughtChannels) -> GenerationResult {
         self.generate_with_callback(channels, &mut |_| {})
