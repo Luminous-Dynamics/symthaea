@@ -60,6 +60,11 @@ pub mod audio_bridge;
 pub mod orchestrator;
 pub mod synthesis_bridge;
 
+/// Bridges `symthaea-muse::singing_bridge` (lyrics + melody) into
+/// `FormantVocoder` — see module docs.
+#[cfg(feature = "singing")]
+pub mod singing;
+
 // LTC-driven articulatory synthesis (Phase 17)
 pub mod vocal_tract_controller;
 pub mod vocal_tract_encoder;

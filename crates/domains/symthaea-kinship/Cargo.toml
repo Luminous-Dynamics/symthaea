@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-kinship"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Kinship algebra for Symthaea: compute the (English/Eskimo-system) kin term between two people from a genealogy — consanguineal (parent..cousin-n-removed) and affinal (spouse, in-laws). The formal, testable core of anthropology. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link. The formal core of the
+# "hard" anthropology domain (see symthaea/HARD_DOMAINS_PLAN_2026-07-07.md).
+[dependencies]

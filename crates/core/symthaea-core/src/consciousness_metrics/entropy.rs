@@ -691,3 +691,84 @@ impl JointDistribution {
         }
     }
 }
+
+#[cfg(test)]
+mod histogram_entropy_tests {
+    //! Direct property tests for `entropy_histogram` (via the public
+    //! `entropy()` API). Added as the correctness oracle for the Tier 2
+    //! algorithm-search proof-of-concept (`symthaea-forge`) — this function
+    //! previously had zero direct tests despite being the crate's default
+    //! ("fast") entropy estimator, so mutations to it had nothing to fail
+    //! against except unrelated downstream tests.
+    use super::*;
+
+    fn histogram_estimator() -> ContinuousEntropyEstimator {
+        ContinuousEntropyEstimator::fast()
+    }
+
+    #[test]
+    fn entropy_is_never_negative() {
+        let est = histogram_estimator();
+        for seed in 0..8u64 {
+            let hv = ContinuousHV::random(256, seed);
+            assert!(
+                est.entropy(&hv) >= 0.0,
+                "entropy must be non-negative (seed {seed})"
+            );
+        }
+    }
+
+    #[test]
+    fn entropy_of_a_constant_vector_is_zero() {
+        // All mass falls in a single bin -> p=1.0 for that bin -> H = -1*log2(1) = 0.
+        let est = histogram_estimator();
+        let hv = ContinuousHV::from_values(vec![0.3f32; 512]);
+        let h = est.entropy(&hv);
+        assert!(
+            h.abs() < 1e-9,
+            "entropy of a constant-valued vector should be exactly 0, got {h}"
+        );
+    }
+
+    #[test]
+    fn entropy_never_exceeds_log2_of_bin_count() {
+        // Mathematical upper bound (maximum entropy) for any distribution
+        // over `adaptive_bins` categories is log2(adaptive_bins) bits.
+        let est = histogram_estimator();
+        let max_possible = (est.adaptive_bins as f64).log2();
+        for seed in 0..8u64 {
+            let hv = ContinuousHV::random(1024, seed);
+            let h = est.entropy(&hv);
+            assert!(
+                h <= max_possible + 1e-9,
+                "entropy {h} exceeded the log2(bins)={max_possible} upper bound (seed {seed})"
+            );
+        }
+    }
+
+    #[test]
+    fn entropy_of_an_exactly_uniform_histogram_hits_the_upper_bound() {
+        // Construct a vector that places exactly one sample in each of the
+        // 16 default bins (values spread evenly across [-1, 1]) -- this
+        // should produce entropy == log2(16) == 4.0 bits exactly, giving a
+        // tight (not just approximate) correctness check on the binning
+        // math itself, not just an inequality.
+        let est = histogram_estimator();
+        let num_bins = est.adaptive_bins;
+        let values: Vec<f32> = (0..num_bins)
+            .map(|i| {
+                // Bin i covers normalized range [i/num_bins, (i+1)/num_bins);
+                // pick the bin midpoint and invert normalized = (v+1)/2.
+                let normalized_mid = (i as f32 + 0.5) / num_bins as f32;
+                normalized_mid * 2.0 - 1.0
+            })
+            .collect();
+        let hv = ContinuousHV::from_values(values);
+        let h = est.entropy(&hv);
+        let expected = (num_bins as f64).log2();
+        assert!(
+            (h - expected).abs() < 1e-9,
+            "expected exactly uniform histogram to hit {expected} bits, got {h}"
+        );
+    }
+}

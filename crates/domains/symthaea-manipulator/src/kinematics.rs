@@ -278,6 +278,25 @@ impl ManipulatorKinematics {
             .zip(&self.joint_limits)
             .all(|(&angle, limits)| angle >= limits[0] && angle <= limits[1])
     }
+
+    /// Map a Cartesian end-effector force to the equivalent per-joint
+    /// torque via the transpose of the position Jacobian: `tau = J^T · F`.
+    ///
+    /// This is the standard mapping used both to give an external force
+    /// real physical effect on joint dynamics (`simulator.rs`) and to let
+    /// a controller compute a compliance correction from a sensed force
+    /// (`admittance.rs`) — shared here so the two stay consistent.
+    pub fn cartesian_force_to_joint_torque(&self, q: &[f64], force: &[f64; 3]) -> Vec<f64> {
+        let n = self.num_joints();
+        let jac = self.jacobian(q, 1e-6); // rows 0-2 are position
+        let mut tau = vec![0.0; n];
+        for j in 0..n {
+            for i in 0..3 {
+                tau[j] += jac[i][j] * force[i];
+            }
+        }
+        tau
+    }
 }
 
 impl Default for ManipulatorKinematics {
@@ -420,5 +439,38 @@ mod tests {
 
         let q_invalid = vec![10.0; 7]; // Way out of range
         assert!(!kin.within_limits(&q_invalid));
+    }
+
+    #[test]
+    fn test_cartesian_force_to_joint_torque_zero_force_is_zero_torque() {
+        let kin = ManipulatorKinematics::default_7dof();
+        let q = vec![0.1, 0.2, 0.0, -1.0, 0.0, 1.0, 0.0];
+        let tau = kin.cartesian_force_to_joint_torque(&q, &[0.0, 0.0, 0.0]);
+        assert!(tau.iter().all(|&t| t.abs() < 1e-9));
+    }
+
+    #[test]
+    fn test_cartesian_force_to_joint_torque_nonzero_for_nonzero_force() {
+        let kin = ManipulatorKinematics::default_7dof();
+        let q = vec![0.1, 0.2, 0.0, -1.0, 0.0, 1.0, 0.0];
+        let tau = kin.cartesian_force_to_joint_torque(&q, &[10.0, 0.0, 0.0]);
+        assert!(
+            tau.iter().any(|&t| t.abs() > 1e-6),
+            "a real Cartesian force should produce nonzero torque on at least one joint: {tau:?}"
+        );
+    }
+
+    #[test]
+    fn test_cartesian_force_to_joint_torque_scales_linearly() {
+        let kin = ManipulatorKinematics::default_7dof();
+        let q = vec![0.1, 0.2, 0.0, -1.0, 0.0, 1.0, 0.0];
+        let tau1 = kin.cartesian_force_to_joint_torque(&q, &[5.0, 3.0, -2.0]);
+        let tau2 = kin.cartesian_force_to_joint_torque(&q, &[10.0, 6.0, -4.0]);
+        for (t1, t2) in tau1.iter().zip(tau2.iter()) {
+            assert!(
+                (t2 - 2.0 * t1).abs() < 1e-9,
+                "J^T*F should be linear in F: {t1} vs {t2}"
+            );
+        }
     }
 }

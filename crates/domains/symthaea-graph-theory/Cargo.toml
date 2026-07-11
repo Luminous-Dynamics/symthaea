@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-graph-theory"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Graph-theory layer for Symthaea: traversal (BFS/DFS), connected components, topological sort, cycle detection, centrality (degree/PageRank), minimum spanning tree (Kruskal), and max-flow (Edmonds-Karp). Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

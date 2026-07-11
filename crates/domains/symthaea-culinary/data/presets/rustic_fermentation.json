@@ -1,0 +1,4 @@
+{
+  "name": "rustic_fermentation",
+  "hydration": { "dough": "Bread", "flour_g": 1000.0, "water_g": 800.0 }
+}

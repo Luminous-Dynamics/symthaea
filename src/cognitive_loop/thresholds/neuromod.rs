@@ -81,3 +81,15 @@ pub const HOMEOSTASIS_NEUROMOD_STEP: f32 = 0.01;
 /// EMA smoothing alpha for end-of-cycle neuromodulator averages.
 /// Science: Doya (2002) — slow EMA tracks tonic neuromodulator levels.
 pub const NEUROMOD_EMA_ALPHA: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANVAS AESTHETIC FEEDBACK
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Scale applied to canvas AestheticFeedback deltas before bath injection.
+/// The canvas is a *passive diagnostic rendering* of cognitive state, not a
+/// deliberate creative act, so its aesthetic reward is half the weight of the
+/// `creative` path (which scores intentionally generated artifacts). This also
+/// keeps the combined signal additive-but-small when both features are on.
+#[cfg(feature = "canvas")]
+pub const CANVAS_AESTHETIC_FEEDBACK_WEIGHT: f32 = 0.5;

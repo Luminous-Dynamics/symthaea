@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-statistics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Statistics & probability layer for Symthaea: descriptive stats, probability distributions (normal/binomial/Poisson/Student-t/chi-square via real special functions), hypothesis testing, linear regression, and Bayesian diagnostics. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

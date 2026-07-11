@@ -230,6 +230,16 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
 
         tokio::task::spawn(async move {
             let service = service_fn(|req: Request<hyper::body::Incoming>| async move {
+                if req.method() == hyper::Method::OPTIONS {
+                    let resp = Response::builder()
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
+                        .header("Access-Control-Allow-Headers", "Content-Type")
+                        .body(Full::new(Bytes::from("")))
+                        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
+                    return Ok::<_, hyper::Error>(resp);
+                }
+
                 if req.uri().path() == "/metrics" {
                     let body = match Metrics::try_global() {
                         Ok(m) => m.render(),
@@ -244,6 +254,17 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
                     };
                     let resp = Response::builder()
                         .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
+                    Ok::<_, hyper::Error>(resp)
+                } else if req.uri().path() == "/state" || req.uri().path() == "/snapshot" {
+                    let path = crate::ipc::default_snapshot_path();
+                    let body = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
+                    let resp = Response::builder()
+                        .header("Content-Type", "application/json")
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
+                        .header("Access-Control-Allow-Headers", "Content-Type")
                         .body(Full::new(Bytes::from(body)))
                         .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
                     Ok::<_, hyper::Error>(resp)

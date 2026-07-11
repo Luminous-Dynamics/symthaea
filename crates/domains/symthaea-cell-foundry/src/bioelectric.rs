@@ -1933,4 +1933,66 @@ mod tests {
              an active regeneration episode ran with fep_regeneration_enabled"
         );
     }
+
+    fn progenitor_count(organoid: &NeuralOrganoid) -> usize {
+        (0..organoid.field.num_cells())
+            .filter(|&i| organoid.field.cells[i].cell_type.is_progenitor())
+            .count()
+    }
+
+    #[test]
+    fn differentiation_threshold_multiplier_defaults_to_one() {
+        let organoid = NeuralOrganoid::new(10, 26);
+        assert_eq!(organoid.differentiation_threshold_multiplier(), 1.0);
+    }
+
+    #[test]
+    fn differentiation_threshold_multiplier_default_matches_legacy_behavior() {
+        // Explicitly setting the default value must produce byte-identical
+        // results to never touching the setter at all -- this is the
+        // opt-in/default-off guarantee this field exists to preserve.
+        let seed = 10_000;
+        let mut untouched = NeuralOrganoid::new(150, seed);
+        let mut explicit_default = NeuralOrganoid::new(150, seed);
+        explicit_default.set_differentiation_threshold_multiplier(1.0);
+        for _ in 0..20 {
+            untouched.advance_day();
+            explicit_default.advance_day();
+        }
+        assert_eq!(
+            progenitor_count(&untouched),
+            progenitor_count(&explicit_default),
+            "setting the multiplier to its default value must not change \
+             differentiation dynamics at all"
+        );
+    }
+
+    #[test]
+    fn higher_differentiation_threshold_multiplier_delays_progenitor_depletion() {
+        // See `examples/differentiation_threshold_tuning.rs` for the full
+        // empirical sweep this value was chosen from: multiplier=12.0 keeps
+        // a real, nonzero progenitor population alive out to day ~30,
+        // versus the default's crash to 0 by day 8.
+        let seed = 10_000;
+        let mut default_organoid = NeuralOrganoid::new(150, seed);
+        let mut boosted_organoid = NeuralOrganoid::new(150, seed);
+        boosted_organoid.set_differentiation_threshold_multiplier(12.0);
+        for _ in 0..20 {
+            default_organoid.advance_day();
+            boosted_organoid.advance_day();
+        }
+        let default_count = progenitor_count(&default_organoid);
+        let boosted_count = progenitor_count(&boosted_organoid);
+        assert_eq!(
+            default_count, 0,
+            "sanity check on the known baseline: by day 20 the default \
+             multiplier should already have crashed the progenitor count \
+             to zero"
+        );
+        assert!(
+            boosted_count > 0,
+            "a multiplier of 12.0 should keep some progenitors alive at \
+             day 20, got {boosted_count}"
+        );
+    }
 }

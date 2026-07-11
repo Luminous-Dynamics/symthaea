@@ -26,7 +26,7 @@ use std::env;
 use spark_engine::constants::*;
 use spark_engine::experimental_design::ExperimentDesigner;
 use spark_engine::hypothesis_models::HypothesisComparison;
-use spark_engine::literature::{HostMaterial as LitMaterial, LiteratureDatabase, TriggerMethod};
+use spark_engine::literature::{HostMaterial as LitMaterial, LiteratureDatabase};
 use spark_engine::physics::GamowIntegration;
 use spark_engine::prelude::*;
 use spark_engine::rate_gap::{

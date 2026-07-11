@@ -33,7 +33,7 @@ pub use sequence::{SequenceResult, TrainingBackend};
 ///
 /// The `channels` field uses `Vec<f32>` for backward compatibility with both
 /// legacy 20-channel and current 24-channel JSONL training data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TrainingPair {
     pub channels: Vec<f32>,
     pub target_text: String,
@@ -45,6 +45,14 @@ pub struct TrainingPair {
     /// **NEW**: Emotional arousal at start of sequence (0.0 to 1.0).
     #[serde(default)]
     pub arousal: f32,
+    /// Optional content-conditioning signal: a bag-of-token-embeddings HV
+    /// (same dimensionality as `ThoughtEncoder::encode`'s output) built from
+    /// this example's actual subject matter, blended into `thought_hv` via
+    /// `BrocaConfig::enable_nsm_semantic`/`nsm_semantic_alpha` the same way
+    /// `generate_with_semantic` already does at inference. `None` for all
+    /// pre-existing training data (channels alone), preserving prior behavior.
+    #[serde(default)]
+    pub semantic_hv: Option<Vec<f32>>,
 }
 
 impl TrainingPair {
@@ -57,6 +65,7 @@ impl TrainingPair {
             target_ids,
             valence: 0.0,
             arousal: 0.0,
+            semantic_hv: None,
         }
     }
 
@@ -424,6 +433,21 @@ pub struct TrainingConfig {
     /// (which saves the final epoch, not the best).
     pub best_checkpoint_path: String,
 
+    // ── Epoch Auto-Save (crash recovery) ──
+    /// Path to save an in-progress checkpoint at the end of every epoch
+    /// (empty = disabled, the default). This is a crash-recovery safety
+    /// net for long real training runs, NOT a substitute for the final
+    /// `--output` save. Must be explicitly opted into by the caller with
+    /// a caller-chosen path -- this field used to be a hardcoded relative
+    /// literal (`"data/models/broca-checkpoint-latest.bin"`) fired
+    /// unconditionally by every call to `train()`/`train_with_adam()`,
+    /// including toy unit tests. Since `cargo test` runs with the crate's
+    /// manifest directory as cwd, that silently overwrote the real
+    /// production Broca checkpoint with tiny toy-network weights on every
+    /// test run (found 2026-07-09; see
+    /// memory/broca_direct_decoder_degenerate_generation_jul9.md).
+    pub epoch_autosave_path: String,
+
     // ── Hidden State Dropout ──
     /// Dropout rate for CfC hidden states during training (0.0 = disabled).
     /// After each forward step, randomly zeros this fraction of hidden state
@@ -493,6 +517,7 @@ impl Default for TrainingConfig {
             unknown_token_penalty_weight: 0.0,
             unknown_token_penalty_margin: 0.0,
             best_checkpoint_path: String::new(),
+            epoch_autosave_path: String::new(),
             hidden_dropout: 0.0,
             adaptive_veto_target: 0.0, // disabled by default
             veto_warmup_epochs: 10,
@@ -859,6 +884,52 @@ fn sample_negatives(target: usize, vocab_size: usize, k: usize, seed: u64) -> Ve
     indices
 }
 
+/// Encode `channels` into `thought_hv` exactly as `encoder.encode()` does,
+/// then — if `semantic_hv` is present and `config.enable_nsm_semantic` is on
+/// (the `BrocaConfig` default) — blend it in the same way
+/// `BrocaGenerator::generate_with_semantic` already does at inference:
+/// `thought_hv.lerp_in_place(sem_hv, 1 - alpha, alpha)` with
+/// `alpha = config.nsm_semantic_alpha`. This is the training-side half of
+/// that existing inference-time blend; without it, training never supplies
+/// the signal the config already defaults to using, so
+/// `TrainingPair::semantic_hv` would be silently ignored. Takes `encoder`
+/// and `config` separately (rather than `&BrocaGenerator`) so it's usable
+/// from contexts that only hold the encoder (e.g. the GPU validation-loss
+/// path, which doesn't carry a full generator reference).
+fn semantic_blended_thought_hv_raw(
+    encoder: &crate::encoder::ThoughtLanguageEncoder,
+    config: &crate::generator::BrocaConfig,
+    channels: &ThoughtChannels,
+    semantic_hv: Option<&[f32]>,
+) -> ContinuousHV {
+    let mut thought_hv = encoder.encode(channels);
+    if config.enable_nsm_semantic
+        && let Some(sem) = semantic_hv
+    {
+        let alpha = config.nsm_semantic_alpha.clamp(0.0, 1.0);
+        if alpha > 0.0 {
+            let sem_hv = ContinuousHV::from_vec(sem.to_vec());
+            thought_hv.lerp_in_place(&sem_hv, 1.0 - alpha, alpha);
+        }
+    }
+    thought_hv
+}
+
+/// Convenience wrapper over [`semantic_blended_thought_hv_raw`] for the
+/// common case of holding a full `&BrocaGenerator`.
+fn semantic_blended_thought_hv(
+    generator: &BrocaGenerator,
+    channels: &ThoughtChannels,
+    semantic_hv: Option<&[f32]>,
+) -> ContinuousHV {
+    semantic_blended_thought_hv_raw(
+        generator.encoder(),
+        generator.config(),
+        channels,
+        semantic_hv,
+    )
+}
+
 /// Train the BrocaGenerator on a dataset using teacher forcing.
 ///
 /// For each pair:
@@ -1021,7 +1092,7 @@ pub fn train_with_adam(
             .iter()
             .map(|p| {
                 let channels = p.to_thought_channels();
-                generator.encoder().encode(&channels)
+                semantic_blended_thought_hv(generator, &channels, p.semantic_hv.as_deref())
             })
             .collect()
     } else {
@@ -1063,7 +1134,11 @@ pub fn train_with_adam(
                             continue;
                         }
                         let channels = pair.to_thought_channels();
-                        let thought_hv = generator.encoder().encode(&channels);
+                        let thought_hv = semantic_blended_thought_hv(
+                            generator,
+                            &channels,
+                            pair.semantic_hv.as_deref(),
+                        );
                         let thought_tensor = candle_core::Tensor::from_vec(
                             thought_hv.as_slice().to_vec(),
                             (1, thought_hv.as_slice().len()),
@@ -1113,7 +1188,8 @@ pub fn train_with_adam(
                     continue;
                 }
                 let channels = pair.to_thought_channels();
-                let thought_hv = generator.encoder().encode(&channels);
+                let thought_hv =
+                    semantic_blended_thought_hv(generator, &channels, pair.semantic_hv.as_deref());
                 for (pos, &target_id) in pair.target_ids.iter().take(config.bptt_window).enumerate()
                 {
                     let loss = apply_thought_logit_aux_gradient(
@@ -1264,7 +1340,8 @@ pub fn train_with_adam(
             }
 
             let channels = pair.to_thought_channels();
-            let thought_hv = generator.encoder().encode(&channels);
+            let thought_hv =
+                semantic_blended_thought_hv(generator, &channels, pair.semantic_hv.as_deref());
 
             // Reset controller for this sequence (unless carrying state)
             let should_carry = config.carry_state > 0.0 && pair_idx > 0 && {
@@ -1937,6 +2014,7 @@ pub fn train_with_adam(
                 compute_validation_loss_gpu(
                     trainer,
                     generator.encoder(),
+                    generator.config(),
                     val_dataset,
                     config.bptt_window,
                 )
@@ -2152,14 +2230,16 @@ pub fn train_with_adam(
             }
         }
 
-        // NATIVE AUTO-SAVE: Secure current weights at the end of each completed epoch
-        {
+        // Epoch auto-save (crash recovery): opt-in only, via
+        // config.epoch_autosave_path. See the field's doc comment for why
+        // this must never be a hardcoded/implicit path.
+        if !config.epoch_autosave_path.is_empty() {
             #[cfg(feature = "mamba-cpu")]
             let projection_weights = generator.controller().projection_weights();
             #[cfg(not(feature = "mamba-cpu"))]
             let projection_weights = None;
 
-            let auto_path = "data/models/broca-checkpoint-latest.bin";
+            let auto_path = &config.epoch_autosave_path;
             if let Some(parent) = std::path::Path::new(auto_path).parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
@@ -3350,6 +3430,7 @@ pub fn generate_curriculum_with_style(
             target_ids: ids,
             valence: 0.0,
             arousal: 0.5,
+            ..Default::default()
         });
     }
 
@@ -3396,7 +3477,8 @@ pub fn compute_validation_loss_sampled(
         }
 
         let channels = pair.to_thought_channels();
-        let thought_hv = generator.encoder().encode(&channels);
+        let thought_hv =
+            semantic_blended_thought_hv(generator, &channels, pair.semantic_hv.as_deref());
         generator.controller_mut().reset();
         generator.controller_mut().seed_from_thought(&thought_hv);
 
@@ -3441,6 +3523,7 @@ pub fn compute_validation_loss_sampled(
 pub fn compute_validation_loss_gpu(
     trainer: &mut crate::gpu_cfc::GpuTrainer,
     encoder: &crate::encoder::ThoughtLanguageEncoder,
+    broca_config: &crate::generator::BrocaConfig,
     dataset: &TrainingDataset,
     bptt_window: usize,
 ) -> f32 {
@@ -3453,7 +3536,12 @@ pub fn compute_validation_loss_gpu(
         }
 
         let channels = pair.to_thought_channels();
-        let thought_hv = encoder.encode(&channels);
+        let thought_hv = semantic_blended_thought_hv_raw(
+            encoder,
+            broca_config,
+            &channels,
+            pair.semantic_hv.as_deref(),
+        );
 
         // Transfer thought to GPU
         let thought_tensor = match candle_core::Tensor::from_vec(
@@ -3556,6 +3644,29 @@ mod tests {
         let pair = TrainingPair::new(channels, "hello world".to_string(), &tok);
         assert!(!pair.target_ids.is_empty());
         assert_eq!(pair.channels.len(), crate::encoder::NUM_CHANNELS);
+    }
+
+    #[test]
+    fn test_semantic_blended_thought_hv_noop_when_absent() {
+        let generator = BrocaGenerator::new(&test_genesis(), test_config());
+        let channels = ThoughtChannels::default();
+        let plain = generator.encoder().encode(&channels);
+        let blended = semantic_blended_thought_hv(&generator, &channels, None);
+        assert_eq!(plain, blended);
+    }
+
+    #[test]
+    fn test_semantic_blended_thought_hv_differs_when_present() {
+        let generator = BrocaGenerator::new(&test_genesis(), test_config());
+        let channels = ThoughtChannels::default();
+        let plain = generator.encoder().encode(&channels);
+        let semantic = ContinuousHV::random(plain.values.len(), 42).values;
+        let blended = semantic_blended_thought_hv(&generator, &channels, Some(&semantic));
+        assert_ne!(plain, blended);
+
+        // Deterministic: same inputs produce the same blended HV every time.
+        let blended_again = semantic_blended_thought_hv(&generator, &channels, Some(&semantic));
+        assert_eq!(blended, blended_again);
     }
 
     #[test]
@@ -3764,6 +3875,537 @@ mod tests {
             last_loss < first_loss,
             "Training should reduce loss: first={first_loss} last={last_loss}"
         );
+    }
+
+    /// Phase D smoke test (Part 3 of the curriculum-bridge plan): reproduces
+    /// the exact real-cycle collapse scenario at tiny scale — two groups of
+    /// pairs sharing byte-identical `channels` (mirroring `build_channels()`
+    /// collapsing 148 real objectives to 2 distinct vectors) but different
+    /// `target_text`, distinguished only by `semantic_hv`. Confirms training
+    /// actually uses the blended signal to tell the two groups apart at
+    /// generation time, before spending hours on another real GPU cycle.
+    #[test]
+    fn test_semantic_hv_differentiates_colliding_channels() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut generator = BrocaGenerator::new(&genesis, config);
+        let tok = generator.tokenizer().clone();
+
+        let dim = generator
+            .encoder()
+            .encode(&ThoughtChannels::default())
+            .values
+            .len();
+        let semantic_a = ContinuousHV::random(dim, 11).values;
+        let semantic_b = ContinuousHV::random(dim, 22).values;
+
+        // Both groups share IDENTICAL channels — the exact collision that
+        // broke both real curriculum cycles — but different target text and
+        // different semantic_hv, so only semantic_hv can disambiguate them.
+        let channels = ThoughtChannels::default();
+        let mut dataset = TrainingDataset::default();
+        for _ in 0..8 {
+            let mut pair_a = TrainingPair::new(channels, "alpha alpha alpha".to_string(), &tok);
+            pair_a.semantic_hv = Some(semantic_a.clone());
+            dataset.push(pair_a);
+
+            let mut pair_b = TrainingPair::new(channels, "beta beta beta".to_string(), &tok);
+            pair_b.semantic_hv = Some(semantic_b.clone());
+            dataset.push(pair_b);
+        }
+
+        let train_config = TrainingConfig {
+            epochs: 40,
+            learning_rate: 0.05,
+            bptt_window: 8,
+            grad_clip: 1.0,
+            report_interval: 100,
+            use_adam: false,
+            warmup_fraction: 0.0,
+            patience: 0,
+            enable_diagnostics: false,
+            ..Default::default()
+        };
+        let metrics = train(&mut generator, &dataset, &train_config);
+        assert!(metrics.last().unwrap().avg_loss.is_finite());
+
+        generator.config_mut().bypass_gating = true;
+        let sem_a_hv = ContinuousHV::from_vec(semantic_a);
+        let sem_b_hv = ContinuousHV::from_vec(semantic_b);
+        let result_a = generator.generate_with_semantic(&channels, Some(&sem_a_hv), &[]);
+        let result_b = generator.generate_with_semantic(&channels, Some(&sem_b_hv), &[]);
+
+        assert_ne!(
+            result_a.text, result_b.text,
+            "with identical channels, only semantic_hv differs between groups — \
+             identical generated text here means the wiring isn't actually \
+             differentiating on it (the same failure mode as the real collapse)"
+        );
+    }
+
+    /// Diagnostic for the real Phase E cycle's failure to transfer: on real
+    /// data, only ~3-4% of the merged training set carried a real
+    /// semantic_hv (this cycle's ~250 new pairs vs. ~6800 base-corpus +
+    /// prior-cycle pairs with semantic_hv=None), and differentiation did
+    /// not land. This reproduces the same ratio at toy scale — a large
+    /// majority of unrelated "noise" pairs (distinct channels, no
+    /// semantic_hv, standing in for the base corpus) plus a small minority
+    /// sharing colliding channels distinguished only by semantic_hv (the
+    /// signal) — under a fixed, generous training budget (NOT an attempt to
+    /// replicate the real cycle's single-epoch/low-LR/pretrained-`--resume`
+    /// regime, which a from-scratch toy network can't meaningfully mimic).
+    /// Tests the qualitative question: does drowning the signal in noise
+    /// prevent differentiation, and does oversampling the signal pairs
+    /// restore it, at the same total epoch budget.
+    fn build_diluted_dataset(
+        tok: &BpeTokenizer,
+        oversample: usize,
+    ) -> (TrainingDataset, ThoughtChannels, Vec<f32>, Vec<f32>) {
+        let genesis = test_genesis();
+        let generator = BrocaGenerator::new(&genesis, test_config());
+        let dim = generator
+            .encoder()
+            .encode(&ThoughtChannels::default())
+            .values
+            .len();
+        let semantic_a = ContinuousHV::random(dim, 33).values;
+        let semantic_b = ContinuousHV::random(dim, 44).values;
+        let signal_channels = ThoughtChannels::default();
+
+        let mut dataset = TrainingDataset::default();
+        // ~96 noise pairs across 8 distinct intents (distinct channels,
+        // never colliding with signal_channels or each other), no
+        // semantic_hv — stands in for the base corpus + prior-cycle data
+        // that predates this fix.
+        for intent in 0..8 {
+            let noise_channels = ThoughtChannels::with_intent(intent);
+            for _ in 0..12 {
+                dataset.push(TrainingPair::new(
+                    noise_channels,
+                    "hello world".to_string(),
+                    tok,
+                ));
+            }
+        }
+        // The minority signal, oversampled `oversample` times.
+        for _ in 0..oversample {
+            let mut pair_a =
+                TrainingPair::new(signal_channels, "alpha alpha alpha".to_string(), tok);
+            pair_a.semantic_hv = Some(semantic_a.clone());
+            dataset.push(pair_a);
+
+            let mut pair_b = TrainingPair::new(signal_channels, "beta beta beta".to_string(), tok);
+            pair_b.semantic_hv = Some(semantic_b.clone());
+            dataset.push(pair_b);
+        }
+
+        (dataset, signal_channels, semantic_a, semantic_b)
+    }
+
+    fn diluted_train_config() -> TrainingConfig {
+        TrainingConfig {
+            epochs: 15,
+            learning_rate: 0.05,
+            bptt_window: 8,
+            grad_clip: 1.0,
+            report_interval: 1000,
+            use_adam: false,
+            warmup_fraction: 0.0,
+            patience: 0,
+            enable_diagnostics: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_dilution_at_real_ratio_without_oversampling() {
+        let genesis = test_genesis();
+        let mut generator = BrocaGenerator::new(&genesis, test_config());
+        let tok = generator.tokenizer().clone();
+        // 96 noise + 2 signal pairs (1 alpha + 1 beta) = ~2% signal ratio,
+        // in the same ballpark as the real cycle's ~3-4%.
+        let (dataset, channels, semantic_a, semantic_b) = build_diluted_dataset(&tok, 1);
+
+        let metrics = train(&mut generator, &dataset, &diluted_train_config());
+        assert!(metrics.last().unwrap().avg_loss.is_finite());
+
+        generator.config_mut().bypass_gating = true;
+        let sem_a_hv = ContinuousHV::from_vec(semantic_a);
+        let sem_b_hv = ContinuousHV::from_vec(semantic_b);
+        let result_a = generator.generate_with_semantic(&channels, Some(&sem_a_hv), &[]);
+        let result_b = generator.generate_with_semantic(&channels, Some(&sem_b_hv), &[]);
+
+        eprintln!(
+            "[dilution, no oversampling] a={:?} b={:?} differentiated={}",
+            result_a.text,
+            result_b.text,
+            result_a.text != result_b.text
+        );
+    }
+
+    #[test]
+    fn test_dilution_fixed_by_oversampling() {
+        let genesis = test_genesis();
+        let mut generator = BrocaGenerator::new(&genesis, test_config());
+        let tok = generator.tokenizer().clone();
+        // Same 96 noise pairs, but the signal is oversampled 15x (30 signal
+        // pairs vs 96 noise = ~24% ratio) at the SAME epoch budget as the
+        // no-oversampling test above.
+        let (dataset, channels, semantic_a, semantic_b) = build_diluted_dataset(&tok, 15);
+
+        let metrics = train(&mut generator, &dataset, &diluted_train_config());
+        assert!(metrics.last().unwrap().avg_loss.is_finite());
+
+        generator.config_mut().bypass_gating = true;
+        let sem_a_hv = ContinuousHV::from_vec(semantic_a);
+        let sem_b_hv = ContinuousHV::from_vec(semantic_b);
+        let result_a = generator.generate_with_semantic(&channels, Some(&sem_a_hv), &[]);
+        let result_b = generator.generate_with_semantic(&channels, Some(&sem_b_hv), &[]);
+
+        eprintln!(
+            "[dilution, 15x oversampling] a={:?} b={:?} differentiated={}",
+            result_a.text,
+            result_b.text,
+            result_a.text != result_b.text
+        );
+        assert_ne!(
+            result_a.text, result_b.text,
+            "oversampling the minority signal pairs should restore \
+             differentiation even when drowned out by a large majority of \
+             unrelated noise pairs at the same training budget"
+        );
+    }
+
+    /// Phase F.1 (Part 4 of the curriculum-bridge plan): does a moderate,
+    /// *incremental* bootstrap pass teach an already-converged,
+    /// channels-only-trained model to use semantic_hv, without collapsing
+    /// what it already knew? Unlike the dilution tests (which trained a
+    /// fresh network from scratch), this simulates the real `--resume`
+    /// regime: pretrain to convergence on channels-only data first, THEN
+    /// continue training the SAME generator instance on a mix of replayed
+    /// pretraining data + new semantic_hv-distinguished pairs, at several
+    /// candidate (lr, epochs) budgets between the real cycle's too-weak
+    /// 0.00003/1-epoch and the from-scratch dilution tests' too-aggressive
+    /// 0.05/15-epochs. Reports both success criteria per candidate so a
+    /// human can pick the recipe to scale up to a real GPU run — this test
+    /// is a diagnostic sweep, not a strict pass/fail gate.
+    #[test]
+    fn test_bootstrap_recipe_sweep() {
+        const NUM_BASELINE_CHANNELS: usize = 4;
+        let baseline_texts = [
+            "zero zero zero",
+            "one one one",
+            "two two two",
+            "three three three",
+        ];
+
+        struct Candidate {
+            lr: f32,
+            epochs: usize,
+        }
+        let candidates = [
+            Candidate {
+                lr: 0.001,
+                epochs: 5,
+            },
+            Candidate {
+                lr: 0.003,
+                epochs: 8,
+            },
+            Candidate {
+                lr: 0.005,
+                epochs: 5,
+            },
+        ];
+
+        for candidate in &candidates {
+            // ── Stage 1: pretrain to convergence on diverse channels-only
+            // data, simulating "production, before this fix." ──
+            let genesis = test_genesis();
+            let mut generator = BrocaGenerator::new(&genesis, test_config());
+            let tok = generator.tokenizer().clone();
+
+            let mut pretrain_dataset = TrainingDataset::default();
+            let baseline_channels: Vec<ThoughtChannels> = (0..NUM_BASELINE_CHANNELS)
+                .map(ThoughtChannels::with_intent)
+                .collect();
+            for (channels, text) in baseline_channels.iter().zip(baseline_texts.iter()) {
+                for _ in 0..6 {
+                    pretrain_dataset.push(TrainingPair::new(*channels, text.to_string(), &tok));
+                }
+            }
+            let pretrain_config = TrainingConfig {
+                epochs: 30,
+                learning_rate: 0.05,
+                bptt_window: 8,
+                grad_clip: 1.0,
+                report_interval: 1000,
+                use_adam: false,
+                warmup_fraction: 0.0,
+                patience: 0,
+                enable_diagnostics: false,
+                ..Default::default()
+            };
+            train(&mut generator, &pretrain_dataset, &pretrain_config);
+
+            generator.config_mut().bypass_gating = true;
+            let baseline_before: Vec<String> = baseline_channels
+                .iter()
+                .map(|c| generator.generate(c).text)
+                .collect();
+
+            // ── Stage 2: incremental bootstrap — replay stage-1 data +
+            // new semantic_hv-distinguished pairs sharing ONE previously
+            // unseen channel value, at this candidate's moderate budget. ──
+            let dim = generator
+                .encoder()
+                .encode(&ThoughtChannels::default())
+                .values
+                .len();
+            let semantic_a = ContinuousHV::random(dim, 55).values;
+            let semantic_b = ContinuousHV::random(dim, 66).values;
+            let signal_channels = ThoughtChannels::default(); // distinct from with_intent(0..4)
+
+            let mut bootstrap_dataset = pretrain_dataset.clone();
+            for _ in 0..6 {
+                let mut pair_a =
+                    TrainingPair::new(signal_channels, "alpha alpha alpha".to_string(), &tok);
+                pair_a.semantic_hv = Some(semantic_a.clone());
+                bootstrap_dataset.push(pair_a);
+
+                let mut pair_b =
+                    TrainingPair::new(signal_channels, "beta beta beta".to_string(), &tok);
+                pair_b.semantic_hv = Some(semantic_b.clone());
+                bootstrap_dataset.push(pair_b);
+            }
+            let bootstrap_config = TrainingConfig {
+                epochs: candidate.epochs,
+                learning_rate: candidate.lr,
+                bptt_window: 8,
+                grad_clip: 1.0,
+                report_interval: 1000,
+                use_adam: false,
+                warmup_fraction: 0.0,
+                patience: 0,
+                enable_diagnostics: false,
+                ..Default::default()
+            };
+            train(&mut generator, &bootstrap_dataset, &bootstrap_config);
+
+            // ── Check (a): new signal differentiates ──
+            let sem_a_hv = ContinuousHV::from_vec(semantic_a);
+            let sem_b_hv = ContinuousHV::from_vec(semantic_b);
+            let result_a = generator.generate_with_semantic(&signal_channels, Some(&sem_a_hv), &[]);
+            let result_b = generator.generate_with_semantic(&signal_channels, Some(&sem_b_hv), &[]);
+            let differentiated = result_a.text != result_b.text;
+
+            // ── Check (b): baseline channels haven't collapsed ──
+            let baseline_after: Vec<String> = baseline_channels
+                .iter()
+                .map(|c| generator.generate(c).text)
+                .collect();
+            let baseline_preserved = baseline_before == baseline_after;
+            let baseline_distinct_after = baseline_after
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                == NUM_BASELINE_CHANNELS;
+
+            eprintln!(
+                "[bootstrap sweep] lr={} epochs={} | differentiated={} \
+                 (a={:?} b={:?}) | baseline_preserved={} baseline_still_distinct={} \
+                 (before={:?} after={:?})",
+                candidate.lr,
+                candidate.epochs,
+                differentiated,
+                result_a.text,
+                result_b.text,
+                baseline_preserved,
+                baseline_distinct_after,
+                baseline_before,
+                baseline_after,
+            );
+        }
+    }
+
+    /// Phase F.3 (Part 4 fallback): does freezing embeddings while giving
+    /// the CfC network a higher relative LR avoid the destabilization the
+    /// two real full-network bootstrap attempts hit? Mechanistic read of
+    /// those two failures: both used `freeze_embeddings: false` with a base
+    /// `--lr` of 0.0005 / 0.0001 applied directly to embeddings and scaled
+    /// by the default `network_lr_scale=0.3` for the network — meaning
+    /// embeddings actually moved *faster* than the network in both failed
+    /// runs (0.0005/0.0001 vs. effective network rates of 0.00015/0.00003),
+    /// yet embeddings feed both the token-output layer and the semantic_hv
+    /// encoding itself, so a shifting embedding table is a plausible
+    /// destabilizer independent of the network's own LR. This test isolates
+    /// that variable: freeze embeddings entirely and push the network's own
+    /// effective LR up via `network_lr_scale`, at bases spanning the exact
+    /// values that failed at real scale, and checks whether embeddings
+    /// literally didn't move (mechanical proof freezing worked) in addition
+    /// to the same differentiation/no-collapse criteria as the F.1 sweep.
+    #[test]
+    fn test_bootstrap_recipe_sweep_frozen_embeddings() {
+        const NUM_BASELINE_CHANNELS: usize = 4;
+        let baseline_texts = [
+            "zero zero zero",
+            "one one one",
+            "two two two",
+            "three three three",
+        ];
+
+        struct Candidate {
+            lr: f32,
+            network_lr_scale: f32,
+            epochs: usize,
+        }
+        let candidates = [
+            // network effective lr = lr * network_lr_scale
+            Candidate {
+                lr: 0.0001,
+                network_lr_scale: 1.0,
+                epochs: 8,
+            }, // network eff. lr = 0.0001 (the base lr of the 2nd real failure)
+            Candidate {
+                lr: 0.0005,
+                network_lr_scale: 1.0,
+                epochs: 8,
+            }, // network eff. lr = 0.0005 (the base lr of the 1st real failure)
+            Candidate {
+                lr: 0.001,
+                network_lr_scale: 0.5,
+                epochs: 8,
+            }, // network eff. lr = 0.0005, reached via a different (lr, scale) split
+        ];
+
+        for candidate in &candidates {
+            let genesis = test_genesis();
+            let mut generator = BrocaGenerator::new(&genesis, test_config());
+            let tok = generator.tokenizer().clone();
+
+            let mut pretrain_dataset = TrainingDataset::default();
+            let baseline_channels: Vec<ThoughtChannels> = (0..NUM_BASELINE_CHANNELS)
+                .map(ThoughtChannels::with_intent)
+                .collect();
+            for (channels, text) in baseline_channels.iter().zip(baseline_texts.iter()) {
+                for _ in 0..6 {
+                    pretrain_dataset.push(TrainingPair::new(*channels, text.to_string(), &tok));
+                }
+            }
+            let pretrain_config = TrainingConfig {
+                epochs: 30,
+                learning_rate: 0.05,
+                bptt_window: 8,
+                grad_clip: 1.0,
+                report_interval: 1000,
+                use_adam: false,
+                warmup_fraction: 0.0,
+                patience: 0,
+                enable_diagnostics: false,
+                ..Default::default()
+            };
+            train(&mut generator, &pretrain_dataset, &pretrain_config);
+
+            generator.config_mut().bypass_gating = true;
+            let baseline_before: Vec<String> = baseline_channels
+                .iter()
+                .map(|c| generator.generate(c).text)
+                .collect();
+            let embedding_norms_before: Vec<f32> = generator
+                .controller()
+                .token_embeddings()
+                .iter()
+                .map(|e| e.norm())
+                .collect();
+
+            let dim = generator
+                .encoder()
+                .encode(&ThoughtChannels::default())
+                .values
+                .len();
+            let semantic_a = ContinuousHV::random(dim, 55).values;
+            let semantic_b = ContinuousHV::random(dim, 66).values;
+            let signal_channels = ThoughtChannels::default();
+
+            let mut bootstrap_dataset = pretrain_dataset.clone();
+            for _ in 0..6 {
+                let mut pair_a =
+                    TrainingPair::new(signal_channels, "alpha alpha alpha".to_string(), &tok);
+                pair_a.semantic_hv = Some(semantic_a.clone());
+                bootstrap_dataset.push(pair_a);
+
+                let mut pair_b =
+                    TrainingPair::new(signal_channels, "beta beta beta".to_string(), &tok);
+                pair_b.semantic_hv = Some(semantic_b.clone());
+                bootstrap_dataset.push(pair_b);
+            }
+            let bootstrap_config = TrainingConfig {
+                epochs: candidate.epochs,
+                learning_rate: candidate.lr,
+                network_lr_scale: candidate.network_lr_scale,
+                freeze_embeddings: true,
+                train_network: true,
+                bptt_window: 8,
+                grad_clip: 1.0,
+                report_interval: 1000,
+                use_adam: false,
+                warmup_fraction: 0.0,
+                patience: 0,
+                enable_diagnostics: false,
+                ..Default::default()
+            };
+            train(&mut generator, &bootstrap_dataset, &bootstrap_config);
+
+            let embedding_norms_after: Vec<f32> = generator
+                .controller()
+                .token_embeddings()
+                .iter()
+                .map(|e| e.norm())
+                .collect();
+            let embeddings_frozen = embedding_norms_before
+                .iter()
+                .zip(embedding_norms_after.iter())
+                .all(|(before, after)| (before - after).abs() < 1e-6);
+
+            let sem_a_hv = ContinuousHV::from_vec(semantic_a);
+            let sem_b_hv = ContinuousHV::from_vec(semantic_b);
+            let result_a = generator.generate_with_semantic(&signal_channels, Some(&sem_a_hv), &[]);
+            let result_b = generator.generate_with_semantic(&signal_channels, Some(&sem_b_hv), &[]);
+            let differentiated = result_a.text != result_b.text;
+
+            let baseline_after: Vec<String> = baseline_channels
+                .iter()
+                .map(|c| generator.generate(c).text)
+                .collect();
+            let baseline_still_distinct = baseline_after
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                == NUM_BASELINE_CHANNELS;
+
+            eprintln!(
+                "[frozen-embeddings sweep] lr={} network_lr_scale={} (eff. network lr={}) epochs={} | \
+                 embeddings_frozen={} | differentiated={} (a={:?} b={:?}) | \
+                 baseline_still_distinct={} (before={:?} after={:?})",
+                candidate.lr,
+                candidate.network_lr_scale,
+                candidate.lr * candidate.network_lr_scale,
+                candidate.epochs,
+                embeddings_frozen,
+                differentiated,
+                result_a.text,
+                result_b.text,
+                baseline_still_distinct,
+                baseline_before,
+                baseline_after,
+            );
+
+            assert!(
+                embeddings_frozen,
+                "embeddings must not move when freeze_embeddings=true (lr={}, scale={})",
+                candidate.lr, candidate.network_lr_scale
+            );
+        }
     }
 
     #[test]

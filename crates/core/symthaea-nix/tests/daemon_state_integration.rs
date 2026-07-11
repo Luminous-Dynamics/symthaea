@@ -59,6 +59,7 @@ fn test_daemon_snapshot_serialization_with_new_fields() {
         maintenance_plan_count: 1,
         load_average_1m: Some(0.42),
         swap_used_percent: Some(10.0),
+        ..DaemonSnapshot::test_default()
     };
 
     // Serialize → deserialize roundtrip

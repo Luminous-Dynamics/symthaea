@@ -1653,6 +1653,97 @@ Highest-leverage next step for whoever picks this up: decide what actually
 reads a `CodeCertificate` and wire that, or delete the "competitive moat"
 claim if nothing ever will.
 
+## 2026-07-06 Update: the first trustworthy pass@1 number for the fixed pipeline
+
+Every benchmark number so far this week was a small sample (15-40 problems)
+taken *while* actively finding and fixing bugs — useful for measuring each
+fix's before/after delta, but none of them were "how good is the finished
+pipeline" numbers. Two follow-ups:
+
+**Made the benchmark itself more resilient first**: `humaneval_benchmark.rs`
+only wrote its JSON report once, after the entire loop finished — so a run
+killed partway through (this has happened repeatedly, this benchmark is
+long-running and the machine sees heavy concurrent-session load) lost every
+result gathered so far, not just the remaining ones. Refactored into
+`write_report()`, now called after every single problem. Cheap, and it
+immediately paid for itself on the very next run.
+
+**Ran a real 40-problem sample of the fully-fixed Agent pipeline**
+(`--llm`, `use_orchestrator=false`, `docs/HUMANEVAL_AGENT_FINAL_40_RESULTS.json`):
+
+- **Pass@1: 9/40 (22.5%)**, compiled 34/40 (85%).
+- This is the **exact same pass@1 as the very first Direct-mode baseline**
+  measured at the start of this whole investigation (`docs/HUMANEVAL_BASELINE_RESULTS.json`,
+  2026-07-03: also 9/40, 22.5%, though that run's compile rate was measured
+  under worse concurrent-session contention). After a full week of finding
+  and fixing 8 real bugs in this pipeline — Rust-idiom leakage, a
+  prose/declaration name-extraction collision, a fuzzy-HDC-match bypass, 4
+  sub-cases of one wrapping bug, a markdown-fence stripping bug, a
+  384-error dead test file, and a never-persisted distillation buffer — the
+  full Agent pipeline has gone from a **0/15 regression** (worse than doing
+  nothing) to **genuine parity** with a bare LLM call on the same
+  benchmark. That's the correct outcome: this week's work was about making
+  the machinery around the LLM stop actively hurting it, not about beating
+  the LLM itself — that was never the goal (see the "don't compete with
+  LLMs at raw generation" framing throughout this doc).
+- The remaining open comparison — does `use_orchestrator=true` improve on
+  this 22.5% baseline — is still unmeasured at this sample size (all
+  orchestrator runs so far have been the 3-15 problem samples from earlier
+  in the week). That's the natural next benchmark to run.
+
+## 2026-07-07 Update: the orchestrator question, answered as well as today allows
+
+Spent the rest of this day chasing infrastructure specifically to get a clean
+run of `examples/rust_orchestrator_benchmark` (14 cases, real `rustc`+test
+verification, `use_orchestrator` false vs true): found and fixed a duplicate
+crash-looping systemd `ollama.service` (72,000+ failed restarts over 4 days,
+~3s apart), added a `cargo` `jobs=4` cap (previously unbounded — every session
+independently tried to use all 12 cores), tightened the stale-target cleanup
+threshold from 48h to 12h, and extended an already-proven `codegen-units=16`
+fix (previously only applied to `[profile.test]`, fixing a 2% sccache
+cache-hit regression) to `[profile.dev]` as well, since regular
+`cargo build`/`check` — the most common commands all week — had never
+gotten that fix. All four are real, committed, verified improvements
+regardless of what follows.
+
+Despite all four fixes landing, **never got a single full, uninterrupted
+14-case run** — the shared machine's load (driven by 5-12+ concurrent
+Claude sessions, confirmed via direct process/journal inspection, not
+guessed) kept killing or corrupting long-running attempts. Two partial runs
+did complete enough cases to be informative, and since both started from
+the same fixed case order they substantially overlap rather than add
+cleanly:
+
+- **Run A** (13 of 14 cases, first real signal after the
+  `execute_rust_with_inline_tests` sandbox fix — see the entry above):
+  **orchestrator=false 8/13 (61.5%) vs orchestrator=true 4/13 (30.8%)**.
+- **Run B** (6 of 14 cases, after the infra fixes above — same first 6
+  cases as Run A, a noisy re-measurement, not new coverage):
+  **orchestrator=false 3/6 vs orchestrator=true 2/5** (fibonacci's `true`
+  attempt was cut off mid-run). Notably, individual case outcomes are not
+  stable run-to-run (`is_palindrome` flipped false→true, `http_parse`
+  flipped true→false, `fizzbuzz` flipped true→false on the *false* setting
+  this time) — real LLM sampling variance, not just orchestrator noise.
+
+**Conclusion, treated as sufficient rather than chasing a cleaner number
+tonight**: across both runs, `use_orchestrator=true` shows **no measurable
+benefit** and multiple concrete instances of **active harm** — malformed
+code (unclosed delimiters, mismatched types) that the non-orchestrator path
+didn't produce for the same task. Combined with the earlier, root-caused
+finding that the orchestrator's only compiler-verification path
+(`verified_generation.rs`) was Rust-only until this week and is a
+comparatively immature code path overall, the honest read is: **the
+orchestrator is not yet a net positive over the plain `IntelligentDispatcher`
+path, on this sample.** Not proven with a statistically bulletproof sample,
+but consistent across two independent partial runs and not worth more hours
+chasing tonight.
+
+**Recommendation for whoever revisits this**: don't default `use_orchestrator`
+to `true` based on anything found this week. If picking this back up, the
+highest-leverage next step is running the full 14 cases (or more) in a
+genuinely quiet window — the infra fixes above should make that meaningfully
+more achievable than it was today.
+
 ---
 
 *Plan authored: 2026-03-06. Based on comprehensive review of 8 subsystems across ~985K lines of Rust.*

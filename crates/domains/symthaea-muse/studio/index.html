@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muse Studio</title>
+<style>
+  :root {
+    --bg: #16130f; --panel: #201b15; --ink: #e8dfd2; --dim: #a3968a;
+    --amber: #d9a05b; --amber-soft: #8a6a44; --green: #7ba05b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: radial-gradient(ellipse at 20% -10%, #241e16, var(--bg) 60%);
+    color: var(--ink); font: 15px/1.55 Georgia, 'Times New Roman', serif;
+    min-height: 100vh; padding: 2.5rem 1.5rem;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-weight: normal; font-size: 1.7rem; letter-spacing: 0.06em; margin: 0 0 0.2rem; }
+  h1 em { color: var(--amber); font-style: normal; }
+  .sub { color: var(--dim); margin: 0 0 2rem; font-size: 0.95rem; }
+  form {
+    background: var(--panel); border: 1px solid #322a1f;
+    border-radius: 14px; padding: 1.4rem 1.6rem; display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem 1.6rem;
+  }
+  label { display: block; font-size: 0.85rem; color: var(--dim); margin-bottom: 0.25rem; }
+  input[type=range] { width: 100%; accent-color: var(--amber); }
+  select, input[type=number], input[type=text] {
+    width: 100%; background: #17130e; color: var(--ink); border: 1px solid #3a3226;
+    border-radius: 8px; padding: 0.45rem 0.6rem; font: inherit;
+  }
+  .prompt-row { grid-column: 1 / -1; }
+  .actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem; }
+  button {
+    background: var(--amber); color: #221a10; border: none; border-radius: 999px;
+    padding: 0.6rem 1.6rem; font: inherit; font-size: 1rem; cursor: pointer;
+  }
+  button:disabled { background: var(--amber-soft); cursor: wait; }
+  #note { color: var(--dim); font-size: 0.85rem; }
+  #candidates { margin-top: 2rem; display: grid; gap: 1rem; }
+  .card {
+    background: var(--panel); border: 1px solid #322a1f; border-radius: 14px;
+    padding: 1rem 1.3rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem;
+  }
+  .card .who { min-width: 9rem; }
+  .card .seed { font-size: 1.05rem; }
+  .card .sim { color: var(--green); font-size: 0.85rem; }
+  .card audio { flex: 1 1 16rem; height: 2.2rem; }
+  .card a {
+    color: var(--amber); text-decoration: none; border: 1px solid var(--amber-soft);
+    border-radius: 999px; padding: 0.3rem 0.9rem; font-size: 0.85rem; white-space: nowrap;
+  }
+  .badge { font-size: 0.78rem; color: var(--dim); }
+  .roll {
+    flex: 1 1 100%; height: 130px; width: 100%; display: block;
+    background: #14100c; border: 1px solid #2b241a; border-radius: 10px;
+    cursor: pointer;
+  }
+  .legend { flex: 1 1 100%; font-size: 0.72rem; color: var(--dim); margin-top: -0.4rem; }
+  .legend b { font-weight: normal; }
+  footer { margin-top: 3rem; color: var(--dim); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1><em>Muse</em> Studio</h1>
+  <p class="sub">Describe a feeling; take away a score you own. Every candidate is a genuinely
+  different composition — the MIDI is yours to edit in any DAW, with no scraped-data strings attached.</p>
+
+  <form id="form">
+    <div>
+      <label>Style</label>
+      <select name="style">
+        <option>Classical</option><option>Waltz</option><option>Folk</option>
+        <option>Cinematic</option><option>Playful</option><option>Nocturne</option>
+        <option>March</option><option>Lullaby</option><option>ModalFolk</option>
+        <option>Fugue</option>
+      </select>
+    </div>
+    <div>
+      <label>Mood <span class="badge">dark ↔ bright</span></label>
+      <input type="range" name="valence" min="-1" max="1" step="0.05" value="0.3">
+    </div>
+    <div>
+      <label>Arousal <span class="badge">calm ↔ excited</span></label>
+      <input type="range" name="arousal" min="0" max="1" step="0.05" value="0.5">
+    </div>
+    <div>
+      <label>Energy <span class="badge">soft ↔ full</span></label>
+      <input type="range" name="energy" min="0" max="1" step="0.05" value="0.6">
+    </div>
+    <div>
+      <label>Key</label>
+      <select name="tonic">
+        <option value="0">C</option><option value="1">C♯/D♭</option>
+        <option value="2">D</option><option value="3">D♯/E♭</option>
+        <option value="4">E</option><option value="5">F</option>
+        <option value="6">F♯/G♭</option><option value="7">G</option>
+        <option value="8">G♯/A♭</option><option value="9">A</option>
+        <option value="10">A♯/B♭</option><option value="11">B</option>
+      </select>
+    </div>
+    <div>
+      <label>Bars per phrase</label>
+      <input type="number" name="bars" min="2" max="16" value="4">
+    </div>
+    <div>
+      <label>Candidates</label>
+      <input type="number" name="n_candidates" min="1" max="12" value="4">
+    </div>
+    <div>
+      <label>Base seed</label>
+      <input type="number" name="base_seed" min="0" value="0">
+    </div>
+    <div class="prompt-row">
+      <label>Describe it in words <span class="badge">(optional — ranks candidates by CLAP similarity)</span></label>
+      <input type="text" name="prompt" placeholder="a gentle nostalgic waltz for a rainy evening">
+    </div>
+    <div class="prompt-row">
+      <details>
+        <summary style="cursor:pointer;color:var(--dim);font-size:0.85rem">
+          Consciousness state (drives the RENDERING: timbre, filter movement, reverb, precision)
+        </summary>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:0.8rem;margin-top:0.6rem">
+          <div><label>Dopamine <span class="badge">brightness/shimmer</span></label>
+            <input type="range" name="dopamine" min="0" max="1" step="0.05" value="0.5"></div>
+          <div><label>Serotonin <span class="badge">warmth/sub-weight</span></label>
+            <input type="range" name="serotonin" min="0" max="1" step="0.05" value="0.5"></div>
+          <div><label>Noradrenaline <span class="badge">urgency/tightness</span></label>
+            <input type="range" name="noradrenaline" min="0" max="1" step="0.05" value="0.3"></div>
+          <div><label>Consciousness <span class="badge">precision/space</span></label>
+            <input type="range" name="consciousness" min="0" max="1" step="0.05" value="0.5"></div>
+        </div>
+      </details>
+    </div>
+    <div class="prompt-row">
+      <details>
+        <summary style="cursor:pointer;color:var(--dim);font-size:0.85rem">
+          Advanced: edit the style spec (motifs, progression, forms, textures, ensembles — complete control)
+        </summary>
+        <div style="margin-top:0.6rem">
+          <button type="button" id="loadSpec"
+            style="background:none;border:1px solid var(--amber-soft);color:var(--amber);padding:0.25rem 0.8rem;font-size:0.8rem">
+            Load current style's spec</button>
+          <select id="savedSpecs" style="width:auto;display:inline-block;margin-left:0.5rem;padding:0.25rem 0.5rem;font-size:0.8rem">
+            <option value="">saved specs…</option>
+          </select>
+          <input id="specName" type="text" placeholder="name it"
+            style="width:10rem;display:inline-block;margin-left:0.5rem;padding:0.25rem 0.5rem;font-size:0.8rem">
+          <button type="button" id="saveSpec"
+            style="background:none;border:1px solid var(--amber-soft);color:var(--amber);padding:0.25rem 0.8rem;font-size:0.8rem">
+            Save</button>
+          <textarea id="spec" rows="14" spellcheck="false" placeholder="(empty = use the style preset unchanged)"
+            style="width:100%;margin-top:0.5rem;background:#17130e;color:var(--ink);border:1px solid #3a3226;border-radius:8px;padding:0.6rem;font:0.8rem/1.4 monospace"></textarea>
+        </div>
+      </details>
+    </div>
+    <div class="actions">
+      <button id="go" type="submit">Compose</button>
+      <span id="note"></span>
+    </div>
+  </form>
+
+  <div id="candidates"></div>
+
+  <footer>Symbolic composition · CC0 instrument samples · MAESTRO-fitted expression ·
+  everything rendered locally on this machine.</footer>
+</main>
+<script>
+const form = document.getElementById('form');
+const specBox = document.getElementById('spec');
+let seedStride = 1;
+document.getElementById('loadSpec').addEventListener('click', async () => {
+  const style = new FormData(form).get('style');
+  const res = await fetch('/api/spec/' + style);
+  specBox.value = await res.text();
+});
+const savedSel = document.getElementById('savedSpecs');
+async function refreshSaved() {
+  const names = await (await fetch('/api/specs')).json();
+  savedSel.innerHTML = '<option value="">saved specs…</option>' +
+    names.map(n => `<option>${n}</option>`).join('');
+}
+refreshSaved();
+savedSel.addEventListener('change', async () => {
+  if (!savedSel.value) return;
+  const res = await fetch('/api/specs/' + savedSel.value);
+  specBox.value = await res.text();
+  document.getElementById('specName').value = savedSel.value;
+});
+document.getElementById('saveSpec').addEventListener('click', async () => {
+  const name = document.getElementById('specName').value.trim();
+  if (!name || !specBox.value.trim()) { note.textContent = 'name + spec JSON required to save'; return; }
+  let spec;
+  try { spec = JSON.parse(specBox.value); }
+  catch (e) { note.textContent = 'spec is not valid JSON: ' + e.message; return; }
+  const res = await fetch('/api/specs', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, spec})
+  });
+  note.textContent = res.ok ? `saved “${name}”` : await res.text();
+  refreshSaved();
+});
+const go = document.getElementById('go');
+const note = document.getElementById('note');
+const list = document.getElementById('candidates');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = new FormData(form);
+  const body = {
+    style: f.get('style'),
+    valence: parseFloat(f.get('valence')),
+    arousal: parseFloat(f.get('arousal')),
+    energy: parseFloat(f.get('energy')),
+    tonic: parseInt(f.get('tonic')),
+    bars: parseInt(f.get('bars')),
+    n_candidates: parseInt(f.get('n_candidates')),
+    base_seed: parseInt(f.get('base_seed')),
+    seed_stride: seedStride,
+    dopamine: parseFloat(f.get('dopamine')),
+    serotonin: parseFloat(f.get('serotonin')),
+    noradrenaline: parseFloat(f.get('noradrenaline')),
+    consciousness: parseFloat(f.get('consciousness')),
+    prompt: f.get('prompt') || ''
+  };
+  seedStride = 1; // one-shot: More-like-this sets it, plain Compose resets
+  if (specBox.value.trim()) {
+    try { body.spec = JSON.parse(specBox.value); }
+    catch (e) { note.textContent = 'spec is not valid JSON: ' + e.message; return; }
+  }
+  go.disabled = true;
+  note.textContent = 'composing… (each candidate is a full piece; give it a moment)';
+  list.innerHTML = '';
+  try {
+    const res = await fetch('/api/compose', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    note.textContent = data.ranking_note +
+      (data.sampled_instruments ? ' · sampled instruments' : ' · synthesis (set SYMTHAEA_VCSL_DIR for samples)');
+    for (const c of data.candidates) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="who">
+          <div class="seed">seed ${c.seed}</div>
+          <div class="sim">${c.similarity != null ? 'match ' + c.similarity.toFixed(3) : ''}</div>
+          <div class="badge">${c.duration_secs.toFixed(0)}s</div>
+        </div>
+        <audio controls preload="none" src="/api/audio/${c.id}"></audio>
+        <a href="/api/midi/${c.id}" download>MIDI</a>
+        <a href="/api/audio/${c.id}" download="muse_seed${c.seed}.wav">WAV</a>
+        <a href="#" data-seed="${c.seed}" class="more">More like this</a>
+        <a href="#" data-id="${c.id}" class="keep" title="mark as a keeper — feeds Muse's taste">♡ keep</a>
+        <span class="badge">${c.renderer === 'fluidsynth' ? 'soundfont render' : 'native render'} · Φ ${c.phi.toFixed(2)}</span>
+        <canvas class="roll" title="click to seek"></canvas>
+        <div class="legend"></div>`;
+      card.querySelector('.keep').addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const el = ev.target;
+        const res = await fetch('/api/keeper/' + el.dataset.id, { method: 'POST' });
+        if (res.ok) { el.textContent = '♥ kept'; el.style.color = 'var(--green)'; }
+      });
+      card.querySelector('.more').addEventListener('click', (ev) => {
+        ev.preventDefault();
+        form.querySelector('[name=base_seed]').value = ev.target.dataset.seed;
+        seedStride = 6; // holds form/accompaniment/motif, varies the rest
+        form.requestSubmit();
+      });
+      list.appendChild(card);
+      pianoRoll(card.querySelector('.roll'), card.querySelector('.legend'),
+                card.querySelector('audio'), c.id);
+    }
+  } catch (err) {
+    note.textContent = 'error: ' + err.message;
+  } finally {
+    go.disabled = false;
+  }
+});
+
+// ── Piano-roll: the performed notes, per voice, with a playhead ─────────
+const VOICE_COLORS = {
+  Melody:   '#d9a05b',
+  Doubling: 'rgba(217,160,91,0.45)',
+  Harmony:  '#7a6d5c',
+  Bass:     '#7ba05b',
+  Counter:  '#6f9bbf',
+};
+async function pianoRoll(canvas, legend, audio, id) {
+  let voices;
+  try { voices = await (await fetch('/api/notes/' + id)).json(); }
+  catch { canvas.remove(); legend.remove(); return; }
+  const midiOf = f => 69 + 12 * Math.log2(f / 440);
+  let tMax = 0, mLo = 127, mHi = 0;
+  for (const v of voices) for (const n of v.notes) {
+    tMax = Math.max(tMax, n.start_time + n.duration);
+    const m = midiOf(n.frequency);
+    mLo = Math.min(mLo, m); mHi = Math.max(mHi, m);
+  }
+  if (!tMax) { canvas.remove(); legend.remove(); return; }
+  mLo -= 2; mHi += 2;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth * dpr, H = canvas.clientHeight * dpr;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const x = t => t / tMax * W;
+  const y = m => H - (m - mLo) / (mHi - mLo) * H;
+  const noteH = Math.max(2 * dpr, H / (mHi - mLo) * 0.85);
+  // Draw once to an offscreen copy; the playhead redraws over it.
+  function drawNotes() {
+    ctx.clearRect(0, 0, W, H);
+    for (const v of voices) {
+      ctx.fillStyle = VOICE_COLORS[v.name] || '#999';
+      for (const n of v.notes) {
+        ctx.globalAlpha = 0.35 + 0.6 * Math.min(1, n.velocity);
+        ctx.fillRect(x(n.start_time), y(midiOf(n.frequency)) - noteH / 2,
+                     Math.max(1.5 * dpr, x(n.duration)), noteH);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  drawNotes();
+  const base = ctx.getImageData(0, 0, W, H);
+  legend.innerHTML = voices.map(v =>
+    `<b style="color:${VOICE_COLORS[v.name] || '#999'}">■</b> ${v.name} · ${v.instrument}`
+  ).join('  ');
+  let raf;
+  function playhead() {
+    ctx.putImageData(base, 0, 0);
+    if (audio.duration) {
+      const px = audio.currentTime / audio.duration * W;
+      ctx.fillStyle = 'rgba(232,223,210,0.85)';
+      ctx.fillRect(px, 0, 1.5 * dpr, H);
+    }
+    if (!audio.paused && !audio.ended) raf = requestAnimationFrame(playhead);
+  }
+  audio.addEventListener('play', () => { cancelAnimationFrame(raf); playhead(); });
+  audio.addEventListener('pause', () => cancelAnimationFrame(raf));
+  audio.addEventListener('seeked', playhead);
+  canvas.addEventListener('click', ev => {
+    if (!audio.duration) { audio.play(); return; }
+    const r = canvas.getBoundingClientRect();
+    audio.currentTime = (ev.clientX - r.left) / r.width * audio.duration;
+    playhead();
+  });
+}
+</script>
+</body>
+</html>

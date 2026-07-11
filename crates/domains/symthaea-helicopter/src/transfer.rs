@@ -3,10 +3,22 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Morphological transfer: quadrotor flight → helicopter.
 //!
-//! 11 shared channels (position, orientation, velocities) enable direct
+//! ## Status: DATA-ONLY, NOT YET CONSUMED (2026-07 robotics deep review)
+//!
+//! Nothing instantiates these mappings — no transfer routine reads
+//! `default_flight_to_helicopter_mapping()` or `RECOMMENDED_BLEND_FACTOR`
+//! anywhere in the workspace. This module is the *specification* of the
+//! flight→helicopter channel correspondence, kept for the future transfer
+//! implementation (wire-or-drop is tracked in
+//! SYMTHAEA_ROBOTICS_IMPROVEMENT_PLAN_2026-07-06.md Tier 2.5).
+//!
+//! 13 shared channels (position, orientation, velocities) enable direct
 //! concept projection from a trained quadrotor controller to a new helicopter.
-//! Helicopter-specific channels (rotor RPM, swashplate feedback) are initialized
-//! from genesis.
+//! The 5 helicopter-specific channels (rotor RPM ×2, swashplate feedback ×3)
+//! are initialized from genesis.
+//! (An earlier version of this header said "11 shared channels" while the
+//! table and `SHARED_CHANNELS` said 13 — 13 is correct: 3 position +
+//! 4 quaternion + 3 linear velocity + 3 angular velocity.)
 
 /// Channel mapping entry for flight → helicopter morphological transfer.
 #[derive(Debug, Clone)]
@@ -21,13 +33,13 @@ pub struct ChannelMapping {
 
 /// Default flight (13 channels) → helicopter (18 channels) mapping.
 ///
-/// Shared concepts (11 channels):
+/// Shared concepts (13 channels):
 /// - Position: flight[0..3] → helicopter[0..3]
 /// - Quaternion: flight[3..7] → helicopter[3..7]
 /// - Linear velocity: flight[7..10] → helicopter[7..10]
 /// - Angular velocity: flight[10..13] → helicopter[10..13]
 ///
-/// Unshared (7 channels, helicopter-only):
+/// Unshared (5 channels, helicopter-only):
 /// - main_rotor_rpm [13], tail_rotor_rpm [14], collective_pitch [15],
 ///   cyclic_lon_feedback [16], cyclic_lat_feedback [17]
 pub fn default_flight_to_helicopter_mapping() -> Vec<ChannelMapping> {

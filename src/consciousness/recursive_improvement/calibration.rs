@@ -545,6 +545,22 @@ impl BrierScoreTracker {
         self.global_calibration.prediction_count
     }
 
+    /// Rigorous calibration analytics over the recorded prediction history:
+    /// Murphy's Brier decomposition (reliability / resolution / uncertainty),
+    /// expected calibration error, and a Wilson accuracy interval. Powered by
+    /// `symthaea-statistics`. `None` if no predictions have resolved yet.
+    pub fn calibration_report(
+        &self,
+        n_bins: usize,
+    ) -> Option<super::calibration_analytics::CalibrationReport> {
+        let pairs: Vec<(f64, bool)> = self
+            .prediction_history
+            .iter()
+            .map(|r| (r.confidence, r.was_correct))
+            .collect();
+        super::calibration_analytics::analyze_pairs(&pairs, n_bins)
+    }
+
     /// Get overall accuracy
     pub fn accuracy(&self) -> f64 {
         self.global_calibration.accuracy()

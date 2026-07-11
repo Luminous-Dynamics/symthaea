@@ -358,7 +358,7 @@ impl ReactionCalculator {
         let e0 = (e_g * t_kev * t_kev / 4.0).powf(1.0 / 3.0);
 
         // Width: Δ = 4/√3 × √(E_0 × kT)
-        let delta = 4.0 / 3.0_f64.sqrt() * (e0 * t_kev).sqrt();
+        let _delta = 4.0 / 3.0_f64.sqrt() * (e0 * t_kev).sqrt();
 
         // <σv> ≈ (8/πm)^(1/2) × S(E_0) × Δ/kT × exp(-3E_0/kT)
         // Simplified: <σv> ≈ 3.7×10⁻¹² × S₀ × τ⁻² × exp(-3τ) where τ = (E_G/4kT)^(1/3)

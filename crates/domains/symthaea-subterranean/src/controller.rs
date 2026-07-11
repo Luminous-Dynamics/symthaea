@@ -10,6 +10,12 @@ pub struct SubterraneanController {
     network: HdcLtcUnifiedNetwork,
     weights: Vec<f32>,
     bias: [f32; NUM_ACTUATORS],
+    learning_rate: f32,
+    /// Cached final-layer HV from the last forward() (post-normalize) --
+    /// needed by train_step's delta rule.
+    last_features: Vec<f32>,
+    /// Cached post-tanh outputs from the last forward().
+    last_outputs: [f32; NUM_ACTUATORS],
 }
 
 impl SubterraneanController {
@@ -37,6 +43,9 @@ impl SubterraneanController {
             network,
             weights: w,
             bias: [0.0; NUM_ACTUATORS],
+            learning_rate: c.learning_rate,
+            last_features: Vec::new(),
+            last_outputs: [0.0; NUM_ACTUATORS],
         }
     }
 
@@ -53,11 +62,41 @@ impl SubterraneanController {
             }
             t[o] = s.tanh();
         }
+        self.last_features = d.to_vec();
+        self.last_outputs = t;
         SubterraneanCommand { torques: t }
+    }
+
+    /// One supervised update of the output projection toward `target`
+    /// (delta rule through the tanh), using the features cached by the last
+    /// `forward()`. Returns the pre-update mean-squared error. This is what
+    /// makes `SubterraneanTrainer` actually train -- previously the trainer
+    /// collected metrics and never touched a weight (Tier 2 of
+    /// SYMTHAEA_UNAUDITED_PLATFORMS_REVIEW_2026-07-07.md).
+    pub fn train_step(&mut self, target: &SubterraneanCommand) -> f32 {
+        if self.last_features.is_empty() {
+            return 0.0;
+        }
+        let mut mse = 0.0f32;
+        for o in 0..NUM_ACTUATORS {
+            let out = self.last_outputs[o];
+            let err = target.torques[o] - out;
+            mse += err * err;
+            // Backprop through tanh: d(out)/d(pre) = 1 - out²
+            let delta = self.learning_rate * err * (1.0 - out * out);
+            let off = o * HDC_DIM;
+            for (j, f) in self.last_features.iter().enumerate() {
+                self.weights[off + j] += delta * f;
+            }
+            self.bias[o] += delta;
+        }
+        mse / NUM_ACTUATORS as f32
     }
 
     pub fn reset(&mut self) {
         self.network.reset();
+        self.last_features.clear();
+        self.last_outputs = [0.0; NUM_ACTUATORS];
     }
 }
 

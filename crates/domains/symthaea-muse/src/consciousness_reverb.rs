@@ -6,29 +6,43 @@
 //! - Pre-delay (consciousness_level → room distance)
 //! - 8 early reflection taps from harmony activations
 //! - Air absorption LP filter (serotonin → warmth)
-//! - Modulated comb delays for lush, living tail
 //! - Phi → room size mapping (closet → cathedral)
 
 use crate::MusicalState;
-use crate::synth::Freeverb;
+use crate::synth::{Freeverb, flush_denormal};
 
 /// Consciousness-driven reverb engine.
+///
+/// All per-channel state (pre-delay, air absorption) is duplicated L/R: a
+/// previous version pushed both channels through one mono delay line and one
+/// mono filter, which halved the effective pre-delay and cross-contaminated
+/// the channels.
 pub struct ConsciousnessReverb {
-    pre_delay: DelayLine,
+    pre_delay_l: DelayLine,
+    pre_delay_r: DelayLine,
     early_reflections: EarlyReflections,
     late_reverb: Freeverb,
-    air_absorption: OnePoleLP,
-    mod_phase: f32,
+    air_absorption_l: OnePoleLP,
+    air_absorption_r: OnePoleLP,
     sample_rate: f32,
 }
 
-/// Smooth mono delay line with interpolated delay changes (no clicks).
+/// Mono delay line with click-free delay changes via two-tap crossfade.
+///
+/// A previous version *glided* one read tap toward the new delay, which
+/// swept it through the buffer at several samples per output sample — a
+/// pitch-warp artifact, plus a hard step when the tap crossed from written
+/// signal into unwritten (zero) buffer (measured 0.54 sample-to-sample jump
+/// on a 0.5-amplitude sine). Crossfading between a stationary old tap and a
+/// stationary new tap is the standard fix: both taps read coherent audio and
+/// only their mix changes, at the crossfade rate.
 struct DelayLine {
     buffer: Vec<f32>,
     write_pos: usize,
-    delay_samples: f32, // current (smoothed) delay
-    target_delay: f32,  // target delay
-    smooth_rate: f32,   // interpolation rate (lower = smoother)
+    current_delay: f32, // outgoing tap (fully active when xfade == 0)
+    target_delay: f32,  // incoming tap (fully active when xfade == 1)
+    xfade: f32,         // crossfade progress [0, 1]
+    xfade_step: f32,    // per-sample progress (~45ms total at 44.1kHz)
 }
 
 impl DelayLine {
@@ -36,29 +50,47 @@ impl DelayLine {
         Self {
             buffer: vec![0.0; max_samples.max(1)],
             write_pos: 0,
-            delay_samples: 0.0,
+            current_delay: 0.0,
             target_delay: 0.0,
-            smooth_rate: 0.001, // very smooth transitions
+            xfade: 1.0,
+            xfade_step: 0.0005,
         }
     }
 
     fn set_delay(&mut self, samples: usize) {
-        self.target_delay = (samples as f32).min((self.buffer.len() - 1) as f32);
+        let new_target = (samples as f32).min((self.buffer.len() - 1) as f32);
+        if (new_target - self.target_delay).abs() < 0.5 {
+            return; // no real change — don't restart the fade
+        }
+        // The tap we've faded furthest toward becomes the outgoing tap.
+        if self.xfade >= 0.5 {
+            self.current_delay = self.target_delay;
+        }
+        self.target_delay = new_target;
+        self.xfade = 0.0;
+    }
+
+    /// Read a stationary fractional tap (linear interpolation).
+    fn tap(&self, delay: f32) -> f32 {
+        let delay_int = delay as usize;
+        let frac = delay - delay_int as f32;
+        let n = self.buffer.len();
+        let p0 = (self.write_pos + n - delay_int) % n;
+        let p1 = (self.write_pos + n - delay_int - 1) % n;
+        self.buffer[p0] * (1.0 - frac) + self.buffer[p1] * frac
     }
 
     fn process(&mut self, input: f32) -> f32 {
-        // Smooth toward target (eliminates clicks)
-        self.delay_samples += (self.target_delay - self.delay_samples) * self.smooth_rate;
-
         self.buffer[self.write_pos] = input;
 
-        // Fractional delay via linear interpolation
-        let delay_int = self.delay_samples as usize;
-        let delay_frac = self.delay_samples - delay_int as f32;
-        let read_pos0 = (self.write_pos + self.buffer.len() - delay_int) % self.buffer.len();
-        let read_pos1 = (self.write_pos + self.buffer.len() - delay_int - 1) % self.buffer.len();
-        let output =
-            self.buffer[read_pos0] * (1.0 - delay_frac) + self.buffer[read_pos1] * delay_frac;
+        let output = if self.xfade >= 1.0 {
+            self.tap(self.target_delay)
+        } else {
+            let a = self.tap(self.current_delay);
+            let b = self.tap(self.target_delay);
+            self.xfade = (self.xfade + self.xfade_step).min(1.0);
+            a * (1.0 - self.xfade) + b * self.xfade
+        };
 
         self.write_pos = (self.write_pos + 1) % self.buffer.len();
         output
@@ -144,7 +176,7 @@ impl OnePoleLP {
     }
 
     fn process(&mut self, input: f32) -> f32 {
-        self.state += self.coeff * (input - self.state);
+        self.state = flush_denormal(self.state + self.coeff * (input - self.state));
         self.state
     }
 }
@@ -156,11 +188,12 @@ impl ConsciousnessReverb {
         let max_predelay = (100.0 * 0.001 * sr) as usize + 1; // 100ms max
 
         Self {
-            pre_delay: DelayLine::new(max_predelay),
+            pre_delay_l: DelayLine::new(max_predelay),
+            pre_delay_r: DelayLine::new(max_predelay),
             early_reflections: EarlyReflections::new(sample_rate),
             late_reverb: Freeverb::new(sample_rate, 0.5, 0.5, 0.3),
-            air_absorption: OnePoleLP::new(sr, 8000.0),
-            mod_phase: 0.0,
+            air_absorption_l: OnePoleLP::new(sr, 8000.0),
+            air_absorption_r: OnePoleLP::new(sr, 8000.0),
             sample_rate: sr,
         }
     }
@@ -178,8 +211,9 @@ impl ConsciousnessReverb {
 
         // Pre-delay: higher consciousness = larger room = more pre-delay
         let predelay_ms = psi * 80.0; // 0-80ms
-        self.pre_delay
-            .set_delay((predelay_ms * 0.001 * self.sample_rate) as usize);
+        let predelay_samples = (predelay_ms * 0.001 * self.sample_rate) as usize;
+        self.pre_delay_l.set_delay(predelay_samples);
+        self.pre_delay_r.set_delay(predelay_samples);
 
         // Room size: consciousness maps to Freeverb feedback.
         // CRITICAL: update params in-place to preserve reverb tail.
@@ -194,34 +228,29 @@ impl ConsciousnessReverb {
 
         // Air absorption: serotonin → warmth (lower cutoff = more absorption)
         let cutoff = 4000.0 + (1.0 - state.serotonin) * 12000.0; // 4-16kHz
-        self.air_absorption.set_cutoff(self.sample_rate, cutoff);
+        self.air_absorption_l.set_cutoff(self.sample_rate, cutoff);
+        self.air_absorption_r.set_cutoff(self.sample_rate, cutoff);
     }
 
     /// Process a stereo sample pair through the full reverb chain.
     ///
     /// Signal flow: pre-delay → early reflections → late reverb → air absorption
     pub fn process_stereo(&mut self, input_l: f32, input_r: f32) -> (f32, f32) {
-        // 1. Pre-delay (mono, applied to both channels equally)
-        let pd_l = self.pre_delay.process(input_l);
-        let pd_r = self.pre_delay.process(input_r);
+        // 1. Pre-delay (independent per channel)
+        let pd_l = self.pre_delay_l.process(input_l);
+        let pd_r = self.pre_delay_r.process(input_r);
 
         // 2. Early reflections (harmony-driven spatial pattern)
         let (er_l, er_r) = self.early_reflections.process(pd_l, pd_r);
 
-        // 3. Comb delay modulation (slow LFO for lush tail)
-        self.mod_phase += 0.3 / self.sample_rate; // ~0.3 Hz LFO
-        if self.mod_phase > 1.0 {
-            self.mod_phase -= 1.0;
-        }
-
-        // 4. Late reverb (Freeverb)
+        // 3. Late reverb (Freeverb)
         let (late_l, late_r) = self.late_reverb.process_stereo(er_l, er_r);
 
-        // 5. Air absorption (LP filter on reverb tail only)
+        // 4. Air absorption (LP filter on reverb tail only, per channel)
         let wet_l = late_l - input_l; // extract wet signal
         let wet_r = late_r - input_r;
-        let absorbed_l = self.air_absorption.process(wet_l);
-        let absorbed_r = self.air_absorption.process(wet_r);
+        let absorbed_l = self.air_absorption_l.process(wet_l);
+        let absorbed_r = self.air_absorption_r.process(wet_r);
 
         (input_l + absorbed_l, input_r + absorbed_r)
     }
@@ -260,7 +289,8 @@ mod tests {
             ..Default::default()
         };
         reverb.update_state(&low_state);
-        assert!(reverb.pre_delay.target_delay < 500.0);
+        assert!(reverb.pre_delay_l.target_delay < 500.0);
+        assert!(reverb.pre_delay_r.target_delay < 500.0);
 
         // High consciousness = long pre-delay
         let high_state = MusicalState {
@@ -268,7 +298,8 @@ mod tests {
             ..Default::default()
         };
         reverb.update_state(&high_state);
-        assert!(reverb.pre_delay.target_delay > 2000.0);
+        assert!(reverb.pre_delay_l.target_delay > 2000.0);
+        assert!(reverb.pre_delay_r.target_delay > 2000.0);
     }
 
     #[test]
@@ -294,6 +325,93 @@ mod tests {
         assert!(
             any_nonzero,
             "active harmonies should produce reflection gains"
+        );
+    }
+
+    #[test]
+    fn reverb_tail_decays() {
+        // Property: after an impulse, the tail's energy must decrease over
+        // time and approach silence (a stuck or growing tail means feedback ≥ 1).
+        let mut reverb = ConsciousnessReverb::new(44100);
+        reverb.update_state(&MusicalState {
+            consciousness_level: 0.9, // big room, long tail
+            ..Default::default()
+        });
+
+        let sr = 44100usize;
+        let mut rms_early = 0.0f64; // 0.1-0.5s after impulse
+        let mut rms_late = 0.0f64; // 1.5-2.0s after impulse
+        for i in 0..(2 * sr) {
+            let input = if i < 32 { 0.8 } else { 0.0 };
+            let (l, r) = reverb.process_stereo(input, input);
+            let p = (l * l + r * r) as f64;
+            if i >= sr / 10 && i < sr / 2 {
+                rms_early += p;
+            }
+            if i >= sr * 3 / 2 {
+                rms_late += p;
+            }
+        }
+        rms_early = (rms_early / (0.4 * sr as f64)).sqrt();
+        rms_late = (rms_late / (0.5 * sr as f64)).sqrt();
+
+        assert!(rms_early > 1e-7, "tail should exist early ({rms_early})");
+        assert!(
+            rms_late < rms_early * 0.5,
+            "tail must decay: early={rms_early} late={rms_late}"
+        );
+    }
+
+    #[test]
+    fn parameter_changes_do_not_click() {
+        // Property: yanking consciousness (pre-delay, room size, wet) mid-
+        // stream must not produce discontinuities. A click is an ISOLATED
+        // outlier in the first-difference sequence — a single diff far above
+        // its neighbors. Loud-but-smooth content (comb resonance while
+        // feedback glides) legitimately produces LARGE diffs, but they come
+        // in runs of similar magnitude, so we test each window's peak diff
+        // against that window's mean diff, not an absolute level.
+        // (Pre-glide/pre-crossfade, the parameter steps produced window
+        // ratios far above 8; the wet/feedback glides and the two-tap
+        // pre-delay crossfade brought them into the smooth range.)
+        let mut reverb = ConsciousnessReverb::new(44100);
+        reverb.update_state(&MusicalState::default());
+
+        let sr = 44100.0f32;
+        let mut prev = 0.0f32;
+        let mut diffs: Vec<f32> = Vec::with_capacity(44100);
+        for i in 0..44100 {
+            let x = 0.5 * (std::f32::consts::TAU * 440.0 * i as f32 / sr).sin();
+            // Yank the room size every 4410 samples
+            if i % 4410 == 0 {
+                let psi = if (i / 4410) % 2 == 0 { 0.1 } else { 0.9 };
+                reverb.update_state(&MusicalState {
+                    consciousness_level: psi,
+                    ..Default::default()
+                });
+            }
+            let (l, _r) = reverb.process_stereo(x, x);
+            if i > 100 {
+                diffs.push((l - prev).abs());
+            }
+            prev = l;
+        }
+
+        let mut worst_ratio = 0.0f32;
+        let mut worst_window = 0usize;
+        for (w, window) in diffs.chunks(128).enumerate() {
+            let mean = window.iter().sum::<f32>() / window.len() as f32;
+            let peak = window.iter().fold(0.0f32, |a, &b| a.max(b));
+            let ratio = peak / (mean + 1e-6);
+            if ratio > worst_ratio {
+                worst_ratio = ratio;
+                worst_window = w;
+            }
+        }
+        assert!(
+            worst_ratio < 8.0,
+            "parameter changes should not click: window {worst_window} has a \
+             first-difference outlier {worst_ratio:.1}x its window mean"
         );
     }
 

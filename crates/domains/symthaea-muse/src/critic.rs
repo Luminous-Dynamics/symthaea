@@ -6,6 +6,17 @@
 //! Parallel to the visual critic in symthaea-atelier. Scores melodic interest,
 //! rhythmic regularity, harmonic alignment, voice balance, and form coherence.
 //! Weights shift with neuromodulator state (moral-aesthetic binding).
+//!
+//! **Honesty note**: [`evaluate_composition`] is a hand-authored heuristic
+//! scorer over statistical properties of the note sequence (pitch variety,
+//! inter-onset timing regularity, a section pitch-centroid contrast proxy
+//! for form, a rise-then-fall arc detector) — it does not listen to audio
+//! or use any learned/perceptual judge. [`music_auto_improve`] closes a
+//! REAL loop (generate → score → mutate state → regenerate), but because
+//! the loop optimizes against this same fixed heuristic, "improvement"
+//! means "scores higher on these specific proxies," not verified perceptual
+//! quality. Treat trajectories as evidence the loop is doing SOMETHING
+//! directional, not as proof the music got more beautiful.
 
 use crate::{Composition, MusicalState, Note, form};
 
@@ -213,12 +224,52 @@ pub fn music_auto_improve(
     max_rounds: usize,
     seed_base: u64,
 ) -> MusicPracticeResult {
+    run_auto_improve(state, max_rounds, |round, state| {
+        crate::compose(config, state, seed_base + round as u64)
+    })
+}
+
+/// Like [`music_auto_improve`], but each round composes AND realizes
+/// through the real pipeline (`symthaea-music-theory`'s structural
+/// composer + muse's per-voice-instrument synthesis + mastering) instead
+/// of the legacy neural-melody `crate::compose` path. This is what makes
+/// the self-listening loop actually reflect on the SAME music a listener
+/// hears today, not a disconnected older pipeline.
+///
+/// Only `seed` varies per round on the composed side (mirroring
+/// `music_auto_improve`'s `seed_base + round`); `state` is what evolves via
+/// [`apply_music_wisdom`], shaping the additive-voice harmonic doubling,
+/// reverb depth, and dynamics each round.
+#[cfg(feature = "theory")]
+pub fn music_auto_improve_theory(
+    intent: &symthaea_music_theory::MusicalIntent,
+    style: symthaea_music_theory::Style,
+    state: &mut MusicalState,
+    sample_rate: u32,
+    max_rounds: usize,
+    seed_base: u64,
+) -> MusicPracticeResult {
+    run_auto_improve(state, max_rounds, |round, state| {
+        let mut round_intent = *intent;
+        round_intent.seed = seed_base + round as u64;
+        crate::theory_realize::compose_and_realize_styled(&round_intent, style, state, sample_rate)
+    })
+}
+
+/// Shared round loop: generate → evaluate → check stillness → apply wisdom.
+/// `generate` gets the round index and the CURRENT (possibly wisdom-evolved)
+/// state, and produces this round's [`Composition`].
+fn run_auto_improve(
+    state: &mut MusicalState,
+    max_rounds: usize,
+    mut generate: impl FnMut(usize, &MusicalState) -> Composition,
+) -> MusicPracticeResult {
     let mut trajectory = Vec::with_capacity(max_rounds);
     let mut best_score = 0.0f32;
     let mut prev_score = 0.0f32;
 
     for round in 0..max_rounds {
-        let comp = crate::compose(config, state, seed_base + round as u64);
+        let comp = generate(round, state);
         let verdict = evaluate_composition(&comp, state);
         trajectory.push(verdict.composite);
 
@@ -534,5 +585,41 @@ mod tests {
             original_serotonin,
             state.serotonin
         );
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn music_auto_improve_theory_produces_trajectory() {
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let intent = MusicalIntent {
+            bars: 2,
+            ..Default::default()
+        };
+        let mut state = crate::MusicalState::default();
+        let result = music_auto_improve_theory(&intent, Style::Classical, &mut state, 44100, 4, 42);
+        assert!(result.rounds > 0);
+        assert!(!result.trajectory.is_empty());
+        assert!(result.best_score >= 0.0 && result.best_score <= 1.0);
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn music_auto_improve_theory_rounds_use_different_seeds() {
+        // Two consecutive rounds must not compose the identical piece --
+        // otherwise "practice" would just be re-scoring the same music.
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let intent = MusicalIntent {
+            bars: 4,
+            ..Default::default()
+        };
+        let a = symthaea_music_theory::compose(&MusicalIntent {
+            seed: 100,
+            ..intent
+        });
+        let b = symthaea_music_theory::compose(&MusicalIntent {
+            seed: 101,
+            ..intent
+        });
+        assert_ne!(a, b, "different seeds must produce different scores");
     }
 }

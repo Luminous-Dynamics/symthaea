@@ -38,9 +38,13 @@ and human harm.
 ## Recovery Variables
 
 - `battery_ratio`: available energy
-- `chassis_stability`: motion and manipulation stability
-- `payload_mass_norm`: current carried / buffered mass
 - `salvage_purity`: quality of recovered stream
+
+### Not Yet Implemented
+
+`chassis_stability` and `payload_mass_norm` were speculatively listed here but were never
+added as state channels in `types.rs` (found by the 2026-07-07 unaudited-platforms review) --
+treat them as design intent for a future revision, not current behavior.
 
 ## Sensorium
 
@@ -52,9 +56,11 @@ and human harm.
 - thermal probes
 - material classification signals
 - human proximity sensing
-- chassis stability / tilt sensing
 
 ### Strong Next Sensors
+
+- chassis stability / tilt sensing (no `chassis_stability` channel exists yet -- see
+  "Not Yet Implemented" above)
 
 - hazardous chemical / radiation proxy
 - line vision for contamination detection

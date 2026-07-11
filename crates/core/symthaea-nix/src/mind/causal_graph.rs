@@ -99,6 +99,21 @@ impl NixCausalGraph {
         self.causal_graph.insert((from, to), edge);
     }
 
+    /// Merge causal edges from another graph.
+    pub fn merge(&mut self, other: &Self) {
+        for (k, edge) in &other.causal_graph {
+            if let Some(existing) = self.causal_graph.get_mut(k) {
+                existing.confidence = (existing.confidence + edge.confidence) / 2.0;
+            } else {
+                self.causal_graph.insert(k.clone(), edge.clone());
+                self.from_index
+                    .entry(k.0.clone())
+                    .or_default()
+                    .insert(k.1.clone());
+            }
+        }
+    }
+
     /// Set the Hebbian learning rate (default 0.1).
     pub fn with_learning_rate(mut self, rate: f64) -> Self {
         self.learning_rate = rate.clamp(0.001, 1.0);
@@ -247,15 +262,27 @@ impl NixCausalGraph {
         let mut visited = HashSet::new();
         let mut to_visit = vec![symptom.to_string()];
 
+        // Path-multiplied transitive confidence (hierarchical causal mapping)
+        let mut path_confidence = std::collections::HashMap::new();
+        path_confidence.insert(symptom.to_string(), 1.0f64);
+
         while let Some(current) = to_visit.pop() {
             if visited.contains(&current) {
                 continue;
             }
             visited.insert(current.clone());
 
-            for ((_from, to), edge) in &self.causal_graph {
+            let current_conf = *path_confidence.get(&current).unwrap_or(&0.0);
+
+            for ((from, to), edge) in &self.causal_graph {
                 if to == &current {
                     causal_chain.push(edge.clone());
+
+                    let new_conf = current_conf * (edge.confidence as f64);
+                    let entry = path_confidence.entry(from.clone()).or_insert(0.0);
+                    if new_conf > *entry {
+                        *entry = new_conf;
+                    }
                     to_visit.push(edge.from.clone());
                 }
             }
@@ -265,14 +292,17 @@ impl NixCausalGraph {
 
         for edge in &causal_chain {
             if !has_incoming.contains(&edge.from) {
+                let trans_conf = *path_confidence
+                    .get(&edge.from)
+                    .unwrap_or(&(edge.confidence as f64));
                 root_causes.push(RootCause {
                     variable: edge.from.clone(),
-                    confidence: edge.confidence,
+                    confidence: trans_conf,
                     explanation: format!(
-                        "{} causally influences {} with confidence {:.1}%",
+                        "{} causally influences {} (transitive path confidence: {:.1}%)",
                         edge.from,
                         symptom,
-                        edge.confidence * 100.0
+                        trans_conf * 100.0
                     ),
                 });
             }

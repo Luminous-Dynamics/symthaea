@@ -21,6 +21,7 @@ pub mod matrix_operations;
 pub mod polynomial_roots;
 pub mod proof_construction;
 pub mod quantum_circuits;
+pub mod solver_correctness_gate;
 pub mod statistical_inference;
 
 pub use arithmetic_word_problems::ArithmeticWordProblemsBenchmark;
@@ -35,4 +36,5 @@ pub use matrix_operations::MatrixOperationsBenchmark;
 pub use polynomial_roots::PolynomialRootsBenchmark;
 pub use proof_construction::ProofConstructionBenchmark;
 pub use quantum_circuits::QuantumCircuitsBenchmark;
+pub use solver_correctness_gate::SolverCorrectnessGateBenchmark;
 pub use statistical_inference::StatisticalInferenceBenchmark;

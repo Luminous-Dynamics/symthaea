@@ -640,7 +640,7 @@ mod tests {
     #[test]
     fn test_competition_entry() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 
@@ -673,7 +673,7 @@ mod tests {
     fn test_capacity_limit() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
             max_capacity: 2,
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 
@@ -696,7 +696,7 @@ mod tests {
     fn test_decay() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
             decay_rate: 0.3, // Higher decay rate
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 
@@ -721,7 +721,7 @@ mod tests {
     fn test_broadcasting() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
             enable_broadcasting: true,
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 
@@ -737,6 +737,13 @@ mod tests {
     fn test_ignition_detection() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig::default());
 
+        // Under `ctc_wiring`, activation is scaled by (0.5 + 0.5*pac_mi); with the
+        // default pac_mi=0 no activation reaches the ignition sigmoid's ~0.70
+        // threshold. Set pac_mi high so the CTC path can ignite — matching the
+        // non-ctc semantics this test asserts.
+        #[cfg(feature = "ctc_wiring")]
+        ws.set_pac_mi(1.0);
+
         // Very high activation should trigger ignition
         let content =
             WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.95, "perception".to_string());
@@ -750,7 +757,7 @@ mod tests {
     fn test_winner_takes_all() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
             winner_takes_all: true,
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 
@@ -774,7 +781,7 @@ mod tests {
     #[test]
     fn test_is_conscious() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 
@@ -789,7 +796,7 @@ mod tests {
     #[test]
     fn test_similar_workspace_contents_detected() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
-            entry_threshold: 0.5,
+            entry_threshold: 0.3,
             ..Default::default()
         });
 

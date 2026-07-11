@@ -615,10 +615,35 @@ impl PersistenceManager {
         self.current.loop_state = PersistedLoopState::from(loop_state);
         self.current.lifetime_iterations = loop_state.loop_iterations;
 
-        // Update global calibration stats
-        let cal_summary = model.calibration_summary();
+        // Update global + per-domain calibration stats
+        self.update_from_tracker(model.calibration());
+
+        // Update attributions (keep last N)
+        let attrs: Vec<PersistedCausalAttribution> = model
+            .recent_attributions()
+            .iter()
+            .rev()
+            .take(50)
+            .map(PersistedCausalAttribution::from)
+            .collect();
+        self.current.attribution_history = attrs;
+
+        // Update gate config
+        self.current.gate_config = model.gate().config().clone();
+    }
+
+    /// Update the snapshot's calibration fields directly from a
+    /// `BrierScoreTracker`.
+    ///
+    /// This is the tracker-level counterpart of [`Self::update_from_model`]:
+    /// it lets components that own a bare `BrierScoreTracker` (e.g. the
+    /// `Symthaea` facade's Phase 4.5/7.5 calibration) persist their state
+    /// without wrapping it in a full `WorldGroundedSelfModel`. The restored
+    /// tracker comes back via [`super::calibration::BrierScoreTracker::from_persisted`].
+    pub fn update_from_tracker(&mut self, tracker: &super::calibration::BrierScoreTracker) {
+        let cal_summary = tracker.calibration_summary();
         self.current.global_stats = GlobalCalibrationStats {
-            rolling_brier: model.calibration().rolling_brier_score(),
+            rolling_brier: tracker.rolling_brier_score(),
             lifetime_brier: cal_summary.global_brier,
             ece: cal_summary.global_ece,
             total_predictions: cal_summary.total_predictions,
@@ -629,7 +654,6 @@ impl PersistenceManager {
             is_well_calibrated: cal_summary.is_well_calibrated,
         };
 
-        // Update per-domain stats
         for (domain, stats) in cal_summary.domain_stats {
             self.current.calibration.insert(
                 domain,
@@ -647,19 +671,6 @@ impl PersistenceManager {
                 },
             );
         }
-
-        // Update attributions (keep last N)
-        let attrs: Vec<PersistedCausalAttribution> = model
-            .recent_attributions()
-            .iter()
-            .rev()
-            .take(50)
-            .map(PersistedCausalAttribution::from)
-            .collect();
-        self.current.attribution_history = attrs;
-
-        // Update gate config
-        self.current.gate_config = model.gate().config().clone();
     }
 
     /// Check if we loaded from disk

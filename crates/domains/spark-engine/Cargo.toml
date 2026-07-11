@@ -5,16 +5,10 @@ edition = "2024"
 authors = ["Luminous Dynamics Research Team"]
 description = "Lattice Confinement Fusion (LCF) physics simulation and analysis"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/luminous-dynamics/spark-engine"
+repository = "https://github.com/Luminous-Dynamics/spark-engine"
+readme = "README.md"
 keywords = ["fusion", "physics", "lcf", "neutron", "simulation"]
 categories = ["science", "simulation"]
-
-[features]
-default = ["full"]
-full = ["visualization", "uncertainty"]
-visualization = []
-uncertainty = []
-experimental = []  # For anomaly investigation (Path C)
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

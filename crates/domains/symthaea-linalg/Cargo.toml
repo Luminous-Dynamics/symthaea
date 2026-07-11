@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-linalg"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pure-std linear algebra for the zero-dependency domain-crate ecosystem: dense matrices, LU-based solve/determinant/inverse, and eigenvalues (power iteration + Jacobi for symmetric matrices). Consolidates the Gaussian elimination previously reinvented per-crate. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

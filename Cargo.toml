@@ -17,7 +17,6 @@ members = [
 exclude = [
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
-    "crates/bridges/symthaea-muse-wasm",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
@@ -115,6 +114,13 @@ num-complex = "0.4"
 libc = "0.2"
 csv = "1.3"
 axum = { version = "0.8", features = ["ws"] }
+symthaea-fep = { path = "crates/core/symthaea-fep" }
+symthaea-core = { path = "crates/core/symthaea-core" }
+symthaea-epidemiology = { path = "crates/domains/symthaea-epidemiology" }
+symthaea-memetics = { path = "crates/domains/symthaea-memetics" }
+symthaea-earth-system = { path = "crates/domains/symthaea-earth-system" }
+symthaea-thermofluids = { path = "crates/domains/symthaea-thermofluids" }
+symthaea-organic-chemistry = { path = "crates/domains/symthaea-organic-chemistry" }
 
 [package]
 name = "symthaea"
@@ -150,6 +156,29 @@ symthaea-consciousness-equation = { path = "crates/domains/symthaea-consciousnes
 # Symthaea Neuromodulators - DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine bath
 symthaea-neuromodulators = { path = "crates/domains/symthaea-neuromodulators" }
 symthaea-memory = { path = "crates/domains/symthaea-memory" }
+symthaea-organic-chemistry = { path = "crates/domains/symthaea-organic-chemistry" }
+symthaea-physiology = { path = "crates/domains/symthaea-physiology" }
+symthaea-economics = { path = "crates/domains/symthaea-economics" }
+symthaea-geodesy = { path = "crates/domains/symthaea-geodesy" }
+symthaea-epidemiology = { path = "crates/domains/symthaea-epidemiology" }
+symthaea-astronomy = { path = "crates/domains/symthaea-astronomy" }
+symthaea-thermofluids = { path = "crates/domains/symthaea-thermofluids" }
+symthaea-optics = { path = "crates/domains/symthaea-optics" }
+symthaea-earth-system = { path = "crates/domains/symthaea-earth-system" }
+symthaea-circuits = { path = "crates/domains/symthaea-circuits" }
+symthaea-control-theory = { path = "crates/domains/symthaea-control-theory" }
+symthaea-acoustics = { path = "crates/domains/symthaea-acoustics" }
+symthaea-dsp = { path = "crates/domains/symthaea-dsp" }
+symthaea-operations-research = { path = "crates/domains/symthaea-operations-research" }
+symthaea-modal = { path = "crates/domains/symthaea-modal" }
+symthaea-chronicle = { path = "crates/domains/symthaea-chronicle" }
+symthaea-statistics = { path = "crates/domains/symthaea-statistics" }
+symthaea-social-choice = { path = "crates/domains/symthaea-social-choice" }
+symthaea-formal-language = { path = "crates/domains/symthaea-formal-language" }
+symthaea-structural = { path = "crates/domains/symthaea-structural" }
+symthaea-pragmatics = { path = "crates/domains/symthaea-pragmatics" }
+symthaea-alife = { path = "crates/domains/symthaea-alife" }
+symthaea-memetics = { path = "crates/domains/symthaea-memetics", optional = true }
 
 # Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
 symthaea-causal-reasoning = { path = "crates/core/symthaea-causal-reasoning", default-features = false }
@@ -295,6 +324,13 @@ symthaea-aesthetic = { path = "crates/domains/symthaea-aesthetic", optional = tr
 # Symthaea Atelier - Generative art studio
 symthaea-atelier = { path = "crates/domains/symthaea-atelier", optional = true }
 
+# Symthaea Art Eye - rasterize generated SVG art + extract real pixel percepts
+# (the perception half of the creative loop; see art-eye feature)
+symthaea-art-eye = { path = "crates/bridges/symthaea-art-eye", optional = true }
+
+# Symthaea Gallery - self-curating persistent artwork store + style identity
+symthaea-gallery = { path = "crates/bridges/symthaea-gallery", optional = true }
+
 # Symthaea Clinical - Clinical assessment and therapeutic reasoning
 symthaea-clinical = { path = "crates/domains/symthaea-clinical", optional = true }
 symthaea-therapeutic = { path = "crates/domains/symthaea-therapeutic", optional = true }
@@ -404,6 +440,7 @@ rayon = { workspace = true }
 # Serialization (for consciousness persistence)
 serde = { workspace = true }
 bincode = { workspace = true }
+csv = { workspace = true }
 
 # Observability
 tracing = { workspace = true }
@@ -560,6 +597,8 @@ neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  
 neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI matrix; GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 muse = ["dep:symthaea-muse"]                             # Consciousness-driven music synthesis in cognitive loop (streaming PCM)
+muse-live = ["muse", "symthaea-muse/muse-live"]          # Real-time speaker output for muse streaming (cpal + ringbuf); gates MuseManager::live_output. NOTE: cpal needs ALSA — build inside `nix develop` (same constraint as live-voice)
+singing = ["muse", "vocal-tract", "symthaea-muse/voice"]  # Bridges symthaea-muse::singing_bridge (lyrics + melody -> FormantFrame) into the root crate's FormantVocoder — Phase 3.1 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
@@ -584,6 +623,9 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 # ── Motor / Embodiment ─────────────────────────────────────────────
 cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
 creative = ["dep:symthaea-muse", "dep:symthaea-canvas", "dep:symthaea-aesthetic", "dep:symthaea-atelier"]  # Creative agency: motor rendering bridge, artistic expression
+art-eye = ["creative", "dep:symthaea-art-eye"]  # The artist's eye: rasterize generated SVG (resvg) → real pixel percepts → SelfCritic inside the iterate loop. Adds a resvg/tiny-skia dep tree, hence its own gate on top of `creative`.
+gallery = ["creative", "dep:symthaea-gallery"]  # Persistent self-curating gallery: CreativeManager writes accepted visual works to the flat-file store, and the gallery's 16D StyleEmbedding conditions future generation (artistic identity). Was a fully-tested island before 2026-07-10.
+art-observer = ["art-eye", "vision-manifold"]  # Observer-ΔΨ: after generating an artwork, Symthaea LOOKS at it — the render is injected as vision frames for a viewing window and the change in her own consciousness level while perceiving it becomes an aesthetic signal (consciousness-coupled taste, not formula-based). Assumes no concurrent external camera feed (single shared vision buffer).
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
@@ -616,7 +658,7 @@ neural_validation = ["symthaea-core/neural_validation"]        # TRIBE v2 fMRI c
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
 mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh
-social-fabric = ["mesh"]                       # Resonance-based content routing (sovereign social)
+social-fabric = ["mesh", "dep:symthaea-memetics"]  # Resonance-based content routing (sovereign social) + memetic immune screening
 survival = ["mesh"]                            # Infrastructure monitoring + demand forecasting
 
 # ── Desktop & System Integration ────────────────────────────────────
@@ -646,6 +688,7 @@ orbital = ["dep:symthaea-orbital"]
 quadruped = ["dep:symthaea-quadruped"]
 subterranean = ["dep:symthaea-subterranean"]   # Mole / boring scout: digging, spoil, heat, intermittent comms
 infrastructure = ["dep:symthaea-infrastructure"] # Stationary hub / microgrid / routing agent
+infrastructure-grid-physics = ["infrastructure", "symthaea-infrastructure/grid_physics"] # Real battery/feeder/droop/islanding backend (default is a fast heuristic sim)
 scavenger = ["dep:symthaea-scavenger"]         # Disassembly / recycling / salvage platform
 agribot = ["dep:symthaea-agribot"]             # Ecological stewardship platform: soil / water / light
 biota = ["dep:symthaea-biota"]                 # Interspecies bridge: sanctuary, right-of-way, distress sensing
@@ -655,7 +698,7 @@ ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sens
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
 broca_lite = ["dep:symthaea-spore"]             # Lightweight always-on language generation (512 tokens, 1024D, ~2MB)
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
-canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
+canvas = ["dep:symthaea-canvas", "dep:symthaea-aesthetic"]  # Living topology UI: cognitive geometry → animated SVG. Includes symthaea-aesthetic so the canvas Birkhoff score can close the loop into the neuromod bath (AestheticFeedback) without requiring the full `creative` tier.
 neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
 jepa = ["dep:symthaea-jepa"]                         # JEPA: latent-space prediction for thermodynamically efficient FEP
 therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
@@ -802,6 +845,32 @@ profile-voice = [
     "vocal-tract",
     "ssm_language",
     "muse",
+]
+
+# Creative tier: full generative-art stack (music + SVG art + aesthetic feedback
+# + topology canvas). This is the documented way to compile Symthaea with her
+# art capabilities — none of these are in default-mind (measure cycle-time
+# against the 20Hz budget before considering that). Additive to the default
+# build: deliberately does NOT include ssm_language (default-mind's broca_lite
+# is mutually exclusive with it), so the Poetry creative modality stays
+# compiled out here; for poetry use `--no-default-features --features
+# profile-voice,creative`, which brings ssm_language without broca_lite.
+# See ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md Phase 1.
+profile-creative = [
+    "creative",
+    "muse",
+    "canvas",
+]
+
+# Culture layer (ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md Phase 4): adds
+# self-authored artifact publishing + imitation-of-self on top of
+# profile-creative, via `cognitive_loop::cultural_memory` +
+# `SocialFabricManager`'s resonance graph. Still single-node — no live
+# mesh-send is wired (see cultural_memory.rs module docs for exactly what's
+# missing before this becomes real cross-agent culture).
+profile-culture = [
+    "profile-creative",
+    "social-fabric",
 ]
 
 # Embodiment: all robotics platforms with CPG motor control
@@ -1003,6 +1072,10 @@ name = "mujoco_vs_simple_benchmark"
 required-features = ["multirotor-mujoco"]
 
 [[example]]
+name = "agw_ethics_holdout"
+path = "examples/agw_ethics_holdout.rs"
+
+[[example]]
 name = "engineering_school_benchmarks"
 path = "examples/engineering_school_benchmarks.rs"
 
@@ -1046,6 +1119,10 @@ required-features = ["humanoid", "manipulator"]
 [[test]]
 name = "robotics_scenarios"
 required-features = ["humanoid"]
+
+[[test]]
+name = "infrastructure_embodiment_integration"
+required-features = ["infrastructure"]
 
 [[test]]
 name = "substrate_embodiment_integration"
@@ -1112,6 +1189,13 @@ name = "core_facade_boundary"
 [[test]]
 name = "test_spectral_mip_validation"
 
+# Tier 1.2 (DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md): end-to-end proof
+# of the CLS threshold-phenotype promotion path (evolve -> gate -> promote ->
+# construct a live CognitiveLoopService). See cls_evolution_harness.rs.
+[[test]]
+name = "cls_threshold_promotion_e2e"
+required-features = ["neuroevolution"]
+
 [[example]]
 name = "helicopter_phi_benchmark"
 required-features = ["helicopter"]
@@ -1123,6 +1207,10 @@ required-features = ["humanoid"]
 [[example]]
 name = "robotics_benchmark_suite"
 # No required-features: gracefully degrades based on enabled platforms
+
+[[example]]
+name = "gravity_assist_demo"
+required-features = ["orbital"]
 
 [[example]]
 name = "flight_integration"
@@ -1877,6 +1965,13 @@ harness = false
 name = "dynamics_temporal"
 harness = false
 
+[profile.dev]
+codegen-units = 16  # Same fix as [profile.test] below, extended here since it
+                    # was never applied to dev (cargo build/check default of
+                    # 256 codegen-units) -- only test inherited it explicitly.
+                    # 16 CUs: good parallelism + sccache hits (was 256 -> 2%
+                    # cache hit rate, per the test-profile fix this mirrors).
+
 [profile.test]
 inherits = "dev"
 opt-level = 1  # HV16 array ops are 10-100x slower at opt-level=0
@@ -1945,3 +2040,28 @@ required-features = ["unstable-examples"]
 [[example]]
 name = "benchmark_jepa_thermodynamic"
 required-features = ["unstable-examples"]
+
+# Tier 1.2 (DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md): CLS
+# threshold-phenotype promotion path. evolve_cls writes a candidate;
+# cls_promotion_gate re-evaluates it on fresh seeds before it can be promoted
+# via scripts/cls_promote_candidate.sh. See cls_evolution_harness.rs.
+[[example]]
+name = "evolve_cls"
+required-features = ["neuroevolution"]
+
+[[example]]
+name = "cls_promotion_gate"
+required-features = ["neuroevolution"]
+
+# Architecture experiments 2026-07-08 (SYMTHAEA_EXPERIMENTS_2026-07-08.md):
+# E1 subsystem ablation + E2 Φ/Ψ dynamic range + E3 tick-rate ablation;
+# E4b epistemic red-team + E5 calibration mining; E6 facade↔loop divergence.
+# All default-features.
+[[example]]
+name = "exp_loop_ablation"
+
+[[example]]
+name = "exp_epistemic_redteam"
+
+[[example]]
+name = "exp_facade_loop_divergence"

@@ -56,9 +56,16 @@
 
 - breathable-air integrity
 - thermal comfort across occupied zones
-- circadian coherence
+- circadian coherence (**not yet real** -- see note below)
 - noise-aware environmental stability
 - energy-aware habitat continuity
+
+> **Honesty note (added after the 2026-07-07 unaudited-platforms review):** the implemented
+> `circadian_mismatch` channel is a single scalar that monotonically accumulates "night-mode
+> pressure" over time and decays only when the `light_circadian_shift` actuator counteracts it.
+> There is no time-of-day input, no light-history tracking, and no real two-process
+> (sleep-pressure + circadian-phase) model behind it. Treat "circadian coherence" throughout
+> this doc as design intent for a future revision, not current behavior.
 
 ## Failure variables
 

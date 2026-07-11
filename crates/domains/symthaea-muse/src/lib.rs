@@ -31,14 +31,20 @@
 
 pub mod audio_analyzer;
 pub mod choreography;
+#[cfg(feature = "clap-fad")]
+pub mod clap_embed;
+#[cfg(feature = "clap-fad")]
+pub mod clap_mel;
 pub mod critic;
 pub mod export;
-pub mod fingerprint;
+pub mod expressive;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod fluid_render;
 pub mod form;
-pub mod hdc_mel_decoder;
 #[cfg(feature = "muse-live")]
 pub mod live_output;
 pub mod mel_extractor;
+pub mod mel_mlp;
 pub mod melody;
 pub mod midi;
 pub mod midi_loader;
@@ -46,12 +52,18 @@ pub mod neural_melody;
 pub mod notation;
 pub mod pitch;
 pub mod rhythm;
+#[cfg(all(feature = "clap-fad", feature = "theory"))]
+pub mod steering;
 pub mod stream;
 pub mod streaming;
 pub mod structure;
 pub mod synth;
+#[cfg(feature = "theory")]
+pub mod theory_realize;
 pub mod training;
 pub mod training_pairs;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod vcsl;
 pub mod voice;
 
 use serde::{Deserialize, Serialize};
@@ -155,6 +167,11 @@ pub struct ReverbConfig {
     pub damping: f32,
     /// Stereo width [0, 1] — decorrelation between L/R.
     pub width: f32,
+    /// Minimum wet level; the consciousness state adds on top (wet =
+    /// wet_floor + 0.3·consciousness). Raised by the chamber path: dry,
+    /// close-mic'd sampled instruments read as synthetic — "a little room
+    /// helps the ear forgive the edges" (listening review).
+    pub wet_floor: f32,
 }
 
 impl Default for ReverbConfig {
@@ -163,6 +180,7 @@ impl Default for ReverbConfig {
             room_size: 0.5,
             damping: 0.5,
             width: 0.8,
+            wet_floor: 0.1,
         }
     }
 }
@@ -235,6 +253,7 @@ impl MuseConfig {
             noise_mix: 0.1,
             num_partials: 12,
             reverb: ReverbConfig {
+                wet_floor: 0.1,
                 room_size: 0.85,
                 damping: 0.3,
                 width: 1.0,
@@ -255,6 +274,7 @@ impl MuseConfig {
             noise_mix: 0.0,
             num_partials: 2,
             reverb: ReverbConfig {
+                wet_floor: 0.1,
                 room_size: 0.2,
                 damping: 0.8,
                 width: 0.3,
@@ -397,9 +417,13 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
                 use symthaea_core::genesis::GenesisSeed;
                 let genesis = GenesisSeed::from_phrase(&format!("muse-neural-{sec_seed}"));
                 let mut neural = neural_melody::NeuralMelody::new(&genesis, config);
-                // Load trained projections if available
-                let proj_path = std::path::Path::new("data/midi-training/melody_projections.json");
-                neural.load_trained_projections(proj_path);
+                // Load trained projections if available. Path is CWD-relative
+                // by default; override with SYMTHAEA_MUSE_PROJECTIONS. If the
+                // file is absent this warns once and runs untrained decode
+                // weights (load_trained_projections returns false).
+                let proj_path = std::env::var("SYMTHAEA_MUSE_PROJECTIONS")
+                    .unwrap_or_else(|_| "data/midi-training/melody_projections.json".to_string());
+                neural.load_trained_projections(std::path::Path::new(&proj_path));
                 neural.generate(&sec_config, state, &sec_scale, beat_duration)
             }
         };
@@ -637,11 +661,8 @@ mod tests {
                     assert!(s.is_finite(), "NaN/Inf");
                 }
             }
-            AudioData::I16(samples) => {
-                for &s in samples {
-                    assert!(s >= i16::MIN && s <= i16::MAX);
-                }
-            }
+            // i16 samples cannot be NaN/Inf or out of range by construction
+            AudioData::I16(samples) => assert!(!samples.is_empty()),
         }
     }
 
@@ -785,6 +806,8 @@ pub mod rhythm_engine;
 pub mod sample_player;
 pub mod sidechain;
 pub mod similarity_monitor;
+#[cfg(feature = "voice")]
+pub mod singing_bridge;
 pub mod spectral_vocoder;
 pub mod state_smoother;
 pub mod substrate_timbre;
@@ -792,7 +815,6 @@ pub mod synesthesia;
 pub mod taste_bench;
 pub mod taste_melody;
 pub mod taste_space;
-pub mod temporal_hierarchy;
 pub mod timbre_space;
 #[cfg(feature = "voice")]
 pub mod voice_bridge;

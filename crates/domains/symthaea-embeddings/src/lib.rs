@@ -42,6 +42,7 @@
 //! - **HdcBridge**: Projects embeddings to HDC space preserving similarity
 //! - **Aligned Encoding**: Same projection for primitives and inputs
 
+pub mod ollama;
 pub mod qwen3;
 
 #[cfg(feature = "persistent-cache")]
@@ -184,10 +185,17 @@ impl HdcBridge {
         } else {
             // Dense Gaussian projection
             for _ in 0..total_size {
-                // Box-Muller transform for Gaussian distribution
+                // Box-Muller transform for Gaussian distribution.
+                // Use (1 - u1) ∈ (0, 1]: rng.gen::<f32>() ∈ [0, 1) can be exactly
+                // 0.0 (P ≈ 2^-24 per draw, ~0.75 expected hits per 16,384×768
+                // matrix), and ln(0) = -inf poisons every projected vector with
+                // inf/NaN. The binary path masked this (NaN fails the sign
+                // threshold); project_continuous exposed it (found 2026-07-09 by
+                // the geometry-preservation example).
                 let u1: f32 = rng.r#gen();
                 let u2: f32 = rng.r#gen();
-                let gaussian = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+                let gaussian =
+                    (-2.0 * (1.0 - u1).ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
                 matrix.push(gaussian * scale);
             }
         }

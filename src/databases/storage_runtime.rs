@@ -77,6 +77,12 @@ pub struct StorageRuntimeHandle {
 }
 
 impl StorageRuntimeHandle {
+    /// Build a handle from a caller-provided sender for boundary tests.
+    #[cfg(test)]
+    pub(crate) fn from_sender_for_test(tx: mpsc::Sender<StorageOp>) -> Self {
+        Self { tx }
+    }
+
     /// Try to enqueue a store without awaiting. Use this on hot paths.
     pub fn try_store_memory(&self, record: MemoryRecord) -> Result<(), StorageRuntimeError> {
         self.tx
@@ -104,6 +110,9 @@ impl StorageRuntimeHandle {
     }
 
     /// Try to enqueue a batch store and clear `guard` after the worker applies it.
+    ///
+    /// If the batch cannot be enqueued, the guard is cleared before returning
+    /// the error so callers do not leave a flush permanently marked in-flight.
     pub fn try_store_memory_batch_guarded(
         &self,
         records: Vec<MemoryRecord>,
@@ -116,6 +125,14 @@ impl StorageRuntimeHandle {
         self.tx
             .try_send(StorageOp::StoreMemoryBatchGuarded(records, guard))
             .map_err(|err| match err {
+                TrySendError::Full(StorageOp::StoreMemoryBatchGuarded(_, guard)) => {
+                    guard.store(false, Ordering::Relaxed);
+                    StorageRuntimeError::Full
+                }
+                TrySendError::Closed(StorageOp::StoreMemoryBatchGuarded(_, guard)) => {
+                    guard.store(false, Ordering::Relaxed);
+                    StorageRuntimeError::Closed
+                }
                 TrySendError::Full(_) => StorageRuntimeError::Full,
                 TrySendError::Closed(_) => StorageRuntimeError::Closed,
             })
@@ -402,6 +419,27 @@ mod tests {
 
         assert!(!guard.load(Ordering::Relaxed));
         runtime.try_store_memory(record("after-empty", 11)).unwrap();
+    }
+
+    #[test]
+    fn guarded_batch_send_failure_clears_guard() {
+        let (tx, _rx) = mpsc::channel(1);
+        let runtime = StorageRuntimeHandle { tx };
+        runtime.try_store_memory(record("queued", 12)).unwrap();
+
+        let guard = Arc::new(AtomicBool::new(true));
+        let err = runtime
+            .try_store_memory_batch_guarded(vec![record("overflow", 13)], guard.clone())
+            .unwrap_err();
+
+        assert!(
+            matches!(err, StorageRuntimeError::Full),
+            "guarded batch should report a full queue"
+        );
+        assert!(
+            !guard.load(Ordering::Relaxed),
+            "failed guarded enqueue must clear the in-flight guard"
+        );
     }
 
     #[test]

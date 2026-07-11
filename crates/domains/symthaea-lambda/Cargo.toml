@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-lambda"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Untyped lambda calculus for Symthaea: de Bruijn terms with capture-free substitution, normal-order β-reduction to normal form, Church numerals/booleans, and the S/K/I combinators. Foundational to computation and Symthaea's code reasoning. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

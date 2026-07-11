@@ -313,6 +313,9 @@ mod tests {
 
     #[test]
     fn test_format_comparison() {
+        // NOTE: this is a string-FORMATTER test on a synthetic result — the
+        // 0.85 below is made-up input, not a measured benchmark score. Do
+        // not cite "0.850" from this test as a performance claim.
         let result = DmcBenchmarkResult {
             mean_return: 0.85,
             return_std: 0.1,

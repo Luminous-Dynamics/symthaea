@@ -327,6 +327,7 @@ fn test_training_pair_legacy_padding() {
         channels: vec![0.5; 20],
         target_text: "hello world".to_string(),
         target_ids: vec![1, 2, 3],
+        ..Default::default()
     };
 
     let tc = legacy_pair.to_thought_channels();
@@ -355,7 +356,7 @@ fn test_training_pair_legacy_padding() {
 
 #[test]
 fn test_eval_result_has_new_metrics() {
-    use symthaea_broca::evaluation::{evaluate, EvalConfig};
+    use symthaea_broca::evaluation::{EvalConfig, evaluate};
     use symthaea_broca::training::TrainingDataset;
 
     let mut r#gen = test_generator();
@@ -371,6 +372,7 @@ fn test_eval_result_has_new_metrics() {
         channels: channels.channels.to_vec(),
         target_text: "I understand.".to_string(),
         target_ids: vec![],
+        ..Default::default()
     });
     dataset.tokenize_all(&tokenizer);
 
@@ -415,7 +417,8 @@ fn test_checkpoint_roundtrip_preserves_generation() {
         .join("broca_integration_checkpoint.bin")
         .to_string_lossy()
         .to_string();
-    r#gen.save_checkpoint(&path, 0, 1.0, None, None, None)
+    r#gen
+        .save_checkpoint(&path, 0, 1.0, None, None, None)
         .expect("save should succeed");
 
     // Reload

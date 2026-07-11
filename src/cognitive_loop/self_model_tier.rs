@@ -14,6 +14,7 @@ use crate::consciousness::predictive_self::{PredictiveSelfConfig, PredictiveSelf
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 
 use super::CognitiveLoopConfig;
+use super::managers::{AutobiographyNarrator, AutobiographyResult};
 
 /// Groups all self-model-gated subsystems.
 ///
@@ -42,6 +43,15 @@ pub(crate) struct SelfModelTierManager {
     /// Attention schema (AST) for self-modeling attention state.
     /// Tracks attention focus, shifts, and generates control signals.
     pub attention_schema: Option<AttentionSchema>,
+
+    /// Background autobiography narrator: turns `narrative_self.autobio.life_story`
+    /// into narrated prose via a background LLM thread. Gated independently of
+    /// `narrative_self` itself (network/thread side effects, opt-in).
+    pub autobiography_narrator: Option<AutobiographyNarrator>,
+
+    /// Most recently completed narration, if any (drained each cycle via
+    /// `drain_narration`).
+    pub last_narration: Option<AutobiographyResult>,
 }
 
 impl SelfModelTierManager {
@@ -71,12 +81,31 @@ impl SelfModelTierManager {
             None
         };
 
+        let autobiography_narrator = if config.enable_autobiography_narration {
+            Some(AutobiographyNarrator::spawn())
+        } else {
+            None
+        };
+
         Self {
             self_reflection: SelfReflection::default(),
             meta_cognition,
             narrative_self,
             predictive_self,
             attention_schema,
+            autobiography_narrator,
+            last_narration: None,
+        }
+    }
+
+    /// Drain any completed narration results (non-blocking). Keeps the most
+    /// recent one in `last_narration`. Call once per cycle regardless of
+    /// whether a narration was submitted this cycle — cheap when idle.
+    pub fn drain_narration(&mut self) {
+        if let Some(ref mut narrator) = self.autobiography_narrator {
+            if let Some(result) = narrator.drain_results().into_iter().last() {
+                self.last_narration = Some(result);
+            }
         }
     }
 }
@@ -156,6 +185,29 @@ mod tests {
         assert!(tier.attention_schema.is_some());
         // self_reflection is always present
         let _ = &tier.self_reflection;
+    }
+
+    #[test]
+    fn test_autobiography_narrator_disabled_by_default() {
+        let config = CognitiveLoopConfig::default();
+        assert!(!config.enable_autobiography_narration);
+        let tier = SelfModelTierManager::new(&config);
+        assert!(tier.autobiography_narrator.is_none());
+        assert!(tier.last_narration.is_none());
+    }
+
+    #[test]
+    fn test_autobiography_narrator_spawns_and_drains_without_panic() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_narrative_self = true;
+        config.enable_autobiography_narration = true;
+        let mut tier = SelfModelTierManager::new(&config);
+        assert!(tier.autobiography_narrator.is_some());
+        // Idle drain (nothing submitted yet) must not block or panic.
+        for _ in 0..5 {
+            tier.drain_narration();
+        }
+        assert!(tier.last_narration.is_none());
     }
 
     #[test]

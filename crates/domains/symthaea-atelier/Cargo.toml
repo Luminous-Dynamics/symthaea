@@ -9,6 +9,8 @@ license = "AGPL-3.0-or-later"
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-canvas = { path = "../symthaea-canvas" }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+symthaea-fractal-time-lab = { path = "../symthaea-fractal-time-lab" }
+symthaea-hodge = { path = "../symthaea-hodge" }
 serde = { workspace = true }
 rand = { workspace = true }
 

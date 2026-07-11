@@ -55,6 +55,7 @@ impl EvolutionaryScaffolder {
                 target_ids: Vec::new(), // will be re-tokenized
                 valence: pair.valence,
                 arousal: pair.arousal,
+                semantic_hv: pair.semantic_hv.clone(),
             })
         } else {
             None

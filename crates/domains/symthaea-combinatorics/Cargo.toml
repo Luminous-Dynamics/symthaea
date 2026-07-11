@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-combinatorics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pure-std combinatorics for Symthaea: factorials, permutations & combinations (overflow-safe multiplicative binomial), Catalan and Stirling (2nd kind) numbers, integer partitions, and derangements. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

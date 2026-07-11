@@ -33,12 +33,14 @@ use crate::{Composition, MuseConfig, MusicalState, Note};
 
 // ─── Melodic Coherence ───────────────────────────────────────────────────────
 
-/// Evaluate melodic coherence: how well do interval transitions match
-/// learned expectations from a tonal music corpus?
+/// Evaluate melodic coherence: how well do interval transitions match a
+/// hand-transcribed reference histogram of Western tonal music?
 ///
-/// Uses a simplified version of Pearce's IDyOM model: intervals that appear
-/// frequently in Western tonal music are "expected"; rare intervals are "surprising."
-/// A good melody balances expectation with surprise (Berlyne's optimal arousal).
+/// The "corpus" is the 13-value interval-probability table below, approximated
+/// from Huron's *Sweet Anticipation* (Table 4.2) — a textbook constant, not a
+/// distribution learned in this repository. Spirit of Pearce's IDyOM model:
+/// frequent intervals are "expected", rare ones "surprising"; a good melody
+/// balances expectation with surprise (Berlyne's optimal arousal).
 ///
 /// Score: 0.0 (incoherent/random) to 1.0 (highly coherent tonal melody).
 pub fn melodic_coherence(notes: &[Note]) -> f32 {
@@ -1366,16 +1368,20 @@ fn interval_semitones(f1: f32, f2: f32) -> f32 {
 /// Compares the statistical distribution of generated audio features against
 /// a reference distribution of real music. Lower FAD = closer to real music.
 ///
-/// Since we don't have VGGish/CLAP embeddings available in pure Rust, this
-/// implementation uses hand-crafted audio features (MFCCs approximation via
-/// spectral band energies) as the embedding space. This is less precise than
-/// VGGish FAD but still captures the key distributional differences.
+/// By default (no `clap-fad` feature), this uses hand-crafted audio features
+/// (a spectral-band-energy proxy, not a real embedding model) — an honest
+/// approximation, not a claim of VGGish/CLAP-equivalent precision. With the
+/// `clap-fad` feature, [`FadScore::compute_with_clap`] uses a real
+/// pretrained CLAP audio-tower embedding (see [`crate::clap_embed`]) for
+/// FAD in the sense the literature actually means it.
 ///
 /// # References
 /// - Kilgour et al. (2019). "Fréchet Audio Distance: A Reference-Free Metric
 ///   for Evaluating Music Enhancement Algorithms." INTERSPEECH.
 /// - Hershey et al. (2017). "CNN Architectures for Large-Scale Audio
 ///   Classification" (VGGish model).
+/// - Wu et al. (2023). "Large-Scale Contrastive Language-Audio Pretraining
+///   with Feature Fusion and Keyword-to-Caption Augmentation" (CLAP).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FadScore {
     /// Fréchet distance between generated and reference distributions.
@@ -1405,28 +1411,72 @@ impl FadScore {
         reference: &[Vec<[f32; 2]>],
         sample_rate: u32,
     ) -> Self {
-        let gen_embeddings: Vec<[f32; FAD_N_BANDS]> = generated
+        let gen_embeddings: Vec<Vec<f32>> = generated
             .iter()
-            .map(|s| Self::extract_embedding(s, sample_rate))
+            .map(|s| Self::extract_embedding(s, sample_rate).to_vec())
             .collect();
-        let ref_embeddings: Vec<[f32; FAD_N_BANDS]> = reference
+        let ref_embeddings: Vec<Vec<f32>> = reference
             .iter()
-            .map(|s| Self::extract_embedding(s, sample_rate))
+            .map(|s| Self::extract_embedding(s, sample_rate).to_vec())
             .collect();
+        Self::from_embeddings(gen_embeddings, ref_embeddings, FAD_N_BANDS)
+    }
 
+    /// Real FAD via a pretrained CLAP audio-tower embedding (see
+    /// [`crate::clap_embed::ClapEmbedder`]) instead of the hand-crafted
+    /// proxy. Requires audio sampled at exactly
+    /// [`crate::clap_mel::SAMPLE_RATE`] (48kHz) — CLAP's mel-spectrogram
+    /// pipeline is tied to that rate; resampling arbitrary rates correctly
+    /// is out of scope here, so callers must render at 48kHz for this path.
+    #[cfg(feature = "clap-fad")]
+    pub fn compute_with_clap(
+        generated: &[Vec<[f32; 2]>],
+        reference: &[Vec<[f32; 2]>],
+        sample_rate: u32,
+    ) -> anyhow::Result<Self> {
+        if sample_rate != crate::clap_mel::SAMPLE_RATE {
+            anyhow::bail!(
+                "compute_with_clap requires audio rendered at {}Hz (CLAP's fixed mel-spectrogram rate), got {}Hz",
+                crate::clap_mel::SAMPLE_RATE,
+                sample_rate
+            );
+        }
+        let mut embedder = crate::clap_embed::ClapEmbedder::new()?;
+        let mut embed_all = |sets: &[Vec<[f32; 2]>]| -> anyhow::Result<Vec<Vec<f32>>> {
+            sets.iter()
+                .map(|s| {
+                    let mono: Vec<f64> = s.iter().map(|[l, r]| ((l + r) * 0.5) as f64).collect();
+                    embedder.embed(&mono)
+                })
+                .collect()
+        };
+        let gen_embeddings = embed_all(generated)?;
+        let ref_embeddings = embed_all(reference)?;
+        Ok(Self::from_embeddings(
+            gen_embeddings,
+            ref_embeddings,
+            crate::clap_embed::EMBEDDING_DIM,
+        ))
+    }
+
+    fn from_embeddings(
+        gen_embeddings: Vec<Vec<f32>>,
+        ref_embeddings: Vec<Vec<f32>>,
+        dim: usize,
+    ) -> Self {
         if gen_embeddings.is_empty() || ref_embeddings.is_empty() {
             return Self {
                 fad: f32::MAX,
                 n_generated: gen_embeddings.len(),
                 n_reference: ref_embeddings.len(),
-                generated_mean: vec![0.0; FAD_N_BANDS],
-                reference_mean: vec![0.0; FAD_N_BANDS],
+                generated_mean: vec![0.0; dim],
+                reference_mean: vec![0.0; dim],
             };
         }
 
         // Compute means
-        let gen_mean = Self::mean_embedding(&gen_embeddings);
-        let ref_mean = Self::mean_embedding(&ref_embeddings);
+        let gen_mean = Self::mean_embedding(&gen_embeddings, dim);
+        let ref_mean = Self::mean_embedding(&ref_embeddings, dim);
 
         // Compute covariances
         let gen_cov = Self::covariance(&gen_embeddings, &gen_mean);
@@ -1495,9 +1545,9 @@ impl FadScore {
         bands
     }
 
-    fn mean_embedding(embeddings: &[[f32; FAD_N_BANDS]]) -> Vec<f32> {
+    fn mean_embedding(embeddings: &[Vec<f32>], dim: usize) -> Vec<f32> {
         let n = embeddings.len() as f32;
-        let mut mean = vec![0.0f32; FAD_N_BANDS];
+        let mut mean = vec![0.0f32; dim];
         for emb in embeddings {
             for (i, &v) in emb.iter().enumerate() {
                 mean[i] += v;
@@ -1509,9 +1559,9 @@ impl FadScore {
         mean
     }
 
-    fn covariance(embeddings: &[[f32; FAD_N_BANDS]], mean: &[f32]) -> Vec<f32> {
+    fn covariance(embeddings: &[Vec<f32>], mean: &[f32]) -> Vec<f32> {
         let n = embeddings.len() as f32;
-        let mut var = vec![0.0f32; FAD_N_BANDS];
+        let mut var = vec![0.0f32; mean.len()];
         for emb in embeddings {
             for (i, &v) in emb.iter().enumerate() {
                 var[i] += (v - mean[i]).powi(2);
@@ -1668,9 +1718,40 @@ mod external_validation_tests {
                 fad_cross.fad > fad_self.fad,
                 "Cross-set FAD ({:.2}) should exceed self FAD ({:.2})",
                 fad_cross.fad,
-                fad_self.fad,
+                fad_self.fad
             );
         }
+    }
+
+    #[test]
+    #[cfg(feature = "clap-fad")]
+    #[ignore] // Requires network access to download the CLAP ONNX audio tower.
+    fn fad_with_clap_self_distance_near_zero() {
+        let config = MuseConfig {
+            duration_secs: 1.0,
+            max_notes: 4,
+            sample_rate: crate::clap_mel::SAMPLE_RATE,
+            ..Default::default()
+        };
+        let state = MusicalState::default();
+
+        let mut compositions = Vec::new();
+        for seed in 0..3 {
+            let comp = crate::compose(&config, &state, seed);
+            if let crate::AudioData::StereoF32(samples) = &comp.audio {
+                compositions.push(samples.clone());
+            }
+        }
+
+        assert!(compositions.len() >= 2);
+        let fad =
+            FadScore::compute_with_clap(&compositions, &compositions, crate::clap_mel::SAMPLE_RATE)
+                .expect("compute_with_clap should succeed at the correct sample rate");
+        assert!(
+            fad.fad < 1.0,
+            "real-CLAP FAD of a set against itself should be near zero, got {}",
+            fad.fad
+        );
     }
 
     #[test]

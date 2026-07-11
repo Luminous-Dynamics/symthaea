@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-finite-field"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Finite-field arithmetic for Symthaea: prime fields GF(p) (add/sub/mul/pow/inverse via Fermat) and the binary field GF(2^8) used by AES/Reed-Solomon (XOR add, carryless mul with polynomial reduction, inverse). Foundational to coding theory and cryptography. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

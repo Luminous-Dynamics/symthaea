@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-game-theory"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Game-theory layer for Symthaea: two-player normal-form games — best responses, pure-strategy Nash equilibria, strict dominance, and mixed-strategy Nash for 2×2 games. Complements economics (2×2 payoffs) and social-choice. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

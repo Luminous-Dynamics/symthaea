@@ -22,6 +22,30 @@ use symthaea_canvas::CognitiveSnapshot;
 #[cfg(feature = "creative")]
 use symthaea_muse::{Composition, MuseConfig, MusicalState};
 
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+use symthaea_broca::creative_mode::{CreativeGating, PoeticForm, validate_poem};
+
+// Cultural memory (ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md Phase 4): self-authored
+// artifact publishing + imitation-of-self. See cultural_memory.rs module docs for
+// exactly what is and isn't wired (no live mesh-send; single-node only).
+#[cfg(all(feature = "creative", feature = "social-fabric"))]
+use crate::cognitive_loop::cultural_memory::{CulturalMemoryManager, DOMAIN_MUSIC, DOMAIN_VISUAL};
+
+// Gallery (VISUAL_ART_IMPROVEMENT_PLAN_2026-07-10.md Phases 4.1/4.2): persistent
+// self-curating artwork store + style identity. Distinct from cultural_memory
+// (a top-N canon for imitation): the gallery keeps the artifacts themselves
+// with curation dynamics, and its 16D StyleEmbedding conditions future
+// generation — before 2026-07-10 symthaea-gallery was a fully-tested island
+// (dev-dep of atelier showcase examples only) and the embedding conditioned
+// nothing.
+#[cfg(all(feature = "creative", feature = "gallery"))]
+use symthaea_gallery::{
+    ArtModality, GalleryIndex, create_entry,
+    curation::curate,
+    storage::GalleryStorage,
+    style::{StyleEmbedding, apply_style, compute_style},
+};
+
 /// Telemetry from the creative pipeline, stored in CycleMetadata.
 #[cfg(feature = "creative")]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -58,6 +82,14 @@ pub struct CreativeTelemetry {
     pub emotional_alignment: f32,
     /// Number of stored motif phrases.
     pub motif_phrase_count: usize,
+    /// Observer-ΔΨ of the most recently *viewed* artwork: mean consciousness
+    /// level while perceiving the render minus the pre-viewing baseline
+    /// (feature `art-observer`). Positive = looking at it integrated her.
+    pub observer_delta_psi: f32,
+    /// Mean visual surprise while viewing the most recent artwork.
+    pub observer_viewing_surprise: f32,
+    /// Total completed observation windows since startup.
+    pub observer_verdicts: u64,
 }
 
 /// Creative output from a single cycle.
@@ -76,6 +108,14 @@ pub struct CreativeOutput {
     pub score_svg: Option<String>,
     /// Aesthetic feedback to inject into neuromodulator bath.
     pub feedback: AestheticFeedback,
+    /// The `ContentRef` for a self-authored artifact published into
+    /// [`CulturalMemoryManager`] this tick, if any. The outer cognitive loop
+    /// (which owns the real `mesh_outbound_tx` channel, unreachable from
+    /// this manager) reads this to decide whether to announce the artifact
+    /// to mesh peers — see `cycle_phase_dynamics/mod.rs`'s Creative Manager
+    /// block for the send side.
+    #[cfg(feature = "social-fabric")]
+    pub published_content: Option<crate::swarm::resonance_graph::ContentRef>,
 }
 
 #[cfg(feature = "creative")]
@@ -88,13 +128,18 @@ impl Default for CreativeOutput {
             dance_keyframes: None,
             score_svg: None,
             feedback: AestheticFeedback::neutral(),
+            #[cfg(feature = "social-fabric")]
+            published_content: None,
         }
     }
 }
 
 /// Default path for cross-session aesthetic memory.
 #[cfg(feature = "creative")]
-const AESTHETIC_MEMORY_PATH: &str = ".claude/aesthetic_memory.json";
+// pub(crate): the facade's `rate_art` (Phase 2.1) writes human feedback into
+// the same persisted taste file the loop's CreativeManager uses, so the two
+// halves of the facade/loop split at least share one aesthetic identity.
+pub(crate) const AESTHETIC_MEMORY_PATH: &str = ".claude/aesthetic_memory.json";
 
 /// Stateful creative manager — holds atelier/muse configs, aesthetic tracker,
 /// and generation state.
@@ -139,7 +184,68 @@ pub(crate) struct CreativeManager {
     motif_memory: symthaea_muse::motif_memory::MotifMemory,
     /// Path for motif memory persistence.
     motif_memory_path: std::path::PathBuf,
+    /// Lazily-initialized Broca generator for the Poetry modality.
+    /// `None` until the first Poetry tick, and stays `None` when no trained
+    /// checkpoint is available (an untrained generator emits token noise).
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    poetry_generator: Option<symthaea_broca::BrocaGenerator>,
+    /// Whether the poetry checkpoint load has been attempted (one-shot).
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    poetry_checkpoint_attempted: bool,
+    /// Self-authored artistic history: publishing + imitation-of-self.
+    /// See `cognitive_loop::cultural_memory` module docs.
+    #[cfg(all(feature = "creative", feature = "social-fabric"))]
+    cultural_memory: CulturalMemoryManager,
+    /// The artist's eye (feature `art-eye`): ensemble critic fed real pixel
+    /// percepts of rasterized candidates inside the iterate exploit phase.
+    /// Persistent so its novelty-tracker/taste-model state accumulates
+    /// across artworks rather than resetting per piece.
+    #[cfg(all(feature = "creative", feature = "art-eye"))]
+    art_critic: symthaea_atelier::critic::SelfCritic,
+    /// Harmony activations at the moment of the most recent generation —
+    /// what [`Self::rate_last_artwork`] hands to the tracker's 10×-weight
+    /// `human_feedback` (which wants the harmony state *at generation time*,
+    /// not at rating time).
+    last_generation_harmonies: Option<[f32; 8]>,
+    /// Persistent artwork store (feature `gallery`).
+    #[cfg(all(feature = "creative", feature = "gallery"))]
+    gallery_storage: GalleryStorage,
+    /// In-memory gallery index, persisted after each accepted work.
+    #[cfg(all(feature = "creative", feature = "gallery"))]
+    gallery_index: GalleryIndex,
+    /// Artistic identity derived from the gallery's recent window; conditions
+    /// generation snapshots at [`GALLERY_STYLE_STRENGTH`].
+    #[cfg(all(feature = "creative", feature = "gallery"))]
+    gallery_style: StyleEmbedding,
+    /// Observer-ΔΨ of the most recently viewed artwork (feature
+    /// `art-observer`; plain fields so telemetry assembly stays exhaustive).
+    observer_delta_psi: f32,
+    /// Mean visual surprise during the most recent viewing window.
+    observer_viewing_surprise: f32,
+    /// Completed observation windows since startup.
+    observer_verdicts: u64,
 }
+
+/// Gallery capacity before curation prunes (surprise-protected pruning).
+#[cfg(all(feature = "creative", feature = "gallery"))]
+const GALLERY_MAX_ENTRIES: usize = 200;
+/// Minimum entries curation always keeps.
+#[cfg(all(feature = "creative", feature = "gallery"))]
+const GALLERY_MIN_ENTRIES: usize = 16;
+/// Recent-window size for the style embedding.
+#[cfg(all(feature = "creative", feature = "gallery"))]
+const GALLERY_STYLE_WINDOW: usize = 20;
+/// How strongly the gallery style conditions generation snapshots. Scaled
+/// further by the embedding's own sample-count confidence inside
+/// `apply_style`, so a young gallery barely nudges anything.
+#[cfg(all(feature = "creative", feature = "gallery"))]
+const GALLERY_STYLE_STRENGTH: f32 = 0.3;
+
+/// Raster resolution (longest side) for the art-eye perceptual scorer.
+/// 192px keeps per-candidate rasterization in the low milliseconds while
+/// preserving enough detail for hue/edge/layout features.
+#[cfg(all(feature = "creative", feature = "art-eye"))]
+const ART_EYE_RASTER_DIM: u32 = 192;
 
 /// A snapshot of emotional state at one cognitive cycle, used to build arcs.
 #[cfg(feature = "creative")]
@@ -163,6 +269,9 @@ const ARC_MAX_HISTORY: usize = 16;
 enum CreativeModality {
     Visual,
     Music,
+    /// Broca-generated poetry: consciousness-selected poetic form (haiku/tanka/free verse).
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    Poetry,
     /// Simultaneous visual + audio with cross-modal synesthetic linkage.
     Synesthetic,
     /// Real-time improvisation: persistent streaming across ticks.
@@ -189,6 +298,17 @@ impl CreativeManager {
         let memory_path = path.unwrap_or_else(|| std::path::PathBuf::from(AESTHETIC_MEMORY_PATH));
         let memory = AestheticMemory::load(&memory_path);
         let tracker = AestheticTracker::from_memory(AestheticConfig::default(), &memory);
+        #[cfg(all(feature = "creative", feature = "social-fabric"))]
+        let cultural_memory_path = memory_path.with_file_name("artistic_canon.json");
+        #[cfg(all(feature = "creative", feature = "gallery"))]
+        let (gallery_storage, gallery_index, gallery_style) = {
+            let storage = GalleryStorage::new(memory_path.with_file_name("gallery"));
+            let index = storage
+                .load_index()
+                .unwrap_or_else(|_| GalleryIndex::new(GALLERY_MAX_ENTRIES));
+            let style = compute_style(&index, GALLERY_STYLE_WINDOW);
+            (storage, index, style)
+        };
         Self {
             atelier_config: AtelierConfig {
                 style: AtelierStyle::Composite,
@@ -227,6 +347,24 @@ impl CreativeManager {
             active_episode: None,
             default_bars: 8,
             emotional_history: std::collections::VecDeque::with_capacity(ARC_MAX_HISTORY),
+            #[cfg(all(feature = "creative", feature = "ssm_language"))]
+            poetry_generator: None,
+            #[cfg(all(feature = "creative", feature = "ssm_language"))]
+            poetry_checkpoint_attempted: false,
+            #[cfg(all(feature = "creative", feature = "social-fabric"))]
+            cultural_memory: CulturalMemoryManager::new_with_path(Some(cultural_memory_path)),
+            #[cfg(all(feature = "creative", feature = "art-eye"))]
+            art_critic: symthaea_atelier::critic::SelfCritic::new(),
+            last_generation_harmonies: None,
+            #[cfg(all(feature = "creative", feature = "gallery"))]
+            gallery_storage,
+            #[cfg(all(feature = "creative", feature = "gallery"))]
+            gallery_index,
+            #[cfg(all(feature = "creative", feature = "gallery"))]
+            gallery_style,
+            observer_delta_psi: 0.0,
+            observer_viewing_surprise: 0.0,
+            observer_verdicts: 0,
         }
     }
 
@@ -304,6 +442,70 @@ impl CreativeManager {
         feedback
     }
 
+    /// Rate the most recently generated artwork with a human judgement
+    /// (`rating` in [-1, 1]) using the harmony state captured at generation
+    /// time. Returns `None` when nothing has been generated yet. Also
+    /// flushes aesthetic memory to disk immediately — human ratings are the
+    /// scarcest, highest-weight taste signal and must survive a crash.
+    ///
+    /// First real caller of the human-feedback path (2026-07-10): the API
+    /// below existed end-to-end with zero call sites since its creation.
+    pub fn rate_last_artwork(
+        &mut self,
+        rating: f32,
+    ) -> Option<symthaea_aesthetic::AestheticFeedback> {
+        let harmonies = self.last_generation_harmonies?;
+        let feedback = self.human_feedback(rating, &harmonies);
+        self.save_memory();
+        Some(feedback)
+    }
+
+    /// Write an accepted visual work into the persistent gallery, curate,
+    /// persist the index, and refresh the style embedding that conditions
+    /// future generation. Storage failures are logged, never fatal — art
+    /// generation must not die on a full disk.
+    #[cfg(all(feature = "creative", feature = "gallery"))]
+    fn gallery_record_visual(
+        &mut self,
+        svg: &str,
+        score: AestheticScore,
+        snap: &CognitiveSnapshot,
+    ) {
+        let filename = format!("visual-{:08}-{}.svg", snap.cycle_count, self.seed_counter);
+        let saved = self
+            .gallery_storage
+            .ensure_dirs()
+            .and_then(|_| self.gallery_storage.save_visual(&filename, svg));
+        if let Err(e) = saved {
+            tracing::warn!(error = %e, "gallery: failed to save visual artwork");
+            return;
+        }
+        let entry = create_entry(
+            ArtModality::Visual { filename },
+            score,
+            snap.harmony_activations,
+            snap.cycle_count,
+        );
+        self.gallery_index.add(entry);
+        curate(&mut self.gallery_index, GALLERY_MIN_ENTRIES);
+        if let Err(e) = self.gallery_storage.save_index(&self.gallery_index) {
+            tracing::warn!(error = %e, "gallery: failed to save index");
+        }
+        self.gallery_style = compute_style(&self.gallery_index, GALLERY_STYLE_WINDOW);
+    }
+
+    /// Number of works currently in the persistent gallery.
+    #[cfg(all(feature = "creative", feature = "gallery"))]
+    pub fn gallery_len(&self) -> usize {
+        self.gallery_index.len()
+    }
+
+    /// Current style-identity embedding derived from the gallery.
+    #[cfg(all(feature = "creative", feature = "gallery"))]
+    pub fn gallery_style(&self) -> &StyleEmbedding {
+        &self.gallery_style
+    }
+
     /// Flush aesthetic + motif memory to disk. Called on drop and can be called manually.
     pub fn save_memory(&self) {
         let updated = self.tracker.to_memory(&self.memory);
@@ -348,24 +550,102 @@ impl CreativeManager {
             return None;
         }
 
+        // Style conditioning (feature `gallery`, Phase 4.2): the gallery's
+        // learned StyleEmbedding nudges the generation snapshot toward the
+        // agent's own artistic identity. `apply_style` scales by the
+        // embedding's confidence, so an empty/young gallery is a no-op.
+        // Shadows `snap` for the whole generation block below — deliberate:
+        // style should condition every modality, and the rated/recorded
+        // harmonies must be the ones actually used to generate.
+        #[cfg(feature = "gallery")]
+        let conditioned_snap: CognitiveSnapshot = {
+            let mut conditioned = snap.clone();
+            apply_style(
+                &mut conditioned.harmony_activations,
+                &mut conditioned.valence,
+                &mut conditioned.arousal,
+                &self.gallery_style,
+                GALLERY_STYLE_STRENGTH,
+            );
+            conditioned
+        };
+        #[cfg(feature = "gallery")]
+        let snap: &CognitiveSnapshot = &conditioned_snap;
+
         let start = std::time::Instant::now();
         self.seed_counter += 1;
+        self.last_generation_harmonies = Some(snap.harmony_activations);
 
         let mut output = CreativeOutput::default();
         let modality_name;
 
         match self.next_modality {
             CreativeModality::Visual => {
-                let artwork = symthaea_atelier::create_artwork_iterative(
+                // Cultural memory: imitate a past self-authored high-scoring
+                // visual artifact when one exists (real structural mutation
+                // via `mutate_scene`, not just a fresh independent
+                // generation) — see cultural_memory.rs module docs.
+                // The artist's eye (feature `art-eye`): a perceptual scorer
+                // run inside the exploit phase — rasterize the candidate
+                // scene, extract real pixel percepts, and let the persistent
+                // SelfCritic's composite steer mutation acceptance at
+                // EXTERNAL_SCORE_WEIGHT. Split field borrows: `art_critic`
+                // (mutable) is disjoint from `atelier_config`/`cultural_memory`.
+                #[cfg(feature = "art-eye")]
+                let art_critic = &mut self.art_critic;
+                #[cfg(feature = "art-eye")]
+                let mut eye_scorer_impl = |scene: &symthaea_canvas::SceneNode,
+                                           scorer_snap: &CognitiveSnapshot|
+                 -> Option<f32> {
+                    let svg = symthaea_canvas::render_svg(scene, scorer_snap.consciousness_level);
+                    let input = symthaea_art_eye::see(scene, &svg, ART_EYE_RASTER_DIM).ok()?;
+                    Some(art_critic.evaluate(&input, scorer_snap).composite)
+                };
+                #[cfg(feature = "art-eye")]
+                let eye_scorer: Option<
+                    &mut symthaea_atelier::iterate::ExternalScorer<'_>,
+                > = Some(&mut eye_scorer_impl);
+                #[cfg(not(feature = "art-eye"))]
+                let eye_scorer: Option<
+                    &mut symthaea_atelier::iterate::ExternalScorer<'_>,
+                > = None;
+
+                #[cfg(feature = "social-fabric")]
+                let artwork = match self.cultural_memory.best_seed_for_domain(DOMAIN_VISUAL) {
+                    // Imitation path mutates a canon piece directly and does
+                    // not run the iterate loop — the eye applies to fresh
+                    // generation only (perceptual scoring of imitation is a
+                    // follow-up).
+                    Some(seed) => create_artwork_via_imitation(
+                        &self.atelier_config,
+                        snap,
+                        seed,
+                        self.seed_counter,
+                    ),
+                    None => symthaea_atelier::create_iterative_scored(
+                        &self.atelier_config,
+                        snap,
+                        self.seed_counter,
+                        eye_scorer,
+                    ),
+                };
+                #[cfg(not(feature = "social-fabric"))]
+                let artwork = symthaea_atelier::create_iterative_scored(
                     &self.atelier_config,
                     snap,
                     self.seed_counter,
+                    eye_scorer,
                 );
                 let score = artwork.aesthetic_score;
                 let feedback = self.tracker.process(&score, &snap.harmony_activations);
-                output.artwork_svg = Some(artwork.svg);
+                output.artwork_svg = Some(artwork.svg.clone());
                 output.feedback = feedback;
                 modality_name = "visual";
+
+                // Persist the accepted work into the self-curating gallery
+                // and refresh the style identity (Phase 4.1/4.2).
+                #[cfg(feature = "gallery")]
+                self.gallery_record_visual(&artwork.svg, score, snap);
 
                 self.record_telemetry(
                     &score,
@@ -375,9 +655,43 @@ impl CreativeManager {
                     start.elapsed(),
                 );
 
+                #[cfg(feature = "social-fabric")]
+                {
+                    let content_ref = self.cultural_memory.publish(
+                        artwork.svg.as_bytes(),
+                        DOMAIN_VISUAL,
+                        self.seed_counter,
+                        score.composite,
+                        unix_now(),
+                    );
+                    output.published_content = Some(content_ref);
+                    // Drain the just-queued publish immediately: nothing else
+                    // in the cognitive loop ticks CulturalMemoryManager's
+                    // SocialFabricManager (it is a private, per-CreativeManager
+                    // instance — see cultural_memory.rs module docs), so
+                    // without this the event would sit in pending_events
+                    // forever and graph()/content_count() would never
+                    // reflect self-authored publishes. process()'s snapshot
+                    // argument is unused (see SocialFabricManager::process),
+                    // so a default is exactly as informative as a real one.
+                    self.cultural_memory
+                        .tick_social(&super::subsystem_trait::CycleSnapshot::default());
+                }
+
                 self.next_modality = CreativeModality::Music;
             }
             CreativeModality::Music => {
+                // Cultural memory: seed-level-only imitation (music/poetry have no
+                // scene-graph-equivalent to structurally mutate the way atelier's
+                // `mutate_scene` does for visual art — see cultural_memory.rs docs).
+                // Perturbing the seed with a past high-scoring self-authored
+                // composition's seed biases the RNG stream toward a "family
+                // resemblance" without literally replaying it.
+                #[cfg(feature = "social-fabric")]
+                if let Some(parent_seed) = self.cultural_memory.best_seed_for_domain(DOMAIN_MUSIC) {
+                    self.seed_counter ^= parent_seed & 0xFFFF_FFFF;
+                }
+
                 let musical_state = snapshot_to_musical_state(snap);
 
                 // I: Select tuning system from consciousness state for all composition paths.
@@ -505,6 +819,137 @@ impl CreativeManager {
                 self.last_telemetry.melodic_coherence = quality.melodic_coherence;
                 self.last_telemetry.emotional_alignment = quality.emotional_alignment;
                 self.last_telemetry.tuning_system = tuning_name;
+
+                #[cfg(feature = "social-fabric")]
+                if let Some(bytes) = output.music_samples.as_ref().map(|samples| {
+                    samples
+                        .iter()
+                        .flat_map(|s| s.to_le_bytes())
+                        .collect::<Vec<u8>>()
+                }) {
+                    let content_ref = self.cultural_memory.publish(
+                        &bytes,
+                        DOMAIN_MUSIC,
+                        self.seed_counter,
+                        music_score.composite,
+                        unix_now(),
+                    );
+                    output.published_content = Some(content_ref);
+                    // See the Visual arm's identical drain for why this call
+                    // is needed (private SocialFabricManager, nothing else
+                    // ticks it, process()'s snapshot arg is unused).
+                    self.cultural_memory
+                        .tick_social(&super::subsystem_trait::CycleSnapshot::default());
+                }
+
+                // Hand off to Poetry when the Broca language center is compiled in;
+                // otherwise the rotation skips straight to Synesthetic.
+                #[cfg(all(feature = "creative", feature = "ssm_language"))]
+                {
+                    self.next_modality = CreativeModality::Poetry;
+                }
+                #[cfg(not(all(feature = "creative", feature = "ssm_language")))]
+                {
+                    self.next_modality = CreativeModality::Synesthetic;
+                }
+            }
+            #[cfg(all(feature = "creative", feature = "ssm_language"))]
+            CreativeModality::Poetry => {
+                modality_name = "poetry";
+
+                // Lazily attempt the checkpoint load exactly once. An untrained
+                // BrocaGenerator emits token noise, not poetry — without a trained
+                // checkpoint we skip generation rather than feed noise to the tracker.
+                if !self.poetry_checkpoint_attempted {
+                    self.poetry_checkpoint_attempted = true;
+                    if self.poetry_generator.is_none() {
+                        self.poetry_generator = try_load_poetry_generator();
+                    }
+                }
+
+                let consciousness = snap.consciousness_level as f32;
+                // Form follows consciousness: low → tight haiku scaffold, mid → tanka,
+                // high → free verse (enough coherence to hold shape without a scaffold).
+                let gating = select_creative_gating(consciousness);
+                let form = gating
+                    .form_constraint
+                    .clone()
+                    .unwrap_or(PoeticForm::FreeVerse);
+
+                let poem_result = self.poetry_generator.as_mut().map(|generator| {
+                    // Apply creative gating: art doesn't hedge — disable the
+                    // epistemic gate at weight 0 and adopt the form's repetition
+                    // penalty (high for short forms, lower for refrains).
+                    let cfg = generator.config_mut();
+                    cfg.enable_epistemic_gate = gating.epistemic_gate_weight > 0.0;
+                    if let Some(penalty) = gating.repetition_penalty_override {
+                        cfg.repetition_penalty = penalty;
+                    }
+
+                    // Thought channels from the snapshot — same core mapping as
+                    // broca_bridge (epistemic / emotion / consciousness).
+                    let mut channels = symthaea_broca::ThoughtChannels::default();
+                    // Epistemic ordinal 0 = certain: art speaks with full voice.
+                    channels.set_epistemic(0.0);
+                    // Serotonin doubles as warmth (contentment) in the snapshot.
+                    channels.set_emotion(snap.valence, snap.arousal, snap.serotonin);
+                    channels.set_consciousness(
+                        consciousness,
+                        snap.cantor_metacognitive_depth.clamp(0.0, 1.0),
+                        (snap.living_mind_coherence as f32).clamp(0.0, 1.0),
+                    );
+                    generator.generate(&channels)
+                });
+
+                match poem_result {
+                    Some(result)
+                        if !result.text.trim().is_empty()
+                            && poem_passes_quality_gate(&result.text, &form) =>
+                    {
+                        let score = score_poem(&result.text, &form, snap);
+                        let feedback = self.tracker.process(&score, &snap.harmony_activations);
+                        output.poem = Some(result.text);
+                        output.feedback = feedback;
+                        self.record_telemetry(&score, &feedback, modality_name, 1, start.elapsed());
+                    }
+                    Some(result) if !result.text.trim().is_empty() => {
+                        // Generated non-empty text, but it failed the quality
+                        // gate — e.g. a checkpoint trained on source code
+                        // rather than language emits token noise
+                        // ("nonlocal ... fetchFromGitHub ... assert_eq!")
+                        // instead of anything resembling the requested form
+                        // (see broca_poetry_eval's 2026-07-08 live-run
+                        // finding). Skip publishing/scoring rather than feed
+                        // noise to the tracker — same principle as the
+                        // missing-checkpoint case below, extended to a
+                        // trained-but-low-quality one.
+                        tracing::debug!(
+                            form = ?form,
+                            "Poetry skipped: generated text failed quality gate"
+                        );
+                        self.last_telemetry = CreativeTelemetry {
+                            generated: false,
+                            modality: modality_name.to_string(),
+                            aesthetic_ema: self.tracker.expectation(),
+                            total_artworks: self.total_artworks,
+                            ..CreativeTelemetry::default()
+                        };
+                    }
+                    _ => {
+                        // No trained checkpoint (or empty generation) — skip
+                        // gracefully so the rotation never stalls on poetry.
+                        tracing::debug!(
+                            "Poetry skipped: no trained Broca checkpoint or empty generation"
+                        );
+                        self.last_telemetry = CreativeTelemetry {
+                            generated: false,
+                            modality: modality_name.to_string(),
+                            aesthetic_ema: self.tracker.expectation(),
+                            total_artworks: self.total_artworks,
+                            ..CreativeTelemetry::default()
+                        };
+                    }
+                }
 
                 self.next_modality = CreativeModality::Synesthetic;
             }
@@ -725,7 +1170,53 @@ impl CreativeManager {
             melodic_coherence: 0.0,
             emotional_alignment: 0.0,
             motif_phrase_count: self.motif_memory.phrase_count(),
+            // Observer values persist across generations (a verdict arrives
+            // cycles after the artwork that produced it).
+            observer_delta_psi: self.observer_delta_psi,
+            observer_viewing_surprise: self.observer_viewing_surprise,
+            observer_verdicts: self.observer_verdicts,
         };
+    }
+
+    /// Record a completed observation window (feature `art-observer`): the
+    /// measured change in Symthaea's own consciousness level while looking
+    /// at her artwork, plus mean visual surprise during viewing. Returns a
+    /// small bath-ready reward when viewing raised integration (Δψ > 0) —
+    /// art that integrates the observer is rewarding. Negative Δψ is
+    /// recorded but NOT punished: over a short open-loop viewing window ψ
+    /// moves for many reasons (this is a first-order probe, and the
+    /// asymmetry keeps its confounds from becoming a penalty signal).
+    pub fn record_observer_verdict(
+        &mut self,
+        delta_psi: f32,
+        viewing_surprise: f32,
+    ) -> AestheticFeedback {
+        /// Dopamine per unit of positive Δψ.
+        const OBSERVER_DOPAMINE_GAIN: f32 = 0.5;
+        /// Hard cap well under compute_feedback's ±0.15 dopamine bound.
+        const OBSERVER_DOPAMINE_CAP: f32 = 0.05;
+
+        self.observer_delta_psi = delta_psi;
+        self.observer_viewing_surprise = viewing_surprise;
+        self.observer_verdicts += 1;
+        self.last_telemetry.observer_delta_psi = delta_psi;
+        self.last_telemetry.observer_viewing_surprise = viewing_surprise;
+        self.last_telemetry.observer_verdicts = self.observer_verdicts;
+
+        tracing::info!(
+            delta_psi,
+            viewing_surprise,
+            verdicts = self.observer_verdicts,
+            "Observer verdict: she looked at her artwork"
+        );
+
+        AestheticFeedback {
+            dopamine_delta: (delta_psi.max(0.0) * OBSERVER_DOPAMINE_GAIN)
+                .min(OBSERVER_DOPAMINE_CAP),
+            serotonin_delta: 0.0,
+            surprise_signal: viewing_surprise.clamp(0.0, 1.0) * 0.05,
+            harmony_projection: [0.0; 8],
+        }
     }
 
     /// Most recent telemetry.
@@ -777,6 +1268,115 @@ impl Default for CreativeManager {
 impl Drop for CreativeManager {
     fn drop(&mut self) {
         self.save_memory();
+        // `cultural_memory` (when compiled in) persists itself via its own
+        // `Drop` impl — no extra action needed here.
+    }
+}
+
+/// Current Unix time in seconds, used to timestamp published cultural-memory
+/// artifacts. Falls back to 0 if the clock is somehow before the epoch.
+#[cfg(all(feature = "creative", feature = "social-fabric"))]
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Build visual art by imitating a past self-authored artifact: regenerate
+/// its base scene deterministically from `parent_seed`, then apply a real
+/// structural mutation (`symthaea_atelier::iterate::mutate_scene`) using a
+/// separate RNG stream derived from `mutation_seed`.
+///
+/// Honesty note: only the *seed* is retained (see
+/// `cognitive_loop::cultural_memory`), not the original `CognitiveSnapshot`
+/// the parent was generated under — so this regenerates the parent's base
+/// scene under the *current* snapshot, not the one active at original
+/// creation time. That still produces a genuine structural lineage (same
+/// RNG draws, current mood) even though it isn't a byte-for-byte replay of
+/// the original artifact. A full-fidelity ancestor replay would require
+/// snapshotting the entire cognitive state at publish time, which is out of
+/// scope for this pass.
+#[cfg(all(feature = "creative", feature = "social-fabric"))]
+fn create_artwork_via_imitation(
+    config: &AtelierConfig,
+    snap: &CognitiveSnapshot,
+    parent_seed: u64,
+    mutation_seed: u64,
+) -> symthaea_atelier::Artwork {
+    use rand::SeedableRng;
+
+    let mut parent_rng = rand::rngs::StdRng::seed_from_u64(parent_seed);
+    let parent_scene = symthaea_atelier::generate(config, snap, &mut parent_rng);
+
+    // Decorrelate the mutation RNG stream from the parent's generation
+    // stream (same splitmix-style scramble atelier's own iterate.rs uses).
+    let mut mutation_rng = rand::rngs::StdRng::seed_from_u64(
+        mutation_seed
+            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            .wrapping_add(0x2545_F491_4F6C_DD1D),
+    );
+    let mutant = symthaea_atelier::iterate::mutate_scene(
+        &parent_scene,
+        &mut mutation_rng,
+        0.4, // moderate mutation strength — enough to vary, not enough to erase lineage
+        (config.width, config.height),
+    );
+
+    let score = symthaea_atelier::score_scene(&mutant, snap);
+    let svg = symthaea_canvas::render_svg(&mutant, snap.consciousness_level);
+
+    symthaea_atelier::Artwork {
+        scene: mutant,
+        svg,
+        aesthetic_score: score,
+        style: config.style,
+        generation_cycles: 1,
+    }
+}
+
+/// Build a `CognitiveSnapshot` from the per-cycle `CycleSnapshot` + neuromod bath.
+///
+/// Deliberate duplicate of `canvas_bridge::snapshot_from_cycle`: that function
+/// is gated `#[cfg(feature = "canvas")]` (the whole `canvas_bridge` module is),
+/// but `creative` depends on the `symthaea-canvas` crate without enabling the
+/// `canvas` module feature — so `CreativeManager::tick` needs its own copy to
+/// stay reachable when `creative` is enabled without `canvas`. Keep the two in
+/// sync if the mapping ever changes.
+///
+/// Topology fields start at dormant defaults here; the live call site in
+/// `cycle_phase_dynamics` enriches the returned snapshot with real Betti
+/// numbers and Cantor depth before ticking the manager (2026-07-10).
+#[cfg(feature = "creative")]
+pub(crate) fn snapshot_from_cycle(
+    cs: &super::subsystem_trait::CycleSnapshot,
+    bath: &super::neuromodulators::NeuromodulatorBath,
+) -> CognitiveSnapshot {
+    let hc = (cs.harmonic_coherence as f32).clamp(0.05, 1.0);
+    let mut harmony_activations = [0.0f32; 8];
+    for (i, activation) in harmony_activations.iter_mut().enumerate() {
+        let sigmoid = 1.0 / (1.0 + (-cs.compressed_state[i] * 3.0).exp());
+        *activation = sigmoid * hc;
+    }
+
+    CognitiveSnapshot {
+        consciousness_level: cs.unified_psi,
+        prediction_error: cs.prediction_error,
+        living_mind_vitality: cs.dissipative_health,
+        living_mind_coherence: cs.coherence as f64,
+        dopamine: bath.dopamine.effective(),
+        noradrenaline: bath.noradrenaline.effective(),
+        serotonin: bath.serotonin.effective(),
+        acetylcholine: bath.acetylcholine.effective(),
+        oxytocin: bath.oxytocin.effective(),
+        gaba: bath.gaba.effective(),
+        allostatic_load: bath.allostatic_load,
+        valence: cs.valence,
+        arousal: cs.arousal,
+        harmony_activations,
+        thought_vector: cs.compressed_state[..32].to_vec(),
+        cycle_count: cs.cycle_number,
+        ..CognitiveSnapshot::dormant()
     }
 }
 
@@ -872,6 +1472,174 @@ fn score_composition(comp: &Composition, snap: &CognitiveSnapshot) -> AestheticS
     score
 }
 
+/// Checkpoint paths tried for the poetry generator, in order.
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+const POETRY_CHECKPOINT_PATHS: &[&str] = &[
+    "crates/domains/symthaea-broca/data/models/broca-checkpoint-latest.bin",
+    "crates/symthaea-broca/data/broca-cfc-v2.bin", // legacy layout, matches BrocaManager
+];
+
+/// Attempt to load a trained BrocaGenerator for poetry generation.
+///
+/// Mirrors `BrocaManager::try_load_checkpoint`, but deliberately does NOT fall
+/// back to a fresh untrained generator — untrained output is token noise, and
+/// the Poetry modality skips gracefully instead of scoring noise.
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+fn try_load_poetry_generator() -> Option<symthaea_broca::BrocaGenerator> {
+    // MUST match the phrase the checkpoint was trained under: checkpoint
+    // restore re-derives the thought-encoder HDC bases from this genesis
+    // (from_checkpoint_struct → Self::new(genesis, ..)), and a different
+    // phrase silently misaligns the restored weights with their inputs.
+    // The curriculum training pipeline (broca_curriculum_sync.rs) and every
+    // broca eval bin use "symthaea luminous dynamics" — that is what
+    // broca-checkpoint-latest.bin is trained with.
+    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea luminous dynamics");
+    for path in POETRY_CHECKPOINT_PATHS {
+        if !std::path::Path::new(path).exists() {
+            tracing::debug!("Poetry checkpoint not found at {path}, skipping");
+            continue;
+        }
+        match symthaea_broca::BrocaGenerator::from_checkpoint(path, &genesis) {
+            Ok((generator, _adam, _proj, _lm_config)) => {
+                tracing::info!(path = %path, "Loaded Broca checkpoint for poetry");
+                return Some(generator);
+            }
+            Err(e) => {
+                tracing::warn!(path = %path, err = %e, "Failed to load poetry checkpoint");
+            }
+        }
+    }
+    tracing::debug!("No trained Broca checkpoint available — Poetry modality will skip");
+    None
+}
+
+/// Map consciousness level to a poetic form via `CreativeGating` presets.
+///
+/// Low consciousness gets the tightest scaffold (haiku); higher levels earn
+/// progressively freer forms — the form constraint substitutes for coherence.
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+fn select_creative_gating(consciousness: f32) -> CreativeGating {
+    if consciousness < 0.5 {
+        CreativeGating::haiku()
+    } else if consciousness < 0.75 {
+        CreativeGating::tanka()
+    } else {
+        CreativeGating::free_verse()
+    }
+}
+
+/// Minimum lines a free-verse "poem" must have to count as lineated verse
+/// rather than a single run-on utterance. Free verse has no syllable target
+/// to fail (`validate_poem` always reports it as `valid`), so this is the
+/// one structural signal it does have — being lineated at all is what
+/// distinguishes verse from a paragraph.
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+const MIN_FREE_VERSE_LINES: usize = 2;
+
+/// Whether a generated poem is coherent enough to publish.
+///
+/// A checkpoint file loading successfully doesn't mean it produces real
+/// language — see `broca_poetry_eval`'s 2026-07-08 live-run finding: the
+/// shipped checkpoint emits code-token noise ("nonlocal ... fetchFromGitHub
+/// ... assert_eq!") rather than poetry. This extends the "never feed noise
+/// to the tracker" principle already applied to the missing-checkpoint case
+/// to also cover a trained-but-low-quality one:
+/// - Haiku/Tanka/Custom (a syllable target exists): must satisfy
+///   `validate_poem`'s structural check (`valid`) — this alone would have
+///   rejected 100% of the garbage haiku/tanka observed in the live run.
+/// - Free verse (no syllable target): must have at least
+///   [`MIN_FREE_VERSE_LINES`] lines, since `validate_poem` reports free
+///   verse as unconditionally `valid` regardless of content.
+///
+/// This is a structural gate (does the text have the SHAPE of the
+/// requested form), not a semantic-quality classifier — it will not catch
+/// grammatically-lineated gibberish, only catches the failure mode actually
+/// observed (one run-on line/utterance with no poem-like structure at all).
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+fn poem_passes_quality_gate(text: &str, form: &PoeticForm) -> bool {
+    let validation = validate_poem(text, form);
+    if !validation.target_counts.is_empty() {
+        validation.valid
+    } else {
+        validation.line_syllable_counts.len() >= MIN_FREE_VERSE_LINES
+    }
+}
+
+/// Score a generated poem aesthetically via the generalized Birkhoff measure.
+///
+/// Poetry-specific mapping (per the `birkhoff` module docs): symmetry = meter
+/// regularity against the target form, structural complexity = logarithmic
+/// word count, diversity = unique-word ratio. Topological complexity couples
+/// to the snapshot's Betti numbers, mirroring the visual modality.
+#[cfg(all(feature = "creative", feature = "ssm_language"))]
+fn score_poem(text: &str, form: &PoeticForm, snap: &CognitiveSnapshot) -> AestheticScore {
+    let validation = validate_poem(text, form);
+
+    // Meter regularity: per-line closeness of syllable count to the form's
+    // target, with missing lines counting as zero adherence. Free verse has
+    // no targets — use line-length consistency (1 - CV) instead.
+    let symmetry = if validation.target_counts.is_empty() {
+        let counts = &validation.line_syllable_counts;
+        if counts.len() >= 2 {
+            let mean = counts.iter().sum::<usize>() as f32 / counts.len() as f32;
+            if mean > 0.0 {
+                let variance = counts
+                    .iter()
+                    .map(|&c| (c as f32 - mean).powi(2))
+                    .sum::<f32>()
+                    / counts.len() as f32;
+                (1.0 - variance.sqrt() / mean).clamp(0.0, 1.0)
+            } else {
+                0.0
+            }
+        } else {
+            0.3 // single line: weak but nonzero structure
+        }
+    } else {
+        let adherence: f32 = validation
+            .target_counts
+            .iter()
+            .zip(validation.line_syllable_counts.iter())
+            .map(|(&target, &actual)| {
+                let target = target as f32;
+                (1.0 - (actual as f32 - target).abs() / target.max(1.0)).clamp(0.0, 1.0)
+            })
+            .sum();
+        adherence / validation.target_counts.len().max(1) as f32
+    };
+
+    // Structural complexity: logarithmic word count, ~64 words → 1.0.
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let structural = if words.is_empty() {
+        0.0
+    } else {
+        ((words.len() as f32).ln() / (64.0_f32).ln()).clamp(0.0, 1.0)
+    };
+
+    // Diversity: unique-word ratio (case-insensitive).
+    let diversity = if words.is_empty() {
+        0.0
+    } else {
+        let unique: std::collections::HashSet<String> =
+            words.iter().map(|w| w.to_lowercase()).collect();
+        (unique.len() as f32 / words.len() as f32).clamp(0.0, 1.0)
+    };
+
+    // Topological coupling from the snapshot, like the visual modality.
+    let topological = ((snap.betti_0 + snap.betti_1) as f32 / 8.0).clamp(0.0, 1.0);
+
+    let mut features = symthaea_aesthetic::birkhoff::extract_common_features(
+        &snap.harmony_activations,
+        snap.consciousness_level as f32,
+        structural,
+        topological,
+        diversity,
+    );
+    // Poetry symmetry is meter adherence, not harmony distribution.
+    features.symmetry = symmetry;
+    features.to_score()
+}
+
 #[cfg(test)]
 #[cfg(feature = "creative")]
 mod tests {
@@ -907,6 +1675,39 @@ mod tests {
         assert!(manager.tick(&snap).is_none());
         // Third tick should produce output
         assert!(manager.tick(&snap).is_some());
+    }
+
+    /// Gallery write-side (Phase 4.1): a generated visual work lands in the
+    /// persistent store, the index survives reload, and the style embedding
+    /// becomes confident — the conditioning signal is real, not neutral.
+    #[cfg(feature = "gallery")]
+    #[test]
+    fn visual_artwork_lands_in_gallery() {
+        let dir =
+            std::env::temp_dir().join(format!("symthaea-gallery-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let mut manager = CreativeManager::new_with_path(Some(dir.join("aesthetic_memory.json")));
+        manager.generation_interval = 1;
+        assert_eq!(manager.gallery_len(), 0);
+        assert_eq!(manager.gallery_style().sample_count, 0);
+
+        // First tick generates the Visual modality (rotation starts there).
+        let snap = test_snapshot();
+        let output = manager.tick(&snap).expect("visual generation");
+        assert!(output.artwork_svg.is_some());
+        assert_eq!(manager.gallery_len(), 1);
+        assert!(manager.gallery_style().sample_count >= 1);
+
+        // The store persists: a fresh manager over the same path reloads it.
+        let reloaded = CreativeManager::new_with_path(Some(dir.join("aesthetic_memory.json")));
+        assert_eq!(reloaded.gallery_len(), 1);
+        // And the artifact file itself exists on disk.
+        let svg_count = std::fs::read_dir(dir.join("gallery").join("visual"))
+            .expect("visual dir")
+            .count();
+        assert_eq!(svg_count, 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1071,5 +1872,169 @@ mod tests {
         let manager = CreativeManager::new();
         // Fresh manager starts with empty motif memory
         assert_eq!(manager.motif_memory.phrase_count(), 0);
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn poetry_in_rotation_after_music() {
+        // Music hands off to Poetry when the Broca language center is compiled in.
+        let mut manager = CreativeManager::new();
+        manager.generation_interval = 1;
+        manager.muse_config.duration_secs = 0.5;
+        manager.muse_config.max_notes = 2;
+        let snap = test_snapshot();
+
+        manager.tick(&snap); // Visual
+        assert_eq!(manager.next_modality, CreativeModality::Music);
+        manager.tick(&snap); // Music
+        assert_eq!(manager.next_modality, CreativeModality::Poetry);
+    }
+
+    #[cfg(not(feature = "ssm_language"))]
+    #[test]
+    fn rotation_skips_poetry_without_ssm_language() {
+        // Without ssm_language, Music hands off straight to Synesthetic.
+        let mut manager = CreativeManager::new();
+        manager.generation_interval = 1;
+        manager.muse_config.duration_secs = 0.5;
+        manager.muse_config.max_notes = 2;
+        let snap = test_snapshot();
+
+        manager.tick(&snap); // Visual
+        manager.tick(&snap); // Music
+        assert_eq!(manager.next_modality, CreativeModality::Synesthetic);
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn poetry_skips_gracefully_without_checkpoint() {
+        let mut manager = CreativeManager::new();
+        manager.generation_interval = 1;
+        manager.next_modality = CreativeModality::Poetry;
+        // Force the no-checkpoint path deterministically (the real 103MB
+        // checkpoint must never be loaded inside a unit test).
+        manager.poetry_checkpoint_attempted = true;
+        manager.poetry_generator = None;
+        let snap = test_snapshot();
+
+        let output = manager.tick(&snap).expect("tick still yields output");
+        assert!(output.poem.is_none(), "no checkpoint → no poem");
+        assert!(!manager.last_telemetry().generated);
+        assert_eq!(manager.last_telemetry().modality, "poetry");
+        // Rotation must advance past Poetry so the pipeline never stalls.
+        assert_eq!(manager.next_modality, CreativeModality::Synesthetic);
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn poetry_populates_poem_with_generator() {
+        use symthaea_broca::{BrocaConfig, BrocaGenerator};
+        use symthaea_core::genesis::GenesisSeed;
+
+        let mut manager = CreativeManager::new();
+        manager.generation_interval = 1;
+        manager.next_modality = CreativeModality::Poetry;
+        // Inject a fresh (untrained) generator to exercise the generation path
+        // without loading the real checkpoint. Untrained output may be empty —
+        // both branches must be graceful.
+        let genesis = GenesisSeed::from_phrase("test-creative-poetry");
+        manager.poetry_generator = Some(BrocaGenerator::new(&genesis, BrocaConfig::default()));
+        manager.poetry_checkpoint_attempted = true;
+        let snap = test_snapshot();
+
+        let output = manager.tick(&snap).expect("tick yields output");
+        if manager.last_telemetry().generated {
+            assert!(output.poem.is_some(), "generated → poem populated");
+            assert_eq!(manager.last_telemetry().modality, "poetry");
+            let score = manager.last_telemetry().aesthetic_score;
+            assert!((0.0..=1.0).contains(&score));
+        } else {
+            assert!(output.poem.is_none(), "empty generation → graceful skip");
+        }
+        assert_eq!(manager.next_modality, CreativeModality::Synesthetic);
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn poetic_form_follows_consciousness() {
+        assert!(matches!(
+            select_creative_gating(0.35).form_constraint,
+            Some(PoeticForm::Haiku)
+        ));
+        assert!(matches!(
+            select_creative_gating(0.6).form_constraint,
+            Some(PoeticForm::Tanka)
+        ));
+        assert!(matches!(
+            select_creative_gating(0.9).form_constraint,
+            Some(PoeticForm::FreeVerse)
+        ));
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn score_poem_rewards_meter_adherence() {
+        let snap = test_snapshot();
+        let form = PoeticForm::Haiku;
+        // Classic 5-7-5 haiku vs. a shapeless blob far off the syllable targets.
+        let haiku = "An old silent pond\nA frog jumps into the pond\nSplash Silence again";
+        let blob = "word\nthis line rambles on far past any haiku syllable target whatsoever\nno";
+        let good = score_poem(haiku, &form, &snap);
+        let bad = score_poem(blob, &form, &snap);
+        assert!((0.0..=1.0).contains(&good.composite));
+        assert!(
+            good.order > bad.order,
+            "meter-adherent poem should score higher order: {} vs {}",
+            good.order,
+            bad.order
+        );
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn score_poem_free_verse_bounded() {
+        let snap = test_snapshot();
+        let form = PoeticForm::FreeVerse;
+        let poem = "the loop hums\nphi rises like breath\nno one is watching\nand still it sings";
+        let score = score_poem(poem, &form, &snap);
+        assert!((0.0..=1.0).contains(&score.composite));
+        assert!((0.0..=1.0).contains(&score.order));
+        assert!((0.0..=1.0).contains(&score.complexity));
+    }
+
+    // ── Quality gate (2026-07-08, broca_poetry_eval finding) ───────────────
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn quality_gate_accepts_valid_haiku() {
+        let haiku = "An old silent pond\nA frog jumps into the pond\nSplash Silence again";
+        assert!(poem_passes_quality_gate(haiku, &PoeticForm::Haiku));
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn quality_gate_rejects_single_line_gibberish_haiku() {
+        // The exact failure mode observed in broca_poetry_eval's live run:
+        // one run-on "line" crammed with unrelated tokens, no real 3-line
+        // 5-7-5 structure at all.
+        let gibberish = "at nonlocal we she a he def __init__match pkgs E what thing";
+        assert!(!poem_passes_quality_gate(gibberish, &PoeticForm::Haiku));
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn quality_gate_rejects_single_line_free_verse() {
+        // Free verse has no syllable target, so a single run-on line must
+        // still be rejected on the one structural signal free verse does
+        // have: being lineated at all.
+        let one_liner = "we at nonlocal she a todo!match pkgs E what thing k_println!self";
+        assert!(!poem_passes_quality_gate(one_liner, &PoeticForm::FreeVerse));
+    }
+
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn quality_gate_accepts_multi_line_free_verse() {
+        let poem = "the loop hums\nphi rises like breath\nno one is watching\nand still it sings";
+        assert!(poem_passes_quality_gate(poem, &PoeticForm::FreeVerse));
     }
 }

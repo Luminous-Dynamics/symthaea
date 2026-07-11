@@ -212,6 +212,36 @@ impl App {
 
     /// Handle a key press.
     fn handle_key(&mut self, key: KeyCode) {
+        let has_pending = self
+            .daemon_snapshot
+            .as_ref()
+            .map_or(false, |s| s.pending_action.is_some());
+        if has_pending && (self.focus != FocusPanel::Input || self.input.is_empty()) {
+            match key {
+                KeyCode::Char('a') | KeyCode::Char('A') => {
+                    let wd_path = self
+                        .daemon_snapshot_path
+                        .with_file_name("watchdog_verdict.txt");
+                    let _ = std::fs::write(&wd_path, "Approved");
+                    self.output
+                        .push("🧠 [Watchdog] Action APPROVED. Sending to daemon...".into());
+                    self.refresh_data();
+                    return;
+                }
+                KeyCode::Char('v') | KeyCode::Char('V') => {
+                    let wd_path = self
+                        .daemon_snapshot_path
+                        .with_file_name("watchdog_verdict.txt");
+                    let _ = std::fs::write(&wd_path, "Vetoed");
+                    self.output
+                        .push("🧠 [Watchdog] Action VETOED. Notifying daemon...".into());
+                    self.refresh_data();
+                    return;
+                }
+                _ => {}
+            }
+        }
+
         match key {
             KeyCode::Char('q') if self.focus != FocusPanel::Input => {
                 self.should_quit = true;
@@ -345,6 +375,16 @@ impl App {
 
         // Auto-adjust complexity based on success rate
         self.auto_adjust_complexity();
+
+        // Write command file to communicate natural language goals to daemon (Proposal 4)
+        let cmd_path = self.daemon_snapshot_path.with_file_name("tui_command.txt");
+        if let Err(e) = std::fs::write(&cmd_path, &input) {
+            self.output
+                .push(format!("⚠️ Failed to send goal to daemon: {}", e));
+        } else {
+            self.output
+                .push("🧠 Sent natural language goal to daemon.".into());
+        }
     }
 
     /// Adjust complexity level based on interaction success rate.
@@ -429,6 +469,12 @@ impl App {
             episodic_count: snap.episodic_count,
             prediction_accuracy: snap.prediction_accuracy,
             maintenance_plan_count: snap.maintenance_plan_count,
+            anomaly_volatility_ema: snap.anomaly_volatility_ema,
+            active_anomaly_threshold: snap.active_anomaly_threshold,
+            hibernating: snap.hibernating,
+            risk_aversion: snap.risk_aversion,
+            curiosity_weight: snap.curiosity_weight,
+            causal_learning_rate: snap.causal_learning_rate,
             ..Default::default()
         };
 
@@ -521,6 +567,41 @@ impl App {
         self.alerts.prediction_mae_history = self.mae_history.clone();
 
         self.refresh_generations();
+
+        // Print pending Ollama diagnostic response (Proposal 1)
+        if let Some(resp) = &snap.pending_response {
+            if !self.output.iter().any(|line| line.contains(resp)) {
+                self.output.push("🧠 [Diagnostics] Ollama Response:".into());
+                for line in resp.lines() {
+                    self.output.push(format!("   {}", line));
+                }
+            }
+        }
+
+        // Print new metacognitive journal entries with LLM rationales (Proposal 3)
+        for entry in &snap.metacognitive_journal {
+            let already_printed = self.output.iter().any(|line| {
+                line.contains(&entry.symptom)
+                    && (line.contains(&entry.action)
+                        || line.contains(&format!("{:?}", entry.action)))
+            });
+            if !already_printed {
+                self.output.push(format!(
+                    "🧠 [Daemon] Goal: {} → Action: {} (EFE={:.2})",
+                    entry.symptom, entry.action, entry.expected_free_energy
+                ));
+                self.output
+                    .push(format!("   Rationale: {}", entry.rationale));
+                if entry.outcome != "Pending" {
+                    self.output.push(format!("   Outcome: {}", entry.outcome));
+                }
+            }
+        }
+
+        // Cap output log lines at 50 to prevent overflow
+        while self.output.len() > 50 {
+            self.output.remove(0);
+        }
     }
 
     /// Direct system queries (fallback when daemon not running).
@@ -794,7 +875,12 @@ impl App {
             mid_chunks[1],
         );
 
-        // Right column: alerts panel
+        // Right column: alerts panel + allostatic mood panel
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(top_chunks[2]);
+
         let alerts_block = Block::default()
             .title(" Alerts & Predictions ")
             .borders(Borders::ALL)
@@ -803,17 +889,114 @@ impl App {
         alerts_snap.is_focused = self.focus == FocusPanel::Alerts;
         frame.render_widget(
             AlertsPanel::new(alerts_snap).block(alerts_block),
-            top_chunks[2],
+            right_chunks[0],
         );
 
-        // Bottom: input + output
-        let bottom_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(1)])
-            .split(main_chunks[1]);
+        // Draw Mood & Volatility Panel (Proposal 3)
+        let mood_block = Block::default()
+            .title(" Allostatic Mood & Volatility ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Magenta));
 
-        self.draw_input(frame, bottom_chunks[0]);
-        self.draw_output(frame, bottom_chunks[1]);
+        // Get snapshot data
+        let (vol, risk, cur, lr, hib) = if let Some(snap) = &self.daemon_snapshot {
+            (
+                snap.anomaly_volatility_ema,
+                snap.risk_aversion,
+                snap.curiosity_weight,
+                snap.causal_learning_rate,
+                snap.hibernating,
+            )
+        } else {
+            (0.1, 0.2, 0.3, 0.1, false)
+        };
+
+        // Determine mood text and color
+        let (mood_text, mood_color) = if hib {
+            ("🧘 Hibernating / Rest", Color::Cyan)
+        } else if vol > 0.4 {
+            ("💥 Turbulent / High surprise", Color::Red)
+        } else if risk > 0.5 {
+            ("🛡️ Risk Averse / Defensive", Color::Yellow)
+        } else if cur > 0.4 {
+            ("🔍 Curious / Exploring", Color::Green)
+        } else {
+            ("⚡ Calm / Alert", Color::Cyan)
+        };
+
+        // Build bars
+        fn make_bar(val: f64) -> String {
+            let filled = (val * 10.0).round() as usize;
+            let empty = 10 - filled.min(10);
+            format!(
+                "[{}{}] {:.2}",
+                "■".repeat(filled.min(10)),
+                " ".repeat(empty),
+                val
+            )
+        }
+
+        let lines = vec![
+            Line::from(vec![
+                Span::raw("System Mood: "),
+                Span::styled(
+                    mood_text,
+                    Style::default().fg(mood_color).add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(format!("Volatility EMA:  {}", make_bar(vol))),
+            Line::from(format!("Risk Aversion:   {}", make_bar(risk))),
+            Line::from(format!("Curiosity Drive: {}", make_bar(cur))),
+            Line::from(format!("Learning Rate:   {}", make_bar(lr))),
+        ];
+
+        frame.render_widget(Paragraph::new(lines).block(mood_block), right_chunks[1]);
+
+        // Bottom: input + output (and optional gated action banner)
+        let pending = self
+            .daemon_snapshot
+            .as_ref()
+            .and_then(|s| s.pending_action.as_ref());
+        let bottom_chunks = if let Some(_) = pending {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Length(3),
+                    Constraint::Min(1),
+                ])
+                .split(main_chunks[1])
+        } else {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(3), Constraint::Min(1)])
+                .split(main_chunks[1])
+        };
+
+        if let Some(action) = pending {
+            let banner_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .title(" ⚠️ Gated Autonomic Action (Watchdog Veto Required) ");
+            let content = format!(
+                " The daemon wants to execute: `{}`. Press [A] to Approve or [V] to Veto.",
+                action
+            );
+            frame.render_widget(
+                Paragraph::new(content).block(banner_block),
+                bottom_chunks[0],
+            );
+            self.draw_input(frame, bottom_chunks[1]);
+            self.draw_output(frame, bottom_chunks[2]);
+        } else {
+            self.draw_input(frame, bottom_chunks[0]);
+            self.draw_output(frame, bottom_chunks[1]);
+        }
     }
 
     /// Render a text-based sparkline of the free energy history.
@@ -1070,6 +1253,13 @@ mod tests {
             anomaly_volatility_ema: 0.1,
             active_anomaly_threshold: 0.5,
             last_plan_efe: None,
+            hibernating: false,
+            metacognitive_journal: vec![],
+            risk_aversion: 0.2,
+            curiosity_weight: 0.3,
+            causal_learning_rate: 0.1,
+            pending_action: None,
+            pending_response: None,
         };
 
         app.apply_daemon_snapshot(&snap);

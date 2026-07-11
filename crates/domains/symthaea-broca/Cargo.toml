@@ -195,6 +195,10 @@ path = "src/bin/broca_checkpoint_compare.rs"
 name = "broca-topic-coverage"
 path = "src/bin/broca_topic_coverage.rs"
 
+[[bin]]
+name = "broca-poetry-eval"
+path = "src/bin/broca_poetry_eval.rs"
+
 [features]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)

@@ -98,6 +98,8 @@ fn main() {
         let config = symthaea_muse::MuseConfig {
             duration_secs: 6.0,
             max_notes: 24,
+            // This demo's WAV writer is mono 16-bit
+            output_format: symthaea_muse::OutputFormat::Mono16,
             ..Default::default()
         };
 
@@ -106,7 +108,10 @@ fn main() {
         // Write WAV
         let filename = format!("{name}.wav");
         let path = output_dir.join("music").join(&filename);
-        write_wav(&path, &composition.samples, composition.sample_rate);
+        let symthaea_muse::AudioData::I16(ref samples) = composition.audio else {
+            unreachable!("Mono16 was requested above");
+        };
+        write_wav(&path, samples, composition.sample_rate);
 
         // Compute scale info
         let scale = symthaea_muse::pitch::build_scale(&musical_state);

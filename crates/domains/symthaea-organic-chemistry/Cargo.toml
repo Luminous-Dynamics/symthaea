@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-organic-chemistry"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Organic chemistry structural layer for Symthaea: SMILES parsing, molecular graphs, formula/weight, and functional-group detection. Complements the ab-initio symthaea-quantum-chemistry crate."
+
+# Deliberately zero external dependencies and no symthaea-core link: this is a
+# self-contained structural chemistry layer (parse/graph/formula), so it builds
+# fast and in isolation. Quantum/electronic-structure work stays in
+# symthaea-quantum-chemistry.
+[dependencies]

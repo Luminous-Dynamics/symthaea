@@ -8,6 +8,7 @@ use crate::encoder::AuvHdcEncoder;
 use crate::fep_agent::ActiveInferenceAuvAgent;
 use crate::navigation_bridge::{AuvNavigationBridge, UnderwaterNavigationSample};
 use crate::navigation_estimator::{AuvNavigationEstimate, AuvNavigationEstimator};
+use crate::reflex::reflex_thrusters;
 use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 use crate::store_forward::StoreForwardBuffer;
 use crate::types::AuvConfig;
@@ -25,6 +26,10 @@ pub struct EpisodeMetrics {
     pub samples_collected: usize,
     pub steps_survived: usize,
     pub exceeded_crush_depth: bool,
+    /// Mean pre-update imitation MSE against the hand-designed depth-hold
+    /// reflex -- the learning signal (real-trainer follow-up to
+    /// SYMTHAEA_CLASSIC_PLATFORMS_FEP_HONESTY_2026-07-09.md).
+    pub mean_imitation_loss: f32,
 }
 
 /// AUV trainer.
@@ -64,6 +69,8 @@ impl AuvTrainer {
         let mut depth_error_sum = 0.0;
         let mut effort_sum = 0.0f32;
         let mut speed_sum = 0.0;
+        let mut tau_factor = 1.0f32;
+        let mut loss_sum = 0.0f32;
 
         self.simulator.reset(self.target_depth);
         self.controller.reset();
@@ -81,12 +88,15 @@ impl AuvTrainer {
                 self.store_forward
                     .update_blackout(self.simulator.state().depth);
                 self.fep_agent.set_blackout(self.store_forward.in_blackout);
-                let _fep = self
+                let fep = self
                     .fep_agent
                     .tick(self.simulator.state(), self.target_depth);
+                tau_factor = fep.tau_factor;
             }
 
-            let cmd = self.controller.forward(&hv, dt as f32);
+            let cmd = self.controller.forward(&hv, dt as f32 * tau_factor);
+            let target = reflex_thrusters(self.simulator.state(), self.target_depth);
+            loss_sum += self.controller.train_step(&target);
             self.simulator.step(&cmd, dt);
 
             let state = self.simulator.state();
@@ -137,6 +147,7 @@ impl AuvTrainer {
         metrics.mean_depth_error = depth_error_sum / n;
         metrics.mean_control_effort = effort_sum / n as f32;
         metrics.mean_speed = speed_sum / n;
+        metrics.mean_imitation_loss = loss_sum / n as f32;
         let estimate = self.navigation_estimator.estimate();
         metrics.final_navigation_sigma_m = estimate.position_sigma_m;
         metrics.final_navigation_position_error_m =
@@ -181,6 +192,26 @@ mod tests {
         assert!(metrics.steps_survived > 0);
         assert!(metrics.mean_depth_error.is_finite());
         assert!(metrics.samples_collected > 0);
+        assert!(
+            metrics.mean_imitation_loss > 0.0,
+            "learning signal must be live"
+        );
+    }
+
+    #[test]
+    fn test_training_reduces_imitation_loss() {
+        let mut config = AuvConfig::default();
+        config.steps_per_episode = 200;
+        let mut trainer = AuvTrainer::new(config, 10.0);
+        let first = trainer.run_episode().mean_imitation_loss;
+        for _ in 0..3 {
+            trainer.run_episode();
+        }
+        let last = trainer.run_episode().mean_imitation_loss;
+        assert!(
+            last < first,
+            "imitation loss must decrease with training: first {first:.5} -> last {last:.5}"
+        );
     }
 
     #[test]

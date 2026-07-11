@@ -69,6 +69,13 @@ impl SimplePhysicsSimulator {
         self.motor_time_constant
     }
 
+    /// Thrust required to exactly counteract gravity for this airframe (N).
+    /// Safety fallbacks must derive their thrust from this instead of
+    /// hardcoding airframe-specific Newton values.
+    pub fn hover_thrust(&self) -> f64 {
+        self.mass * 9.81
+    }
+
     /// Enable or disable motor lag simulation.
     pub fn set_motor_lag(&mut self, enabled: bool) {
         self.enable_motor_lag = enabled;

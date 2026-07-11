@@ -21,16 +21,39 @@ pub mod phi_monitor;
 pub mod semantic_intent;
 
 // Domain plugins
+pub mod acoustics_plugin;
+pub mod astronomy_plugin;
+pub mod chemistry_plugin;
+pub mod circuits_plugin;
 pub mod code_assistant_plugin;
 pub mod coding_feedback_core;
+pub mod control_plugin;
+pub mod dsp_plugin;
+pub mod earth_system_plugin;
+pub mod economics_plugin;
+pub mod epidemiology_plugin;
+pub mod formal_language_plugin;
 pub mod general_assistant_plugin;
+pub mod geodesy_plugin;
 pub mod math_plugin;
+pub mod modal_plugin;
 pub mod nixos_plugin;
+pub mod operations_research_plugin;
+pub mod optics_plugin;
+pub mod physiology_plugin;
+pub mod plugin_parse;
 pub mod programming_plugin;
 pub mod research_plugin;
+pub mod social_choice_plugin;
+pub mod statistics_plugin;
+pub mod structural_plugin;
+pub mod thermofluids_plugin;
 
 // Narrative prompt compiler (CfC Ghost Signal → LLM writing instructions)
 pub mod narrative_compiler;
+
+// Autobiography narration (LifeEpisode history → first-person memoir prose)
+pub mod autobiography;
 
 // LLM provider backends
 pub mod anthropic_backend;

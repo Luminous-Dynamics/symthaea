@@ -1,10 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! CfC-driven spectral vocoder: consciousness dynamics generate spectral envelopes.
+//! CfC-driven spectral synthesizer: consciousness dynamics generate spectral
+//! envelopes, rendered by a sinusoidal oscillator bank.
 //!
 //! The CfC hidden state evolves at ~1kHz control rate, generating 100-bin mel
-//! spectral envelopes. A Griffin-Lim-like overlap-add kernel renders these
-//! at audio rate. The key insight: the **temporal dynamics of the sound itself**
+//! spectral envelopes. One phase-accumulating sine oscillator per mel bin
+//! renders these at audio rate (additive resynthesis). This is NOT a
+//! phase-reconstruction vocoder — there is no FFT/ISTFT and no Griffin-Lim
+//! iteration (an earlier header claimed "Griffin-Lim-like overlap-add").
+//! The key insight stands: the **temporal dynamics of the sound itself**
 //! emerge from the continuous-time neural ODE, not from note-level decisions.
 //!
 //! # Architecture
@@ -13,7 +17,7 @@
 //! MusicalState → HDC encoder → 16,384D HV
 //!   → HdcLtcUnifiedNetwork (3 layers, evolve at dt=1ms)
 //!   → output HV → MelDecoder → 100-bin mel frame
-//!   → OverlapAdd → PCM @ 44.1kHz
+//!   → per-bin sine oscillator bank → PCM @ 44.1kHz
 //! ```
 
 use symthaea_core::genesis::GenesisSeed;
@@ -64,8 +68,6 @@ impl MelDecoder {
 pub struct SpectralVocoder {
     network: HdcLtcUnifiedNetwork,
     decoder: MelDecoder,
-    /// Accumulated mel frames for overlap-add.
-    mel_buffer: Vec<Vec<f32>>,
     /// Current phase accumulators for oscillator bank.
     phases: Vec<f32>,
     sample_rate: u32,
@@ -94,7 +96,6 @@ impl SpectralVocoder {
         Self {
             network,
             decoder,
-            mel_buffer: Vec::new(),
             phases: vec![0.0; MEL_BINS],
             sample_rate,
             hop_size,
@@ -185,7 +186,6 @@ impl SpectralVocoder {
 
     /// Reset vocoder state.
     pub fn reset(&mut self) {
-        self.mel_buffer.clear();
         self.phases.fill(0.0);
     }
 }

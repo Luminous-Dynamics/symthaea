@@ -39,6 +39,46 @@ pub struct MotorRenderingManager {
     /// Creative pipeline manager: generative art + music + synesthesia + gallery.
     #[cfg(feature = "creative")]
     pub(crate) creative_manager: Option<super::creative_bridge::CreativeManager>,
+
+    /// Cached topological measurement shared by the canvas/creative snapshot
+    /// builders (Betti numbers from the CfC compressed state). Refreshed on
+    /// an interval in cycle_phase_dynamics — the Hodge pipeline is O(n³) in
+    /// the subsampled dimensions, too heavy to recompute every cycle just
+    /// for art. Before 2026-07-10 both snapshot builders left topology at
+    /// dormant defaults, hollowing out every topology-driven art style.
+    #[cfg(any(feature = "canvas", feature = "creative"))]
+    pub(crate) art_topology:
+        Option<super::consciousness_engine::topological_measure::TopologicalConsciousnessResult>,
+
+    /// Cycle number at which `art_topology` was last refreshed.
+    #[cfg(any(feature = "canvas", feature = "creative"))]
+    pub(crate) art_topology_cycle: u64,
+
+    /// Active artwork-observation window (feature `art-observer`): while
+    /// `Some`, the rendered artwork is injected as the vision frame each
+    /// cycle and ψ is accumulated; on expiry the Δψ verdict goes back to
+    /// the CreativeManager.
+    #[cfg(feature = "art-observer")]
+    pub(crate) art_viewing: Option<ArtViewing>,
+
+    /// Short ψ history ring (pre-viewing baseline for observer-Δψ).
+    #[cfg(feature = "art-observer")]
+    pub(crate) psi_history: std::collections::VecDeque<f64>,
+}
+
+/// State of one artwork-observation window.
+#[cfg(feature = "art-observer")]
+pub(crate) struct ArtViewing {
+    /// Channel-matched pixel frame of the rendered artwork.
+    pub frame: Vec<u8>,
+    /// Cycles left in the viewing window.
+    pub cycles_remaining: u32,
+    /// Mean ψ over the pre-viewing history window.
+    pub baseline_psi: f64,
+    /// Accumulated ψ during viewing.
+    pub psi_sum: f64,
+    /// Number of ψ samples accumulated.
+    pub psi_samples: u32,
 }
 
 impl MotorRenderingManager {
@@ -63,6 +103,14 @@ impl MotorRenderingManager {
             creative_manager: Some(super::creative_bridge::CreativeManager::new_with_path(
                 aesthetic_path,
             )),
+            #[cfg(any(feature = "canvas", feature = "creative"))]
+            art_topology: None,
+            #[cfg(any(feature = "canvas", feature = "creative"))]
+            art_topology_cycle: 0,
+            #[cfg(feature = "art-observer")]
+            art_viewing: None,
+            #[cfg(feature = "art-observer")]
+            psi_history: std::collections::VecDeque::with_capacity(8),
         }
     }
 }

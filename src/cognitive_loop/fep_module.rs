@@ -531,8 +531,17 @@ impl FepModule {
         observation: &symthaea_core::hdc::unified_hv::ContinuousHV,
         proprioception: &[f32],
     ) {
-        // Project proprioceptive state into semantic space, adaptively dampened by actuator health
-        let health = vec![1.0; proprioception.len()];
+        // Project proprioceptive state into semantic space, adaptively dampened by
+        // actuator health. Actuator indices don't align with proprioception state
+        // dims (state layouts are platform-specific), so degraded hardware dampens
+        // the haptic constraint uniformly via mean health rather than per-index.
+        let reported = bridge.actuator_health();
+        let mean_health = if reported.is_empty() {
+            1.0
+        } else {
+            (reported.iter().sum::<f32>() / reported.len() as f32).clamp(0.0, 1.0)
+        };
+        let health = vec![mean_health; proprioception.len()];
         let haptic_constraint = self
             .haptic_semantic_binder
             .bind_with_health(proprioception, &health);

@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-optics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Geometric optics for Symthaea: thin-lens/mirror imaging, Snell's law refraction, total internal reflection, diffraction gratings. Completes the applied classical-physics layer. Closed-form, ground-truth-checked."
+
+[dependencies]

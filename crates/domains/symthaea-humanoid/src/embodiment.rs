@@ -301,6 +301,40 @@ mod tests {
     }
 
     #[test]
+    fn test_standing_lock_applies_hip_gravity_comp() {
+        // Regression: joint_names() used to return generic "j_N" names, so
+        // the contains("hip_y") lookup never matched and the advertised
+        // gravity-comp baseline was silently absent (pure zero torque).
+        let bridge = HumanoidEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let mut cmd = HumanoidCommand {
+            torques: vec![1.0; 21],
+        };
+        bridge.apply_standing_lock(&mut cmd);
+        let names = crate::morphology::HumanoidMorphology::Dmc21.joint_names();
+        let hip_indices: Vec<usize> = names
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| n.contains("hip_y"))
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(
+            hip_indices.len(),
+            2,
+            "expected right_hip_y + left_hip_y in joint names, got {names:?}"
+        );
+        for (i, t) in cmd.torques.iter().enumerate() {
+            if hip_indices.contains(&i) {
+                assert!(
+                    *t > 0.0,
+                    "hip pitch joint {i} must carry the gravity-comp baseline"
+                );
+            } else {
+                assert_eq!(*t, 0.0, "non-hip joint {i} must be zeroed at Red");
+            }
+        }
+    }
+
+    #[test]
     fn test_perception() {
         let mut bridge = HumanoidEmbodiment::new(&GenesisSeed::from_phrase("test"));
         let hv = ContinuousHV::random(16384, 42);

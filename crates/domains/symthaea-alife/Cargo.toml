@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-alife"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Artificial life for Symthaea: organisms as Markov blankets minimizing free energy (Friston 2013), built directly on symthaea-fep. No HDC, no EmbodimentBridge, no consciousness coupling — see ALIFE_PLAN_2026-07-08.md."
+
+[dependencies]
+serde = { workspace = true }
+symthaea-fep = { workspace = true }
+symthaea-earth-system = { workspace = true }

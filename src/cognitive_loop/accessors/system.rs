@@ -1048,6 +1048,39 @@ impl CognitiveLoopService {
             .and_then(|m| m.take_svg())
     }
 
+    /// Deliver a human rating (`[-1, 1]`) of the most recently generated
+    /// creative artwork. The rating recalibrates the aesthetic tracker at
+    /// 10× self-evaluation weight (humans are ground truth for taste),
+    /// persists aesthetic memory to disk, and applies the resulting
+    /// dopamine/serotonin deltas to the neuromodulator bath — human approval
+    /// is a real reward, not just a log line. Returns `false` when no
+    /// artwork has been generated yet (nothing to rate).
+    ///
+    /// First live surface for the human-feedback path (2026-07-10, visual-art
+    /// plan Phase 2.1): `AestheticTracker::human_feedback` had zero callers
+    /// since its creation.
+    #[cfg(feature = "creative")]
+    pub fn rate_creative_art(&mut self, rating: f32) -> bool {
+        let feedback = self
+            .sensorimotor
+            .motor_rendering
+            .creative_manager
+            .as_mut()
+            .and_then(|m| m.rate_last_artwork(rating));
+        match feedback {
+            Some(fb) => {
+                if fb.dopamine_delta != 0.0 {
+                    self.neuromod.bath.dopamine.produce(fb.dopamine_delta);
+                }
+                if fb.serotonin_delta != 0.0 {
+                    self.neuromod.bath.serotonin.produce(fb.serotonin_delta);
+                }
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Last canvas generation time in microseconds.
     #[cfg(feature = "canvas")]
     pub fn canvas_generation_time_us(&self) -> u64 {

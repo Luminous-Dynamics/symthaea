@@ -74,6 +74,16 @@ pub const CONSEQUENCE_TRACKER_MAX_AGE_CYCLES: u64 = 2000;
 /// Basis: Friston (2010) — precision-weighted prediction error learning.
 pub const CONSEQUENCE_TRACKER_ACCURACY_ALPHA: f64 = 0.05;
 
+/// Cycles between recording an ethical verdict as a consequence prediction
+/// and resolving it against the Ψ/valence that actually materialized.
+/// At ~31Hz, 20 cycles ≈ 0.65s — long enough for an input's effects to
+/// propagate through several ticks, short enough that predictions resolve
+/// within the same behavioral episode. Must stay well below
+/// CONSEQUENCE_TRACKER_MAX_AGE_CYCLES (2000) and the tracker's pending cap
+/// (100), since one prediction is recorded per cycle.
+/// Basis: Cushman (2013) — outcome observation follows action at short lag.
+pub const CONSEQUENCE_OBSERVATION_HORIZON_CYCLES: u64 = 20;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GOVERNANCE LEARNING — OUTCOME-BASED FEEDBACK
 // ═══════════════════════════════════════════════════════════════════════════════

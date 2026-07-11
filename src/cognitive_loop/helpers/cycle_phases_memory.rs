@@ -774,7 +774,6 @@ impl CognitiveLoopService {
                                 }
                                 Err(e) => {
                                     memory_db_flushed = false;
-                                    flush_guard.store(false, Ordering::Relaxed);
                                     tracing::warn!(error = %e, "Memory flush queue failed");
                                 }
                             }

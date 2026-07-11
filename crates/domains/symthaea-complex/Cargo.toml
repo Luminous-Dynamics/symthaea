@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-complex"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Complex numbers and the FFT for Symthaea's pure-std domain ecosystem: arithmetic (operator-overloaded), polar form, exp/ln/sqrt, roots of unity, and a radix-2 Cooley-Tukey FFT/IFFT. std has no complex type. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

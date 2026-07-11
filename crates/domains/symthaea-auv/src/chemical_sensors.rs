@@ -149,12 +149,19 @@ impl SensorNoiseModel {
             let mut s = rng_seed
                 .wrapping_add(i as u64)
                 .wrapping_mul(6364136223846793005);
-            s ^= s >> 12;
-            s ^= s << 25;
-            s ^= s >> 27;
-            let uniform = (s as f64) / (u64::MAX as f64); // [0, 1)
-            // Box-Muller approximation: (uniform - 0.5) * sqrt(12) ≈ N(0,1)
-            let gaussian = (uniform - 0.5) * 3.464;
+            // Irwin-Hall Gaussian approximation: sum of 12 uniforms − 6
+            // ≈ N(0,1) (mean 0, variance 1, near-Gaussian tails to ~3σ).
+            // The previous single-uniform (u − 0.5)·√12 had the right mean
+            // and variance but uniform (no) tails, which understates
+            // anomaly-detector false-positive rates.
+            let mut sum = 0.0f64;
+            for _ in 0..12 {
+                s ^= s >> 12;
+                s ^= s << 25;
+                s ^= s >> 27;
+                sum += (s.wrapping_mul(2685821657736338717) as f64) / (u64::MAX as f64);
+            }
+            let gaussian = sum - 6.0;
 
             // Additive noise
             let noise = gaussian * self.noise_std[i];

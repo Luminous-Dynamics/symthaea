@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-music-theory"
+version = "0.1.0"
+edition = "2024"
+description = "Symbolic music theory for Symthaea — pitch, scale, harmony, motif, and phrase primitives with ground-truth-verifiable rules. The 'what to play' layer; symthaea-muse realizes it as audio."
+license = "AGPL-3.0-or-later"
+
+# Deliberately dependency-light: this is pure symbolic music theory (no audio,
+# no DSP, no symthaea-core). It compiles in seconds and every rule is a unit
+# test against a textbook fact.
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+# Spec JSON round-trip test.
+serde_json = { workspace = true }
+# Only for the standalone `render_wav` example — a tiny self-contained synth so
+# a Score can be HEARD without pulling in muse's heavy (wgpu) synthesis stack.
+hound = { workspace = true }
+

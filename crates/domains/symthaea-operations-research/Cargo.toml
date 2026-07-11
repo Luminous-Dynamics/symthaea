@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-operations-research"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Operations research for Symthaea: economic order quantity (EOQ), M/M/1 queueing, and Dijkstra shortest paths. Closed-form + exact algorithms, ground-truth-checked."
+
+[dependencies]

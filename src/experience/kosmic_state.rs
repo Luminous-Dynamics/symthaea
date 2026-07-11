@@ -1,7 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! KosmicSong State Management
+//! KosmicSong State Management (identity state — NOT music; "song" is metaphor)
+//!
+//! NOTE: this `KosmicSong` is a distinct, lighter struct from the one in
+//! `mycelix/kosmic_song.rs` (same name, different type — disambiguating
+//! rename planned, see `ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md` Phase 0).
+//! Neither produces audio; music synthesis lives in `symthaea-muse`.
 //!
 //! Implements the unified identity structure from GIS v4.0 "Kosmic Song Synthesis":
 //!

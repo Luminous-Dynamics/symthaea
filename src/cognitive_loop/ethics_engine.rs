@@ -1483,6 +1483,22 @@ impl EthicsEngine {
         // Small deltas: no change (exploration neutral)
     }
 
+    /// Consequence-prediction accuracy modulates moral exploration (AGW Phase 2.1).
+    ///
+    /// Called once per *resolved* consequence prediction. When the engine's
+    /// verdicts anticipate outcomes well (accuracy above the tracker's 0.5
+    /// prior), moral exploration may grow modestly; when they fail to,
+    /// exploration tightens toward its floor — a judgment that cannot predict
+    /// its consequences should not be adventurous. Same bounds as
+    /// `feedback_exploration_outcome` ([0.05, 0.25]); per-resolution nudge is
+    /// deliberately small (±0.005 at the extremes) so the coupling emerges
+    /// over tens of outcomes, not single events.
+    pub fn apply_consequence_accuracy(&mut self, accuracy: f64) {
+        let delta = ((accuracy - 0.5) * 0.01) as f32;
+        self.cache.moral_exploration_gain =
+            (self.cache.moral_exploration_gain + delta).clamp(0.05, 0.25);
+    }
+
     /// Save moral topology state to a JSON file for cross-session persistence.
     pub fn save_topology_snapshot(
         &self,
@@ -1975,6 +1991,91 @@ mod tests {
             engine.moral_exploration_gain() < initial_gain,
             "Gain should decrease on high PE: {}",
             engine.moral_exploration_gain()
+        );
+    }
+
+    // ── AGW Phase 2.1: pre-registered falsifiable tests ──────────────────
+    // Claim under test: a moral judgment whose Safe verdicts are followed by
+    // bad outcomes must (a) lose measured accuracy and (b) tighten its moral
+    // exploration gain. If either fails, the verdict→outcome→update loop is
+    // decorative and the wiring must not be claimed as closed.
+
+    #[test]
+    fn test_consequence_bad_outcomes_drop_accuracy_and_tighten_exploration() {
+        let mut engine = make_engine();
+        let initial_gain = engine.moral_exploration_gain();
+        let initial_acc = engine.consequence_tracker_accuracy();
+        assert!((initial_acc - 0.5).abs() < 1e-9, "tracker prior is 0.5");
+
+        // Safe verdicts at high baseline Ψ/valence, outcomes collapse.
+        for i in 0..30u64 {
+            engine.record_consequence_prediction(
+                format!("cycle-{i}"),
+                EthicalVerdict::Safe,
+                0.8,
+                i,
+                0.8, // baseline psi
+                0.5, // baseline valence
+            );
+        }
+        for i in 0..30u64 {
+            let pe = engine.observe_consequence_outcome(
+                &format!("cycle-{i}"),
+                0.3,  // observed psi: collapsed (delta -0.5 < -0.05)
+                -0.5, // observed valence: collapsed (delta -1.0 < -0.2)
+                i + 20,
+            );
+            assert_eq!(pe, Some(1.0), "Safe verdict + bad outcome must be an error");
+            let acc = engine.consequence_tracker_accuracy();
+            engine.apply_consequence_accuracy(acc);
+        }
+
+        let final_acc = engine.consequence_tracker_accuracy();
+        assert!(
+            final_acc < 0.25,
+            "30 consecutive wrong Safe verdicts must drag accuracy well below the 0.5 prior (got {final_acc})"
+        );
+        assert!(
+            engine.moral_exploration_gain() < initial_gain,
+            "Low consequence accuracy must tighten moral exploration gain (start {initial_gain}, now {})",
+            engine.moral_exploration_gain()
+        );
+    }
+
+    #[test]
+    fn test_consequence_good_outcomes_raise_accuracy_without_tightening() {
+        let mut engine = make_engine();
+        let initial_gain = engine.moral_exploration_gain();
+
+        for i in 0..30u64 {
+            engine.record_consequence_prediction(
+                format!("cycle-{i}"),
+                EthicalVerdict::Safe,
+                0.8,
+                i,
+                0.5,
+                0.0,
+            );
+        }
+        for i in 0..30u64 {
+            let pe = engine.observe_consequence_outcome(
+                &format!("cycle-{i}"),
+                0.55, // psi improved
+                0.1,  // valence improved
+                i + 20,
+            );
+            assert_eq!(pe, Some(0.0), "Safe verdict + good outcome must be correct");
+            let acc = engine.consequence_tracker_accuracy();
+            engine.apply_consequence_accuracy(acc);
+        }
+
+        assert!(
+            engine.consequence_tracker_accuracy() > 0.75,
+            "30 correct verdicts must raise accuracy above the prior"
+        );
+        assert!(
+            engine.moral_exploration_gain() >= initial_gain,
+            "High consequence accuracy must not tighten exploration"
         );
     }
 

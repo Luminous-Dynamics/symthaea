@@ -1,0 +1,46 @@
+{
+  "provenance": {
+    "dataset": "/opt/datasets/maestro/maestro-v3.0.0",
+    "held_out_metrics": {
+      "accent_direction_accuracy": 0.7296959974554091,
+      "accent_direction_n": 289241,
+      "articulation_mae_mean_baseline": 0.5873807029069673,
+      "articulation_mae_model": 0.4235027915476709,
+      "velocity_dev_mae_model": 0.06758311719282317,
+      "velocity_dev_mae_zero_baseline": 0.07590704839070053
+    },
+    "split": "file-level FNV hash bucket 0/10 = test; no augmentation",
+    "targets": "velocity deviation from ±8-note local mean; articulation = duration/IOI (grid-free — see expressive.rs docs for why onset micro-timing is out of scope)",
+    "test_files": 140,
+    "test_pairs": 522222,
+    "train_files": 1136,
+    "train_pairs": 4353711,
+    "trained": "ridge least squares (closed form), lambda = 1e-3 * n"
+  },
+  "w_articulation": [
+    -0.04389037936925888,
+    -0.10459719598293304,
+    0.04122830927371979,
+    0.02046746201813221,
+    -0.3929625451564789,
+    -0.5499890446662903,
+    -0.3052956461906433,
+    -0.040345173329114914,
+    0.06169576942920685,
+    0.1552739143371582,
+    0.8093404173851013
+  ],
+  "w_velocity": [
+    0.02222895808517933,
+    -0.018332526087760925,
+    0.008796514011919498,
+    -0.0019961048383265734,
+    -0.033189427107572556,
+    0.030531903728842735,
+    0.10776343196630478,
+    0.00008997374243335798,
+    0.006800409406423569,
+    0.004803695250302553,
+    -0.04405868425965309
+  ]
+}

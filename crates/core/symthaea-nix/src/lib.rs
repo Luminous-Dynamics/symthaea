@@ -69,7 +69,6 @@ pub mod plugin;
 pub mod support;
 
 /// Daemon ↔ TUI inter-process communication
-#[cfg(feature = "native")]
 pub mod ipc;
 
 /// Layer 7: Command-line interface

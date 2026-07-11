@@ -202,3 +202,69 @@ fn memory_pipeline_safe_on_first_cycle() {
         assert!(v.is_finite());
     }
 }
+
+#[test]
+fn episodic_storage_queue_full_is_non_fatal_to_cycle() {
+    use crate::databases::storage_runtime::StorageRuntimeHandle;
+    use crate::databases::{MemoryRecord, MemoryType};
+    use std::sync::atomic::Ordering;
+    use symthaea_core::hdc::binary_hv::BinaryHV;
+    use tokio::sync::mpsc;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.episodic_replay_training = false;
+    config.episodic_replay_config.psi_threshold = 0.0;
+
+    let mut svc = CognitiveLoopService::new(config).unwrap();
+    let warmup = svc.cycle("storage backpressure warmup");
+    assert!(warmup.prediction_error.is_finite());
+    assert!(
+        svc.memory
+            .episodic_persistence
+            .replay
+            .as_ref()
+            .map(|replay| !replay.get_top_episodes(1).is_empty())
+            .unwrap_or(false),
+        "test should create at least one episode before forcing persistence"
+    );
+
+    let (tx, _rx) = mpsc::channel(1);
+    let runtime = StorageRuntimeHandle::from_sender_for_test(tx);
+
+    runtime
+        .try_store_memory(MemoryRecord {
+            id: "queue-filler".to_string(),
+            memory_type: MemoryType::Episodic,
+            encoding: BinaryHV::random(42),
+            content: "occupy bounded storage queue".to_string(),
+            timestamp_ms: 0,
+            valence: 0.0,
+            arousal: 0.0,
+            psi: 0.0,
+            topics: Vec::new(),
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        })
+        .unwrap();
+
+    svc.memory
+        .episodic_persistence
+        .attach_storage_runtime(runtime);
+
+    svc.stats.total_cycles = 198;
+    let result = svc.cycle("storage backpressure forced flush");
+
+    assert!(result.prediction_error.is_finite());
+    assert!(
+        result.output.iter().all(|v| v.is_finite()),
+        "cycle output should stay finite when storage queue is full"
+    );
+    assert!(
+        !svc.memory
+            .episodic_persistence
+            .flush_in_progress
+            .load(Ordering::Relaxed),
+        "failed storage enqueue must clear the flush guard"
+    );
+}

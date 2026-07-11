@@ -31,6 +31,8 @@ macro_rules! cognitive_accessors {
 
 mod behavior;
 mod consciousness;
+#[cfg(feature = "social-fabric")]
+mod memetics;
 mod memory;
 mod neuromodulation;
 mod system;

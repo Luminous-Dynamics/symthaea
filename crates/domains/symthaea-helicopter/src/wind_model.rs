@@ -3,15 +3,28 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Wind and atmospheric model for SAR helicopter simulation.
 //!
-//! Models three wind phenomena critical for SAR operations:
-//! - **Steady wind**: constant velocity vector (e.g., prevailing wind)
-//! - **Gusts**: stochastic bursts with Dryden turbulence spectrum
-//! - **Ground effect**: reduced power requirement near terrain
+//! ## Status: WIRED INTO THE SIMULATOR (Tier 2.5, 2026-07-07)
 //!
-//! Science:
-//! - Dryden wind turbulence model (MIL-F-8785C, 1980)
-//! - Ground effect: thrust augmentation ratio ≈ 1 / (1 - (R/4z)²)
-//!   where R = rotor radius, z = altitude (Cheeseman & Bennett, 1955)
+//! `SimpleHelicopterSimulator` owns a `WindModel`: each physics step it
+//! evolves the gust state via [`WindModel::wind_velocity_step`], computes
+//! aerodynamic drag on *relative* airspeed (vehicle velocity minus wind),
+//! and multiplies rotor thrust by [`WindModel::ground_effect_ratio`]. The
+//! default config is calm (zero steady wind, zero gusts), which reproduces
+//! the pre-wiring still-air behavior exactly; enable wind explicitly with
+//! `SimpleHelicopterSimulator::set_wind(config, seed)` (seeded → tests stay
+//! deterministic).
+//!
+//! Models three wind phenomena relevant to SAR operations:
+//! - **Steady wind**: constant velocity vector (e.g., prevailing wind)
+//! - **Gusts**: a scalar first-order Markov (Ornstein-Uhlenbeck) low-pass of
+//!   Gaussian noise. This is *Dryden-inspired*, NOT the MIL-F-8785C Dryden
+//!   model — no spectral transfer functions, no Lu/Lv/Lw length scales, no
+//!   altitude scheduling. An earlier version of this header cited "Dryden
+//!   turbulence spectrum (MIL-F-8785C)"; the implementation never matched
+//!   that citation.
+//! - **Ground effect**: thrust augmentation ratio ≈ 1 / (1 - (R/4z)²)
+//!   where R = rotor radius, z = altitude (Cheeseman & Bennett, 1955) —
+//!   this formula is real, but also currently unused (see status above).
 
 use serde::{Deserialize, Serialize};
 
@@ -108,12 +121,14 @@ impl WindModel {
         }
     }
 
-    /// Step the wind model forward by dt seconds.
+    /// Evolve the gust state by dt seconds and return the total wind
+    /// velocity (steady + gust) in m/s, world frame.
     ///
-    /// Returns the total wind force vector [Fx, Fy, Fz] in Newtons,
-    /// given the current airspeed and a drag area (Cd × A).
-    pub fn step(&mut self, dt: f64, airspeed: [f64; 3], drag_area: f64) -> WindForce {
-        // 1. Update gust state (first-order Markov, Dryden-inspired)
+    /// This is the primary simulator entry point: the simulator computes
+    /// drag on relative airspeed itself (per-axis, matching its historical
+    /// still-air drag model), so it only needs the wind velocity.
+    pub fn wind_velocity_step(&mut self, dt: f64) -> [f64; 3] {
+        // Update gust state (first-order Markov, Dryden-inspired)
         let alpha = (-self.config.gust_bandwidth * dt).exp();
         let noise_scale = self.config.gust_intensity * (1.0 - alpha * alpha).sqrt();
 
@@ -122,12 +137,20 @@ impl WindModel {
             self.gust_state[i] = alpha * self.gust_state[i] + noise;
         }
 
-        // 2. Total wind velocity = steady + gust
-        let wind_vel = [
+        [
             self.config.steady_wind[0] + self.gust_state[0],
             self.config.steady_wind[1] + self.gust_state[1],
             self.config.steady_wind[2] + self.gust_state[2],
-        ];
+        ]
+    }
+
+    /// Step the wind model forward by dt seconds.
+    ///
+    /// Returns the total wind force vector [Fx, Fy, Fz] in Newtons,
+    /// given the current airspeed and a drag area (Cd × A).
+    pub fn step(&mut self, dt: f64, airspeed: [f64; 3], drag_area: f64) -> WindForce {
+        // 1-2. Evolve gusts + total wind velocity
+        let wind_vel = self.wind_velocity_step(dt);
 
         // 3. Relative airspeed (vehicle speed - wind speed)
         let relative = [
@@ -163,6 +186,10 @@ impl WindModel {
     /// and can reach ~1.3 at one rotor radius above ground.
     ///
     /// Science: Cheeseman & Bennett (1955) — T_ge/T_oge = 1 / (1 - (R/4z)²)
+    ///
+    /// The formula is only valid for z/R ≳ 0.5; below that it blows up, so
+    /// the ratio is capped at 1.3 (≈ the maximum practically observed IGE
+    /// thrust augmentation).
     pub fn ground_effect_ratio(&self, altitude: f64) -> f64 {
         if !self.config.enable_ground_effect || altitude <= 0.0 {
             return 1.0;
@@ -175,7 +202,7 @@ impl WindModel {
             // Very close to ground — cap at reasonable maximum
             1.3
         } else {
-            1.0 / (1.0 - ratio_sq)
+            (1.0 / (1.0 - ratio_sq)).min(1.3)
         }
     }
 

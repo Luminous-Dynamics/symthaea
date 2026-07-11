@@ -50,6 +50,7 @@ pub mod mission;
 pub mod navigation_bridge;
 pub mod navigation_estimator;
 pub mod perturbations;
+pub mod reflex;
 pub mod simulator;
 pub mod store_forward;
 pub mod training;

@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-formal-language"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Formal-language layer for Symthaea: the Chomsky hierarchy's computable core — deterministic finite automata, a Thompson-construction regex→NFA engine (regular languages), and a CYK recognizer for context-free grammars. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

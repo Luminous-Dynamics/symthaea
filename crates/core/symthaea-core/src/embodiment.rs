@@ -260,6 +260,11 @@ pub enum EmbodimentPlatform {
     Phone,
     /// Desktop screen — mouse/keyboard control via xdotool/ydotool.
     Desktop,
+    /// Mk0 plastic shredder/extruder recycler — distinct from the
+    /// `symthaea-scavenger` platform (`Scavenger`), which this used to
+    /// collide with before the 2026-07-07 unaudited-platforms review
+    /// flagged the identity clash as a latent footgun.
+    Detritivore,
 }
 
 // ── Agent Identity ────────────────────────────────────────────────────────

@@ -2,16 +2,34 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Active Inference agent for the manipulator arm.
 
-use crate::types::ManipulatorState;
+use crate::types::{ManipulatorState, NUM_STATE_CHANNELS};
+use symthaea_fep::Observation;
 
 /// Result of a single FEP agent tick.
 pub struct ManipulatorFepResult {
     pub tau_factor: f32,
     pub learning_rate_factor: f32,
+    /// Distance from the current posture to `target_morphology` (plus a
+    /// force term) -- NOT the agent's free energy. Kept under its original
+    /// name for backward compatibility with existing tau/lr gating and
+    /// tests, which deliberately depend on its exact hand-derived value
+    /// (see the `test_fep_at_home` doc comment below). Renaming this would
+    /// be a larger, riskier change than SYMTHAEA_CLASSIC_PLATFORMS_FEP_HONESTY_2026-07-09.md's
+    /// scope -- see `perceived_free_energy` for the genuine FEP output.
     pub free_energy: f64,
+    /// The wrapped agent's real, perceive()-computed free energy -- added by
+    /// the 2026-07-09 fix. `agent` was previously constructed and never
+    /// perceived at all (pure dead weight); this is now genuine.
+    pub perceived_free_energy: f64,
 }
 
 /// Result of a multi-scale agential active inference evaluation.
+///
+/// NOTE: `localized_free_energy` has the same "not real FEP output" caveat
+/// as `ManipulatorFepResult::free_energy` above, but this method isn't
+/// called from `ManipulatorTrainer` (only `tick()` is) and has its own
+/// tested Levin-morphogenetic design (`test_levin_morphogenetic_lifecycle`)
+/// -- left out of scope for the 2026-07-09 FEP-honesty pass.
 pub struct ManipulatorMultiScaleFepResult {
     pub tau_factor: f32,
     pub learning_rate_factor: f32,
@@ -23,6 +41,7 @@ pub struct ManipulatorMultiScaleFepResult {
 pub struct ActiveInferenceManipulatorAgent {
     agent: symthaea_fep::ActiveInferenceAgent,
     pub target_morphology: [f64; 7],
+    tick_count: u64,
 }
 
 impl ActiveInferenceManipulatorAgent {
@@ -157,7 +176,7 @@ impl ActiveInferenceManipulatorAgent {
     pub fn new() -> Self {
         let config = symthaea_fep::ActiveInferenceAgentConfig {
             state_dim: 7,
-            obs_dim: 7,
+            obs_dim: NUM_STATE_CHANNELS,
             num_actions: 8,
             belief_learning_rate: 0.08,
             planning_horizon: 1,
@@ -167,6 +186,7 @@ impl ActiveInferenceManipulatorAgent {
         Self {
             agent: symthaea_fep::ActiveInferenceAgent::new(config),
             target_morphology: [0.0; 7],
+            tick_count: 0,
         }
     }
 
@@ -213,6 +233,16 @@ impl ActiveInferenceManipulatorAgent {
     }
 
     pub fn tick(&mut self, state: &ManipulatorState) -> ManipulatorFepResult {
+        self.tick_count += 1;
+        let values: Vec<f64> = state.to_channels().iter().map(|v| *v as f64).collect();
+        let observation = Observation {
+            values,
+            precision: 1.0,
+            timestamp: self.tick_count,
+            modality: "manipulator".to_string(),
+        };
+        self.agent.perceive(&observation);
+
         let joint_deviation: f64 = state
             .joint_angles
             .iter()
@@ -245,6 +275,7 @@ impl ActiveInferenceManipulatorAgent {
             tau_factor: tau,
             learning_rate_factor: lr,
             free_energy: fe,
+            perceived_free_energy: self.agent.current_free_energy(),
         }
     }
 
@@ -328,13 +359,23 @@ mod tests {
     use super::*;
     use symthaea_core::hdc::unified_hv::ContinuousHV;
 
+    // NOTE: `ManipulatorState::home()` is the Panda "ready" pose
+    // ([0,0,0,-π/2,0,π/2,0]), while the agent's default `target_morphology`
+    // is [0.0; 7] (arm fully extended). They are deliberately different
+    // postures, so at home the joint deviation is (π/2)·√2 ≈ 2.2214 and
+    // `tick()` reports a nonzero baseline free energy of ≈4.443 with tau=0.9
+    // (deviation > 1.5). These tests assert that baseline, not zero.
+    // (Open design question flagged in SYMTHAEA_IMPROVEMENT_PLAN_2026-07-06.md:
+    // whether the FEP attractor default *should* be the home pose.)
     #[test]
     fn test_fep_at_home() {
         let mut agent = ActiveInferenceManipulatorAgent::new();
         let result = agent.tick(&ManipulatorState::home());
         assert!(result.free_energy.is_finite());
-        assert!(result.free_energy < 2.0);
-        assert_eq!(result.tau_factor, 1.0);
+        // Home-pose baseline: (π/2)·√2 · 2.0 ≈ 4.443, force term 0.
+        assert!((result.free_energy - 4.443).abs() < 0.01);
+        // Deviation 2.2214 > 1.5 → tau 0.9 (no force, so not the 0.8 branch).
+        assert_eq!(result.tau_factor, 0.9);
     }
 
     #[test]
@@ -343,8 +384,10 @@ mod tests {
         let mut state = ManipulatorState::home();
         state.end_effector_force = [10.0, 0.0, 0.0];
         let result = agent.tick(&state);
+        // Home baseline 4.443 + force term 10·0.5 = 5.0 → ≈9.443.
         assert!(result.free_energy > 4.0);
-        assert_eq!(result.tau_factor, 1.0);
+        // force_magnitude 10.0 > 5.0 → tau 0.8 (the high-force branch).
+        assert_eq!(result.tau_factor, 0.8);
     }
 
     #[test]
@@ -365,7 +408,35 @@ mod tests {
         let _ = agent.tick(&state);
         agent.reset();
         let result = agent.tick(&ManipulatorState::home());
-        assert!(result.free_energy < 2.0);
+        // After reset the 50 N force spike (fe ≈ 4.443 + 25 = 29.4) must not
+        // persist: back at the home baseline of ≈4.443, well below 5.0.
+        assert!(result.free_energy < 5.0);
+    }
+
+    #[test]
+    fn test_perceived_free_energy_is_real_and_finite() {
+        // The 2026-07-09 fix: `agent` used to be constructed and never
+        // perceived at all. `perceived_free_energy` must now be a genuine,
+        // finite output of a real perceive() call.
+        let mut agent = ActiveInferenceManipulatorAgent::new();
+        let result = agent.tick(&ManipulatorState::home());
+        assert!(result.perceived_free_energy.is_finite());
+    }
+
+    #[test]
+    fn test_fep_perceiving_changes_agent_belief() {
+        let mut agent = ActiveInferenceManipulatorAgent::new();
+        let belief_before = agent.agent.belief.mean.clone();
+        let mut strained_state = ManipulatorState::home();
+        strained_state.joint_angles = [3.0; 7];
+        strained_state.end_effector_force = [80.0, 80.0, 80.0];
+        for _ in 0..10 {
+            agent.tick(&strained_state);
+        }
+        assert_ne!(
+            belief_before, agent.agent.belief.mean,
+            "belief must change after repeated perception of an extreme observation"
+        );
     }
 
     #[test]

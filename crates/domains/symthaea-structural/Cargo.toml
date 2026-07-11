@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-structural"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Structural/mechanical engineering layer for Symthaea: section properties, Euler-Bernoulli beam analysis, axial members, and Euler buckling. Closed-form, ground-truth-checked."
+
+# Zero external dependencies, no symthaea-core link: a self-contained
+# engineering-statics layer. Builds fast and in isolation.
+[dependencies]

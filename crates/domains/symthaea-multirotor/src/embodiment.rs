@@ -49,15 +49,31 @@ pub struct FlightEmbodiment {
 }
 
 impl FlightEmbodiment {
-    /// Emergency descent thrust (Newtons). Approximately 30% of hover thrust
-    /// for a 1.5kg quadrotor: 0.3 * 1.5 * 9.81 ≈ 4.4 N.
-    /// Produces a controlled ~3 m/s descent instead of freefall.
-    const EMERGENCY_DESCENT_THRUST: f32 = 4.4;
+    /// Emergency descent thrust as a fraction of hover thrust.
+    /// Produces a controlled descent instead of freefall.
+    const EMERGENCY_DESCENT_FRACTION: f32 = 0.3;
+    /// Touchdown cushion thrust as a fraction of hover thrust —
+    /// more than descent, still below hover so the vehicle settles.
+    const TOUCHDOWN_CUSHION_FRACTION: f32 = 0.55;
+    /// StabilizeHover vertical-rate damping gain (fraction of hover thrust
+    /// removed/added per m/s of climb/sink). 0.5 nulls a 0.5 m/s residual
+    /// climb in roughly a quarter second on the Crazyflie airframe.
+    const HOVER_VERTICAL_DAMPING: f32 = 0.5;
 
     pub fn new(genesis: &GenesisSeed) -> Self {
         let config = FlightConfig::default();
+        Self::with_controller(genesis, FlightController::new(genesis, &config))
+    }
+
+    /// Construct a bridge around an already-trained controller — the
+    /// trainer→bridge transfer path (`FlightTrainer::train_returning_
+    /// controller` / `train_intent_controller`). Without this, every shipped
+    /// bridge ran genesis-random weights, under which thought has no
+    /// task-axis motor authority (measured by examples/cognition_ablation.rs).
+    /// `genesis` still seeds the encoder so perception stays deterministic.
+    pub fn with_controller(genesis: &GenesisSeed, controller: FlightController) -> Self {
         Self {
-            controller: FlightController::new(genesis, &config),
+            controller,
             simulator: SimplePhysicsSimulator::new(),
             encoder: QuadrotorHdcEncoder::new(genesis, 32),
             last_perception: None,
@@ -160,17 +176,23 @@ impl FlightEmbodiment {
             cmd.pitch_moment = 0.0;
             cmd.yaw_moment = 0.0;
 
+            // Derive fallback thrust from the airframe's actual hover thrust
+            // (mass·g). Hardcoded Newton values sized for a different airframe
+            // previously made "descent" a >10g ascent on the 27g Crazyflie.
+            let hover = self.simulator.hover_thrust() as f32;
             cmd.thrust = match self.fallback_stage {
                 FlightFallbackStage::StabilizeHover => {
-                    // Hover thrust ~14.7 N for 1.5kg airframe
-                    14.7
+                    // Actually stabilize: damp any inherited vertical rate
+                    // instead of merely holding altitude-neutral thrust
+                    // (plain thrust=hover preserves a pre-Red climb/sink
+                    // indefinitely, modulo drag).
+                    let v_z = self.simulator.state().linear_velocity[2] as f32;
+                    (hover * (1.0 - Self::HOVER_VERTICAL_DAMPING * v_z)).clamp(0.0, hover * 1.5)
                 }
-                FlightFallbackStage::ControlledDescent => {
-                    Self::EMERGENCY_DESCENT_THRUST // 4.4 N (30% hover)
-                }
+                FlightFallbackStage::ControlledDescent => hover * Self::EMERGENCY_DESCENT_FRACTION,
                 FlightFallbackStage::Touchdown => {
-                    // Cushion landing — slightly more than descent thrust
-                    8.0
+                    // Cushion landing — more than descent thrust, below hover
+                    hover * Self::TOUCHDOWN_CUSHION_FRACTION
                 }
             };
         } else {
@@ -358,6 +380,7 @@ mod tests {
         for _ in 0..20 {
             bridge.step(&hv, 0.01, 0.8);
         }
+        let alt_at_red_onset = bridge.simulator().state().position[2];
 
         // Now force Red safety for 100 steps
         for _ in 0..100 {
@@ -367,14 +390,25 @@ mod tests {
                 r.success,
                 "state must remain finite during emergency descent"
             );
+            // Descent rate bounded at every step (never exceeds ~5 m/s)
+            let v_z = bridge.simulator().state().linear_velocity[2];
+            assert!(v_z >= -5.1, "descent rate {v_z} exceeded MAX_DESCENT_RATE");
+            // And never a sustained climb — an ascent also satisfies a lower
+            // bound alone, which is exactly how the 55x thrust-unit bug
+            // previously slipped through this test. Tolerance 1.0 m/s allows
+            // the residual Green-phase climb that StabilizeHover inherits and
+            // damps out (the 55x bug produced +5 m/s after a single step).
+            assert!(v_z <= 1.0, "Red fallback must not ascend, got v_z = {v_z}");
         }
 
-        // Verify descent rate is bounded (never exceeds ~5 m/s)
+        // The vehicle must have come DOWN (descended or landed), never
+        // ballooned upward during "descent".
         let state = bridge.simulator().state();
         assert!(
-            state.linear_velocity[2] >= -5.1,
-            "descent rate {} exceeded MAX_DESCENT_RATE",
-            state.linear_velocity[2]
+            state.position[2] <= alt_at_red_onset + 0.05,
+            "Red fallback flew away upward: {} -> {}",
+            alt_at_red_onset,
+            state.position[2]
         );
     }
 

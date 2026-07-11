@@ -87,19 +87,44 @@ impl NeuralMelody {
 
     /// Load trained decode parameters from a JSON file.
     ///
-    /// Falls back silently to default weights if file doesn't exist or fails.
-    /// This enables compose() to use trained projections when available.
-    pub fn load_trained_projections(&mut self, path: &std::path::Path) {
-        if let Ok(projections) = crate::training::load_projections(path) {
-            if projections.len() >= 2 {
+    /// Returns `true` if trained projections were loaded, `false` if the
+    /// generator is running with UNTRAINED default weights. Callers must not
+    /// describe the output as "trained" unless this returned true. The miss
+    /// is logged loudly (once per call) rather than swallowed — a previous
+    /// version fell back silently, which let examples and benchmarks claim
+    /// "trained on MAESTRO" while comparing two untrained generators.
+    pub fn load_trained_projections(&mut self, path: &std::path::Path) -> bool {
+        match crate::training::load_projections(path) {
+            Ok(projections) if projections.len() >= 2 => {
                 for i in 0..3.min(projections[0].len()) {
                     self.decode_weights[i] = projections[0][i];
                 }
                 for i in 0..3.min(projections[1].len()) {
                     self.decode_biases[i] = projections[1][i];
                 }
+                true
+            }
+            Ok(_) => {
+                Self::warn_untrained(path, "projections file is malformed (need >= 2 rows)");
+                false
+            }
+            Err(_) => {
+                Self::warn_untrained(path, "no trained projections file");
+                false
             }
         }
+    }
+
+    /// Warn (once per process) that Neural melody is running untrained.
+    fn warn_untrained(path: &std::path::Path, reason: &str) {
+        static WARN_ONCE: std::sync::Once = std::sync::Once::new();
+        WARN_ONCE.call_once(|| {
+            eprintln!(
+                "[symthaea-muse] WARNING: {reason} at {}; Neural melody mode is \
+                 running with UNTRAINED default weights (warning shown once)",
+                path.display()
+            );
+        });
     }
 
     /// Encode cognitive state into a hypervector input for the network.

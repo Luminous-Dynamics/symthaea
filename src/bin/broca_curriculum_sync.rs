@@ -28,7 +28,10 @@ use symthaea::language::llm_backend::LLMBackend;
 use symthaea::language::{LLMOrgan, LLMOrganConfig, LLMQuery, OllamaBackend, QueryType};
 use symthaea_broca::BpeTokenizer;
 use symthaea_broca::encoder::ThoughtChannels;
+use symthaea_broca::generator::BrocaGenerator;
 use symthaea_broca::training::{TrainingDataset, TrainingPair};
+use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::ContinuousHV;
 
 // Local mirror of `symthaea::school::curriculum_loader`'s on-disk JSON shape
 // (`CurriculumStore { meta, curriculum: CurriculumSpec }`, `ObjectiveSpec`).
@@ -149,12 +152,51 @@ struct HoldoutEntry {
     objective_id: String,
     channels: Vec<f32>,
     reference_text: String,
+    /// Same content-conditioning signal stored on this objective's
+    /// `TrainingPair`s (see `TrainingPair::semantic_hv`) — held-out
+    /// generation should be conditioned identically to training, or a
+    /// missing signal here would silently reproduce the collapse it's
+    /// meant to catch. See `broca_topic_coverage.rs`.
+    #[serde(default)]
+    semantic_hv: Option<Vec<f32>>,
 }
 
 fn state_path() -> PathBuf {
     std::env::var("BROCA_BRIDGE_STATE_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("data/broca_curriculum_bridge_state.json"))
+}
+
+/// The checkpoint whose tokenizer + token-embedding table is used to encode
+/// each objective's `semantic_hv` (read-only — never trained or saved here).
+/// Defaults to the production checkpoint so the encoding is consistent with
+/// what `--resume` will fine-tune from this cycle.
+fn synthesis_checkpoint_path() -> PathBuf {
+    std::env::var("BROCA_SYNTHESIS_CHECKPOINT_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            PathBuf::from("crates/domains/symthaea-broca/data/models/broca-checkpoint-latest.bin")
+        })
+}
+
+/// Encode `text` as a bag-of-token-embeddings HV, mirroring
+/// `BrocaBridge::encode_knowledge_context`'s pattern exactly (tokenize with
+/// Broca's own tokenizer, look up each token's embedding in Broca's own
+/// embedding table, bundle into one HV) — reused here rather than inventing
+/// new text-encoding infrastructure. Returns `None` if `text` tokenizes to
+/// nothing (e.g. empty input).
+fn encode_semantic_hv(generator: &BrocaGenerator, text: &str) -> Option<Vec<f32>> {
+    let ids = generator.tokenizer().encode(text);
+    let all_embs = generator.controller().token_embeddings();
+    let embs: Vec<&ContinuousHV> = ids
+        .iter()
+        .filter_map(|&id| all_embs.get(id as usize))
+        .collect();
+    if embs.is_empty() {
+        None
+    } else {
+        Some(ContinuousHV::bundle(&embs).values)
+    }
 }
 
 fn curriculum_path() -> PathBuf {
@@ -295,11 +337,25 @@ async fn synthesize_for_objective(
     tokenizer: &BpeTokenizer,
     corpus_hashes: &HashSet<String>,
     model_name: &str,
+    semantic_generator: &BrocaGenerator,
 ) -> Result<(
     Vec<TrainingPair>,
     Option<HoldoutEntry>,
     ObjectiveManifestEntry,
 )> {
+    // Computed once per objective from its actual identity (name + description
+    // + domain + tags), not from difficulty — this is the content-conditioning
+    // signal `build_channels()` structurally cannot carry (see Part 3 of the
+    // plan file: `build_channels()` collapses to ~2 distinct vectors across a
+    // real curriculum batch because it derives everything from `difficulty`).
+    let semantic_text = format!(
+        "{} {} {} {}",
+        obj.name,
+        obj.description,
+        obj.domain,
+        obj.tags.join(" ")
+    );
+    let semantic_hv = encode_semantic_hv(semantic_generator, &semantic_text);
     let prompt = format!(
         "Objective: {}\nDomain: {}\nDifficulty: {} ({:.2})\nDescription: {}\nTags: {}\n\nWrite {} distinct explanations as instructed.",
         obj.name,
@@ -361,6 +417,7 @@ async fn synthesize_for_objective(
             objective_id: obj.id.clone(),
             channels: channels.channels.to_vec(),
             reference_text: holdout_text,
+            semantic_hv: semantic_hv.clone(),
         })
     } else {
         None
@@ -368,7 +425,11 @@ async fn synthesize_for_objective(
 
     let accepted: Vec<TrainingPair> = accepted_texts
         .into_iter()
-        .map(|text| TrainingPair::new(build_channels(obj), text, tokenizer))
+        .map(|text| {
+            let mut pair = TrainingPair::new(build_channels(obj), text, tokenizer);
+            pair.semantic_hv = semantic_hv.clone();
+            pair
+        })
         .collect();
 
     let manifest_entry = ObjectiveManifestEntry {
@@ -469,15 +530,35 @@ async fn main() -> Result<()> {
     let tokenizer = BpeTokenizer::default_minimal();
     let corpus_hashes = load_existing_corpus_hashes();
 
+    // Loaded once, read-only, purely for its tokenizer + token-embedding
+    // table (see `encode_semantic_hv`) — never trained or saved by this
+    // binary. Using the current production checkpoint keeps each cycle's
+    // semantic encoding consistent with the weights `--resume` fine-tunes.
+    let synth_checkpoint = synthesis_checkpoint_path();
+    let genesis = GenesisSeed::from_phrase("symthaea luminous dynamics");
+    let (semantic_generator, ..) = BrocaGenerator::from_checkpoint(&synth_checkpoint, &genesis)
+        .with_context(|| {
+            format!(
+                "loading checkpoint {} for semantic_hv encoding (override with BROCA_SYNTHESIS_CHECKPOINT_PATH)",
+                synth_checkpoint.display()
+            )
+        })?;
+
     let mut dataset = TrainingDataset::default();
     let mut manifest_entries = Vec::new();
     let mut consumed_ids = Vec::new();
     let mut holdout_entries = Vec::new();
 
     for obj in &new_objectives {
-        let (pairs, holdout, entry) =
-            synthesize_for_objective(&mut llm, obj, &tokenizer, &corpus_hashes, &model_name)
-                .await?;
+        let (pairs, holdout, entry) = synthesize_for_objective(
+            &mut llm,
+            obj,
+            &tokenizer,
+            &corpus_hashes,
+            &model_name,
+            &semantic_generator,
+        )
+        .await?;
 
         println!(
             "[broca-curriculum-sync]   {} -> {} accepted, {} rejected, holdout: {}",

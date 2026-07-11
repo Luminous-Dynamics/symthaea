@@ -23,7 +23,11 @@
           inherit system overlays;
         };
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default;
+        # Rust toolchain - read from symthaea/rust-toolchain.toml (single source
+        # of truth) rather than stable.latest, which silently drifts over time.
+        rustToolchainToml = builtins.fromTOML (builtins.readFile ../../../rust-toolchain.toml);
+        rustChannel = rustToolchainToml.toolchain.channel;
+        rustToolchain = pkgs.rust-bin.stable.${rustChannel}.default;
 
         commonBuildInputs = with pkgs; [
           pkg-config

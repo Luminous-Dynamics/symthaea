@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! First-pass agribot / stewardship simulator.
+use crate::environment::FieldEnvironment;
 use crate::types::{
     AgribotCommand, AgribotState, BATTERY_RATIO, CROP_HEALTH, DISEASE_RISK, DROUGHT_RISK,
     FORECAST_CONFIDENCE, HUMAN_PROXIMITY, MISSION_PROGRESS, POLLINATOR_DISTURBANCE_RISK,
@@ -8,6 +9,7 @@ use crate::types::{
     SOIL_NUTRIENTS, TREATMENT_CONFIDENCE, WATER_TANK_RATIO, WATERLOGGING_RISK, WEED_PRESSURE,
     YIELD_FORECAST,
 };
+use symthaea_core::genesis::GenesisSeed;
 
 pub trait AgribotPhysicsSimulator {
     fn step(&mut self, cmd: &AgribotCommand, dt: f64);
@@ -15,16 +17,44 @@ pub trait AgribotPhysicsSimulator {
     fn reset(&mut self);
 }
 
+/// How fast each sensed channel tracks its ground-truth source (per
+/// second). Higher = faster/less-lagged sensing.
+const LIGHT_SENSOR_GAIN_DEPLOYED: f64 = 2.0;
+const LIGHT_SENSOR_GAIN_STOWED: f64 = 0.3;
+const TERRAIN_SENSOR_GAIN: f64 = 1.0;
+const HUMAN_SENSOR_GAIN: f64 = 1.5;
+
 /// A simple field-tending model with water, seeding, weed pressure, and crop health.
 pub struct SimpleAgribotSimulator {
     state: AgribotState,
+    environment: FieldEnvironment,
+    genesis: GenesisSeed,
 }
 
 impl SimpleAgribotSimulator {
-    pub fn new() -> Self {
+    pub fn new(genesis: &GenesisSeed) -> Self {
         Self {
             state: AgribotState::home(),
+            environment: FieldEnvironment::new(genesis),
+            genesis: genesis.clone(),
         }
+    }
+
+    /// Mutable state access, for tests that need to set up a degraded
+    /// starting condition (e.g. low soil moisture) before stepping.
+    pub fn state_mut(&mut self) -> &mut AgribotState {
+        &mut self.state
+    }
+
+    /// Mutable access to the ground-truth field world, for tests that need
+    /// to script a real human-proximity or terrain scenario independent of
+    /// the robot's own actuator history.
+    pub fn environment_mut(&mut self) -> &mut FieldEnvironment {
+        &mut self.environment
+    }
+
+    pub fn environment(&self) -> &FieldEnvironment {
+        &self.environment
     }
 }
 
@@ -36,6 +66,10 @@ impl AgribotPhysicsSimulator for SimpleAgribotSimulator {
         let watering_request = cmd.water_pump().max(0.0) as f64;
         let seeding_request = cmd.seed_dispenser().max(0.0) as f64;
         let mast = cmd.torques[6].max(0.0) as f64;
+
+        // Ground-truth world evolves independently of the robot's own
+        // actuation.
+        self.environment.step(dt);
 
         let human_gate = if self.state.channels[HUMAN_PROXIMITY] >= 0.55 {
             0.2
@@ -81,7 +115,18 @@ impl AgribotPhysicsSimulator for SimpleAgribotSimulator {
         self.state.channels[2] = (self.state.channels[2] + self.state.channels[13] * dt * 8.0
             - watering * dt * 5.0)
             .clamp(-10.0, 60.0);
-        self.state.channels[3] = (0.55 + mast * 0.35).clamp(0.0, 1.0);
+        // light_level: sensed via a lag chasing the ground-truth ambient
+        // light, not manufactured from the mast's own torque. A deployed
+        // mast (canopy_sensor_mast) senses faster/more accurately -- it
+        // provides a better reading, it does not change the actual light.
+        let light_gain = if mast >= 0.3 {
+            LIGHT_SENSOR_GAIN_DEPLOYED
+        } else {
+            LIGHT_SENSOR_GAIN_STOWED
+        };
+        self.state.channels[3] = (self.state.channels[3]
+            + (self.environment.ambient_light - self.state.channels[3]) * light_gain * dt)
+            .clamp(0.0, 1.0);
         self.state.channels[CROP_HEALTH] = (self.state.channels[CROP_HEALTH]
             + self.state.channels[SOIL_MOISTURE] * dt * 0.04
             + self.state.channels[SOIL_NUTRIENTS] * dt * 0.03
@@ -119,8 +164,26 @@ impl AgribotPhysicsSimulator for SimpleAgribotSimulator {
             .clamp(0.0, 1.0);
         self.state.channels[16] =
             (self.state.channels[16] * 0.97 + self.state.channels[3] * 0.03).clamp(0.0, 1.0);
-        self.state.channels[17] = (0.2 + drive_request * 0.15).clamp(0.0, 1.0);
-        self.state.channels[18] = (drive_request * 0.2).clamp(0.0, 1.0);
+        // terrain_roughness: sensed via a lag chasing the ground-truth
+        // terrain, not manufactured from the robot's own drive effort.
+        self.state.channels[17] = (self.state.channels[17]
+            + (self.environment.terrain_roughness - self.state.channels[17])
+                * TERRAIN_SENSOR_GAIN
+                * dt)
+            .clamp(0.0, 1.0);
+        // human_proximity: sensed via a lag chasing a real ground-truth
+        // human encounter, not the robot's own drive request. This is the
+        // safety-critical channel that gates human_gate above -- previously
+        // a stationary robot always read zero proximity regardless of
+        // whether a human was actually standing next to it.
+        let human_truth = if self.environment.human_present {
+            self.environment.human_intensity
+        } else {
+            0.0
+        };
+        self.state.channels[18] = (self.state.channels[18]
+            + (human_truth - self.state.channels[18]) * HUMAN_SENSOR_GAIN * dt)
+            .clamp(0.0, 1.0);
         self.state.channels[19] = (0.15 + self.state.channels[13] * 0.2).clamp(0.0, 1.0);
         self.state.channels[FORECAST_CONFIDENCE] = (self.state.channels[FORECAST_CONFIDENCE] * 0.9
             + self.state.channels[YIELD_FORECAST] * 0.1)
@@ -166,21 +229,21 @@ impl AgribotPhysicsSimulator for SimpleAgribotSimulator {
     }
     fn reset(&mut self) {
         self.state = AgribotState::home();
-    }
-}
-
-impl Default for SimpleAgribotSimulator {
-    fn default() -> Self {
-        Self::new()
+        self.environment = FieldEnvironment::new(&self.genesis);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_sim() -> SimpleAgribotSimulator {
+        SimpleAgribotSimulator::new(&GenesisSeed::from_phrase("test"))
+    }
+
     #[test]
     fn test_stable() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         for _ in 0..1000 {
             sim.step(&AgribotCommand::zero(), 0.005);
         }
@@ -188,7 +251,7 @@ mod tests {
     }
     #[test]
     fn test_torque_moves() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         let mut cmd = AgribotCommand::zero();
         cmd.torques[0] = 1.0;
         let coverage_before = sim.state().channels[10];
@@ -200,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_watering_recovers_soil_moisture_under_drought() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[0] = 0.1;
         let mut cmd = AgribotCommand::zero();
         cmd.torques[4] = 1.0;
@@ -213,7 +276,7 @@ mod tests {
 
     #[test]
     fn test_disease_pressure_pushes_mode_into_disease_control() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[DISEASE_RISK] = 0.75;
         sim.state.channels[15] = 0.75;
         assert_eq!(
@@ -224,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_human_proximity_suppresses_tool_aggression() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[HUMAN_PROXIMITY] = 0.8;
         sim.state.channels[5] = 0.7;
         assert_eq!(
@@ -239,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_overwatering_drives_waterlogging_and_runoff_risk() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[SOIL_MOISTURE] = 0.92;
         let mut cmd = AgribotCommand::zero();
         cmd.torques[4] = 1.0;
@@ -252,7 +315,7 @@ mod tests {
 
     #[test]
     fn test_compaction_pushes_soil_protection_mode() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[SOIL_MOISTURE] = 0.9;
         sim.state.channels[13] = 0.05;
         let mut cmd = AgribotCommand::zero();
@@ -271,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_low_reserve_recommends_refill_return() {
-        let mut sim = SimpleAgribotSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[WATER_TANK_RATIO] = 0.08;
         sim.state.channels[BATTERY_RATIO] = 0.12;
         let mut cmd = AgribotCommand::zero();
@@ -282,6 +345,67 @@ mod tests {
         assert_eq!(
             sim.state().inferred_mode(),
             crate::types::AgribotOperatingMode::RefillReturn
+        );
+    }
+
+    #[test]
+    fn test_human_proximity_is_falsifiable_without_encounter() {
+        // Regression: human_proximity used to be `drive_request * 0.2` --
+        // pure heavy driving with no human ever nearby now must NOT read a
+        // high proximity, unlike the old actuator-only formula. Ground
+        // truth is re-pinned absent every step so this doesn't depend on
+        // the environment's own stochastic arrival roll never firing.
+        let mut sim = test_sim();
+        let mut cmd = AgribotCommand::zero();
+        cmd.torques[0] = 1.0;
+        cmd.torques[1] = 1.0;
+        for _ in 0..1000 {
+            sim.environment_mut().human_present = false;
+            sim.environment_mut().human_intensity = 0.0;
+            sim.step(&cmd, 0.01);
+        }
+        assert!(
+            sim.state().channels[HUMAN_PROXIMITY] < 0.2,
+            "human_proximity must stay low with no ground-truth encounter even under heavy sustained driving, got {}",
+            sim.state().channels[HUMAN_PROXIMITY]
+        );
+    }
+
+    #[test]
+    fn test_human_proximity_tracks_ground_truth_encounter() {
+        // The flip side: a scripted real human nearby, with the robot
+        // stationary, must still be sensed -- unlike the old formula which
+        // required drive_request > 0 to read anything at all.
+        let mut sim = test_sim();
+        for _ in 0..300 {
+            sim.environment_mut().human_present = true;
+            sim.environment_mut().human_intensity = 0.9;
+            sim.step(&AgribotCommand::zero(), 0.05);
+        }
+        assert!(
+            sim.state().channels[HUMAN_PROXIMITY] > 0.6,
+            "human_proximity must rise once the ground truth has a human present, even with the robot stationary, got {}",
+            sim.state().channels[HUMAN_PROXIMITY]
+        );
+    }
+
+    #[test]
+    fn test_terrain_roughness_is_not_purely_drive_derived() {
+        // Regression: terrain_roughness used to be `0.2 + drive_request *
+        // 0.15` -- heavy sustained driving must not inflate it beyond the
+        // ground-truth terrain, which is pinned flat here.
+        let mut sim = test_sim();
+        let mut cmd = AgribotCommand::zero();
+        cmd.torques[0] = 1.0;
+        cmd.torques[1] = 1.0;
+        for _ in 0..500 {
+            sim.environment_mut().terrain_roughness = 0.1;
+            sim.step(&cmd, 0.01);
+        }
+        assert!(
+            sim.state().channels[17] < 0.3,
+            "terrain_roughness must track ground truth, not the robot's own drive effort, got {}",
+            sim.state().channels[17]
         );
     }
 }

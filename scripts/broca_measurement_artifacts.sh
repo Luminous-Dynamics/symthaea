@@ -64,6 +64,12 @@ JSON
   echo "broca_baseline_artifact_dir=${BROCA_BASELINE_ARTIFACT_DIR:-}"
   echo "broca_require_all_comparison_metrics=${BROCA_REQUIRE_ALL_COMPARISON_METRICS:-}"
   echo "broca_fail_on_regression=${BROCA_FAIL_ON_REGRESSION:-}"
+  echo "broca_baseline_topic_coverage=${BROCA_BASELINE_TOPIC_COVERAGE:-}"
+  echo "broca_candidate_topic_coverage=${BROCA_CANDIDATE_TOPIC_COVERAGE:-}"
+  echo "broca_min_keyword_overlap_improvement=${BROCA_MIN_KEYWORD_OVERLAP_IMPROVEMENT:-0.05}"
+  echo "broca_min_coherence_improvement=${BROCA_MIN_COHERENCE_IMPROVEMENT:-0.02}"
+  echo "broca_require_improvement_evaluated=${BROCA_REQUIRE_IMPROVEMENT_EVALUATED:-}"
+  echo "broca_require_all_improvement_metrics=${BROCA_REQUIRE_ALL_IMPROVEMENT_METRICS:-}"
 } > "$OUT_DIR/measurement-manifest.env"
 
 decoder_cmd=(
@@ -146,22 +152,49 @@ if [[ "${BROCA_EXTERNAL_BASELINE:-0}" == "1" ]]; then
 fi
 
 if [[ -n "${BROCA_BASELINE_ARTIFACT_DIR:-}" ]]; then
-  cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-checkpoint-compare -- \
-    --baseline-dir "$BROCA_BASELINE_ARTIFACT_DIR" \
-    --candidate-dir "$OUT_DIR" \
-    --json-out "$OUT_DIR/checkpoint-compare.json" \
-    --max-drift-regression "${BROCA_MAX_DRIFT_REGRESSION:-0.05}" \
-    --max-hallucination-regression "${BROCA_MAX_HALLUCINATION_REGRESSION:-0.05}" \
-    --max-compile-rate-regression "${BROCA_MAX_COMPILE_RATE_REGRESSION:-0.0}" \
-    --max-test-rate-regression "${BROCA_MAX_TEST_RATE_REGRESSION:-0.0}" \
-    --max-structured-confidence-regression "${BROCA_MAX_STRUCTURED_CONFIDENCE_REGRESSION:-0.05}" \
-    --max-structured-validity-regression "${BROCA_MAX_STRUCTURED_VALIDITY_REGRESSION:-0.05}" \
-    --max-structured-required-role-rate-regression "${BROCA_MAX_STRUCTURED_REQUIRED_ROLE_RATE_REGRESSION:-0.0}" \
-    --max-structured-translation-validity-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_VALIDITY_REGRESSION:-0.02}" \
-    --max-structured-translation-grounding-rate-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_GROUNDING_RATE_REGRESSION:-0.0}" \
-    --max-structured-translation-drift-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_DRIFT_REGRESSION:-0.02}" \
-    ${BROCA_REQUIRE_ALL_COMPARISON_METRICS:+--require-all-metrics} \
-    ${BROCA_FAIL_ON_REGRESSION:+--fail-on-regression}
+  compare_cmd=(
+    cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-checkpoint-compare --
+    --baseline-dir "$BROCA_BASELINE_ARTIFACT_DIR"
+    --candidate-dir "$OUT_DIR"
+    --json-out "$OUT_DIR/checkpoint-compare.json"
+    --max-drift-regression "${BROCA_MAX_DRIFT_REGRESSION:-0.05}"
+    --max-hallucination-regression "${BROCA_MAX_HALLUCINATION_REGRESSION:-0.05}"
+    --max-compile-rate-regression "${BROCA_MAX_COMPILE_RATE_REGRESSION:-0.0}"
+    --max-test-rate-regression "${BROCA_MAX_TEST_RATE_REGRESSION:-0.0}"
+    --max-structured-confidence-regression "${BROCA_MAX_STRUCTURED_CONFIDENCE_REGRESSION:-0.05}"
+    --max-structured-validity-regression "${BROCA_MAX_STRUCTURED_VALIDITY_REGRESSION:-0.05}"
+    --max-structured-required-role-rate-regression "${BROCA_MAX_STRUCTURED_REQUIRED_ROLE_RATE_REGRESSION:-0.0}"
+    --max-structured-translation-validity-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_VALIDITY_REGRESSION:-0.02}"
+    --max-structured-translation-grounding-rate-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_GROUNDING_RATE_REGRESSION:-0.0}"
+    --max-structured-translation-drift-regression "${BROCA_MAX_STRUCTURED_TRANSLATION_DRIFT_REGRESSION:-0.02}"
+    --min-keyword-overlap-improvement "${BROCA_MIN_KEYWORD_OVERLAP_IMPROVEMENT:-0.05}"
+    --min-coherence-improvement "${BROCA_MIN_COHERENCE_IMPROVEMENT:-0.02}"
+  )
+  # Presence-of-improvement gate (Tier 1.1): only wired when the caller
+  # supplies both topic-coverage reports (produced by broca-topic-coverage
+  # against the SAME held-out objective batch — one run against
+  # BROCA_BASELINE_ARTIFACT_DIR's checkpoint, one against $BROCA_CHECKPOINT_PATH).
+  # Optional by design: most measurement runs (baseline capture, ad hoc
+  # regression checks) have no held-out-objective evidence to compare.
+  if [[ -n "${BROCA_BASELINE_TOPIC_COVERAGE:-}" ]]; then
+    compare_cmd+=(--baseline-topic-coverage "$BROCA_BASELINE_TOPIC_COVERAGE")
+  fi
+  if [[ -n "${BROCA_CANDIDATE_TOPIC_COVERAGE:-}" ]]; then
+    compare_cmd+=(--candidate-topic-coverage "$BROCA_CANDIDATE_TOPIC_COVERAGE")
+  fi
+  if [[ -n "${BROCA_REQUIRE_ALL_IMPROVEMENT_METRICS:-}" ]]; then
+    compare_cmd+=(--require-all-improvement-metrics)
+  fi
+  if [[ -n "${BROCA_REQUIRE_IMPROVEMENT_EVALUATED:-}" ]]; then
+    compare_cmd+=(--require-improvement-evaluated)
+  fi
+  if [[ -n "${BROCA_REQUIRE_ALL_COMPARISON_METRICS:-}" ]]; then
+    compare_cmd+=(--require-all-metrics)
+  fi
+  if [[ -n "${BROCA_FAIL_ON_REGRESSION:-}" ]]; then
+    compare_cmd+=(--fail-on-regression)
+  fi
+  "${compare_cmd[@]}"
 fi
 
 scripts/broca_measurement_summary.py "$OUT_DIR"

@@ -3,8 +3,15 @@
 //! HDC XOR Binding Proof Benchmark
 //!
 //! Proves a 16,384-bit Hyperdimensional XOR binding operation across:
-//! 1. **Binius64** — Binary tower field STARK (XOR = native field addition, FREE)
-//! 2. **Winterfell** — Prime field STARK (XOR requires constraint decomposition)
+//! 1. **Binius64** — Binary tower field STARK (XOR = native field addition, FREE).
+//!    REAL prover + verifier: every Binius number here is a measured cryptographic proof.
+//! 2. **Winterfell** — Prime field STARK (XOR requires constraint decomposition).
+//!    **ANALYTIC ESTIMATE ONLY**: this crate implements NO Winterfell AIR and never
+//!    invokes a Winterfell prover or verifier. The Winterfell numbers are computed from
+//!    a constraint-count model (~50us/constraint prove, ~2us/constraint verify) — they
+//!    are NOT measured proving results. A real, measured Winterfell 16,384-bit XOR
+//!    circuit lives separately in
+//!    `crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs` (monorepo root).
 //!
 //! This benchmark generates the core data for the paper:
 //! "Binary-Field STARKs for Hyperdimensional Computing"
@@ -19,9 +26,9 @@
 //!
 //! Per backend:
 //! - Constraint count (AND gates for Binius, trace rows for Winterfell)
-//! - Prover time (ms)
-//! - Verifier time (ms)
-//! - Proof size (bytes)
+//! - Prover time (ms) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
+//! - Verifier time (ms) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
+//! - Proof size (bytes) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 
 mod bundling;
 mod cfc_temporal;
@@ -166,13 +173,20 @@ fn bench_binius_hdc_xor() -> BenchResult {
 
 // ═══════════════════════════════════════════════════════════════════
 // BENCHMARK 2: WINTERFELL — HDC XOR requires bit decomposition
+//
+// ANALYTIC ESTIMATE ONLY — no real prover. This function implements no
+// AIR and never invokes Winterfell. All numbers it reports are derived
+// from a constraint-count model, not from running a prover. Do NOT cite
+// them as measured proving results. A real, measured Winterfell
+// 16,384-bit XOR circuit exists separately in
+// crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs (monorepo root).
 // ═══════════════════════════════════════════════════════════════════
 
 fn bench_winterfell_hdc_xor() -> BenchResult {
-    use winter_math::FieldElement;
-    use winter_math::fields::f64::BaseElement;
-
-    println!("\n=== WINTERFELL: HDC XOR Binding (16,384 bits) ===\n");
+    println!("\n=== WINTERFELL (estimated — analytic model, no real prover) ===");
+    println!("=== HDC XOR Binding (16,384 bits) ===\n");
+    println!("  WARNING: All Winterfell numbers below are ANALYTIC ESTIMATES.");
+    println!("  No Winterfell prover runs in this benchmark (no AIR implemented).\n");
 
     // In Winterfell (prime field), XOR on 64-bit words requires:
     // 1. Decompose each word into 64 bits (64 constraints per word)
@@ -195,12 +209,13 @@ fn bench_winterfell_hdc_xor() -> BenchResult {
     println!("  Note: Each XOR bit requires a_i * b_i multiplication in prime fields");
     println!("  This is the fundamental algebraic disadvantage vs binary fields");
 
-    // Winterfell AIR for XOR would require implementing a full Air trait with
+    // A Winterfell AIR for XOR would require implementing a full Air trait with
     // trace width = 3 * 16,384 (a_bits, b_bits, c_bits) + original words.
     // The proving time is dominated by the FFT over the prime field with
-    // a trace of ~49,152 rows.
+    // a trace of ~49,152 rows. No such AIR exists in this crate.
     //
-    // We estimate based on Winterfell's known performance characteristics:
+    // Instead we ESTIMATE analytically from Winterfell's known performance
+    // characteristics (nothing below is measured):
     // - ~50us per constraint for proving
     // - ~2us per constraint for verification
     // - Proof size ~200KB for this trace size
@@ -209,17 +224,24 @@ fn bench_winterfell_hdc_xor() -> BenchResult {
     let estimated_verify_ms = constraint_count as f64 * 0.002; // 2us per constraint
     let estimated_proof_size = 200_000; // ~200KB typical for this trace
 
-    println!("  Estimated prover time: {:.0} ms", estimated_prove_ms);
-    println!("  Estimated verifier time: {:.1} ms", estimated_verify_ms);
     println!(
-        "  Estimated proof size: {} bytes ({:.1} KB)",
+        "  Estimated prover time: {:.0} ms (analytic model, NOT measured)",
+        estimated_prove_ms
+    );
+    println!(
+        "  Estimated verifier time: {:.1} ms (analytic model, NOT measured)",
+        estimated_verify_ms
+    );
+    println!(
+        "  Estimated proof size: {} bytes ({:.1} KB) (analytic model, NOT measured)",
         estimated_proof_size,
         estimated_proof_size as f64 / 1024.0
     );
     println!("  Note: Estimates based on Winterfell ~50us/constraint proving performance");
+    println!("  Note: NO real proof was generated or verified for this backend");
 
     BenchResult {
-        backend: "Winterfell (prime field F_p)".to_string(),
+        backend: "Winterfell (estimated — analytic model, no real prover)".to_string(),
         operation: "HDC XOR binding (16,384 bits)".to_string(),
         constraint_count,
         prove_time_ms: estimated_prove_ms,
@@ -251,6 +273,9 @@ fn main() {
     println!("Operation: XOR binding of two 16,384-bit BinaryHV vectors");
     println!("This is the fundamental operation in Hyperdimensional Computing.");
     println!();
+    println!("Backends: Binius = REAL prover+verifier (measured).");
+    println!("          Winterfell = ANALYTIC ESTIMATE only (no real prover).");
+    println!();
 
     let binius_result = bench_binius_hdc_xor();
     let winterfell_result = bench_winterfell_hdc_xor();
@@ -258,8 +283,10 @@ fn main() {
     // Summary table
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                    COMPARISON SUMMARY                       ║");
+    println!("║  Binius = MEASURED (real proof) │ Winterfell = ESTIMATED    ║");
+    println!("║  (analytic model, no real prover — see warning above)       ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ Metric              │ Binius (GF(2))  │ Winterfell (F_p)   ║");
+    println!("║ Metric              │ Binius (GF(2))  │ Winterfell (est.)  ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!(
         "║ Constraints          │ {:>14} │ {:>18} ║",
@@ -295,14 +322,16 @@ fn main() {
             }
         );
         println!(
-            "Key finding: Binius proves {:.1}x faster for HDC XOR",
+            "Key finding: Binius proves an estimated {:.1}x faster for HDC XOR",
             prove_ratio
         );
+        println!("(measured Binius time vs ANALYTIC ESTIMATE of Winterfell time —");
+        println!("the Winterfell side was never actually run)");
         println!();
         println!("Conclusion: XOR binding (the core HDC operation) is algebraically");
         println!("FREE in binary-field STARKs — native GF(2) addition requires zero");
         println!(
-            "non-linear constraints, while prime-field STARKs need {} constraints",
+            "non-linear constraints, while prime-field STARKs need an estimated {} constraints",
             winterfell_result.constraint_count
         );
         println!("for the same operation on 16,384-bit vectors.");
@@ -469,7 +498,7 @@ fn main() {
                 "verify_time_ms": winterfell_result.verify_time_ms,
                 "proof_size_bytes": winterfell_result.proof_size_bytes,
                 "real_proof": false,
-                "note": "Estimated — full AIR implementation would require 49,152 constraint rows"
+                "note": "ANALYTIC ESTIMATE — no Winterfell prover was run (no AIR implemented in this crate); numbers derive from a ~50us/constraint model over 49,152 constraint rows. Do not cite as measured."
             }
         })
     );

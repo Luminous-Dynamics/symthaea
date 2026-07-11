@@ -46,6 +46,18 @@ impl GeoPoint {
         let dalt = other.alt - self.alt;
         (dlat * dlat + dlon * dlon + dalt * dalt).sqrt()
     }
+
+    /// Convert to local meters relative to a mission origin
+    /// (equirectangular approximation — fine for SAR-scale distances).
+    ///
+    /// Returns `[east_m, north_m, alt_m]` matching the simulator's world
+    /// frame (x = east, y = north, z = altitude). Altitude passes through
+    /// unchanged: the simulator's z is already meters above ground.
+    pub fn to_local_meters(&self, origin: &GeoPoint) -> [f64; 3] {
+        let east = (self.lon - origin.lon) * 111_320.0 * origin.lat.to_radians().cos();
+        let north = (self.lat - origin.lat) * 111_320.0;
+        [east, north, self.alt]
+    }
 }
 
 /// SAR mission definition.
@@ -242,12 +254,19 @@ pub struct MissionMetrics {
 
 /// Run a grid search mission on the given simulator.
 ///
-/// Returns mission metrics. The simulator must be pre-initialized
-/// at the mission start position.
+/// Returns mission metrics. The simulator must be pre-initialized at the
+/// mission start position; `origin` is the geographic point corresponding
+/// to the simulator's local frame origin `[0, 0, z]` — all waypoints are
+/// converted to local meters relative to it.
+///
+/// (Before Tier 2.5 this multiplied *absolute* lat/lon by 111,320 and
+/// subtracted local meters, producing ~10⁷ m position errors for any
+/// non-zero coordinates.)
 pub fn run_grid_search<S: HelicopterPhysicsSimulator>(
     sim: &mut S,
     controller: &mut crate::controller::HelicopterController,
     encoder: &mut crate::encoder::HelicopterHdcEncoder,
+    origin: &GeoPoint,
     waypoints: &[GeoPoint],
     dt: f64,
     max_steps: usize,
@@ -269,11 +288,12 @@ pub fn run_grid_search<S: HelicopterPhysicsSimulator>(
         let target = &waypoints[current_wp];
         let state = sim.state();
 
-        // Simple position error (using sim coordinates, not geo)
-        // In a real implementation, we'd convert geo → local coords
-        let dx = target.lon * 111_320.0 * target.lat.to_radians().cos() - state.position[0];
-        let dy = target.lat * 111_320.0 - state.position[1];
-        let dz = target.alt - state.position[2];
+        // Geo → local: waypoint in meters relative to the mission origin,
+        // compared against the simulator's local position.
+        let local = target.to_local_meters(origin);
+        let dx = local[0] - state.position[0];
+        let dy = local[1] - state.position[1];
+        let dz = local[2] - state.position[2];
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
         altitude_error_sum += dz.abs();
@@ -491,6 +511,11 @@ mod tests {
         let mut enc = HelicopterHdcEncoder::new(&genesis, 32);
 
         // Simple 2-waypoint mission at hover altitude
+        let origin = GeoPoint {
+            lat: 0.0,
+            lon: 0.0,
+            alt: 0.0,
+        };
         let waypoints = vec![
             GeoPoint {
                 lat: 0.0,
@@ -508,6 +533,7 @@ mod tests {
             &mut sim,
             &mut ctrl,
             &mut enc,
+            &origin,
             &waypoints,
             1.0 / 300.0,
             300,    // 1 second
@@ -517,5 +543,76 @@ mod tests {
         assert!(metrics.steps > 0);
         assert!(metrics.flight_time > 0.0);
         assert!(metrics.mean_control_effort >= 0.0);
+    }
+
+    #[test]
+    fn test_to_local_meters_100m_north() {
+        let origin = GeoPoint {
+            lat: 30.0,
+            lon: -97.0,
+            alt: 0.0,
+        };
+        let north_100m = GeoPoint {
+            lat: 30.0 + 100.0 / 111_320.0,
+            lon: -97.0,
+            alt: 20.0,
+        };
+        let local = north_100m.to_local_meters(&origin);
+        assert!(
+            local[0].abs() < 0.1,
+            "east offset should be ~0: {}",
+            local[0]
+        );
+        assert!(
+            (local[1] - 100.0).abs() < 0.1,
+            "north offset should be ~100m: {}",
+            local[1]
+        );
+        assert!((local[2] - 20.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_grid_search_position_error_is_local_not_geographic() {
+        // Regression for the Tier 2.5 geo→local bug: a waypoint 100m north
+        // of the mission origin must produce a ~100m error vector, not the
+        // ~1e7 m garbage that absolute-degrees × 111,320 used to produce.
+        use crate::controller::HelicopterController;
+        use crate::encoder::HelicopterHdcEncoder;
+        use crate::simulator::SimpleHelicopterSimulator;
+        use crate::types::HelicopterConfig;
+
+        let config = HelicopterConfig::default();
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(&config.genesis_phrase);
+        let mut sim = SimpleHelicopterSimulator::new(); // Hover at 20m, local [0,0,20]
+        let mut ctrl = HelicopterController::new(&genesis, &config);
+        let mut enc = HelicopterHdcEncoder::new(&genesis, 32);
+
+        let origin = GeoPoint {
+            lat: 30.0,
+            lon: -97.0,
+            alt: 0.0,
+        };
+        let waypoints = vec![GeoPoint {
+            lat: 30.0 + 100.0 / 111_320.0, // 100m north of origin
+            lon: -97.0,
+            alt: 20.0, // Same altitude as the hovering sim
+        }];
+
+        let metrics = run_grid_search(
+            &mut sim,
+            &mut ctrl,
+            &mut enc,
+            &origin,
+            &waypoints,
+            1.0 / 300.0,
+            30, // Short: position barely changes → error stays near initial
+            1.0,
+        );
+
+        assert!(
+            metrics.mean_position_error > 50.0 && metrics.mean_position_error < 200.0,
+            "100m-north waypoint must give ~100m error, got {} m",
+            metrics.mean_position_error
+        );
     }
 }

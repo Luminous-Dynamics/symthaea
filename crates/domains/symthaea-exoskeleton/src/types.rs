@@ -120,6 +120,14 @@ pub struct ExoskeletonConfig {
     pub max_torques: [f64; NUM_JOINTS],
     pub human_mass: f64,
     pub exo_mass: f64,
+    /// Joint stiffness (N·m/rad) applied by the exo at
+    /// `ExoskeletonCommand::stiffness_gain == 1.0`. Consumed by the
+    /// simulator as a spring toward the neutral (standing) posture, so the
+    /// Phi-derived compliance tiers are physically real.
+    pub max_joint_stiffness: f64,
+    /// Joint damping (N·m·s/rad) applied by the exo at
+    /// `ExoskeletonCommand::damping_gain == 1.0`.
+    pub max_joint_damping: f64,
     pub physics_hz: f64,
     pub cognitive_interval: usize,
     pub steps_per_episode: usize,
@@ -134,6 +142,8 @@ impl Default for ExoskeletonConfig {
             max_torques: [40.0, 30.0, 20.0, 40.0, 30.0, 20.0],
             human_mass: 80.0,
             exo_mass: 12.0,
+            max_joint_stiffness: 60.0,
+            max_joint_damping: 8.0,
             physics_hz: 200.0,
             cognitive_interval: 10,
             steps_per_episode: 2000,

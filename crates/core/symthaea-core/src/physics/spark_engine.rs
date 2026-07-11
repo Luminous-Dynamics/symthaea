@@ -6,7 +6,20 @@
 //! This module integrates all components of the Lattice Confinement Fusion
 //! power system into a single, coherent specification.
 //!
-//! ## Architecture
+//! ## Physics honesty — read before citing this header
+//!
+//! The v1.0 diagram below is a **hypothetical design target, not a validated
+//! device**. Under standard Gamow physics, D-D fusion at 300 K gives
+//! `<σv>` ≈ 5×10⁻⁹⁰ cm³/s and Q ≈ 10⁻⁵⁷ — no net energy gain is possible
+//! (Q > 1 requires T > 10⁷ K). The design is contingent on the unexplained
+//! ~40-order-of-magnitude rate anomaly reported by NASA Glenn (Steinetz et
+//! al. 2020, Phys. Rev. C) being real, controllable, AND vastly scalable —
+//! none of which is established. See `crates/domains/spark-engine/docs/
+//! TECHNICAL_REPORT.md` for the honest assessment; the credible near-term
+//! application is a compact neutron source, not a power system. The Q-factor
+//! enforcement in this physics stack flags Q < 1 explicitly — keep it that way.
+//!
+//! ## Architecture (hypothetical target)
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────┐

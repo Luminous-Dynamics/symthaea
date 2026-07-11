@@ -27,12 +27,21 @@ use std::process;
 use symthaea_broca::encoder::{NUM_CHANNELS, ThoughtChannels};
 use symthaea_broca::generator::BrocaGenerator;
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::ContinuousHV;
 
 #[derive(Debug, Clone, Deserialize)]
 struct HoldoutEntry {
     objective_id: String,
     channels: Vec<f32>,
     reference_text: String,
+    /// Same content-conditioning signal training was given for this
+    /// objective (see `TrainingPair::semantic_hv` / `broca_curriculum_sync.rs`).
+    /// Must be supplied here too — otherwise this report would judge a
+    /// checkpoint trained with semantic conditioning by generating without
+    /// it, silently reproducing the exact collision/collapse this report
+    /// exists to catch.
+    #[serde(default)]
+    semantic_hv: Option<Vec<f32>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -40,7 +49,13 @@ struct CoverageCase {
     objective_id: String,
     reference_text: String,
     generated_text: String,
-    generated_coherence: f32,
+    /// Thought↔output HV similarity, averaged over generated tokens.
+    /// `None` when coherence was never measured for this case (empty
+    /// generation) — a `None` must NOT be read as coherent. Historical
+    /// reports (schema_version 1) wrote 1.0 here for unmeasured cases
+    /// because CoherenceFeedback initializes at 1.0; treat any
+    /// schema_version-1 coherence of exactly 1.0 as suspect.
+    generated_coherence: Option<f32>,
     veto_triggered: bool,
     /// Cheap, non-authoritative signal: fraction of the reference text's
     /// significant (>3 char) words that also appear in the generated text.
@@ -55,7 +70,13 @@ struct CoverageReport {
     checkpoint_path: String,
     num_objectives: usize,
     avg_keyword_overlap: f32,
-    avg_generated_coherence: f32,
+    /// Mean coherence over cases where coherence was actually measured;
+    /// `None` if no case measured it. Cases with unmeasured coherence are
+    /// excluded from the average instead of polluting it with the 1.0
+    /// initialization value.
+    avg_generated_coherence: Option<f32>,
+    /// How many cases actually measured coherence (denominator of the avg).
+    coherence_measured_count: usize,
     veto_count: usize,
     cases: Vec<CoverageCase>,
 }
@@ -167,16 +188,26 @@ fn run(opts: Options) -> Result<()> {
         load_result.with_context(|| format!("loading checkpoint {}", opts.checkpoint_path))?;
     generator.config_mut().gating.base_max_tokens = opts.max_gen_tokens;
     generator.config_mut().bypass_gating = true;
+    // Force coherence measurement even under bypass_gating: without this,
+    // a checkpoint config with coherence feedback disabled leaves
+    // coherence_dynamics empty and final_coherence falls back to the
+    // CoherenceFeedback 1.0 initialization — reporting a perfect score for
+    // output whose coherence was never measured.
+    generator.config_mut().enable_coherence_feedback = true;
 
     let mut cases = Vec::with_capacity(entries.len());
     for entry in &entries {
         let channels = channels_from_raw(&entry.channels);
-        let result = generator.generate(&channels);
+        let semantic_hv = entry.semantic_hv.clone().map(ContinuousHV::from_vec);
+        let result = generator.generate_with_semantic(&channels, semantic_hv.as_ref(), &[]);
         cases.push(CoverageCase {
             objective_id: entry.objective_id.clone(),
             reference_text: entry.reference_text.clone(),
             generated_text: result.text.clone(),
-            generated_coherence: result.final_coherence,
+            // Only trust final_coherence when at least one token actually
+            // measured it; otherwise it's the 1.0 initialization value.
+            generated_coherence: (!result.coherence_dynamics.is_empty())
+                .then_some(result.final_coherence),
             veto_triggered: result.veto_triggered,
             keyword_overlap: keyword_overlap(&entry.reference_text, &result.text),
         });
@@ -188,19 +219,22 @@ fn run(opts: Options) -> Result<()> {
     } else {
         0.0
     };
-    let avg_generated_coherence = if num_objectives > 0 {
-        cases.iter().map(|c| c.generated_coherence).sum::<f32>() / num_objectives as f32
+    let measured: Vec<f32> = cases.iter().filter_map(|c| c.generated_coherence).collect();
+    let coherence_measured_count = measured.len();
+    let avg_generated_coherence = if coherence_measured_count > 0 {
+        Some(measured.iter().sum::<f32>() / coherence_measured_count as f32)
     } else {
-        0.0
+        None
     };
     let veto_count = cases.iter().filter(|c| c.veto_triggered).count();
 
     let report = CoverageReport {
-        schema_version: 1,
+        schema_version: 2,
         checkpoint_path: opts.checkpoint_path.clone(),
         num_objectives,
         avg_keyword_overlap,
         avg_generated_coherence,
+        coherence_measured_count,
         veto_count,
         cases,
     };

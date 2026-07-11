@@ -5,13 +5,107 @@
 //!
 //! All items in this module are gated behind `#[cfg(feature = "magi_loop")]`.
 
-use crate::consciousness::recursive_improvement::{CalibrationSummary, PredictionDomain};
+use std::path::PathBuf;
+
+use crate::consciousness::recursive_improvement::{
+    BrierScoreTracker, CalibrationConfig, CalibrationSummary, PersistenceConfig,
+    PersistenceManager, PredictionDomain, StartupMode,
+};
 use crate::mind::SemanticIntent;
 use crate::mind::structured_thought::EpistemicStatus;
 
 use super::Symthaea;
 
+/// Default on-disk location for the facade's Brier calibration state,
+/// resolved relative to the home directory by `PersistenceConfig::full_path`
+/// (same convention as the RSI subsystem's `.symthaea/magi_state.json`).
+const FACADE_CALIBRATION_STATE_PATH: &str = ".symthaea/facade_calibration.json";
+
 impl Symthaea {
+    /// Initialize the facade Brier calibration tracker, restoring persisted
+    /// state from disk when available (Tier 0.3, 2026-07-06).
+    ///
+    /// Without this, `calibration` was rebuilt `with_defaults()` every
+    /// session, so the Phase 4.5 confidence adjustment could never actually
+    /// calibrate. Reuses the RSI persistence types (`MagiStateSnapshot` /
+    /// `PersistedDomainCalibration`) — no new schema.
+    ///
+    /// Set `SYMTHAEA_FACADE_CALIBRATION_PATH` to override the state path, or
+    /// to the empty string to disable persistence entirely (tests, ephemeral
+    /// runs).
+    pub(super) fn init_facade_calibration() -> (BrierScoreTracker, Option<PersistenceManager>) {
+        let state_path = match std::env::var("SYMTHAEA_FACADE_CALIBRATION_PATH") {
+            Ok(p) if p.trim().is_empty() => {
+                tracing::info!(
+                    target: "symthaea::broca::calibration",
+                    "Facade calibration persistence disabled (SYMTHAEA_FACADE_CALIBRATION_PATH is empty)"
+                );
+                return (BrierScoreTracker::with_defaults(), None);
+            }
+            Ok(p) => PathBuf::from(p),
+            Err(_) => PathBuf::from(FACADE_CALIBRATION_STATE_PATH),
+        };
+
+        let config = PersistenceConfig {
+            state_path,
+            autosave_interval: 0, // facade drives the save cadence explicitly
+            create_backups: true,
+            max_backups: 3,
+            enabled: true,
+        };
+        let mut manager = PersistenceManager::new(config);
+        match manager.initialize() {
+            Ok(StartupMode::WarmStart { session, .. }) => {
+                let snapshot = manager.current();
+                let tracker = BrierScoreTracker::from_persisted(
+                    CalibrationConfig::default(),
+                    &snapshot.calibration,
+                    &snapshot.global_stats,
+                );
+                tracing::info!(
+                    target: "symthaea::broca::calibration",
+                    session,
+                    total_predictions = tracker.total_predictions(),
+                    path = %manager.config().state_path.display(),
+                    "Facade calibration restored from persisted state"
+                );
+                (tracker, Some(manager))
+            }
+            Ok(_) => (BrierScoreTracker::with_defaults(), Some(manager)),
+            Err(e) => {
+                tracing::warn!(
+                    target: "symthaea::broca::calibration",
+                    error = %e,
+                    "Facade calibration persistence unavailable; calibration will be in-memory only"
+                );
+                (BrierScoreTracker::with_defaults(), None)
+            }
+        }
+    }
+
+    /// Persist the facade calibration tracker to disk (atomic temp+rename
+    /// inside `PersistenceManager::save`). Warns and continues on IO errors.
+    pub(super) fn persist_facade_calibration(&mut self) {
+        let Some(ref mut pm) = self.calibration_persistence else {
+            return;
+        };
+        pm.update_from_tracker(&self.calibration);
+        if let Err(e) = pm.save() {
+            tracing::warn!(
+                target: "symthaea::broca::calibration",
+                error = %e,
+                "Failed to persist facade calibration; continuing"
+            );
+        } else {
+            tracing::debug!(
+                target: "symthaea::broca::calibration",
+                total_predictions = self.calibration.total_predictions(),
+                path = %pm.config().state_path.display(),
+                "Facade calibration persisted"
+            );
+        }
+    }
+
     /// Get the current calibration summary.
     ///
     /// Returns global and per-domain Brier scores, ECE, accuracy, and

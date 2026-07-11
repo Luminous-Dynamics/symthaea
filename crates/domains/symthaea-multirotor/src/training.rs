@@ -319,6 +319,15 @@ impl FlightTrainer {
 
     /// Run the full training curriculum.
     pub fn train(&mut self) -> Vec<EpisodeMetrics> {
+        self.train_returning_controller().1
+    }
+
+    /// Run the full training curriculum and hand back the trained
+    /// controller for transfer into a shipped bridge
+    /// (`FlightEmbodiment::with_controller`). `train()` used to drop the
+    /// trained controller on the floor — the purest form of the
+    /// trainer-island gap.
+    pub fn train_returning_controller(&mut self) -> (FlightController, Vec<EpisodeMetrics>) {
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
         let mut encoder = QuadrotorHdcEncoder::new(&genesis, num_levels);
@@ -352,7 +361,7 @@ impl FlightTrainer {
         }
 
         self.metrics = all_metrics.clone();
-        all_metrics
+        (controller, all_metrics)
     }
 
     /// Run training with CSV telemetry output.
@@ -448,6 +457,63 @@ fn sample_prioritized_index(priorities: &[f32], alpha: f32, rng: &mut u64) -> us
         }
     }
     len - 1
+}
+
+/// Deterministic genesis-derived intent thought vector — the vocabulary the
+/// intent curriculum trains against and callers steer with at runtime.
+pub fn intent_hv(genesis: &GenesisSeed, intent: &str) -> ContinuousHV {
+    ContinuousHV::from_genesis(
+        genesis,
+        &format!("multirotor::intent::{intent}"),
+        symthaea_core::hdc::HDC_DIMENSION,
+    )
+}
+
+/// Intent-conditioned curriculum: teach opposing intent thoughts opposing
+/// thrust commands, through the SAME input path the shipped bridge uses
+/// (`forward(thought_hv, ..)`).
+///
+/// Different from the PD-imitation curriculum in `FlightTrainer`, whose
+/// input is the *encoded body state* (thought-independent by construction).
+/// The cognition-ablation experiment (2026-07-08) showed genesis-random
+/// weights give opposite intents zero task-axis separation through the
+/// bridge; this controller is what makes thought an actual control signal.
+/// The controller is reset before each intent block so training features
+/// match the bridge's from-reset serving distribution.
+///
+/// Returns a controller mapping `intent_hv(genesis, "climb")` to
+/// above-hover thrust and `"descend"` to below-hover thrust (moments zero).
+pub fn train_intent_controller(config: &FlightConfig, epochs: usize) -> FlightController {
+    let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+    let mut controller = FlightController::new(&genesis, config);
+    let dt = 0.002f32; // 500 Hz reflex rate, same as the bridge default
+
+    let climb = intent_hv(&genesis, "climb");
+    let descend = intent_hv(&genesis, "descend");
+    let target_climb = QuadrotorCommand {
+        thrust: QuadrotorCommand::HOVER_THRUST * 1.5,
+        roll_moment: 0.0,
+        pitch_moment: 0.0,
+        yaw_moment: 0.0,
+    };
+    let target_descend = QuadrotorCommand {
+        thrust: QuadrotorCommand::HOVER_THRUST * 0.5,
+        roll_moment: 0.0,
+        pitch_moment: 0.0,
+        yaw_moment: 0.0,
+    };
+
+    const SETTLE_STEPS: usize = 10;
+    for _ in 0..epochs {
+        for (hv, target) in [(&climb, &target_climb), (&descend, &target_descend)] {
+            controller.reset();
+            for _ in 0..SETTLE_STEPS {
+                controller.forward(hv, dt);
+                controller.train_output_only(target, Some(config.learning_rate * 4.0));
+            }
+        }
+    }
+    controller
 }
 
 #[cfg(test)]

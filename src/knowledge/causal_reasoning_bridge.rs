@@ -12,6 +12,14 @@
 use super::causal_bridge::CausalKnowledgeBridge;
 use std::collections::HashMap;
 use symthaea_causal_reasoning::causal_calculus::{CausalDAG, StructuralCausalModel};
+// `symthaea-causal-reasoning` has TWO structurally different `CausalDAG` types:
+// this module's `causal_calculus::CausalDAG` (id/name/values/is_observed nodes +
+// an adjacency matrix, built via add_node/add_edge) and
+// `counterfactual::CausalDAG` (bare `Vec<String>` node names + edge pairs, used
+// by `ConsciousReasoningEngine::analyze_counterfactual`). They do not interoperate
+// without conversion — see `to_identification_dag()` below (AGW plan Phase 5.3,
+// found 2026-07-10 when the un-islanding attempt discovered this mismatch).
+use symthaea_causal_reasoning::counterfactual::CausalDAG as IdentificationCausalDAG;
 
 /// Bridge from knowledge engine causal edges to full CausalDAG.
 ///
@@ -177,6 +185,25 @@ impl CausalReasoningBridge {
         &self.dag
     }
 
+    /// Convert to the `identification::CausalDAG` shape
+    /// `ConsciousReasoningEngine::analyze_counterfactual()` expects (AGW plan
+    /// Phase 5.3). Node order is preserved 1:1: `causal_calculus::CausalDAG`
+    /// assigns each node's `id` as its insertion-order index into `nodes`
+    /// (see `add_node`), which is exactly the implicit index
+    /// `identification::CausalDAG` uses — so edge index pairs carry over
+    /// unchanged and only node names need projecting out.
+    pub fn to_identification_dag(&self) -> IdentificationCausalDAG {
+        let names: Vec<String> = self.dag.nodes.iter().map(|n| n.name.clone()).collect();
+        IdentificationCausalDAG::new(names, self.dag.edges.clone())
+    }
+
+    /// Resolve a synced entity name to its node index in the
+    /// `identification::CausalDAG` returned by `to_identification_dag()`
+    /// (same indices as `dag()`'s own `causal_calculus::CausalDAG`).
+    pub fn identification_node_index(&self, entity: &str) -> Option<usize> {
+        self.node_map.get(entity).copied()
+    }
+
     /// Access the underlying SCM (for intervention/counterfactual queries).
     pub fn scm(&self) -> &StructuralCausalModel {
         &self.scm
@@ -282,6 +309,77 @@ mod tests {
         let crb = CausalReasoningBridge::new();
         assert!(crb.d_separated("foo", "bar", &[]).is_none());
         assert!(crb.ancestors("nonexistent").is_none());
+    }
+
+    // ── AGW plan Phase 5.3: does the un-islanded pipeline actually work? ──────
+    // Deliberately test-only, not wired into the live ~31Hz loop (that wiring
+    // is a separate, riskier step scoped for a dedicated session — see
+    // AGW_PLAN_2026-07-09.md). This proves the mechanism end-to-end BEFORE any
+    // live wiring is attempted: real extracted relations -> CausalKnowledgeBridge
+    // -> CausalReasoningBridge::sync_from_bridge -> to_identification_dag() ->
+    // the exact type ConsciousReasoningEngine::analyze_counterfactual() expects.
+
+    #[test]
+    fn identification_dag_conversion_preserves_topology() {
+        let bridge = make_bridge_with_chain();
+        let mut crb = CausalReasoningBridge::new();
+        crb.sync_from_bridge(&bridge);
+
+        let idag = crb.to_identification_dag();
+        assert_eq!(idag.num_nodes(), 4);
+
+        let s = crb.identification_node_index("sanctions").unwrap();
+        let o = crb.identification_node_index("oil shortage").unwrap();
+        let p = crb.identification_node_index("price spike").unwrap();
+        let i = crb.identification_node_index("inflation").unwrap();
+
+        assert_eq!(idag.nodes[s], "sanctions");
+        assert_eq!(idag.nodes[i], "inflation");
+        assert!(
+            idag.has_path(s, i),
+            "sanctions must reach inflation transitively"
+        );
+        assert!(
+            idag.parents(o).contains(&s),
+            "oil shortage's parent must be sanctions in the converted DAG"
+        );
+    }
+
+    #[test]
+    fn end_to_end_counterfactual_query_through_the_unislanded_pipeline() {
+        use crate::consciousness::counterfactual::{CausalQuery, CausalQueryOutcome};
+        use crate::consciousness::reasoning_engine::ConsciousReasoningEngine;
+
+        let bridge = make_bridge_with_chain();
+        let mut crb = CausalReasoningBridge::new();
+        crb.sync_from_bridge(&bridge);
+
+        let idag = crb.to_identification_dag();
+        let treatment = crb.identification_node_index("sanctions").unwrap();
+        let outcome_node = crb.identification_node_index("inflation").unwrap();
+
+        let query = CausalQuery {
+            treatment,
+            outcome: outcome_node,
+            conditioning: vec![],
+        };
+
+        let engine = ConsciousReasoningEngine::new();
+        let result = engine.analyze_counterfactual(&idag, &query);
+
+        // The claim under test is narrow and honest: a real knowledge-derived
+        // chain, converted through the new bridge method, produces a
+        // meaningful (non-panicking, decidable) outcome from the reasoning
+        // engine's real entry point -- proving the "island" pieces genuinely
+        // interoperate. It does NOT prove this is worth wiring into the live
+        // loop, nor what threshold should gate it there.
+        match result {
+            CausalQueryOutcome::Identified { .. } => {} // sanctions -> inflation is a simple chain: identifiable
+            other => panic!(
+                "expected a simple 3-hop chain to be identifiable, got {:?}",
+                other
+            ),
+        }
     }
 
     #[test]

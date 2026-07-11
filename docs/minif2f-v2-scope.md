@@ -1,83 +1,91 @@
-# miniF2F-v2: Phase 1 Scope Analysis
+# miniF2F-v2: Scope & Status
 
-**Bottom line:** Symthaea's current Lean 4 bridge targets propositional and first-order classical logic. **miniF2F-v2 is almost entirely algebra, arithmetic, and number theory over ℝ, ℕ, and ℤ** — outside our current scope. This document explains the gap precisely so the Phase 1 → Phase 2 decision is made with open eyes.
+> **2026-07-06 correction.** An earlier version of this document declared
+> real-number arithmetic *out of scope* ("Phase 2, not yet done", "well under
+> 2% accept rate"). **That is stale and wrong.** The arithmetic bridge has since
+> been implemented through "Phase 6". This document now records the *verified*
+> state and, importantly, the one gap that is actually real: **the emitted Lean
+> is never checked by an actual Lean toolchain in this repo, so the accept rate
+> is unmeasured.**
 
-## What the bridge can prove today
+## What is actually built (verified against source, 2026-07-06)
 
-The `symthaea-lean-bridge` crate's `synthesize_proof_term` closes classical propositional tautologies up to arbitrary nesting of ∧, ∨, →, ¬, ↔, ⊤, ⊥. The W4 tautology suite (`prove_proptauts`, 23 fixtures) demonstrates this with **23/23 Lean-accepted, 0 `sorry`**. The synthesizer handles:
+The bridge is no longer propositional-only. Real-number / integer arithmetic is
+implemented across two crates:
 
-- Identity, K, and S-style combinators
-- Curry/uncurry between `A → B → C` and `A ∧ B → C`
-- Nested conjunction projection (`h.1.2.1` etc.) via `collect_projections`
-- Multi-argument `h a₁ a₂ … aₙ` application via `try_curry_apply`
-- Classical excluded middle (`A ∨ ¬A`) via `Classical.em`
-- Ex falso (`False → P`) via `False.elim`
+**`symthaea-core::hdc::fol_ext_smt`** — the arithmetic formula layer:
+- `FolFormulaExt` with `Eq`, `Lt`, `Le`, implication, and quantifiers over typed
+  binders (`NumericType::{Int, Real, Nat}`).
+- `Term` with `Add`, `Mul`, `Pow`, `IntLit`, and exact rational literals
+  (rendered `(1 : ℝ) / (3 : ℝ)`).
+- `SmtFragment` (`QfLia`/`Lia`/`QfLra`/`Lra`/`QfNia`/`Nia`/`QfNra`/`Nra`) with
+  `detect_fragment()` and `suggested_lean_tactic()`:
+  LIA→`omega`, LRA→`linarith`, NRA→`nlinarith`, NIA→`omega_nat` (bounded).
 
-No Mathlib dependency. All proofs are term-mode in core Lean 4.
+**`symthaea-lean-bridge::fol_ext_bridge`** — the emitter:
+- `render_fol_ext_file()` routes pure-propositional goals to the Phase-1 term
+  synthesizer and arithmetic goals to `synthesize_arith_tactic()`.
+- The arithmetic cascade emits real Mathlib:
+  `first | rfl | norm_num | ring | omega | linarith | nlinarith [hints] |
+  positivity | tauto | polyrith`, with:
+  - **named-variable threading** (Phase 3) — concrete `intro x y`, and
+    `sq_nonneg x` / `mul_self_nonneg y` hints using real names, not `_`.
+  - **conjunction splitter** (Phase 4) — gated on `conclusion_is_and`.
+  - **field-simp branch** (Phase 5) — gated on symbolic division, with
+    `subst_eqs` / `field_simp`.
+  - **`sub_ne_zero` witness derivation** (Phase 6a) — turns `x ≠ c` hypotheses
+    into the `x - c ≠ 0` witnesses `field_simp` needs.
 
-## What miniF2F-v2 demands
+The representative problem the old doc called "unrepresentable"
+(`mathd_algebra_206`, `a + b = -2` over ℝ) is now representable and routes to the
+`linarith`/`nlinarith` cascade.
 
-A representative miniF2F-v2 problem (`mathd_algebra_206`):
+## What the unit tests actually prove — and what they don't
 
-```lean
-theorem mathd_algebra_206 (a b : ℝ)
-    (f : ℝ → ℝ → ℝ)
-    (h₀ : ∀ x, f x b = x^2 + b * x + 1)
-    (h₁ : ∀ y, f a y = y^2 + a * y + 1)
-    : a + b = -2 := by sorry
-```
+`fol_ext_bridge.rs` unit tests assert **emission shape**, not Lean acceptance:
+- `linear_int_cascade_includes_omega`: `∀ n:ℤ, n < n+1` → output contains
+  `omega`, no `sorry`.
+- `nonlinear_real_cascade_includes_nlinarith`: `∀ x:ℝ, 0 ≤ x·x` → contains
+  `nlinarith`, no `sorry`.
+- rendering: unicode `≤`, exact rational `(1:ℝ)/(3:ℝ)`, implication `→`,
+  Phase-1 vs arithmetic routing.
 
-None of this is propositional. It requires:
+**These prove the emitter picks the right Mathlib tactic for the fragment and
+produces well-formed ℝ/ℤ Lean syntax. They do NOT prove the emitted proof
+type-checks and closes the goal.** A perfectly-shaped `nlinarith [...]` cascade
+can still fail inside Lean. This is the Phase 0 grounding lesson one level up:
+the tests verify *output shape*, not *output correctness*.
 
-1. **Real-number arithmetic**: `x^2`, `b * x`, `a + b = -2`.
-2. **Universally-quantified function equations**: `∀ x, f x b = …`.
-3. **Algebraic manipulation**: deriving `a = b` from `f x b = f a y` pattern-matching.
-4. **Linear arithmetic on the goal**: `a + b = -2` is a linear inequality Z3's `QF_LRA` can decide (after the preceding algebraic rearrangement).
+## The one real gap: no external verification
 
-Our `Proposition` enum doesn't include `Eq`, `Mul`, `Pow`, or quantification over functions — making the problem statement unrepresentable, let alone provable.
+- **Lean toolchain is absent in this environment** (`lean`/`lake` not on PATH),
+  so `runner::check_with_lean4` and the `prove_minif2f*` examples cannot run
+  here.
+- **No committed, reproducible accept-rate artifact exists.** The "Phase 3/4/5/6
+  measurement" claims live only in code comments; there is no results CSV in the
+  crate. The true miniF2F-v2 accept rate is therefore **currently unknown /
+  unverified in-repo**, in either direction.
 
-## Scope spectrum
+## Concrete next step to actually close Phase 1
 
-miniF2F-v2 problems, as a rough reading of the public set:
+The arithmetic *synthesis* is done; the missing work is *verification*, not
+capability:
 
-| Category | Fraction (est.) | Our Phase 1 reach |
-|----------|----------------|-------------------|
-| Algebra over ℝ (polynomials, linear/quadratic manipulation) | ~55% | None |
-| Number theory over ℕ, ℤ (gcd, Fermat's little, factorizations) | ~25% | None |
-| Inequalities (AM-GM, Cauchy-Schwarz, Jensen) | ~10% | None |
-| Combinatorics (finite counting, Pigeonhole) | ~5% | None |
-| Pure propositional / FOL | ~1-2% | **All** |
+1. Provision Lean 4 + Mathlib (a `nix develop` devShell input or a pinned
+   `elan`/`lake` toolchain). This is the blocker — everything else exists.
+2. Run the committed examples against the corpus and **commit the results CSV**:
+   ```bash
+   MINIF2F_V2_DIR=/path/to/miniF2F/lean4 \
+     cargo run -p symthaea-lean-bridge --example prove_minif2f_v2 \
+     > minif2f_v2_results.csv
+   ```
+   (`prove_minif2f_curated`, `prove_minif2f`, and `prove_fol_arith` also exist;
+   `prove_fol_arith` already optionally shells out to `lake env lean`.)
+3. Add a **Lean-verified gate** — the analog of the Phase 0
+   `SolverCorrectnessGate` — that runs a small fixed battery of arithmetic goals
+   through the real Lean toolchain and asserts they close `sorry`-free. Gate it
+   behind Lean availability so CI without Lean skips rather than fails.
 
-A generous estimate of our Phase 1 accept rate: **well under 2%**. Most of that 2% would also require parsing infrastructure we don't yet have: miniF2F statements are written in Lean 4, and we'd need to map them onto `symthaea_core::hdc::logic_engine::Proposition` before `tactics_for_goal` could even see them.
-
-## What's needed to actually attack miniF2F-v2
-
-1. **Extend `Proposition` (or a new `FOLFormula+`)** to include `Eq`, arithmetic operators, and domain-specific types (ℝ, ℕ, ℤ). This is several KLOC.
-2. **Lean 4 parser** for the subset of Lean 4 syntax miniF2F uses. Even a restricted parser is a real undertaking — roughly the size of `logic_engine.rs`.
-3. **Arithmetic decision procedures** to dispatch to. Z3 (`QF_LRA`, `QF_LIA`, `QF_NIA`) closes many algebra goals; hooking the existing `conjecture_engine::auto_prove_via_z3` into the Lean bridge is the most direct path.
-4. **Term synthesis for arithmetic proofs**: Z3 typically returns `unsat` without a proof term; translating that into a Lean proof requires either (a) Mathlib's `linarith`/`nlinarith` tactics (which need Mathlib as a dependency) or (b) extracting a Positivstellensatz certificate from Z3 and reconstructing a Lean proof manually.
-
-All four items together are a Phase 2 scope. Best-case timeline: one fully-focused sprint (4–6 weeks) gets item (1) + partial (2) + (3) into a working state with `linarith`-style Mathlib tactics. Target realistic accept rate post-Phase-2: 15–30% of miniF2F-v2.
-
-## Honest decision-point framing
-
-At the week-10 review, the artifact to show is:
-
-- **Proposition level:** strong (23/23 strict, 100% on classical propositional tautologies).
-- **miniF2F-v2:** architecturally out-of-scope at Phase 1; 0/X accepted.
-
-That second number isn't a failure of the pipeline — it's a scope declaration. The right follow-up question is whether Phase 2 should prioritize the `linarith`-bridge path (algebraic mass production on benchmarks) or stay focused on propositional/FOL depth (novel theorem discovery via conjecture_engine's Z3 integration). These two paths don't conflict, but they have different staffing profiles, and one should lead.
-
-## Placeholder harness
-
-The `prove_minif2f_v2` example, when `MINIF2F_V2_DIR` is set, iterates the downloaded corpus and reports which problems the **bridge's statement representation can accept** (a strict upper bound on Phase 1 achievable accept rate). This number is expected to be near zero and should be read as a scope signal, not a quality signal.
-
-```bash
-# Install miniF2F-v2 first, e.g.:
-#   git clone https://github.com/openai/miniF2F /tmp/miniF2F
-#
-# Then:
-MINIF2F_V2_DIR=/tmp/miniF2F/lean4 \
-    cargo run -p symthaea-lean-bridge --example prove_minif2f_v2 \
-    > minif2f_v2_results.csv
-```
+Until step 2 lands a committed accept rate, describe this capability as
+**"real-number arithmetic proof synthesis, implemented but externally
+unverified"** — not as a percentage.

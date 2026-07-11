@@ -10,10 +10,23 @@ use crate::types::{
 };
 use tracing;
 
-pub trait InfrastructurePhysicsSimulator {
+// `Send + Sync` supertrait bounds: `EmbodimentBridge: Send + Sync` (see
+// symthaea-core/src/embodiment.rs), so `InfrastructureEmbodiment` — which
+// now holds `Box<dyn InfrastructurePhysicsSimulator>` instead of a concrete
+// simulator type — needs the trait OBJECT itself to be known Send + Sync
+// for that auto-trait to propagate through the `dyn`. Without these bounds
+// declared here, `Box<dyn InfrastructurePhysicsSimulator>` is not Send/Sync
+// regardless of whether every concrete implementor happens to be.
+pub trait InfrastructurePhysicsSimulator: Send + Sync {
     fn step(&mut self, cmd: &InfrastructureCommand, dt: f64);
     fn state(&self) -> &InfrastructureState;
     fn reset(&mut self);
+    /// Which concrete backend this is — lets callers (and tests) confirm
+    /// which simulator is actually wired in behind the `Box<dyn Trait>`
+    /// without needing `Any` downcasting. See `embodiment::make_default_simulator`.
+    fn backend_name(&self) -> &'static str {
+        "unknown"
+    }
 }
 
 /// A simple stationary node model with storage, thermal, routing, and health.
@@ -189,6 +202,9 @@ impl InfrastructurePhysicsSimulator for SimpleInfrastructureSimulator {
     }
     fn reset(&mut self) {
         self.state = InfrastructureState::home();
+    }
+    fn backend_name(&self) -> &'static str {
+        "heuristic"
     }
 }
 

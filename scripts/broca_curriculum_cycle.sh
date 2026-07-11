@@ -130,6 +130,22 @@ for f in "${holdout_files_after[@]}"; do
   fi
 done
 
+# Fallback for a retried/resumed cycle: if this invocation's sync step was a
+# no-op (e.g. re-running after training was killed mid-epoch, with all
+# objectives already marked consumed from the interrupted attempt), the
+# before/after diff above finds nothing even though a real, never-measured
+# holdout batch from the ORIGINAL synthesis sits on disk and is already part
+# of this candidate's merged training data. Silently skipping the
+# improvement/collapse gates in that case is exactly what let candidate
+# 20260707T155814Z report "PASSED" while its real generated text had
+# near-zero coherence (avg_generated_coherence=0.0076) — the gates never ran
+# at all, not that they ran and missed it. Fall back to the most recently
+# written holdout file on disk rather than skip gating entirely.
+if [[ -z "$new_holdout_file" && ${#holdout_files_after[@]} -gt 0 ]]; then
+  new_holdout_file="$(ls -t "${holdout_files_after[@]}" | head -1)"
+  echo "[broca-cycle] NOTE: no holdout file was newly written this invocation (sync was a no-op) — falling back to the most recent one on disk for gating: $new_holdout_file"
+fi
+
 if [[ ${#derived_jsonl_files[@]} -eq 0 ]]; then
   echo "[broca-cycle] no curriculum-derived pairs on disk; nothing to train on"
   exit 0
@@ -307,13 +323,57 @@ if [[ -z "$baseline_dir" || ! -d "$baseline_dir" ]]; then
 fi
 echo "[broca-cycle] using production baseline: $baseline_dir"
 
-# ── Step 7: measure the candidate against that baseline, fail-closed ───────
-echo "[broca-cycle] measuring candidate checkpoint..."
+# ── Step 6.5: topic-coverage evidence, generated BEFORE the gate so the
+# presence-of-improvement check (Step 7) has both sides to compare. Uses
+# only this cycle's new holdout batch (not full history) since the question
+# is "did THIS cycle's learning work," not the whole corpus's. Two runs
+# against the SAME holdout file: production checkpoint (the "did production
+# already know this" baseline) and the candidate (the "did fine-tuning
+# actually land it" side) — this is the evidence the regression gate
+# structurally cannot produce, since regression bounds only look at drift
+# from the checkpoint's OWN prior behavior, not at performance on material
+# neither checkpoint was ever trained on identically. See
+# broca_checkpoint_compare.rs's module docs and
+# DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md Tier 1.1.
+baseline_topic_coverage_report=""
+candidate_topic_coverage_report=""
+if [[ -n "$new_holdout_file" ]]; then
+  echo "[broca-cycle] checking topic coverage on this cycle's new material (production baseline)..."
+  baseline_topic_coverage_report="$candidate_dir/topic-coverage-baseline-report.json"
+  cargo run "${cargo_locked_args[@]}" -p symthaea-broca --features simd --bin broca-topic-coverage -- \
+    --checkpoint "$PRODUCTION_CHECKPOINT" \
+    --holdout "$new_holdout_file" \
+    --json-out "$baseline_topic_coverage_report"
+  echo "[broca-cycle] production baseline topic coverage report: $baseline_topic_coverage_report"
+
+  echo "[broca-cycle] checking topic coverage on this cycle's new material (candidate)..."
+  candidate_topic_coverage_report="$candidate_dir/topic-coverage-report.json"
+  cargo run "${cargo_locked_args[@]}" -p symthaea-broca --features simd --bin broca-topic-coverage -- \
+    --checkpoint "$candidate_checkpoint" \
+    --holdout "$new_holdout_file" \
+    --json-out "$candidate_topic_coverage_report"
+  echo "[broca-cycle] candidate topic coverage report: $candidate_topic_coverage_report"
+else
+  echo "[broca-cycle] NOTE: no holdout batch from this cycle (every objective produced fewer than 2 accepted texts) — skipping topic-coverage reports and the improvement gate for this cycle"
+fi
+
+# ── Step 7: measure the candidate against that baseline, fail-closed. This
+# is BOTH gates at once: checkpoint-compare computes regression_passed
+# (absence-of-regression, the historical behavior) AND, when the topic
+# coverage reports above exist, improvement_passed (presence-of-improvement
+# on held-out material). promotion.passed = regression_passed &&
+# improvement_passed — see broca_checkpoint_compare.rs. ─────────────────────
+echo "[broca-cycle] measuring candidate checkpoint (regression + improvement gates)..."
 set +e
 BROCA_CHECKPOINT_PATH="$candidate_checkpoint" \
 BROCA_BASELINE_ARTIFACT_DIR="$baseline_dir" \
 BROCA_FAIL_ON_REGRESSION=1 \
 BROCA_SKIP_EXERCISM="${BROCA_SKIP_EXERCISM:-1}" \
+BROCA_BASELINE_TOPIC_COVERAGE="$baseline_topic_coverage_report" \
+BROCA_CANDIDATE_TOPIC_COVERAGE="$candidate_topic_coverage_report" \
+BROCA_REQUIRE_IMPROVEMENT_EVALUATED="${new_holdout_file:+1}" \
+BROCA_MIN_KEYWORD_OVERLAP_IMPROVEMENT="${BROCA_MIN_KEYWORD_OVERLAP_IMPROVEMENT:-0.05}" \
+BROCA_MIN_COHERENCE_IMPROVEMENT="${BROCA_MIN_COHERENCE_IMPROVEMENT:-0.02}" \
   scripts/broca_measurement_artifacts.sh "$candidate_dir/measurement"
 measure_status=$?
 set -e
@@ -331,49 +391,34 @@ if [[ "$recorded_checkpoint" != "$candidate_checkpoint" ]]; then
 fi
 
 if [[ "$measure_status" -ne 0 ]]; then
-  echo "[broca-cycle] FAIL: candidate did not pass the regression gate (see $candidate_dir/measurement/checkpoint-compare.json)" >&2
+  echo "[broca-cycle] FAIL: candidate did not pass the regression and/or improvement gate (see $candidate_dir/measurement/checkpoint-compare.json)" >&2
   exit 1
 fi
 
 promotion_passed="$(python3 -c "import json; print(json.load(open('$candidate_dir/measurement/checkpoint-compare.json'))['promotion']['passed'])" 2>/dev/null || echo "False")"
 if [[ "$promotion_passed" != "True" ]]; then
-  echo "[broca-cycle] FAIL: promotion.passed is not true in checkpoint-compare.json" >&2
+  regression_passed="$(python3 -c "import json; print(json.load(open('$candidate_dir/measurement/checkpoint-compare.json'))['promotion'].get('regression_passed'))" 2>/dev/null || echo "unknown")"
+  improvement_passed="$(python3 -c "import json; print(json.load(open('$candidate_dir/measurement/checkpoint-compare.json'))['promotion'].get('improvement_passed'))" 2>/dev/null || echo "unknown")"
+  echo "[broca-cycle] FAIL: promotion.passed is not true in checkpoint-compare.json (regression_passed=$regression_passed, improvement_passed=$improvement_passed)" >&2
   exit 1
 fi
 
-# ── Step 7.5: topic-coverage evidence — does the NEW material actually show
-# up in generation, not just "didn't regress"? checkpoint-compare above is a
-# regression gate; it has no signal for whether newly-learned content
-# landed. Most of what this produces is diagnostic only — a human reviewing
-# PROMOTION_READY.json gets concrete generated-vs-reference examples to
-# read, not just abstract drift/hallucination numbers — but the
-# collapse/repetition check below it (added 2026-07-05) DOES gate: it's the
-# one signal available that catches a model that has stopped distinguishing
-# inputs, which checkpoint-compare's regression metrics provably cannot (see
-# fuzzy-beaming-brook.md for the incident this was added after). Uses only
-# this cycle's new holdout batch (not full history) since the question is
-# "did THIS cycle's learning work," not the whole corpus's.
+# ── Step 7.5: collapse/repetition check on this cycle's new material. Not
+# diagnostic-only, this one actually blocks promotion. Added 2026-07-05
+# after candidate 20260705T094221Z passed checkpoint-compare's regression
+# gate (decoder-ab metrics: the structured path is checkpoint-independent
+# by design, and the direct path's coherence/hallucination metrics don't
+# detect degenerate output) while its topic-coverage-report.json showed it
+# had actually collapsed — dozens of unrelated objectives all generating
+# the exact same garbage string. checkpoint-compare.json's regression
+# metrics have no signal for this failure mode at all; this is the cheapest
+# real check that would have caught it: if a large fraction of distinct
+# objectives produce byte-identical generated text, the model isn't
+# distinguishing inputs anymore. Reads the candidate topic-coverage report
+# generated in Step 6.5 above — no need to regenerate it here.
 if [[ -n "$new_holdout_file" ]]; then
-  echo "[broca-cycle] checking topic coverage on this cycle's new material..."
-  cargo run "${cargo_locked_args[@]}" -p symthaea-broca --features simd --bin broca-topic-coverage -- \
-    --checkpoint "$candidate_checkpoint" \
-    --holdout "$new_holdout_file" \
-    --json-out "$candidate_dir/topic-coverage-report.json"
-  echo "[broca-cycle] topic coverage report: $candidate_dir/topic-coverage-report.json"
-
-  # ── Collapse/repetition gate — NOT diagnostic-only, this one actually
-  # blocks promotion. Added 2026-07-05 after candidate 20260705T094221Z
-  # passed checkpoint-compare's regression gate (decoder-ab metrics: the
-  # structured path is checkpoint-independent by design, and the direct
-  # path's coherence/hallucination metrics don't detect degenerate output)
-  # while its topic-coverage-report.json showed it had actually collapsed —
-  # dozens of unrelated objectives all generating the exact same garbage
-  # string. checkpoint-compare.json has no signal for this failure mode at
-  # all; this is the cheapest real check that would have caught it: if a
-  # large fraction of distinct objectives produce byte-identical generated
-  # text, the model isn't distinguishing inputs anymore.
   collapse_check_status=0
-  python3 - "$candidate_dir/topic-coverage-report.json" <<'PY' || collapse_check_status=$?
+  python3 - "$candidate_topic_coverage_report" <<'PY' || collapse_check_status=$?
 import json, sys
 from collections import Counter
 
@@ -431,27 +476,42 @@ with open(f"{candidate_dir}/curriculum-derived-manifest.json") as f:
 with open(f"{candidate_dir}/measurement/checkpoint-compare.json") as f:
     compare = json.load(f)
 
-topic_coverage = None
-topic_coverage_path = f"{candidate_dir}/topic-coverage-report.json"
-try:
-    with open(topic_coverage_path) as f:
-        report = json.load(f)
-    topic_coverage = {
-        "report_path": topic_coverage_path,
+def load_topic_coverage_summary(path):
+    try:
+        with open(path) as f:
+            report = json.load(f)
+    except FileNotFoundError:
+        return None
+    return {
+        "report_path": path,
         "num_objectives": report.get("num_objectives"),
         "avg_keyword_overlap": report.get("avg_keyword_overlap"),
         "avg_generated_coherence": report.get("avg_generated_coherence"),
         "veto_count": report.get("veto_count"),
     }
-except FileNotFoundError:
-    pass
+
+topic_coverage = load_topic_coverage_summary(f"{candidate_dir}/topic-coverage-report.json")
+topic_coverage_baseline = load_topic_coverage_summary(
+    f"{candidate_dir}/topic-coverage-baseline-report.json"
+)
+
+promotion = compare.get("promotion", {})
 
 promotion_ready = {
     "candidate_checkpoint": candidate_checkpoint,
     "created_at_utc": datetime.now(timezone.utc).isoformat(),
     "contributing_objective_ids": contributing,
     "checkpoint_compare": compare,
+    # Convenience top-level verdicts (also present nested inside
+    # checkpoint_compare.promotion) so a human/script scanning
+    # PROMOTION_READY.json doesn't have to know the nested schema to see
+    # whether this candidate cleared BOTH the absence-of-regression gate
+    # and the presence-of-improvement gate (Tier 1.1) distinctly.
+    "regression_passed": promotion.get("regression_passed"),
+    "improvement_passed": promotion.get("improvement_passed"),
+    "improvement_evaluated": promotion.get("improvement_evaluated"),
     "topic_coverage": topic_coverage,
+    "topic_coverage_baseline": topic_coverage_baseline,
 }
 with open(f"{candidate_dir}/PROMOTION_READY.json", "w") as f:
     json.dump(promotion_ready, f, indent=2)

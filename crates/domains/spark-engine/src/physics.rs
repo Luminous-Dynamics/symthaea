@@ -204,8 +204,7 @@ impl GamowIntegration {
         // Compute bare (no screening) for enhancement factor
         let bare_integral = {
             let mut log_bare: Vec<f64> = Vec::with_capacity(n_points + 1);
-            for i in 0..=n_points {
-                let e_kev = energies[i];
+            for &e_kev in energies.iter().take(n_points + 1) {
                 let log_sigma = (DD_S_FACTOR / e_kev).ln() - b_g / e_kev.sqrt();
                 let log_val = log_sigma + e_kev.ln() - e_kev / kt_kev;
                 log_bare.push(log_val);
@@ -271,7 +270,7 @@ impl GamowIntegration {
         let exponent = DD_GAMOW_CONSTANT * (1.0 / e_kev.sqrt() - 1.0 / e_screened.sqrt());
         let prefactor = e_kev / e_screened;
 
-        (prefactor * exponent.exp()).max(1.0).min(1e6)
+        (prefactor * exponent.exp()).clamp(1.0, 1e6)
     }
 
     /// Energy-dependent D-D branching ratio.
@@ -306,7 +305,7 @@ impl GamowIntegration {
         let proton_sigma_v = gamow.sigma_v_cm3_s * proton_frac;
 
         // Reaction rate density: R = n² × <σv> / 4
-        let total_rate_density = n_d_cm3.powi(2) * gamow.sigma_v_cm3_s / 4.0;
+        let _total_rate_density = n_d_cm3.powi(2) * gamow.sigma_v_cm3_s / 4.0;
         let neutron_rate_density = n_d_cm3.powi(2) * neutron_sigma_v / 4.0;
         let proton_rate_density = n_d_cm3.powi(2) * proton_sigma_v / 4.0;
 

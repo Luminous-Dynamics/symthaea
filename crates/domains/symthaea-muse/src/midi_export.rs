@@ -177,6 +177,181 @@ pub fn export_midi_voices(
     write_midi_file(output_path, &tracks)
 }
 
+/// Export a symbolic theory [`Score`](symthaea_music_theory::Score) as a
+/// Standard MIDI File — the composition-intelligence escape hatch: load the
+/// result into any DAW with professional virtual instruments and the
+/// composed structure (voice leading, form, secondary dominants, tension
+/// arc) renders at production quality, completely decoupled from muse's own
+/// synthesis.
+///
+/// Unlike [`export_midi`], which reverse-guesses voices from frequency and
+/// loudness, this export is EXACT: voice identity comes from the score's own
+/// `VoiceRole`s, timing is beat-arithmetic (`beats × 480 ticks`, no
+/// float-seconds round trip), the time signature is the score's real meter,
+/// and each track's GM program comes from the same per-style ensemble the
+/// audio renderer would use ([`crate::theory_realize::instruments_for`]).
+/// Velocities are the score's written (structural) dynamics — expressive
+/// jitter is deliberately NOT baked in, that's the DAW instrument's job.
+/// (This doc describes [`export_score_midi`] below; the performed
+/// counterpart follows.)
+///
+/// Export the PERFORMED piece as MIDI — the same swing∘rubato timeline,
+/// learned expression, humanize jitter, and equal-loudness taper the audio
+/// render bakes into its voices, written into the event ticks (fixed tempo
+/// track, warped timing). Use this when the `.mid` should carry what you
+/// HEAR: a listening review of a swung piece found the symbolic export
+/// landing straight-grid while the WAV shuffled. [`export_score_midi`]
+/// remains the clean-grid symbolic counterpart for DAW re-instrumentation.
+/// Voices and instruments resolve exactly as the audio path resolves them
+/// ([`crate::theory_realize::resolve_spec_ensemble`]), including the
+/// climax doubling voice and the counter-melody's contrast timbre.
+#[cfg(feature = "theory")]
+pub fn export_performance_midi(
+    score: &symthaea_music_theory::Score,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &crate::MusicalState,
+    output_path: &Path,
+) -> Result<(), String> {
+    let ensemble = crate::theory_realize::resolve_spec_ensemble(spec, seed);
+    let voices = crate::theory_realize::performance_voices(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+    );
+    let usec_per_beat = (60_000_000.0 / score.tempo_bpm) as u32;
+    let tempo_track = Track {
+        name: "Tempo".into(),
+        channel: 0,
+        events: vec![
+            MidiEvent {
+                tick: 0,
+                channel: 0,
+                event_type: MidiEventType::Tempo(usec_per_beat),
+            },
+            MidiEvent {
+                tick: 0,
+                channel: 0,
+                event_type: MidiEventType::TimeSignature(score.meter, 4),
+            },
+        ],
+    };
+    let mut tracks = vec![tempo_track];
+    for (idx, voice) in voices.iter().enumerate() {
+        // At most 5 performed voices — channels stay safely below the GM
+        // drum channel (9).
+        let channel = idx as u8;
+        let mut events = vec![MidiEvent {
+            tick: 0,
+            channel,
+            event_type: MidiEventType::ProgramChange(voice.instrument.gm_program()),
+        }];
+        for n in &voice.notes {
+            let on = secs_to_ticks(n.start_time, score.tempo_bpm);
+            let off = secs_to_ticks(n.start_time + n.duration, score.tempo_bpm).max(on + 1);
+            let note = freq_to_midi(n.frequency);
+            events.push(MidiEvent {
+                tick: on,
+                channel,
+                event_type: MidiEventType::NoteOn {
+                    note,
+                    velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                },
+            });
+            events.push(MidiEvent {
+                tick: off,
+                channel,
+                event_type: MidiEventType::NoteOff { note },
+            });
+        }
+        events.sort_by_key(|e| e.tick);
+        tracks.push(Track {
+            name: voice.name.into(),
+            channel,
+            events,
+        });
+    }
+    write_midi_file(output_path, &tracks)
+}
+
+/// The clean-grid SYMBOLIC export — see the doc block above
+/// [`export_performance_midi`] for the full contrast between the two.
+#[cfg(feature = "theory")]
+pub fn export_score_midi(
+    score: &symthaea_music_theory::Score,
+    style: symthaea_music_theory::Style,
+    seed: u64,
+    output_path: &Path,
+) -> Result<(), String> {
+    use symthaea_music_theory::score::VoiceRole as TheoryRole;
+
+    let (melody_i, harmony_i, bass_i) = crate::theory_realize::instruments_for(style, seed);
+    let counter_i = crate::theory_realize::contrast_counter(melody_i, bass_i);
+    let usec_per_beat = (60_000_000.0 / score.tempo_bpm) as u32;
+
+    let tempo_track = Track {
+        name: "Tempo".into(),
+        channel: 0,
+        events: vec![
+            MidiEvent {
+                tick: 0,
+                channel: 0,
+                event_type: MidiEventType::Tempo(usec_per_beat),
+            },
+            MidiEvent {
+                tick: 0,
+                channel: 0,
+                event_type: MidiEventType::TimeSignature(score.meter, 4),
+            },
+        ],
+    };
+
+    let beats_to_ticks = |beats: f64| (beats * TICKS_PER_BEAT as f64).round() as u64;
+    let mut tracks = vec![tempo_track];
+    for (role, name, channel, instrument) in [
+        (TheoryRole::Melody, "Melody", 0u8, melody_i),
+        (TheoryRole::Harmony, "Harmony", 1, harmony_i),
+        (TheoryRole::Bass, "Bass", 2, bass_i),
+        // The counter-melody gets its contrast timbre (same rule as the
+        // audio render — see `contrast_counter`), its own channel/track.
+        (TheoryRole::CounterMelody, "Counter", 3, counter_i),
+    ] {
+        let mut events = vec![MidiEvent {
+            tick: 0,
+            channel,
+            event_type: MidiEventType::ProgramChange(instrument.gm_program()),
+        }];
+        for n in score.voice(role) {
+            let on = beats_to_ticks(n.onset.beats());
+            let off = beats_to_ticks((n.onset + n.duration).beats()).max(on + 1);
+            let note = n.pitch.midi().clamp(0, 127);
+            events.push(MidiEvent {
+                tick: on,
+                channel,
+                event_type: MidiEventType::NoteOn {
+                    note,
+                    velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                },
+            });
+            events.push(MidiEvent {
+                tick: off,
+                channel,
+                event_type: MidiEventType::NoteOff { note },
+            });
+        }
+        events.sort_by_key(|e| e.tick);
+        tracks.push(Track {
+            name: name.into(),
+            channel,
+            events,
+        });
+    }
+
+    write_midi_file(output_path, &tracks)
+}
+
 fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_bpm: f32) -> Track {
     let mut events = Vec::new();
 
@@ -348,6 +523,100 @@ mod tests {
     #[test]
     fn freq_to_midi_a4() {
         assert_eq!(freq_to_midi(440.0), 69);
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn score_export_round_trips_through_a_midi_parser() {
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let score = symthaea_music_theory::compose(&MusicalIntent::default());
+        let path =
+            std::env::temp_dir().join(format!("muse_score_export_test_{}.mid", std::process::id()));
+        export_score_midi(&score, Style::Classical, 0, &path).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let smf = midly::Smf::parse(&bytes).expect("exported file must be valid SMF");
+        // Tempo track + melody + harmony + bass + counter-melody.
+        assert_eq!(smf.tracks.len(), 5);
+        // Every score note becomes exactly one NoteOn (and its NoteOff).
+        let count = |kind: fn(&midly::MidiMessage) -> bool| -> usize {
+            smf.tracks
+                .iter()
+                .flatten()
+                .filter(|e| {
+                    matches!(&e.kind,
+                        midly::TrackEventKind::Midi { message, .. } if kind(message))
+                })
+                .count()
+        };
+        let ons =
+            count(|m| matches!(m, midly::MidiMessage::NoteOn { vel, .. } if vel.as_int() > 0));
+        let offs = count(|m| {
+            matches!(m, midly::MidiMessage::NoteOff { .. })
+                || matches!(m, midly::MidiMessage::NoteOn { vel, .. } if vel.as_int() == 0)
+        });
+        assert_eq!(ons, score.notes.len());
+        assert_eq!(offs, score.notes.len());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn performance_export_bakes_swing_into_the_ticks() {
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let intent = MusicalIntent::default();
+        let straight = Style::Classical.spec();
+        let mut swung = straight.clone();
+        swung.texture.swing = 0.68;
+        let score = symthaea_music_theory::compose_with_spec(&intent, &straight);
+        let state = crate::MusicalState::default();
+        let mut onsets = Vec::new();
+        for (tag, spec) in [("straight", &straight), ("swung", &swung)] {
+            let path = std::env::temp_dir()
+                .join(format!("muse_perf_export_{tag}_{}.mid", std::process::id()));
+            export_performance_midi(&score, spec, 0, &state, &path).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let smf = midly::Smf::parse(&bytes).expect("valid SMF");
+            // Absolute NoteOn ticks of the melody track (named tracks are in
+            // performance-voice order; melody is present in every form).
+            let mut track_onsets = Vec::new();
+            for track in &smf.tracks {
+                let mut abs = 0u32;
+                let mut name = String::new();
+                let mut ons = Vec::new();
+                for e in track {
+                    abs += e.delta.as_int();
+                    match &e.kind {
+                        midly::TrackEventKind::Meta(midly::MetaMessage::TrackName(n)) => {
+                            name = String::from_utf8_lossy(n).into_owned();
+                        }
+                        midly::TrackEventKind::Midi {
+                            message: midly::MidiMessage::NoteOn { vel, .. },
+                            ..
+                        } if vel.as_int() > 0 => ons.push(abs),
+                        _ => {}
+                    }
+                }
+                if name == "Melody" {
+                    track_onsets = ons;
+                }
+            }
+            assert!(!track_onsets.is_empty(), "{tag}: melody track must exist");
+            onsets.push(track_onsets);
+        }
+        assert_eq!(onsets[0].len(), onsets[1].len());
+        // Swing is a within-beat warp: SOME onsets must land later in the
+        // swung export (off-beats pushed toward 0.68), and none earlier by
+        // more than humanize jitter (same seeds both runs → identical
+        // jitter, so the difference is pure swing).
+        let later = onsets[0]
+            .iter()
+            .zip(&onsets[1])
+            .filter(|(s, w)| w > s)
+            .count();
+        assert!(
+            later > 0,
+            "a swung export must move off-beat onsets later than straight"
+        );
     }
 
     #[test]

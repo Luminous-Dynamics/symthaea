@@ -9,7 +9,14 @@
 //! dynamics engine, with `symthaea-fep` providing precision-weighted Active Inference
 //! modulation. Multi-rate architecture: 200Hz physics + 50Hz cognitive tick.
 //!
-//! ## Architecture
+//! ## Architecture — TARGET DEPLOYMENT SHAPE, NOT IMPLEMENTED
+//!
+//! Everything in this diagram outside the "Cognitive Core" box (Coral/Hailo
+//! retina coprocessor, Raspberry Pi host, CAN bus actuators, LoRa mesh
+//! radio) is aspirational hardware — none of it exists in this crate, which
+//! is a pure-Rust simulation. The in-crate mesh (`swarm.rs`) exchanges peer
+//! state instantly with no latency/dropout model. (Labeled honestly per the
+//! 2026-07 robotics deep review.)
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────┐

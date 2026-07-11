@@ -3,7 +3,7 @@ name = "hdc-zkp-bench"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Benchmark: HDC XOR binding proof across Binius, Winterfell, and RISC0 backends"
+description = "Benchmark: HDC XOR binding proof on Binius (real prover, measured) plus an analytic Winterfell estimate (no real Winterfell prover)"
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 
 [[bin]]
@@ -22,10 +22,10 @@ binius-verifier = { path = "../../vendor/binius64/crates/verifier" }
 binius-transcript = { path = "../../vendor/binius64/crates/transcript" }
 binius-hash = { path = "../../vendor/binius64/crates/hash" }
 
-# Winterfell (prime field STARKs — XOR requires bit decomposition)
-winterfell = "0.13.1"
-winter-math = "0.13.1"
-winter-crypto = "0.13.1"
+# NOTE: No Winterfell dependency. The "Winterfell" numbers this benchmark
+# prints are an ANALYTIC ESTIMATE (constraint-count model) — no AIR is
+# implemented and no Winterfell prover runs. A real, measured Winterfell
+# 16,384-bit XOR circuit lives in crates/mycelix-zkp-core (monorepo root).
 
 # Common
 rand = "0.9"

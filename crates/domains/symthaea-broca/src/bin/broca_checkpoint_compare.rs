@@ -5,6 +5,26 @@
 //!
 //! This binary treats benchmark JSON as evidence. Missing metrics are reported
 //! as unavailable rather than silently interpreted as success.
+//!
+//! ## Two gates, not one
+//!
+//! `promotion.regression_passed` proves the candidate didn't get *worse* on
+//! drift/hallucination/compile/test/structured metrics — that's the whole of
+//! what this binary used to check. It structurally cannot tell you whether
+//! the candidate got *better*: a checkpoint that memorized nothing new still
+//! clears every regression bound, because those bounds only look at drift
+//! from the *previous* behavior, not at performance on genuinely new
+//! material (see `fuzzy-beaming-brook.md` incident notes and
+//! `DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md` Tier 1.1).
+//!
+//! `promotion.improvement_passed` closes that gap: when
+//! `--baseline-topic-coverage`/`--candidate-topic-coverage` (both produced
+//! by `broca-topic-coverage` against the SAME held-out-objective batch — one
+//! run against the production checkpoint, one against the candidate) are
+//! supplied, the candidate must beat production by a configured positive
+//! margin on those held-out, never-trained-on topics. `promotion.passed` is
+//! `regression_passed && improvement_passed` — a candidate that merely
+//! didn't regress is not enough to promote.
 
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -28,6 +48,30 @@ struct Options {
     max_structured_translation_grounding_rate_regression: f64,
     max_structured_translation_drift_regression: f64,
     require_all_metrics: bool,
+    // ── Presence-of-improvement gate (Tier 1.1) ────────────────────────────
+    /// `broca-topic-coverage` report generated against the PRODUCTION
+    /// checkpoint, evaluated on this cycle's held-out objectives.
+    baseline_topic_coverage: Option<PathBuf>,
+    /// `broca-topic-coverage` report generated against the CANDIDATE
+    /// checkpoint, evaluated on the same held-out objectives.
+    candidate_topic_coverage: Option<PathBuf>,
+    /// Candidate's `avg_keyword_overlap` must exceed baseline's by at least
+    /// this much on held-out objectives.
+    min_keyword_overlap_improvement: f64,
+    /// Candidate's `avg_generated_coherence` must exceed baseline's by at
+    /// least this much on held-out objectives (metric skipped, not failed,
+    /// when coherence wasn't measured on either side).
+    min_coherence_improvement: f64,
+    /// Fail closed if topic-coverage evidence was expected (this flag set)
+    /// but couldn't be loaded/parsed on either side. Without this flag, a
+    /// missing/unreadable topic-coverage report makes the improvement gate
+    /// vacuously pass — the correct default for callers that never intended
+    /// to evaluate it (e.g. cycles with no new held-out material), but wrong
+    /// for callers that did.
+    require_improvement_evaluated: bool,
+    /// Fail the improvement gate if any individual improvement metric (e.g.
+    /// coherence) couldn't be computed, instead of silently skipping it.
+    require_all_improvement_metrics: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -39,13 +83,31 @@ struct CompareReport {
     promotion: PromotionDecision,
     metrics: Vec<MetricComparison>,
     missing_metrics: Vec<String>,
+    improvement_metrics: Vec<ImprovementMetricComparison>,
+    missing_improvement_metrics: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct PromotionDecision {
+    /// Combined gate: `regression_passed && improvement_passed`. This is
+    /// what callers should check to decide promotion eligibility.
     passed: bool,
+    /// Absence-of-regression verdict only (the historical `passed` field's
+    /// exact semantics, kept as its own field for callers that only care
+    /// about drift/hallucination/compile/test bounds).
+    regression_passed: bool,
+    /// Presence-of-improvement verdict on held-out objectives. `true`
+    /// vacuously when the improvement gate wasn't evaluated (no
+    /// topic-coverage evidence supplied) AND it wasn't required to be.
+    improvement_passed: bool,
+    /// Whether the improvement gate actually had evidence to evaluate
+    /// (i.e. both `--baseline-topic-coverage` and `--candidate-topic-coverage`
+    /// were supplied and parsed successfully).
+    improvement_evaluated: bool,
     failures: Vec<PromotionFailure>,
     missing_required_metrics: Vec<String>,
+    improvement_failures: Vec<ImprovementFailure>,
+    missing_required_improvement_metrics: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,6 +117,25 @@ struct PromotionFailure {
     candidate: f64,
     delta: f64,
     allowed_regression: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ImprovementMetricComparison {
+    metric: String,
+    baseline: f64,
+    candidate: f64,
+    delta: f64,
+    required_improvement: f64,
+    passed: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ImprovementFailure {
+    metric: String,
+    baseline: f64,
+    candidate: f64,
+    delta: f64,
+    required_improvement: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -298,20 +379,123 @@ fn compare(opts: &Options) -> Result<CompareReport> {
     } else {
         Vec::new()
     };
+    let regression_passed = failures.is_empty() && missing_required_metrics.is_empty();
+
+    // ── Presence-of-improvement gate (Tier 1.1) ─────────────────────────────
+    // Distinct from the regression comparisons above: those compare the SAME
+    // artifact kind (decoder-ab / exercism-bench) between baseline_dir and
+    // candidate_dir. This compares `broca-topic-coverage` reports — evidence
+    // of held-out, never-trained-on objective performance — which live at
+    // caller-supplied paths, not necessarily inside baseline_dir/candidate_dir.
+    let baseline_topic = opts
+        .baseline_topic_coverage
+        .as_deref()
+        .map(read_optional_json)
+        .transpose()?
+        .flatten();
+    let candidate_topic = opts
+        .candidate_topic_coverage
+        .as_deref()
+        .map(read_optional_json)
+        .transpose()?
+        .flatten();
+    let improvement_evaluated = baseline_topic.is_some() && candidate_topic.is_some();
+
+    let mut improvement_metrics = Vec::new();
+    let mut missing_improvement_metrics = Vec::new();
+    if improvement_evaluated {
+        compare_improvement_metric(
+            &mut improvement_metrics,
+            &mut missing_improvement_metrics,
+            "topic_coverage.avg_keyword_overlap",
+            value_at(baseline_topic.as_ref(), &["avg_keyword_overlap"]),
+            value_at(candidate_topic.as_ref(), &["avg_keyword_overlap"]),
+            opts.min_keyword_overlap_improvement,
+        );
+        compare_improvement_metric(
+            &mut improvement_metrics,
+            &mut missing_improvement_metrics,
+            "topic_coverage.avg_generated_coherence",
+            value_at(baseline_topic.as_ref(), &["avg_generated_coherence"]),
+            value_at(candidate_topic.as_ref(), &["avg_generated_coherence"]),
+            opts.min_coherence_improvement,
+        );
+    }
+
+    let improvement_failures = improvement_metrics
+        .iter()
+        .filter(|metric| !metric.passed)
+        .map(|metric| ImprovementFailure {
+            metric: metric.metric.clone(),
+            baseline: metric.baseline,
+            candidate: metric.candidate,
+            delta: metric.delta,
+            required_improvement: metric.required_improvement,
+        })
+        .collect::<Vec<_>>();
+
+    let missing_required_improvement_metrics =
+        if improvement_evaluated && opts.require_all_improvement_metrics {
+            missing_improvement_metrics.clone()
+        } else {
+            Vec::new()
+        };
+
+    let improvement_passed = if improvement_evaluated {
+        // Evaluated but produced zero comparable metrics (e.g. both reports
+        // parsed but neither had a usable field) is itself a failure, not a
+        // vacuous pass — this gate exists to require positive evidence.
+        !improvement_metrics.is_empty()
+            && improvement_failures.is_empty()
+            && missing_required_improvement_metrics.is_empty()
+    } else {
+        !opts.require_improvement_evaluated
+    };
 
     Ok(CompareReport {
-        schema_version: 1,
+        schema_version: 2,
         evidence_level: "measured",
         baseline_dir: opts.baseline_dir.display().to_string(),
         candidate_dir: opts.candidate_dir.display().to_string(),
         promotion: PromotionDecision {
-            passed: failures.is_empty() && missing_required_metrics.is_empty(),
+            passed: regression_passed && improvement_passed,
+            regression_passed,
+            improvement_passed,
+            improvement_evaluated,
             failures,
             missing_required_metrics,
+            improvement_failures,
+            missing_required_improvement_metrics,
         },
         metrics,
         missing_metrics,
+        improvement_metrics,
+        missing_improvement_metrics,
     })
+}
+
+fn compare_improvement_metric(
+    metrics: &mut Vec<ImprovementMetricComparison>,
+    missing_metrics: &mut Vec<String>,
+    name: &str,
+    baseline: Option<f64>,
+    candidate: Option<f64>,
+    required_improvement: f64,
+) {
+    let (Some(baseline), Some(candidate)) = (baseline, candidate) else {
+        missing_metrics.push(name.to_string());
+        return;
+    };
+    let delta = candidate - baseline;
+    let passed = delta >= required_improvement;
+    metrics.push(ImprovementMetricComparison {
+        metric: name.to_string(),
+        baseline,
+        candidate,
+        delta,
+        required_improvement,
+        passed,
+    });
 }
 
 fn compare_metric(
@@ -387,6 +571,12 @@ fn parse_args() -> Result<Options> {
         max_structured_translation_grounding_rate_regression: 0.0,
         max_structured_translation_drift_regression: 0.02,
         require_all_metrics: false,
+        baseline_topic_coverage: None,
+        candidate_topic_coverage: None,
+        min_keyword_overlap_improvement: 0.05,
+        min_coherence_improvement: 0.02,
+        require_improvement_evaluated: false,
+        require_all_improvement_metrics: false,
     };
 
     let args = std::env::args().collect::<Vec<_>>();
@@ -460,6 +650,31 @@ fn parse_args() -> Result<Options> {
                 opts.max_structured_translation_drift_regression =
                     value(&args, i, "--max-structured-translation-drift-regression")?.parse()?;
             }
+            "--baseline-topic-coverage" => {
+                i += 1;
+                opts.baseline_topic_coverage =
+                    Some(PathBuf::from(value(&args, i, "--baseline-topic-coverage")?));
+            }
+            "--candidate-topic-coverage" => {
+                i += 1;
+                opts.candidate_topic_coverage = Some(PathBuf::from(value(
+                    &args,
+                    i,
+                    "--candidate-topic-coverage",
+                )?));
+            }
+            "--min-keyword-overlap-improvement" => {
+                i += 1;
+                opts.min_keyword_overlap_improvement =
+                    value(&args, i, "--min-keyword-overlap-improvement")?.parse()?;
+            }
+            "--min-coherence-improvement" => {
+                i += 1;
+                opts.min_coherence_improvement =
+                    value(&args, i, "--min-coherence-improvement")?.parse()?;
+            }
+            "--require-improvement-evaluated" => opts.require_improvement_evaluated = true,
+            "--require-all-improvement-metrics" => opts.require_all_improvement_metrics = true,
             "-h" | "--help" => {
                 print_usage();
                 std::process::exit(0);
@@ -483,7 +698,13 @@ fn value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str> {
 
 fn print_usage() {
     eprintln!(
-        "Usage: broca-checkpoint-compare --baseline-dir DIR --candidate-dir DIR [--json-out PATH] [--fail-on-regression] [--require-all-metrics] [--max-drift-regression F] [--max-hallucination-regression F] [--max-compile-rate-regression F] [--max-test-rate-regression F] [--max-structured-confidence-regression F] [--max-structured-validity-regression F] [--max-structured-required-role-rate-regression F] [--max-structured-translation-validity-regression F] [--max-structured-translation-grounding-rate-regression F] [--max-structured-translation-drift-regression F]"
+        "Usage: broca-checkpoint-compare --baseline-dir DIR --candidate-dir DIR [--json-out PATH] [--fail-on-regression] [--require-all-metrics] [--max-drift-regression F] [--max-hallucination-regression F] [--max-compile-rate-regression F] [--max-test-rate-regression F] [--max-structured-confidence-regression F] [--max-structured-validity-regression F] [--max-structured-required-role-rate-regression F] [--max-structured-translation-validity-regression F] [--max-structured-translation-grounding-rate-regression F] [--max-structured-translation-drift-regression F] [--baseline-topic-coverage PATH] [--candidate-topic-coverage PATH] [--min-keyword-overlap-improvement F] [--min-coherence-improvement F] [--require-improvement-evaluated] [--require-all-improvement-metrics]\n\n\
+         The improvement gate (--baseline-topic-coverage/--candidate-topic-coverage) is a\n\
+         PRESENCE-of-improvement check, distinct from the regression bounds above which only\n\
+         prove ABSENCE of regression. Both --baseline-topic-coverage and --candidate-topic-coverage\n\
+         must point at `broca-topic-coverage` reports generated against the SAME held-out\n\
+         objective batch (one run against the production checkpoint, one against the candidate).\n\
+         promotion.passed requires both regression_passed and improvement_passed."
     );
 }
 
@@ -509,7 +730,30 @@ mod tests {
             max_structured_translation_grounding_rate_regression: 0.0,
             max_structured_translation_drift_regression: 0.02,
             require_all_metrics: false,
+            baseline_topic_coverage: None,
+            candidate_topic_coverage: None,
+            min_keyword_overlap_improvement: 0.05,
+            min_coherence_improvement: 0.02,
+            require_improvement_evaluated: false,
+            require_all_improvement_metrics: false,
         }
+    }
+
+    fn write_topic_coverage(path: &Path, avg_keyword_overlap: f64, avg_generated_coherence: f64) {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        let report = json!({
+            "schema_version": 2,
+            "checkpoint_path": "irrelevant-for-test.bin",
+            "num_objectives": 5,
+            "avg_keyword_overlap": avg_keyword_overlap,
+            "avg_generated_coherence": avg_generated_coherence,
+            "coherence_measured_count": 5,
+            "veto_count": 0,
+            "cases": []
+        });
+        std::fs::write(path, serde_json::to_string_pretty(&report).unwrap()).unwrap();
     }
 
     fn write_artifacts(
@@ -658,5 +902,131 @@ mod tests {
         let report = compare(&strict).unwrap();
         assert!(!report.promotion.passed);
         assert!(!report.promotion.missing_required_metrics.is_empty());
+    }
+
+    // ── Presence-of-improvement gate (Tier 1.1) ─────────────────────────────
+    // These four tests are the acceptance criterion for
+    // DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md Tier 1.1: "a Broca
+    // candidate has been rejected by the improvement gate at least once,
+    // proving it can fail" — plus the accept path, and the two gate-shape
+    // tests around what happens when topic-coverage evidence is absent.
+
+    #[test]
+    fn improvement_gate_vacuously_passes_without_topic_coverage() {
+        // No --baseline-topic-coverage/--candidate-topic-coverage supplied,
+        // and not required: the improvement gate must not silently block
+        // every cycle that has no new held-out material (the common case),
+        // matching the historical `passed` semantics for callers that never
+        // opt into the improvement check.
+        let temp = tempfile::tempdir().unwrap();
+        let baseline = temp.path().join("baseline");
+        let candidate = temp.path().join("candidate");
+        write_artifacts(&baseline, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+        write_artifacts(&candidate, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+
+        let report = compare(&opts(baseline, candidate)).unwrap();
+        assert!(report.promotion.regression_passed);
+        assert!(!report.promotion.improvement_evaluated);
+        assert!(report.promotion.improvement_passed);
+        assert!(report.promotion.passed);
+    }
+
+    #[test]
+    fn improvement_gate_required_but_missing_fails_closed() {
+        // Same as above, but the caller explicitly required the improvement
+        // gate to be evaluated (e.g. the cycle script knows it generated new
+        // held-out material this cycle) and forgot/failed to supply reports.
+        // Must fail closed, not silently pass.
+        let temp = tempfile::tempdir().unwrap();
+        let baseline = temp.path().join("baseline");
+        let candidate = temp.path().join("candidate");
+        write_artifacts(&baseline, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+        write_artifacts(&candidate, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+
+        let mut strict = opts(baseline, candidate);
+        strict.require_improvement_evaluated = true;
+        let report = compare(&strict).unwrap();
+        assert!(report.promotion.regression_passed);
+        assert!(!report.promotion.improvement_evaluated);
+        assert!(!report.promotion.improvement_passed);
+        assert!(!report.promotion.passed);
+    }
+
+    #[test]
+    fn improvement_gate_rejects_flat_candidate_despite_clean_regression() {
+        // The exact failure mode Tier 1.1 exists to catch: a candidate that
+        // clears every regression bound (didn't get worse) but shows no real
+        // signal of having learned the new held-out material (flat/noise-level
+        // delta vs. production on the same held-out objectives). Regression
+        // gate alone would promote this; the improvement gate must reject it.
+        let temp = tempfile::tempdir().unwrap();
+        let baseline_dir = temp.path().join("baseline");
+        let candidate_dir = temp.path().join("candidate");
+        write_artifacts(&baseline_dir, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+        write_artifacts(&candidate_dir, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+
+        let baseline_topic = temp.path().join("topic-coverage-baseline.json");
+        let candidate_topic = temp.path().join("topic-coverage-candidate.json");
+        // Candidate barely nudges keyword overlap (+0.02, below the 0.05
+        // default margin) and coherence actually dips slightly — this is
+        // what "didn't learn anything new" looks like in this report shape.
+        write_topic_coverage(&baseline_topic, 0.10, 0.55);
+        write_topic_coverage(&candidate_topic, 0.12, 0.54);
+
+        let mut opts = opts(baseline_dir, candidate_dir);
+        opts.baseline_topic_coverage = Some(baseline_topic);
+        opts.candidate_topic_coverage = Some(candidate_topic);
+        let report = compare(&opts).unwrap();
+
+        assert!(
+            report.promotion.regression_passed,
+            "regression gate should pass — this candidate did not get worse"
+        );
+        assert!(report.promotion.improvement_evaluated);
+        assert!(
+            !report.promotion.improvement_passed,
+            "improvement gate should reject a flat/no-improvement candidate"
+        );
+        assert!(!report.promotion.passed);
+        assert!(
+            report
+                .promotion
+                .improvement_failures
+                .iter()
+                .any(|f| f.metric == "topic_coverage.avg_keyword_overlap")
+        );
+    }
+
+    #[test]
+    fn improvement_gate_accepts_genuine_improvement() {
+        // Mirror image: candidate clears regression AND shows a real,
+        // above-margin delta over production on the same held-out
+        // objectives. Both gates pass, so the combined verdict passes.
+        let temp = tempfile::tempdir().unwrap();
+        let baseline_dir = temp.path().join("baseline");
+        let candidate_dir = temp.path().join("candidate");
+        write_artifacts(&baseline_dir, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+        write_artifacts(&candidate_dir, 0.4, 0.2, 0.8, 0.9, 1.0, 2, 1);
+
+        let baseline_topic = temp.path().join("topic-coverage-baseline.json");
+        let candidate_topic = temp.path().join("topic-coverage-candidate.json");
+        // Production has never seen these objectives (low overlap/coherence);
+        // the fine-tuned candidate clearly landed the new material.
+        write_topic_coverage(&baseline_topic, 0.08, 0.40);
+        write_topic_coverage(&candidate_topic, 0.35, 0.60);
+
+        let mut opts = opts(baseline_dir, candidate_dir);
+        opts.baseline_topic_coverage = Some(baseline_topic);
+        opts.candidate_topic_coverage = Some(candidate_topic);
+        let report = compare(&opts).unwrap();
+
+        assert!(report.promotion.regression_passed);
+        assert!(report.promotion.improvement_evaluated);
+        assert!(
+            report.promotion.improvement_passed,
+            "improvement gate should accept a candidate with a real above-margin delta"
+        );
+        assert!(report.promotion.improvement_failures.is_empty());
+        assert!(report.promotion.passed);
     }
 }

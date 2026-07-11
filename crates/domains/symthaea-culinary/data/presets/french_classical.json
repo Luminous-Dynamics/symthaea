@@ -1,0 +1,14 @@
+{
+  "name": "french_classical",
+  "emulsion": { "dispersed_phase_fraction": 0.68 },
+  "coagulation": {
+    "protein": "EggYolk",
+    "trajectory": { "points": [[0.0, 20.0], [4.0, 70.0]] }
+  },
+  "pasteurization": {
+    "pathogen": "SalmonellaPoultry",
+    "trajectory": { "points": [[0.0, 20.0], [8.0, 63.0], [11.0, 63.0]] },
+    "required_log_reduction": null
+  },
+  "hydration": { "dough": "Bread", "flour_g": 1000.0, "water_g": 680.0 }
+}

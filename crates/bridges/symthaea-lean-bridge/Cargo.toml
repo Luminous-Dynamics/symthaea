@@ -16,5 +16,6 @@ default = []
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-proof-audit = { path = "../symthaea-proof-audit" }
 
 [dev-dependencies]

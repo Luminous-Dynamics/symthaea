@@ -39,6 +39,22 @@ pub fn surgical_cautery_allowed(level: MotorSafetyLevel) -> bool {
     matches!(level, MotorSafetyLevel::Green)
 }
 
+/// Per-tier tip speed limit in mm/s, enforced by the simulator's physics
+/// step (joint velocities are scaled down whenever the instantaneous tip
+/// velocity from the kinematic Jacobian would exceed this).
+///
+/// Green 50 mm/s / Yellow 20 mm/s restores (a basic, now-real version of)
+/// the tier speed limits this crate's docs once claimed and then retracted.
+/// Orange/Red allow only slow motion (5 mm/s) so the Red Retract withdrawal
+/// itself cannot move the tool fast.
+pub fn surgical_tip_speed_limit(level: MotorSafetyLevel) -> f64 {
+    match level {
+        MotorSafetyLevel::Green => 50.0,
+        MotorSafetyLevel::Yellow => 20.0,
+        MotorSafetyLevel::Orange | MotorSafetyLevel::Red => 5.0,
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SurgicalState {
     pub joint_angles: [f64; NUM_JOINTS],
@@ -52,10 +68,19 @@ pub struct SurgicalState {
 }
 impl SurgicalState {
     pub fn home() -> Self {
+        let joint_angles = [0.0, 0.3, 0.0, -0.5, 0.0, 0.0];
+        // tip_position must be the actual FK of joint_angles — it was
+        // previously a stale placeholder ([0,0,-50] vs the true ~[38,-14,-274]),
+        // a ~230mm inconsistency that (among other things) made any code
+        // reading state().tip_position before the first step() see a
+        // fictitious position, producing a spurious ~230,000 mm/s apparent
+        // "jump" on the first real step (caught by
+        // simulator::tests::test_tip_speed_clamp_enforced, 2026-07-07).
+        let tip_position = crate::simulator::fk_tip(&joint_angles);
         Self {
-            joint_angles: [0.0, 0.3, 0.0, -0.5, 0.0, 0.0],
+            joint_angles,
             joint_velocities: [0.0; NUM_JOINTS],
-            tip_position: [0.0, 0.0, -50.0],
+            tip_position,
             tip_force: [0.0; 3],
             jaw_angle: 0.0,
             cautery_power: 0.0,
@@ -125,7 +150,21 @@ pub struct SurgicalConfig {
     pub max_joint_torques: [f64; NUM_JOINTS],
     pub motion_scaling: f64,
     pub tremor_filter_hz: f64,
+    /// RCM (remote-center-of-motion) spring stiffness in N/m, applied at the
+    /// point where the tool shaft crosses the trocar port plane. Consumed by
+    /// the simulator's physics step (Jacobian-transpose spring torque pulling
+    /// the shaft back through the pivot). Set to 0.0 to disable the
+    /// constraint entirely.
     pub rcm_stiffness: f64,
+    /// Depth (mm, negative = into the body) of the trocar port plane the
+    /// tool shaft must keep passing through. The port's lateral anchor point
+    /// is computed from the home pose at construction, so the home shaft
+    /// line is RCM-neutral.
+    pub trocar_port_z: f64,
+    /// Workspace position (mm) of a critical anatomical structure (vessel,
+    /// nerve, duct). `SurgicalState::critical_structure_distance` is the
+    /// live tip-to-structure Euclidean distance from actual kinematics.
+    pub critical_structure: [f64; 3],
     pub physics_hz: f64,
     pub cognitive_interval: usize,
     pub steps_per_episode: usize,
@@ -140,6 +179,11 @@ impl Default for SurgicalConfig {
             motion_scaling: 0.2,
             tremor_filter_hz: 8.0,
             rcm_stiffness: 1000.0,
+            trocar_port_z: -100.0,
+            // Home tip sits near [38.4, -14.4, -274.2] (FK of the home
+            // joint angles); the default structure is ~35 mm lateral of it —
+            // inside the reachable workspace but safely away from home.
+            critical_structure: [70.0, -14.4, -260.0],
             physics_hz: 1000.0,
             cognitive_interval: 50,
             steps_per_episode: 5000,
@@ -217,6 +261,20 @@ mod tests {
         assert_eq!(MotorSafetyLevel::from_phi(0.11), MotorSafetyLevel::Orange);
         assert_eq!(MotorSafetyLevel::from_phi(0.10), MotorSafetyLevel::Red);
         assert_eq!(MotorSafetyLevel::from_phi(0.0), MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_tip_speed_limit_ordering() {
+        // Speed authority must tighten monotonically with the safety tier,
+        // and Yellow must sit strictly below the Green allowance.
+        let green = surgical_tip_speed_limit(MotorSafetyLevel::Green);
+        let yellow = surgical_tip_speed_limit(MotorSafetyLevel::Yellow);
+        let orange = surgical_tip_speed_limit(MotorSafetyLevel::Orange);
+        let red = surgical_tip_speed_limit(MotorSafetyLevel::Red);
+        assert!(green > yellow);
+        assert!(yellow > orange);
+        assert_eq!(orange, red);
+        assert!(red > 0.0, "Red keeps a small allowance so Retract can move");
     }
 
     #[test]

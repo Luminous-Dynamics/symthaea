@@ -12,3 +12,15 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 
+# Optional HTTP gallery server (feature = "server")
+axum = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[features]
+server = ["dep:axum", "dep:tokio"]
+
+[[bin]]
+name = "gallery-server"
+path = "src/bin/gallery-server.rs"
+required-features = ["server"]
+

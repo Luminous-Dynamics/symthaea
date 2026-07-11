@@ -13,7 +13,7 @@
 //! ```
 
 use std::path::PathBuf;
-use symthaea_muse::hdc_mel_decoder::MelDecoder;
+use symthaea_muse::mel_mlp::MelDecoder;
 use symthaea_muse::training_pairs::load_pairs;
 
 fn normalize_state(raw: &[f32; 17]) -> [f32; 17] {

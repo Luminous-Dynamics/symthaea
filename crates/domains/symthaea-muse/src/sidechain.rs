@@ -49,7 +49,7 @@ impl SidechainDucker {
         } else {
             self.release_coeff
         };
-        self.envelope = coeff * self.envelope + (1.0 - coeff) * level;
+        self.envelope = crate::synth::flush_denormal(coeff * self.envelope + (1.0 - coeff) * level);
 
         if self.envelope > self.threshold {
             let excess_db = 20.0 * (self.envelope / self.threshold).log10();

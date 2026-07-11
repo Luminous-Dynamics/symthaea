@@ -3,6 +3,7 @@
 use crate::controller::SurgicalController;
 use crate::encoder::SurgicalHdcEncoder;
 use crate::fep_agent::ActiveInferenceSurgicalAgent;
+use crate::reflex::reflex_torques;
 use crate::simulator::{SimpleSurgicalSimulator, SurgicalPhysicsSimulator};
 use crate::types::SurgicalConfig;
 use symthaea_core::genesis::GenesisSeed;
@@ -12,6 +13,10 @@ pub struct EpisodeMetrics {
     pub mean_effort: f32,
     pub steps_survived: usize,
     pub diverged: bool,
+    /// Mean pre-update imitation MSE against the hand-designed
+    /// PD-hold-toward-home reflex -- the learning signal (real-trainer
+    /// follow-up to SYMTHAEA_CLASSIC_PLATFORMS_FEP_HONESTY_2026-07-09.md).
+    pub mean_imitation_loss: f32,
 }
 pub struct SurgicalTrainer {
     ctrl: SurgicalController,
@@ -38,12 +43,17 @@ impl SurgicalTrainer {
         let dt = self.cfg.physics_dt();
         let mut tf = 0.0;
         let mut te = 0.0f32;
+        let mut tau_factor = 1.0f32;
+        let mut loss_sum = 0.0f32;
         for step in 0..self.cfg.steps_per_episode {
             let hv = self.enc.encode(self.sim.state());
             if step % self.cfg.cognitive_interval == 0 {
-                let _ = self.fep.tick(self.sim.state());
+                let fep = self.fep.tick(self.sim.state());
+                tau_factor = fep.tau_factor;
             }
-            let cmd = self.ctrl.forward(&hv, dt as f32);
+            let cmd = self.ctrl.forward(&hv, dt as f32 * tau_factor);
+            let target = reflex_torques(self.sim.state());
+            loss_sum += self.ctrl.train_step(&target);
             self.sim.step(&cmd, dt);
             tf += self.sim.state().force_magnitude();
             te += cmd.control_effort();
@@ -53,6 +63,7 @@ impl SurgicalTrainer {
                     mean_effort: te / (step + 1) as f32,
                     steps_survived: step,
                     diverged: true,
+                    mean_imitation_loss: loss_sum / (step + 1) as f32,
                 };
             }
         }
@@ -62,6 +73,7 @@ impl SurgicalTrainer {
             mean_effort: te / n as f32,
             steps_survived: n,
             diverged: false,
+            mean_imitation_loss: loss_sum / n as f32,
         }
     }
 }
@@ -75,5 +87,22 @@ mod tests {
         let mut t = SurgicalTrainer::new(c);
         let m = t.run_episode();
         assert!(!m.diverged);
+        assert!(m.mean_imitation_loss > 0.0, "learning signal must be live");
+    }
+
+    #[test]
+    fn test_training_reduces_imitation_loss() {
+        let mut c = SurgicalConfig::default();
+        c.steps_per_episode = 400;
+        let mut t = SurgicalTrainer::new(c);
+        let first = t.run_episode().mean_imitation_loss;
+        for _ in 0..3 {
+            t.run_episode();
+        }
+        let last = t.run_episode().mean_imitation_loss;
+        assert!(
+            last < first,
+            "imitation loss must decrease with training: first {first:.5} -> last {last:.5}"
+        );
     }
 }

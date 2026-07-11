@@ -42,18 +42,11 @@ pub const HARMONY_NAMES: [&str; 8] = [
     "Sacred Stillness",
 ];
 
-/// The characteristic interval (semitones from root) for each harmony.
-/// Used for chroma-based identification.
-const HARMONY_INTERVALS: [i32; 8] = [
-    0,  // [0] Resonant Coherence — unison/octave
-    4,  // [1] Pan-Sentient Flourishing — major 3rd
-    7,  // [2] Integral Wisdom — perfect 5th
-    10, // [3] Infinite Play — minor 7th
-    5,  // [4] Universal Interconnectedness — perfect 4th
-    9,  // [5] Sacred Reciprocity — major 6th
-    2,  // [6] Evolutionary Progression — major 2nd
-    0,  // [7] Sacred Stillness — unison (silence/pedal)
-];
+/// The characteristic interval (semitones from root) for each harmony,
+/// used for chroma-based identification. Re-exported from the canonical
+/// mapping in `pitch` — this module once carried its own duplicate copy,
+/// which risked silent drift between wake detection and composition.
+use crate::pitch::HARMONY_INTERVALS;
 
 /// Safety levels matching the immune system.
 pub const SAFETY_GREEN: u8 = 0;

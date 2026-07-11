@@ -5,6 +5,7 @@
 
 use crate::rotor_dynamics::{RotorDynamics, RotorOutput};
 use crate::types::{HelicopterCommand, HelicopterState};
+use crate::wind_model::{WindConfig, WindModel};
 
 /// Trait for helicopter physics simulation backends.
 pub trait HelicopterPhysicsSimulator {
@@ -25,10 +26,19 @@ pub trait HelicopterPhysicsSimulator {
 /// Uses the [`RotorDynamics`] model for thrust/torque computation and
 /// semi-implicit Euler integration for body dynamics.
 ///
+/// Atmosphere: owns a [`WindModel`] — each step the gust state evolves,
+/// aerodynamic drag acts on *relative* airspeed (vehicle velocity minus
+/// wind), and rotor thrust is multiplied by the Cheeseman-Bennett ground
+/// effect ratio. The default wind config is calm (zero steady wind, zero
+/// gusts), which reproduces still-air drag exactly; enable wind explicitly
+/// via [`SimpleHelicopterSimulator::set_wind`] with a seed so runs stay
+/// deterministic.
+///
 /// Mass: 500 kg (light SAR helicopter, e.g., Robinson R44 class).
 pub struct SimpleHelicopterSimulator {
     state: HelicopterState,
     rotor: RotorDynamics,
+    wind: WindModel,
     mass: f64,
     inertia: [f64; 3],
     external_force: [f64; 3],
@@ -37,17 +47,28 @@ pub struct SimpleHelicopterSimulator {
 }
 
 impl SimpleHelicopterSimulator {
-    /// Create a new simulator hovering at 20m.
+    /// Create a new simulator hovering at 20m (calm air).
     pub fn new() -> Self {
         Self {
             state: HelicopterState::hover(20.0),
             rotor: RotorDynamics::new(),
+            wind: WindModel::calm(),
             mass: 500.0,
             inertia: [1500.0, 1500.0, 2000.0],
             external_force: [0.0; 3],
             drag_coeff: 0.15, // Higher drag than quadrotor (larger body)
             angular_damping: 2.0,
         }
+    }
+
+    /// Enable wind with the given config and gust seed (deterministic).
+    pub fn set_wind(&mut self, config: WindConfig, seed: u64) {
+        self.wind = WindModel::with_seed(config, seed);
+    }
+
+    /// Access the current wind model.
+    pub fn wind_model(&self) -> &WindModel {
+        &self.wind
     }
 }
 
@@ -89,21 +110,25 @@ impl HelicopterPhysicsSimulator for SimpleHelicopterSimulator {
             return;
         }
 
-        // 3. Thrust vector in world frame (rotate body-z by quaternion)
+        // 3. Thrust vector in world frame (rotate body-z by quaternion),
+        //    augmented by ground effect near the surface (Cheeseman-Bennett).
         let [w, x, y, z] = self.state.quaternion;
-        let thrust = rotor_out.thrust_force;
+        let thrust = rotor_out.thrust_force * self.wind.ground_effect_ratio(self.state.position[2]);
 
         let fx = 2.0 * (x * z + w * y) * thrust + self.external_force[0];
         let fy = 2.0 * (y * z - w * x) * thrust + self.external_force[1];
         let fz = (1.0 - 2.0 * (x * x + y * y)) * thrust + self.external_force[2];
 
-        // 4. Linear acceleration with quadratic drag: F_drag = -c × |v| × v
+        // 4. Linear acceleration with quadratic drag: F_drag = -c × |v_rel| × v_rel
         // Quadratic drag better models aerodynamic forces at helicopter speeds
         // (Fossen 2011). The drag coefficient absorbs 0.5 × ρ × Cd × A / mass.
+        // Drag acts on airspeed relative to the wind: with the default calm
+        // config wind_vel is exactly [0,0,0] and this reduces to still-air drag.
+        let wind_vel = self.wind.wind_velocity_step(dt);
         let drag = self.drag_coeff / self.mass;
-        let vx = self.state.linear_velocity[0];
-        let vy = self.state.linear_velocity[1];
-        let vz = self.state.linear_velocity[2];
+        let vx = self.state.linear_velocity[0] - wind_vel[0];
+        let vy = self.state.linear_velocity[1] - wind_vel[1];
+        let vz = self.state.linear_velocity[2] - wind_vel[2];
         let ax = fx / self.mass - drag * vx.abs() * vx;
         let ay = fy / self.mass - drag * vy.abs() * vy;
         let az = fz / self.mass - g - drag * vz.abs() * vz;
@@ -179,6 +204,7 @@ impl HelicopterPhysicsSimulator for SimpleHelicopterSimulator {
     fn reset(&mut self, altitude: f64) {
         self.state = HelicopterState::hover(altitude);
         self.rotor.reset();
+        self.wind.reset();
         self.external_force = [0.0; 3];
     }
 
@@ -314,5 +340,78 @@ mod tests {
         sim.step(&HelicopterCommand::hover(), 0.01);
         assert!(sim.state().main_rotor_rpm > 0.0);
         assert!(sim.state().tail_rotor_rpm > 0.0);
+    }
+
+    #[test]
+    fn test_steady_wind_pushes_downwind() {
+        let mut calm = SimpleHelicopterSimulator::new();
+        let mut windy = SimpleHelicopterSimulator::new();
+        windy.set_wind(
+            WindConfig {
+                steady_wind: [10.0, 0.0, 0.0],
+                gust_intensity: 0.0, // deterministic: no gusts
+                ..WindConfig::default()
+            },
+            42,
+        );
+
+        let cmd = HelicopterCommand::hover();
+        for _ in 0..900 {
+            calm.step(&cmd, 1.0 / 300.0);
+            windy.step(&cmd, 1.0 / 300.0);
+        }
+
+        assert!(
+            windy.state().linear_velocity[0] > calm.state().linear_velocity[0],
+            "Steady +x wind must push the helicopter downwind: windy vx={}, calm vx={}",
+            windy.state().linear_velocity[0],
+            calm.state().linear_velocity[0]
+        );
+        assert!(
+            windy.state().linear_velocity[0] > 0.0,
+            "Downwind drift must be positive: vx={}",
+            windy.state().linear_velocity[0]
+        );
+    }
+
+    #[test]
+    fn test_gusty_wind_deterministic_with_seed() {
+        let make = || {
+            let mut sim = SimpleHelicopterSimulator::new();
+            sim.set_wind(WindConfig::moderate_wind(), 7);
+            sim
+        };
+        let mut a = make();
+        let mut b = make();
+        let cmd = HelicopterCommand::hover();
+        for _ in 0..300 {
+            a.step(&cmd, 1.0 / 300.0);
+            b.step(&cmd, 1.0 / 300.0);
+        }
+        assert_eq!(a.state().position, b.state().position);
+        assert_eq!(a.state().linear_velocity, b.state().linear_velocity);
+    }
+
+    #[test]
+    fn test_ground_effect_boosts_thrust_near_ground() {
+        // Same hover command, low vs high altitude: ground effect must
+        // produce a higher climb rate (or slower descent) near the ground.
+        let mut low = SimpleHelicopterSimulator::new();
+        let mut high = SimpleHelicopterSimulator::new();
+        low.reset(3.0);
+        high.reset(100.0);
+
+        let cmd = HelicopterCommand::hover();
+        for _ in 0..300 {
+            low.step(&cmd, 1.0 / 300.0);
+            high.step(&cmd, 1.0 / 300.0);
+        }
+
+        let low_climb = low.state().altitude() - 3.0;
+        let high_climb = high.state().altitude() - 100.0;
+        assert!(
+            low_climb > high_climb,
+            "Ground effect should augment thrust near ground: low_climb={low_climb}, high_climb={high_climb}"
+        );
     }
 }

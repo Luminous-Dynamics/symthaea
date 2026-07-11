@@ -9,39 +9,29 @@
 //! Usage: `service.threshold_overrides.apply_from_phenotype(&phenotype);`
 //! Then in hot loops: `let scale = overrides.fep_surprise_scale.unwrap_or(FEP_SURPRISE_SCALE);`
 
+use std::ops::{Deref, DerefMut};
+
 use serde::{Deserialize, Serialize};
+use symthaea_types::ThresholdOverrideValues;
 
 /// Runtime threshold overrides. All `None` = use compile-time defaults.
 /// Populated from `ThresholdPhenotype` via `apply_from_phenotype()`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ThresholdOverrides {
-    // Learning
-    pub fep_surprise_scale: Option<f32>,
-    pub fep_lr_decay: Option<f32>,
+#[serde(transparent)]
+pub struct ThresholdOverrides(pub ThresholdOverrideValues);
 
-    // Consciousness
-    pub dream_base_interval: Option<u64>,
-    pub dream_min_interval: Option<u64>,
+impl Deref for ThresholdOverrides {
+    type Target = ThresholdOverrideValues;
 
-    // Neuromodulation
-    pub neuromod_d2_baseline: Option<f64>,
-    pub neuromod_ne_phasic_threshold: Option<f32>,
-    pub neuromod_arousal_ema_decay: Option<f32>,
-    pub homeostasis_recalibrate_high: Option<f32>,
-    pub homeostasis_recalibrate_low: Option<f32>,
-    pub neuromod_ema_alpha: Option<f32>,
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
-    // Drives
-    pub frustration_dampen_threshold: Option<f64>,
-    pub engagement_low_threshold: Option<f64>,
-    pub flow_exploration_increment: Option<f32>,
-    pub coherence_low: Option<f32>,
-
-    // Feedback
-    pub arousal_trap_threshold: Option<f32>,
-    pub self_model_weight_high: Option<f32>,
-    pub homeostasis_pull_cruise: Option<f32>,
-    pub confidence_crash_threshold: Option<f64>,
+impl DerefMut for ThresholdOverrides {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl ThresholdOverrides {
@@ -76,67 +66,44 @@ impl ThresholdOverrides {
 
     /// Clear all overrides (revert to compile-time defaults).
     pub fn clear(&mut self) {
-        *self = Self::default();
+        self.0.clear();
+    }
+
+    /// Load threshold overrides from a JSON file. This is the file format
+    /// written by the CLS threshold-phenotype promotion path (Tier 1.2,
+    /// `DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md`) -
+    /// `scripts/cls_promote_candidate.sh` copies a gated candidate
+    /// `ThresholdPhenotype` JSON to the path this reads. `ThresholdPhenotype`
+    /// (from `symthaea_neuroevolution`) and `ThresholdOverrides` declare the
+    /// same 18 fields with the same names/types (modulo `Option<T>`), so a
+    /// `ThresholdPhenotype` JSON deserializes here with every field becoming
+    /// `Some(..)` - no conversion step needed. See
+    /// `cls_evolution_harness.rs` module docs and
+    /// `test_threshold_phenotype_json_loads_as_overrides` below for the
+    /// contract this relies on.
+    ///
+    /// Fail-closed: a missing, unreadable, or unparseable file NEVER panics -
+    /// it logs a warning (missing file is silent, since "no promoted
+    /// phenotype yet" is the common/default case) and falls back to
+    /// `Self::default()`, i.e. compile-time defaults.
+    pub fn load_from_file(path: &std::path::Path) -> Self {
+        Self(ThresholdOverrideValues::load_from_file(path))
+    }
+
+    /// Construct from the `SYMTHAEA_THRESHOLD_OVERRIDES_PATH` env var, if
+    /// set. This is the only place production code reads a promoted CLS
+    /// threshold phenotype - no live consumer hot-reloads this file; the env
+    /// var is read once, at `CognitiveLoopService` construction time. Falls
+    /// back to `Self::default()` if the env var is unset/empty, or via
+    /// `load_from_file`'s fail-closed behavior if it's set but the file is
+    /// missing/invalid. Never panics.
+    pub fn from_env() -> Self {
+        Self(ThresholdOverrideValues::from_env())
     }
 
     /// Count how many thresholds are overridden.
     pub fn active_count(&self) -> usize {
-        let mut n = 0;
-        if self.fep_surprise_scale.is_some() {
-            n += 1;
-        }
-        if self.fep_lr_decay.is_some() {
-            n += 1;
-        }
-        if self.dream_base_interval.is_some() {
-            n += 1;
-        }
-        if self.dream_min_interval.is_some() {
-            n += 1;
-        }
-        if self.neuromod_d2_baseline.is_some() {
-            n += 1;
-        }
-        if self.neuromod_ne_phasic_threshold.is_some() {
-            n += 1;
-        }
-        if self.neuromod_arousal_ema_decay.is_some() {
-            n += 1;
-        }
-        if self.homeostasis_recalibrate_high.is_some() {
-            n += 1;
-        }
-        if self.homeostasis_recalibrate_low.is_some() {
-            n += 1;
-        }
-        if self.neuromod_ema_alpha.is_some() {
-            n += 1;
-        }
-        if self.frustration_dampen_threshold.is_some() {
-            n += 1;
-        }
-        if self.engagement_low_threshold.is_some() {
-            n += 1;
-        }
-        if self.flow_exploration_increment.is_some() {
-            n += 1;
-        }
-        if self.coherence_low.is_some() {
-            n += 1;
-        }
-        if self.arousal_trap_threshold.is_some() {
-            n += 1;
-        }
-        if self.self_model_weight_high.is_some() {
-            n += 1;
-        }
-        if self.homeostasis_pull_cruise.is_some() {
-            n += 1;
-        }
-        if self.confidence_crash_threshold.is_some() {
-            n += 1;
-        }
-        n
+        self.0.active_count()
     }
 }
 
@@ -148,6 +115,158 @@ mod tests {
     fn test_default_is_all_none() {
         let o = ThresholdOverrides::default();
         assert_eq!(o.active_count(), 0);
+    }
+
+    #[test]
+    fn test_load_from_file_missing_falls_back_to_default() {
+        let path = std::path::Path::new("/nonexistent/path/does-not-exist-12345.json");
+        let o = ThresholdOverrides::load_from_file(path);
+        assert_eq!(o.active_count(), 0);
+    }
+
+    #[test]
+    fn test_load_from_file_invalid_json_falls_back_to_default() {
+        let dir =
+            std::env::temp_dir().join(format!("threshold_overrides_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bad.json");
+        std::fs::write(&path, "not valid json{{{").unwrap();
+
+        let o = ThresholdOverrides::load_from_file(&path);
+        assert_eq!(
+            o.active_count(),
+            0,
+            "invalid JSON must fall back to defaults, never panic"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_load_from_file_valid_populates_overrides() {
+        let dir = std::env::temp_dir().join(format!(
+            "threshold_overrides_test_valid_{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("overrides.json");
+        let mut o = ThresholdOverrides::default();
+        o.fep_surprise_scale = Some(4.2);
+        o.homeostasis_recalibrate_high = Some(1.2);
+        std::fs::write(&path, serde_json::to_string(&o).unwrap()).unwrap();
+
+        let loaded = ThresholdOverrides::load_from_file(&path);
+        assert_eq!(loaded.fep_surprise_scale, Some(4.2));
+        assert_eq!(loaded.homeostasis_recalibrate_high, Some(1.2));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_from_env_unset_is_default() {
+        // Ensure clean env for this test (best-effort; std::env::var is
+        // process-global, but no other test in this module sets this var).
+        // SAFETY: This test clears a single process-wide test variable before
+        // reading it and no other test in this module mutates this variable.
+        unsafe { std::env::remove_var("SYMTHAEA_THRESHOLD_OVERRIDES_PATH") };
+        let o = ThresholdOverrides::from_env();
+        assert_eq!(o.active_count(), 0);
+    }
+
+    /// Pins the contract `cls_evolution_harness.rs` and `load_from_file` rely
+    /// on: a `ThresholdPhenotype` (the type `evolve_cls`/the promotion gate
+    /// actually produce) serializes to JSON that deserializes cleanly into a
+    /// `ThresholdOverrides` with every field populated as `Some(..)` matching
+    /// the phenotype's value. If this ever breaks (e.g. a field renamed on
+    /// one side but not the other), a promoted phenotype would silently load
+    /// as a partial/empty override set instead of failing loudly - this test
+    /// exists so that drift is caught here first.
+    #[cfg(feature = "neuroevolution")]
+    #[test]
+    fn test_threshold_phenotype_json_loads_as_overrides() {
+        let pheno = symthaea_neuroevolution::ThresholdPhenotype {
+            fep_surprise_scale: 4.5,
+            fep_lr_decay: 0.93,
+            dream_base_interval: 123,
+            dream_min_interval: 45,
+            neuromod_d2_baseline: 0.61,
+            neuromod_ne_phasic_threshold: 0.25,
+            neuromod_arousal_ema_decay: 0.88,
+            homeostasis_recalibrate_high: 1.21,
+            homeostasis_recalibrate_low: 0.79,
+            neuromod_ema_alpha: 0.07,
+            frustration_dampen_threshold: 0.55,
+            engagement_low_threshold: 0.28,
+            flow_exploration_increment: 0.06,
+            coherence_low: 0.31,
+            arousal_trap_threshold: 0.77,
+            self_model_weight_high: 0.69,
+            homeostasis_pull_cruise: 1.6,
+            confidence_crash_threshold: 0.29,
+        };
+
+        let json = serde_json::to_string(&pheno).expect("phenotype serializes");
+        let overrides: ThresholdOverrides =
+            serde_json::from_str(&json).expect("phenotype JSON must deserialize as overrides");
+
+        assert_eq!(overrides.active_count(), 18, "every field must be Some(..)");
+        assert_eq!(overrides.fep_surprise_scale, Some(pheno.fep_surprise_scale));
+        assert_eq!(overrides.fep_lr_decay, Some(pheno.fep_lr_decay));
+        assert_eq!(
+            overrides.dream_base_interval,
+            Some(pheno.dream_base_interval)
+        );
+        assert_eq!(overrides.dream_min_interval, Some(pheno.dream_min_interval));
+        assert_eq!(
+            overrides.neuromod_d2_baseline,
+            Some(pheno.neuromod_d2_baseline)
+        );
+        assert_eq!(
+            overrides.neuromod_ne_phasic_threshold,
+            Some(pheno.neuromod_ne_phasic_threshold)
+        );
+        assert_eq!(
+            overrides.neuromod_arousal_ema_decay,
+            Some(pheno.neuromod_arousal_ema_decay)
+        );
+        assert_eq!(
+            overrides.homeostasis_recalibrate_high,
+            Some(pheno.homeostasis_recalibrate_high)
+        );
+        assert_eq!(
+            overrides.homeostasis_recalibrate_low,
+            Some(pheno.homeostasis_recalibrate_low)
+        );
+        assert_eq!(overrides.neuromod_ema_alpha, Some(pheno.neuromod_ema_alpha));
+        assert_eq!(
+            overrides.frustration_dampen_threshold,
+            Some(pheno.frustration_dampen_threshold)
+        );
+        assert_eq!(
+            overrides.engagement_low_threshold,
+            Some(pheno.engagement_low_threshold)
+        );
+        assert_eq!(
+            overrides.flow_exploration_increment,
+            Some(pheno.flow_exploration_increment)
+        );
+        assert_eq!(overrides.coherence_low, Some(pheno.coherence_low));
+        assert_eq!(
+            overrides.arousal_trap_threshold,
+            Some(pheno.arousal_trap_threshold)
+        );
+        assert_eq!(
+            overrides.self_model_weight_high,
+            Some(pheno.self_model_weight_high)
+        );
+        assert_eq!(
+            overrides.homeostasis_pull_cruise,
+            Some(pheno.homeostasis_pull_cruise)
+        );
+        assert_eq!(
+            overrides.confidence_crash_threshold,
+            Some(pheno.confidence_crash_threshold)
+        );
     }
 
     #[test]

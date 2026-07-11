@@ -3,6 +3,7 @@
 use crate::controller::SubterraneanController;
 use crate::encoder::SubterraneanHdcEncoder;
 use crate::fep_agent::ActiveInferenceSubterraneanAgent;
+use crate::reflex::reflex_command;
 use crate::simulator::{SimpleSubterraneanSimulator, SubterraneanPhysicsSimulator};
 use crate::types::SubterraneanConfig;
 use symthaea_core::genesis::GenesisSeed;
@@ -12,6 +13,13 @@ pub struct EpisodeMetrics {
     pub mean_effort: f32,
     pub steps_survived: usize,
     pub diverged: bool,
+    /// Mean pre-update imitation MSE against the hand-designed reflex
+    /// target -- the learning signal. Decreasing across episodes = the
+    /// controller is actually learning (Tier 2 of
+    /// SYMTHAEA_UNAUDITED_PLATFORMS_REVIEW_2026-07-07.md).
+    pub mean_imitation_loss: f32,
+    /// Mean FEP free energy over the episode.
+    pub mean_free_energy: f64,
 }
 
 pub struct SubterraneanTrainer {
@@ -33,17 +41,33 @@ impl SubterraneanTrainer {
             config,
         }
     }
+    /// Run one training episode: imitation learning toward the
+    /// hand-designed reflex policy, with FEP tau modulation.
+    ///
+    /// Previously this ran a rollout, collected metrics, and never updated
+    /// a single weight while the FEP tick result was discarded (`let _ =`).
+    /// Both loops are now closed.
     pub fn run_episode(&mut self) -> EpisodeMetrics {
         self.simulator.reset();
         self.controller.reset();
         let dt = self.config.physics_dt();
         let mut total_e = 0.0f32;
+        let mut loss_sum = 0.0f32;
+        let mut fe_sum = 0.0f64;
+        let mut fe_count = 0usize;
+        let mut tau_factor = 1.0f32;
         for step in 0..self.config.steps_per_episode {
             let hv = self.encoder.encode(self.simulator.state());
             if step % self.config.cognitive_interval == 0 {
-                let _ = self.fep.tick(self.simulator.state());
+                let fep = self.fep.tick(self.simulator.state());
+                tau_factor = fep.tau_factor;
+                fe_sum += fep.free_energy;
+                fe_count += 1;
             }
-            let cmd = self.controller.forward(&hv, dt as f32);
+            let cmd = self.controller.forward(&hv, dt as f32 * tau_factor);
+            loss_sum += self
+                .controller
+                .train_step(&reflex_command(self.simulator.state()));
             self.simulator.step(&cmd, dt);
             total_e += cmd.control_effort();
             if !self.simulator.state().is_finite() {
@@ -51,6 +75,8 @@ impl SubterraneanTrainer {
                     mean_effort: total_e / (step + 1) as f32,
                     steps_survived: step,
                     diverged: true,
+                    mean_imitation_loss: loss_sum / (step + 1) as f32,
+                    mean_free_energy: fe_sum / fe_count.max(1) as f64,
                 };
             }
         }
@@ -58,6 +84,8 @@ impl SubterraneanTrainer {
             mean_effort: total_e / self.config.steps_per_episode as f32,
             steps_survived: self.config.steps_per_episode,
             diverged: false,
+            mean_imitation_loss: loss_sum / self.config.steps_per_episode as f32,
+            mean_free_energy: fe_sum / fe_count.max(1) as f64,
         }
     }
 }
@@ -73,5 +101,26 @@ mod tests {
         let m = t.run_episode();
         assert!(!m.diverged);
         assert_eq!(m.steps_survived, 200);
+        assert!(m.mean_imitation_loss > 0.0, "learning signal must be live");
+        assert!(m.mean_free_energy.is_finite());
+    }
+
+    #[test]
+    fn test_training_reduces_imitation_loss() {
+        // The trainer must actually LEARN: imitation loss against the
+        // reflex target decreases across episodes. This fails against the
+        // old trainer, which never updated a weight.
+        let mut c = SubterraneanConfig::default();
+        c.steps_per_episode = 400;
+        let mut t = SubterraneanTrainer::new(c);
+        let first = t.run_episode().mean_imitation_loss;
+        for _ in 0..3 {
+            t.run_episode();
+        }
+        let last = t.run_episode().mean_imitation_loss;
+        assert!(
+            last < first,
+            "imitation loss must decrease with training: first {first:.5} -> last {last:.5}"
+        );
     }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "molecular_gastronomy",
+  "emulsion": { "dispersed_phase_fraction": 0.72 },
+  "coagulation": {
+    "protein": "EggYolk",
+    "trajectory": { "points": [[0.0, 20.0], [6.0, 69.0]] }
+  },
+  "pasteurization": {
+    "pathogen": "SalmonellaPoultry",
+    "trajectory": { "points": [[0.0, 20.0], [10.0, 60.0], [55.0, 60.0]] },
+    "required_log_reduction": null
+  },
+  "hydration": { "dough": "Pastry", "flour_g": 1000.0, "water_g": 500.0 }
+}

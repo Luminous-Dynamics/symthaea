@@ -14,6 +14,7 @@ mod accessors_and_types;
 mod arousal_trap;
 mod behavioral_modulation;
 mod core;
+mod creative_mesh_sharing;
 mod crucible_integration;
 mod cycle_properties;
 mod dream_pipeline;
@@ -24,6 +25,7 @@ mod holographic_dilation_tests;
 #[allow(clippy::field_reassign_with_default)]
 mod integration;
 mod managers;
+mod memetic_screening_live;
 mod memory_pipeline;
 mod moral_and_drives;
 #[allow(clippy::field_reassign_with_default)]

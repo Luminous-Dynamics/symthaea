@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-epidemiology"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Epidemiology layer for Symthaea: the SIR compartment model — basic reproduction number, herd-immunity threshold, final epidemic size, and time-stepped simulation. Closed-form + numerically integrated, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

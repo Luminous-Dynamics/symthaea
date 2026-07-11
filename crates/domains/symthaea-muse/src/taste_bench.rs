@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Music taste benchmark: scores output against Tristan's taste profile.
 //!
-//! Derived from 5,972 Spotify liked songs and music theory research.
-//! Each dimension is scored 0-100, with a composite score.
-//! Use this to measure and optimize toward musical quality that
-//! matches the target listener's preferences.
+//! PROVENANCE (honesty note, 2026-07-06): the target values below are
+//! hand-authored constants informed by music-theory heuristics and the
+//! listener's self-described preferences (prog/jazz/atmospheric). An earlier
+//! header said "derived from 5,972 Spotify liked songs", but no Spotify data
+//! file or ingestion code exists in this repository — treat the numbers as a
+//! hand-written prior, not a measured distribution. Each dimension is scored
+//! 0-100, with a composite score.
 
 use crate::Note;
 use std::collections::HashMap;
@@ -31,7 +34,7 @@ pub struct TasteScore {
     pub details: Vec<(String, f32, String)>,
 }
 
-/// Target profile (derived from Spotify analysis + music theory).
+/// Target profile (hand-authored; see provenance note above).
 pub struct TasteProfile {
     pub target_repeated_pct: f32,  // 10%
     pub target_steps_pct: f32,     // 60%
@@ -53,7 +56,7 @@ impl Default for TasteProfile {
 }
 
 impl TasteProfile {
-    /// Tristan's taste (5,972 Spotify songs: prog/jazz/atmospheric).
+    /// Tristan's taste (hand-authored prior: prog/jazz/atmospheric).
     pub fn tristan() -> Self {
         Self {
             target_repeated_pct: 10.0,

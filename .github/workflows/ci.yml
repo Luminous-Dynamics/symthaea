@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
 
@@ -60,6 +60,15 @@ jobs:
       - name: Check CognitiveLoopService field count
         run: bash scripts/check-cls-field-count.sh
 
+  workspace-targets:
+    name: Workspace Target Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every workspace member has a build target
+        run: bash scripts/check-workspace-targets.sh
+
   doc-tests:
     name: Documentation Tests
     runs-on: ubuntu-latest
@@ -68,7 +77,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -91,7 +100,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy
 
@@ -158,7 +167,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -183,6 +192,32 @@ jobs:
       - name: Run tests
         run: cargo test -p symthaea --lib -- --test-threads=1
 
+  test-spark-engine:
+    name: Test spark-engine (workspace-excluded crate)
+    runs-on: ubuntu-latest
+    # crates/domains/spark-engine is in workspace.exclude, so no other job
+    # compiles or tests it. It builds standalone from its own directory.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/domains/spark-engine/target
+          key: ${{ runner.os }}-cargo-spark-engine-${{ hashFiles('crates/domains/spark-engine/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-spark-engine-
+
+      - name: Run spark-engine tests
+        working-directory: crates/domains/spark-engine
+        run: cargo test
+
   test-nextest:
     name: Test (nextest, observational)
     runs-on: ubuntu-latest
@@ -195,7 +230,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -231,7 +266,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -272,7 +307,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -328,7 +363,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -365,7 +400,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -421,7 +456,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -506,7 +541,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -560,7 +595,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -605,8 +640,24 @@ jobs:
           - "physics"
           - "code_generation"
           - "flight"
+          # Canonical spelling of the multirotor feature (flight is the
+          # backward-compat alias) — guards against gates that only know the
+          # alias, e.g. the embodiment-telemetry cfg that silently dropped
+          # metadata under --features multirotor.
+          - "multirotor"
           - "mesh"
           - "swarm"
+          # Art stack legs (VISUAL_ART_IMPROVEMENT_PLAN_2026-07-10.md Phase
+          # 0.4 — the creative stack previously had zero CI soak). "creative"
+          # alone is the combo that has already broken once undetected
+          # (creative pulls the symthaea-canvas crate without the canvas
+          # feature; caught 2026-07-09). The second leg is the full art
+          # surface: profile-culture (creative + canvas + social-fabric,
+          # incl. the live-loop creative_mesh_sharing regression test) plus
+          # the artist's-eye rasterize-critique path and the persistent
+          # gallery/style-identity path (both landed 2026-07-10).
+          - "creative"
+          - "profile-culture,art-eye,gallery"
           - "ssm_language"
           - "multi_agent"
           - "full_perception"
@@ -619,7 +670,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -723,7 +774,7 @@ jobs:
 
       - name: Install Rust toolchain
         if: steps.should_run.outputs.run == 'true'
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         if: steps.should_run.outputs.run == 'true'
@@ -799,7 +850,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -850,7 +901,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain + wasm32 target
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
           targets: wasm32-unknown-unknown
 
@@ -927,7 +978,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -971,7 +1022,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx
       - name: Generate SBOM
@@ -1021,7 +1072,25 @@ jobs:
           - symthaea-observability
           - symthaea-nix
           - symthaea-stt
-          - symthaea-flight
+          # Robotics platform crates — every EmbodimentBridge platform gets a
+          # CI leg. (symthaea-flight was the stale pre-rename name for
+          # symthaea-multirotor; 8 of 11 classic platforms previously had no
+          # CI compilation at all — see robotics plan 2026-07-06 Tier 1.1.)
+          - symthaea-multirotor
+          - symthaea-helicopter
+          - symthaea-auv
+          - symthaea-manipulator
+          - symthaea-exoskeleton
+          - symthaea-surgical
+          - symthaea-orbital
+          - symthaea-quadruped
+          - symthaea-phone-embodiment
+          - symthaea-subterranean
+          - symthaea-infrastructure
+          - symthaea-scavenger
+          - symthaea-agribot
+          - symthaea-biota
+          - symthaea-clime
           - symthaea-hal
           - symthaea-humanoid
           - symthaea-vehicle
@@ -1041,7 +1110,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -1090,7 +1159,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -1124,7 +1193,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -1167,7 +1236,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -1214,7 +1283,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -1258,7 +1327,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4

@@ -1,11 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Parallel swarm training via rayon (behind `swarm` feature).
+//! Parallel domain-randomized training via rayon (behind `swarm` feature).
 //!
-//! 128 parallel MuJoCo instances via rayon, each with randomized wind/mass/geometry.
-//! All drones feed into a single thread-safe global experience buffer. Each drone
-//! also learns from the swarm's collective experience.
+//! Honest scope (2026-07 robotics deep review): this is N *independent*
+//! MuJoCo instances with randomized wind/mass/geometry sharing a global
+//! experience replay buffer — parallel domain randomization plus collective
+//! replay. There is NO inter-agent physics, no relative sensing, no comms
+//! model, and no collision avoidance, so "swarm" in the multi-agent sense
+//! overstates it. Each controller seeds from a per-drone genesis
+//! (phrase + drone index), so the population starts from diverse initial
+//! policies in addition to the domain randomization.
 //!
 //! Key design: MuJoCo's `MjModel` is read-only after loading and can be shared.
 //! But `MjData` is per-simulation and NOT thread-safe. Each rayon task creates
@@ -186,8 +191,15 @@ pub fn train_swarm(config: &SwarmConfig) -> SwarmResult {
             let wy = (next_f64() * 2.0 - 1.0) * wind_mag;
             let wind_force = [wx, wy, 0.0];
 
-            // Each drone has its own controller (same genesis → same initial weights)
-            let genesis = GenesisSeed::from_phrase(&config.flight_config.genesis_phrase);
+            // Each drone gets a per-drone genesis (phrase + drone index) —
+            // distinct initial weights so the swarm explores from diverse
+            // starting policies. Previously every drone shared the identical
+            // genesis, so domain randomization was the ONLY source of
+            // diversity across the fleet.
+            let genesis = GenesisSeed::from_phrase(&format!(
+                "{}::drone::{drone_id}",
+                config.flight_config.genesis_phrase
+            ));
             let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
             let mut controller = FlightController::new(&genesis, &config.flight_config);
             let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());

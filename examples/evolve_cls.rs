@@ -17,6 +17,26 @@
 //! Default: 10 pop × 8 r#gen × 30 cycles = 2,400 CLS cycles (~40 min)
 //! Scale up with env vars: POP_SIZE, GENERATIONS, EVAL_CYCLES
 //!
+//! # Promotion path (Tier 1.2, `DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md`)
+//!
+//! This binary is step 1 of 3 in getting an evolved phenotype into the live
+//! system, mirroring the Broca curriculum bridge's shape:
+//!
+//! 1. **This binary** writes the winning phenotype to
+//!    `<candidate-dir>/candidate-phenotype.json` + a provenance sidecar at
+//!    `<candidate-dir>/provenance.json`. It NEVER writes to any path the live
+//!    system reads.
+//! 2. `cargo run --release --features neuroevolution --example cls_promotion_gate -- <candidate-dir>`
+//!    re-evaluates the candidate on fresh seeds (never the ones used here) and,
+//!    if it clears the recorded fitness within tolerance, writes
+//!    `<candidate-dir>/PROMOTION_READY.json`.
+//! 3. `scripts/cls_promote_candidate.sh <candidate-dir> --i-understand-this-is-live`
+//!    (human-run only) copies the candidate to the path
+//!    `SYMTHAEA_THRESHOLD_OVERRIDES_PATH` points at.
+//!
+//! Candidate directory: `CLS_CANDIDATE_DIR` env var, default
+//! `target/cls-evolution/candidates/<UTC-timestamp>`.
+//!
 //! Usage: cargo run --release --features neuroevolution --example evolve_cls
 
 #[cfg(not(feature = "neuroevolution"))]
@@ -26,11 +46,13 @@ fn main() {
 
 #[cfg(feature = "neuroevolution")]
 fn main() {
-    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+    use symthaea::cognitive_loop::cls_evolution_harness::{
+        CandidateProvenance, ClsFitness, EVOLUTION_INPUTS, current_git_sha, evaluate_with_cls,
+    };
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_neuroevolution::{
-        threshold_genome::{decode_thresholds, evaluate_threshold_fitness},
         NeuralGenome, ThresholdPhenotype,
+        threshold_genome::{decode_thresholds, evaluate_threshold_fitness},
     };
 
     let pop_size: usize = std::env::var("POP_SIZE")
@@ -58,25 +80,9 @@ fn main() {
     println!("  Override: POP_SIZE, GENERATIONS, EVAL_CYCLES env vars");
     println!("═══════════════════════════════════════════════════════════════\n");
 
-    let inputs: Vec<&str> = vec![
-        "the sun rises over the mountain, warming the valley below",
-        "a sudden crash echoes through the darkness",
-        "gentle waves lap at the shore as the moon rises",
-        "the machine grinds to a halt, alarms blaring",
-        "children laughing in the garden after the rain",
-        "silence falls across the empty room like snow",
-        "new patterns emerge from chaos, self-organizing",
-        "the old bridge creaks under the weight of memory",
-        "music drifts through the open window at dusk",
-        "a warning light blinks red on the console",
-        "the forest canopy filters sunlight into emerald shards",
-        "thunder rolls across the plains, shaking the earth",
-        "a single bird calls across the frozen lake",
-        "the reactor core temperature stabilizes at nominal",
-        "two strangers share a knowing glance on the train",
-    ];
-
-    let genesis = GenesisSeed::from_phrase("cls-in-the-loop-evolution");
+    let inputs: &[&str] = EVOLUTION_INPUTS;
+    let genesis_seed_phrase = "cls-in-the-loop-evolution";
+    let genesis = GenesisSeed::from_phrase(genesis_seed_phrase);
 
     // Initialize population
     let mut population: Vec<(NeuralGenome, ClsFitness)> = (0..pop_size)
@@ -87,7 +93,7 @@ fn main() {
         .collect();
 
     let defaults = ThresholdPhenotype::default();
-    let default_fitness = evaluate_with_cls(&defaults, &inputs, eval_cycles);
+    let default_fitness = evaluate_with_cls(&defaults, inputs, eval_cycles);
     println!(
         "  Default baseline: Φ={:.4}  FE-red={:.4}  pred={:.4}  stab={:.4}\n",
         default_fitness.mean_phi,
@@ -108,7 +114,7 @@ fn main() {
         // Evaluate each organism via CLS
         for (genome, fitness) in population.iter_mut() {
             let phenotype = decode_thresholds(&genome.hv);
-            *fitness = evaluate_with_cls(&phenotype, &inputs, eval_cycles);
+            *fitness = evaluate_with_cls(&phenotype, inputs, eval_cycles);
             fitness.threshold_consistency = evaluate_threshold_fitness(&phenotype);
         }
 
@@ -175,7 +181,8 @@ fn main() {
 
     // Final evaluation of best
     let best_pheno = decode_thresholds(&population[0].0.hv);
-    let best_fitness = evaluate_with_cls(&best_pheno, &inputs, eval_cycles);
+    let mut best_fitness = evaluate_with_cls(&best_pheno, inputs, eval_cycles);
+    best_fitness.threshold_consistency = evaluate_threshold_fitness(&best_pheno);
 
     println!("\n═══════════════════════════════════════════════════════════════");
     println!("  Final Best vs Defaults");
@@ -246,97 +253,63 @@ fn main() {
         best_pheno.homeostasis_pull_cruise,
         d.homeostasis_pull_cruise,
     );
+
+    // ── Write candidate + provenance (Tier 1.2 promotion path, step 1) ─────
+    // Never writes to any path the live system reads — see module doc.
+    let candidate_dir = write_candidate(
+        &best_pheno,
+        &CandidateProvenance {
+            created_at_utc: chrono::Utc::now().to_rfc3339(),
+            git_sha: current_git_sha(),
+            pop_size,
+            generations,
+            eval_cycles,
+            genesis_seed_phrase: genesis_seed_phrase.to_string(),
+            evolution_input_count: inputs.len(),
+            default_fitness,
+            final_fitness: best_fitness,
+        },
+    );
+
+    println!("\n═══════════════════════════════════════════════════════════════");
+    println!("  Candidate written: {}", candidate_dir.display());
+    println!(
+        "  Next: cargo run --release --features neuroevolution --example cls_promotion_gate -- {}",
+        candidate_dir.display()
+    );
+    println!("═══════════════════════════════════════════════════════════════");
 }
 
 #[cfg(feature = "neuroevolution")]
-#[derive(Debug, Clone, Default)]
-struct ClsFitness {
-    mean_phi: f64,
-    fe_reduction: f64,
-    pred_accuracy: f64,
-    phi_stability: f64,
-    threshold_consistency: f64,
-}
-
-#[cfg(feature = "neuroevolution")]
-impl ClsFitness {
-    fn composite(&self) -> f64 {
-        // Multi-objective composite for sorting (Pareto would be better,
-        // but for small pops, weighted sum with Goodhart guards suffices)
-        self.mean_phi * 0.35
-            + self.fe_reduction.max(0.0) * 0.25
-            + self.pred_accuracy * 0.20
-            + self.phi_stability * 0.10
-            + self.threshold_consistency * 0.10
-    }
-}
-
-#[cfg(feature = "neuroevolution")]
-fn evaluate_with_cls(
+fn write_candidate(
     phenotype: &symthaea_neuroevolution::ThresholdPhenotype,
-    inputs: &[&str],
-    cycles: usize,
-) -> ClsFitness {
-    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+    provenance: &symthaea::cognitive_loop::cls_evolution_harness::CandidateProvenance,
+) -> std::path::PathBuf {
+    let base_dir = std::env::var("CLS_CANDIDATE_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
+            std::path::PathBuf::from("target/cls-evolution/candidates").join(timestamp)
+        });
 
-    let config = CognitiveLoopConfig::default();
-    let mut service = match CognitiveLoopService::new(config) {
-        Ok(s) => s,
-        Err(_) => return ClsFitness::default(),
-    };
+    std::fs::create_dir_all(&base_dir)
+        .unwrap_or_else(|e| panic!("failed to create candidate dir {base_dir:?}: {e}"));
 
-    // Apply threshold overrides
-    service
-        .threshold_overrides_mut()
-        .apply_from_phenotype(phenotype);
+    let phenotype_path = base_dir.join("candidate-phenotype.json");
+    std::fs::write(
+        &phenotype_path,
+        serde_json::to_string_pretty(phenotype).expect("phenotype serializes"),
+    )
+    .unwrap_or_else(|e| panic!("failed to write {phenotype_path:?}: {e}"));
 
-    let mut phi_values = Vec::with_capacity(cycles);
-    let mut pe_values = Vec::with_capacity(cycles);
+    let provenance_path = base_dir.join("provenance.json");
+    std::fs::write(
+        &provenance_path,
+        serde_json::to_string_pretty(provenance).expect("provenance serializes"),
+    )
+    .unwrap_or_else(|e| panic!("failed to write {provenance_path:?}: {e}"));
 
-    for i in 0..cycles {
-        let input = inputs[i % inputs.len()];
-        let result = service.cycle(input);
-        let phi = result.metadata.consciousness.consciousness_level;
-        phi_values.push(phi);
-        pe_values.push(result.prediction_error as f64);
-    }
-
-    let n = cycles as f64;
-    let mean_phi = phi_values.iter().sum::<f64>() / n;
-
-    // FE reduction: are prediction errors decreasing?
-    let first_quarter: f64 = pe_values[..cycles / 4].iter().sum::<f64>() / (cycles / 4) as f64;
-    let last_quarter: f64 = pe_values[3 * cycles / 4..].iter().sum::<f64>() / (cycles / 4) as f64;
-    let fe_reduction = if first_quarter > 1e-6 {
-        ((first_quarter - last_quarter) / first_quarter).clamp(-1.0, 1.0)
-    } else {
-        0.0
-    };
-
-    // Prediction accuracy: 1 - mean PE (normalized)
-    let mean_pe: f64 = pe_values.iter().sum::<f64>() / n;
-    let pred_accuracy = (1.0 - mean_pe / 2.0).clamp(0.0, 1.0);
-
-    // Phi stability: 1 / (1 + 10 * variance)
-    let phi_var = if cycles > 1 {
-        let phi_mean = mean_phi;
-        phi_values
-            .iter()
-            .map(|&p| (p - phi_mean).powi(2))
-            .sum::<f64>()
-            / (n - 1.0)
-    } else {
-        0.0
-    };
-    let phi_stability = 1.0 / (1.0 + 10.0 * phi_var);
-
-    ClsFitness {
-        mean_phi,
-        fe_reduction,
-        pred_accuracy,
-        phi_stability,
-        threshold_consistency: 0.0, // Filled by caller
-    }
+    base_dir
 }
 
 #[cfg(feature = "neuroevolution")]

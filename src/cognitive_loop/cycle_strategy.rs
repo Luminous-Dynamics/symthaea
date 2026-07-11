@@ -696,6 +696,39 @@ impl CognitiveLoopService {
         self.last_ethics_verdict = self
             .ethics_verdict_override
             .unwrap_or(ethics_output.unified_verdict);
+
+        // ── CONSEQUENCE TRACKER: judgment answers for its outcomes (AGW Phase 2.1) ──
+        // Resolve the prediction recorded HORIZON cycles ago against the Ψ/valence
+        // that actually materialized, then record this cycle's verdict as a new
+        // prediction. Outcome signals are INTERNAL (own Ψ, own emotional valence)
+        // — this closes the verdict→outcome→update loop but does not claim
+        // external grounding (that is AGW Phase 5).
+        {
+            use super::thresholds::CONSEQUENCE_OBSERVATION_HORIZON_CYCLES as HORIZON;
+            let cycle = self.stats.total_cycles as u64;
+            let psi = self.stats.unified_psi as f64;
+            let valence = self.stats.unified_emotional_valence as f64;
+            if cycle >= HORIZON {
+                let past_id = format!("cycle-{}", cycle - HORIZON);
+                if self
+                    .ethics_engine
+                    .observe_consequence_outcome(&past_id, psi, valence, cycle)
+                    .is_some()
+                {
+                    let acc = self.ethics_engine.consequence_tracker_accuracy();
+                    self.ethics_engine.apply_consequence_accuracy(acc);
+                }
+            }
+            self.ethics_engine.record_consequence_prediction(
+                format!("cycle-{cycle}"),
+                self.last_ethics_verdict,
+                psi,
+                cycle,
+                psi,
+                valence,
+            );
+        }
+
         // Reset escalation block flag each cycle — re-applied below if still warranted.
         self.stats.escalation_blocked = false;
 

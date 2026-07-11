@@ -224,6 +224,39 @@ impl CognitiveLoopService {
                                 );
                             }
 
+                            // Autobiography narration: once enough new episodes
+                            // have accumulated since the last narration, hand the
+                            // current life_story off to the background LLM
+                            // narrator (see managers::autobiography_bridge docs
+                            // for why this can't just run inline — it's async
+                            // and LLM-backed).
+                            if let Some(episode_count) = self
+                                .consciousness
+                                .self_model_tier
+                                .narrative_self
+                                .as_ref()
+                                .map(|n| n.autobio.life_story.len())
+                            {
+                                let cycle_num = self.stats.total_cycles as u64;
+                                if let Some(ref mut narrator) =
+                                    self.consciousness.self_model_tier.autobiography_narrator
+                                {
+                                    if narrator.should_narrate(episode_count) {
+                                        if let Some(ref narrative) =
+                                            self.consciousness.self_model_tier.narrative_self
+                                        {
+                                            narrator.submit(
+                                                crate::cognitive_loop::managers::AutobiographyRequest {
+                                                    episodes: narrative.autobio.life_story.clone(),
+                                                    self_name: "Symthaea".to_string(),
+                                                    cycle_num,
+                                                },
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
                             // Dream→MCE Narrative coupling: dream insights are
                             // high-integration episodes (counterfactual-validated).
                             // Science: Walker (2009) — sleep-dependent memory consolidation

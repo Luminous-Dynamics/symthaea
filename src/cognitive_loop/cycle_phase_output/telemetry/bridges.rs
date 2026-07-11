@@ -105,11 +105,19 @@ impl CognitiveLoopService {
                 CorticalRegion::Sensory,
                 (thalamic_depth_score * 0.3).clamp(0.0, 1.0),
             );
-            let creative = if perception.exploration.surprise_triggered {
-                0.7
-            } else {
-                0.2
-            };
+            // Creative region: prefer a real signal from the creative/canvas
+            // machinery when compiled in (see creative_region_activation).
+            let creative = self.creative_region_activation().unwrap_or_else(|| {
+                // Placeholder heuristic — NOT a real computation. Without the
+                // `creative`/`canvas` features there is no creative machinery
+                // to observe, so surprise-triggered exploration serves as a
+                // coarse proxy for creative-cortex engagement.
+                if perception.exploration.surprise_triggered {
+                    0.7
+                } else {
+                    0.2
+                }
+            });
             cam.set(CorticalRegion::Creative, creative);
 
             if self.cortical_history.len() >= 1000 {
@@ -457,5 +465,57 @@ impl CognitiveLoopService {
         {
             metadata.vision = perception.vision_telemetry.clone();
         }
+    }
+
+    /// Derive Creative cortical-region activation from live creative/canvas
+    /// machinery, when compiled in.
+    ///
+    /// Returns `None` when neither the `creative` nor `canvas` feature is
+    /// enabled (or their managers are absent) — the caller then falls back to
+    /// the legacy surprise placeholder heuristic.
+    ///
+    /// Mapping (all constants in `thresholds/feedback.rs`):
+    /// - `creative`: baseline + generation burst + aesthetic-EMA tonic
+    ///   + refinement (generate-evaluate iterations), clamped to [0, 1].
+    /// - `canvas` only: baseline + weaker frame burst + weaker aesthetic-EMA
+    ///   tonic — the canvas passively renders state rather than making art.
+    #[cfg(feature = "neural_validation")]
+    fn creative_region_activation(&self) -> Option<f32> {
+        #[cfg(feature = "creative")]
+        if let Some(ref cm) = self.sensorimotor.motor_rendering.creative_manager {
+            use super::super::super::thresholds::{
+                CREATIVE_REGION_AESTHETIC_GAIN, CREATIVE_REGION_BASELINE,
+                CREATIVE_REGION_GENERATION_BURST, CREATIVE_REGION_REFINEMENT_GAIN,
+                CREATIVE_REGION_REFINEMENT_NORM,
+            };
+            let t = cm.last_telemetry();
+            let burst = if t.generated {
+                CREATIVE_REGION_GENERATION_BURST
+            } else {
+                0.0
+            };
+            let tonic = t.aesthetic_ema.clamp(0.0, 1.0) * CREATIVE_REGION_AESTHETIC_GAIN;
+            let refinement = (t.iteration_count as f32 / CREATIVE_REGION_REFINEMENT_NORM).min(1.0)
+                * CREATIVE_REGION_REFINEMENT_GAIN;
+            return Some((CREATIVE_REGION_BASELINE + burst + tonic + refinement).clamp(0.0, 1.0));
+        }
+
+        #[cfg(feature = "canvas")]
+        if let Some(ref mgr) = self.sensorimotor.motor_rendering.canvas_manager {
+            use super::super::super::thresholds::{
+                CANVAS_REGION_AESTHETIC_GAIN, CANVAS_REGION_GENERATION_BURST,
+                CREATIVE_REGION_BASELINE,
+            };
+            let t = mgr.last_telemetry();
+            let burst = if t.generated {
+                CANVAS_REGION_GENERATION_BURST
+            } else {
+                0.0
+            };
+            let tonic = mgr.aesthetic_ema().clamp(0.0, 1.0) * CANVAS_REGION_AESTHETIC_GAIN;
+            return Some((CREATIVE_REGION_BASELINE + burst + tonic).clamp(0.0, 1.0));
+        }
+
+        None
     }
 }

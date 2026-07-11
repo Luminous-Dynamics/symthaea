@@ -19,6 +19,8 @@
 
 pub mod curation;
 pub mod evolution;
+#[cfg(feature = "server")]
+pub mod server;
 pub mod storage;
 pub mod style;
 

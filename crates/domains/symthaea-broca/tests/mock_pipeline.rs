@@ -365,6 +365,7 @@ fn test_eval_only_workflow() {
             channels: ch.channels.to_vec(),
             target_text: "test evaluation".to_string(),
             target_ids: vec![],
+            ..Default::default()
         });
     }
     let eval_config = LiquidMambaEvalConfig {
@@ -652,6 +653,7 @@ fn test_full_training_pipeline_smoke() {
             channels: ch.channels.to_vec(),
             target_text: format!("training sample {intent}"),
             target_ids: vec![],
+            ..Default::default()
         });
     }
 

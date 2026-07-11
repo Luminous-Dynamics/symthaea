@@ -46,17 +46,26 @@ impl AdbDevice {
     }
 
     /// Capture a screenshot and return the PNG bytes.
+    ///
+    /// Temp paths are scoped by device serial so multiple bridges (multi-phone
+    /// use, or overlapping steps) never race on shared files.
     pub fn screenshot(&self) -> Result<Vec<u8>, String> {
+        // Filename-safe serial: keeps paths unique per device while ensuring
+        // no shell metacharacters or path separators reach the device shell.
+        let safe_serial: String = self
+            .serial
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        let device_path = format!("/sdcard/_symthaea_screen_{safe_serial}.png");
+        let host_path = std::env::temp_dir().join(format!("_symthaea_phone_{safe_serial}.png"));
+        let host_path_str = host_path
+            .to_str()
+            .ok_or_else(|| "non-UTF8 temp path".to_string())?;
+
         // Capture to device
         let status = Command::new("adb")
-            .args([
-                "-s",
-                &self.serial,
-                "shell",
-                "screencap",
-                "-p",
-                "/sdcard/_symthaea_screen.png",
-            ])
+            .args(["-s", &self.serial, "shell", "screencap", "-p", &device_path])
             .status()
             .map_err(|e| format!("adb screencap failed: {e}"))?;
         if !status.success() {
@@ -64,22 +73,15 @@ impl AdbDevice {
         }
 
         // Pull to temp file
-        let tmp_path = "/tmp/_symthaea_phone_screen.png";
         let status = Command::new("adb")
-            .args([
-                "-s",
-                &self.serial,
-                "pull",
-                "/sdcard/_symthaea_screen.png",
-                tmp_path,
-            ])
+            .args(["-s", &self.serial, "pull", &device_path, host_path_str])
             .status()
             .map_err(|e| format!("adb pull failed: {e}"))?;
         if !status.success() {
             return Err("adb pull returned non-zero".into());
         }
 
-        std::fs::read(tmp_path).map_err(|e| format!("Failed to read screenshot: {e}"))
+        std::fs::read(&host_path).map_err(|e| format!("Failed to read screenshot: {e}"))
     }
 
     /// Tap at screen coordinates.

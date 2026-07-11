@@ -502,6 +502,52 @@ impl CognitiveLoopService {
         self.pending_crisis_events.drain(..).collect()
     }
 
+    /// Forward the current embodiment telemetry to the Mycelix
+    /// robotics-dispatch zome via `MycelixBridge::dispatch_robotics_telemetry`.
+    ///
+    /// Call from the host application between cycles (same pattern as
+    /// `poll_bridge_crisis`). The bridge itself gates on registration binding
+    /// + mission status and rate-limits to one report per ~5 s, so calling
+    /// this every cycle is cheap. Returns `true` if a report was dispatched.
+    ///
+    /// Closes the telemetry-dispatch gap from the 2026-07-06 robotics review:
+    /// `sensorimotor.embodiment_telemetry` was populated every cycle but
+    /// nothing ever drained it toward the (fully built) zome path.
+    /// Keep this feature list in sync with cycle.rs Phase 2.5's.
+    #[cfg(all(
+        feature = "mycelix",
+        any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        )
+    ))]
+    pub fn poll_bridge_robotics_telemetry(
+        &mut self,
+        bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
+    ) -> bool {
+        let telemetry = &self.sensorimotor.embodiment_telemetry;
+        // No embodiment stepped yet — nothing meaningful to report.
+        if telemetry.total_steps == 0 {
+            return false;
+        }
+        bridge.dispatch_robotics_telemetry(telemetry, self.carryover.history.consciousness_level)
+    }
+
     /// Override the epistemic mesh with collective network data.
     ///
     /// Call from the host application after aggregating EpistemicSummary vectors

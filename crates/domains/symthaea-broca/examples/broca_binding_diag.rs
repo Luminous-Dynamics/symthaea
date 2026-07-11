@@ -551,6 +551,7 @@ fn case_channels(case: &CanonicalEvalCase) -> ThoughtChannels {
         target_ids: Vec::new(),
         valence: 0.0,
         arousal: 0.5,
+        ..Default::default()
     }
     .to_thought_channels()
 }

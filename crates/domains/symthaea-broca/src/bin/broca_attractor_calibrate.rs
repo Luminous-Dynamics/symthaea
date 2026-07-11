@@ -358,6 +358,7 @@ fn case_channels(case: &CanonicalEvalCase) -> symthaea_broca::encoder::ThoughtCh
         target_ids: vec![],
         valence: 0.0,
         arousal: 0.5,
+        ..Default::default()
     }
     .to_thought_channels()
 }

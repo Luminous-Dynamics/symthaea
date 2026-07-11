@@ -12,6 +12,7 @@
 //! not copyrightable). DX7 patents expired in early 2000s.
 
 use crate::MusicalState;
+use serde::{Deserialize, Serialize};
 
 // ─── Acoustic Partial Data ──────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ pub const PIANO_INHARMONICITY: [f32; 8] = [
 // ─── Instrument Enum ────────────────────────────────────────────────────────
 
 /// Available instrument timbres.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Instrument {
     Piano,
     PianoPP,
@@ -132,6 +133,167 @@ impl Instrument {
         }
     }
 
+    /// Velocity-dependent partial spectrum. A fortissimo note is not just a
+    /// louder pianissimo note — playing harder shifts energy into upper
+    /// partials on essentially every acoustic instrument. Before this,
+    /// velocity was a pure amplitude multiplier ("organ mode").
+    ///
+    /// Piano crossfades between the two MEASURED dynamic tables that were
+    /// already in this file (Fletcher & Rossing's ff and pp spectra —
+    /// previously reachable only as *separate instruments*); everything else
+    /// gets a physically-motivated spectral tilt (upper partial h scaled by
+    /// `tilt^h`, tilt rising with velocity).
+    pub fn partials_at_velocity(&self, velocity: f32) -> [f32; 16] {
+        let v = velocity.clamp(0.0, 1.0);
+        let mut out = [0.0f32; 16];
+        match self {
+            Self::Piano | Self::PianoPP => {
+                for h in 0..16 {
+                    out[h] = PIANO_PP[h] + (PIANO_FF[h] - PIANO_PP[h]) * v;
+                }
+            }
+            _ => {
+                let base = self.partials();
+                let tilt = 0.7 + 0.3 * v;
+                let mut f = 1.0f32;
+                for h in 0..16 {
+                    out[h] = base[h] * f;
+                    f *= tilt;
+                }
+            }
+        }
+        out
+    }
+
+    /// Whether the instrument is continuously energized while a note is held
+    /// (bowed strings, wind, organ, synth pad). These must NOT get the
+    /// struck/plucked per-partial decay — a sustained violin note keeps its
+    /// brightness while bowed; a piano note dulls as it rings.
+    pub fn sustains(&self) -> bool {
+        matches!(
+            self,
+            Self::Violin
+                | Self::Cello
+                | Self::Flute
+                | Self::Organ
+                | Self::Clarinet
+                | Self::Trumpet
+                | Self::Saxophone
+                | Self::Ney
+                | Self::Pad
+                | Self::SawLead
+        )
+    }
+
+    /// Attack transient noise for the additive path: `(amplitude, seconds)`.
+    /// The onset noise — bow bite, breath chiff, hammer strike — is a large
+    /// part of instrument identity; a pure partial stack has none, which is
+    /// a big reason additive "violin" reads as synthetic. Amplitudes are
+    /// relative to the note's own level and deliberately subtle.
+    pub fn attack_noise(&self) -> (f32, f32) {
+        match self {
+            Self::Violin | Self::Cello => (0.10, 0.06), // bow bite
+            Self::Flute | Self::Ney => (0.12, 0.04),    // breath chiff
+            Self::Clarinet | Self::Saxophone | Self::Trumpet => (0.06, 0.03), // reed/lip start
+            Self::Piano | Self::PianoPP => (0.05, 0.008), // hammer click
+            Self::Organ => (0.04, 0.02),                // pipe speech/chiff
+            _ => (0.0, 0.0),
+        }
+    }
+
+    /// Vibrato for the additive path: `(rate_hz, depth_ratio, onset_delay_s)`,
+    /// or `None` for instruments played without it. A perfectly stationary
+    /// sine stack is one of the strongest "this is a synthesizer" tells for
+    /// bowed strings and winds — real players' vibrato develops shortly
+    /// after the note speaks (the delay), at ~4.5-6 Hz, with depth well
+    /// under a semitone. Organ pipes and struck/plucked strings have no
+    /// player-controlled vibrato, so they honestly get `None`.
+    pub fn vibrato(&self) -> Option<(f32, f32, f32)> {
+        match self {
+            Self::Violin | Self::Cello => Some((5.5, 0.007, 0.20)),
+            Self::Flute | Self::Ney => Some((5.0, 0.004, 0.25)),
+            Self::Clarinet | Self::Saxophone | Self::Trumpet => Some((4.5, 0.003, 0.30)),
+            _ => None,
+        }
+    }
+
+    /// Inharmonicity coefficient B for stretched partials (`f_h =
+    /// f·(h+1)·√(1+B(h+1)²)`). Piano strings are stiff enough that upper
+    /// partials run measurably sharp — `PIANO_INHARMONICITY` (Conklin 1996)
+    /// sat in this file cited-but-unreferenced while piano partials rendered
+    /// perfectly harmonic, a big part of why synthesized piano sounds fake.
+    pub fn inharmonicity(&self, freq: f32) -> f32 {
+        match self {
+            Self::Piano | Self::PianoPP => {
+                // Octave index 0..7 over the piano range (A0 = 27.5 Hz).
+                let oct = (freq / 27.5).max(1.0).log2().clamp(0.0, 7.0) as usize;
+                PIANO_INHARMONICITY[oct.min(7)]
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// Resolve a spec's snake_case instrument name (see
+    /// `symthaea_music_theory::spec::CompositionSpec::ensemble_pool`).
+    /// Unknown names return `None` — the CALLER decides the fallback and
+    /// must do it loudly, never silently.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "piano" => Self::Piano,
+            "piano_pp" => Self::PianoPP,
+            "violin" => Self::Violin,
+            "cello" => Self::Cello,
+            "flute" => Self::Flute,
+            "organ" => Self::Organ,
+            "electric_piano" => Self::ElectricPiano,
+            "bell" => Self::Bell,
+            "acoustic_guitar" => Self::AcousticGuitar,
+            "harp" => Self::Harp,
+            "pad" => Self::Pad,
+            "clarinet" => Self::Clarinet,
+            "trumpet" => Self::Trumpet,
+            "saxophone" => Self::Saxophone,
+            "marimba" => Self::Marimba,
+            "sitar" => Self::Sitar,
+            "kalimba" => Self::Kalimba,
+            "saw_lead" => Self::SawLead,
+            "koto" => Self::Koto,
+            "oud" => Self::Oud,
+            "ney" => Self::Ney,
+            "upright_bass" => Self::UprightBass,
+            _ => return None,
+        })
+    }
+
+    /// General MIDI program number (0-based) for exporting this instrument
+    /// to a Standard MIDI File. Instruments without an exact GM equivalent
+    /// map to the closest family member (Oud → nylon guitar, Ney → pan
+    /// flute) so a DAW's default GM bank renders something reasonable.
+    pub fn gm_program(&self) -> u8 {
+        match self {
+            Self::Piano | Self::PianoPP => 0, // Acoustic Grand Piano
+            Self::ElectricPiano => 4,         // Electric Piano 1
+            Self::Marimba => 12,
+            Self::Bell => 14, // Tubular Bells
+            Self::Organ => 19,
+            Self::AcousticGuitar | Self::Oud => 24, // Nylon Guitar
+            Self::UprightBass => 32,                // Acoustic Bass
+            Self::Violin => 40,
+            Self::Cello => 42,
+            Self::Harp => 46,
+            Self::Trumpet => 56,
+            Self::Saxophone => 66, // Tenor Sax
+            Self::Clarinet => 71,
+            Self::Flute => 73,
+            Self::Ney => 75, // Pan Flute
+            Self::SawLead => 81,
+            Self::Pad => 88,
+            Self::Sitar => 104,
+            Self::Koto => 107,
+            Self::Kalimba => 108,
+        }
+    }
+
     /// Whether this instrument uses Karplus-Strong synthesis.
     pub fn uses_karplus_strong(&self) -> bool {
         matches!(
@@ -170,6 +332,39 @@ impl Instrument {
             _ => (1.0, 1.0, 0.3, 10.0),
         }
     }
+
+    /// Default ADSR envelope (attack, decay, sustain, release) in seconds
+    /// for the ADDITIVE synthesis path (`synth::render_arrangement`).
+    /// Physically motivated per instrument family rather than the single
+    /// mood-derived envelope every voice used to share: bowed/blown
+    /// instruments sustain while played (slow-ish attack, high sustain,
+    /// long release); a struck piano decays even while "held." Instruments
+    /// that render via Karplus-Strong or FM (see [`Self::uses_karplus_strong`]
+    /// / [`Self::uses_fm`]) don't consult this — their envelope comes from
+    /// the physical model or the FM index decay instead — but it's still a
+    /// sane fallback if one of them is ever routed through the additive path.
+    pub fn default_adsr(&self) -> (f32, f32, f32, f32) {
+        match self {
+            Self::Piano | Self::PianoPP => (0.005, 0.3, 0.3, 0.4),
+            Self::Violin | Self::Cello => (0.05, 0.1, 0.85, 0.3),
+            Self::Flute | Self::Clarinet | Self::Trumpet | Self::Saxophone | Self::Ney => {
+                (0.03, 0.05, 0.9, 0.15)
+            }
+            Self::Organ | Self::Pad => (0.3, 0.1, 0.95, 0.8),
+            Self::Sitar | Self::SawLead => (0.01, 0.2, 0.6, 0.3),
+            // Struck/plucked/FM families: a percussive fallback (their real
+            // envelope normally comes from the KS/FM path, not this one).
+            Self::ElectricPiano
+            | Self::Bell
+            | Self::AcousticGuitar
+            | Self::Harp
+            | Self::Marimba
+            | Self::Koto
+            | Self::Kalimba
+            | Self::Oud
+            | Self::UprightBass => (0.002, 0.3, 0.2, 0.5),
+        }
+    }
 }
 
 // ─── Karplus-Strong Synthesis ───────────────────────────────────────────────
@@ -199,9 +394,23 @@ impl KarplusStrong {
         }
     }
 
-    /// Excite the string with a noise burst.
+    /// Excite the string with a noise burst (fixed seed — every pluck
+    /// identical). Prefer [`Self::excite_seeded`] with a per-note seed:
+    /// a real string never receives the same pluck twice, and the fixed
+    /// seed here was audible as "machine-gun" repetition on repeated
+    /// notes and strummed chords.
     pub fn excite(&mut self, velocity: f32) {
-        let mut rng = 42u32;
+        self.excite_seeded(velocity, 42);
+    }
+
+    /// Excite the string with a noise burst from `seed` — the round-robin
+    /// variation point. Different seeds give genuinely different excitation
+    /// noise (a different pluck), same seed reproduces the same pluck
+    /// exactly (renders stay deterministic).
+    pub fn excite_seeded(&mut self, velocity: f32, seed: u32) {
+        // Avoid the LCG's degenerate zero fixed-point neighborhood and
+        // decorrelate adjacent seeds.
+        let mut rng = seed.wrapping_mul(2654435761).wrapping_add(1);
         for sample in &mut self.delay_line {
             rng = rng.wrapping_mul(1103515245).wrapping_add(12345);
             *sample = ((rng as f32 / u32::MAX as f32) * 2.0 - 1.0) * velocity;
@@ -220,8 +429,9 @@ impl KarplusStrong {
         let filtered = self.brightness * current + (1.0 - self.brightness) * next;
         let output = self.damping * filtered;
 
-        // One-pole smoothing for extra warmth
-        let smoothed = 0.5 * output + 0.5 * self.prev_output;
+        // One-pole smoothing for extra warmth (denormal-flushed: this value
+        // recirculates through the delay line as the string decays)
+        let smoothed = crate::synth::flush_denormal(0.5 * output + 0.5 * self.prev_output);
         self.prev_output = smoothed;
 
         // Write back into delay line
@@ -246,8 +456,25 @@ pub fn render_fm_instrument(
     let (c_ratio, m_ratio, max_index, decay_rate) = instrument.fm_params();
     let n = (duration * sr) as usize + (0.5 * sr) as usize; // note + release
 
+    // Velocity → modulation index: FM's index IS its brightness, and striking
+    // an electric piano / bell / marimba harder makes it brighter, not just
+    // louder. (Callers fold voice volume into `velocity`; coupling that into
+    // brightness slightly is acceptable — a quieter voice reading mellower is
+    // the right direction anyway.)
+    let max_index = max_index * (0.5 + 0.7 * velocity.clamp(0.0, 1.0));
+
     let carrier_freq = freq * c_ratio;
     let mod_freq = freq * m_ratio;
+
+    // Band-limit: FM sidebands extend to roughly carrier + (index+1)·mod
+    // (Carson's rule). Clamp the index so they stay below Nyquist — without
+    // this, high notes fold their sidebands back as inharmonic aliasing.
+    let nyquist = sr * 0.5;
+    let max_index = if mod_freq > 1.0 {
+        max_index.min(((nyquist - carrier_freq) / mod_freq - 1.0).max(0.0))
+    } else {
+        max_index
+    };
 
     let mut buf = Vec::with_capacity(n);
     for i in 0..n {
@@ -585,6 +812,80 @@ mod tests {
     }
 
     #[test]
+    fn piano_velocity_crossfades_between_the_measured_tables() {
+        assert_eq!(Instrument::Piano.partials_at_velocity(1.0), PIANO_FF);
+        assert_eq!(Instrument::Piano.partials_at_velocity(0.0), PIANO_PP);
+        // Midway blend sits strictly between the two on a partial where they
+        // differ substantially.
+        let mid = Instrument::Piano.partials_at_velocity(0.5);
+        assert!(mid[8] > PIANO_PP[8] && mid[8] < PIANO_FF[8]);
+    }
+
+    #[test]
+    fn velocity_tilt_brightens_non_piano_spectra() {
+        // Louder playing must shift relative energy toward upper partials.
+        let soft = Instrument::Violin.partials_at_velocity(0.2);
+        let hard = Instrument::Violin.partials_at_velocity(0.9);
+        let ratio = |p: &[f32; 16]| p[8] / p[0];
+        assert!(
+            ratio(&hard) > ratio(&soft),
+            "upper-partial share must grow with velocity: {} vs {}",
+            ratio(&soft),
+            ratio(&hard)
+        );
+    }
+
+    #[test]
+    fn piano_is_inharmonic_and_sustaining_instruments_are_not() {
+        assert!(Instrument::Piano.inharmonicity(261.6) > 0.0);
+        assert_eq!(Instrument::Violin.inharmonicity(261.6), 0.0);
+        assert!(Instrument::Violin.sustains());
+        assert!(!Instrument::Piano.sustains());
+        // Attack transients: bowed/blown/struck have one, pads don't.
+        assert!(Instrument::Violin.attack_noise().0 > 0.0);
+        assert_eq!(Instrument::Pad.attack_noise().0, 0.0);
+    }
+
+    #[test]
+    fn fm_velocity_raises_brightness_not_just_loudness() {
+        // The modulation index (FM's brightness) now scales with velocity —
+        // measured as zero crossings, which amplitude cannot change.
+        let zc = |v: &[f32]| {
+            v.windows(2)
+                .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
+                .count()
+        };
+        let soft = render_fm_instrument(Instrument::Bell, 220.0, 0.15, 0.5, 44100);
+        let hard = render_fm_instrument(Instrument::Bell, 220.0, 1.0, 0.5, 44100);
+        let n = 8820; // first 200ms
+        assert!(
+            zc(&hard[..n]) > zc(&soft[..n]),
+            "hard strike must be brighter: soft={} hard={}",
+            zc(&soft[..n]),
+            zc(&hard[..n])
+        );
+    }
+
+    #[test]
+    fn ks_excitation_varies_by_seed_and_reproduces_by_seed() {
+        // Round-robin contract: different seeds → genuinely different plucks;
+        // same seed → bit-identical pluck (renders stay deterministic).
+        let render = |seed: u32| -> Vec<f32> {
+            let mut ks = KarplusStrong::new(440.0, 44100, 0.996, 0.5);
+            ks.excite_seeded(0.8, seed);
+            (0..2205).map(|_| ks.tick()).collect()
+        };
+        let a = render(1);
+        let b = render(2);
+        let a2 = render(1);
+        assert_eq!(a, a2, "same seed must reproduce the same pluck exactly");
+        assert!(
+            a.iter().zip(&b).any(|(x, y)| x != y),
+            "different seeds must produce different plucks"
+        );
+    }
+
+    #[test]
     fn karplus_strong_decays() {
         let mut ks = KarplusStrong::new(440.0, 44100, 0.990, 0.5); // faster decay
         ks.excite(0.8);
@@ -702,5 +1003,41 @@ mod tests {
                 inst
             );
         }
+    }
+
+    #[test]
+    fn default_adsr_values_are_physically_sane() {
+        // Every ADSR component must be positive/valid regardless of family.
+        for inst in [
+            Instrument::Piano,
+            Instrument::Violin,
+            Instrument::Flute,
+            Instrument::Organ,
+            Instrument::Sitar,
+            Instrument::AcousticGuitar,
+        ] {
+            let (a, d, s, r) = inst.default_adsr();
+            assert!(a > 0.0, "{inst:?} attack must be positive");
+            assert!(d > 0.0, "{inst:?} decay must be positive");
+            assert!(
+                (0.0..=1.0).contains(&s),
+                "{inst:?} sustain must be in 0..=1"
+            );
+            assert!(r > 0.0, "{inst:?} release must be positive");
+        }
+    }
+
+    #[test]
+    fn bowed_instruments_sustain_more_than_struck_ones() {
+        // A defining difference between a bowed/blown instrument (sustains
+        // as long as it's played) and a struck one (decays immediately,
+        // "sustain" here meaning "the level it settles to while nominally
+        // still held") is a much higher sustain level.
+        let (_, _, violin_sustain, _) = Instrument::Violin.default_adsr();
+        let (_, _, piano_sustain, _) = Instrument::Piano.default_adsr();
+        assert!(
+            violin_sustain > piano_sustain,
+            "violin ({violin_sustain}) should sustain higher than piano ({piano_sustain})"
+        );
     }
 }

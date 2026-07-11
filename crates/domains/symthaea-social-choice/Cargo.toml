@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-social-choice"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Social-choice & voting-theory layer for Symthaea: ranked-ballot rules (plurality/Borda/Condorcet/instant-runoff), seat apportionment (D'Hondt/Sainte-Laguë/Hamilton), and voting-power indices (Banzhaf/Shapley-Shubik). Pure-std, ground-truth-checked. Consumer: Mycelix governance."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

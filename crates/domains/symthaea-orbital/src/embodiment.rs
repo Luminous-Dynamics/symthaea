@@ -1,7 +1,7 @@
 use crate::controller::OrbitalController;
 use crate::encoder::OrbitalHdcEncoder;
 use crate::simulator::{OrbitalPhysicsSimulator, SimpleOrbitalSimulator};
-use crate::types::{NUM_ACTUATORS, OrbitalConfig};
+use crate::types::{NUM_ACTUATORS, OrbitalConfig, OrbitalState};
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
     MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
@@ -31,6 +31,7 @@ pub struct OrbitalEmbodiment {
     pe: f32,
     fallback_stage: OrbitalFallbackStage,
     fallback_cycles_in_stage: u32,
+    stuck_thruster_fault: Option<[f32; 3]>,
 }
 impl OrbitalEmbodiment {
     pub fn new(g: &GenesisSeed) -> Self {
@@ -48,6 +49,7 @@ impl OrbitalEmbodiment {
             pe: 0.0,
             fallback_stage: OrbitalFallbackStage::Park,
             fallback_cycles_in_stage: 0,
+            stuck_thruster_fault: None,
         }
     }
     pub fn set_safety_override(&mut self, l: MotorSafetyLevel) {
@@ -58,6 +60,25 @@ impl OrbitalEmbodiment {
     }
     pub fn fallback_stage(&self) -> OrbitalFallbackStage {
         self.fallback_stage
+    }
+    /// Read-only view of the current orbital/arm state (position, velocity,
+    /// delta-v used, joint state, etc.) — for telemetry and testing.
+    pub fn orbital_state(&self) -> &OrbitalState {
+        self.sim.state()
+    }
+    /// Simulate a stuck thruster valve: this burn (m/s per axis, per step)
+    /// is added to whatever the controller commands, every step, until
+    /// cleared. Models a COMMAND-level fault (the fault always tries to
+    /// fire) — this is what the safety gate can defend against. It does
+    /// NOT model an actuator-level fault where the valve ignores a
+    /// zero-command entirely; that would defeat any software gate by
+    /// construction and needs a different (hardware-redundancy) mitigation,
+    /// not a control-loop one.
+    pub fn inject_stuck_thruster(&mut self, burn_mps: [f32; 3]) {
+        self.stuck_thruster_fault = Some(burn_mps);
+    }
+    pub fn clear_stuck_thruster(&mut self) {
+        self.stuck_thruster_fault = None;
     }
     /// Apply moral gate from ethics engine.
     /// Orbital platforms can damage other spacecraft/debris — ahimsa forces Red (park), consent Orange.
@@ -84,6 +105,11 @@ impl OrbitalEmbodiment {
         }
         let gain = self.safety.motor_gain();
         let mut cmd = self.ctrl.forward(hv, dt);
+        if let Some(fault) = self.stuck_thruster_fault {
+            for i in 0..3 {
+                cmd.translational_burn_mps[i] += fault[i];
+            }
+        }
 
         // ── SafeFallback: Park at Red (unifies the former 0.3 hard cliff
         // under the shared MotorSafetyLevel contract) ───────────────────
@@ -95,6 +121,13 @@ impl OrbitalEmbodiment {
         if matches!(self.safety, MotorSafetyLevel::Red) {
             self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
             cmd.joint_torques = [0.0; NUM_ACTUATORS];
+            // Park means the WHOLE bus goes passive, not just the arm: a
+            // stuck-thruster or fault-injected burn command must not slip
+            // through the safety gate. Added with translational_burn_mps
+            // (Phase 1) -- this gate predates that field and only zeroed
+            // joint_torques, which would have let a faulty burn command
+            // fire right through Red.
+            cmd.translational_burn_mps = [0.0; 3];
         } else {
             self.fallback_stage = OrbitalFallbackStage::Park;
             self.fallback_cycles_in_stage = 0;
@@ -145,6 +178,7 @@ impl OrbitalEmbodiment {
         self.pe = 0.0;
         self.fallback_stage = OrbitalFallbackStage::Park;
         self.fallback_cycles_in_stage = 0;
+        self.stuck_thruster_fault = None;
     }
     pub fn safety_level(&self) -> MotorSafetyLevel {
         self.safety
@@ -213,7 +247,8 @@ impl SafeFallback for OrbitalEmbodiment {
         3 // Low-moderate: stationary/contained, but debris/collision risk
     }
     fn safe_fallback_description(&self) -> &'static str {
-        "Park: zero relative-motion torque on every joint, hold station attitude"
+        "Park: zero relative-motion torque on every joint and zero all thruster \
+         burns, hold station attitude"
     }
     fn safe_fallback_latency_cycles(&self) -> u32 {
         1
@@ -256,6 +291,47 @@ mod tests {
             r.control_effort
         );
         assert_eq!(b.fallback_stage(), OrbitalFallbackStage::Park);
+    }
+    #[test]
+    fn test_stuck_thruster_fault_applies_at_green() {
+        // Sanity check that the fault mechanism itself works: at Green
+        // (full authority), an injected stuck-thruster burn must actually
+        // reach the simulator and spend delta-v. Without this, the "Red
+        // blocks it" test below would be meaningless (it'd pass even if the
+        // fault never did anything).
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.inject_stuck_thruster([1.0, 0.0, 0.0]);
+        b.step(&ContinuousHV::random(16384, 42), 0.01, 0.9); // Green
+        assert!(
+            b.orbital_state().delta_v_used_m_s > 0.0,
+            "stuck-thruster fault should have spent delta-v at Green"
+        );
+    }
+    #[test]
+    fn test_stuck_thruster_fault_zeroed_at_red() {
+        // The safety-tier cascade (Phase 2 scenario: stuck-thruster fault):
+        // a fault-injected burn command must NOT slip through Red-tier
+        // Park, even though it keeps trying to fire every step.
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.inject_stuck_thruster([1.0, 0.0, 0.0]);
+        b.step(&ContinuousHV::random(16384, 42), 0.01, 0.05); // Red
+        assert_eq!(
+            b.orbital_state().delta_v_used_m_s,
+            0.0,
+            "Red-tier Park must zero a stuck-thruster fault, not just arm torques"
+        );
+    }
+    #[test]
+    fn test_clear_stuck_thruster_stops_further_burns() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let hv = ContinuousHV::random(16384, 42);
+        b.inject_stuck_thruster([1.0, 0.0, 0.0]);
+        b.step(&hv, 0.01, 0.9); // Green: fault applies
+        let used_after_fault = b.orbital_state().delta_v_used_m_s;
+        assert!(used_after_fault > 0.0);
+        b.clear_stuck_thruster();
+        b.step(&hv, 0.01, 0.9); // Green: no fault, no further burn
+        assert_eq!(b.orbital_state().delta_v_used_m_s, used_after_fault);
     }
     #[test]
     fn test_safe_fallback_trait_impl() {

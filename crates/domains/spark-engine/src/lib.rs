@@ -26,6 +26,10 @@
 //! - **experimental_design**: Tools for designing discriminating experiments
 //! - **neutron_source**: Compact neutron generator design
 //! - **shielding**: Neutron shielding calculations
+//! - **bayesian**: Probability distribution over anomaly hypotheses, updated
+//!   from experimental outcomes
+//! - **optimal_experiment**: Expected-information-gain ranking and
+//!   budget-constrained experiment sequencing
 //!
 //! ## Usage
 //!
@@ -48,20 +52,17 @@
 
 // Core physics modules
 pub mod anomaly;
+pub mod error;
 pub mod lattice;
 pub mod neutron_source;
 pub mod physics;
 pub mod shielding;
-// pub mod reactor_design;
-// pub mod economics;
-pub mod error;
 
 // Path C: Anomaly Investigation modules
 pub mod experimental_design;
 pub mod hypothesis_models;
 pub mod literature;
 pub mod rate_gap;
-// pub mod experimental_proposal;
 pub mod uncertainty;
 
 // Integration modules
@@ -77,46 +78,23 @@ pub mod multi_physics;
 pub mod cfc_physics;
 
 // Bayesian hypothesis discrimination
-// pub mod bayesian;
-
-// Emergent physics simulation
-// pub mod emergent;
-
-// Design optimization
-// pub mod optimization;
-
-// Visualization and export
-// pub mod visualization;
-
-// Extended materials database
-// pub mod materials;
-
-// Experimental data assimilation and digital twin
-// pub mod data_assimilation;
-
-// Temporal degradation modeling
-// pub mod degradation;
-
-// ML surrogate models and inverse design
-// pub mod surrogate;
-
-// Safety analysis (FMEA, fault trees, control systems, compliance)
-// pub mod safety;
-
-// Multi-scale physics coupling
-// pub mod multiscale;
+pub mod bayesian;
 
 // Bayesian optimal experiment design
-// pub mod optimal_experiment;
+pub mod optimal_experiment;
 
 // Core re-exports
 pub use anomaly::{AnomalyAnalysis, AnomalyHypothesis};
+pub use bayesian::{ALL_HYPOTHESES, HypothesisBelief, ObservedOutcome, OutcomeClasses};
+pub use error::{Result, SparkError};
 pub use lattice::{LatticeLifetime, LatticeState};
 pub use neutron_source::{NeutronSourceDesign, SourceSpec};
+pub use optimal_experiment::{
+    ExperimentInfoGain, SequenceStep, expected_information_gain, generate_proposal_markdown,
+    greedy_sequence, rank_experiments, standard_candidate_experiments,
+};
 pub use physics::{GamowIntegration, GamowResult, QFactor, QFactorParams};
 pub use shielding::{NeutronShielding, ShieldingResult};
-// pub use reactor_design::{ReactorDesign, ReactorDesigner, MassBreakdown, CostBreakdown, FuelCycle, ThermalConstraint, CoolingMethod};
-pub use error::{Result, SparkError};
 
 // Path C re-exports
 pub use experimental_design::{ExperimentDesign, ExperimentDesigner, ExperimentalProgram};

@@ -16,6 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_nix::NixParser;
 use symthaea_nix::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use symthaea_nix::ipc::{
     AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry, DaemonConfig,
@@ -93,6 +94,14 @@ struct DaemonState {
     hibernating: bool,
     /// Metacognitive journal of actions taken and their outcomes.
     metacognitive_journal: Vec<symthaea_nix::ipc::MetacognitiveEntry>,
+    /// Whether autonomic countermeasures (active healing) are enabled.
+    active_healing: bool,
+    /// The currently pending system command waiting for watchdog approval.
+    pending_action: Option<String>,
+    /// The currently pending conversational response from Ollama.
+    pending_response: Option<String>,
+    /// Custom user goal set via natural language input: (goal_description, target_name, expected_value)
+    custom_user_goal: Option<(String, String, f64)>,
 }
 
 /// Tracks alert continuity across IPC cycles.
@@ -161,6 +170,10 @@ impl DaemonState {
             calm_cycles: 0,
             hibernating: false,
             metacognitive_journal: Vec::new(),
+            active_healing: config.active_healing,
+            pending_action: None,
+            pending_response: None,
+            custom_user_goal: None,
         }
     }
 
@@ -202,6 +215,111 @@ impl DaemonState {
             hit_count: 0,
         };
         kb.add_learned_article(article, &mut self.codebook);
+    }
+
+    /// Generate NixOS hardening patch for failed services using tree-sitter AST (Proposal 2)
+    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String)> {
+        let path = std::path::Path::new("/etc/nixos/configuration.nix");
+        let content = if path.exists() {
+            std::fs::read_to_string(path).ok()?
+        } else {
+            // Fallback for development/testing sandbox
+            "{}\n".to_string()
+        };
+
+        let mut parser = NixParser::new();
+        let config = parser.parse(&content).ok()?;
+
+        // Clean target unit name
+        let unit_clean = unit.replace(".service", "");
+
+        // Based on unit name, recommend a hardening configuration parameter
+        let (path_str, value_str) = match unit_clean.as_str() {
+            "clickhouse-server" | "clickhouse" => (
+                "services.clickhouse.extraConfig".to_string(),
+                "<max_server_memory_usage>80%</max_server_memory_usage>".to_string(),
+            ),
+            "postgresql" | "postgres" => (
+                "services.postgresql.settings.shared_buffers".to_string(),
+                "\"512MB\"".to_string(),
+            ),
+            _ => (
+                format!("systemd.services.{}.serviceConfig.RestartSec", unit_clean),
+                "5".to_string(),
+            ),
+        };
+
+        // AST verification: check if this option is already set in options
+        let already_configured = config.options.iter().any(|opt| opt.path == path_str);
+        if already_configured {
+            return None;
+        }
+
+        // Generate hardened nix configuration string (diff representation)
+        let hardened_line = format!("{} = {}", path_str, value_str);
+        let mut new_content = content.clone();
+
+        // Find insert point before the closing brace
+        if let Some(last_brace) = new_content.rfind('}') {
+            new_content.insert_str(last_brace, &format!("  {};\n", hardened_line));
+        } else {
+            new_content.push_str(&format!("\n  {};\n", hardened_line));
+        }
+
+        Some((hardened_line, new_content))
+    }
+
+    /// Sync causal graphs and learned resolutions with other local daemons (Proposal 4)
+    fn sync_with_cluster(&mut self) {
+        let state_dir = default_snapshot_path().parent().unwrap().to_path_buf();
+        let parent_dir = state_dir.parent().unwrap(); // e.g. ~/.config/agy/data1
+
+        if let Some(grandparent) = parent_dir.parent() {
+            if let Ok(entries) = std::fs::read_dir(grandparent) {
+                for entry in entries.filter_map(Result::ok) {
+                    let path = entry.path();
+                    if path.is_dir() && path != parent_dir {
+                        let other_nm = path.join("nix-mind");
+                        if other_nm.exists() {
+                            // 1. Sync Causal Graph
+                            let other_causal = other_nm.join("causal_graph.json");
+                            if other_causal.exists() {
+                                let mut other_graph = NixCausalGraph::new(42);
+                                if other_graph.load(&other_causal).is_ok() {
+                                    let before = self.causal_graph.edge_count();
+                                    self.causal_graph.merge(&other_graph);
+                                    let added = self.causal_graph.edge_count() - before;
+                                    if added > 0 {
+                                        eprintln!(
+                                            "nix-mind-daemon: Clustered Sync: merged {} causal edges from {:?}",
+                                            added, other_causal
+                                        );
+                                    }
+                                }
+                            }
+
+                            // 2. Sync Learned Knowledge
+                            let other_kb = other_nm.join("knowledge_learned.json");
+                            if other_kb.exists() {
+                                if let Ok(json) = std::fs::read_to_string(&other_kb) {
+                                    if let Some(kb) = self.knowledge_base.as_mut() {
+                                        let before = kb.dynamic_len();
+                                        kb.load_dynamic(&json, &mut self.codebook);
+                                        let added = kb.dynamic_len() - before;
+                                        if added > 0 {
+                                            eprintln!(
+                                                "nix-mind-daemon: Clustered Sync: merged {} learned knowledge articles from {:?}",
+                                                added, other_kb
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Process a system snapshot: encode, detect transitions, learn.
@@ -698,20 +816,44 @@ impl DaemonState {
         let now = now_secs();
         let mut candidates = Vec::new();
 
-        // 1. Collect candidates from persistent alerts
+        // 1. Collect candidates from persistent alerts and proactive predictions (Proposal 3)
         for alert in alerts {
-            if alert.consecutive_cycles >= 3 && alert.confidence > 0.6 {
+            let is_persistent = alert.consecutive_cycles >= 3 && alert.confidence > 0.6;
+
+            // Proactive auto-tuning: predicted crossing within 6 hours with high confidence
+            let is_proactive_crossing = alert.predicted_value > alert.threshold
+                && alert.hours_ahead <= 6.0
+                && alert.confidence > 0.6;
+
+            if is_persistent || is_proactive_crossing {
+                let prefix = if is_proactive_crossing && !is_persistent {
+                    "[Proactive Auto-Tune] "
+                } else {
+                    ""
+                };
                 let goal_description = format!(
-                    "Maintain {} below {} (currently {} predicted {})",
-                    alert.metric, alert.threshold, alert.current_value, alert.predicted_value
+                    "{}Maintain {} below {} (currently {} predicted {})",
+                    prefix,
+                    alert.metric,
+                    alert.threshold,
+                    alert.current_value,
+                    alert.predicted_value
                 );
                 let severity_weight = match alert.severity {
                     AlertSeverity::Critical => 3.0,
                     AlertSeverity::Warning => 1.0,
                     AlertSeverity::Info => 0.5,
                 };
-                let priority =
-                    severity_weight * (alert.consecutive_cycles as f64) * alert.confidence;
+                // Proactive plans have slightly lower urgency weight than persistent active alerts
+                let priority_multiplier = if is_proactive_crossing && !is_persistent {
+                    0.7
+                } else {
+                    1.0
+                };
+                let priority = severity_weight
+                    * (alert.consecutive_cycles.max(1) as f64)
+                    * alert.confidence
+                    * priority_multiplier;
                 candidates.push((
                     goal_description,
                     priority,
@@ -741,6 +883,17 @@ impl DaemonState {
                 let priority = 2.5 * anomaly.score;
                 candidates.push((goal_description, priority, anomaly.unit.clone(), 1.0));
             }
+        }
+
+        // 2.5 Collect candidates from custom user natural language goal (Proposal 4)
+        if let Some((goal_desc, target, val)) = &self.custom_user_goal {
+            let priority = 10.0; // Max priority for user-directed goals
+            candidates.push((
+                format!("[User Goal] {goal_desc}"),
+                priority,
+                target.clone(),
+                *val,
+            ));
         }
 
         // 3. Proactive epistemic exploration (curiosity drive):
@@ -788,11 +941,175 @@ impl DaemonState {
                 });
 
                 if let Some(best_action) = non_cooldown_action.or_else(|| plan.actions.first()) {
-                    eprintln!(
-                        "nix-mind-daemon: Coordinated Executive Plan (dry-run) [priority={:.2}]: {} → {:?} (EFE={:.3})",
-                        priority, best_goal, best_action.action, best_action.expected_free_energy
-                    );
+                    if self.active_healing {
+                        use symthaea_nix::action::executor::{
+                            NixOSCommand, NixOSExecutor, SafetyLevel,
+                        };
+                        let target_name_clone = target_name.clone();
+
+                        // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
+                        let patch_tweak = self.generate_nixos_hardening_patch(&target_name_clone);
+
+                        let (cmd, cmd_str, _is_patch) = if let Some((tweak, _)) = &patch_tweak {
+                            let command_str =
+                                format!("PATCH /etc/nixos/configuration.nix: {}", tweak);
+                            (
+                                NixOSCommand::Custom {
+                                    command: "nixos-rebuild".into(),
+                                    args: vec!["switch".into()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                                command_str,
+                                true,
+                            )
+                        } else {
+                            let default_cmd = match &best_action.action {
+                                ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
+                                    older_than_days: None,
+                                    delete_all: false,
+                                },
+                                ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
+                                    flake: None,
+                                    extra_args: vec![],
+                                },
+                                ActionCategory::Rollback => NixOSCommand::EnvRollback,
+                                ActionCategory::Enable => NixOSCommand::Custom {
+                                    command: "systemctl".into(),
+                                    args: vec!["enable".into(), target_name_clone.clone()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                                ActionCategory::Disable => NixOSCommand::Custom {
+                                    command: "systemctl".into(),
+                                    args: vec!["disable".into(), target_name_clone.clone()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                                _ => NixOSCommand::Custom {
+                                    command: "systemctl".into(),
+                                    args: vec!["restart".into(), target_name_clone.clone()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                            };
+                            let (bin, args) = default_cmd.to_command();
+                            let command_str = format!("{} {}", bin, args.join(" "));
+                            (default_cmd, command_str, false)
+                        };
+
+                        let safety = cmd.safety_level();
+                        let is_modifying = safety != SafetyLevel::ReadOnly;
+
+                        if is_modifying {
+                            let is_approved = self
+                                .watchdog_status
+                                .as_ref()
+                                .map(|s| {
+                                    s.eq_ignore_ascii_case("approved")
+                                        || s.eq_ignore_ascii_case("a")
+                                        || s.eq_ignore_ascii_case("yes")
+                                })
+                                .unwrap_or(false);
+
+                            if !is_approved {
+                                self.pending_action = Some(cmd_str.clone());
+                                eprintln!(
+                                    "nix-mind-daemon: Gating action [safety={:?}]. Waiting for watchdog approval: {}",
+                                    safety, cmd_str
+                                );
+                                return (dynamic_threshold, Some(best_action.expected_free_energy));
+                            } else {
+                                // TOCTOU guard: the operator approved a *specific*
+                                // command (the one stored in `pending_action` when we
+                                // requested approval). The plan can change between
+                                // cycles, so if the command we would run now differs
+                                // from what was approved, re-gate instead of executing
+                                // an unapproved action.
+                                if self.pending_action.as_deref() != Some(cmd_str.as_str()) {
+                                    eprintln!(
+                                        "nix-mind-daemon: Plan changed since approval; re-gating (approved {:?}, now {}).",
+                                        self.pending_action, cmd_str
+                                    );
+                                    self.pending_action = Some(cmd_str.clone());
+                                    self.watchdog_status = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+
+                                eprintln!("nix-mind-daemon: Watchdog APPROVED action: {}", cmd_str);
+
+                                // If it was an AST configuration patch, apply the configuration change before switching!
+                                if let Some((_, new_content)) = patch_tweak {
+                                    let path = std::path::Path::new("/etc/nixos/configuration.nix");
+                                    if path.exists() {
+                                        // Do NOT proceed to `nixos-rebuild switch` if the
+                                        // config write failed — a partial/unwritten config
+                                        // would rebuild the wrong system.
+                                        if let Err(e) = std::fs::write(path, &new_content) {
+                                            eprintln!(
+                                                "nix-mind-daemon: FAILED to write /etc/nixos/configuration.nix ({e}); aborting rebuild."
+                                            );
+                                            self.watchdog_status = None;
+                                            self.pending_action = None;
+                                            return (
+                                                dynamic_threshold,
+                                                Some(best_action.expected_free_energy),
+                                            );
+                                        }
+                                    }
+                                    let local_harden = default_snapshot_path()
+                                        .with_file_name("symthaea_hardening.nix");
+                                    if let Err(e) = std::fs::write(&local_harden, &new_content) {
+                                        eprintln!(
+                                            "nix-mind-daemon: warning: failed to write local hardening snapshot ({e})."
+                                        );
+                                    }
+                                }
+
+                                // Clear verdict file
+                                let wd_path =
+                                    default_snapshot_path().with_file_name("watchdog_verdict.txt");
+                                let _ = std::fs::remove_file(wd_path);
+                                self.watchdog_status = None;
+                                self.pending_action = None;
+                            }
+                        } else {
+                            self.pending_action = None;
+                        }
+
+                        eprintln!(
+                            "nix-mind-daemon: Executing Coordinated Executive Plan [priority={:.2}]: {} → {:?}",
+                            priority, best_goal, best_action.action
+                        );
+
+                        // Spawn in a background thread to execute asynchronously without blocking daemon tick loop
+                        std::thread::spawn(move || {
+                            let rt = tokio::runtime::Builder::new_current_thread()
+                                .enable_all()
+                                .build()
+                                .expect("Failed to build executor runtime");
+                            rt.block_on(async {
+                                let mut executor = NixOSExecutor::new();
+                                let result = executor.execute(cmd, 0.5).await;
+                                eprintln!("nix-mind-daemon: Active healing execution finished. Result: {:?}", result);
+                            });
+                        });
+                    } else {
+                        eprintln!(
+                            "nix-mind-daemon: Coordinated Executive Plan (dry-run) [priority={:.2}]: {} → {:?} (EFE={:.3})",
+                            priority,
+                            best_goal,
+                            best_action.action,
+                            best_action.expected_free_energy
+                        );
+                    }
                     self.maintenance_plan_count += 1;
+
+                    // Clear custom user goal if this action target matches it
+                    if let Some((_, target, _)) = &self.custom_user_goal {
+                        if target == target_name {
+                            self.custom_user_goal = None;
+                        }
+                    }
 
                     // Set last_recommended_action for telemetry feedback loop in the next cycle
                     let state_before = self.active_inference.world_model().system_state().clone();
@@ -803,6 +1120,23 @@ impl DaemonState {
                         *initial_val,
                     ));
 
+                    // Query Ollama for rationales (Proposal 3: LLM-Enriched Metacognitive Explanations)
+                    let mut rationale = best_action.rationale.clone();
+                    if let Some(ollama) = self.ollama.as_mut() {
+                        let prompt = format!(
+                            "As a NixOS cognitive reliability agent, explain concisely (1 sentence) why you recommended the action '{:?}' to address the system goal '{}', considering the suspected root causes: {}.\nKeep it technical, precise, and direct. Format as a statement.",
+                            best_action.action,
+                            best_goal,
+                            root_causes.join(", ")
+                        );
+                        if let Some(resp) = ollama.query(&prompt) {
+                            let text = resp.text.trim().to_string();
+                            if !text.is_empty() {
+                                rationale = text;
+                            }
+                        }
+                    }
+
                     // Add entry to metacognitive journal (cap at 20 entries)
                     let entry = symthaea_nix::ipc::MetacognitiveEntry {
                         timestamp: now,
@@ -810,7 +1144,7 @@ impl DaemonState {
                         root_causes: root_causes.clone(),
                         action: format!("{:?}", best_action.action),
                         expected_free_energy: best_action.expected_free_energy,
-                        rationale: best_action.rationale.clone(),
+                        rationale,
                         outcome: "Pending".to_string(),
                         allostatic_threshold: dynamic_threshold,
                         volatility_ema: self.anomaly_volatility_ema,
@@ -950,6 +1284,8 @@ impl DaemonState {
             risk_aversion: self.active_inference.risk_aversion(),
             curiosity_weight: self.active_inference.curiosity_weight(),
             causal_learning_rate: self.causal_graph.learning_rate(),
+            pending_action: self.pending_action.clone(),
+            pending_response: self.pending_response.clone(),
         }
     }
 }
@@ -1167,7 +1503,13 @@ fn main() -> ! {
     #[cfg(feature = "observability")]
     init_tracing();
 
-    let config = DaemonConfig::load_default();
+    let mut config = DaemonConfig::load_default();
+    if std::env::var("NIX_MIND_ACTIVE_HEALING")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false)
+    {
+        config.active_healing = true;
+    }
     let mut state = DaemonState::new(&config);
     let snapshot_path = default_snapshot_path();
 
@@ -1299,6 +1641,126 @@ fn main() -> ! {
     loop {
         cycle += 1;
 
+        // Check for TUI commands (Proposal 4: Natural Language Goal-Setting)
+        let cmd_path = snapshot_path.with_file_name("tui_command.txt");
+        if cmd_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cmd_path) {
+                let content = content.trim().to_string();
+                if !content.is_empty() {
+                    state.pending_response = None;
+                    eprintln!(
+                        "nix-mind-daemon: Received TUI natural language command: '{}'",
+                        content
+                    );
+
+                    let lower = content.to_lowercase();
+                    let is_question = lower.contains("why")
+                        || lower.contains("what")
+                        || lower.contains("how")
+                        || lower.contains("explain")
+                        || content.starts_with('?');
+
+                    if is_question {
+                        // Gather log context for failed/anomalous services
+                        let mut logs_context = String::new();
+                        for anomaly in &state.recent_anomalies {
+                            if anomaly.score > 0.5 {
+                                let unit = &anomaly.unit;
+                                if let Ok(output) = std::process::Command::new("journalctl")
+                                    .args(&["-u", unit, "-n", "10", "--no-pager"])
+                                    .output()
+                                {
+                                    let logs = String::from_utf8_lossy(&output.stdout);
+                                    if !logs.is_empty() {
+                                        logs_context.push_str(&format!(
+                                            "\n--- Logs for {} ---\n{}",
+                                            unit, logs
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+
+                        let top_causal_edges: Vec<String> = state
+                            .causal_graph
+                            .top_edges(5)
+                            .iter()
+                            .map(|e| format!("{} -> {} ({:.2})", e.from, e.to, e.confidence))
+                            .collect();
+
+                        let prompt = format!(
+                            "As a NixOS cognitive reliability agent, answer the user's diagnostic question: '{}'\n\n\
+                            Internal System State:\n\
+                            - Free Energy: {:.3}\n\
+                            - Anomaly Volatility (EMA): {:.3}\n\
+                            - Risk Aversion: {:.3}\n\
+                            - Curiosity explore weight: {:.3}\n\
+                            - Causal learning rate: {:.3}\n\
+                            - Recent anomalies: {:?}\n\
+                            - Top causal links: {:?}\n\
+                            {}\n\n\
+                            Provide a concise, expert answer (max 3 sentences) explaining the diagnosis and suggesting any actions.",
+                            content,
+                            state.world_model.free_energy(),
+                            state.anomaly_volatility_ema,
+                            state.active_inference.risk_aversion(),
+                            state.active_inference.curiosity_weight(),
+                            state.causal_graph.learning_rate(),
+                            state.recent_anomalies,
+                            top_causal_edges,
+                            logs_context
+                        );
+
+                        if let Some(ollama) = state.ollama.as_mut() {
+                            if let Some(resp) = ollama.query(&prompt) {
+                                state.pending_response = Some(resp.text.trim().to_string());
+                            } else {
+                                state.pending_response =
+                                    Some("Failed to query local Ollama instance.".to_string());
+                            }
+                        } else {
+                            state.pending_response =
+                                Some("Ollama is not configured or offline.".to_string());
+                        }
+                    } else {
+                        let (target, val) = if lower.contains("disk") {
+                            let num = lower
+                                .split_whitespace()
+                                .filter_map(|w| w.parse::<f64>().ok())
+                                .next()
+                                .unwrap_or(85.0);
+                            ("disk_used_pct".to_string(), num)
+                        } else if lower.contains("memory") || lower.contains("mem") {
+                            let num = lower
+                                .split_whitespace()
+                                .filter_map(|w| w.parse::<f64>().ok())
+                                .next()
+                                .unwrap_or(80.0);
+                            ("memory_used_pct".to_string(), num)
+                        } else if lower.contains("restart")
+                            || lower.contains("enable")
+                            || lower.contains("disable")
+                        {
+                            let target = lower
+                                .split_whitespace()
+                                .skip_while(|w| {
+                                    *w != "restart" && *w != "enable" && *w != "disable"
+                                })
+                                .nth(1)
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| "systemd".to_string());
+                            (target, 1.0)
+                        } else {
+                            ("systemd".to_string(), 1.0)
+                        };
+
+                        state.custom_user_goal = Some((content, target, val));
+                    }
+                }
+            }
+            let _ = std::fs::remove_file(&cmd_path);
+        }
+
         if last_snapshot.elapsed() >= Duration::from_secs(config.snapshot_interval) {
             #[cfg(feature = "observability")]
             let _observe_timer = PhaseTimer::start("observe");
@@ -1360,7 +1822,12 @@ fn main() -> ! {
             }
         }
 
-        if cycle % config.ipc_write_interval == 0 {
+        if cycle == 1 || cycle % config.ipc_write_interval == 0 {
+            // Run P2P clustered synchronization (Proposal 4)
+            if cycle % (config.ipc_write_interval * 2) == 0 {
+                state.sync_with_cluster();
+            }
+
             #[cfg(feature = "observability")]
             let _ipc_timer = PhaseTimer::start("ipc_write");
 
@@ -2389,6 +2856,66 @@ mod tests {
 
         // Verify journal entry has transitioned to Success
         assert_eq!(state.metacognitive_journal[0].outcome, "Success");
+    }
+
+    #[test]
+    fn test_custom_user_goal_and_watchdog_veto() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Verify initial custom goal and pending action is None
+        assert!(state.custom_user_goal.is_none());
+        assert!(state.pending_action.is_none());
+
+        // Set custom user goal: keep disk below 75%
+        state.custom_user_goal = Some((
+            "keep disk below 75".to_string(),
+            "disk_used_pct".to_string(),
+            75.0,
+        ));
+
+        // When we run planning, the daemon should formulate a plan for the custom user goal
+        // Because active_healing = false in test_config(), it shouldn't execute or gate, but should plan it as dry-run
+        state.run_active_inference_plans(&[]);
+        assert!(
+            state.last_recommended_action.is_some(),
+            "Expected a plan to be formulated for the custom user goal"
+        );
+        let planned = state.last_recommended_action.as_ref().unwrap();
+        assert_eq!(planned.0, "disk_used_pct");
+
+        // Now, enable active healing
+        state.active_healing = true;
+        // Re-inject custom goal
+        state.custom_user_goal = Some((
+            "keep disk below 75".to_string(),
+            "disk_used_pct".to_string(),
+            75.0,
+        ));
+
+        // When we run planning with active_healing = true and watchdog_status = None,
+        // it should GATE the action and set pending_action!
+        state.run_active_inference_plans(&[]);
+        assert!(
+            state.pending_action.is_some(),
+            "Expected action to be gated behind watchdog approval"
+        );
+        assert!(
+            state.pending_action.as_ref().unwrap().contains("systemctl")
+                || state.pending_action.as_ref().unwrap().contains("nix-store")
+                || state.pending_action.as_ref().unwrap().contains("PATCH"),
+            "Expected pending command to be a PATCH, systemctl, or nix-store command"
+        );
+
+        // Approve it!
+        state.watchdog_status = Some("Approved".to_string());
+        state.run_active_inference_plans(&[]);
+
+        // It should clear pending action on approval
+        assert!(
+            state.pending_action.is_none(),
+            "Expected pending action to be cleared on approval"
+        );
     }
 
     #[test]

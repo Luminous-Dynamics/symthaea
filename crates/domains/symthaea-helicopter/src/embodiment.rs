@@ -392,10 +392,25 @@ mod tests {
         let mut bridge = make_bridge();
         let hv = ContinuousHV::random(16384, 42);
 
-        // Red safety = zero motor gain
+        // Red safety does NOT zero the motors — a helicopter cannot safely
+        // hard-cut power mid-air. It enters the staged emergency-landing
+        // fallback (StabilizeHover → AutorotationDescent → Touchdown), so
+        // control effort is the fallback's hover command, not 0.0.
+        // (An earlier version of this test asserted effort == 0.0, which the
+        // staged fallback can never produce — stale hard-zero design.)
         let result = bridge.step(&hv, 1.0 / 300.0, 0.05);
         assert_eq!(result.safety_level, MotorSafetyLevel::Red);
-        assert_eq!(result.control_effort, 0.0);
+        assert!(
+            result.control_effort > 0.0,
+            "Red fallback must command a staged hover, not dead motors"
+        );
+        // Stage 1 hover command: collective 0.55, thrust 0.6, tail 0.5,
+        // cyclic/pedal zeroed → effort = 1.65/6 = 0.275
+        assert!(
+            (result.control_effort - 0.275).abs() < 1e-4,
+            "expected StabilizeHover effort 0.275, got {}",
+            result.control_effort
+        );
     }
 
     #[test]

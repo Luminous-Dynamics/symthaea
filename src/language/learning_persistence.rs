@@ -44,6 +44,72 @@ impl Default for AdaptiveThresholds {
     }
 }
 
+/// Per-outcome threshold adjustment step size.
+const THRESHOLD_STEP: f64 = 0.01;
+/// Lower clamp for adaptive thresholds.
+const THRESHOLD_MIN: f64 = 0.05;
+/// Upper clamp for adaptive thresholds.
+const THRESHOLD_MAX: f64 = 0.95;
+/// Cap on retained threshold-adjustment history entries.
+const MAX_ADJUSTMENT_HISTORY: usize = 256;
+
+impl AdaptiveThresholds {
+    /// Record a verified interaction outcome and adapt thresholds.
+    ///
+    /// Simple threshold servo: a *failure* that passed a threshold pushes
+    /// that threshold up (be stricter); a *success* that fell below a
+    /// threshold pulls it down (we were too strict). Steps are small
+    /// (`THRESHOLD_STEP`) and clamped to `[THRESHOLD_MIN, THRESHOLD_MAX]`.
+    /// Every actual adjustment is appended to `adjustment_history` as
+    /// `(unix_millis, old, new)`, capped at `MAX_ADJUSTMENT_HISTORY`.
+    pub fn record_outcome(&mut self, phi: f64, confidence: f64, success: bool) {
+        if success {
+            self.successes += 1;
+        } else {
+            self.failures += 1;
+        }
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        // Confidence threshold servo
+        let old_conf = self.confidence_threshold;
+        if !success && confidence >= self.confidence_threshold {
+            self.confidence_threshold =
+                (self.confidence_threshold + THRESHOLD_STEP).clamp(THRESHOLD_MIN, THRESHOLD_MAX);
+        } else if success && confidence < self.confidence_threshold {
+            self.confidence_threshold =
+                (self.confidence_threshold - THRESHOLD_STEP).clamp(THRESHOLD_MIN, THRESHOLD_MAX);
+        }
+        if (self.confidence_threshold - old_conf).abs() > f64::EPSILON {
+            self.adjustment_history
+                .push((now, old_conf, self.confidence_threshold));
+        }
+
+        // Phi threshold servo (same shape)
+        let old_phi = self.phi_threshold;
+        if !success && phi >= self.phi_threshold {
+            self.phi_threshold =
+                (self.phi_threshold + THRESHOLD_STEP).clamp(THRESHOLD_MIN, THRESHOLD_MAX);
+        } else if success && phi < self.phi_threshold {
+            self.phi_threshold =
+                (self.phi_threshold - THRESHOLD_STEP).clamp(THRESHOLD_MIN, THRESHOLD_MAX);
+        }
+        if (self.phi_threshold - old_phi).abs() > f64::EPSILON {
+            self.adjustment_history
+                .push((now, old_phi, self.phi_threshold));
+        }
+
+        // Bound history growth
+        if self.adjustment_history.len() > MAX_ADJUSTMENT_HISTORY {
+            let excess = self.adjustment_history.len() - MAX_ADJUSTMENT_HISTORY;
+            self.adjustment_history.drain(..excess);
+        }
+    }
+}
+
 /// Outcome patterns tracking success rates across different strategies.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutcomePatterns {
@@ -59,6 +125,20 @@ impl Default for OutcomePatterns {
             quadrant_samples: [0; 4],
             quadrant_success_rates: [0.0; 4],
         }
+    }
+}
+
+impl OutcomePatterns {
+    /// Record an outcome for a quadrant, updating the running success rate
+    /// incrementally. Quadrant layout matches the struct docs:
+    /// 0 = low-φ/low-conf, 1 = low-φ/high-conf, 2 = high-φ/low-conf,
+    /// 3 = high-φ/high-conf.
+    pub fn record(&mut self, quadrant: usize, success: bool) {
+        let q = quadrant.min(3);
+        let n = self.quadrant_samples[q] as f64;
+        let outcome = if success { 1.0 } else { 0.0 };
+        self.quadrant_success_rates[q] = (self.quadrant_success_rates[q] * n + outcome) / (n + 1.0);
+        self.quadrant_samples[q] = self.quadrant_samples[q].saturating_add(1);
     }
 }
 
@@ -336,6 +416,26 @@ impl LearningPersistence {
         }
     }
 
+    /// Record a per-interaction outcome into the adaptive learning state.
+    ///
+    /// This is what makes the persisted `LearningState` genuinely adaptive:
+    /// the facade calls it after fidelity verification with the interaction's
+    /// phi (`StructuredThought::psi`), the generation confidence, and whether
+    /// the translation was verified. It updates the quadrant outcome patterns
+    /// (bucketed by the thresholds *before* adjustment) and then runs the
+    /// threshold servo in [`AdaptiveThresholds::record_outcome`].
+    pub fn record_outcome(&mut self, phi: f64, confidence: f64, success: bool) {
+        // Bucket by the current thresholds before they adapt.
+        let hi_phi = phi >= self.state.thresholds.phi_threshold;
+        let hi_conf = confidence >= self.state.thresholds.confidence_threshold;
+        let quadrant = (hi_phi as usize) * 2 + (hi_conf as usize);
+        self.state.patterns.record(quadrant, success);
+        self.state
+            .thresholds
+            .record_outcome(phi, confidence, success);
+        self.dirty = true;
+    }
+
     /// Update thresholds and mark dirty
     pub fn update_thresholds(&mut self, thresholds: AdaptiveThresholds) {
         self.state.thresholds = thresholds;
@@ -600,6 +700,85 @@ mod tests {
 
         let stats = persist.stats();
         assert!((stats.accuracy - 0.8).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_record_outcome_updates_counts_and_quadrants() {
+        let mut persist = LearningPersistence::new();
+
+        // high-phi/high-conf success (defaults: phi 0.5, conf 0.6) -> quadrant 3
+        persist.record_outcome(0.8, 0.9, true);
+        assert_eq!(persist.thresholds().successes, 1);
+        assert_eq!(persist.thresholds().failures, 0);
+        assert_eq!(persist.patterns().quadrant_samples[3], 1);
+        assert!((persist.patterns().quadrant_success_rates[3] - 1.0).abs() < 1e-9);
+
+        // low-phi/low-conf failure -> quadrant 0
+        persist.record_outcome(0.1, 0.1, false);
+        assert_eq!(persist.thresholds().failures, 1);
+        assert_eq!(persist.patterns().quadrant_samples[0], 1);
+        assert!(persist.patterns().quadrant_success_rates[0].abs() < 1e-9);
+
+        assert!(persist.is_dirty());
+    }
+
+    #[test]
+    fn test_record_outcome_adapts_thresholds() {
+        let mut persist = LearningPersistence::new();
+        let initial_conf = persist.thresholds().confidence_threshold;
+
+        // Confident failures should raise the confidence threshold.
+        for _ in 0..5 {
+            persist.record_outcome(0.9, 0.95, false);
+        }
+        assert!(persist.thresholds().confidence_threshold > initial_conf);
+        assert!(!persist.thresholds().adjustment_history.is_empty());
+
+        // Low-confidence successes should pull it back down.
+        let raised = persist.thresholds().confidence_threshold;
+        for _ in 0..5 {
+            persist.record_outcome(0.1, 0.1, true);
+        }
+        assert!(persist.thresholds().confidence_threshold < raised);
+    }
+
+    #[test]
+    fn test_record_outcome_running_success_rate() {
+        let mut patterns = OutcomePatterns::default();
+        patterns.record(2, true);
+        patterns.record(2, false);
+        patterns.record(2, true);
+        assert_eq!(patterns.quadrant_samples[2], 3);
+        assert!((patterns.quadrant_success_rates[2] - 2.0 / 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_record_outcome_persists_across_sessions() {
+        let dir = tempdir().unwrap();
+        let config = LearningPersistenceConfig::default().with_dir(dir.path().to_path_buf());
+
+        let mut persist = LearningPersistence::with_config(config.clone());
+        persist.initialize().unwrap();
+        persist.record_outcome(0.8, 0.9, true);
+        persist.record_outcome(0.8, 0.9, false);
+        persist.save().unwrap();
+
+        let mut persist2 = LearningPersistence::with_config(config);
+        persist2.initialize().unwrap();
+        assert_eq!(persist2.thresholds().successes, 1);
+        assert_eq!(persist2.thresholds().failures, 1);
+        assert_eq!(persist2.patterns().quadrant_samples[3], 2);
+    }
+
+    #[test]
+    fn test_adjustment_history_bounded() {
+        let mut thresholds = AdaptiveThresholds::default();
+        // Alternate confident failures / unconfident successes so every
+        // outcome adjusts both thresholds.
+        for i in 0..600 {
+            thresholds.record_outcome(0.9, 0.9, i % 2 == 0);
+        }
+        assert!(thresholds.adjustment_history.len() <= MAX_ADJUSTMENT_HISTORY);
     }
 
     #[test]

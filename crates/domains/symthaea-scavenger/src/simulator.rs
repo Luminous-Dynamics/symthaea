@@ -1,12 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! First-pass scavenger / disassembly simulator.
+use crate::environment::SiteEnvironment;
 use crate::types::{
     BATTERY_RATIO, BLADE_BIND_RISK, CONTAINMENT_BREACH_RISK, CONTAMINATION_RISK, HOPPER_FILL,
     HUMAN_PROXIMITY, INCIDENT_RISK, JAM_RISK, QUARANTINE_LOAD_RATIO, SALVAGE_PURITY,
     SALVAGE_VALUE_RATE, SORTER_CLOG_RISK, ScavengerCommand, ScavengerOperatingMode, ScavengerState,
     THERMAL_LOAD, TOOL_WEAR, TOXIC_DUST_RISK,
 };
+use symthaea_core::genesis::GenesisSeed;
 
 pub trait ScavengerPhysicsSimulator {
     fn step(&mut self, cmd: &ScavengerCommand, dt: f64);
@@ -14,21 +16,50 @@ pub trait ScavengerPhysicsSimulator {
     fn reset(&mut self);
 }
 
+/// How fast the sensed human_proximity channel tracks its ground-truth
+/// source (per second). Higher = faster/less-lagged sensing.
+const HUMAN_SENSOR_GAIN: f64 = 1.5;
+
 /// A simple recovery robot model with sorting, cutting, hopper, and hazard load.
 pub struct SimpleScavengerSimulator {
     state: ScavengerState,
+    environment: SiteEnvironment,
+    genesis: GenesisSeed,
 }
 
 impl SimpleScavengerSimulator {
-    pub fn new() -> Self {
+    pub fn new(genesis: &GenesisSeed) -> Self {
         Self {
             state: ScavengerState::home(),
+            environment: SiteEnvironment::new(genesis),
+            genesis: genesis.clone(),
         }
+    }
+
+    /// Mutable state access, for tests that need to set up a degraded
+    /// starting condition (e.g. elevated dust level) before stepping.
+    pub fn state_mut(&mut self) -> &mut ScavengerState {
+        &mut self.state
+    }
+
+    /// Mutable access to the ground-truth site world, for tests that need
+    /// to script a real human-proximity scenario independent of the
+    /// robot's own actuator history.
+    pub fn environment_mut(&mut self) -> &mut SiteEnvironment {
+        &mut self.environment
+    }
+
+    pub fn environment(&self) -> &SiteEnvironment {
+        &self.environment
     }
 }
 
 impl ScavengerPhysicsSimulator for SimpleScavengerSimulator {
     fn step(&mut self, cmd: &ScavengerCommand, dt: f64) {
+        // Ground-truth world evolves independently of the robot's own
+        // actuation.
+        self.environment.step(dt);
+
         let human_guard = (1.0 - self.state.channels[HUMAN_PROXIMITY] * 0.7).clamp(0.1, 1.0);
         let contamination_guard =
             (1.0 - self.state.channels[CONTAMINATION_RISK] * 0.5).clamp(0.2, 1.0);
@@ -98,8 +129,18 @@ impl ScavengerPhysicsSimulator for SimpleScavengerSimulator {
         self.state.channels[22] = (self.state.channels[22] * 0.9
             + (1.0 - self.state.channels[JAM_RISK]) * 0.1)
             .clamp(0.0, 1.0);
-        self.state.channels[HUMAN_PROXIMITY] = (self.state.channels[HUMAN_PROXIMITY] * 0.94
-            + effective_cutter.abs() as f64 * 0.03)
+        // human_proximity: sensed via a lag chasing a real ground-truth
+        // human encounter, not the robot's own cutter usage. This is the
+        // safety-critical channel that gates human_guard above -- previously
+        // a robot that never ran its cutter always read zero proximity
+        // regardless of whether a human was actually standing next to it.
+        let human_truth = if self.environment.human_present {
+            self.environment.human_intensity
+        } else {
+            0.0
+        };
+        self.state.channels[HUMAN_PROXIMITY] = (self.state.channels[HUMAN_PROXIMITY]
+            + (human_truth - self.state.channels[HUMAN_PROXIMITY]) * HUMAN_SENSOR_GAIN * dt)
             .clamp(0.0, 1.0);
         self.state.channels[CONTAINMENT_BREACH_RISK] = (self.state.channels[13] * 0.25
             + self.state.channels[9] * 0.18
@@ -168,21 +209,21 @@ impl ScavengerPhysicsSimulator for SimpleScavengerSimulator {
     }
     fn reset(&mut self) {
         self.state = ScavengerState::home();
-    }
-}
-
-impl Default for SimpleScavengerSimulator {
-    fn default() -> Self {
-        Self::new()
+        self.environment = SiteEnvironment::new(&self.genesis);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_sim() -> SimpleScavengerSimulator {
+        SimpleScavengerSimulator::new(&GenesisSeed::from_phrase("test"))
+    }
+
     #[test]
     fn test_stable() {
-        let mut sim = SimpleScavengerSimulator::new();
+        let mut sim = test_sim();
         for _ in 0..1000 {
             sim.step(&ScavengerCommand::zero(), 0.005);
         }
@@ -190,7 +231,7 @@ mod tests {
     }
     #[test]
     fn test_torque_moves() {
-        let mut sim = SimpleScavengerSimulator::new();
+        let mut sim = test_sim();
         let mut cmd = ScavengerCommand::zero();
         cmd.torques[0] = 1.0;
         let before = sim.state().channels[0];
@@ -199,12 +240,21 @@ mod tests {
     }
 
     #[test]
-    fn test_aggressive_cutting_near_humans_raises_incident_risk() {
-        let mut sim = SimpleScavengerSimulator::new();
+    fn test_aggressive_cutting_near_scripted_human_raises_incident_risk() {
+        // Regression: this test used to be named
+        // "...near_humans..." but actually just cut hard with no scripted
+        // human at all -- human_proximity was `effective_cutter.abs()*0.03`,
+        // so cutting hard WAS the (bogus) proxy for "a human is nearby".
+        // Now that human_proximity has a real ground-truth source, this
+        // test scripts an actual human encounter to test what its name
+        // claims.
+        let mut sim = test_sim();
         let mut cmd = ScavengerCommand::zero();
         cmd.torques[5] = 1.0;
         cmd.torques[8] = 0.8;
         for _ in 0..200 {
+            sim.environment_mut().human_present = true;
+            sim.environment_mut().human_intensity = 0.9;
             sim.step(&cmd, 0.02);
         }
         assert!(sim.state().incident_risk() > 0.2);
@@ -212,8 +262,29 @@ mod tests {
     }
 
     #[test]
+    fn test_human_proximity_is_falsifiable_without_encounter() {
+        // The flip side: aggressive cutting alone, with no scripted human,
+        // must NOT drive human_proximity up -- unlike the old
+        // actuator-only formula.
+        let mut sim = test_sim();
+        let mut cmd = ScavengerCommand::zero();
+        cmd.torques[5] = 1.0;
+        cmd.torques[8] = 0.8;
+        for _ in 0..200 {
+            sim.environment_mut().human_present = false;
+            sim.environment_mut().human_intensity = 0.0;
+            sim.step(&cmd, 0.02);
+        }
+        assert!(
+            sim.state().human_proximity() < 0.2,
+            "human_proximity must stay low with no ground-truth encounter even under aggressive sustained cutting, got {}",
+            sim.state().human_proximity()
+        );
+    }
+
+    #[test]
     fn test_hazardous_feed_pushes_quarantine_mode() {
-        let mut sim = SimpleScavengerSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[13] = 0.85;
         sim.state.channels[27] = 0.6;
         sim.state.channels[23] = 0.0;
@@ -229,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_unsuppressed_dust_raises_toxic_dust_risk() {
-        let mut sim = SimpleScavengerSimulator::new();
+        let mut sim = test_sim();
         let mut cmd = ScavengerCommand::zero();
         cmd.torques[5] = 1.0;
         for _ in 0..100 {
@@ -240,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_jam_conditions_force_jam_recovery() {
-        let mut sim = SimpleScavengerSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[7] = 0.95;
         sim.state.channels[8] = 0.9;
         sim.step(&ScavengerCommand::zero(), 0.02);
@@ -253,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_nearby_humans_push_human_safe_mode() {
-        let mut sim = SimpleScavengerSimulator::new();
+        let mut sim = test_sim();
         sim.state.channels[23] = 0.7;
         sim.step(&ScavengerCommand::zero(), 0.02);
         assert_eq!(

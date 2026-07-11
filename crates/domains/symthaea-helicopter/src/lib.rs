@@ -51,7 +51,7 @@ pub mod transfer;
 pub mod types;
 pub mod wind_model;
 
-pub use controller::HelicopterController;
+pub use controller::{HelicopterController, pd_hover_baseline};
 pub use encoder::HelicopterHdcEncoder;
 pub use fep_agent::ActiveInferenceHelicopterAgent;
 pub use navigation_estimator::{HelicopterNavigationEstimate, HelicopterNavigationEstimator};
@@ -59,6 +59,7 @@ pub use perturbations::{HelicopterPerturbation, PerturbationSchedule};
 pub use simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
 pub use training::HelicopterTrainer;
 pub use types::*;
+pub use wind_model::{WindConfig, WindForce, WindModel};
 
 #[cfg(test)]
 mod tests {

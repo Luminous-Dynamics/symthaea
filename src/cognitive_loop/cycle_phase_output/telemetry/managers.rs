@@ -95,6 +95,7 @@ impl CognitiveLoopService {
             metadata.cpg_desync_alert = ct.desync_alert;
         }
 
+        // Keep in sync with cycle.rs Phase 2.5's feature list.
         #[cfg(any(
             feature = "humanoid",
             feature = "helicopter",
@@ -106,6 +107,12 @@ impl CognitiveLoopService {
             feature = "surgical",
             feature = "orbital",
             feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
             feature = "phone"
         ))]
         {

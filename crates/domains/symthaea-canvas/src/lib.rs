@@ -20,6 +20,7 @@ pub mod aesthetic_score;
 pub mod animation;
 pub mod color;
 pub mod geometry;
+pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
 
@@ -30,6 +31,7 @@ pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use color::{Color, Palette};
 pub use geometry::build_scene;
+pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
 pub use svg_renderer::render_svg;
 

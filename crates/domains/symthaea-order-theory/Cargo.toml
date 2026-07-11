@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-order-theory"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Order theory and lattices for Symthaea: finite posets (from cover relations), meet/join, top/bottom, lattice & distributivity tests, and Knaster-Tarski least/greatest fixed points of a monotone map. Foundational to abstract interpretation. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

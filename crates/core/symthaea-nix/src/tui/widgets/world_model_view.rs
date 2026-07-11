@@ -39,6 +39,18 @@ pub struct WorldModelSnapshot {
     pub prediction_accuracy: Option<f64>,
     /// Number of active inference maintenance plans (dry-run).
     pub maintenance_plan_count: u32,
+    /// Volatility EMA
+    pub anomaly_volatility_ema: f64,
+    /// Active anomaly threshold
+    pub active_anomaly_threshold: f64,
+    /// Whether the daemon is hibernating
+    pub hibernating: bool,
+    /// Risk aversion weight
+    pub risk_aversion: f64,
+    /// Curiosity weight
+    pub curiosity_weight: f64,
+    /// Causal learning rate
+    pub causal_learning_rate: f64,
 }
 
 impl Default for WorldModelSnapshot {
@@ -55,6 +67,12 @@ impl Default for WorldModelSnapshot {
             episodic_count: 0,
             prediction_accuracy: None,
             maintenance_plan_count: 0,
+            anomaly_volatility_ema: 0.0,
+            active_anomaly_threshold: 0.7,
+            hibernating: false,
+            risk_aversion: 0.2,
+            curiosity_weight: 0.3,
+            causal_learning_rate: 0.1,
         }
     }
 }
@@ -216,6 +234,64 @@ impl Widget for WorldModelView<'_> {
                 buf.set_line(x, y, &Line::from(spans), inner.width.saturating_sub(1));
                 y += 1;
             }
+        }
+
+        // Autonomic and Mood state
+        if y < inner.y + inner.height {
+            let sleep_str = if self.snapshot.hibernating {
+                "Deep Sleep (Hibernating)"
+            } else {
+                "Active / Alert"
+            };
+            let sleep_color = if self.snapshot.hibernating {
+                Color::Blue
+            } else {
+                Color::Green
+            };
+            let sleep_line = Line::from(vec![
+                Span::raw("Sleep state: "),
+                Span::styled(sleep_str, Style::default().fg(sleep_color)),
+            ]);
+            buf.set_line(x, y, &sleep_line, inner.width.saturating_sub(1));
+            y += 1;
+        }
+
+        if y < inner.y + inner.height {
+            let threshold_line = Line::from(vec![
+                Span::raw("Vigilance:   "),
+                Span::styled(
+                    format!("{:.2}", self.snapshot.active_anomaly_threshold),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::raw(format!(
+                    " (volatility: {:.2})",
+                    self.snapshot.anomaly_volatility_ema
+                )),
+            ]);
+            buf.set_line(x, y, &threshold_line, inner.width.saturating_sub(1));
+            y += 1;
+        }
+
+        if y < inner.y + inner.height {
+            let cognitive_line = Line::from(vec![
+                Span::raw("Cognition:   Risk: "),
+                Span::styled(
+                    format!("{:.2}", self.snapshot.risk_aversion),
+                    Style::default().fg(Color::Magenta),
+                ),
+                Span::raw("  Curiosity: "),
+                Span::styled(
+                    format!("{:.2}", self.snapshot.curiosity_weight),
+                    Style::default().fg(Color::Cyan),
+                ),
+                Span::raw("  Learn: "),
+                Span::styled(
+                    format!("{:.2}", self.snapshot.causal_learning_rate),
+                    Style::default().fg(Color::Green),
+                ),
+            ]);
+            buf.set_line(x, y, &cognitive_line, inner.width.saturating_sub(1));
+            y += 1;
         }
 
         // Working memory

@@ -52,6 +52,7 @@ pub mod types;
 // MAGI Loop implementation (World-Grounded Prediction)
 pub mod active_inference_bridge;
 pub mod calibration;
+pub mod calibration_analytics;
 pub mod constraint_gate;
 pub mod dream_feedback;
 pub mod magi_integration;

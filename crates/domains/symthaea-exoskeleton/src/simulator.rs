@@ -22,6 +22,13 @@ pub struct SimpleExoskeletonSimulator {
     gait_phase: f64,
     gait_frequency: f64,
     walking: bool,
+    /// Neutral (standing) posture the exo impedance spring pulls toward.
+    neutral_pose: [f64; NUM_JOINTS],
+    /// Disturbance-observer estimate of the HUMAN's joint torques,
+    /// inferred from the dynamics residual (I·q̈ + d·q̇ + g − τ_exo) —
+    /// never by reading the scripted human generator. This is what a real
+    /// exo can actually sense; see `intent_estimate()`.
+    intent_estimate: [f64; NUM_JOINTS],
 }
 
 impl SimpleExoskeletonSimulator {
@@ -53,11 +60,24 @@ impl SimpleExoskeletonSimulator {
             gait_phase: 0.0,
             gait_frequency: 1.0,
             walking: true,
+            neutral_pose: ExoskeletonState::standing().joint_angles,
+            intent_estimate: [0.0; NUM_JOINTS],
         }
     }
 
     pub fn set_walking(&mut self, w: bool) {
         self.walking = w;
+    }
+
+    /// Disturbance-observer estimate of the human's joint torques (N·m).
+    ///
+    /// Computed each step as the dynamics residual: the torque left over
+    /// after accounting for observed acceleration, damping, gravity, and
+    /// the exo's own (commanded + impedance) torque. A real exoskeleton
+    /// estimates its wearer's intent exactly this way — from interaction
+    /// dynamics, not from privileged access to the human's motor plan.
+    pub fn intent_estimate(&self) -> [f64; NUM_JOINTS] {
+        self.intent_estimate
     }
 
     fn random(&mut self) -> f64 {
@@ -112,16 +132,32 @@ impl Default for SimpleExoskeletonSimulator {
 impl ExoskeletonPhysicsSimulator for SimpleExoskeletonSimulator {
     fn step(&mut self, cmd: &ExoskeletonCommand, dt: f64) {
         let human = self.human_gait_torques();
+        // Impedance gains: stiffness/damping were previously telemetry-only
+        // (self-flagged in embodiment.rs) — the "compliant/transparent"
+        // tiers had identical mechanics. They are now a real spring-damper
+        // the exo applies toward the neutral posture (Tier 2.6, 2026-07).
+        let k_imp = (cmd.stiffness_gain as f64).clamp(0.0, 1.0) * self.config.max_joint_stiffness;
+        let d_imp = (cmd.damping_gain as f64).clamp(0.0, 1.0) * self.config.max_joint_damping;
         for i in 0..NUM_JOINTS {
-            let exo = cmd.joint_torques[i] as f64 * self.config.max_torques[i];
+            let exo_cmd = cmd.joint_torques[i] as f64 * self.config.max_torques[i];
+            let impedance = -k_imp * (self.state.joint_angles[i] - self.neutral_pose[i])
+                - d_imp * self.state.joint_velocities[i];
+            let exo = exo_cmd + impedance;
             self.state.human_torques[i] = human[i];
             self.state.exo_torques[i] = exo;
             let gravity = self.gravity_torque(i);
-            let total =
-                human[i] + exo - self.joint_damping[i] * self.state.joint_velocities[i] - gravity;
+            let v_prev = self.state.joint_velocities[i];
+            let total = human[i] + exo - self.joint_damping[i] * v_prev - gravity;
             let ddq = total / self.inertias[i];
             self.state.joint_velocities[i] += ddq * dt;
             self.state.joint_angles[i] += self.state.joint_velocities[i] * dt;
+            // Intent observer: residual torque after everything the exo can
+            // model/measure — I·q̈_obs + d·q̇ + g − τ_exo. (q̈_obs from the
+            // velocity delta, i.e. what an encoder-differentiating observer
+            // sees; NOT a read of the scripted human generator.)
+            let ddq_obs = (self.state.joint_velocities[i] - v_prev) / dt.max(1e-9);
+            self.intent_estimate[i] =
+                self.inertias[i] * ddq_obs + self.joint_damping[i] * v_prev + gravity - exo;
             let limits = match i % 3 {
                 0 => [-0.5, 1.5],
                 1 => [0.0, 2.4],
@@ -156,6 +192,7 @@ impl ExoskeletonPhysicsSimulator for SimpleExoskeletonSimulator {
         self.state = ExoskeletonState::standing();
         self.gait_phase = 0.0;
         self.rng_state = 42;
+        self.intent_estimate = [0.0; NUM_JOINTS];
     }
 }
 
@@ -194,6 +231,81 @@ mod tests {
         assert!(sim.state().joint_angles[0] <= 1.51);
         assert!(sim.state().is_finite());
     }
+    #[test]
+    fn test_stiffness_tier_is_physically_real() {
+        // High-impedance tier must resist the human's perturbing torques
+        // more than the transparent tier — this fails against the old sim,
+        // where stiffness_gain/damping_gain were telemetry-only and the
+        // "compliant" tiers had identical mechanics. Same RNG seed in both
+        // sims → identical human torque sequences.
+        let mut stiff = SimpleExoskeletonSimulator::new();
+        stiff.set_walking(false); // random perturbing human torques
+        let mut transparent = SimpleExoskeletonSimulator::new();
+        transparent.set_walking(false);
+
+        let stiff_cmd = ExoskeletonCommand {
+            joint_torques: [0.0; NUM_ACTUATORS],
+            stiffness_gain: 1.0,
+            damping_gain: 1.0,
+        };
+        let transparent_cmd = ExoskeletonCommand {
+            joint_torques: [0.0; NUM_ACTUATORS],
+            stiffness_gain: 0.0,
+            damping_gain: 0.0,
+        };
+
+        let neutral = ExoskeletonState::standing().joint_angles;
+        let mut dev_stiff = 0.0f64;
+        let mut dev_transparent = 0.0f64;
+        for _ in 0..2000 {
+            stiff.step(&stiff_cmd, 0.005);
+            transparent.step(&transparent_cmd, 0.005);
+            for i in 0..NUM_JOINTS {
+                dev_stiff += (stiff.state().joint_angles[i] - neutral[i]).powi(2);
+                dev_transparent += (transparent.state().joint_angles[i] - neutral[i]).powi(2);
+            }
+        }
+        assert!(
+            dev_stiff < 0.5 * dev_transparent,
+            "full impedance must at least halve posture deviation: stiff {dev_stiff:.4} vs transparent {dev_transparent:.4}"
+        );
+    }
+
+    #[test]
+    fn test_intent_estimator_tracks_human_torque() {
+        // The disturbance-observer intent estimate must track the scripted
+        // human's actual torque (ground truth it never reads directly).
+        let mut sim = SimpleExoskeletonSimulator::new();
+        let cmd = ExoskeletonCommand {
+            joint_torques: [0.1; NUM_ACTUATORS],
+            stiffness_gain: 0.3,
+            damping_gain: 0.2,
+        };
+        let mut agree = 0usize;
+        let mut total = 0usize;
+        for _ in 0..1000 {
+            sim.step(&cmd, 0.005);
+            let est = sim.intent_estimate();
+            let truth = sim.state().human_torques;
+            for i in 0..NUM_JOINTS {
+                // Only score confidently-nonzero ground truth (hip/knee
+                // amplitudes reach 15-30 N·m; noise floor is ~3 N·m).
+                if truth[i].abs() > 5.0 {
+                    total += 1;
+                    if est[i].signum() == truth[i].signum() {
+                        agree += 1;
+                    }
+                }
+            }
+        }
+        assert!(total > 500, "need a meaningful sample, got {total}");
+        let rate = agree as f64 / total as f64;
+        assert!(
+            rate > 0.9,
+            "intent estimate must track human torque sign: {rate:.3} agreement"
+        );
+    }
+
     mod proptest_physics {
         use super::*;
         use proptest::prelude::*;

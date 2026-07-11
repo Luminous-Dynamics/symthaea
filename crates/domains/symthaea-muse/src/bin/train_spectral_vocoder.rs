@@ -1,17 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! CfC Spectral Vocoder Training Pipeline
+//! CfC Spectral Vocoder training SCAFFOLD — does not actually train yet.
 //!
-//! Tries GPU (CUDA) first, falls back to CPU automatically.
+//! HONESTY NOTE (2026-07-06): `Backend::step()` is a no-op (see its comment),
+//! so no weights are updated regardless of epochs; the loop only measures the
+//! untrained baseline. An earlier header claimed this "trains CfC network to
+//! predict mel frames" and "tries GPU (CUDA) first" — neither was true (the
+//! crate has no CUDA dependency). What this bin does do: sweeps consciousness
+//! parameters, generates (state, mel) training pairs, and reports baseline
+//! reconstruction error — the harness a real trainer can drop into.
 //!
 //! Run: cargo run -p symthaea-muse --bin train_spectral_vocoder
-//!
-//! Training: sweeps consciousness parameters, generates (state, mel) pairs,
-//! trains CfC network to predict mel frames from consciousness state.
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║     CfC Spectral Vocoder Training Pipeline                 ║");
+    println!("║   CfC Spectral Vocoder Training SCAFFOLD (no-op trainer)   ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Detect compute backend
@@ -24,7 +27,10 @@ fn main() {
     println!("  Generated {} (state, mel) pairs\n", training_pairs.len());
 
     // Phase 2: Train
-    println!("Phase 2: Training CfC network ({})...", backend.name());
+    println!(
+        "Phase 2: Baseline sweep (NO training — step() is a no-op) [{}]...",
+        backend.name()
+    );
     let epochs = 100;
     let lr = 0.001;
     let momentum = 0.9;
@@ -58,15 +64,11 @@ fn main() {
     println!("\nPhase 3: Evaluation...");
     let (avg_error, max_error) = evaluate_training_data(&training_pairs, &backend);
     println!("  Final: avg_error={avg_error:.4}, max_error={max_error:.4}");
-    if avg_error < 0.3 {
-        println!("  Status: GOOD — model learned meaningful representations");
-    } else if avg_error < 0.45 {
-        println!("  Status: FAIR — model shows some learning, needs more epochs");
-    } else {
-        println!("  Status: BASELINE — model has not yet converged");
-    }
+    println!("  Status: UNTRAINED BASELINE — step() is a no-op, so this measures");
+    println!("  the genesis-seeded projection only. Any 'learning' in the loss");
+    println!("  numbers above is noise.");
 
-    println!("\nDone. Weights can be loaded into SpectralVocoder via genesis seed.");
+    println!("\nDone. This is the reference error a real trainer must beat.");
 }
 
 // ─── Compute Backend ────────────────────────────────────────────────────────
@@ -91,44 +93,10 @@ impl Backend {
 }
 
 fn detect_backend() -> Backend {
-    // Try GPU first
-    if let Some(gpu) = try_gpu() {
-        return gpu;
-    }
-    println!("  GPU not available, falling back to CPU");
+    // CPU only. This crate has no candle/CUDA dependency — a previous version
+    // advertised a `cuda` feature that was never declared in Cargo.toml and,
+    // even if enabled, only pattern-matched on env vars without any GPU code.
     Backend::Cpu
-}
-
-fn try_gpu() -> Option<Backend> {
-    // Check for CUDA availability via candle or environment
-    #[cfg(feature = "cuda")]
-    {
-        // candle-core with CUDA feature
-        if std::env::var("CUDA_VISIBLE_DEVICES").is_ok()
-            || std::path::Path::new("/dev/nvidia0").exists()
-        {
-            println!("  CUDA device detected");
-            return Some(Backend::Gpu {
-                device_name: "CUDA GPU".to_string(),
-            });
-        }
-    }
-
-    // Check for ROCm
-    if std::path::Path::new("/dev/kfd").exists() {
-        println!("  ROCm device detected (not yet supported, falling back)");
-    }
-
-    // Check for NVIDIA device without cuda feature
-    if std::path::Path::new("/dev/nvidia0").exists() {
-        println!("  NVIDIA GPU detected but 'cuda' feature not enabled");
-        println!(
-            "  Rebuild with: cargo run -p symthaea-muse --features cuda --bin train_spectral_vocoder"
-        );
-        println!("  (Requires nix develop for CUDA libraries)");
-    }
-
-    None
 }
 
 // ─── Training Data ──────────────────────────────────────────────────────────

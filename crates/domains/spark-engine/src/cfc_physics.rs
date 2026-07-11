@@ -20,9 +20,7 @@
 //! 3. Analyze which temporal features correlate with high enhancement
 
 use crate::bridge::{LiteratureDataLoader, ScreeningMeasurement};
-use crate::constants::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ============================================================================
 // Physics-Based Time Series Generation
@@ -241,7 +239,7 @@ impl PhysicsCfCCell {
     pub fn forward(&mut self, input: &[f32], dt: f32) -> Vec<f32> {
         let mut new_state = vec![0.0; self.hidden_dim];
 
-        for i in 0..self.hidden_dim {
+        for (i, ns) in new_state.iter_mut().enumerate() {
             // Compute input contribution
             let mut x_contrib = 0.0;
             for (j, &x) in input.iter().enumerate() {
@@ -259,7 +257,7 @@ impl PhysicsCfCCell {
 
             // CfC interpolation
             let decay = (-dt / self.tau[i]).exp();
-            new_state[i] = self.state[i] * decay + (1.0 - decay) * f_target;
+            *ns = self.state[i] * decay + (1.0 - decay) * f_target;
         }
 
         self.state = new_state.clone();
@@ -678,7 +676,7 @@ fn generate_insights(results: &[CfCAnalysisResult], corr: &CfCCorrelations) -> V
 
     // Screening rate insight
     if corr.rate_enhancement_corr.abs() > 0.3 {
-        let direction = if corr.rate_enhancement_corr > 0.0 {
+        let _direction = if corr.rate_enhancement_corr > 0.0 {
             "faster"
         } else {
             "slower"
@@ -749,7 +747,7 @@ fn generate_insights(results: &[CfCAnalysisResult], corr: &CfCCorrelations) -> V
     insights
 }
 
-fn generate_recommendations(results: &[CfCAnalysisResult], corr: &CfCCorrelations) -> Vec<String> {
+fn generate_recommendations(_results: &[CfCAnalysisResult], corr: &CfCCorrelations) -> Vec<String> {
     let mut recs = Vec::new();
 
     // Based on correlations
@@ -896,7 +894,7 @@ mod tests {
         let state = cell.forward(&input, 0.01);
 
         assert_eq!(state.len(), 8);
-        assert!(state.iter().all(|&x| x >= 0.0 && x <= 1.0));
+        assert!(state.iter().all(|&x| (0.0..=1.0).contains(&x)));
     }
 
     #[test]

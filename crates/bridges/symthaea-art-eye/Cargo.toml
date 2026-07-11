@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-art-eye"
+version = "0.1.0"
+edition = "2024"
+description = "The artist's eye: rasterizes generated SVG art and extracts real pixel percepts so Symthaea can see (and critique) her own artwork"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+# resvg re-exports usvg + tiny_skia; use those re-exports so the three stay
+# version-locked.
+resvg = "0.45"
+symthaea-atelier = { path = "../../domains/symthaea-atelier" }
+symthaea-canvas = { path = "../../domains/symthaea-canvas" }
+

@@ -15,6 +15,12 @@ pub struct ManipulatorController {
     output_weights: Vec<f32>,
     output_bias: [f32; NUM_OUTPUTS],
     learning_rate: f32,
+    /// Cached final-layer HV from the last forward() (post-normalize) --
+    /// needed by train_step's delta rule.
+    last_features: Vec<f32>,
+    /// Cached post-activation outputs from the last forward() (tanh for
+    /// joints, sigmoid for the gripper).
+    last_outputs: [f32; NUM_OUTPUTS],
 }
 
 impl ManipulatorController {
@@ -49,6 +55,8 @@ impl ManipulatorController {
             output_weights,
             output_bias,
             learning_rate: config.learning_rate,
+            last_features: Vec::new(),
+            last_outputs: [0.0; NUM_OUTPUTS],
         }
     }
 
@@ -70,6 +78,13 @@ impl ManipulatorController {
             torques[i] = fast_tanh(raw[i]);
         }
         let gripper = fast_sigmoid(raw[NUM_JOINTS]);
+        self.last_features = hv.to_vec();
+        self.last_outputs = {
+            let mut o = [0.0f32; NUM_OUTPUTS];
+            o[..NUM_JOINTS].copy_from_slice(&torques);
+            o[NUM_JOINTS] = gripper;
+            o
+        };
         ManipulatorCommand {
             joint_torques: torques,
             gripper,
@@ -77,9 +92,85 @@ impl ManipulatorController {
         .clamped()
     }
 
+    /// One supervised update of the joint-torque output rows toward
+    /// `target` (delta rule through tanh), using the features cached by the
+    /// last `forward()`. The gripper output row is left untouched -- the
+    /// imitation target (gravity-compensation hold) has no opinion about
+    /// grip state. Returns the pre-update mean-squared error over the
+    /// joint torques. This is what makes `ManipulatorTrainer` actually
+    /// train (Tier 2 of SYMTHAEA_CLASSIC_PLATFORMS_FEP_HONESTY_2026-07-09.md's
+    /// real-trainer follow-up).
+    pub fn train_step(&mut self, target: &[f32; NUM_JOINTS]) -> f32 {
+        if self.last_features.is_empty() {
+            return 0.0;
+        }
+        let mut mse = 0.0f32;
+        for i in 0..NUM_JOINTS {
+            let out = self.last_outputs[i];
+            let err = target[i] - out;
+            mse += err * err;
+            let delta = self.learning_rate * err * (1.0 - out * out);
+            let offset = i * HDC_DIM;
+            for (j, f) in self.last_features.iter().enumerate() {
+                self.output_weights[offset + j] += delta * f;
+            }
+            self.output_bias[i] += delta;
+        }
+        mse / NUM_JOINTS as f32
+    }
+
     pub fn reset(&mut self) {
         self.network.reset();
+        self.last_features.clear();
+        self.last_outputs = [0.0; NUM_OUTPUTS];
     }
+
+    /// Export the trainable output layer (the only parameters `train_step`
+    /// mutates — the LTC network itself is genesis-derived and untouched by
+    /// training), so trained weights can be transferred into a shipped
+    /// bridge or persisted by the caller.
+    pub fn export_weights(&self) -> ControllerWeights {
+        ControllerWeights {
+            output_weights: self.output_weights.clone(),
+            output_bias: self.output_bias.to_vec(),
+        }
+    }
+
+    /// Install a previously exported output layer. Fails (leaving the
+    /// controller unchanged) if the snapshot's dimensions don't match this
+    /// controller's output layer.
+    pub fn import_weights(&mut self, weights: &ControllerWeights) -> Result<(), String> {
+        if weights.output_weights.len() != self.output_weights.len() {
+            return Err(format!(
+                "output_weights length mismatch: snapshot {} vs controller {}",
+                weights.output_weights.len(),
+                self.output_weights.len()
+            ));
+        }
+        if weights.output_bias.len() != NUM_OUTPUTS {
+            return Err(format!(
+                "output_bias length mismatch: snapshot {} vs controller {NUM_OUTPUTS}",
+                weights.output_bias.len()
+            ));
+        }
+        self.output_weights.copy_from_slice(&weights.output_weights);
+        self.output_bias.copy_from_slice(&weights.output_bias);
+        Ok(())
+    }
+}
+
+/// Portable snapshot of the controller's trainable output layer.
+///
+/// This is the trainer→bridge transfer contract: `ManipulatorTrainer` (or
+/// the intent curriculum in `training.rs`) exports one, and a shipped
+/// `ManipulatorEmbodiment` installs it via `install_weights`. Before this
+/// existed, trained weights were stranded inside the trainer's private
+/// controller and every shipped bridge ran genesis-random weights (see the
+/// cognition-ablation example: thought had no task-axis motor authority).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ControllerWeights {
+    pub output_weights: Vec<f32>,
+    pub output_bias: Vec<f32>,
 }
 
 fn fast_tanh(x: f32) -> f32 {
@@ -119,5 +210,47 @@ mod tests {
         let cmd1 = c1.forward(&hv, 0.002);
         let cmd2 = c2.forward(&hv, 0.002);
         assert_eq!(cmd1.joint_torques, cmd2.joint_torques);
+    }
+
+    #[test]
+    fn test_weight_export_import_roundtrip() {
+        // Train one controller a little, export, import into a fresh
+        // controller with a different genesis: outputs must match the
+        // trained controller exactly (the output layer is the only
+        // trainable state, and it must transfer completely).
+        let config = ManipulatorConfig::default();
+        let mut trained =
+            ManipulatorController::new(&GenesisSeed::from_phrase("test-roundtrip-a"), &config);
+        let hv = ContinuousHV::random(HDC_DIM, 7);
+        let target = [0.3f32; NUM_JOINTS];
+        for _ in 0..5 {
+            trained.forward(&hv, 0.002);
+            trained.train_step(&target);
+        }
+        let snapshot = trained.export_weights();
+
+        // Same genesis for the receiving controller so the (untrained,
+        // genesis-derived) LTC network matches; only the output layer moves.
+        let mut receiver =
+            ManipulatorController::new(&GenesisSeed::from_phrase("test-roundtrip-a"), &config);
+        receiver.import_weights(&snapshot).unwrap();
+
+        trained.reset();
+        receiver.reset();
+        let a = trained.forward(&hv, 0.002);
+        let b = receiver.forward(&hv, 0.002);
+        assert_eq!(a.joint_torques, b.joint_torques);
+        assert_eq!(a.gripper, b.gripper);
+    }
+
+    #[test]
+    fn test_import_weights_rejects_dim_mismatch() {
+        let config = ManipulatorConfig::default();
+        let mut ctrl = ManipulatorController::new(&GenesisSeed::from_phrase("test-dims"), &config);
+        let bad = ControllerWeights {
+            output_weights: vec![0.0; 3],
+            output_bias: vec![0.0; NUM_OUTPUTS],
+        };
+        assert!(ctrl.import_weights(&bad).is_err());
     }
 }

@@ -57,7 +57,7 @@ impl Default for MelConfig {
 /// Mel-spectrogram extractor with precomputed filterbank.
 pub struct MelExtractor {
     config: MelConfig,
-    fft_planner: FftPlanner<f32>,
+    fft: std::sync::Arc<dyn rustfft::Fft<f32>>,
     hann_window: Vec<f32>,
     mel_filterbank: Vec<Vec<f32>>, // [n_mels][n_fft/2 + 1]
 }
@@ -72,10 +72,12 @@ impl MelExtractor {
             .collect();
 
         let mel_filterbank = build_mel_filterbank(&config);
+        // Plan the FFT once at construction (n_fft is fixed per extractor)
+        let fft = FftPlanner::new().plan_fft_forward(config.n_fft);
 
         Self {
             config,
-            fft_planner: FftPlanner::new(),
+            fft,
             hann_window,
             mel_filterbank,
         }
@@ -94,7 +96,7 @@ impl MelExtractor {
             return Vec::new();
         }
 
-        let fft = self.fft_planner.plan_fft_forward(n_fft);
+        let fft = &self.fft;
         let mut frames = Vec::new();
 
         let mut pos = 0;

@@ -92,6 +92,43 @@ pub fn humanize_with_consciousness(
     note.duration *= 1.10;
 }
 
+/// Humanize a note realized from a symbolic theory `Score`. Deliberately a
+/// SUBSET of [`humanize_with_consciousness`]: a theory score's velocities
+/// already carry phrase arch, section intensity, and climax accents
+/// (`symthaea-music-theory`'s composer), so applying the full phrase-dynamics
+/// curve here would double-apply structural dynamics. What a score CANNOT
+/// represent — and what this adds — is human motor variance:
+/// - Φ-scaled Gaussian onset jitter (downbeats anchored tighter, matching
+///   measured pianist behavior), meter-aware via `beats_per_bar` instead of
+///   the 4/4 hardcoded in the older path (a Waltz has 3 beats to a bar);
+/// - ±8% Gaussian velocity noise (small enough not to fight the score's
+///   structural dynamics);
+/// - optional legato overlap for sustained melodic/bass lines (block chords
+///   should NOT get it — extending every chord tone smears the harmonic
+///   rhythm into mud).
+pub fn humanize_score_note(
+    note: &mut Note,
+    beat_position: f32,
+    beats_per_bar: f32,
+    seed: u32,
+    phi: f32,
+    legato: bool,
+) {
+    let sd_ms = timing_sd_ms(phi);
+    let beat_in_bar = beat_position % beats_per_bar.max(1.0);
+    // Downbeats anchor tighter (humans lock to beat 1).
+    let beat_tightness = if beat_in_bar < 0.5 { 0.5 } else { 1.0 };
+    let jitter_s = gaussian(seed) * sd_ms * beat_tightness / 1000.0;
+    note.start_time = (note.start_time + jitter_s).max(0.0);
+
+    let vel_jitter = gaussian(seed.wrapping_mul(7)) * 0.08;
+    note.velocity = (note.velocity + vel_jitter).clamp(0.05, 1.0);
+
+    if legato {
+        note.duration *= 1.08;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +201,69 @@ mod tests {
             humanize(&mut note, 0.0, 0.5, seed);
             assert!(note.velocity >= 0.05 && note.velocity <= 1.0);
         }
+    }
+
+    #[test]
+    fn score_humanize_is_deterministic_and_bounded() {
+        let make = || Note {
+            frequency: 440.0,
+            start_time: 2.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        for seed in 0..200 {
+            let mut a = make();
+            let mut b = make();
+            humanize_score_note(&mut a, 1.0, 4.0, seed, 0.5, true);
+            humanize_score_note(&mut b, 1.0, 4.0, seed, 0.5, true);
+            assert_eq!(a.start_time, b.start_time, "same seed → same jitter");
+            assert_eq!(a.velocity, b.velocity);
+            // Jitter must stay in the tens-of-milliseconds regime — audible
+            // as human looseness, never as a wrong rhythm.
+            assert!(
+                (a.start_time - 2.0).abs() < 0.15,
+                "jitter too large: {}",
+                a.start_time - 2.0
+            );
+            assert!(a.velocity >= 0.05 && a.velocity <= 1.0);
+        }
+    }
+
+    #[test]
+    fn score_humanize_legato_only_when_asked() {
+        let mut melodic = Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let mut chordal = melodic;
+        humanize_score_note(&mut melodic, 0.0, 4.0, 3, 0.5, true);
+        humanize_score_note(&mut chordal, 0.0, 4.0, 3, 0.5, false);
+        assert!(melodic.duration > 0.5, "legato should extend");
+        assert_eq!(chordal.duration, 0.5, "chords keep their written length");
+    }
+
+    #[test]
+    fn score_humanize_does_not_reshape_structural_dynamics() {
+        // The velocity change must be small noise, not a phrase curve: over
+        // many seeds the mean velocity stays near the written value.
+        let mut sum = 0.0f32;
+        let n = 500;
+        for seed in 0..n {
+            let mut note = Note {
+                frequency: 440.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.6,
+            };
+            humanize_score_note(&mut note, 2.0, 4.0, seed, 0.5, false);
+            sum += note.velocity;
+        }
+        let mean = sum / n as f32;
+        assert!(
+            (mean - 0.6).abs() < 0.03,
+            "velocity noise must be zero-mean around the written value: {mean}"
+        );
     }
 }

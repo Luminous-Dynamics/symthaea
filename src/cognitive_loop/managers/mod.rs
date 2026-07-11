@@ -126,6 +126,9 @@ pub mod music_publisher;
 #[cfg(feature = "muse")]
 pub use music_publisher::{MusicPublisher, UploadResult};
 
+pub mod autobiography_bridge;
+pub use autobiography_bridge::{AutobiographyNarrator, AutobiographyRequest, AutobiographyResult};
+
 #[cfg(feature = "ssm_language")]
 pub mod language_manager;
 #[cfg(feature = "ssm_language")]

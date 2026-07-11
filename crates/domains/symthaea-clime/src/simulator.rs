@@ -3,11 +3,11 @@
 //! First-pass habitat homeostasis simulator.
 use crate::types::{
     AIR_QUALITY, CIRCADIAN_MISMATCH, CO2_LOAD, COLD_STRESS, COMFORT_INTEGRITY, CONTAMINATION_RISK,
-    COOLING_MARGIN, ClimeCommand, ClimeState, FILTRATION_EFFECTIVENESS, HABITAT_CONTINUITY,
-    HEATING_MARGIN, HUMIDITY, HUMIDITY_STRESS, LIGHT_LEVEL, MISSION_PROGRESS, NIGHT_MODE_PRESSURE,
-    NOISE_STRESS, OCCUPANCY_CONFIDENCE, OCCUPANCY_PRESSURE, PUBLIC_HEALTH_RISK, QUIET_COMPLIANCE,
-    SENSOR_CONFIDENCE, SMOKE_RISK, THERMAL_STRESS, UTILITY_RESERVE, VENTILATION_AUTHORITY,
-    ZONE_ISOLATION_CONFIDENCE,
+    COOLING_MARGIN, ClimeCommand, ClimeState, ENERGY_EFFICIENCY, FILTRATION_EFFECTIVENESS,
+    HABITAT_CONTINUITY, HEATING_MARGIN, HUMIDITY, HUMIDITY_STRESS, LIGHT_LEVEL, MISSION_PROGRESS,
+    NIGHT_MODE_PRESSURE, NOISE_STRESS, OCCUPANCY_CONFIDENCE, OCCUPANCY_PRESSURE,
+    PUBLIC_HEALTH_RISK, QUIET_COMPLIANCE, SENSOR_CONFIDENCE, SMOKE_RISK, THERMAL_BALANCE,
+    THERMAL_STRESS, UTILITY_RESERVE, VENTILATION_AUTHORITY, ZONE_ISOLATION_CONFIDENCE,
 };
 
 pub trait ClimePhysicsSimulator {
@@ -25,6 +25,12 @@ impl SimpleClimeSimulator {
         Self {
             state: ClimeState::home(),
         }
+    }
+
+    /// Mutable state access, for tests that need to set up a degraded
+    /// starting condition (e.g. low ventilation authority) before stepping.
+    pub fn state_mut(&mut self) -> &mut ClimeState {
+        &mut self.state
     }
 }
 
@@ -139,12 +145,12 @@ impl ClimePhysicsSimulator for SimpleClimeSimulator {
             - self.state.channels[CIRCADIAN_MISMATCH] * 0.15
             - self.state.channels[NOISE_STRESS] * 0.12)
             .clamp(0.0, 1.0);
-        self.state.channels[23] = (self.state.channels[COMFORT_INTEGRITY] * 0.7
+        self.state.channels[ENERGY_EFFICIENCY] = (self.state.channels[COMFORT_INTEGRITY] * 0.7
             + self.state.channels[UTILITY_RESERVE] * 0.3)
             .clamp(0.0, 1.0);
         self.state.channels[MISSION_PROGRESS] =
             (self.state.channels[MISSION_PROGRESS] + effective_vent * dt * 0.015).clamp(0.0, 1.0);
-        self.state.channels[25] = (1.0
+        self.state.channels[THERMAL_BALANCE] = (1.0
             - (self.state.channels[THERMAL_STRESS] - self.state.channels[COLD_STRESS]).abs())
         .clamp(0.0, 1.0);
         self.state.channels[QUIET_COMPLIANCE] = (1.0

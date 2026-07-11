@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-chronicle"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Historical-events reasoning for Symthaea: event chronology, causal-chain reachability, and anachronism detection. The formal core of history-as-narrative. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link. Formal core of the "hard"
+# history domain (see symthaea/HARD_DOMAINS_PLAN_2026-07-07.md). Uses only
+# minimal date comparison — rich Allen-interval temporal reasoning lives in the
+# main crate's src/consciousness/temporal/ and should be used when integrated
+# (this crate deliberately does NOT reimplement it).
+[dependencies]

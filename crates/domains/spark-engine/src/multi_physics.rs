@@ -222,8 +222,8 @@ impl MultiPhysicsEncoder {
         let mut vec = vec![-1.0f32; self.dimensions];
         let fill_to = (normalized * self.dimensions as f64) as usize;
 
-        for i in 0..fill_to.min(self.dimensions) {
-            vec[i] = 1.0;
+        for v in vec.iter_mut().take(fill_to.min(self.dimensions)) {
+            *v = 1.0;
         }
 
         vec
@@ -1066,44 +1066,41 @@ impl PhysicsDiscoveryEngine {
     }
 
     fn find_cross_domain_correlations(&self) -> Vec<CrossDomainCorrelation> {
-        let mut correlations = Vec::new();
-
-        // Screening ↔ Lattice correlation
-        correlations.push(CrossDomainCorrelation {
-            domain_a: PhysicsDomain::Chemistry,
-            domain_b: PhysicsDomain::CondensedMatter,
-            quantity_a: "electron_screening".to_string(),
-            quantity_b: "lattice_constant".to_string(),
-            correlation_strength: 0.7,
-            mechanism: "Smaller lattice → higher electron density → more screening".to_string(),
-            evidence: "Ta (small lattice) has highest screening in Raiola data".to_string(),
-        });
-
-        // Rate ↔ Trigger correlation
-        correlations.push(CrossDomainCorrelation {
-            domain_a: PhysicsDomain::Nuclear,
-            domain_b: PhysicsDomain::Electromagnetic,
-            quantity_a: "neutron_rate".to_string(),
-            quantity_b: "trigger_intensity".to_string(),
-            correlation_strength: 0.9,
-            mechanism: "X-rays create hot spots or excite phonons that enhance tunneling"
-                .to_string(),
-            evidence: "NASA rate scales with X-ray flux".to_string(),
-        });
-
-        // Phonon ↔ Tunneling correlation
-        correlations.push(CrossDomainCorrelation {
-            domain_a: PhysicsDomain::CondensedMatter,
-            domain_b: PhysicsDomain::Quantum,
-            quantity_a: "optical_phonon_energy".to_string(),
-            quantity_b: "tunneling_probability".to_string(),
-            correlation_strength: 0.5,
-            mechanism: "Coherent phonons add energy to CM motion, boosting tunneling".to_string(),
-            evidence: "PdD has 56 meV optical phonon, could provide ~0.17 keV with 3 modes"
-                .to_string(),
-        });
-
-        correlations
+        vec![
+            // Screening ↔ Lattice correlation
+            CrossDomainCorrelation {
+                domain_a: PhysicsDomain::Chemistry,
+                domain_b: PhysicsDomain::CondensedMatter,
+                quantity_a: "electron_screening".to_string(),
+                quantity_b: "lattice_constant".to_string(),
+                correlation_strength: 0.7,
+                mechanism: "Smaller lattice → higher electron density → more screening".to_string(),
+                evidence: "Ta (small lattice) has highest screening in Raiola data".to_string(),
+            },
+            // Rate ↔ Trigger correlation
+            CrossDomainCorrelation {
+                domain_a: PhysicsDomain::Nuclear,
+                domain_b: PhysicsDomain::Electromagnetic,
+                quantity_a: "neutron_rate".to_string(),
+                quantity_b: "trigger_intensity".to_string(),
+                correlation_strength: 0.9,
+                mechanism: "X-rays create hot spots or excite phonons that enhance tunneling"
+                    .to_string(),
+                evidence: "NASA rate scales with X-ray flux".to_string(),
+            },
+            // Phonon ↔ Tunneling correlation
+            CrossDomainCorrelation {
+                domain_a: PhysicsDomain::CondensedMatter,
+                domain_b: PhysicsDomain::Quantum,
+                quantity_a: "optical_phonon_energy".to_string(),
+                quantity_b: "tunneling_probability".to_string(),
+                correlation_strength: 0.5,
+                mechanism: "Coherent phonons add energy to CM motion, boosting tunneling"
+                    .to_string(),
+                evidence: "PdD has 56 meV optical phonon, could provide ~0.17 keV with 3 modes"
+                    .to_string(),
+            },
+        ]
     }
 
     fn generate_insights(
@@ -1360,7 +1357,7 @@ impl DiscoveryReport {
                 }
             ));
         }
-        s.push_str("\n");
+        s.push('\n');
 
         s.push_str("▶ KEY INSIGHTS\n");
         for insight in &self.insights {
@@ -1370,7 +1367,7 @@ impl DiscoveryReport {
                 insight.confidence * 100.0
             ));
         }
-        s.push_str("\n");
+        s.push('\n');
 
         s.push_str("▶ CROSS-DOMAIN CORRELATIONS\n");
         for corr in &self.cross_domain_correlations {
@@ -1379,13 +1376,13 @@ impl DiscoveryReport {
                 corr.domain_a, corr.domain_b, corr.mechanism, corr.correlation_strength
             ));
         }
-        s.push_str("\n");
+        s.push('\n');
 
         s.push_str("▶ OPEN QUESTIONS\n");
         for q in &self.open_questions {
             s.push_str(&format!("  ? {}\n", q.question));
         }
-        s.push_str("\n");
+        s.push('\n');
 
         s.push_str("▶ RECOMMENDED EXPERIMENTS (by priority)\n");
         for exp in &self.recommended_experiments {

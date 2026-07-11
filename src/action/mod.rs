@@ -911,6 +911,12 @@ pub struct SimpleExecutor {
     log: Vec<ExecutionRecord>,
     budget: BudgetTracker,
     pub dream_engine: DreamEngine<ActionIR>,
+    /// Cognitive context for causal learning (AGW Phase 2.3). When set (by a
+    /// host that has real state, e.g. the facade's input embedding sketch),
+    /// the dream engine records and predicts against it instead of the
+    /// all-zeros dummy — making the causal veto state-aware rather than
+    /// purely action-fingerprint-based.
+    context_state: Option<Vec<f32>>,
 }
 
 impl SimpleExecutor {
@@ -921,6 +927,7 @@ impl SimpleExecutor {
             log: Vec::new(),
             budget: BudgetTracker::new(),
             dream_engine: DreamEngine::new(DreamEngineConfig::default()),
+            context_state: None,
         }
     }
 
@@ -931,6 +938,7 @@ impl SimpleExecutor {
             log: Vec::new(),
             budget: BudgetTracker::new(),
             dream_engine: DreamEngine::new(DreamEngineConfig::default()),
+            context_state: None,
         }
     }
 
@@ -942,14 +950,25 @@ impl SimpleExecutor {
                 log: Vec::new(),
                 budget: BudgetTracker::new(),
                 dream_engine: DreamEngine::new(DreamEngineConfig::default()),
+                context_state: None,
             },
             _ => Self {
                 mode: ExecutionMode::Simulated,
                 log: Vec::new(),
                 budget: BudgetTracker::new(),
                 dream_engine: DreamEngine::new(DreamEngineConfig::default()),
+                context_state: None,
             },
         }
+    }
+
+    /// Provide the cognitive context the next executions should learn
+    /// against (AGW Phase 2.3). Callers with real state (the facade passes a
+    /// 64-D sketch of the current input embedding) should refresh this per
+    /// turn; without it, recording and prediction fall back to the legacy
+    /// all-zeros context and the causal veto is action-fingerprint-only.
+    pub fn set_context_state(&mut self, state: Vec<f32>) {
+        self.context_state = Some(state);
     }
 
     /// Inspect current execution mode.
@@ -1018,10 +1037,13 @@ impl SimpleExecutor {
 
         // 0.5. PRECOGNITION (The "Causal Veto")
         // Before executing, simulate the outcome in working memory.
-        let state_dummy = vec![0.0; 64];
+        // Uses the host-provided cognitive context when available (AGW
+        // Phase 2.3) so prediction matches against experiences from similar
+        // states, not just the same action fingerprint.
+        let state_context = self.context_state.clone().unwrap_or_else(|| vec![0.0; 64]);
         let prediction = self
             .dream_engine
-            .predict_outcome_distribution(&state_dummy, &final_action);
+            .predict_outcome_distribution(&state_context, &final_action);
 
         if prediction.failure_probability > 0.8 {
             tracing::warn!(target: "symthaea::action", 
@@ -1234,10 +1256,10 @@ impl SimpleExecutor {
         };
         self.log.push(record.clone());
 
-        // Record to dream engine (learning from experience)
-        // We use a dummy state because SimpleExecutor is stateless,
-        // but this allows the DreamEngine to start accumulating action-outcome pairs.
-        let state_dummy = vec![0.0; 64];
+        // Record to dream engine (learning from experience) against the same
+        // cognitive context the veto predicts with (AGW Phase 2.3) — falls
+        // back to the legacy zero-context when no host has provided state.
+        let state_context = self.context_state.clone().unwrap_or_else(|| vec![0.0; 64]);
         let outcome_vec = self.vectorize_outcome(&outcome);
         // Surprise heuristic: 0.0 for success, 1.0 for error or dangerous simulated command
         let surprise = match &outcome {
@@ -1248,7 +1270,7 @@ impl SimpleExecutor {
         // Only record if we didn't just use wisdom (prevent circular reinforcement)
         if !wisdom_used {
             self.dream_engine
-                .record(&state_dummy, final_action.clone(), &outcome_vec, surprise);
+                .record(&state_context, final_action.clone(), &outcome_vec, surprise);
         }
 
         Ok(ExecutionOutcome {
@@ -1718,6 +1740,103 @@ mod tests {
         matches!(
             err,
             PolicyViolation::SandboxEscape(_) | PolicyViolation::ReadNotAllowed(_)
+        );
+    }
+
+    // ── AGW Phase 2.3: pre-registered falsifiable tests ──────────────────
+    // Claim under test: the causal veto's learned failures survive a
+    // "restart" (observation transplant — the exact payload store_causal_links
+    // persists and attach_database hydrates), and executions record against
+    // the host-provided context state rather than the legacy zero vector.
+    // Context value -0.3 is chosen so the ReadFile heuristic alone does NOT
+    // veto (phi = |0.5·(-0.3)+0.4| = 0.25 > 0.2) while a transplanted
+    // zero-outcome history DOES (blended phi = |0.6·0 + 0.4·0.25| = 0.1 < 0.2)
+    // — i.e. the flip is attributable to hydrated experience, nothing else.
+
+    #[test]
+    fn causal_veto_learned_failures_survive_restart() {
+        let sandbox = SandboxRoot::new("test_veto_restart").unwrap();
+        let path = sandbox.root().join("data.txt");
+        std::fs::write(&path, b"ok").unwrap();
+        let action = ActionIR::ReadFile {
+            path,
+            encoding: None,
+        };
+        let policy = PolicyBundle::restrictive();
+        let ctx = vec![-0.3f32; 64];
+
+        // "Session 1": no history — must execute, not veto.
+        let mut e1 = SimpleExecutor::new();
+        e1.set_context_state(ctx.clone());
+        assert!(
+            e1.execute(&action, &policy, &sandbox, 1.0).is_ok(),
+            "fresh executor must not veto a benign read"
+        );
+
+        // Learn a catastrophic history for this action+context, then
+        // transplant the observations into a brand-new executor — the same
+        // round-trip attach_database performs from store_causal_links.
+        let mut teacher = SimpleExecutor::new();
+        for _ in 0..3 {
+            teacher
+                .dream_engine
+                .record(&ctx, action.clone(), &vec![0.0f32; 64], 1.0);
+        }
+        let persisted = teacher.dream_engine.world_model.observations.clone();
+
+        // "Session 2" after restart: hydrated executor must veto.
+        let mut e2 = SimpleExecutor::new();
+        e2.dream_engine.world_model.observations = persisted;
+        e2.set_context_state(ctx);
+        let err = e2
+            .execute(&action, &policy, &sandbox, 1.0)
+            .expect_err("hydrated failure history must trigger the causal veto");
+        assert!(
+            format!("{err}").contains("Causal Veto"),
+            "error must be the causal veto, got: {err}"
+        );
+    }
+
+    #[test]
+    fn executions_record_against_host_context_state() {
+        // The dream engine only records events with surprise above its
+        // threshold (0.1) — a successful read records nothing (this test's
+        // first version failed on exactly that). A simulated `rm` carries
+        // surprise 1.0, so it is guaranteed to record; the claim under test
+        // is that the recorded observation carries the HOST-provided context
+        // rather than the legacy zero dummy.
+        let sandbox = SandboxRoot::new("test_ctx_record").unwrap();
+        let mut policy = PolicyBundle::restrictive();
+        policy
+            .capabilities
+            .shell
+            .allowed_programs
+            .insert("rm".to_string());
+        let action = ActionIR::RunCommand {
+            program: "rm".into(),
+            args: vec![
+                "-f".into(),
+                sandbox.root().join("f.txt").to_string_lossy().into_owned(),
+            ],
+            env: BTreeMap::new(),
+            working_dir: None,
+        };
+
+        // Simulated mode (default): rm is not actually run.
+        let mut e = SimpleExecutor::new();
+        e.set_context_state(vec![0.7f32; 64]);
+        e.execute(&action, &policy, &sandbox, 1.0).unwrap();
+
+        let obs = e
+            .dream_engine
+            .world_model
+            .observations
+            .last()
+            .expect("surprising execution must record an observation");
+        assert_eq!(
+            obs.state_context,
+            vec![0.7f32; 64],
+            "observation must carry the host-provided context, not the zero dummy"
         );
     }
 

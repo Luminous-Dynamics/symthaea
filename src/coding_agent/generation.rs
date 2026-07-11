@@ -104,7 +104,7 @@ impl CodingAgent {
 
             let params = GenerationParams {
                 temperature,
-                max_tokens: 1024,
+                max_tokens: 4096, // was 1024 — truncated code+prose mid-function; see CAPABILITY_LADDER.md
                 system_prompt: Some(sys_prompt.clone()),
                 consciousness_context: Some(consciousness_ctx),
             };
@@ -199,7 +199,7 @@ impl CodingAgent {
                         // Re-dispatch with overridden state to force LLM tier
                         let params = GenerationParams {
                             temperature: 0.4,
-                            max_tokens: 1024,
+                            max_tokens: 4096, // was 1024 — truncated code+prose mid-function; see CAPABILITY_LADDER.md
                             system_prompt: Some(sys_prompt.clone()),
                             consciousness_context: None, // escalation path — no context needed
                         };

@@ -220,9 +220,17 @@ pub fn melody_to_training_pairs(melody: &ExtractedMelody) -> Vec<MelodyTrainingP
         let window_end = window_start + CONTEXT_LEN;
         let target_idx = window_end;
 
-        // Context intervals (semitone differences)
-        let interval_context: Vec<f32> = (window_start..window_end)
-            .zip((window_start + 1)..=window_end)
+        // Context intervals (semitone differences) among the notes BEFORE the
+        // target: pairs (ws,ws+1)..(we-2,we-1), i.e. CONTEXT_LEN-1 intervals.
+        // LEAKAGE FIX (2026-07-07): a previous version zipped up to
+        // `..=window_end`, so the LAST context interval was
+        // notes[target]−notes[target−1] — the target itself. Direction
+        // accuracy evaluated through that leak reads ~93-100% (the origin of
+        // the mythical "93.2%" in learned_melody's old header); honest
+        // context must stop at the last completed note, exactly like
+        // MelodyPredictor::record() does at inference.
+        let interval_context: Vec<f32> = (window_start..window_end - 1)
+            .zip((window_start + 1)..window_end)
             .map(|(a, b)| notes[b].pitch as f32 - notes[a].pitch as f32)
             .collect();
 
@@ -412,6 +420,46 @@ pub fn compute_stats(pairs: &[MelodyTrainingPair]) -> TrainingStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn training_pairs_do_not_leak_target_interval() {
+        // Regression: a previous version included notes[target]−notes[target−1]
+        // — the target itself — as the LAST context interval, which made every
+        // direction-accuracy evaluation through this pipeline read ~93-100%.
+        // Build a melody whose successive intervals are all distinct so any
+        // leak is unambiguous, then check every window.
+        let pitches: [u8; 12] = [60, 62, 61, 65, 63, 68, 64, 70, 66, 73, 67, 75];
+        let notes: Vec<MidiNote> = pitches
+            .iter()
+            .enumerate()
+            .map(|(i, &p)| MidiNote {
+                pitch: p,
+                onset_tick: (i as u64) * 480,
+                duration_ticks: 480,
+                velocity: 80,
+            })
+            .collect();
+        let melody = ExtractedMelody {
+            notes,
+            ticks_per_beat: 480,
+            tempo_bpm: 120.0,
+            key: 0,
+            minor: false,
+            source: "leak-test".into(),
+        };
+        let pairs = melody_to_training_pairs(&melody);
+        assert!(!pairs.is_empty());
+        for pair in &pairs {
+            let last_ctx = *pair.interval_context.last().unwrap();
+            assert_ne!(
+                last_ctx, pair.target_interval,
+                "context must end at the last COMPLETED note, not the target"
+            );
+            // 8-note window over 8 completed notes yields 7 intervals
+            assert_eq!(pair.interval_context.len(), 7);
+            assert_eq!(pair.duration_context.len(), 8);
+        }
+    }
 
     #[test]
     fn encode_features_correct_length() {

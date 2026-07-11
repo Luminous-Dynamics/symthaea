@@ -17,6 +17,11 @@
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
+      # Rust channel - read from symthaea/rust-toolchain.toml (single source of
+      # truth) rather than stable.latest, which silently drifts over time.
+      # Computed once here since it doesn't depend on `system`.
+      rustChannel = (builtins.fromTOML (builtins.readFile ../../../rust-toolchain.toml)).toolchain.channel;
+
       mkHalPackage = { pkgs, rustPlatform, features ? [ "linux" ], name ? "symthaea-hal" }:
         rustPlatform.buildRustPackage {
           pname = name;
@@ -56,7 +61,7 @@
             inherit system;
             overlays = [ rust-overlay.overlays.default ];
           };
-          rustToolchain = pkgs.rust-bin.stable.latest.default;
+          rustToolchain = pkgs.rust-bin.stable.${rustChannel}.default;
           rustPlatform = pkgs.makeRustPlatform {
             cargo = rustToolchain;
             rustc = rustToolchain;
@@ -81,8 +86,8 @@
               overlays = [ rust-overlay.overlays.default ];
             };
             crossRustPlatform = pkgsCross.makeRustPlatform {
-              cargo = pkgsCross.rust-bin.stable.latest.default;
-              rustc = pkgsCross.rust-bin.stable.latest.default;
+              cargo = pkgsCross.rust-bin.stable.${rustChannel}.default;
+              rustc = pkgsCross.rust-bin.stable.${rustChannel}.default;
             };
           in
             mkHalPackage {
@@ -100,7 +105,7 @@
             inherit system;
             overlays = [ rust-overlay.overlays.default ];
           };
-          rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+          rustToolchain = pkgs.rust-bin.stable.${rustChannel}.default.override {
             extensions = [ "rust-src" "rust-analyzer" ];
           };
         in

@@ -147,6 +147,7 @@ impl CanonicalEvalCase {
             target_ids: vec![],
             valence: 0.0,
             arousal: 0.5,
+            ..Default::default()
         }
         .to_thought_channels();
         TrainingPair::new(channels, self.target_text.clone(), tokenizer)
@@ -1129,6 +1130,7 @@ fn evaluate_structured_output_mode(
             target_ids: vec![],
             valence: 0.0,
             arousal: 0.5,
+            ..Default::default()
         }
         .to_thought_channels();
         let result = generate_for_eval(generator, &channels, max_gen_tokens);
@@ -1343,6 +1345,7 @@ fn evaluate_code_sheaf_mode(
             target_ids: vec![],
             valence: 0.0,
             arousal: 0.5,
+            ..Default::default()
         }
         .to_thought_channels();
         let result = generate_for_eval(generator, &channels, max_gen_tokens);
@@ -3661,6 +3664,7 @@ mod tests {
                 target_ids: vec![],
                 valence: 0.0,
                 arousal: 0.5,
+                ..Default::default()
             });
 
             let eval_config = LiquidMambaEvalConfig {
@@ -3709,6 +3713,7 @@ mod tests {
                     target_ids: vec![],
                     valence: 0.0,
                     arousal: 0.5,
+                    ..Default::default()
                 });
             }
 
@@ -3765,6 +3770,7 @@ mod tests {
                     target_ids: vec![],
                     valence: 0.0,
                     arousal: 0.5,
+                    ..Default::default()
                 });
             }
 

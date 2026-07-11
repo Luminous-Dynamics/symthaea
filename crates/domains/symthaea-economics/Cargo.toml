@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-economics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Economics & finance layer for Symthaea: time value of money (NPV/IRR/annuities), market equilibrium & elasticity, inequality (Gini), and 2x2 game theory. Closed-form, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

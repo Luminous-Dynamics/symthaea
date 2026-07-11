@@ -23,6 +23,7 @@ pub mod full_frame;
 pub mod hal_bridge;
 pub mod perturbations;
 pub mod plugin;
+pub mod reflex;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;

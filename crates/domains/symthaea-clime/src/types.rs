@@ -68,7 +68,9 @@ pub const SENSOR_CONFIDENCE: usize = 19;
 pub const NIGHT_MODE_PRESSURE: usize = 20;
 pub const PUBLIC_HEALTH_RISK: usize = 21;
 pub const COMFORT_INTEGRITY: usize = 22;
+pub const ENERGY_EFFICIENCY: usize = 23;
 pub const MISSION_PROGRESS: usize = 24;
+pub const THERMAL_BALANCE: usize = 25;
 pub const QUIET_COMPLIANCE: usize = 26;
 pub const HABITAT_CONTINUITY: usize = 27;
 

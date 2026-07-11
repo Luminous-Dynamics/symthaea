@@ -44,9 +44,12 @@ pub mod cmod_evaluation;
 pub mod cross_machine_evaluation;
 pub mod datacenter;
 pub mod fission;
+pub mod fission_bench;
+pub mod fission_dispatch;
 pub mod fusion_twin;
 pub mod grid;
 pub mod multiscale;
+pub mod nppad_validation;
 pub mod plasma_control;
 pub mod plasma_hdc_encoder;
 pub mod threat;
@@ -103,6 +106,17 @@ pub use grid::{
 pub use fission::{
     FISSION_HORIZON_LABELS, FISSION_HORIZONS, FissionFepAction, FissionFepAgent, FissionHdcEncoder,
     FissionOutput, FissionPredictor, FissionReading, FissionSafetyLevel, FissionTwin,
+};
+
+pub use fission_bench::{
+    BenchmarkReport, FaultKind, FaultScenario, FreeEnergyDetector, PLANT_CHANNEL_LABELS,
+    PLANT_CHANNELS, PlantHdcEncoder, PlantReading, PlantSimulator, ScenarioResult, run_benchmark,
+    run_healthy_false_alarm_check, run_scenario, standard_fault_suite,
+};
+
+pub use fission_dispatch::{
+    FissionTelemetryPayload, SensorNodeRegistration, SimulatedRadZoneInspectionOrder,
+    simulated_dispatch_for_degradation,
 };
 
 pub use accelerator::{

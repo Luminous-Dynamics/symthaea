@@ -16,6 +16,10 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod threshold_overrides;
+
+pub use threshold_overrides::{THRESHOLD_OVERRIDES_PATH_ENV, ThresholdOverrideValues};
+
 /// Number of harmonies (Eight Harmonies including Sacred Stillness).
 pub const N_HARMONIES: usize = 8;
 

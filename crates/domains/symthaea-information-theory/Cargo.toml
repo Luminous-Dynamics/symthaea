@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-information-theory"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Shannon information theory for Symthaea: entropy (marginal/joint/conditional), mutual information, KL divergence & cross-entropy, binary-symmetric-channel capacity, and Huffman source coding with the entropy bound. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

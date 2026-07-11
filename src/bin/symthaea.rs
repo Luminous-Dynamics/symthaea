@@ -83,6 +83,15 @@ struct Args {
     #[arg(short, long)]
     tcp: Option<String>,
 
+    /// HTTP gateway address (host:port). Serves the same JSON wire
+    /// protocol over `POST /v1/service`, plus `GET /health` and
+    /// `GET /metrics` (Prometheus; needs the `api_module` feature).
+    /// Runs alongside --socket/--tcp and is subject to the same
+    /// refusal-to-bind-non-loopback-without-auth policy as --tcp.
+    /// Phase 1 of SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md.
+    #[arg(long)]
+    http: Option<String>,
+
     /// Background consciousness loop interval (ms)
     #[arg(long, default_value = "5000")]
     loop_interval: u64,
@@ -94,6 +103,22 @@ struct Args {
     /// State file for persistence
     #[arg(long)]
     state_file: Option<PathBuf>,
+
+    /// SQLite consciousness database path. Enables the persist→recall→
+    /// re-perceive experience loop (memory recall, episodic persistence,
+    /// Polymath consolidation). Falls back to SYMTHAEA_DATABASE_PATH env
+    /// var; without either, the daemon runs amnesiac (in-memory only).
+    #[arg(long)]
+    database: Option<PathBuf>,
+
+    /// Enable the experience bridge to the autonomous cognitive loop (AGW
+    /// Phase 3): drives one CognitiveLoopService::cycle() per process()
+    /// call so the loop's knowledge graph and episodic memory accumulate
+    /// conversational experience, and reads it back into ethics evaluation
+    /// the same turn. When --database is also set, the loop's knowledge
+    /// store shares that same SQLite file (survives restarts).
+    #[arg(long)]
+    experience_bridge: bool,
 
     /// Verbose logging
     #[arg(short, long)]
@@ -796,11 +821,13 @@ impl ServiceState {
         auth_enabled: bool,
         audit_log_path: Option<PathBuf>,
         state_file: Option<PathBuf>,
+        database_path: Option<PathBuf>,
+        experience_bridge: bool,
         #[cfg(feature = "voice-tts")] voice_enabled: bool,
         #[cfg(feature = "voice-tts")] voice_id: u8,
     ) -> Result<Self> {
         // Try to resume from state file if it exists
-        let symthaea = if let Some(ref path) = state_file {
+        let mut symthaea = if let Some(ref path) = state_file {
             if path.exists() {
                 info!("Resuming from state file: {:?}", path);
                 let path_str = path.to_string_lossy();
@@ -817,6 +844,41 @@ impl ServiceState {
         } else {
             Symthaea::new(HDC_DIMENSION, LTC_NEURONS).await?
         };
+
+        // Attach the consciousness database. This is what activates the
+        // persist→recall→re-perceive experience loop (memory recall via
+        // search_similar, episodic/WM persistence, Polymath consolidation)
+        // that is otherwise silently dark. Deliberately a HARD error on
+        // failure: a daemon asked to persist must not fall back to running
+        // amnesiac — that silent degradation is exactly how this gap went
+        // unnoticed (AGW plan Phase 1, 2026-07-09).
+        if let Some(ref db_path) = database_path {
+            let config = symthaea::databases::DatabaseConfig {
+                backend: symthaea::databases::DatabaseBackend::Sqlite,
+                path: Some(db_path.to_string_lossy().into_owned()),
+            };
+            symthaea.attach_database(config).await.with_context(|| {
+                format!("Failed to attach consciousness database at {:?}", db_path)
+            })?;
+            info!("Consciousness database attached: {:?}", db_path);
+        } else {
+            warn!(
+                "No --database / SYMTHAEA_DATABASE_PATH configured — running amnesiac (no memory persistence)"
+            );
+        }
+
+        // AGW Phase 3: experience bridge to the autonomous cognitive loop.
+        // Reuses the same SQLite file as --database when set (Option A1) so
+        // the loop's knowledge graph survives restarts in the same store.
+        if experience_bridge {
+            let knowledge_db_path = database_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned());
+            match symthaea.enable_experience_bridge(knowledge_db_path) {
+                Ok(()) => info!("Experience bridge to the autonomous cognitive loop enabled"),
+                Err(e) => error!("Failed to enable experience bridge: {}", e),
+            }
+        }
 
         // Initialize voice if enabled
         #[cfg(feature = "voice-tts")]
@@ -1953,6 +2015,165 @@ where
     Ok(false)
 }
 
+/// Shared context for the HTTP gateway handlers.
+#[derive(Clone)]
+struct HttpGatewayCtx {
+    state: Arc<ServiceState>,
+    security: ServiceSecurity,
+}
+
+/// Fold a standard `Authorization` header into the wire envelope's
+/// top-level `authorization` field. The body's own field wins when both
+/// are present. Non-JSON and non-object bodies pass through untouched so
+/// `process_request_line` reports the same invalid-JSON error the socket
+/// path would.
+fn fold_authorization_header(body: &str, headers: &axum::http::HeaderMap) -> String {
+    let Some(header_value) = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    else {
+        return body.to_string();
+    };
+    match serde_json::from_str::<serde_json::Value>(body) {
+        Ok(mut value) => {
+            if let Some(obj) = value.as_object_mut() {
+                obj.entry("authorization")
+                    .or_insert_with(|| serde_json::Value::String(header_value.to_string()));
+                return value.to_string();
+            }
+            body.to_string()
+        }
+        Err(_) => body.to_string(),
+    }
+}
+
+/// Map a wire-protocol response onto an HTTP status code. The envelope
+/// keeps its own error semantics (`{"type":"error",...}`); this mapping
+/// only exists so plain HTTP clients can branch without parsing.
+fn http_status_for_response(response: &Response) -> axum::http::StatusCode {
+    use axum::http::StatusCode;
+    match response {
+        Response::Error { message } if message == &service_auth_error_message() => {
+            StatusCode::UNAUTHORIZED
+        }
+        Response::Error { .. } => StatusCode::BAD_REQUEST,
+        _ => StatusCode::OK,
+    }
+}
+
+async fn http_health() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "status": "ok",
+        "service": "symthaea-service",
+        "protocol_version": SERVICE_PROTOCOL_VERSION,
+    }))
+}
+
+async fn http_metrics() -> axum::response::Response {
+    use axum::response::IntoResponse;
+    #[cfg(feature = "api_module")]
+    {
+        let registry = symthaea::api::metrics::global();
+        registry.increment("api_requests_total");
+        (
+            axum::http::StatusCode::OK,
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "text/plain; version=0.0.4; charset=utf-8",
+            )],
+            registry.to_prometheus_text(),
+        )
+            .into_response()
+    }
+    #[cfg(not(feature = "api_module"))]
+    {
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "metrics require a build with the api_module feature",
+        )
+            .into_response()
+    }
+}
+
+async fn http_service_endpoint(
+    axum::extract::State(ctx): axum::extract::State<HttpGatewayCtx>,
+    headers: axum::http::HeaderMap,
+    body: String,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+
+    let line = fold_authorization_header(&body, &headers);
+    match process_request_line(&line, ctx.state.clone(), ctx.security.clone()).await {
+        Ok(Some(outcome)) => {
+            if outcome.shutdown {
+                // Mirror the socket path: respond, then exit. The short
+                // delay lets the response flush before the process dies.
+                tokio::spawn(async {
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    info!("Shutdown requested via HTTP gateway");
+                    std::process::exit(0);
+                });
+            }
+            let status = http_status_for_response(&outcome.response);
+            match serde_json::to_value(&outcome.response) {
+                Ok(json) => (status, axum::Json(json)).into_response(),
+                Err(e) => (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to serialize response: {e}"),
+                )
+                    .into_response(),
+            }
+        }
+        Ok(None) => (
+            axum::http::StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "type": "error",
+                "message": "Empty request body",
+            })),
+        )
+            .into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "type": "error",
+                "message": format!("Internal error: {e}"),
+            })),
+        )
+            .into_response(),
+    }
+}
+
+/// Build the HTTP gateway router (Phase 1 of
+/// SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md). One route carries the whole
+/// existing wire protocol, so auth, protocol versioning, size limits, and
+/// audit logging behave identically to the Unix-socket path — this is a
+/// transport, not a second protocol.
+fn build_http_router(state: Arc<ServiceState>, security: ServiceSecurity) -> axum::Router {
+    use axum::routing::{get, post};
+    let ctx = HttpGatewayCtx { state, security };
+    axum::Router::new()
+        .route("/v1/service", post(http_service_endpoint))
+        .route("/health", get(http_health))
+        .route("/v1/health", get(http_health))
+        .route("/metrics", get(http_metrics))
+        .with_state(ctx)
+}
+
+async fn serve_http(
+    addr: String,
+    state: Arc<ServiceState>,
+    security: ServiceSecurity,
+) -> Result<()> {
+    let app = build_http_router(state, security);
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .with_context(|| format!("Failed to bind HTTP gateway to {addr}"))?;
+    axum::serve(listener, app)
+        .await
+        .context("HTTP gateway server error")?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
@@ -1990,6 +2211,8 @@ mod protocol_tests {
                 auth_enabled,
                 None,
                 None,
+                None,
+                false,
                 #[cfg(feature = "voice-tts")]
                 false,
                 #[cfg(feature = "voice-tts")]
@@ -2240,6 +2463,117 @@ mod protocol_tests {
         assert_eq!(json["type"], "not_implemented");
         assert_eq!(json["feature"], "gui_widget_change");
     }
+
+    // ── HTTP gateway (Phase 1, SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md) ──
+
+    #[test]
+    fn authorization_header_folds_into_envelope() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            axum::http::header::AUTHORIZATION,
+            "Bearer header-token".parse().expect("header value"),
+        );
+
+        let folded = fold_authorization_header(r#"{"type":"status"}"#, &headers);
+        let value: serde_json::Value = serde_json::from_str(&folded).expect("folded JSON");
+        assert_eq!(value["authorization"], "Bearer header-token");
+
+        // The body's own authorization field wins over the header.
+        let folded = fold_authorization_header(
+            r#"{"type":"status","authorization":"Bearer body-token"}"#,
+            &headers,
+        );
+        let value: serde_json::Value = serde_json::from_str(&folded).expect("folded JSON");
+        assert_eq!(value["authorization"], "Bearer body-token");
+
+        // Invalid JSON passes through untouched (process_request_line
+        // then reports the same error the socket path would).
+        assert_eq!(fold_authorization_header("not json", &headers), "not json");
+    }
+
+    #[tokio::test]
+    async fn http_gateway_health_is_public() {
+        use axum::body::Body;
+        use axum::http::Request as HttpRequest;
+        use tower::util::ServiceExt;
+
+        let app = build_http_router(test_state(true).await, test_security(Some("tok")));
+        let response = app
+            .oneshot(
+                HttpRequest::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .expect("health request"),
+            )
+            .await
+            .expect("health response");
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn http_gateway_serves_wire_protocol() {
+        use axum::body::Body;
+        use axum::http::Request as HttpRequest;
+        use tower::util::ServiceExt;
+
+        let app = build_http_router(test_state(false).await, test_security(None));
+        let response = app
+            .oneshot(
+                HttpRequest::builder()
+                    .method(axum::http::Method::POST)
+                    .uri("/v1/service")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"type":"ping"}"#))
+                    .expect("ping request"),
+            )
+            .await
+            .expect("ping response");
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("body");
+        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("pong JSON");
+        assert_eq!(json["type"], "pong");
+    }
+
+    #[tokio::test]
+    async fn http_gateway_enforces_bearer_auth() {
+        use axum::body::Body;
+        use axum::http::Request as HttpRequest;
+        use tower::util::ServiceExt;
+
+        let state = test_state(true).await;
+        let security = test_security(Some("secret"));
+
+        // Auth-required request without a token → 401.
+        let response = build_http_router(state.clone(), security.clone())
+            .oneshot(
+                HttpRequest::builder()
+                    .method(axum::http::Method::POST)
+                    .uri("/v1/service")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"type":"status"}"#))
+                    .expect("status request"),
+            )
+            .await
+            .expect("status response");
+        assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+
+        // Same request with the Authorization header folded in → 200.
+        let response = build_http_router(state, security)
+            .oneshot(
+                HttpRequest::builder()
+                    .method(axum::http::Method::POST)
+                    .uri("/v1/service")
+                    .header("content-type", "application/json")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::from(r#"{"type":"status"}"#))
+                    .expect("status request"),
+            )
+            .await
+            .expect("status response");
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+    }
 }
 
 /// Background consciousness loop
@@ -2298,8 +2632,8 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // Validate arguments
-    if args.socket.is_none() && args.tcp.is_none() {
-        anyhow::bail!("Must specify either --socket or --tcp");
+    if args.socket.is_none() && args.tcp.is_none() && args.http.is_none() {
+        anyhow::bail!("Must specify at least one of --socket, --tcp, or --http");
     }
 
     let service_bearer_token = std::env::var("SYMTHAEA_SERVICE_BEARER_TOKEN")
@@ -2327,10 +2661,14 @@ async fn main() -> Result<()> {
         );
     }
 
-    if let Some(ref tcp_addr) = args.tcp {
-        if !addr_is_loopback(tcp_addr) && service_bearer_token.is_none() && !insecure_allow_unauth {
+    // Same refusal policy for every TCP-based transport (--tcp and --http).
+    for addr in [args.tcp.as_ref(), args.http.as_ref()]
+        .into_iter()
+        .flatten()
+    {
+        if !addr_is_loopback(addr) && service_bearer_token.is_none() && !insecure_allow_unauth {
             eprintln!("Refusing to bind Symthaea service to non-loopback address without auth.");
-            eprintln!("  addr: {}", tcp_addr);
+            eprintln!("  addr: {}", addr);
             eprintln!();
             eprintln!("Set one of:");
             eprintln!("  - SYMTHAEA_SERVICE_BEARER_TOKEN=...   (recommended)");
@@ -2338,9 +2676,9 @@ async fn main() -> Result<()> {
             std::process::exit(2);
         }
 
-        if !addr_is_loopback(tcp_addr) && service_bearer_token.is_none() && insecure_allow_unauth {
+        if !addr_is_loopback(addr) && service_bearer_token.is_none() && insecure_allow_unauth {
             eprintln!("WARNING: Symthaea service is binding publicly without auth (insecure).");
-            eprintln!("  addr: {}", tcp_addr);
+            eprintln!("  addr: {}", addr);
         }
     }
 
@@ -2349,11 +2687,26 @@ async fn main() -> Result<()> {
 
     // Initialize state
     info!("Initializing consciousness...");
+    // --database flag wins; SYMTHAEA_DATABASE_PATH env var is the fallback
+    // so the systemd unit can enable persistence via Environment= alone.
+    let database_path = args.database.clone().or_else(|| {
+        std::env::var("SYMTHAEA_DATABASE_PATH")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .map(PathBuf::from)
+    });
+    let experience_bridge = args.experience_bridge
+        || std::env::var("SYMTHAEA_EXPERIENCE_BRIDGE")
+            .map(|v| v == "1")
+            .unwrap_or(false);
+
     let state = Arc::new(
         ServiceState::new(
             service_bearer_token.is_some(),
             service_audit_log_path,
             args.state_file.clone(),
+            database_path,
+            experience_bridge,
             #[cfg(feature = "voice-tts")]
             args.voice,
             #[cfg(feature = "voice-tts")]
@@ -2365,6 +2718,34 @@ async fn main() -> Result<()> {
     let security = ServiceSecurity {
         bearer_token: service_bearer_token,
     };
+
+    // systemd stops this daemon with SIGTERM. Without a handler the process
+    // died without saving relational/partnership state, silently defeating
+    // --state-file on every `systemctl restart` — state was only saved on an
+    // explicit wire `shutdown` request, which nothing sends in production
+    // (found during AGW Phase 1 verification, 2026-07-09).
+    #[cfg(unix)]
+    {
+        let state = Arc::clone(&state);
+        tokio::spawn(async move {
+            let mut sigterm =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                    .expect("install SIGTERM handler");
+            tokio::select! {
+                _ = sigterm.recv() => {},
+                _ = tokio::signal::ctrl_c() => {},
+            }
+            if let Some(ref path) = state.state_file {
+                let path_str = path.to_string_lossy();
+                let mut symthaea = state.symthaea.lock().await;
+                match symthaea.pause(&path_str) {
+                    Ok(()) => info!("Shutdown signal: state saved to {:?}", path),
+                    Err(e) => error!("Shutdown signal: failed to save state: {}", e),
+                }
+            }
+            std::process::exit(0);
+        });
+    }
 
     {
         let intro = {
@@ -2418,6 +2799,25 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         consciousness_loop(loop_state, args.loop_interval, args.sleep_interval).await;
     });
+
+    // HTTP gateway — runs alongside the socket/TCP listeners.
+    let http_handle = if let Some(http_addr) = args.http.clone() {
+        let state = Arc::clone(&state);
+        let security = security.clone();
+        println!("\n🌐 HTTP gateway listening on http://{}", http_addr);
+        println!("   POST /v1/service  |  GET /health  |  GET /metrics");
+        println!(
+            "   Example: curl -s http://{}/v1/service -d '{{\"type\":\"ping\"}}'\n",
+            http_addr
+        );
+        Some(tokio::spawn(async move {
+            if let Err(e) = serve_http(http_addr, state, security).await {
+                error!("HTTP gateway failed: {}", e);
+            }
+        }))
+    } else {
+        None
+    };
 
     // Start listening
     if let Some(socket_path) = args.socket {
@@ -2482,6 +2882,9 @@ async fn main() -> Result<()> {
                 }
             });
         }
+    } else if let Some(handle) = http_handle {
+        // HTTP-only mode: the gateway task is what keeps the daemon alive.
+        handle.await?;
     }
 
     Ok(())

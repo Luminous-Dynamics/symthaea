@@ -422,15 +422,16 @@ impl CurriculumLoader {
         Ok(builder.build())
     }
 
-    /// Save a curriculum to a JSON file
+    /// Save a curriculum to a JSON file (atomic: temp file + rename)
     pub fn save_to_json<P: AsRef<Path>>(curriculum: &Curriculum, path: P) -> Result<(), LoadError> {
         let spec = Self::curriculum_to_spec(curriculum);
         let json = serde_json::to_string_pretty(&spec)?;
-        fs::write(path, json)?;
+        write_atomic(path.as_ref(), &json)?;
         Ok(())
     }
 
     /// Save a curriculum store (metadata + curriculum) to a JSON file
+    /// (atomic: temp file + rename)
     pub fn save_store_to_json<P: AsRef<Path>>(
         curriculum: &Curriculum,
         meta: &CurriculumMeta,
@@ -441,7 +442,7 @@ impl CurriculumLoader {
             curriculum: Self::curriculum_to_spec(curriculum),
         };
         let json = serde_json::to_string_pretty(&store)?;
-        fs::write(path, json)?;
+        write_atomic(path.as_ref(), &json)?;
         Ok(())
     }
 
@@ -477,6 +478,26 @@ impl CurriculumLoader {
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Write `contents` to `path` atomically: write a temp file in the same
+/// directory, then rename over the target. This guarantees readers (e.g. the
+/// Broca curriculum-sync pipeline consuming `SYMTHAEA_CURRICULUM_PATH`) never
+/// observe a partially-written curriculum. The temp filename embeds the
+/// process ID so concurrent writers do not clobber each other's temp files.
+fn write_atomic(path: &Path, contents: &str) -> Result<(), LoadError> {
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("curriculum.json");
+    let tmp_path = path.with_file_name(format!("{}.tmp.{}", file_name, std::process::id()));
+    fs::write(&tmp_path, contents)?;
+    if let Err(e) = fs::rename(&tmp_path, path) {
+        // Best-effort cleanup of the orphaned temp file before surfacing the error.
+        let _ = fs::remove_file(&tmp_path);
+        return Err(LoadError::IoError(e));
+    }
+    Ok(())
+}
 
 /// Parse a difficulty string to Difficulty enum
 fn parse_difficulty(s: &str) -> Option<Difficulty> {
@@ -761,6 +782,32 @@ mod tests {
 
         assert_eq!(loaded.id, original.id);
         assert_eq!(loaded.objectives.len(), original.objectives.len());
+    }
+
+    #[test]
+    fn test_save_store_to_json_atomic_roundtrip() {
+        use super::super::curriculum::{Curriculum as C, CurriculumType};
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("curriculum.json");
+
+        let original = C::builtin(CurriculumType::NixOS);
+        let meta = CurriculumMeta::new(64);
+        CurriculumLoader::save_store_to_json(&original, &meta, &path).unwrap();
+
+        // Atomic write must not leave temp files behind.
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains(".tmp."))
+            .collect();
+        assert!(leftovers.is_empty(), "temp file left behind: {leftovers:?}");
+
+        let (loaded, loaded_meta) =
+            CurriculumLoader::load_store_from_file_with_dimension(&path, 64).unwrap();
+        assert_eq!(loaded.id, original.id);
+        assert_eq!(loaded.objectives.len(), original.objectives.len());
+        assert_eq!(loaded_meta.dimension, 64);
     }
 
     #[test]

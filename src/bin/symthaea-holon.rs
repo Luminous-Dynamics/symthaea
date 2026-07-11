@@ -332,6 +332,18 @@ async fn main() -> Result<()> {
                             correlation_id, severity, crisis_type, confidence
                         )
                     }
+                    GovernanceDispatchCommand::SubmitRoboticsTelemetry {
+                        correlation_id,
+                        platform,
+                        safety_level,
+                        consciousness_level,
+                        ..
+                    } => {
+                        format!(
+                            "SubmitRoboticsTelemetry(cid={}, platform={}, safety={}, phi={:.2})",
+                            correlation_id, platform, safety_level, consciousness_level
+                        )
+                    }
                 };
                 tracing::info!("Governance dispatch (MockTransport): {}", label);
             }

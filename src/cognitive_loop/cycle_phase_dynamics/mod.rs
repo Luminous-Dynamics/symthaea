@@ -512,25 +512,190 @@ impl CognitiveLoopService {
                                     // Sovereign Social: forward ContentAnnounced to SocialFabricManager.
                                     #[cfg(feature = "social-fabric")]
                                     if let SwarmEvent::ContentAnnounced {
-                                        ref peer_id,
+                                        peer_id,
                                         content_hash,
-                                        truncated_hdv: _,
-                                        ref domain,
+                                        truncated_hdv,
+                                        domain,
                                         created_at,
                                     } = &event
                                     {
                                         use symthaea_core::hdc::BinaryHV;
-                                        self.social_fabric_manager.inject_event(
-                                            super::managers::social_fabric_manager::SocialEvent::ContentReceived(
-                                                crate::swarm::resonance_graph::ContentRef {
-                                                    source_peer: peer_id.clone(),
-                                                    content_hash: *content_hash,
-                                                    hdv_embedding: BinaryHV::zero(),
-                                                    domain: domain.clone(),
-                                                    created_at: *created_at,
-                                                },
-                                            ),
-                                        );
+                                        // Trust gate (2026-07-09, cross-agent culture sharing):
+                                        // before this, content from ANY peer (real or spoofed —
+                                        // source_id has no cryptographic identity binding, see
+                                        // mesh auth research) was admitted into the resonance
+                                        // graph with zero reputation check at all. This does NOT
+                                        // require positive trust to admit content — an unknown,
+                                        // never-before-seen peer has `direct_trust`/
+                                        // `transitive_trust` of exactly 0.0, identical to a known
+                                        // bad actor, so a positive-trust requirement would create
+                                        // a cold-start deadlock (no peer could ever be admitted
+                                        // for the first time). Instead this rejects ONLY peers
+                                        // already explicitly flagged by `TrustGraph`'s own Sybil
+                                        // anomaly detection — a real, if narrow, signal: it stops
+                                        // already-caught bad actors from continuing to inject
+                                        // content, without blocking legitimate first contact.
+                                        // Graduated trust-weighted ranking (vs. this binary
+                                        // admit/reject) is future work — see
+                                        // `cultural_memory.rs`'s module docs for the parallel
+                                        // honesty note on the send side. `trust_manager` is
+                                        // gated behind `mesh-trust` (a sibling of, not implied
+                                        // by, `social-fabric`) — without it there is no Sybil
+                                        // detection to consult, so the gate degrades to
+                                        // admitting everything (today's unconditional behavior),
+                                        // not to rejecting everything.
+                                        #[cfg(feature = "mesh-trust")]
+                                        let is_flagged_sybil =
+                                            self.trust_manager.graph().is_flagged(peer_id);
+                                        #[cfg(not(feature = "mesh-trust"))]
+                                        let is_flagged_sybil = false;
+
+                                        if is_flagged_sybil {
+                                            tracing::debug!(
+                                                peer_id = %peer_id,
+                                                "Rejected ContentAnnounced from peer flagged as Sybil anomaly"
+                                            );
+                                        } else {
+                                            // Reconstruct an (approximate, lossy) full-dimension
+                                            // embedding from the wire-truncated 256-bit HDV instead
+                                            // of discarding it in favor of an all-zero placeholder —
+                                            // see `BinaryHV::from_truncated_bytes` for the tiling
+                                            // caveat (periodic self-similarity vs. a native encoding).
+                                            let embedding =
+                                                BinaryHV::from_truncated_bytes(truncated_hdv);
+
+                                            // Memetic immune screen (Phase 2): treat incoming
+                                            // content as a candidate meme and reject known-pathogen
+                                            // memes *before* they enter the resonance graph — a
+                                            // manipulative meme is dangerous precisely because it
+                                            // resonates, so this gates on known-bad, not on novelty.
+                                            // Guardian posture is derived from psi (Red ⇒ lockdown,
+                                            // suppress all uptake) and arousal couples contagion.
+                                            let meme = symthaea_memetics::Meme::seed(
+                                                *created_at,
+                                                embedding.clone(),
+                                                0.9,
+                                            );
+                                            let posture = {
+                                                let psi = self.stats.unified_psi;
+                                                if psi < 0.1 {
+                                                    symthaea_memetics::GuardianPosture::Red
+                                                } else if psi < 0.3 {
+                                                    symthaea_memetics::GuardianPosture::Orange
+                                                } else {
+                                                    symthaea_memetics::GuardianPosture::Green
+                                                }
+                                            };
+                                            let arousal = self.behavior.emotion_contagion.arousal;
+                                            let verdict =
+                                                self.memetic_immune.screen(&meme, posture, arousal);
+
+                                            if verdict.accepted {
+                                                // The agent's belief-state tracks what it adopts.
+                                                self.memetic_immune
+                                                    .set_self_state(embedding.clone());
+                                                self.social_fabric_manager.inject_event(
+                                                    super::managers::social_fabric_manager::SocialEvent::ContentReceived(
+                                                        crate::swarm::resonance_graph::ContentRef {
+                                                            source_peer: peer_id.clone(),
+                                                            content_hash: *content_hash,
+                                                            hdv_embedding: embedding,
+                                                            domain: domain.clone(),
+                                                            created_at: *created_at,
+                                                        },
+                                                    ),
+                                                );
+
+                                                // Cross-agent propagation (Phase 3): if this
+                                                // accepted meme is worth forwarding, re-broadcast a
+                                                // *mutated* variant so ideas actually spread through
+                                                // the swarm instead of dead-ending here. Rides the
+                                                // same signed ContentAnnounce mesh path as
+                                                // cross-agent art sharing (source_id/auth_mac filled
+                                                // by the mesh bridge). Self-limiting: posture gates
+                                                // out Red lockdown, a contagion floor stops
+                                                // broadcast storms, mutation drifts each retelling
+                                                // (lowering resonance until spread dies), and the
+                                                // packet TTL bounds hops.
+                                                let prop_seed = u64::from_le_bytes(
+                                                    content_hash[..8]
+                                                        .try_into()
+                                                        .unwrap_or([0u8; 8]),
+                                                );
+                                                if let Some(variant) =
+                                                    self.memetic_immune.propagation_variant(
+                                                        &meme,
+                                                        &verdict,
+                                                        posture,
+                                                        0.05,
+                                                        created_at.wrapping_add(1),
+                                                        prop_seed,
+                                                    )
+                                                {
+                                                    let variant_hash: [u8; 32] =
+                                                        *blake3::hash(&variant.payload.0)
+                                                            .as_bytes();
+                                                    let announce =
+                                                        crate::swarm::mesh::content_packet::ContentAnnounce::from_full_hdv(
+                                                            variant_hash,
+                                                            &variant.payload,
+                                                            domain.clone(),
+                                                            *created_at,
+                                                        );
+                                                    let packet = crate::swarm::mesh::WisdomPacket {
+                                                        source_id: [0; 8], // filled by mesh bridge
+                                                        sequence: 0,
+                                                        phi: self.stats.unified_psi as f32,
+                                                        urgency: crate::swarm::mesh::MeshUrgency::Cruise,
+                                                        timestamp_s: *created_at as u32,
+                                                        payload_type: crate::swarm::mesh::PayloadType::ContentAnnounce,
+                                                        auth_mac: 0,
+                                                        ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
+                                                        wisdom: announce.encode(),
+                                                    };
+                                                    if let Err(e) = self.mesh_outbound_tx.send(
+                                                        crate::swarm::mesh::MeshOutbound { packet },
+                                                    ) {
+                                                        tracing::debug!(
+                                                            error = %e,
+                                                            "Meme re-propagation send failed — no receiver"
+                                                        );
+                                                    } else {
+                                                        tracing::trace!(
+                                                            generation = variant.generation,
+                                                            "Re-propagated accepted meme to mesh peers"
+                                                        );
+                                                    }
+                                                }
+                                            } else {
+                                                tracing::debug!(
+                                                    peer_id = %peer_id,
+                                                    reason = verdict.reason,
+                                                    threat_match = verdict.threat_match,
+                                                    "Memetic firewall rejected incoming content"
+                                                );
+
+                                                // Bridge A (memetics → immune, plan §Integration
+                                                // follow-up): a genuine pathogen match becomes a
+                                                // first-class immune memory, reusing the existing
+                                                // EpistemicThreat kind (no new ThreatSignalKind).
+                                                // It then gets dream-consolidation salience and can
+                                                // be gossiped via ThreatMemory::shareable_patterns.
+                                                // Gate on threat_match so a mere Red-lockdown
+                                                // rejection of benign content is NOT recorded as a
+                                                // threat (0.5 is the loosest firewall threshold,
+                                                // used under Orange posture).
+                                                if verdict.threat_match >= 0.5 {
+                                                    self.threat_memory.store_threat(
+                                                        super::threat_memory::ThreatSignalKind::EpistemicThreat,
+                                                        verdict.threat_match,
+                                                        verdict.threat_match,
+                                                        cycle_num as usize,
+                                                        "manipulative meme rejected by firewall",
+                                                    );
+                                                }
+                                            }
+                                        }
                                     }
 
                                     // Consciousness-Aware Router: extract peer consciousness from events.
@@ -628,11 +793,11 @@ impl CognitiveLoopService {
                                 };
                                 // Build a minimal Composition for the scorer
                                 let comp = symthaea_muse::Composition {
-                                    audio: symthaea_muse::AudioData::Stereo(Vec::new()),
+                                    audio: symthaea_muse::AudioData::StereoF32(Vec::new()),
                                     sample_rate: 44100,
                                     notes: export.notes.clone(),
                                     duration_secs: export.duration_secs,
-                                    section: symthaea_muse::structure::SectionType::Development,
+                                    section: symthaea_muse::structure::SectionType::Developmental,
                                 };
                                 let quality = CreativeQualityScore::evaluate(&comp, target_va);
                                 // Map creative quality → AestheticScore
@@ -689,6 +854,325 @@ impl CognitiveLoopService {
                                     result.error
                                 );
                             }
+                        }
+                    }
+                }
+
+                // Drain any completed autobiography narration (best-effort
+                // logging; non-blocking; cheap when idle). Unconditional —
+                // not feature-gated, since narrative_self is a plain config
+                // flag, not a Cargo feature.
+                self.consciousness.self_model_tier.drain_narration();
+                if let Some(ref result) = self.consciousness.self_model_tier.last_narration {
+                    tracing::debug!(
+                        used_llm = result.used_llm,
+                        episode_count = result.episode_count,
+                        cycle_num = result.cycle_num,
+                        "[autobiography-narrator] narration ready ({} chars)",
+                        result.prose.len()
+                    );
+                }
+
+                // ── Canvas Manager (living topology SVG + aesthetic feedback) ──
+                // Ticks the passive canvas renderer (SVG every
+                // generation_interval cycles) and closes its aesthetic loop:
+                // the Birkhoff score of the generated scene feeds a small
+                // dopamine/serotonin delta into the bath, at half the weight
+                // of the deliberate `creative` path (see
+                // CANVAS_AESTHETIC_FEEDBACK_WEIGHT). When both `canvas` and
+                // `creative` are enabled the two signals stay additive but
+                // small: the creative self-listen path scores muse
+                // compositions (a different artifact) while this scores the
+                // topology scene, and both are bounded by compute_feedback's
+                // ±0.15 dopamine / harmony-scaled serotonin caps plus the
+                // ½ weight here — no double-dosing from one artifact.
+                // ── Art topology enrichment (canvas + creative snapshots) ──
+                // Both snapshot_from_cycle builders leave Betti/Cantor at
+                // dormant defaults (CycleSnapshot doesn't carry topology),
+                // which ran every topology-driven art style on β₀=1, β₁=β₂=0
+                // until 2026-07-10. Real Betti numbers now come from the
+                // previously-unwired consciousness_engine::topological_measure
+                // Hodge pipeline over the CfC compressed state (cached — it's
+                // O(n³) in the subsampled dims), and Cantor depth comes from
+                // the same live cantor_dream sources the telemetry assembly
+                // uses. Persistence diagrams remain empty here: the Hodge
+                // pipeline yields Betti numbers, not birth/death pairs — real
+                // persistent homology is a planned follow-up
+                // (VISUAL_ART_IMPROVEMENT_PLAN_2026-07-10.md Phase 3).
+                #[cfg(any(feature = "canvas", feature = "creative"))]
+                let art_topology: ([usize; 3], f32, u8) = {
+                    const ART_TOPOLOGY_REFRESH_INTERVAL: u64 = 5;
+                    let mr = &mut self.sensorimotor.motor_rendering;
+                    let due = mr.art_topology.is_none()
+                        || cycle_num.wrapping_sub(mr.art_topology_cycle)
+                            >= ART_TOPOLOGY_REFRESH_INTERVAL;
+                    if due {
+                        let state_f64: Vec<f64> = snapshot
+                            .compressed_state
+                            .iter()
+                            .map(|&v| v as f64)
+                            .collect();
+                        mr.art_topology = Some(
+                            super::consciousness_engine::topological_measure::
+                                compute_topological_consciousness(&state_f64, None),
+                        );
+                        mr.art_topology_cycle = cycle_num;
+                    }
+                    let betti = mr
+                        .art_topology
+                        .as_ref()
+                        .map(|t| {
+                            [
+                                t.betti_numbers.first().copied().unwrap_or(1),
+                                t.betti_numbers.get(1).copied().unwrap_or(0),
+                                t.betti_numbers.get(2).copied().unwrap_or(0),
+                            ]
+                        })
+                        .unwrap_or([1, 0, 0]);
+                    let cantor_depth = self.cantor_dream.dream_surprise;
+                    let cantor_last = self
+                        .cantor_dream
+                        .broadcast_buffer
+                        .iter()
+                        .map(|crhv| crhv.depth.min(5) as u8)
+                        .max()
+                        .unwrap_or(0);
+                    (betti, cantor_depth, cantor_last)
+                };
+
+                #[cfg(feature = "canvas")]
+                {
+                    let mut canvas_snap =
+                        super::canvas_bridge::snapshot_from_cycle(snapshot, &self.neuromod.bath);
+                    canvas_snap.betti_0 = art_topology.0[0];
+                    canvas_snap.betti_1 = art_topology.0[1];
+                    canvas_snap.betti_2 = art_topology.0[2];
+                    canvas_snap.cantor_metacognitive_depth = art_topology.1;
+                    canvas_snap.cantor_last_depth = art_topology.2;
+                    let mut canvas_feedback: Option<(f32, f32)> = None;
+                    if let Some(ref mut mgr) = self.sensorimotor.motor_rendering.canvas_manager {
+                        if mgr.tick(&canvas_snap).is_some() {
+                            let t = mgr.last_telemetry();
+                            canvas_feedback = Some((t.dopamine_delta, t.serotonin_delta));
+                        }
+                        // Only overwrite when a fresh frame exists so an
+                        // undrained frame isn't clobbered between intervals.
+                        if let Some(svg) = mgr.take_svg() {
+                            self.sensorimotor.motor_rendering.last_canvas_svg = Some(svg);
+                        }
+                    }
+                    if let Some((da_delta, se_delta)) = canvas_feedback {
+                        if da_delta != 0.0 {
+                            self.neuromod.bath.dopamine.produce(da_delta);
+                        }
+                        if se_delta != 0.0 {
+                            self.neuromod.bath.serotonin.produce(se_delta);
+                        }
+                    }
+                }
+
+                // ── Creative Manager (Visual/Music/Poetry generation + cultural memory) ──
+                // Previously built (Phase 1/4 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md)
+                // but NEVER actually ticked from the live loop — every other
+                // manager in this file runs via `run_subsystem!`, but
+                // `creative_manager` had zero call sites outside its own unit
+                // tests, so autonomous art/cultural-memory generation never
+                // happened during normal operation (only reachable via the
+                // facade's on-demand Phase 8.5 path, which bypasses this
+                // manager entirely). Fixed 2026-07-09. `CreativeManager::tick`
+                // doesn't implement `CognitiveSubsystem` (it takes
+                // `symthaea_canvas::CognitiveSnapshot`, not
+                // `subsystem_trait::CycleSnapshot`, same mismatch Canvas has
+                // above), so it's ticked directly rather than via the macro.
+                #[cfg(feature = "creative")]
+                {
+                    let mut creative_snap =
+                        super::creative_bridge::snapshot_from_cycle(snapshot, &self.neuromod.bath);
+                    creative_snap.betti_0 = art_topology.0[0];
+                    creative_snap.betti_1 = art_topology.0[1];
+                    creative_snap.betti_2 = art_topology.0[2];
+                    creative_snap.cantor_metacognitive_depth = art_topology.1;
+                    creative_snap.cantor_last_depth = art_topology.2;
+                    let mut creative_feedback: Option<(f32, f32)> = None;
+                    #[cfg(feature = "social-fabric")]
+                    let mut fresh_publish: Option<
+                        crate::swarm::resonance_graph::ContentRef,
+                    > = None;
+                    #[cfg(feature = "art-observer")]
+                    let mut fresh_artwork_svg: Option<String> = None;
+                    if let Some(ref mut mgr) = self.sensorimotor.motor_rendering.creative_manager {
+                        if let Some(output) = mgr.tick(&creative_snap) {
+                            creative_feedback = Some((
+                                output.feedback.dopamine_delta,
+                                output.feedback.serotonin_delta,
+                            ));
+                            #[cfg(feature = "art-observer")]
+                            {
+                                fresh_artwork_svg = output.artwork_svg.clone();
+                            }
+                            #[cfg(feature = "social-fabric")]
+                            {
+                                fresh_publish = output.published_content;
+                            }
+                        }
+                    }
+
+                    // ── Observer-ΔΨ: she looks at her own artwork ─────
+                    // (feature `art-observer`, visual-art plan "Option 2".)
+                    // A fresh visual work opens a viewing window: the render
+                    // is injected as the vision frame each cycle (entering
+                    // real perception next cycle — Phase 1.3 runs before
+                    // this phase), ψ is accumulated, and on expiry the Δψ
+                    // against the pre-viewing baseline becomes an aesthetic
+                    // verdict. First-order probe, honestly scoped: ψ moves
+                    // for many reasons over a short open-loop window, so
+                    // only positive Δψ is rewarded (see
+                    // record_observer_verdict) and the raw value is
+                    // telemetry. Shares the single vision buffer —
+                    // deployments feeding real camera frames concurrently
+                    // will interleave (documented on the feature flag).
+                    #[cfg(feature = "art-observer")]
+                    {
+                        const ART_VIEWING_CYCLES: u32 = 12;
+                        const PSI_HISTORY_LEN: usize = 8;
+
+                        // Baseline ψ history (only cycles outside a viewing
+                        // window, so the baseline isn't contaminated by the
+                        // viewing itself).
+                        if self.sensorimotor.motor_rendering.art_viewing.is_none() {
+                            let history = &mut self.sensorimotor.motor_rendering.psi_history;
+                            history.push_back(snapshot.unified_psi);
+                            while history.len() > PSI_HISTORY_LEN {
+                                history.pop_front();
+                            }
+                        }
+
+                        // Open a viewing window on a fresh artwork.
+                        if self.sensorimotor.motor_rendering.art_viewing.is_none()
+                            && !self.sensorimotor.motor_rendering.psi_history.is_empty()
+                        {
+                            if let (Some(svg), Some(bridge)) = (
+                                fresh_artwork_svg.as_deref(),
+                                self.sensorimotor.vision_sensory.vision_bridge.as_ref(),
+                            ) {
+                                let channels: u8 =
+                                    if bridge.manifold().encoder().config().enable_color {
+                                        3
+                                    } else {
+                                        1
+                                    };
+                                let frame = symthaea_art_eye::rasterize_svg_exact(
+                                    svg,
+                                    self.config.vision_frame_width,
+                                    self.config.vision_frame_height,
+                                )
+                                .ok()
+                                .and_then(|raster| {
+                                    symthaea_art_eye::to_channels(&raster, channels)
+                                });
+                                if let Some(frame) = frame {
+                                    let history = &self.sensorimotor.motor_rendering.psi_history;
+                                    let baseline_psi =
+                                        history.iter().sum::<f64>() / history.len() as f64;
+                                    self.sensorimotor.motor_rendering.art_viewing =
+                                        Some(super::motor_rendering_manager::ArtViewing {
+                                            frame,
+                                            cycles_remaining: ART_VIEWING_CYCLES,
+                                            baseline_psi,
+                                            psi_sum: 0.0,
+                                            psi_samples: 0,
+                                        });
+                                }
+                            }
+                        }
+
+                        // Tick an active viewing window.
+                        let mut completed: Option<(f64, f64)> = None;
+                        if let Some(viewing) =
+                            self.sensorimotor.motor_rendering.art_viewing.as_mut()
+                        {
+                            self.sensorimotor.vision_sensory.vision_frame_buffer =
+                                Some(viewing.frame.clone());
+                            viewing.psi_sum += snapshot.unified_psi;
+                            viewing.psi_samples += 1;
+                            viewing.cycles_remaining -= 1;
+                            if viewing.cycles_remaining == 0 {
+                                let mean_psi = viewing.psi_sum / viewing.psi_samples.max(1) as f64;
+                                completed = Some((mean_psi, viewing.baseline_psi));
+                            }
+                        }
+                        if let Some((mean_psi, baseline_psi)) = completed {
+                            self.sensorimotor.motor_rendering.art_viewing = None;
+                            let viewing_surprise = self
+                                .sensorimotor
+                                .vision_sensory
+                                .vision_bridge
+                                .as_ref()
+                                .map(|b| b.manifold().surprise_map().mean_surprise())
+                                .unwrap_or(0.0);
+                            if let Some(ref mut mgr) =
+                                self.sensorimotor.motor_rendering.creative_manager
+                            {
+                                let fb = mgr.record_observer_verdict(
+                                    (mean_psi - baseline_psi) as f32,
+                                    viewing_surprise,
+                                );
+                                if fb.dopamine_delta != 0.0 {
+                                    self.neuromod.bath.dopamine.produce(fb.dopamine_delta);
+                                }
+                            }
+                        }
+                    }
+                    if let Some((da_delta, se_delta)) = creative_feedback {
+                        if da_delta != 0.0 {
+                            self.neuromod.bath.dopamine.produce(da_delta);
+                        }
+                        if se_delta != 0.0 {
+                            self.neuromod.bath.serotonin.produce(se_delta);
+                        }
+                    }
+
+                    // Cross-agent culture sharing (2026-07-09): announce the
+                    // freshly self-authored artifact to mesh peers. This is
+                    // the send-side counterpart to the existing receive path
+                    // (SwarmEvent::ContentAnnounced below) — ContentAnnounce
+                    // ::encode() had zero callers anywhere in the codebase
+                    // before this. Mirrors the TimeBeacon emission pattern
+                    // above exactly: auth_mac/source_id are placeholders
+                    // filled downstream by the mesh bridge (this manager has
+                    // no key material and shouldn't need any — the transport
+                    // layer owns signing). MeshUrgency::Cruise (non-critical)
+                    // matches the packet's actual stakes: losing or forging
+                    // an art announcement is not safety-relevant the way a
+                    // moral-topology or critical packet would be.
+                    #[cfg(feature = "social-fabric")]
+                    if let Some(content_ref) = fresh_publish {
+                        let announce =
+                            crate::swarm::mesh::content_packet::ContentAnnounce::from_full_hdv(
+                                content_ref.content_hash,
+                                &content_ref.hdv_embedding,
+                                content_ref.domain.clone(),
+                                content_ref.created_at,
+                            );
+                        let packet = crate::swarm::mesh::WisdomPacket {
+                            source_id: [0; 8], // filled by mesh bridge
+                            sequence: 0,
+                            phi: snapshot.unified_psi as f32,
+                            urgency: crate::swarm::mesh::MeshUrgency::Cruise,
+                            timestamp_s: content_ref.created_at as u32,
+                            payload_type: crate::swarm::mesh::PayloadType::ContentAnnounce,
+                            auth_mac: 0,
+                            ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
+                            wisdom: announce.encode(),
+                        };
+                        if let Err(e) = self
+                            .mesh_outbound_tx
+                            .send(crate::swarm::mesh::MeshOutbound { packet })
+                        {
+                            tracing::debug!(
+                                error = %e,
+                                "Mesh content announce send failed — no receiver"
+                            );
                         }
                     }
                 }

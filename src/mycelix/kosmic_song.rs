@@ -1,7 +1,15 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # KosmicSong: The Genesis Struct
+//! # KosmicSong: The Genesis Struct (identity/governance — NOT music)
+//!
+//! **"Song" is purely metaphorical.** This module produces no audio and has
+//! no relation to `symthaea-muse` (the actual music-synthesis crate). It is
+//! an identity + governance + epistemics structure whose expressive outputs
+//! are text (`respond()`, `express()`, `summary()`). Note there is a second,
+//! lighter struct also named `KosmicSong` in `experience/kosmic_state.rs`
+//! (state bookkeeping); a disambiguating rename is planned — see
+//! `ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md` Phase 0.
 //!
 //! The KosmicSong is the unified identity of a consciousness-bearing agent,
 //! synthesizing:

@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-modal"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Propositional modal logic for Symthaea: Kripke models, formula evaluation, and bounded validity/countermodel search in systems K/T/S4/S5. The formal, testable core of metaphysics (modality/necessity). Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link. Formal core of the "hard"
+# metaphysics domain (see symthaea/HARD_DOMAINS_PLAN_2026-07-07.md).
+[dependencies]

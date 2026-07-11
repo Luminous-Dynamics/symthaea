@@ -21,24 +21,70 @@ midly = "0.5"
 serde_json = { workspace = true }
 bevy = { version = "0.18", default-features = false, optional = true }
 symthaea-voice = { path = "../symthaea-voice", optional = true }
+symthaea-vocal-tract = { path = "../symthaea-vocal-tract", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
+# Symbolic music theory: the "what to play" composer whose Score muse realizes.
+symthaea-music-theory = { path = "../symthaea-music-theory", optional = true }
 
 # Real-time audio output (optional)
 cpal = { version = "0.17", optional = true }
 ringbuf = { version = "0.4", optional = true }
 
+# Real Fréchet Audio Distance via a pretrained CLAP audio-tower ONNX model
+# (see src/clap_mel.rs / src/clap_embed.rs). Versions match the root crate's
+# own ort/hf-hub pins (see root Cargo.toml) to avoid duplicate-version bloat.
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }
+hf-hub = { version = "0.4", optional = true }
+anyhow = { workspace = true, optional = true }
+# CLAP text tower needs the RoBERTa tokenizer (tokenizer.json from the same
+# HF repo). Version matches the workspace's existing tokenizers pin.
+tokenizers = { version = "0.21", optional = true }
+
+# Muse Studio local web app (feature `studio`).
+axum = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
 [dev-dependencies]
+# MP3 decoding for the DEAM emotion-regressor example (real audio features)
+symphonia = { version = "0.5", default-features = false, features = ["mp3"] }
 
 [features]
 default = []
 bevy = ["dep:bevy"]
 muse-live = ["cpal", "ringbuf"]
-voice = ["symthaea-voice"]
+voice = ["symthaea-voice", "symthaea-vocal-tract"]
 voice-kokoro = ["voice", "symthaea-voice/kokoro"]
 broca = ["symthaea-broca"]
 voice-broca = ["voice-kokoro", "broca"]
+# Render a symbolic Score (from symthaea-music-theory) to audio.
+theory = ["dep:symthaea-music-theory"]
+# Real Fréchet Audio Distance via a pretrained CLAP audio-tower ONNX model.
+clap-fad = ["dep:ort", "dep:hf-hub", "dep:anyhow", "dep:tokenizers"]
+# Muse Studio: the local sketch-partner web app (src/bin/muse_studio.rs).
+# Add clap-fad on top for prompt ranking.
+studio = ["theory", "dep:axum", "dep:tokio", "dep:anyhow"]
 
 [[example]]
 name = "live_demo"
 required-features = ["muse-live"]
+
+[[example]]
+name = "theory_vs_engine"
+required-features = ["theory"]
+
+[[example]]
+name = "clap_fad_compare"
+required-features = ["clap-fad"]
+
+[[example]]
+name = "prompt_steering"
+required-features = ["clap-fad", "theory"]
+
+[[bin]]
+name = "muse_studio"
+required-features = ["studio"]
+
+[[example]]
+name = "luminous_library_hymn"
+required-features = ["theory"]
 

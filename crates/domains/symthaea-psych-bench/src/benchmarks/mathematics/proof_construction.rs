@@ -5,11 +5,29 @@
 //!
 //! Tests constructing valid logical proofs given premises and a conclusion:
 //!   1. Tautology detection: recognize P ∨ ¬P, (P → Q) → ((Q → R) → (P → R))
-//!   2. Contradiction detection: recognize P ∧ ¬P, P ∧ ¬P ∧ Q
-//!   3. Simple derivations: multi-step proof paths (MP chains, MT chains)
+//!   2. Contradiction detection: recognize P ∧ ¬P, (P ∧ ¬P) ∧ Q
+//!   3. Simple derivations: multi-step Modus Ponens chains
 //!
-//! HDC encodes each formula as a hypervector. Proof validity is tested
-//! by checking structural relationships between premise and conclusion HVs.
+//! **Engine-wired (Tier 0.1, 2026-07-06).** All three parts run the real
+//! `LogicEngine` from `symthaea-core`:
+//! - Tautology detection uses `LogicEngine::is_tautology` (exhaustive truth
+//!   table) on real `Proposition` formulas with known classifications.
+//! - Contradiction detection uses `LogicEngine::is_satisfiable` (DPLL SAT):
+//!   a formula is a contradiction iff it is UNSAT.
+//! - Derivations construct actual multi-step proofs by iterating
+//!   `LogicEngine::modus_ponens` down an implication chain, verifying each
+//!   proof step's conclusion, then cross-checking with SAT that the chain
+//!   endpoint is entailed while a fresh atom is NOT (so the prover cannot
+//!   score by endorsing everything).
+//!
+//! The previous version classified formulas by HDC hypervector norm/sign
+//! heuristics and never invoked the engine; that gap was flagged by the
+//! Phase 0 grounding audit. The HDC fingerprint classifier is retained as
+//! trial structure: its agreement with the engine-computed ground truth is
+//! reported as the auxiliary `hdc_agreement` metric (not part of accuracy).
+//!
+//! Noise model: with probability proportional to `effective_noise()`, a
+//! decision is randomized (degraded readout).
 //!
 //! Human baselines (Polya 1945):
 //! - tautology_accuracy: ~0.78 (SD~0.12) — recognizing always-true formulas
@@ -20,6 +38,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition};
 
 /// Proof Construction benchmark.
 pub struct ProofConstructionBenchmark;
@@ -30,13 +49,126 @@ fn xor_shift(s: &mut u64) {
     *s ^= *s << 17;
 }
 
-/// Formula type for proof problems.
+/// Formula classification for proof problems.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum FormulaClass {
     Tautology,
     Contradiction,
     Contingent, // neither tautology nor contradiction
 }
+
+/// Classify a real propositional formula with the REAL engine:
+/// tautology via exhaustive truth table, contradiction via DPLL UNSAT.
+fn engine_classify(prop: &Proposition) -> FormulaClass {
+    if LogicEngine::is_tautology(prop) {
+        FormulaClass::Tautology
+    } else if !LogicEngine::is_satisfiable(prop) {
+        FormulaClass::Contradiction
+    } else {
+        FormulaClass::Contingent
+    }
+}
+
+/// The labelled formula battery: real `Proposition`s with ground-truth
+/// classifications known from classical logic.
+fn formula_battery() -> Vec<(Proposition, FormulaClass)> {
+    let p = || Proposition::atom("P");
+    let q = || Proposition::atom("Q");
+    let r = || Proposition::atom("R");
+    let s = || Proposition::atom("S");
+
+    vec![
+        // Law of excluded middle: P ∨ ¬P — tautology
+        (p().or(p().not()), FormulaClass::Tautology),
+        // Same form, different atom: S ∨ ¬S — tautology
+        (s().or(s().not()), FormulaClass::Tautology),
+        // Hypothetical syllogism tautology: (P→Q)→((Q→R)→(P→R))
+        (
+            p().implies(q())
+                .implies(q().implies(r()).implies(p().implies(r()))),
+            FormulaClass::Tautology,
+        ),
+        // Non-contradiction: ¬(P ∧ ¬P) — tautology
+        (p().and(p().not()).not(), FormulaClass::Tautology),
+        // P ∧ ¬P — contradiction
+        (p().and(p().not()), FormulaClass::Contradiction),
+        // Q ∧ ¬Q — contradiction
+        (q().and(q().not()), FormulaClass::Contradiction),
+        // (P ∧ ¬P) ∧ Q — contradiction (extended)
+        (p().and(p().not()).and(q()), FormulaClass::Contradiction),
+        // P → Q — contingent
+        (p().implies(q()), FormulaClass::Contingent),
+        // P ∧ Q — contingent
+        (p().and(q()), FormulaClass::Contingent),
+        // P ∨ Q — contingent
+        (p().or(q()), FormulaClass::Contingent),
+    ]
+}
+
+/// Construct and verify a multi-step Modus Ponens derivation with the REAL
+/// natural-deduction engine.
+///
+/// Builds the chain A0 → A1 → ... → An with premise A0, derives An by
+/// iterating `LogicEngine::modus_ponens`, and verifies:
+/// 1. every MP step fires and returns a valid proof whose concluding formula
+///    matches the expected next proposition;
+/// 2. SAT cross-check: the premises entail An;
+/// 3. SAT cross-check: the premises do NOT entail a fresh atom Z (the prover
+///    must be able to say "not derivable").
+fn derive_chain_with_engine(steps: usize) -> bool {
+    let n = steps.clamp(1, 5);
+    let props: Vec<Proposition> = (0..=n)
+        .map(|i| Proposition::atom(&format!("A{}", i)))
+        .collect();
+    let implications: Vec<Proposition> = (0..n)
+        .map(|i| props[i].clone().implies(props[i + 1].clone()))
+        .collect();
+
+    // 1. Step-by-step natural deduction.
+    let mut current = props[0].clone();
+    for (i, implication) in implications.iter().enumerate() {
+        let Some(proof) = LogicEngine::modus_ponens(&current, implication) else {
+            return false; // rule failed to fire
+        };
+        if !proof.valid {
+            return false;
+        }
+        let expected = &props[i + 1];
+        let derived_formula = match proof.proof_steps.last() {
+            Some(step) => step.formula.clone(),
+            None => return false,
+        };
+        if derived_formula != format!("{}", expected) {
+            return false; // proof concluded something other than A_{i+1}
+        }
+        current = expected.clone();
+    }
+    if current != props[n] {
+        return false;
+    }
+
+    // 2. SAT cross-check: premises ∧ ¬An must be UNSAT.
+    let mut entail_check = props[n].clone().not().and(props[0].clone());
+    for imp in &implications {
+        entail_check = entail_check.and(imp.clone());
+    }
+    if LogicEngine::is_satisfiable(&entail_check) {
+        return false;
+    }
+
+    // 3. Negative control: a fresh atom Z must NOT be entailed.
+    let mut z_check = Proposition::atom("Z").not().and(props[0].clone());
+    for imp in &implications {
+        z_check = z_check.and(imp.clone());
+    }
+    if !LogicEngine::is_satisfiable(&z_check) {
+        return false; // engine claims Z is derivable — that would be wrong
+    }
+
+    true
+}
+
+// ─── HDC fingerprint classifier (retained as auxiliary trial structure) ─────
 
 /// Encode a propositional formula into HDC space.
 ///
@@ -55,9 +187,14 @@ impl ProofEncoder {
         Self { dim, base_seed }
     }
 
-    /// Atomic proposition HV for index i.
-    fn prop(&self, i: u64) -> ContinuousHV {
-        ContinuousHV::random(self.dim, self.base_seed.wrapping_add(i * 137 + 1))
+    /// Atomic proposition HV keyed by atom name.
+    fn atom_hv(&self, name: &str) -> ContinuousHV {
+        let mut h: u64 = self.base_seed;
+        for b in name.bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        ContinuousHV::random(self.dim, h.wrapping_mul(137).wrapping_add(1))
     }
 
     /// Negation of an HV.
@@ -71,140 +208,64 @@ impl ProofEncoder {
         result
     }
 
-    /// Conjunction A∧B.
-    fn and(&self, a: &ContinuousHV, b: &ContinuousHV) -> ContinuousHV {
-        a.bind(b)
-    }
-
-    /// Disjunction A∨B.
-    fn or(&self, a: &ContinuousHV, b: &ContinuousHV) -> ContinuousHV {
-        ContinuousHV::weighted_bundle(&[a, b], &[0.5, 0.5])
-    }
-
-    /// Implication A→B encoded as ¬A∨B.
-    fn implies(&self, a: &ContinuousHV, b: &ContinuousHV) -> ContinuousHV {
-        let neg_a = self.neg(a);
-        self.or(&neg_a, b)
-    }
-
-    /// Law of Excluded Middle: P ∨ ¬P (tautology).
-    fn tautology_lem(&self, p_idx: u64) -> ContinuousHV {
-        let p = self.prop(p_idx);
-        let neg_p = self.neg(&p);
-        self.or(&p, &neg_p)
-    }
-
-    /// Hypothetical Syllogism tautology: (P→Q)→((Q→R)→(P→R)).
-    fn tautology_hs(&self, p_idx: u64, q_idx: u64, r_idx: u64) -> ContinuousHV {
-        let p = self.prop(p_idx);
-        let q = self.prop(q_idx);
-        let r = self.prop(r_idx);
-        let pq = self.implies(&p, &q);
-        let qr = self.implies(&q, &r);
-        let pr = self.implies(&p, &r);
-        let qr_implies_pr = self.implies(&qr, &pr);
-        self.implies(&pq, &qr_implies_pr)
-    }
-
-    /// Contradiction: P ∧ ¬P.
-    fn contradiction_basic(&self, p_idx: u64) -> ContinuousHV {
-        let p = self.prop(p_idx);
-        let neg_p = self.neg(&p);
-        self.and(&p, &neg_p)
-    }
-
-    /// Contradiction extended: (P ∧ ¬P) ∧ Q.
-    fn contradiction_extended(&self, p_idx: u64, q_idx: u64) -> ContinuousHV {
-        let base = self.contradiction_basic(p_idx);
-        let q = self.prop(q_idx);
-        self.and(&base, &q)
+    /// Recursively encode a real `Proposition` — the HDC path now mirrors the
+    /// exact formulas fed to the engine instead of a parallel hand-built set.
+    fn encode(&self, prop: &Proposition) -> ContinuousHV {
+        match prop {
+            Proposition::Atom(name) => self.atom_hv(name),
+            Proposition::Not(inner) => self.neg(&self.encode(inner)),
+            Proposition::And(a, b) => self.encode(a).bind(&self.encode(b)),
+            Proposition::Or(a, b) => {
+                let ea = self.encode(a);
+                let eb = self.encode(b);
+                ContinuousHV::weighted_bundle(&[&ea, &eb], &[0.5, 0.5])
+            }
+            // A→B ≡ ¬A∨B
+            Proposition::Implies(a, b) => {
+                let na = self.neg(&self.encode(a));
+                let eb = self.encode(b);
+                ContinuousHV::weighted_bundle(&[&na, &eb], &[0.5, 0.5])
+            }
+            // A↔B ≡ (A→B)∧(B→A)
+            Proposition::Iff(a, b) => {
+                let ab = self.encode(&a.clone().implies(*b.clone()));
+                let ba = self.encode(&b.clone().implies(*a.clone()));
+                ab.bind(&ba)
+            }
+            // ⊤ cancels like a tautology (zero norm); ⊥ is an all-negative
+            // fingerprint like a bound contradiction.
+            Proposition::True => ContinuousHV::zero(self.dim),
+            Proposition::False => {
+                let ref_hv = ContinuousHV::random(self.dim, self.base_seed.wrapping_add(424242));
+                self.neg(&ref_hv.bind(&ref_hv))
+            }
+        }
     }
 }
 
-/// Classify a formula as tautology, contradiction, or contingent
-/// using its HDC fingerprint properties.
-///
-/// Tautologies: encode P∨¬P; due to bundling P and ¬P (which cancel in
-/// continuous HDC), the result has near-zero norm → we check norm.
-///
-/// Contradictions: encode P∧¬P via bind(P, ¬P) = -P² (all-negative components).
-/// Detected via negative similarity to a known all-positive reference vector.
-///
-/// Contingent: neither property holds.
-fn classify_formula(formula_hv: &ContinuousHV, encoder: &ProofEncoder, _seed: u64) -> FormulaClass {
-    // Squared L2 norm normalized by dimension.
-    // Random ContinuousHV values ~ U[-1,1]: E[v²] = 1/3, so norm_sq/dim ≈ 0.333.
+/// Classify a formula from its HDC fingerprint (auxiliary only):
+/// tautologies cancel under bundling (near-zero norm); basic contradictions
+/// bind P with ¬P giving all-negative components (negative similarity to an
+/// all-positive reference).
+fn hdc_classify_formula(formula_hv: &ContinuousHV, encoder: &ProofEncoder) -> FormulaClass {
     let norm_sq = formula_hv.dot(formula_hv) as f64 / encoder.dim as f64;
-
-    // Tautologies: bundling with negation causes cancellation.
-    // LEM (P∨¬P = bundle(P,-P)): exact cancellation → norm ≈ 0.
-    // HS ((P→Q)→((Q→R)→(P→R))): nested bundling → partial cancellation → norm << 0.333.
-    // Threshold 0.18 separates tautologies (< 0.05) from contradictions (≈ 0.20)
-    // and contingent (≈ 0.333).
     if norm_sq < 0.18 {
         return FormulaClass::Tautology;
     }
-
-    // Contradiction detection: bind(P, neg(P)) = P * (-P) = -P², all components negative.
-    // Create a positive reference via bind(ref, ref) = ref² (all components positive).
-    // dot(-P², ref²) < 0 because both P² and ref² are positive → similarity < 0.
-    // For contingent (random signs), dot(random, ref²) ≈ 0 → similarity ≈ 0.
     let ref_hv = ContinuousHV::random(encoder.dim, encoder.base_seed.wrapping_add(99991));
     let positive_ref = ref_hv.bind(&ref_hv);
     let sim_to_positive = formula_hv.similarity(&positive_ref) as f64;
-
-    // Basic contradiction: similarity ≈ -0.56. Extended (bind with extra term):
-    // mixed signs → similarity ≈ 0. Threshold -0.25 catches basic contradictions.
     if sim_to_positive < -0.25 {
         return FormulaClass::Contradiction;
     }
-
     FormulaClass::Contingent
-}
-
-/// Encode a derivation problem: premises + claimed conclusion.
-/// Returns (premise_bundle, correct_conclusion_hv, distractor_hv).
-fn encode_derivation(
-    steps: u32, // number of MP/MT steps in the derivation
-    encoder: &ProofEncoder,
-    rng: &mut u64,
-) -> (ContinuousHV, ContinuousHV, ContinuousHV) {
-    // Build a chain: P0 → P1 → P2 → ... → Pn
-    // Given P0, derive Pn via n applications of Modus Ponens
-    let n = (steps as usize).min(5);
-    let props: Vec<ContinuousHV> = (0..=n)
-        .map(|i| {
-            xor_shift(rng);
-            ContinuousHV::random(encoder.dim, *rng ^ (i as u64 * 13))
-        })
-        .collect();
-
-    // Bundle all implications P_i → P_{i+1} as premises
-    let implications: Vec<ContinuousHV> = (0..n)
-        .map(|i| encoder.implies(&props[i], &props[i + 1]))
-        .collect();
-
-    // Include initial proposition P0 as a premise
-    let mut premise_refs: Vec<&ContinuousHV> = implications.iter().collect();
-    premise_refs.push(&props[0]);
-    let weights = vec![1.0f32 / premise_refs.len() as f32; premise_refs.len()];
-    let premise_bundle = ContinuousHV::weighted_bundle(&premise_refs, &weights);
-
-    // Correct conclusion: Pn (end of chain)
-    let correct_conclusion = props[n].clone();
-
-    // Distractor: Pk for some k ≠ n (wrong step)
-    xor_shift(rng);
-    let k = (*rng % n as u64) as usize; // k < n → wrong
-    let distractor = props[k].clone();
-
-    (premise_bundle, correct_conclusion, distractor)
 }
 
 struct ProofTrial {
     tautology_accuracy: f64,
     contradiction_accuracy: f64,
     derivation_accuracy: f64,
+    hdc_agreement: f64,
 }
 
 impl ProofConstructionBenchmark {
@@ -215,131 +276,75 @@ impl ProofConstructionBenchmark {
         let noise_weight = config.effective_noise();
 
         let encoder = ProofEncoder::new(dim, seed);
+        let battery = formula_battery();
 
-        // ── Part 1: Tautology Detection ──
-        let tautologies = [
-            encoder.tautology_lem(1),
-            encoder.tautology_lem(2),
-            encoder.tautology_hs(1, 2, 3),
-            encoder.tautology_hs(4, 5, 6),
-        ];
-        // Contingent formulas as foils
-        xor_shift(&mut rng);
-        let contingents = [ContinuousHV::random(dim, rng), {
-            xor_shift(&mut rng);
-            ContinuousHV::random(dim, rng)
-        }];
-
+        // ── Parts 1 & 2: Tautology / Contradiction Detection (real engine) ──
         let mut taut_hits = 0u32;
         let mut taut_total = 0u32;
-
-        for taut_hv in &tautologies {
-            let mut hv = taut_hv.clone();
-            if noise_weight > 0.0 {
-                xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                hv = ContinuousHV::weighted_bundle(
-                    &[&hv, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
-            }
-            let class = classify_formula(&hv, &encoder, seed);
-            taut_total += 1;
-            if class == FormulaClass::Tautology {
-                taut_hits += 1;
-            }
-        }
-        // Foils: contingent formulas should NOT be classified as tautologies
-        for cont_hv in &contingents {
-            let mut hv = cont_hv.clone();
-            if noise_weight > 0.0 {
-                xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                hv = ContinuousHV::weighted_bundle(
-                    &[&hv, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
-            }
-            let class = classify_formula(&hv, &encoder, seed);
-            taut_total += 1;
-            if class != FormulaClass::Tautology {
-                taut_hits += 1; // Correctly rejected
-            }
-        }
-        let tautology_accuracy = taut_hits as f64 / taut_total as f64;
-
-        // ── Part 2: Contradiction Detection ──
-        let contradictions = [
-            encoder.contradiction_basic(1),
-            encoder.contradiction_basic(2),
-            encoder.contradiction_extended(3, 4),
-        ];
-
         let mut contr_hits = 0u32;
         let mut contr_total = 0u32;
+        let mut hdc_agree = 0u32;
+        let mut hdc_total = 0u32;
 
-        for contr_hv in &contradictions {
-            let mut hv = contr_hv.clone();
+        for (formula, truth) in &battery {
+            // REAL ENGINE decision (truth table + DPLL).
+            let mut decided = engine_classify(formula);
+
+            // Noise: degraded readout randomizes the classification.
             if noise_weight > 0.0 {
                 xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                hv = ContinuousHV::weighted_bundle(
-                    &[&hv, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
+                if (rng as f64 / u64::MAX as f64) < noise_weight * 0.6 {
+                    xor_shift(&mut rng);
+                    decided = match rng % 3 {
+                        0 => FormulaClass::Tautology,
+                        1 => FormulaClass::Contradiction,
+                        _ => FormulaClass::Contingent,
+                    };
+                }
             }
-            let class = classify_formula(&hv, &encoder, seed);
+
+            // Tautology detection: hits on tautologies AND correct rejection
+            // of non-tautologies (foils), mirroring the original scoring.
+            taut_total += 1;
+            if (decided == FormulaClass::Tautology) == (*truth == FormulaClass::Tautology) {
+                taut_hits += 1;
+            }
+            // Contradiction detection likewise.
             contr_total += 1;
-            if class == FormulaClass::Contradiction {
+            if (decided == FormulaClass::Contradiction) == (*truth == FormulaClass::Contradiction) {
                 contr_hits += 1;
             }
-        }
-        // Foils: tautologies should NOT be classified as contradictions
-        for taut_hv in tautologies.iter().take(2) {
-            let mut hv = taut_hv.clone();
-            if noise_weight > 0.0 {
-                xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                hv = ContinuousHV::weighted_bundle(
-                    &[&hv, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
-            }
-            let class = classify_formula(&hv, &encoder, seed);
-            contr_total += 1;
-            if class != FormulaClass::Contradiction {
-                contr_hits += 1;
+
+            // Auxiliary: HDC fingerprint agreement with ground truth.
+            let hv = encoder.encode(formula);
+            hdc_total += 1;
+            if hdc_classify_formula(&hv, &encoder) == *truth {
+                hdc_agree += 1;
             }
         }
+
+        let tautology_accuracy = taut_hits as f64 / taut_total as f64;
         let contradiction_accuracy = contr_hits as f64 / contr_total as f64;
+        let hdc_agreement = hdc_agree as f64 / hdc_total as f64;
 
-        // ── Part 3: Derivation Accuracy ──
-        // Multi-step MP chains; check if system picks correct vs distractor conclusion
+        // ── Part 3: Derivation Accuracy (real natural deduction) ──
         let mut deriv_hits = 0u32;
         let mut deriv_total = 0u32;
 
-        for steps in [2u32, 3, 4, 5] {
-            xor_shift(&mut rng);
-            let (premise_bundle, correct_conclusion, distractor) =
-                encode_derivation(steps, &encoder, &mut rng);
+        for steps in [2usize, 3, 4, 5] {
+            let mut ok = derive_chain_with_engine(steps);
 
-            let mut pb = premise_bundle;
+            // Noise: degraded readout invalidates the derivation.
             if noise_weight > 0.0 {
                 xor_shift(&mut rng);
-                let noise = ContinuousHV::random(dim, rng);
-                pb = ContinuousHV::weighted_bundle(
-                    &[&pb, &noise],
-                    &[1.0 - noise_weight as f32, noise_weight as f32],
-                );
+                if (rng as f64 / u64::MAX as f64) < noise_weight * 0.6 {
+                    xor_shift(&mut rng);
+                    ok = rng % 2 == 0;
+                }
             }
 
-            let sim_correct = pb.similarity(&correct_conclusion) as f64;
-            let sim_distractor = pb.similarity(&distractor) as f64;
-
             deriv_total += 1;
-            // Correct conclusion should be more similar to the premise bundle
-            // (it is derivable from the chain; distractor is a partial step)
-            if sim_correct > sim_distractor {
+            if ok {
                 deriv_hits += 1;
             }
         }
@@ -349,6 +354,7 @@ impl ProofConstructionBenchmark {
             tautology_accuracy,
             contradiction_accuracy,
             derivation_accuracy,
+            hdc_agreement,
         }
     }
 }
@@ -374,12 +380,14 @@ impl PsychBenchmark for ProofConstructionBenchmark {
         let mut taut_accs = Vec::new();
         let mut contr_accs = Vec::new();
         let mut deriv_accs = Vec::new();
+        let mut hdc_agreements = Vec::new();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
             taut_accs.push(r.tautology_accuracy);
             contr_accs.push(r.contradiction_accuracy);
             deriv_accs.push(r.derivation_accuracy);
+            hdc_agreements.push(r.hdc_agreement);
         }
 
         result.insert("tautology_accuracy", MetricValue::from_samples(&taut_accs));
@@ -391,6 +399,7 @@ impl PsychBenchmark for ProofConstructionBenchmark {
             "derivation_accuracy",
             MetricValue::from_samples(&deriv_accs),
         );
+        result.insert("hdc_agreement", MetricValue::from_samples(&hdc_agreements));
 
         result.conditions = 3; // tautology, contradiction, derivation
         result.trials_per_condition = config.trials_per_condition;
@@ -417,6 +426,7 @@ mod tests {
         assert!(result.metrics.contains_key("tautology_accuracy"));
         assert!(result.metrics.contains_key("contradiction_accuracy"));
         assert!(result.metrics.contains_key("derivation_accuracy"));
+        assert!(result.metrics.contains_key("hdc_agreement"));
     }
 
     #[test]
@@ -447,5 +457,67 @@ mod tests {
             "Tautology accuracy should be above 0.3, got {}",
             acc
         );
+    }
+
+    /// Proves the REAL engine is invoked: at zero noise the truth-table /
+    /// DPLL classifier and the natural-deduction prover must be perfect —
+    /// the old HDC norm heuristic could not classify the whole battery.
+    #[test]
+    fn test_engine_perfect_at_zero_noise() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 4,
+            encoding_noise: 0.0,
+            time_pressure: 0.0,
+            ..Default::default()
+        };
+        let result = ProofConstructionBenchmark.run(&config);
+        assert_eq!(result.metrics["tautology_accuracy"].mean, 1.0);
+        assert_eq!(result.metrics["contradiction_accuracy"].mean, 1.0);
+        assert_eq!(result.metrics["derivation_accuracy"].mean, 1.0);
+    }
+
+    /// Proves the benchmark CAN fail: contingent formulas are neither
+    /// tautologies nor contradictions, and a broken derivation (wrong
+    /// endpoint) is rejected by the engine cross-checks.
+    #[test]
+    fn test_wrong_answers_score_low() {
+        let p = Proposition::atom("P");
+        let q = Proposition::atom("Q");
+
+        // Wrong claim: "P→Q is a tautology" — engine must reject.
+        assert_eq!(
+            engine_classify(&p.clone().implies(q.clone())),
+            FormulaClass::Contingent
+        );
+        // Wrong claim: "P∨Q is a contradiction" — engine must reject.
+        assert_eq!(
+            engine_classify(&p.clone().or(q.clone())),
+            FormulaClass::Contingent
+        );
+
+        // A chain premised on A0 does NOT entail an unrelated atom: the
+        // negative control inside derive_chain_with_engine enforces this.
+        // Directly: A0 ∧ (A0→A1) ∧ ¬Z must be satisfiable.
+        let a0 = Proposition::atom("A0");
+        let a1 = Proposition::atom("A1");
+        let z = Proposition::atom("Z");
+        let check = z.not().and(a0.clone()).and(a0.implies(a1));
+        assert!(
+            LogicEngine::is_satisfiable(&check),
+            "unrelated atom must not be entailed"
+        );
+    }
+
+    /// The multi-step natural-deduction path genuinely constructs proofs.
+    #[test]
+    fn test_mp_chain_derivation_succeeds() {
+        for steps in [1usize, 2, 3, 4, 5] {
+            assert!(
+                derive_chain_with_engine(steps),
+                "MP chain of {} steps must derive its endpoint",
+                steps
+            );
+        }
     }
 }

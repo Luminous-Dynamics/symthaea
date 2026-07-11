@@ -1165,3 +1165,44 @@ pub const SUBSYSTEM_REST_REQUEST_LR_SCALE: f32 = 0.9;
 
 /// Exploration nudge for subsystem exploration request.
 pub const SUBSYSTEM_EXPLORATION_REQUEST_NUDGE: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CREATIVE CORTICAL REGION ACTIVATION (telemetry bridge → CorticalActivationMap)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Baseline Creative-region activation: idle creative cortex resting tone.
+/// Matches the prior placeholder heuristic's floor so telemetry stays comparable.
+#[cfg(all(
+    feature = "neural_validation",
+    any(feature = "creative", feature = "canvas")
+))]
+pub const CREATIVE_REGION_BASELINE: f32 = 0.2;
+
+/// Transient burst when the CreativeManager generated an artifact this cycle.
+/// Largest component: active generation is the strongest creative signal.
+#[cfg(all(feature = "neural_validation", feature = "creative"))]
+pub const CREATIVE_REGION_GENERATION_BURST: f32 = 0.4;
+
+/// Gain on the creative aesthetic EMA — slow tonic component reflecting how
+/// aesthetically successful recent output has been.
+#[cfg(all(feature = "neural_validation", feature = "creative"))]
+pub const CREATIVE_REGION_AESTHETIC_GAIN: f32 = 0.3;
+
+/// Gain on generate-evaluate iteration count — deliberate refinement effort.
+#[cfg(all(feature = "neural_validation", feature = "creative"))]
+pub const CREATIVE_REGION_REFINEMENT_GAIN: f32 = 0.1;
+
+/// Iteration count that saturates the refinement component (atelier's
+/// iterative generator typically runs 1–5 cycles).
+#[cfg(all(feature = "neural_validation", feature = "creative"))]
+pub const CREATIVE_REGION_REFINEMENT_NORM: f32 = 4.0;
+
+/// Burst for a fresh canvas frame — weaker than the creative burst because
+/// the canvas is a passive rendering of state, not deliberate art.
+#[cfg(all(feature = "neural_validation", feature = "canvas"))]
+pub const CANVAS_REGION_GENERATION_BURST: f32 = 0.2;
+
+/// Gain on the canvas aesthetic EMA (weaker than the creative path for the
+/// same reason as the burst).
+#[cfg(all(feature = "neural_validation", feature = "canvas"))]
+pub const CANVAS_REGION_AESTHETIC_GAIN: f32 = 0.2;

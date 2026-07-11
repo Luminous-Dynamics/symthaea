@@ -28,6 +28,7 @@
 //! - [`z3_to_lean`]: Z3 SMT-LIB2 → Lean proof script.
 //! - [`runner`]: subprocess wrapper around `lean4 --check`.
 
+pub mod axiom_gate; // End-to-end axiom-provenance + spec gate via symthaea-proof-audit
 pub mod bridge;
 pub mod fol_ext_bridge; // Phase 2: FolFormulaExt → Lean proof script w/ Mathlib
 pub mod minif2f_ingest; // Phase 4: miniF2F-v2 automated parser + translator

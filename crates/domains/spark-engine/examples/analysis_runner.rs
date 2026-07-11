@@ -12,18 +12,15 @@
 //! 6. Generate experimental program
 //! 7. Output comprehensive report
 
-use spark_engine::anomaly::AnomalyAnalysis;
 use spark_engine::constants::*;
 use spark_engine::experimental_design::ExperimentDesigner;
 use spark_engine::hypothesis_models::{
     HotSpotModel, HypothesisComparison, PhononCascadeModel, SuperScreeningModel,
 };
-use spark_engine::literature::{LiteratureDatabase, PatternAnalysis};
+use spark_engine::literature::LiteratureDatabase;
 use spark_engine::physics::GamowIntegration;
 use spark_engine::prelude::*;
-use spark_engine::rate_gap::{
-    ExperimentalConditions, HostMaterial, RateGapCalculator, TriggerType,
-};
+use spark_engine::rate_gap::{ExperimentalConditions, RateGapCalculator};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -123,20 +120,18 @@ fn main() {
             .effects
             .iter()
             .find(|e| matches!(e, spark_engine::literature::ObservedEffect::Neutrons { .. }))
-        {
-            if let spark_engine::literature::ObservedEffect::Neutrons {
+            && let spark_engine::literature::ObservedEffect::Neutrons {
                 rate_per_s,
                 energy_mev,
             } = effect
-            {
-                println!(
-                    "    Rate: {:.0} n/s, Energy: {} MeV",
-                    rate_per_s,
-                    energy_mev
-                        .map(|e| format!("{:.2}", e))
-                        .unwrap_or("unknown".to_string())
-                );
-            }
+        {
+            println!(
+                "    Rate: {:.0} n/s, Energy: {} MeV",
+                rate_per_s,
+                energy_mev
+                    .map(|e| format!("{:.2}", e))
+                    .unwrap_or("unknown".to_string())
+            );
         }
     }
     println!();

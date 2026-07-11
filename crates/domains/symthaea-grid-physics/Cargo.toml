@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-grid-physics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Standalone electrical-grid physics: battery SoC/degradation, radial feeder power flow (backward-forward sweep), droop control, IEEE 1547 trip envelopes, and passive islanding detection. No symthaea-core dependency — pure physics, structured like the standalone orbital-mechanics crate (mycelix-workspace/crates/orbital-mechanics)."
+
+# Deliberately zero consciousness-stack dependency: this is pure electrical
+# engineering (battery/feeder/droop/trip-envelope/islanding models), usable
+# and testable in complete isolation from the HDC/LTC/IIT stack. Consumed as
+# an optional simulator backend by symthaea-infrastructure.
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

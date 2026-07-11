@@ -29,6 +29,17 @@ const R: [[f32; 2]; NUM_STATE_CHANNELS] = [
     [0.0, 20.0],
     [0.0, 5.0],
     [0.0, 1.0],
+    // Orbital state (added with real two-body propagation): position/velocity
+    // ranges cover LEO through GEO with margin; out-of-range values still
+    // encode safely (the loop below clamps the normalized fraction to
+    // [0,1], it doesn't panic or wrap).
+    [-45000.0, 45000.0], // position_km[0]
+    [-45000.0, 45000.0], // position_km[1]
+    [-45000.0, 45000.0], // position_km[2]
+    [-10.0, 10.0],       // velocity_km_s[0]
+    [-10.0, 10.0],       // velocity_km_s[1]
+    [-10.0, 10.0],       // velocity_km_s[2]
+    [0.0, 40000.0],      // altitude_km
 ];
 pub struct OrbitalHdcEncoder {
     base: Vec<ContinuousHV>,

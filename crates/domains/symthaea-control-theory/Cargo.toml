@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-control-theory"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Control-theory layer for Symthaea: PID controllers, second-order response (damping/overshoot/settling), and Routh-Hurwitz stability. Connects to the robotics platforms. Closed-form, ground-truth-checked."
+
+[dependencies]

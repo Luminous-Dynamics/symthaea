@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-pragmatics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Linguistic pragmatics for Symthaea: speech-act classification (Searle), presupposition-trigger detection, and deixis resolution. The formal, rule-based core of pragmatics/discourse. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link. Rule-based formal core of
+# the "hard" pragmatics domain (see symthaea/HARD_DOMAINS_PLAN_2026-07-07.md).
+# Richer intent/implicature inference wires into the main crate's ToM + NSM +
+# Broca; this crate deliberately does NOT reimplement those.
+[dependencies]

@@ -471,8 +471,38 @@ impl CognitiveLoopService {
         let enable_primitive_consciousness = config.enable_primitive_consciousness;
         let moral_anomaly_config = config.moral_anomaly_config.clone();
 
+        // Spawn the semantic-encoder background channel. (Before 2026-07-09 the
+        // flag was captured here and never used — the channel stayed None and
+        // `enable_semantic_encoder` was decorative; found by the E1 causal-load
+        // audit, fixed as part of OMI-1/2 open-model grounding.)
         #[cfg(feature = "semantic-encoder")]
-        let enable_semantic_encoder = config.enable_semantic_encoder;
+        let (semantic_channel, semantic_bridge) = if config.enable_semantic_encoder {
+            let qcfg = match &config.semantic_encoder_ollama {
+                Some(model) => symthaea_embeddings::Qwen3Config::ollama(
+                    model.clone(),
+                    symthaea_embeddings::ollama::EMBEDDINGGEMMA_DIMENSION,
+                ),
+                None => symthaea_embeddings::Qwen3Config::simulated(),
+            };
+            let input_dim = qcfg.embedding_dim;
+            match symthaea_embeddings::channel::EmbeddingChannel::spawn(qcfg) {
+                Ok(ch) => {
+                    let bridge = symthaea_embeddings::HdcBridge::with_config(
+                        symthaea_embeddings::BridgeConfig {
+                            input_dim,
+                            ..Default::default()
+                        },
+                    );
+                    (Some(ch), Some(bridge))
+                }
+                Err(e) => {
+                    eprintln!("semantic-encoder: channel spawn failed ({e}); running without");
+                    (None, None)
+                }
+            }
+        } else {
+            (None, None)
+        };
 
         #[cfg(feature = "vision-manifold")]
         let cross_manifold_predictor_init =
@@ -553,7 +583,6 @@ impl CognitiveLoopService {
         let knowledge_search_top_k = config.knowledge_search_top_k;
         let knowledge_ontology_max = config.knowledge_ontology_max;
         let knowledge_db_path = config.knowledge_db_path.clone();
-        let enable_streaming_inference = config.enable_streaming_inference;
 
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
         let (safety_alert_tx, safety_alert_rx) =
@@ -895,9 +924,9 @@ impl CognitiveLoopService {
                 #[cfg(feature = "neural-bridge")]
                 neural_bridge: None,
                 #[cfg(feature = "semantic-encoder")]
-                semantic_embedding_channel: None,
+                semantic_embedding_channel: semantic_channel,
                 #[cfg(feature = "semantic-encoder")]
-                semantic_hdc_bridge: None,
+                semantic_hdc_bridge: semantic_bridge,
                 #[cfg(feature = "semantic-encoder")]
                 pending_semantic_rx: std::sync::Mutex::new(None),
                 #[cfg(feature = "semantic-encoder")]
@@ -1017,8 +1046,13 @@ impl CognitiveLoopService {
                 MasterConsciousnessEquation::default(),
             ),
             substrate_manager,
-            metabolic_conductor: None,
-            threshold_overrides: super::threshold_overrides::ThresholdOverrides::default(),
+
+            // Tier 1.2 CLS threshold-phenotype promotion path: checks
+            // SYMTHAEA_THRESHOLD_OVERRIDES_PATH for a human-promoted evolved
+            // phenotype, falling back to compile-time defaults if unset,
+            // missing, or invalid (never panics). See threshold_overrides.rs
+            // and cls_evolution_harness.rs module docs.
+            threshold_overrides: super::threshold_overrides::ThresholdOverrides::from_env(),
             #[cfg(feature = "jepa")]
             jepa_engine: None,
             #[cfg(feature = "neural_validation")]
@@ -1106,6 +1140,12 @@ impl CognitiveLoopService {
             trust_manager: super::managers::TrustManager::new("self".to_string(), true),
             #[cfg(feature = "social-fabric")]
             social_fabric_manager: super::managers::SocialFabricManager::new(true),
+            #[cfg(feature = "social-fabric")]
+            memetic_immune: symthaea_memetics::MemeticImmuneSystem::new(
+                // Neutral initial belief; becomes the running bundle of accepted memes.
+                symthaea_core::hdc::BinaryHV::random(0x5EED_BEEF),
+                1.0,
+            ),
             #[cfg(feature = "survival")]
             survival_manager: super::managers::SurvivalManager::new(true),
             #[cfg(feature = "integrity")]

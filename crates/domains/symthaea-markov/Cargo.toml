@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-markov"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Markov-chain / stochastic-process layer for Symthaea: discrete-time chains, n-step and stationary distributions, and absorbing-chain analysis (fundamental matrix, expected steps to absorption, absorption probabilities). Pure-std, ground-truth-checked."
+
+# Pure-std (only depends on the sibling pure-std linalg crate), no symthaea-core link.
+[dependencies]
+symthaea-linalg = { path = "../symthaea-linalg" }

@@ -3,7 +3,10 @@
 use crate::controller::SurgicalController;
 use crate::encoder::SurgicalHdcEncoder;
 use crate::simulator::{SimpleSurgicalSimulator, SurgicalPhysicsSimulator};
-use crate::types::{NUM_ACTUATORS, SurgicalConfig, surgical_cautery_allowed, surgical_torque_gain};
+use crate::types::{
+    NUM_ACTUATORS, SurgicalConfig, surgical_cautery_allowed, surgical_tip_speed_limit,
+    surgical_torque_gain,
+};
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
     MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
@@ -131,6 +134,11 @@ impl SurgicalEmbodiment {
             cmd.cautery = 0.0;
         }
         self.last_control_effort = cmd.control_effort();
+        // Per-tier tip speed cap, enforced inside the physics step (joint
+        // velocities are scaled whenever the kinematic tip velocity would
+        // exceed the tier's mm/s allowance).
+        self.simulator
+            .set_tip_speed_limit(surgical_tip_speed_limit(self.current_safety));
         self.simulator.step(&cmd, dt as f64);
         let p = self.encoder.encode(self.simulator.state());
         let pe = if let Some(ref prev) = self.last_perception {
@@ -403,6 +411,31 @@ mod tests {
         // Cautery capability check at the safety layer (policy-level assertion).
         assert!(!surgical_cautery_allowed(r.safety_level));
         assert_eq!(b.simulator.state().cautery_power, 0.0);
+    }
+
+    #[test]
+    fn test_tip_speed_limit_follows_tier() {
+        // Yellow tier must arm the simulator with the Yellow (20 mm/s) cap —
+        // strictly below the Green allowance. The cap's physical enforcement
+        // is proven in simulator::tests::test_tip_speed_clamp_enforced; this
+        // verifies the tier→cap wiring, then that measured tip speed under a
+        // sustained Yellow-tier run indeed stays below the Green limit.
+        let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("speed"));
+        let hv = ContinuousHV::random(16384, 42);
+        let green = surgical_tip_speed_limit(MotorSafetyLevel::Green);
+        let yellow = surgical_tip_speed_limit(MotorSafetyLevel::Yellow);
+        let mut max_speed = 0.0f64;
+        for _ in 0..300 {
+            let r = b.step(&hv, 0.001, 0.45); // Yellow band
+            assert_eq!(r.safety_level, MotorSafetyLevel::Yellow);
+            max_speed = max_speed.max(b.simulator.last_tip_speed());
+        }
+        assert_eq!(b.simulator.tip_speed_limit(), yellow);
+        assert!(
+            max_speed <= yellow + 1e-6,
+            "Yellow-tier tip speed {max_speed:.1} mm/s must stay below the cap"
+        );
+        assert!(max_speed < green);
     }
 
     #[test]

@@ -141,9 +141,6 @@ pub struct CognitiveLoopConfig {
     /// modulates the curiosity drive's boredom threshold to seek novel states.
     pub enable_surprise_exploration: bool,
 
-    /// Enable metabolic conductor for Mk0 hardware coordination.
-    pub enable_metabolic_conductor: bool,
-
     /// Enable prefrontal cortex executive control.
     /// When true, the cognitive loop maintains a working memory of recent inputs
     /// and uses prefrontal gating to modulate learning and exploration.
@@ -161,6 +158,14 @@ pub struct CognitiveLoopConfig {
     /// self-model (proto/core/autobio). Each cycle's experience is processed
     /// and self-Φ is used to modulate reasoning confidence.
     pub enable_narrative_self: bool,
+
+    /// Enable background autobiography narration.
+    /// When true (and `enable_narrative_self` is also true), a background
+    /// thread periodically turns `life_story` episodes into narrated prose
+    /// via an LLM backend (Ollama). Off by default: unlike `narrative_self`
+    /// itself, this spawns a thread and makes network calls, so it is an
+    /// explicit opt-in rather than bundled into the narrative-self default.
+    pub enable_autobiography_narration: bool,
 
     /// Enable virtual body for embodied cognition.
     /// When true, the cognitive loop maintains a virtual interoceptive body
@@ -407,6 +412,20 @@ pub struct CognitiveLoopConfig {
     /// Default: false.
     #[cfg(feature = "semantic-encoder")]
     pub enable_semantic_encoder: bool,
+
+    /// Ollama model for the semantic encoder background thread (e.g.
+    /// "embeddinggemma:300m", the approved local embedding model, 768-D).
+    /// None = simulated embedder (prior behavior). Only meaningful with
+    /// `enable_semantic_encoder`. Default: None.
+    #[cfg(feature = "semantic-encoder")]
+    pub semantic_encoder_ollama: Option<String>,
+
+    /// Blend weight mixing the semantic-encoder HV into the thought HV fed to
+    /// the embodiment bridge (0.0 = pure trigram encoding / prior behavior,
+    /// 1.0 = pure semantic). The semantic HV is one cycle stale by design
+    /// (background thread). Requires `enable_semantic_encoder`. Default: 0.0.
+    #[cfg(feature = "semantic-encoder")]
+    pub semantic_thought_blend: f32,
 
     /// Enable validation overlay: scales substrate feasibility by honest evidence confidence.
     /// When enabled, effective_feasibility = raw × (floor + (1 − floor) × honest_confidence).
@@ -671,12 +690,6 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub knowledge_db_path: Option<String>,
 
-    /// Enable streaming inference engine for real-time CfC network inference.
-    /// When enabled, perception encodings are pushed each cycle and outputs polled.
-    /// Default: false (inference engine not spawned).
-    #[serde(default)]
-    pub enable_streaming_inference: bool,
-
     /// Enable FHE collective wisdom pool for privacy-preserving peer learning.
     /// Feature-gated behind `fhe-wisdom`.
     #[cfg(feature = "fhe-wisdom")]
@@ -853,10 +866,11 @@ impl Default for CognitiveLoopConfig {
             epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: true,
-            enable_metabolic_conductor: false,
+
             enable_prefrontal: true,
             enable_meta_cognition: true,
             enable_narrative_self: true,
+            enable_autobiography_narration: false,
             enable_virtual_body: true,
             enable_predictive_self: true,
             enable_attention_schema: true,
@@ -901,6 +915,10 @@ impl Default for CognitiveLoopConfig {
             enable_moral_anomaly_response: false,
             #[cfg(feature = "semantic-encoder")]
             enable_semantic_encoder: false,
+            #[cfg(feature = "semantic-encoder")]
+            semantic_encoder_ollama: None,
+            #[cfg(feature = "semantic-encoder")]
+            semantic_thought_blend: 0.0,
             enable_validation_overlay: false,
             validation_skepticism_floor: 0.5,
             enable_substrate_speed_modulation: false,
@@ -971,7 +989,7 @@ impl Default for CognitiveLoopConfig {
             knowledge_search_top_k: 5,
             knowledge_ontology_max: 500,
             knowledge_db_path: None,
-            enable_streaming_inference: false,
+
             #[cfg(feature = "fhe-wisdom")]
             fhe_wisdom_enabled: false,
             #[cfg(feature = "fhe-wisdom")]
@@ -1312,6 +1330,15 @@ impl CognitiveLoopConfig {
             warnings.push(
                 "enable_predictive_self without enable_narrative_self: \
                  self-model observation will be disabled"
+                    .into(),
+            );
+        }
+
+        // autobiography narrator reads narrative_self.autobio.life_story
+        if self.enable_autobiography_narration && !self.enable_narrative_self {
+            warnings.push(
+                "enable_autobiography_narration without enable_narrative_self: \
+                 there is no life_story to narrate"
                     .into(),
             );
         }

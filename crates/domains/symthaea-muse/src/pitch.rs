@@ -371,7 +371,9 @@ fn expand_cents_to_range(cents: &[f32], state: &MusicalState) -> Vec<f32> {
 
 /// Semitone intervals from root for each harmony.
 /// These map the Eight Harmonies to characteristic musical intervals.
-const HARMONY_INTERVALS: [i32; 8] = [
+/// This is the CANONICAL copy — other modules (e.g. wake_protocol) must use
+/// it rather than redeclaring, so the mapping can't drift.
+pub const HARMONY_INTERVALS: [i32; 8] = [
     0,  // ResonantCoherence → Unison (perfect consonance)
     4,  // PanSentientFlourishing → Major 3rd (warmth)
     7,  // IntegralWisdom → Perfect 5th (stability)

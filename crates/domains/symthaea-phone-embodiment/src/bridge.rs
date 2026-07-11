@@ -127,10 +127,29 @@ impl PhoneBridge {
         let rgb = resized.to_rgb8();
         let pixels: Vec<u8> = rgb.into_raw();
 
+        Ok(self.observe_pixels(&pixels, dt))
+    }
+
+    /// Observe an externally supplied RGB frame (already at the vision target
+    /// resolution). Both screenshot capture paths route through this; callers
+    /// that source frames elsewhere (e.g., scrcpy/RDP streams) can use it
+    /// directly.
+    ///
+    /// Updates the perception HV and prediction error reported by
+    /// `encode_perception()` / `step_embodiment()` — these fields were
+    /// previously never written, leaving the cognitive loop blind (constant
+    /// zero HV, constant 0.0 PE).
+    pub fn observe_pixels(
+        &mut self,
+        pixels: &[u8],
+        dt: f32,
+    ) -> symthaea_vision_manifold::VisionTelemetry {
         let tel = self
             .vision
-            .observe_frame(&pixels, self.target_w, self.target_h, 3, dt);
-        Ok(tel)
+            .observe_frame(pixels, self.target_w, self.target_h, 3, dt);
+        self.last_perception = Some(self.vision.state().clone());
+        self.last_prediction_error = tel.prediction_error;
+        tel
     }
 
     /// Capture a screenshot, observe through the vision manifold, AND return the
@@ -158,9 +177,7 @@ impl PhoneBridge {
             image::imageops::FilterType::Triangle,
         );
         let rgb_pixels: Vec<u8> = resized.to_rgb8().into_raw();
-        let tel = self
-            .vision
-            .observe_frame(&rgb_pixels, self.target_w, self.target_h, 3, dt);
+        let tel = self.observe_pixels(&rgb_pixels, dt);
 
         // Native-resolution RGBA copy for RDP codec.
         let rgba_pixels: Vec<u8> = img.to_rgba8().into_raw();
@@ -774,5 +791,37 @@ mod tests {
     fn test_confirmation_mode_default_on() {
         let phone = PhoneBridge::new("test", 1008, 2244);
         assert!(phone.confirmation_mode());
+    }
+
+    #[test]
+    fn test_observation_populates_perception_and_pe() {
+        // Regression: last_perception/last_prediction_error were never
+        // written by the capture path, so encode_perception() returned a
+        // constant zero HV and PE stayed 0.0 — the loop was blind. Inject
+        // frames directly (no device needed) and assert both fields go live.
+        let mut phone = PhoneBridge::new("test", 1008, 2244);
+
+        // Frame 1: flat gray
+        let frame_a = vec![128u8; 64 * 64 * 3];
+        phone.observe_pixels(&frame_a, 0.033);
+
+        use symthaea_core::embodiment::EmbodimentBridge;
+        let p = phone.encode_perception();
+        assert!(
+            p.as_slice().iter().any(|v| *v != 0.0),
+            "perception HV must be non-zero after an observation"
+        );
+
+        // Frame 2: strongly different content — PE must be finite, >= 0
+        let mut frame_b = vec![0u8; 64 * 64 * 3];
+        for (i, px) in frame_b.iter_mut().enumerate() {
+            *px = ((i * 7) % 256) as u8;
+        }
+        phone.observe_pixels(&frame_b, 0.033);
+        assert!(
+            phone.last_prediction_error.is_finite() && phone.last_prediction_error >= 0.0,
+            "prediction error must be a live, finite signal, got {}",
+            phone.last_prediction_error
+        );
     }
 }

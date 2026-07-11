@@ -7,6 +7,8 @@
 //! preparing raw web data for epistemic verification.
 
 use anyhow::Result;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use scraper::{Html, Selector};
 
 /// Extracted content from a web page
@@ -58,6 +60,40 @@ pub enum ContentType {
     /// Unknown type
     Unknown,
 }
+
+/// A candidate numeric series (table row, list of measurements, sequence
+/// mentioned in prose) pulled out of extracted text.
+///
+/// This is a *best-effort structural* extraction — it makes no claim about
+/// whether the numbers are accurate. Downstream consumers (e.g. the
+/// Conjecture Engine feeder in `conjecture_feed.rs`) are responsible for
+/// combining this with epistemic verification (`verifier.rs`) before
+/// treating the series as trustworthy input.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NumericSeries {
+    /// The line/sentence the numbers were found in, kept for audit trail.
+    pub context: String,
+    /// (x, y) pairs in the order the numbers appeared. When the context
+    /// reads as explicit pairs (e.g. `(1, 2), (2, 4), (3, 6)`), `x` is the
+    /// first number of each pair; otherwise `x` is the 0-based position of
+    /// `y` among the numbers found on the line (an index series).
+    pub values: Vec<(f64, f64)>,
+    /// True if `values` came from explicit `(x, y)` pairs in the text
+    /// rather than being inferred as an index series.
+    pub explicit_pairs: bool,
+}
+
+/// Matches a bare numeric token, e.g. `-3`, `2.5`, `1.6e-19`.
+static NUMBER_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?").unwrap());
+
+/// Matches explicit `(x, y)` pairs, e.g. `(1, 2)` or `(3.5, -7)`.
+static PAIR_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"\(\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*,\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*\)",
+    )
+    .unwrap()
+});
 
 /// Content extractor for web pages
 #[derive(Debug, Clone)]
@@ -121,6 +157,62 @@ impl ContentExtractor {
             metadata,
             quality,
         })
+    }
+
+    /// Best-effort scan for numeric sequences/tables in text: any line
+    /// containing at least `min_values` numeric tokens is treated as a
+    /// candidate series. Lines that contain explicit `(x, y)` pairs are
+    /// interpreted as such; everything else is indexed 0..n in the order
+    /// the numbers appear on the line.
+    ///
+    /// This is intentionally simple (line-oriented, no unit parsing) — it
+    /// is meant to catch the common case of a table or list rendered as
+    /// plain text after HTML extraction, not to be a general table parser.
+    pub fn extract_numeric_series(&self, text: &str, min_values: usize) -> Vec<NumericSeries> {
+        let mut series = Vec::new();
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let pairs: Vec<(f64, f64)> = PAIR_RE
+                .captures_iter(trimmed)
+                .filter_map(|caps| {
+                    let x: f64 = caps.get(1)?.as_str().parse().ok()?;
+                    let y: f64 = caps.get(2)?.as_str().parse().ok()?;
+                    Some((x, y))
+                })
+                .collect();
+
+            if pairs.len() >= min_values {
+                series.push(NumericSeries {
+                    context: trimmed.to_string(),
+                    values: pairs,
+                    explicit_pairs: true,
+                });
+                continue;
+            }
+
+            let numbers: Vec<f64> = NUMBER_RE
+                .find_iter(trimmed)
+                .filter_map(|m| m.as_str().parse::<f64>().ok())
+                .collect();
+
+            if numbers.len() >= min_values {
+                let values = numbers
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, y)| (i as f64, y))
+                    .collect();
+                series.push(NumericSeries {
+                    context: trimmed.to_string(),
+                    values,
+                    explicit_pairs: false,
+                });
+            }
+        }
+        series
     }
 
     /// Extract page title
@@ -518,5 +610,49 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.metadata.content_type, ContentType::Documentation);
+    }
+
+    #[test]
+    fn test_extract_numeric_series_index_form() {
+        let extractor = ContentExtractor::new();
+        let text = "The measured values were 1, 1, 2, 3, 5, 8, 13 across the trial.\nNo numbers on this line.";
+        let series = extractor.extract_numeric_series(text, 3);
+
+        assert_eq!(series.len(), 1);
+        assert!(!series[0].explicit_pairs);
+        assert_eq!(
+            series[0].values,
+            vec![
+                (0.0, 1.0),
+                (1.0, 1.0),
+                (2.0, 2.0),
+                (3.0, 3.0),
+                (4.0, 5.0),
+                (5.0, 8.0),
+                (6.0, 13.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_numeric_series_explicit_pairs() {
+        let extractor = ContentExtractor::new();
+        let text = "Observed points: (1, 2), (2, 4), (3, 6), (4, 8).";
+        let series = extractor.extract_numeric_series(text, 3);
+
+        assert_eq!(series.len(), 1);
+        assert!(series[0].explicit_pairs);
+        assert_eq!(
+            series[0].values,
+            vec![(1.0, 2.0), (2.0, 4.0), (3.0, 6.0), (4.0, 8.0)]
+        );
+    }
+
+    #[test]
+    fn test_extract_numeric_series_respects_min_values() {
+        let extractor = ContentExtractor::new();
+        let text = "Only two numbers: 1 and 2.";
+        let series = extractor.extract_numeric_series(text, 3);
+        assert!(series.is_empty());
     }
 }

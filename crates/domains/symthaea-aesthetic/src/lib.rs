@@ -452,6 +452,41 @@ impl AestheticTracker {
             .map(|(rating, harmonies)| self.human_feedback(*rating, harmonies))
             .collect()
     }
+
+    /// Human feedback when the generation-time harmony state is unknown
+    /// (e.g. Symthaea's facade art path, which deliberately does not
+    /// fabricate harmony readings it cannot observe).
+    ///
+    /// Applies the same 10×-weight EMA recalibration and reward signals as
+    /// [`Self::human_feedback`] but leaves the harmony bias untouched —
+    /// absent information should mean *no* bias update, not a decay toward
+    /// zero (which is what passing an all-zero activation array would do).
+    pub fn human_feedback_unattributed(&mut self, rating: f32) -> AestheticFeedback {
+        let rating = rating.clamp(-1.0, 1.0);
+        let score = (rating + 1.0) * 0.5;
+
+        self.evaluation_count += 1;
+
+        let delta = score - self.ema;
+        let human_alpha = (self.config.ema_alpha * 10.0).min(0.5);
+        self.ema = self.ema * (1.0 - human_alpha) + score * human_alpha;
+
+        let dopamine_delta = delta * self.config.dopamine_scale * 2.0;
+        let serotonin_delta = if rating > 0.3 {
+            rating * self.config.serotonin_scale * 1.5
+        } else if rating < -0.3 {
+            rating * self.config.serotonin_scale * 0.5
+        } else {
+            0.0
+        };
+
+        AestheticFeedback {
+            dopamine_delta: dopamine_delta.clamp(-0.2, 0.3),
+            serotonin_delta: serotonin_delta.clamp(-0.1, 0.2),
+            surprise_signal: delta.abs() * self.config.surprise_scale,
+            harmony_projection: [0.0; 8],
+        }
+    }
 }
 
 impl Default for AestheticTracker {
@@ -463,6 +498,27 @@ impl Default for AestheticTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unattributed_feedback_moves_ema_but_not_bias() {
+        let mut tracker = AestheticTracker::new(AestheticConfig::default());
+        // Seed some real, attributed bias first.
+        tracker.human_feedback(0.8, &[0.9; 8]);
+        let bias_before = *tracker.harmony_bias();
+        let ema_before = tracker.expectation();
+
+        let fb = tracker.human_feedback_unattributed(-0.9);
+        assert!(
+            tracker.expectation() < ema_before,
+            "negative rating must lower the EMA"
+        );
+        assert_eq!(
+            bias_before,
+            *tracker.harmony_bias(),
+            "unattributed feedback must not touch harmony bias"
+        );
+        assert!(fb.dopamine_delta < 0.0, "disapproval is a negative reward");
+    }
 
     #[test]
     fn score_composite_moderate_complexity_preferred() {

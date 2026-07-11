@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-circuits"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Electrical-circuits layer for Symthaea: DC (Ohm/Kirchhoff, series/parallel, dividers), RC/RL transients, and AC (reactance, resonance, RLC impedance). Closed-form, ground-truth-checked. Complements symthaea-structural."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

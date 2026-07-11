@@ -21,6 +21,12 @@ use crate::types::{FlightConfig, QuadrotorCommand};
 /// 2. `output = network.output()` — bundled final layer (16,384D)
 /// 3. `output_weights @ output + output_bias` → 4D raw
 /// 4. Activations: sigmoid for thrust, tanh for moments
+/// Clone is deliberate: it's the trainer→bridge transfer path. A trained
+/// controller (BPTT touches the network, so an output-layer snapshot alone
+/// would NOT capture training) is cloned/moved into
+/// `FlightEmbodiment::with_controller` instead of being dropped at the end
+/// of `FlightTrainer::train`.
+#[derive(Clone)]
 pub struct FlightController {
     /// The temporal dynamics engine — full 16,384D HDC-LTC.
     network: HdcLtcUnifiedNetwork,

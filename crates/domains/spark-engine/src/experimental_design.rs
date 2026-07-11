@@ -316,6 +316,33 @@ impl ExperimentDesigner {
                         "Enhancement with acoustic drive".to_string(),
                     ],
                 },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (10.0, 1000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "Steep (Gamow scaling)".to_string(),
+                    trigger_dependence: "Weak - screening is a steady-state property".to_string(),
+                    signatures: vec!["Signal persists after trigger settles".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "Unknown (speculative mechanism)".to_string(),
+                    trigger_dependence: "Unknown".to_string(),
+                    signatures: vec!["Host-lattice-structure dependence".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (0.0, 1.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "None".to_string(),
+                    trigger_dependence: "None - background only".to_string(),
+                    signatures: vec![
+                        "Independent setup shows only background".to_string(),
+                        "Original signal fails to replicate".to_string(),
+                    ],
+                },
             ],
             instrumentation: vec![
                 Instrument {
@@ -374,14 +401,53 @@ impl ExperimentDesigner {
                 temperature_range: (250.0, 350.0),
                 controls: vec![],
             },
-            expected_outcomes: vec![ExpectedOutcome {
-                hypothesis: HypothesisType::HotSpots, // Placeholder
-                predicted_rate_range: (0.0, 1.0),     // Background only
-                predicted_energy_mev: 0.0,            // No fusion
-                temperature_dependence: "None".to_string(),
-                trigger_dependence: "None - only background".to_string(),
-                signatures: vec!["No neutrons above background".to_string()],
-            }],
+            // Measured quantity: neutron rate from the H-loaded sample.
+            // Every D-D fusion mechanism predicts pure background (no D);
+            // only a measurement artifact would persist with hydrogen.
+            expected_outcomes: vec![
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::HotSpots,
+                    predicted_rate_range: (0.0, 1.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "None".to_string(),
+                    trigger_dependence: "None - no D, no fusion".to_string(),
+                    signatures: vec!["No neutrons above background".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (0.0, 1.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "None".to_string(),
+                    trigger_dependence: "None - no D, no fusion".to_string(),
+                    signatures: vec!["No neutrons above background".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (0.0, 1.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "None".to_string(),
+                    trigger_dependence: "None - no D, no fusion".to_string(),
+                    signatures: vec!["No neutrons above background".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (0.0, 1.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "None".to_string(),
+                    trigger_dependence: "None - no D, no fusion".to_string(),
+                    signatures: vec!["No neutrons above background".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (5.0, 10000.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "Uncorrelated".to_string(),
+                    trigger_dependence: "Artifact persists with H".to_string(),
+                    signatures: vec![
+                        "\"Signal\" appears with hydrogen too — not fusion".to_string(),
+                    ],
+                },
+            ],
             instrumentation: vec![Instrument {
                 instrument_type: InstrumentType::NeutronDetector,
                 specifications: "Same as D experiment for direct comparison".to_string(),
@@ -423,17 +489,57 @@ impl ExperimentDesigner {
                 temperature_range: (300.0, 300.0),
                 controls: vec![],
             },
-            expected_outcomes: vec![ExpectedOutcome {
-                hypothesis: HypothesisType::HotSpots,
-                predicted_rate_range: (100.0, 10000.0),
-                predicted_energy_mev: 2.45,
-                temperature_dependence: "N/A".to_string(),
-                trigger_dependence: "N/A".to_string(),
-                signatures: vec![
-                    "Sharp peak at 2.45 MeV".to_string(),
-                    "No 14.1 MeV peak (no D-T)".to_string(),
-                ],
-            }],
+            // Discrimination here is via neutron ENERGY: every D-D fusion
+            // mechanism produces the 2.45 MeV line; an artifact does not.
+            expected_outcomes: vec![
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::HotSpots,
+                    predicted_rate_range: (100.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec![
+                        "Sharp peak at 2.45 MeV".to_string(),
+                        "No 14.1 MeV peak (no D-T)".to_string(),
+                    ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (100.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec!["Sharp peak at 2.45 MeV".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (100.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec!["Sharp peak at 2.45 MeV".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (100.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec![
+                        "Peak near 2.45 MeV; shift/broadening would be a discovery".to_string(),
+                    ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (100.0, 10000.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec![
+                        "Counts without a 2.45 MeV line (electronics/gamma pileup)".to_string(),
+                    ],
+                },
+            ],
             instrumentation: vec![Instrument {
                 instrument_type: InstrumentType::NeutronDetector,
                 specifications: "Time-of-flight spectrometer, ΔE/E < 10%".to_string(),
@@ -517,6 +623,22 @@ impl ExperimentDesigner {
                         "Negligible rate at 77K".to_string(),
                     ],
                 },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "Unknown (speculative)".to_string(),
+                    trigger_dependence: "Unknown".to_string(),
+                    signatures: vec!["T dependence unlike all standard mechanisms".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (0.0, 10000.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "Uncorrelated with sample T".to_string(),
+                    trigger_dependence: "Uncorrelated".to_string(),
+                    signatures: vec!["\"Rate\" tracks equipment, not lattice T".to_string()],
+                },
             ],
             instrumentation: vec![
                 Instrument {
@@ -578,18 +700,49 @@ impl ExperimentDesigner {
                     rules_out: "Baseline fusion rate".to_string(),
                 }],
             },
-            expected_outcomes: vec![ExpectedOutcome {
-                hypothesis: HypothesisType::PhononCascade,
-                predicted_rate_range: (1.0, 10000.0),
-                predicted_energy_mev: 2.45,
-                temperature_dependence: "N/A - fixed T".to_string(),
-                trigger_dependence: "Strong - rate scales with acoustic power".to_string(),
-                signatures: vec![
-                    "Enhancement at phonon resonances".to_string(),
-                    "Rate proportional to acoustic power".to_string(),
-                    "Frequency-dependent response".to_string(),
-                ],
-            }],
+            // Measured quantity: neutron rate under acoustic drive alone
+            // (no X-ray). Only a phonon mechanism predicts a fusion signal.
+            expected_outcomes: vec![
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (1.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A - fixed T".to_string(),
+                    trigger_dependence: "Strong - rate scales with acoustic power".to_string(),
+                    signatures: vec![
+                        "Enhancement at phonon resonances".to_string(),
+                        "Rate proportional to acoustic power".to_string(),
+                        "Frequency-dependent response".to_string(),
+                    ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::HotSpots,
+                    predicted_rate_range: (0.0, 0.5),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "None - hot spots need X-ray deposition".to_string(),
+                    signatures: vec!["Background only without X-ray".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (0.0, 0.5),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "None - acoustic drive doesn't change screening"
+                        .to_string(),
+                    signatures: vec!["Background only".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (0.0, 100.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "Uncorrelated".to_string(),
+                    trigger_dependence: "Possible EMI correlated with transducer".to_string(),
+                    signatures: vec![
+                        "Counts track transducer electronics, not resonances".to_string(),
+                    ],
+                },
+            ],
             instrumentation: vec![Instrument {
                 instrument_type: InstrumentType::NeutronDetector,
                 specifications: "Fast response for time correlation".to_string(),
@@ -632,27 +785,57 @@ impl ExperimentDesigner {
                 temperature_range: (300.0, 300.0),
                 controls: vec![],
             },
+            // Measured quantity: neutron rate in the WEAKEST-screening host
+            // (Ni), with the reference host (Er/Pd) as baseline. Mechanisms
+            // separate by how hard the rate collapses off-reference.
             expected_outcomes: vec![
                 ExpectedOutcome {
                     hypothesis: HypothesisType::SuperScreening,
-                    predicted_rate_range: (0.0, 10000.0),
+                    predicted_rate_range: (0.0, 10.0),
                     predicted_energy_mev: 2.45,
                     temperature_dependence: "N/A".to_string(),
                     trigger_dependence: "N/A".to_string(),
                     signatures: vec![
-                        "Rate correlates with measured screening (Er > Pd > Ti > Ni)".to_string(),
+                        "Rate collapses in low-screening hosts (Er > Pd > Ti > Ni)".to_string(),
+                    ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (0.0, 10.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec![
+                        "Rate depends on lattice structure (FCC vs BCC vs HCP)".to_string(),
+                    ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (20.0, 400.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "N/A".to_string(),
+                    signatures: vec![
+                        "Moderate variation tracking phonon spectra, not screening".to_string(),
                     ],
                 },
                 ExpectedOutcome {
                     hypothesis: HypothesisType::HotSpots,
-                    predicted_rate_range: (0.0, 10000.0),
+                    predicted_rate_range: (500.0, 10000.0),
                     predicted_energy_mev: 2.45,
                     temperature_dependence: "N/A".to_string(),
                     trigger_dependence: "N/A".to_string(),
                     signatures: vec![
-                        "Rate correlates with X-ray absorption".to_string(),
-                        "High-Z materials (Er) show more enhancement".to_string(),
+                        "Rate roughly host-independent, tracks X-ray absorption".to_string(),
                     ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (0.0, 10000.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Uncorrelated with host".to_string(),
+                    signatures: vec!["No 2.45 MeV line in any host".to_string()],
                 },
             ],
             instrumentation: vec![Instrument {
@@ -697,7 +880,53 @@ impl ExperimentDesigner {
                 temperature_range: (300.0, 300.0),
                 controls: vec![],
             },
-            expected_outcomes: vec![],
+            // Measured quantity: neutron rate at ~100 cm³ active volume
+            // (vs ~10³ n/s from the 0.0025 cm³ NASA film). Bulk mechanisms
+            // scale with volume; trigger-limited ones with irradiated area.
+            expected_outcomes: vec![
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (1e5, 1e8),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Bulk: rate ∝ volume".to_string(),
+                    signatures: vec!["Linear scaling with active volume".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (1e5, 1e8),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Bulk: rate ∝ volume".to_string(),
+                    signatures: vec!["Linear scaling with active volume".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::HotSpots,
+                    predicted_rate_range: (1e3, 5e4),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Trigger-limited: rate ∝ irradiated area".to_string(),
+                    signatures: vec![
+                        "Sublinear scaling, saturates with X-ray penetration".to_string(),
+                    ],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (1e3, 5e4),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Trigger-limited: coherence volume bounded".to_string(),
+                    signatures: vec!["Sublinear scaling".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (0.0, 10.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Artifact fails to reproduce at new scale".to_string(),
+                    signatures: vec!["No coherent scaling law".to_string()],
+                },
+            ],
             instrumentation: vec![Instrument {
                 instrument_type: InstrumentType::NeutronDetector,
                 specifications: "Array for higher rates".to_string(),
@@ -739,7 +968,53 @@ impl ExperimentDesigner {
                 temperature_range: (300.0, 300.0),
                 controls: vec![],
             },
-            expected_outcomes: vec![],
+            // Measured quantity: rate after ~100 h of continuous operation.
+            // All fusion mechanisms decay with D depletion / DPA damage but
+            // keep the 2.45 MeV line; an artifact drifts without the line.
+            expected_outcomes: vec![
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::HotSpots,
+                    predicted_rate_range: (1.0, 1000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Decays with D/Pd ratio (DPA accumulation)".to_string(),
+                    signatures: vec!["Rate decay correlates with loading monitor".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (1.0, 1000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Decays with lattice damage".to_string(),
+                    signatures: vec!["Rate decay correlates with loading monitor".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (1.0, 1000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Decays with loading".to_string(),
+                    signatures: vec!["Rate decay correlates with loading monitor".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (1.0, 1000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Decays with lattice damage".to_string(),
+                    signatures: vec!["Rate decay correlates with lattice quality".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (1.0, 10000.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Uncorrelated drift".to_string(),
+                    signatures: vec![
+                        "No correlation with D depletion; no 2.45 MeV line".to_string(),
+                    ],
+                },
+            ],
             instrumentation: vec![
                 Instrument {
                     instrument_type: InstrumentType::NeutronDetector,
@@ -790,7 +1065,51 @@ impl ExperimentDesigner {
                 temperature_range: (300.0, 300.0),
                 controls: vec![],
             },
-            expected_outcomes: vec![],
+            // Measured quantity: absolute neutron rate per Watt of input.
+            // Every mechanism predicts Q << 1 (no excess heat); the
+            // discrimination is again fusion-line vs artifact.
+            expected_outcomes: vec![
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::HotSpots,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Rate ∝ input power".to_string(),
+                    signatures: vec!["n/s per W constant; no excess heat (Q << 1)".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::PhononCascade,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Rate ∝ input power".to_string(),
+                    signatures: vec!["No excess heat (Q << 1)".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::SuperScreening,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Weakly power-dependent".to_string(),
+                    signatures: vec!["No excess heat (Q << 1)".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::LatticeNuclear,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 2.45,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Unknown".to_string(),
+                    signatures: vec!["No excess heat expected".to_string()],
+                },
+                ExpectedOutcome {
+                    hypothesis: HypothesisType::MeasurementError,
+                    predicted_rate_range: (10.0, 10000.0),
+                    predicted_energy_mev: 0.0,
+                    temperature_dependence: "N/A".to_string(),
+                    trigger_dependence: "Counts track electronics, not input power".to_string(),
+                    signatures: vec!["No 2.45 MeV line".to_string()],
+                },
+            ],
             instrumentation: vec![
                 Instrument {
                     instrument_type: InstrumentType::NeutronDetector,

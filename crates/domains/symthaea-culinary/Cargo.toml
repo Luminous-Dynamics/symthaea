@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-culinary"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Chemically-honest gastronomy for Symthaea: a flavor network over real volatile-compound data (Ahn et al. 2011) that reproduces the published food-pairing result as a falsifiable ground-truth test. Phase 0 of CULINARY_PLAN_2026-07-09.md. Pure-std, no HDC/consciousness coupling."
+
+# Phases 0–1 are pure-std. Phase 2 adds the two domain crates whose real physics
+# and chemistry it builds on (no symthaea-core / HDC link). serde/serde_json
+# are for CulinarySpec JSON externalization (data-driven presets) only.
+[dependencies]
+symthaea-thermofluids = { workspace = true }
+symthaea-organic-chemistry = { workspace = true }
+symthaea-fep = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -19,6 +19,9 @@ use super::types::{
     ActionType, Decision, EvaluationBreakdown, EvaluationContext, EvaluationResult,
     EvaluatorConfig, EvaluatorStats, VetoReason,
 };
+use crate::hdc::harmony_basis::HarmonyBasis;
+use crate::hdc::harmony_semantic_score::evaluate_harmony_semantic_from_text;
+use crate::hdc::moral_text_encoder::TextHdcEncoder;
 use crate::perception::SemanticEncoder;
 use std::collections::{HashMap, VecDeque};
 
@@ -48,6 +51,13 @@ pub struct UnifiedValueEvaluator {
     domain_classifier: DomainClassifier,
     /// Whether to use contextual weighting
     use_contextual_weights: bool,
+    /// Semantic (HDC cosine-projection) Eight Harmonies scorer — basis +
+    /// matching query encoder, built together so both live in the same
+    /// vector space. See `hdc::harmony_semantic_score` module docs.
+    semantic_harmony: Option<(HarmonyBasis, TextHdcEncoder)>,
+    /// Whether to use the semantic harmony scorer in place of the keyword
+    /// matcher (`self.harmonies.evaluate_action`).
+    use_semantic_harmony_scoring: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +83,8 @@ impl UnifiedValueEvaluator {
             contextual_weights: ContextualWeights::new(),
             domain_classifier: DomainClassifier::new(),
             use_contextual_weights: true, // Enabled by default
+            semantic_harmony: None,
+            use_semantic_harmony_scoring: false,
         }
     }
 
@@ -91,6 +103,8 @@ impl UnifiedValueEvaluator {
             contextual_weights: ContextualWeights::new(),
             domain_classifier: DomainClassifier::new(),
             use_contextual_weights: true,
+            semantic_harmony: None,
+            use_semantic_harmony_scoring: false,
         }
     }
 
@@ -112,6 +126,8 @@ impl UnifiedValueEvaluator {
             contextual_weights: ContextualWeights::new(),
             domain_classifier: DomainClassifier::new(),
             use_contextual_weights: true,
+            semantic_harmony: None,
+            use_semantic_harmony_scoring: false,
         }
     }
 
@@ -175,6 +191,36 @@ impl UnifiedValueEvaluator {
     /// Check if semantic embeddings are enabled and available
     pub fn has_semantic_embeddings(&self) -> bool {
         self.use_semantic_embeddings && self.semantic_embedder.is_some()
+    }
+
+    /// Enable semantic (HDC cosine-projection) Eight Harmonies scoring,
+    /// replacing the keyword-matching `EightHarmonies::evaluate_action`
+    /// scorer so alignment survives paraphrase (Phase 3.3 of
+    /// `ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md`; see
+    /// `hdc::harmony_semantic_score` module docs for the keyword-vs-semantic
+    /// tradeoff). Off by default: the basis and query encoder are still
+    /// `TextHdcEncoder`-based (lexical, not a real contextual embedder — see
+    /// that module's honesty note), so this trades one imperfect scorer for
+    /// a differently-imperfect one rather than a strict upgrade; opt in
+    /// deliberately.
+    pub fn enable_semantic_harmony_scoring(&mut self, dim: usize) {
+        let basis = HarmonyBasis::new(dim);
+        // Must match HarmonyBasis::new's internal encoder params exactly
+        // (dim, ngram_size=3, trigram_weight=0.5, sentiment_weight=0.2) so
+        // query and basis vectors live in the same space.
+        let encoder = TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.2);
+        self.semantic_harmony = Some((basis, encoder));
+        self.use_semantic_harmony_scoring = true;
+    }
+
+    /// Disable semantic harmony scoring (fall back to the keyword matcher).
+    pub fn disable_semantic_harmony_scoring(&mut self) {
+        self.use_semantic_harmony_scoring = false;
+    }
+
+    /// Check if semantic harmony scoring is enabled and available.
+    pub fn has_semantic_harmony_scoring(&self) -> bool {
+        self.use_semantic_harmony_scoring && self.semantic_harmony.is_some()
     }
 
     /// Get the last evaluation result (for inspection/debugging)
@@ -269,8 +315,24 @@ impl UnifiedValueEvaluator {
     /// Returns (AlignmentResult, semantic_boost) where semantic_boost is an
     /// adjustment based on semantic embeddings (if available).
     fn evaluate_harmony_alignment(&mut self, action: &str) -> (AlignmentResult, f64) {
-        // Get base HDC alignment
-        let harmony_alignment = self.harmonies.evaluate_action(action);
+        // Base alignment: semantic (HDC cosine-projection) scorer when
+        // enabled, so paraphrases score consistently; keyword matcher
+        // otherwise. Falls back to the keyword matcher if the semantic
+        // encoder ever returns `None` (never fabricates a score).
+        let harmony_alignment = if self.use_semantic_harmony_scoring {
+            self.semantic_harmony
+                .as_ref()
+                .and_then(|(basis, encoder)| {
+                    evaluate_harmony_semantic_from_text(
+                        action,
+                        &mut |text| Some(encoder.encode(text)),
+                        basis,
+                    )
+                })
+                .unwrap_or_else(|| self.harmonies.evaluate_action(action))
+        } else {
+            self.harmonies.evaluate_action(action)
+        };
 
         // If semantic embeddings are enabled, compute a boost based on embedding similarity
         let semantic_boost = if self.use_semantic_embeddings {
@@ -1078,6 +1140,64 @@ mod tests {
     fn test_evaluator_creation() {
         let evaluator = UnifiedValueEvaluator::new();
         assert!(evaluator.history.is_empty());
+    }
+
+    #[test]
+    fn test_semantic_harmony_scoring_disabled_by_default() {
+        let evaluator = UnifiedValueEvaluator::new();
+        assert!(!evaluator.has_semantic_harmony_scoring());
+    }
+
+    #[test]
+    fn test_enable_semantic_harmony_scoring() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        evaluator.enable_semantic_harmony_scoring(256);
+        assert!(evaluator.has_semantic_harmony_scoring());
+
+        evaluator.disable_semantic_harmony_scoring();
+        assert!(!evaluator.has_semantic_harmony_scoring());
+    }
+
+    #[test]
+    fn test_semantic_harmony_scoring_produces_valid_alignment() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        evaluator.enable_semantic_harmony_scoring(256);
+
+        let (alignment, _boost) = evaluator.evaluate_harmony_alignment("we act as one, together");
+
+        // All 8 harmonies present with finite, in-range scores — proves the
+        // semantic path actually ran (not silently falling back and not
+        // fabricating a degenerate result).
+        assert_eq!(alignment.alignments.len(), 8);
+        for a in alignment.harmonies() {
+            assert!(a.score.is_finite());
+            assert!((-1.0..=1.0).contains(&a.score));
+            assert!(
+                a.explanation
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("semantic projection"),
+                "expected the semantic scorer's explanation text, got: {:?}",
+                a.explanation
+            );
+        }
+    }
+
+    #[test]
+    fn test_semantic_harmony_scoring_off_uses_keyword_matcher() {
+        let mut evaluator = UnifiedValueEvaluator::new();
+        // Default (disabled) path must still use the keyword matcher's
+        // explanation style, not the semantic one.
+        let (alignment, _boost) = evaluator.evaluate_harmony_alignment("we act as one, together");
+        for a in alignment.harmonies() {
+            assert!(
+                !a.explanation
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("semantic projection"),
+                "keyword matcher should not produce semantic-scorer explanations"
+            );
+        }
     }
 
     #[test]

@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-memetics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Memetics for Symthaea: a meme as a transmissible HDC unit with fidelity/mutation/lineage, and belief-spread dynamics that reuse the SIR model (symthaea-epidemiology) with a *measured* R₀. See MEMETICS_ANTIMEMETICS_PLAN_2026-07-09.md."
+
+# Rides the existing 16,384-D HDC medium (symthaea-core BinaryHV) and reuses the
+# SIR closed form (symthaea-epidemiology). No cognition/loop/mesh dependency —
+# single-agent, in-process (plan Phases 0–2).
+[dependencies]
+serde = { workspace = true }
+symthaea-core = { workspace = true }
+symthaea-epidemiology = { workspace = true }

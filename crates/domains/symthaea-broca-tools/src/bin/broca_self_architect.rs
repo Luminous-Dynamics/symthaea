@@ -124,34 +124,43 @@ fn main() -> Result<()> {
         .generator
         .generate_semantic_monologue(&channels, 3)?;
     let nucleus = architect.generator.recursive_fold(&monologue);
-    let proof_goal = architect.formal_bridge.synthesize_proof_goal(&nucleus);
 
-    // 2. Formal Verification
-    println!("   🧮 Invoking formal solver on proof goal...");
-    if let Ok(verified) = architect.formal_bridge.verify_invariant(&proof_goal) {
-        if verified {
+    // 2. Formal Verification (only if a real proof goal can be synthesized)
+    match architect.formal_bridge.synthesize_proof_goal(&nucleus) {
+        Ok(proof_goal) => {
+            println!("   🧮 Invoking formal solver on proof goal...");
+            if let Ok(verified) = architect.formal_bridge.verify_invariant(&proof_goal) {
+                if verified {
+                    println!(
+                        "   💎 FORMAL PROOF ACHIEVED: '{}' is mathematically sound.",
+                        target_logic
+                    );
+
+                    // 3. Record verified breakthrough
+                    let commit = CognitiveCommit {
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)?
+                            .as_millis() as u64,
+                        mission_id: format!("formal_verify_{}", target_logic.replace(" ", "_")),
+                        parent_hash: String::new(), // Set by ledger
+                        hash: String::new(),        // Set by ledger
+                        intent_nucleus: nucleus,
+                        synthesized_code: proof_goal,
+                        coherence: 1.0, // Formally verified logic has absolute coherence
+                        entropy: 0.0,
+                        verified: true,
+                    };
+                    architect.cognitive_ledger.commit(commit)?;
+                } else {
+                    println!("   ⚠️  Formal verification failed. Logic contains potential traps.");
+                }
+            }
+        }
+        Err(e) => {
             println!(
-                "   💎 FORMAL PROOF ACHIEVED: '{}' is mathematically sound.",
-                target_logic
+                "   ⚠️  Skipping formal verification of '{}': {} (no proof goal synthesized, nothing verified).",
+                target_logic, e
             );
-
-            // 3. Record verified breakthrough
-            let commit = CognitiveCommit {
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)?
-                    .as_millis() as u64,
-                mission_id: format!("formal_verify_{}", target_logic.replace(" ", "_")),
-                parent_hash: String::new(), // Set by ledger
-                hash: String::new(),        // Set by ledger
-                intent_nucleus: nucleus,
-                synthesized_code: proof_goal,
-                coherence: 1.0, // Formally verified logic has absolute coherence
-                entropy: 0.0,
-                verified: true,
-            };
-            architect.cognitive_ledger.commit(commit)?;
-        } else {
-            println!("   ⚠️  Formal verification failed. Logic contains potential traps.");
         }
     }
 
@@ -166,19 +175,28 @@ fn main() -> Result<()> {
         .generator
         .generate_semantic_monologue(&channels, 3)?;
     let nucleus = architect.generator.recursive_fold(&monologue);
-    let lean_script = architect
+    match architect
         .formal_bridge
-        .synthesize_lean_proof_script(&nucleus);
-
-    // 2. Save the Proof for external audit
-    let proof_path = "proofs/consciousness_sanity.lean";
-    fs::create_dir_all("proofs")?;
-    fs::write(proof_path, &lean_script)?;
-    println!(
-        "   └─ Proof script synthesized and saved to {}.",
-        proof_path
-    );
-    println!("   └─ Result: FORMALLY ANCHORED.");
+        .synthesize_lean_proof_script(&nucleus)
+    {
+        Ok(lean_script) => {
+            // 2. Save the Proof for external audit
+            let proof_path = "proofs/consciousness_sanity.lean";
+            fs::create_dir_all("proofs")?;
+            fs::write(proof_path, &lean_script)?;
+            println!(
+                "   └─ Proof script synthesized and saved to {}.",
+                proof_path
+            );
+            println!("   └─ Result: FORMALLY ANCHORED.");
+        }
+        Err(e) => {
+            println!(
+                "   └─ Skipping Lean proof: {} (no proof script written, nothing anchored).",
+                e
+            );
+        }
+    }
 
     // --- IMPROVEMENT: Lineage Verification ---
     println!("\n[Stage 9] Sovereignty: Verifying absolute developmental lineage...");

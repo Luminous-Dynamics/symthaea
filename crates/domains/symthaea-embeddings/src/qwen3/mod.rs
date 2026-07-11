@@ -531,6 +531,15 @@ pub struct Qwen3Config {
     /// When set, text is formatted as "Instruct: {instruction}\nQuery: {text}"
     /// before tokenization, following the Qwen3-Embedding prompt template.
     pub instruction: Option<String>,
+
+    /// Ollama embedding model (e.g. "embeddinggemma:300m"). When set, `embed()`
+    /// calls the local Ollama `/api/embed` endpoint (blocking — intended to run
+    /// on the `EmbeddingChannel` background thread) instead of Burn/simulated.
+    /// Falls back to simulated on request failure (logged, counted in stats).
+    pub ollama_model: Option<String>,
+
+    /// Ollama endpoint host:port. None = "127.0.0.1:11434".
+    pub ollama_endpoint: Option<String>,
 }
 
 impl Default for Qwen3Config {
@@ -548,6 +557,8 @@ impl Default for Qwen3Config {
             half_precision: false,
             cache_capacity: 10_000,
             instruction: None,
+            ollama_model: None,
+            ollama_endpoint: None,
         }
     }
 }
@@ -583,6 +594,25 @@ impl Qwen3Config {
     }
 
     /// Create config for simulation mode (testing)
+    /// Ollama-backed config using the approved local embedding model
+    /// `embeddinggemma:300m` (768-D) at the default endpoint.
+    pub fn ollama_embeddinggemma() -> Self {
+        Self::ollama(
+            crate::ollama::DEFAULT_MODEL,
+            crate::ollama::EMBEDDINGGEMMA_DIMENSION,
+        )
+    }
+
+    /// Ollama-backed config for an arbitrary local embedding model.
+    pub fn ollama(model: impl Into<String>, dim: usize) -> Self {
+        Self {
+            ollama_model: Some(model.into()),
+            embedding_dim: dim,
+            use_simulated: false,
+            ..Default::default()
+        }
+    }
+
     pub fn simulated() -> Self {
         Self {
             use_simulated: true,
@@ -726,6 +756,9 @@ pub struct Qwen3Stats {
     /// Persistent (on-disk) cache misses
     pub persistent_cache_misses: u64,
 
+    /// Ollama request failures (each falls back to a simulated embedding)
+    pub ollama_failures: u64,
+
     /// Number of `embed_batch()` calls
     pub batch_calls: u64,
 
@@ -749,8 +782,9 @@ impl Qwen3Embedder {
             let pc_config = crate::cache::PersistentCacheConfig {
                 path: None, // default: ~/.cache/symthaea/embeddings.redb
                 model_name: config
-                    .model_path
+                    .ollama_model
                     .clone()
+                    .or_else(|| config.model_path.clone())
                     .unwrap_or_else(|| "unknown".into()),
                 dimension: config.embedding_dim,
                 use_f16_storage: false,
@@ -779,8 +813,9 @@ impl Qwen3Embedder {
             persistent_cache,
         };
 
-        // Try to load Burn model if path is specified and not in simulation mode
-        if !embedder.config.use_simulated {
+        // Try to load Burn model if path is specified and not in simulation mode.
+        // Ollama mode needs no local model — skip Burn entirely.
+        if !embedder.config.use_simulated && embedder.config.ollama_model.is_none() {
             #[cfg(feature = "burn")]
             {
                 embedder.try_load_burn()?;
@@ -1013,7 +1048,30 @@ impl Qwen3Embedder {
         }
 
         // Generate embedding
-        let embedding = if self.config.use_simulated {
+        let embedding = if let Some(model) = self.config.ollama_model.clone() {
+            let endpoint = self
+                .config
+                .ollama_endpoint
+                .clone()
+                .unwrap_or_else(|| crate::ollama::DEFAULT_ENDPOINT.to_string());
+            match crate::ollama::embed(&endpoint, &model, text, self.config.embedding_dim) {
+                Ok(e) => e,
+                Err(err) => {
+                    self.stats.ollama_failures += 1;
+                    // Loud on the first few failures — a permanently-down Ollama
+                    // silently degrading to simulated is exactly the dark-default
+                    // failure mode this backend exists to eliminate.
+                    if self.stats.ollama_failures <= 3 {
+                        eprintln!(
+                            "[symthaea-embeddings] Ollama embed failed ({err}); \
+                             falling back to SIMULATED embeddings (failure #{})",
+                            self.stats.ollama_failures
+                        );
+                    }
+                    self.simulate_embedding(text)
+                }
+            }
+        } else if self.config.use_simulated {
             self.simulate_embedding(text)
         } else {
             #[cfg(feature = "burn")]

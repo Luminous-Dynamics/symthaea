@@ -98,7 +98,9 @@ def main() -> int:
             "",
             "## Promotion Comparison",
             "",
-            f"- Promotion passed: {fmt(compare_promotion.get('passed'))}",
+            f"- Promotion passed: {fmt(compare_promotion.get('passed'))}"
+            f" (regression: {fmt(compare_promotion.get('regression_passed'))},"
+            f" improvement: {fmt(compare_promotion.get('improvement_passed'))})",
         ]
         for failure in compare_promotion.get("failures") or []:
             lines.append(
@@ -117,6 +119,25 @@ def main() -> int:
                 "- Missing optional metrics: "
                 + ", ".join(f"`{metric}`" for metric in missing)
             )
+
+        # ── Presence-of-improvement gate (Tier 1.1) — separate from the
+        # regression comparisons above; see broca_checkpoint_compare.rs.
+        if compare_promotion.get("improvement_evaluated"):
+            lines += ["", "### Held-Out Topic Improvement (vs. production)", ""]
+            for metric in compare.get("improvement_metrics") or []:
+                lines.append(
+                    f"- `{metric.get('metric')}`: baseline {fmt(metric.get('baseline'))} -> "
+                    f"candidate {fmt(metric.get('candidate'))} "
+                    f"(delta {fmt(metric.get('delta'))}, "
+                    f"required >= {fmt(metric.get('required_improvement'))}, "
+                    f"passed: {fmt(metric.get('passed'))})"
+                )
+            missing_improvement = compare.get("missing_improvement_metrics") or []
+            if missing_improvement:
+                lines.append(
+                    "- Missing improvement metrics: "
+                    + ", ".join(f"`{metric}`" for metric in missing_improvement)
+                )
 
     lines += [
         "",

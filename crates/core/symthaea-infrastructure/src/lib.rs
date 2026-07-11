@@ -14,8 +14,11 @@ pub mod economy;
 pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
+#[cfg(feature = "grid_physics")]
+pub mod grid_physics_simulator;
 pub mod perturbations;
 pub mod plugin;
+pub mod reflex;
 pub mod simulator;
 pub mod spatial_metabolism;
 pub mod town_simpoiesis;

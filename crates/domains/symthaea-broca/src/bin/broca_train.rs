@@ -213,6 +213,11 @@ fn main() {
         adaptive_veto_target: opts.adaptive_veto_target,
         veto_warmup_epochs: opts.veto_warmup_epochs,
         enable_soft_veto_during_training: opts.enable_soft_veto_training,
+        // Crash-recovery safety net: save in-progress weights to the
+        // caller-specified --output path at the end of every epoch, so a
+        // killed long-running GPU job doesn't lose all progress. Never a
+        // hardcoded/implicit path -- see epoch_autosave_path's doc comment.
+        epoch_autosave_path: opts.output_path.clone(),
         ..Default::default()
     };
 

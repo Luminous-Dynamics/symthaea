@@ -395,6 +395,10 @@ pub mod moral_prototypes;
 /// Shared Eight Harmonies basis vectors and moral free energy (FEP).
 pub mod harmony_basis;
 
+/// Semantic (HDC-projection) counterpart to `symthaea_harmonies`'s keyword
+/// scorer — Phase 3.3 of the 2026-07-06 art/culture review.
+pub mod harmony_semantic_score;
+
 /// Manifold-based moral classifier using 8D harmony basis centroids.
 pub mod manifold_classifier;
 

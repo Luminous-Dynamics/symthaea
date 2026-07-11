@@ -5,6 +5,12 @@
 //!
 //! Generates frame-by-frame SVG sequences from consciousness state trajectories,
 //! enabling time-based visual art that reflects cognitive evolution.
+//!
+//! **Status (2026-07-10): built-but-unwired.** No call sites outside this
+//! module's own tests. Planned consumer: the gallery/evolution surface
+//! (VISUAL_ART_IMPROVEMENT_PLAN_2026-07-10.md Phase 4), where a keyframed
+//! timeline can animate how an artwork evolved across critic iterations.
+//! Do not cite as a live capability until then.
 
 use crate::AtelierConfig;
 use symthaea_canvas::CognitiveSnapshot;

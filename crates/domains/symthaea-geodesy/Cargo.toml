@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-geodesy"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Geodesy & navigation for Symthaea: great-circle (haversine) distance, initial bearing, and destination point on a sphere. Closed-form, ground-truth-checked."
+
+[dependencies]

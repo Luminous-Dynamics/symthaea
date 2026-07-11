@@ -26,7 +26,7 @@ tokenizers = { version = "0.21", optional = true }
 tracing = { version = "0.1", optional = true }
 half = { version = "2.4", optional = true }
 hf-hub = { version = "0.4", optional = true }
-serde_json = { version = "1", optional = true }
+serde_json = "1"  # non-optional: ollama module (raw /api/embed client) needs JSON
 memmap2 = { version = "0.9", optional = true }
 sha2 = { version = "0.10", optional = true }
 
@@ -50,7 +50,7 @@ criterion = "0.5"
 
 [features]
 default = []
-burn = ["dep:burn", "dep:safetensors", "dep:tokenizers", "dep:tracing", "dep:half", "dep:serde_json", "dep:memmap2", "dep:sha2", "burn/ndarray"]
+burn = ["dep:burn", "dep:safetensors", "dep:tokenizers", "dep:tracing", "dep:half", "dep:memmap2", "dep:sha2", "burn/ndarray"]
 burn-wgpu = ["burn", "burn/wgpu"]
 burn-hub = ["burn", "dep:hf-hub"]
 async-embed = ["dep:tokio"]

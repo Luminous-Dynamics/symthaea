@@ -6,8 +6,10 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::admittance::apply_admittance;
 use crate::controller::ManipulatorController;
 use crate::encoder::ManipulatorHdcEncoder;
+use crate::kitchen_scenario::{clamp_grip_command, hazard_tier, KitchenObject};
 use crate::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use crate::types::ManipulatorConfig;
 
@@ -39,6 +41,11 @@ pub struct ManipulatorEmbodiment {
     last_grounding: u8,
     fallback_stage: ManipulatorFallbackStage,
     fallback_cycles_in_stage: u32,
+    /// Object currently grasped, if any — see `kitchen_scenario.rs`. An
+    /// environmental hazard (hot/sharp), not a Φ/confidence signal, so it
+    /// composes into `current_safety` the same way `safety_override` and
+    /// `moral_safety` already do: as an independent `.max()` floor.
+    held_object: Option<KitchenObject>,
 }
 
 impl ManipulatorEmbodiment {
@@ -59,6 +66,7 @@ impl ManipulatorEmbodiment {
             last_grounding: GROUNDING_SENSORIMOTOR,
             fallback_stage: ManipulatorFallbackStage::GravityHold,
             fallback_cycles_in_stage: 0,
+            held_object: None,
         }
     }
 
@@ -94,6 +102,25 @@ impl ManipulatorEmbodiment {
         }
     }
 
+    /// Install trained output-layer weights (from `ManipulatorTrainer::
+    /// export_weights` / `train_intent_weights`, or a persisted snapshot)
+    /// into the live bridge. This is the trainer→bridge transfer path:
+    /// without it the shipped bridge can only ever run genesis-random
+    /// weights, under which thought has no task-axis motor authority
+    /// (measured by examples/cognition_ablation.rs).
+    pub fn install_weights(
+        &mut self,
+        weights: &crate::controller::ControllerWeights,
+    ) -> Result<(), String> {
+        self.controller.import_weights(weights)
+    }
+
+    /// Read access to the simulated body state (task-space observables for
+    /// tests, benchmarks, and telemetry consumers).
+    pub fn body_state(&self) -> &crate::types::ManipulatorState {
+        self.simulator.state()
+    }
+
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
         self.safety_override = Some(level);
     }
@@ -102,9 +129,20 @@ impl ManipulatorEmbodiment {
         self.safety_override = None;
     }
 
+    /// Report that `object` is now grasped — its own hazards (hot/sharp) will
+    /// floor `current_safety` and cap grip force from the next `step()` on.
+    pub fn set_held_object(&mut self, object: KitchenObject) {
+        self.held_object = Some(object);
+    }
+
+    /// Report that nothing is grasped (dropped/released/never picked up).
+    pub fn clear_held_object(&mut self) {
+        self.held_object = None;
+    }
+
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
-        // Effective safety = max(phi_safety, safety_override, moral_safety)
+        // Effective safety = max(phi_safety, safety_override, moral_safety, hazard_tier)
         // Higher enum variant = stricter (Green < Yellow < Orange < Red)
         self.current_safety = phi_level;
         if let Some(override_level) = self.safety_override {
@@ -113,6 +151,12 @@ impl ManipulatorEmbodiment {
         if let Some(moral_level) = self.moral_safety {
             self.current_safety = self.current_safety.max(moral_level);
         }
+        // A held object's own hazards (hot/sharp) floor the tier regardless
+        // of Φ — see kitchen_scenario.rs's module doc for why this needs no
+        // new gating machinery beyond MotorSafetyLevel's derived Ord.
+        self.current_safety = self
+            .current_safety
+            .max(hazard_tier(self.held_object.as_ref()));
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
@@ -132,6 +176,32 @@ impl ManipulatorEmbodiment {
                     *t *= gain;
                 }
             }
+
+            // ── Admittance: yield to sensed contact force ────────────
+            // Never fight an external push at full cognitive authority
+            // (chatter risk) — subtract a safety-tier-scaled fraction of
+            // the equivalent joint torque for the *previous* step's sensed
+            // end-effector force. One-tick feedback, same convention as
+            // every other sensor-driven correction here.
+            apply_admittance(
+                &mut cmd,
+                self.simulator.kinematics(),
+                &self.simulator.state().joint_angles,
+                &self.simulator.state().end_effector_force,
+                self.simulator.max_torques(),
+                self.current_safety,
+            );
+
+            // Cap squeeze force to whichever is stricter: this safety tier's
+            // own grip authority, or the held object's crush threshold. Only
+            // meaningful here — the Red/GravityHold branch above already
+            // freezes the gripper at its current opening (a stricter, more
+            // conservative behavior in its own right), and this tier-based
+            // cap would otherwise force it *open* instead of held, which is
+            // exactly the "drop whatever it's holding" outcome GravityHold's
+            // own comment says gain=0 alone must not cause.
+            cmd.gripper =
+                clamp_grip_command(cmd.gripper, self.current_safety, self.held_object.as_ref());
         }
 
         self.last_control_effort = cmd.control_effort();
@@ -186,6 +256,7 @@ impl ManipulatorEmbodiment {
         self.last_grounding = GROUNDING_SENSORIMOTOR;
         self.fallback_stage = ManipulatorFallbackStage::GravityHold;
         self.fallback_cycles_in_stage = 0;
+        self.held_object = None;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -298,6 +369,37 @@ mod tests {
         let hv = ContinuousHV::random(16384, 42);
         let r = bridge.step(&hv, 0.002, 0.05);
         assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+    }
+
+    /// The actual "done" proof for kitchen-scenario Phase 1: high Φ alone
+    /// would report Green, but holding a hazardous object floors the live
+    /// `step()` output at the hazard tier regardless — this exercises the
+    /// real composed path (`step()`'s output), not just `hazard_tier()` in
+    /// isolation (already covered in `kitchen_scenario.rs`'s own tests).
+    #[test]
+    fn test_held_hazard_floors_safety_even_at_high_phi() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+
+        // High Φ alone: Green.
+        let baseline = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(baseline.safety_level, MotorSafetyLevel::Green);
+
+        // Same high Φ, but now holding a sharp+hot object: Red, despite Φ
+        // never having changed — proving the hazard tier is a genuine,
+        // independent floor on the live path, not a decorative field.
+        bridge.set_held_object(crate::kitchen_scenario::KitchenObject {
+            temperature_c: 90.0,
+            max_safe_grip_force_n: 50.0,
+            is_sharp: true,
+        });
+        let hazardous = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(hazardous.safety_level, MotorSafetyLevel::Red);
+
+        // Releasing the object at the same Φ returns to Green.
+        bridge.clear_held_object();
+        let released = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(released.safety_level, MotorSafetyLevel::Green);
     }
 
     #[test]

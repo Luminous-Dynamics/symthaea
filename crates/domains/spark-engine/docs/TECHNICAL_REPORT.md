@@ -1,8 +1,20 @@
 # Spark Engine Technical Report: LCF Anomaly Investigation
 
 **Version:** 0.1.0
-**Date:** 2026-02-05
+**Original date:** 2026-02-05
+**Revised:** 2026-07-07
 **Status:** Physics-Honest Assessment
+**Package:** [`spark-engine`](https://crates.io/crates/spark-engine) on crates.io ·
+[github.com/Luminous-Dynamics/spark-engine](https://github.com/Luminous-Dynamics/spark-engine)
+
+> **Revision note (2026-07-07):** this report was updated to reflect the current
+> codebase (99 tests, up from 42) and two capabilities added since the original
+> draft — a Bayesian belief model over the five candidate hypotheses
+> (`bayesian.rs`) and an expected-information-gain experiment ranker
+> (`optimal_experiment.rs`). Section 5's static priority table is now superseded
+> by a regenerable, decision-theoretic ranking — see §5.1. One numeric table from
+> the original draft (§2.3) is flagged as illustrative rather than verified; see
+> the caveat there. No conclusion about the physics itself has changed.
 
 ---
 
@@ -17,6 +29,8 @@ This report presents a rigorous, physics-honest analysis of Lattice Confinement 
 3. **The most plausible explanation** is transient hot spots from X-ray absorption, which could locally achieve temperatures of ~3,500K.
 
 4. **LCF may still be valuable** as a compact neutron source, even without energy gain.
+
+5. **(New, 2026-07-07) The single best next experiment, by expected information gain per dollar, is the Hydrogen Control** (~$10K, 1 month) — not the Temperature Mapping study this report originally emphasized. See §5.1.
 
 ---
 
@@ -92,6 +106,19 @@ NASA Glenn Research Center (Steinetz et al., 2020, Phys. Rev. C) reported:
 | **Unexplained** | **10⁻¹⁷²** | 10⁴⁰ |
 
 The combined known enhancements far exceed the gap, but each is applied at its theoretical maximum. In practice, these enhancements may not combine multiplicatively.
+
+> **Honesty caveat (added 2026-07-07):** this table's numbers could not be reproduced
+> from the current `screening_enhancement()` implementation (`physics.rs`) at any
+> physically relevant energy for this system — the function returns the trivial
+> value 1.0 below 10 eV collision energy by design, and is capped at 10⁶ above
+> that (added later, per `clippy::manual_clamp` cleanup 2026-07-07). The 10²⁰⁰
+> screening figure appears to be from an earlier, uncapped, illustrative
+> back-of-envelope exercise evaluated outside the function's intended domain,
+> not a live-computed result. Treat this table as **narrative intuition about
+> orders of magnitude, not a verified calculation** — which is consistent with
+> the original prose above already flagging the multiplicative-combination
+> assumption as questionable. Recomputing it rigorously (correct energy
+> convention, no artificial floor/ceiling) is open work, not done here.
 
 ---
 
@@ -184,6 +211,37 @@ These are anomalously large compared to the Debye model prediction (~25 eV) but 
 
 ## 5. Recommended Experimental Program
 
+### 5.1 Superseding this section: the live, decision-theoretic ranking (added 2026-07-07)
+
+The phase/priority tables below (§5.1–5.3 as originally written) reflect **hand-set
+priorities** from the initial design. Since then, two modules make this
+decision-theoretic and regenerable rather than fixed:
+
+- `bayesian.rs` — a probability distribution (`HypothesisBelief`) over the five
+  candidate explanations (hot spots, phonon cascade, super-screening,
+  lattice-modified tunneling, measurement error), with a deliberately skeptical
+  default prior (measurement error weighted highest, 0.40).
+- `optimal_experiment.rs` — ranks every candidate experiment by **expected
+  information gain (EIG) per dollar** against that belief, and derives a
+  budget-constrained sequence.
+
+Regenerate the live ranking with:
+
+```bash
+cargo run --example optimal_experiment_proposal 500000   # budget in USD
+```
+
+As of this writing (see
+[`docs/DISCRIMINATING_EXPERIMENT_PROPOSAL.md`](DISCRIMINATING_EXPERIMENT_PROPOSAL.md)),
+the ranking **differs from the static table below in its top pick**: the **Hydrogen
+Control** experiment — $10K, 1 month — ranks #1 at 9.71 bits of information gain per
+$100K, ahead of the NASA Replication and Temperature Mapping experiments the original
+static priorities emphasized. This makes physical sense in hindsight: it is the
+cheapest experiment that cleanly separates "real fusion" from "measurement artifact,"
+the single largest source of belief uncertainty under the skeptical prior. The static
+tables below are kept for historical/narrative context but the generated proposal is
+now the source of truth for sequencing.
+
 ### Phase 1: Validation ($200K, 6 months)
 
 **Goal:** Confirm the anomaly is real and from D-D fusion.
@@ -263,6 +321,10 @@ LCF advantage: No high voltage, no tritium, potentially very compact.
 
 5. **Pivot to neutron source:** If the anomaly is real, LCF's value is as a compact neutron generator, not an energy source.
 
+6. **(New, 2026-07-07) The recommended next step, by expected information gain per
+   dollar, is the Hydrogen Control experiment** — cheaper and more discriminating
+   than the NASA Replication or Temperature Mapping studies emphasized above. See §5.1.
+
 ---
 
 ## Appendix A: Spark Engine Modules
@@ -279,12 +341,17 @@ LCF advantage: No high voltage, no tritium, potentially very compact.
 | `uncertainty` | Monte Carlo propagation |
 | `neutron_source` | Compact source design |
 | `shielding` | Dose calculations |
+| `bayesian` *(added 2026-07-07)* | Probability distribution over the 5 hypotheses, Bayes updates from observations |
+| `optimal_experiment` *(added 2026-07-07)* | Expected-information-gain ranking, budget-constrained experiment sequencing |
 
 ## Appendix B: Running the Analysis
 
 ```bash
 # Full analysis report
 cargo run --example analysis_runner
+
+# Live discriminating-experiment ranking (added 2026-07-07)
+cargo run --example optimal_experiment_proposal 500000
 
 # CLI tool
 cargo run --bin spark -- analyze --rate 1000 --material Er
@@ -295,10 +362,19 @@ cargo run --bin spark -- gamow --temp 1000 --screening 309
 
 ## Appendix C: Test Coverage
 
-- 42 unit tests
-- 1 doc test
-- All passing
+- 99 unit tests (up from 42 at original draft), 1 doc test — verified 2026-07-07
+- All passing; CI (GitHub Actions) enforces `cargo fmt --check` and
+  `cargo clippy -- -D warnings` on every push
+
+## Appendix D: References
+
+- Steinetz, B. M. et al. (2020). "Novel nuclear reactions observed in bremsstrahlung-irradiated deuterated metals." *Physical Review C*, 101(4), 044610.
+- Raiola, F. et al. (2004). "Enhanced electron screening in d(d,p)t for deuterated metals." *European Physical Journal A*, 19(2), 283–287.
+- Czerski, K. et al. (2004). "Enhancement of the electron screening effect for d + d fusion reactions in metallic environments." *Europhysics Letters*, 68(3), 363.
+- Huizenga, J. R. (1993). *Cold Fusion: The Scientific Fiasco of the Century*. University of Rochester Press. (Skeptical review cited in §4.2 as the field's documented failure modes.)
+- Brown, D. A. et al. (2018). "ENDF/B-VIII.0: The 8th major release of the nuclear reaction data library." *Nuclear Data Sheets*, 148, 1–142. (Neutron cross-section validation source, per `literature_validation.rs`.)
+- Miracle, D. B. & Senkov, O. N. (2017). "A critical review of high entropy alloys and related concepts." *Acta Materialia*, 122, 448–511. (HEA property validation source.)
 
 ---
 
-*Report generated by Spark Engine v0.1.0*
+*Report generated by Spark Engine v0.1.0. Original draft 2026-02-05; revised 2026-07-07 alongside the crate's first public release on [crates.io](https://crates.io/crates/spark-engine) and [GitHub](https://github.com/Luminous-Dynamics/spark-engine).*

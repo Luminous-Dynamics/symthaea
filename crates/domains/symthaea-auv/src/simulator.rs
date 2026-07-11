@@ -6,16 +6,6 @@
 use crate::hydrodynamics::{self, HydrodynamicConfig};
 use crate::types::{AuvCommand, AuvState, NUM_ACTUATORS};
 
-/// Convert quaternion [w, x, y, z] to Euler angles [roll, pitch, yaw] in radians.
-/// Uses ZYX convention (aerospace standard).
-fn quaternion_to_euler(q: &[f64; 4]) -> [f64; 3] {
-    let (w, x, y, z) = (q[0], q[1], q[2], q[3]);
-    let roll = (2.0 * (w * x + y * z)).atan2(1.0 - 2.0 * (x * x + y * y));
-    let pitch = (2.0 * (w * y - z * x)).clamp(-1.0, 1.0).asin();
-    let yaw = (2.0 * (w * z + x * y)).atan2(1.0 - 2.0 * (y * y + z * z));
-    [roll, pitch, yaw]
-}
-
 /// Trait for AUV physics simulation backends.
 pub trait AuvPhysicsSimulator {
     fn step(&mut self, cmd: &AuvCommand, dt: f64);
@@ -78,6 +68,16 @@ impl SimpleAuvSimulator {
     pub fn energy_exhausted(&self) -> bool {
         self.energy_remaining_j <= 0.0
     }
+
+    /// Set the attitude quaternion `[w, x, y, z]` directly (normalized on
+    /// entry). For initialization and testing — e.g. spawning the vehicle at
+    /// a heading, or verifying frame math at a known attitude.
+    pub fn set_attitude(&mut self, q: [f64; 4]) {
+        let norm = q.iter().map(|v| v * v).sum::<f64>().sqrt();
+        if norm > 1e-10 {
+            self.state.quaternion = [q[0] / norm, q[1] / norm, q[2] / norm, q[3] / norm];
+        }
+    }
 }
 
 impl Default for SimpleAuvSimulator {
@@ -110,17 +110,33 @@ impl AuvPhysicsSimulator for SimpleAuvSimulator {
         self.energy_consumed_j += energy_this_step;
         self.energy_remaining_j = (self.energy_remaining_j - energy_this_step).max(0.0);
 
-        // Extract Euler angles (roll, pitch, yaw) from quaternion for restoring moments
-        let q = &self.state.quaternion;
-        let orientation_angles = quaternion_to_euler(q);
         let hydro = hydrodynamics::compute_forces(
             &self.hydro_config,
             &self.state.linear_velocity,
             &self.state.angular_velocity,
-            &orientation_angles,
+            &self.state.quaternion,
             self.state.depth,
         );
         let eff = hydrodynamics::effective_mass(&self.hydro_config);
+
+        // External force (currents, tether tugs) is WORLD-frame; rotate into
+        // the body frame the dynamics integrate in.
+        let ext_body = hydrodynamics::world_to_body(&self.state.quaternion, &self.external_force);
+
+        // Rigid-body Coriolis–centripetal terms C(ν)ν (Fossen 2011, §3.3,
+        // diagonal-mass form): f = −ω × (M_eff ⊙ v). Previously absent —
+        // turning while moving had no coupling into sway/heave.
+        let mv = [
+            eff[0] * self.state.linear_velocity[0],
+            eff[1] * self.state.linear_velocity[1],
+            eff[2] * self.state.linear_velocity[2],
+        ];
+        let w = &self.state.angular_velocity;
+        let coriolis = [
+            -(w[1] * mv[2] - w[2] * mv[1]),
+            -(w[2] * mv[0] - w[0] * mv[2]),
+            -(w[0] * mv[1] - w[1] * mv[0]),
+        ];
 
         // Physical velocity limits for a 50kg torpedo-class AUV.
         // Prevents explicit Euler divergence when quadratic drag coefficient
@@ -129,16 +145,24 @@ impl AuvPhysicsSimulator for SimpleAuvSimulator {
         const MAX_LINEAR_VELOCITY: f64 = 5.0; // m/s
         const MAX_ANGULAR_VELOCITY: f64 = 3.0; // rad/s
 
-        // Linear dynamics with velocity-limited integration.
+        // Linear dynamics with velocity-limited integration (BODY frame).
         // The quadratic drag term F = -c*v*|v| is stiff: explicit Euler
         // diverges when |v| is large relative to dt. We apply the force
         // update then clamp, which is equivalent to an implicit drag floor.
         for i in 0..3 {
-            let f = thrust_force[i] + hydro.force[i] + self.external_force[i];
+            let f = thrust_force[i] + hydro.force[i] + ext_body[i] + coriolis[i];
             self.state.linear_velocity[i] += (f / eff[i]) * dt;
             self.state.linear_velocity[i] =
                 self.state.linear_velocity[i].clamp(-MAX_LINEAR_VELOCITY, MAX_LINEAR_VELOCITY);
-            self.state.position[i] += self.state.linear_velocity[i] * dt;
+        }
+        // Position integrates the WORLD-frame velocity. Previously the
+        // body-frame surge/sway/heave were added straight to world position,
+        // so a yawed AUV commanded to surge always advanced world +x —
+        // navigation diverged from truth the moment heading ≠ 0.
+        let world_v =
+            hydrodynamics::body_to_world(&self.state.quaternion, &self.state.linear_velocity);
+        for i in 0..3 {
+            self.state.position[i] += world_v[i] * dt;
         }
 
         // Angular dynamics with velocity-limited integration.
@@ -285,5 +309,45 @@ mod tests {
         sim.reset(50.0);
         assert_eq!(sim.state().speed(), 0.0);
         assert!((sim.state().depth - 50.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_translation_respects_heading() {
+        // Frame regression: a yawed AUV commanded to surge must advance
+        // along its HEADING in the world frame. Before the 2026-07 frame
+        // rework, body-frame velocity was integrated straight into world
+        // position, so this test's yawed vehicle advanced world +x anyway.
+        let mut sim = SimpleAuvSimulator::new();
+        // Yaw 90° about world z: q = [cos(45°), 0, 0, sin(45°)]
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        sim.set_attitude([s, 0.0, 0.0, s]);
+        let p0 = sim.state().position;
+        for _ in 0..500 {
+            sim.step(&AuvCommand::forward(0.5), 0.01);
+        }
+        let dx = (sim.state().position[0] - p0[0]).abs();
+        let dy = (sim.state().position[1] - p0[1]).abs();
+        assert!(
+            dy > 5.0 * dx.max(1e-6),
+            "yawed 90°, surge must move world y, got dx={dx:.3} dy={dy:.3}"
+        );
+        assert!(dy > 0.5, "should actually have moved: dy={dy:.3}");
+    }
+
+    #[test]
+    fn test_coriolis_couples_turn_into_sway() {
+        // With surge velocity and a yaw rate, the rigid-body Coriolis term
+        // −ω × (M v) must push sway — absent before the frame rework.
+        let cfg = crate::hydrodynamics::HydrodynamicConfig::default();
+        let eff = crate::hydrodynamics::effective_mass(&cfg);
+        // Direct term check (unit-level, no integration noise):
+        let v = [1.0, 0.0, 0.0]; // surge 1 m/s
+        let w = [0.0, 0.0, 0.5]; // yawing 0.5 rad/s
+        let mv = [eff[0] * v[0], eff[1] * v[1], eff[2] * v[2]];
+        let coriolis_y = -(w[2] * mv[0] - w[0] * mv[2]);
+        assert!(
+            coriolis_y.abs() > 1.0,
+            "turn+surge must produce a sway Coriolis force, got {coriolis_y}"
+        );
     }
 }

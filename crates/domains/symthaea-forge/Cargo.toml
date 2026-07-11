@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-forge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Mutate -> verify -> benchmark -> select algorithm search over a single target function's AST. Tier 2 of DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md: never auto-applies a mutation, always human-reviewed via a written certificate."
+
+[[bin]]
+name = "forge-run"
+path = "src/bin/forge_run.rs"
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "visit", "visit-mut", "extra-traits"] }
+quote = "1.0"
+prettyplease = "0.2"
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]

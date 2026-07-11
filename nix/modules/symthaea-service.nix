@@ -48,6 +48,10 @@ let
     export SYMTHAEA_SERVICE_BEARER_TOKEN="$(cat "$CREDENTIALS_DIRECTORY/bearer_token")"
     exec "${binPath}" \
       --socket "${cfg.socketPath}" \
+      --database "${cfg.databasePath}" \
+      --state-file "${cfg.stateFile}" \
+      ${optionalString (cfg.httpAddr != null) "--http ${cfg.httpAddr}"} \
+      ${optionalString cfg.experienceBridge "--experience-bridge"} \
       ${optionalString cfg.verbose "-v"}
   '';
 in {
@@ -73,6 +77,80 @@ in {
         curriculum.json), which is NOT where real curriculum data lives on
         this host — confirmed 2026-07-04, same gotcha already documented in
         broca-curriculum-cycle-timer.nix.
+      '';
+    };
+
+    databasePath = mkOption {
+      type = types.str;
+      default = "/srv/luminous-dynamics/.symthaea/consciousness.db";
+      description = ''
+        SQLite consciousness database (--database). Activates the
+        persist→recall→re-perceive experience loop that was dark until
+        2026-07-09 (AGW plan Phase 1): before this option, the daemon
+        constructed Symthaea::new() with no database, so memory recall,
+        episodic persistence, and Polymath consolidation were all
+        silently disabled (hourly "no database attached" warnings).
+        Must live under a ReadWritePaths entry — the unit's hardening
+        blocks everything else. The daemon HARD-FAILS at startup if the
+        database cannot be attached (deliberate: no silent amnesia).
+      '';
+    };
+
+    httpAddr = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "127.0.0.1:8090";
+      description = ''
+        Optional HTTP gateway bind address (--http). Phase 1 of
+        SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md: serves the same JSON wire
+        protocol over POST /v1/service plus GET /health and GET /metrics
+        (Prometheus text needs the binary built with the api_module
+        feature). Off by default — enabling it (and re-pointing the
+        currently-dead symthaea.luminousdynamics.io cloudflared ingress)
+        is a deliberate deploy decision. The daemon applies the same
+        refusal-to-bind-non-loopback-without-auth policy as --tcp; keep
+        this loopback and let the tunnel do public termination. NOTE: the
+        8090 example collides with eval-api's paper claim on 8090 —
+        neither runs today; the plan doc recommends the gateway takes
+        8090 and eval-api moves if ever deployed.
+      '';
+    };
+
+    experienceBridge = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        SYMTHAEA_EXPERIENCE_BRIDGE — drives one autonomous
+        CognitiveLoopService::cycle() per query, sharing databasePath's
+        SQLite file as the loop's knowledge store (AGW plan Phase 3).
+        Lets the loop's knowledge graph shape the facade's ethics
+        evaluation the same turn, and accumulates conversational
+        experience the loop would otherwise never see. Defaults off
+        pending a production verification pass — flip on once the
+        two-loop experience bridge has been observed live.
+      '';
+    };
+
+    stateFile = mkOption {
+      type = types.str;
+      default = "/srv/luminous-dynamics/.symthaea/service-state.json";
+      description = ''
+        Pause/resume state file (--state-file): partnership/trust state,
+        interaction count, trajectory. Written on graceful shutdown,
+        resumed at startup. Without it, relationship state resets on
+        every restart. Same ReadWritePaths constraint as databasePath.
+      '';
+    };
+
+    facadeCalibrationPath = mkOption {
+      type = types.str;
+      default = "/srv/luminous-dynamics/.symthaea/facade_calibration.json";
+      description = ''
+        SYMTHAEA_FACADE_CALIBRATION_PATH — Brier calibration warm-start
+        state. The code default (~/.symthaea/...) is unreachable under
+        ProtectHome=true, so it must be redirected into the writable
+        store. Inert until the binary is built with the magi_loop
+        feature (AGW plan Phase 2.2), but harmless to set now.
       '';
     };
 
@@ -140,10 +218,21 @@ in {
           "SYMTHAEA_CURRICULUM_PATH=${cfg.curriculumPath}"
           "SYMTHAEA_LLM_MODEL=${cfg.llmModel}"
           "SYMTHAEA_LLM_TIMEOUT_SECS=${toString cfg.llmTimeoutSecs}"
+          "SYMTHAEA_FACADE_CALIBRATION_PATH=${cfg.facadeCalibrationPath}"
         ];
         ExecStart = "${launcher}";
         Restart = "always";
         RestartSec = "5s";
+
+        # Guardrail added 2026-07-08 as defense-in-depth, not a response to
+        # an observed leak here (this daemon sat at ~7MB RSS idle when
+        # checked) — added alongside a real incident on mail-conductor.service
+        # (see monorepo CLAUDE.md "Conductor hygiene") where an unbounded
+        # service reached 22-30GB RSS on this same 31GB host. Generous
+        # relative to today's footprint; just a ceiling in case the
+        # curriculum-extension/LLM-call path ever holds onto large buffers.
+        MemoryHigh = "2G";
+        MemoryMax = "4G";
 
         # Hardening — mirrors mycelix-prism/nix/prism-service.nix, plus
         # ReadWritePaths for the curriculum store this daemon writes to.

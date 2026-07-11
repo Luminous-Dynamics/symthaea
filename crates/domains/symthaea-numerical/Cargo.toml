@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-numerical"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pure-std numerical methods for the domain-crate ecosystem: root finding (bisection/Newton/secant), quadrature (trapezoidal/Simpson), ODE integration (RK4, scalar and systems), and interpolation (Lagrange/linear). Consolidates the RK4 previously reinvented per-crate. Ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]

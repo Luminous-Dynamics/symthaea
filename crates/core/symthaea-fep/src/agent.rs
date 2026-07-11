@@ -491,6 +491,12 @@ impl ActiveInferenceAgent {
         self.model.inject_priors(mean, precision);
     }
 
+    /// Set the additive transition bias for `action` (Passport Route for
+    /// transition dynamics — see `GenerativeModel::transition_bias`'s doc).
+    pub fn set_transition_bias(&mut self, action: usize, bias: Vec<f64>) {
+        self.model.set_transition_bias(action, bias);
+    }
+
     /// Reset agent state
     pub fn reset(&mut self) {
         self.belief = HiddenState::new(self.config.state_dim);

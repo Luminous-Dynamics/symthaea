@@ -149,8 +149,10 @@ fn main() {
         );
     }
 
-    println!("\n  C = Classic (random projections)");
-    println!("  N = Neural (trained on MAESTRO)");
+    println!("\n  C = Classic (rand-based melody)");
+    println!("  N = Neural (CfC; loads trained projections IF data/midi-training/");
+    println!("      melody_projections.json exists — otherwise runs UNTRAINED defaults,");
+    println!("      making this an architecture comparison, not a training comparison)");
     println!("  note = note count, mel = melodic interest, comp = composite score");
     println!("  Δcomp = Neural minus Classic (positive = Neural better)\n");
     println!("  WAV audio: audio_output/trained_{{state}}_{{classic,neural}}.wav");

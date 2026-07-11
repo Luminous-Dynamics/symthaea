@@ -5,14 +5,27 @@
 //! Features: configurable partials (1-16), Freeverb (8 comb + 4 allpass),
 //! sub-bass, detuned unison, filtered noise, per-voice stereo panning.
 
-use crate::voice::Arrangement;
+use crate::instruments::Instrument;
+use crate::voice::{Arrangement, VoiceRole};
 use crate::{AudioData, MuseConfig, MusicalState, Note, OutputFormat};
 
+#[derive(Clone, Copy)]
 pub(crate) struct Adsr {
     pub(crate) attack: f32,
     pub(crate) decay: f32,
     pub(crate) sustain: f32,
     pub(crate) release: f32,
+}
+
+impl From<(f32, f32, f32, f32)> for Adsr {
+    fn from((attack, decay, sustain, release): (f32, f32, f32, f32)) -> Self {
+        Adsr {
+            attack,
+            decay,
+            sustain,
+            release,
+        }
+    }
 }
 
 // ─── Freeverb ───────────────────────────────────────────────────────────────
@@ -25,14 +38,21 @@ pub(crate) struct Freeverb {
     comb_r: Vec<CombFilter>,
     allpass_l: Vec<AllpassFilter>,
     allpass_r: Vec<AllpassFilter>,
+    /// Current wet gain, smoothed per sample toward `target_wet`. `set_params`
+    /// must never step wet, feedback, or damping directly: wet multiplies the
+    /// whole tail, and a feedback step (e.g. consciousness 0.1→0.9 retunes
+    /// fb 0.41→0.85) writes a ~2× jump into the recirculating comb buffers —
+    /// both are audible zipper clicks. All three glide here per sample.
     pub(crate) wet: f32,
+    target_wet: f32,
+    feedback: f32,
+    target_feedback: f32,
+    damping: f32,
+    target_damping: f32,
 }
 struct CombFilter {
     buffer: Vec<f32>,
     index: usize,
-    feedback: f32,
-    damp1: f32,
-    damp2: f32,
     filterstore: f32,
 }
 struct AllpassFilter {
@@ -47,9 +67,6 @@ impl Freeverb {
         let mc = |d: usize, o: usize| CombFilter {
             buffer: vec![0.0; ((d + o) as f32 * scale) as usize + 1],
             index: 0,
-            feedback: fb,
-            damp1: damping,
-            damp2: 1.0 - damping,
             filterstore: 0.0,
         };
         let ma = |d: usize, o: usize| AllpassFilter {
@@ -65,27 +82,34 @@ impl Freeverb {
                 .map(|&d| ma(d, STEREO_SPREAD))
                 .collect(),
             wet,
+            target_wet: wet,
+            feedback: fb,
+            target_feedback: fb,
+            damping,
+            target_damping: damping,
         }
     }
-    /// Update reverb parameters WITHOUT destroying the tail.
+    /// Update reverb parameters WITHOUT destroying the tail. Targets only —
+    /// the live values glide per sample in `process_stereo` (see field doc).
     pub(crate) fn set_params(&mut self, room_size: f32, damping: f32, wet: f32) {
-        let fb = 0.28 + room_size.clamp(0.0, 1.0) * 0.7;
-        let d1 = damping.clamp(0.0, 1.0);
-        let d2 = 1.0 - d1;
-        for c in self.comb_l.iter_mut().chain(self.comb_r.iter_mut()) {
-            c.feedback = fb;
-            c.damp1 = d1;
-            c.damp2 = d2;
-        }
-        self.wet = wet.clamp(0.0, 1.0);
+        self.target_feedback = 0.28 + room_size.clamp(0.0, 1.0) * 0.7;
+        self.target_damping = damping.clamp(0.0, 1.0);
+        self.target_wet = wet.clamp(0.0, 1.0);
     }
     pub(crate) fn process_stereo(&mut self, il: f32, ir: f32) -> (f32, f32) {
+        // Glide all parameters toward their targets (~23ms time constant at
+        // 44.1kHz) — see the field doc: stepping any of them clicks.
+        self.wet += (self.target_wet - self.wet) * 0.001;
+        self.feedback += (self.target_feedback - self.feedback) * 0.001;
+        self.damping += (self.target_damping - self.damping) * 0.001;
+        let (fb, d1) = (self.feedback, self.damping);
+        let d2 = 1.0 - d1;
         let (mut ol, mut or) = (0.0f32, 0.0f32);
         for c in &mut self.comb_l {
-            ol += cp(c, il);
+            ol += cp(c, il, fb, d1, d2);
         }
         for c in &mut self.comb_r {
-            or += cp(c, ir);
+            or += cp(c, ir, fb, d1, d2);
         }
         for a in &mut self.allpass_l {
             ol = ap(a, ol);
@@ -97,17 +121,29 @@ impl Freeverb {
         (il * d + ol * self.wet, ir * d + or * self.wet)
     }
 }
-fn cp(c: &mut CombFilter, input: f32) -> f32 {
+/// Flush subnormal floats to zero.
+///
+/// Every feedback/recursive filter in the crate must pass its state through
+/// this: as a reverb tail or filter state decays toward silence it enters the
+/// subnormal range, where x86 float ops run 10-100× slower — a classic
+/// real-time audio CPU spike. Threshold 1e-20 is ~120 dB below the smallest
+/// audible sample, far outside anything musically meaningful.
+#[inline(always)]
+pub(crate) fn flush_denormal(x: f32) -> f32 {
+    if x.abs() < 1e-20 { 0.0 } else { x }
+}
+
+fn cp(c: &mut CombFilter, input: f32, feedback: f32, damp1: f32, damp2: f32) -> f32 {
     let o = c.buffer[c.index];
-    c.filterstore = o * c.damp2 + c.filterstore * c.damp1;
-    c.buffer[c.index] = input + c.filterstore * c.feedback;
+    c.filterstore = flush_denormal(o * damp2 + c.filterstore * damp1);
+    c.buffer[c.index] = flush_denormal(input + c.filterstore * feedback);
     c.index = (c.index + 1) % c.buffer.len();
     o
 }
 fn ap(a: &mut AllpassFilter, input: f32) -> f32 {
     let b = a.buffer[a.index];
     let o = b - input;
-    a.buffer[a.index] = input + b * 0.5;
+    a.buffer[a.index] = flush_denormal(input + b * 0.5);
     a.index = (a.index + 1) % a.buffer.len();
     o
 }
@@ -164,7 +200,147 @@ pub fn render_arrangement(
     for voice in &arrangement.voices {
         let theta = (voice.pan + 1.0) * std::f32::consts::FRAC_PI_4;
         let (gl, gr) = (theta.cos(), theta.sin());
-        for note in &voice.notes {
+
+        // A voice with a real `instrument` set gets that instrument's OWN
+        // acoustic partials/envelope (or its physical model — Karplus-Strong
+        // / FM — entirely bypassing the additive path below) instead of the
+        // single mood-derived timbre every voice used to share. This is the
+        // fix for "every voice sounds like the same chiptune patch in a
+        // different register": melody/harmony/bass can now genuinely be a
+        // violin, a piano, and a cello. See `voice::Voice::instrument`.
+        let additive_instrument = voice
+            .instrument
+            .filter(|i| !i.uses_karplus_strong() && !i.uses_fm());
+        let local_adsr: Adsr = additive_instrument
+            .map(|i| Adsr::from(i.default_adsr()))
+            .unwrap_or(adsr);
+
+        for (ni, note) in voice.notes.iter().enumerate() {
+            // Legato: when the previous note in this voice ends where this
+            // one begins (within 35ms) AND the motion is stepwise, the
+            // recorded ATTACK of the incoming sample is the enemy — a fresh
+            // bow/tongue transient inside a slur is the "MIDI preview"
+            // sound. The gate is deliberately narrow (first version slurred
+            // EVERYTHING adjacent, which turned the walking bass into
+            // attack-less mush — "the strings are not played properly"):
+            // - stepwise only (≤3.5 semitones): a leap takes a fresh bow;
+            // - never the bass voice: a walking bass re-articulates
+            //   every note, that IS the walk;
+            // - only bowed/blown instruments: plucked/struck timbres are
+            //   their attack.
+            #[cfg(not(target_arch = "wasm32"))]
+            let legato_from_prev = ni > 0
+                && voice.role != VoiceRole::Bass
+                && voice
+                    .instrument
+                    .map(instrument_benefits_from_legato)
+                    .unwrap_or(false)
+                && {
+                    let prev = &voice.notes[ni - 1];
+                    let gap = note.start_time - (prev.start_time + prev.duration);
+                    let semis = (12.0 * (note.frequency / prev.frequency).log2()).abs();
+                    (-0.035..=0.035).contains(&gap) && semis <= 3.5
+                };
+            // Long sustained bowed/blown notes get a gentle messa di voce
+            // (swell toward ~40%, relax after) — a flat-gain 3-second note
+            // is a note PARKED, not played. The held-arrival cadence tones
+            // and the held climax are exactly these notes.
+            #[cfg(not(target_arch = "wasm32"))]
+            let sustained_shape = note.duration >= 1.2
+                && voice
+                    .instrument
+                    .map(instrument_benefits_from_legato)
+                    .unwrap_or(false);
+            if let Some(instrument) = voice.instrument {
+                // Sampled instruments first: when the VCSL library is active
+                // (SYMTHAEA_VCSL_DIR or vcsl::init) and has a bank for this
+                // instrument, the note plays from a REAL recording. Inactive
+                // or unmapped → the synthesis paths below, unchanged.
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(lib) = crate::vcsl::library() {
+                    // Articulation-aware: notes short enough to be PLAYED
+                    // short use the real staccato/spiccato bank when the
+                    // library ships one — a truncated sustain never sounds
+                    // like an actual short bow. Falls through to the
+                    // sustain bank, then to synthesis.
+                    let mut done = false;
+                    // 130ms, not 250: the MAESTRO articulation model can
+                    // shorten ordinary detached eighths below 250ms at
+                    // brisk tempi, and merely-detached notes must not flip
+                    // to spiccato -- that articulation is for notes PLAYED
+                    // short (true staccato, grace notes). Defensive guard:
+                    // at slow tempi nothing lands in the 130-250ms band.
+                    if note.duration < 0.13
+                        && let Some(stac) = lib.staccato_bank(instrument)
+                    {
+                        // A staccato note IS its attack — never legato.
+                        done = render_vcsl_note(
+                            &mut bl,
+                            &mut br,
+                            sr,
+                            note,
+                            voice.volume,
+                            gl,
+                            gr,
+                            stac,
+                            false,
+                            false,
+                        );
+                    }
+                    if !done && let Some(bank) = lib.bank(instrument) {
+                        done = render_vcsl_note(
+                            &mut bl,
+                            &mut br,
+                            sr,
+                            note,
+                            voice.volume,
+                            gl,
+                            gr,
+                            bank,
+                            legato_from_prev,
+                            sustained_shape,
+                        );
+                    }
+                    if done {
+                        continue;
+                    }
+                }
+                if instrument.uses_karplus_strong() {
+                    render_karplus_note(
+                        &mut bl,
+                        &mut br,
+                        sr,
+                        note,
+                        voice.volume,
+                        gl,
+                        gr,
+                        instrument,
+                    );
+                    continue;
+                }
+                if instrument.uses_fm() {
+                    render_fm_note(
+                        &mut bl,
+                        &mut br,
+                        sample_rate,
+                        note,
+                        voice.volume,
+                        gl,
+                        gr,
+                        instrument,
+                    );
+                    continue;
+                }
+            }
+            // Per-NOTE timbre: velocity shapes the spectrum (ff is brighter,
+            // not just louder), piano gets stretched partials, sustained
+            // instruments keep their brightness, and the instrument's attack
+            // transient (bow bite / chiff / hammer) speaks at the onset.
+            // Voices with no instrument keep the legacy mood-derived timbre.
+            let timbre = match additive_instrument {
+                Some(i) => NoteTimbre::for_instrument(i, note),
+                None => NoteTimbre::legacy(&partials),
+            };
             for &ir in &chord_intervals {
                 let freq = note.frequency * ir;
                 let cv = if (ir - 1.0).abs() < 0.01 { 1.0 } else { 0.35 };
@@ -177,8 +353,8 @@ pub fn render_arrangement(
                     cv * voice.volume,
                     gl,
                     gr,
-                    &partials,
-                    &adsr,
+                    &timbre,
+                    &local_adsr,
                     fm_depth,
                     fm_ratio,
                     filter_open,
@@ -196,7 +372,7 @@ pub fn render_arrangement(
                             (1.0 - state.serotonin) * 0.4 * voice.volume,
                             gl,
                             gr,
-                            &adsr,
+                            &local_adsr,
                         );
                     }
                 }
@@ -212,8 +388,8 @@ pub fn render_arrangement(
                             cv * voice.volume * 0.3,
                             gl,
                             gr,
-                            &partials,
-                            &adsr,
+                            &timbre,
+                            &local_adsr,
                             fm_depth,
                             fm_ratio,
                             filter_open,
@@ -234,7 +410,7 @@ pub fn render_arrangement(
             state.noradrenaline,
         );
     }
-    let rw = 0.1 + state.consciousness_level * 0.3;
+    let rw = config.reverb.wet_floor + state.consciousness_level * 0.3;
     let mut rv = Freeverb::new(
         sample_rate,
         config.reverb.room_size,
@@ -320,6 +496,88 @@ pub fn render_notes(
 }
 
 // ─── Core ───────────────────────────────────────────────────────────────────
+
+/// Deterministic per-note variation seed: two notes at different times (or
+/// different pitches/lengths) get different seeds, while re-rendering the
+/// same piece reproduces identical audio. This is the round-robin identity —
+/// before it existed, repeated notes rendered bit-identical audio (additive
+/// partials all phase-locked at 0; every Karplus-Strong pluck used one
+/// hardcoded RNG seed), which reads as "machine gun" to the ear.
+pub(crate) fn note_seed(note: &Note) -> u32 {
+    note.start_time.to_bits()
+        ^ note.frequency.to_bits().rotate_left(13)
+        ^ note.duration.to_bits().rotate_left(27)
+}
+
+/// Per-note timbre for the additive path. Before this existed, a voice had
+/// ONE static spectrum for the whole piece: velocity was a pure amplitude
+/// multiplier ("organ mode" — a ff note was just a louder pp note), piano
+/// partials were perfectly harmonic, sustained bowed notes dulled over time
+/// as if they'd been struck, and no instrument had an onset transient.
+pub(crate) struct NoteTimbre {
+    /// Velocity-shaped partial amplitudes (see
+    /// [`Instrument::partials_at_velocity`]).
+    partials: Vec<f32>,
+    /// Stiff-string inharmonicity coefficient B (0 = perfectly harmonic).
+    inharmonicity: f32,
+    /// Per-partial decay speed: ~0.8 for struck/plucked (ringing notes dull),
+    /// much lower for continuously-energized instruments (bowed/blown notes
+    /// keep their brightness while played).
+    decay_rate: f32,
+    /// Attack transient noise (bow bite / breath chiff / hammer click):
+    /// amplitude and duration in seconds. 0.0 disables.
+    attack_amp: f32,
+    attack_dur: f32,
+    /// Vibrato `(rate_hz, depth_ratio, onset_delay_s)` — see
+    /// [`Instrument::vibrato`]. `None` = stationary pitch (the pre-vibrato
+    /// behavior, and the honest setting for organ/struck/plucked timbres).
+    vibrato: Option<(f32, f32, f32)>,
+}
+
+impl NoteTimbre {
+    /// Timbre for one note of a known instrument.
+    fn for_instrument(instrument: Instrument, note: &Note) -> Self {
+        let (attack_amp, attack_dur) = instrument.attack_noise();
+        NoteTimbre {
+            partials: instrument.partials_at_velocity(note.velocity).to_vec(),
+            inharmonicity: instrument.inharmonicity(note.frequency),
+            decay_rate: if instrument.sustains() { 0.12 } else { 0.8 },
+            attack_amp,
+            attack_dur,
+            vibrato: instrument.vibrato(),
+        }
+    }
+
+    /// Legacy mood-derived timbre (voices with no instrument assigned):
+    /// preserves the pre-existing behavior exactly — harmonic partials,
+    /// struck-style decay, no transient.
+    fn legacy(partials: &[f32]) -> Self {
+        NoteTimbre {
+            partials: partials.to_vec(),
+            inharmonicity: 0.0,
+            decay_rate: 0.8,
+            attack_amp: 0.0,
+            attack_dur: 0.0,
+            vibrato: None,
+        }
+    }
+}
+
+/// Per-partial initial phases for one note, derived from its seed. Real
+/// instruments never start every harmonic at phase 0 twice in a row; the
+/// phase set changes the attack's crest pattern, so repeated notes stop
+/// being sample-identical while each render stays deterministic.
+fn partial_phases(seed: u32) -> [f32; 16] {
+    let mut phases = [0.0f32; 16];
+    for (h, p) in phases.iter_mut().enumerate() {
+        let x = seed
+            .wrapping_mul(2654435761)
+            .wrapping_add((h as u32).wrapping_mul(0x9E37_79B9));
+        *p = (x >> 8) as f32 / 16777216.0 * std::f32::consts::TAU;
+    }
+    phases
+}
+
 fn render_tone(
     bl: &mut [f32],
     br: &mut [f32],
@@ -329,7 +587,7 @@ fn render_tone(
     vol: f32,
     gl: f32,
     gr: f32,
-    partials: &[f32],
+    timbre: &NoteTimbre,
     adsr: &Adsr,
     fm_depth: f32,
     fm_ratio: f32,
@@ -341,6 +599,33 @@ fn render_tone(
     let rel = (adsr.release * sr) as usize;
     let mf = freq * fm_ratio;
     let ny = sr * 0.5;
+    // Round-robin: this note's own partial start-phases (see partial_phases).
+    // Also fold the actual rendered freq in, so chord-interval copies of the
+    // same note don't share a phase set.
+    let seed = note_seed(note) ^ freq.to_bits();
+    let phases = partial_phases(seed);
+
+    // Partial frequencies, hoisted out of the sample loop: stiff-string
+    // inharmonicity stretches partial h to f·(h+1)·√(1+B(h+1)²) — for piano
+    // this is the Conklin-measured B, for everything else B=0 gives the
+    // plain harmonic series.
+    let b = timbre.inharmonicity;
+    let mut cfs = [0.0f32; 16];
+    for (h, cf) in cfs.iter_mut().enumerate().take(timbre.partials.len()) {
+        let n = (h + 1) as f32;
+        let stretch = if b > 0.0 {
+            (1.0 + b * n * n).sqrt()
+        } else {
+            1.0
+        };
+        *cf = freq * n * stretch;
+    }
+
+    // Attack transient noise state (bow bite / breath chiff / hammer click).
+    // Runs OUTSIDE the amplitude envelope: the whole point of a transient is
+    // that it speaks before the tone swells.
+    let mut noise_rng = seed ^ 0x5EED_A77A;
+    let attack_samples = (timbre.attack_dur * sr) as usize;
 
     // Filter envelope: cutoff sweeps from filter_open to filter_close over the note.
     // Values are passed as parameters (computed per-emotion in render_arrangement).
@@ -358,9 +643,26 @@ fn render_tone(
         let cutoff = freq * filter_ratio;
 
         let fm = fm_depth * (std::f32::consts::TAU * mf * t).sin();
+        // Vibrato: true frequency modulation via the phase integral —
+        // f(t) = cf·(1 + d·sin(2πf_v t)) integrates to a phase term
+        // −(cf·d/f_v)·cos(2πf_v t). The depth ramps in over 0.3s after the
+        // instrument's onset delay (players don't vibrate the attack), and
+        // the (cf-proportional) term is applied per partial so the whole
+        // harmonic stack breathes coherently instead of shimmering apart.
+        let vib_factor = match timbre.vibrato {
+            Some((rate, depth, delay)) => {
+                let ramp = ((t - delay) / 0.3).clamp(0.0, 1.0);
+                if ramp > 0.0 {
+                    -(depth * ramp / rate) * (std::f32::consts::TAU * rate * t).cos()
+                } else {
+                    0.0
+                }
+            }
+            None => 0.0,
+        };
         let mut s = 0.0f32;
-        for (h, &a) in partials.iter().enumerate() {
-            let cf = freq * (h + 1) as f32;
+        for (h, &a) in timbre.partials.iter().enumerate() {
+            let cf = cfs[h];
             if cf >= ny {
                 break;
             }
@@ -371,17 +673,23 @@ fn render_tone(
                 1.0
             };
             // PER-PARTIAL ENVELOPE: upper partials decay faster than fundamentals.
-            // Real instruments (piano, strings, wind) have this physics: higher
-            // harmonics dissipate energy faster due to string stiffness, air
-            // absorption, body filtering. The fundamental rings; harmonics fade.
-            //
-            // Decay rate scales with partial index: partial N decays ~N× faster
-            // than fundamental. At t=1s, partial 8 is at 0.37× its initial
-            // amplitude while fundamental is still near 1.0.
-            let partial_decay = (-t * 0.8 * (h as f32).sqrt()).exp();
-            s += a * filter_atten * partial_decay * (std::f32::consts::TAU * cf * t + fm).sin();
+            // Rate comes from the timbre: struck/plucked notes dull as they
+            // ring; continuously-energized (bowed/blown) notes keep their
+            // brightness while played.
+            let partial_decay = (-t * timbre.decay_rate * (h as f32).sqrt()).exp();
+            let phase = phases[h.min(phases.len() - 1)];
+            s += a
+                * filter_atten
+                * partial_decay
+                * (std::f32::consts::TAU * cf * t + cf * vib_factor + fm + phase).sin();
         }
-        let o = s * env * note.velocity * vol * 0.2;
+        let mut o = s * env * note.velocity * vol * 0.2;
+        if i < attack_samples {
+            noise_rng = noise_rng.wrapping_mul(1103515245).wrapping_add(12345);
+            let n = (noise_rng >> 8) as f32 / 8388608.0 - 1.0; // [-1, 1)
+            let ramp = 1.0 - i as f32 / attack_samples as f32;
+            o += timbre.attack_amp * n * ramp * note.velocity * vol * 0.2;
+        }
         bl[si] += o * gl;
         br[si] += o * gr;
     }
@@ -412,6 +720,229 @@ fn render_sub(
             * note.velocity
             * vol
             * 0.15;
+        bl[si] += o * gl;
+        br[si] += o * gr;
+    }
+}
+
+/// Render one note through Karplus-Strong plucked-string synthesis (see
+/// [`crate::instruments::KarplusStrong`]) instead of the additive engine.
+/// The string is excited once and left to ring past the note's nominal
+/// duration — a real pluck decays on its own, it doesn't have an ADSR
+/// release phase bolted onto a sustained tone.
+// Matches the existing arg-count shape of render_tone/render_sub in this
+// same file (buffer pair + sample rate + note + gain/pan + synthesis
+// params) -- consistent with the established local convention rather than
+// introducing a bespoke params struct just for this one function.
+#[allow(clippy::too_many_arguments)]
+fn render_karplus_note(
+    bl: &mut [f32],
+    br: &mut [f32],
+    sr: f32,
+    note: &Note,
+    vol: f32,
+    gl: f32,
+    gr: f32,
+    instrument: Instrument,
+) {
+    let (damping, brightness, _stiffness) = instrument.ks_params();
+    // Velocity → brightness: a hard pluck excites more high-frequency string
+    // modes than a gentle one. The loop filter `b·x[n] + (1−b)·x[n+1]` damps
+    // highs by |2b−1| per pass — DULLEST at b = 0.5, brighter on EITHER side
+    // (a naive `b × velocity_factor` scaling can therefore darken a hard
+    // pluck; a test caught exactly that). So soft notes pull b toward 0.5
+    // (more averaging) and full velocity restores the instrument's own value,
+    // keeping v=1.0 renders identical to the instrument's designed character.
+    let brightness = 0.5 + (brightness - 0.5) * (0.4 + 0.6 * note.velocity.clamp(0.0, 1.0));
+    let mut ks =
+        crate::instruments::KarplusStrong::new(note.frequency, sr as u32, damping, brightness);
+    // Round-robin: a per-note excitation seed, so repeated notes and chord
+    // strums stop sounding like the same pluck sample retriggered.
+    ks.excite_seeded(note.velocity, note_seed(note));
+    let start = (note.start_time * sr) as usize;
+    // Let the string ring out well past its nominal duration -- a pluck's
+    // decay IS its release, there's no separate ADSR release to add.
+    let ring = (note.duration * sr) as usize + (0.8 * sr) as usize;
+    for i in 0..ring {
+        let si = start + i;
+        if si >= bl.len() {
+            break;
+        }
+        let s = ks.tick() * vol * 0.6;
+        bl[si] += s * gl;
+        br[si] += s * gr;
+    }
+}
+
+/// 4-point Catmull-Rom (Hermite) interpolation — the standard sampler
+/// interpolator. Linear interpolation leaves high-frequency imaging
+/// artifacts that read as HARSHNESS, worst on upward repitches; cubic
+/// reduces them by orders of magnitude for a few extra multiplies.
+/// Edge points clamp to the boundary sample.
+#[cfg(not(target_arch = "wasm32"))]
+fn hermite_interpolate(frames: &[f32], idx: usize, frac: f32) -> f32 {
+    let xm1 = frames[idx.saturating_sub(1)];
+    let x0 = frames[idx];
+    let x1 = frames[(idx + 1).min(frames.len() - 1)];
+    let x2 = frames[(idx + 2).min(frames.len() - 1)];
+    let c = (x1 - xm1) * 0.5;
+    let v = x0 - x1;
+    let w = c + v;
+    let a = w + v + (x2 - x0) * 0.5;
+    let b = w + a;
+    ((a * frac - b) * frac + c) * frac + x0
+}
+
+/// The bowed/blown sustain instruments whose recorded ATTACK transient
+/// should be skipped on legato continuations. Plucked/struck timbres
+/// (harp, piano, guitar, mallets) are their attack — never skip those.
+#[cfg(not(target_arch = "wasm32"))]
+fn instrument_benefits_from_legato(instrument: Instrument) -> bool {
+    matches!(
+        instrument,
+        Instrument::Violin
+            | Instrument::Cello
+            | Instrument::Flute
+            | Instrument::Clarinet
+            | Instrument::Trumpet
+    )
+}
+
+/// Render one note from a VCSL recorded sample (see [`crate::vcsl`]):
+/// nearest-pitch sample repitched by linear-interpolation resampling, dynamic
+/// layer chosen by note velocity, round-robin by the note's seed. Returns
+/// `false` when the bank has nothing within a musical fifth of the target —
+/// the caller then falls through to synthesis. The recording carries its own
+/// envelope; we only add a 3 ms declick fade-in and a release fade after the
+/// written duration.
+///
+/// `legato_from_prev`: this note continues a slur — start playback past
+/// the worst of the recording's attack transient (~40ms in, bounded by a
+/// quarter of the sample) with a 15ms fade-in. The previous note's 250ms
+/// release tail is still sounding underneath, so the two recordings
+/// crossfade into one gesture instead of re-attacking — the fix for the
+/// per-note "MIDI preview" sound on slurred lines. The CALLER gates this
+/// musically (stepwise motion only, never the bass, bowed/blown only).
+///
+/// `sustained_shape`: a long held note gets a gentle messa di voce swell
+/// instead of parking at constant gain for seconds.
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)] // matches render_tone/render_karplus_note convention
+fn render_vcsl_note(
+    bl: &mut [f32],
+    br: &mut [f32],
+    sr: f32,
+    note: &Note,
+    vol: f32,
+    gl: f32,
+    gr: f32,
+    bank: &crate::vcsl::InstrumentBank,
+    legato_from_prev: bool,
+    sustained_shape: bool,
+) -> bool {
+    let target_midi = 69.0 + 12.0 * (note.frequency / 440.0).log2();
+    // Strict window first; then relaxed (a far-shifted recording beats a
+    // mid-line timbre switch to synthesis — see pick_with_window).
+    let picked = bank
+        .pick(target_midi, note.velocity, note_seed(note))
+        .or_else(|| bank.pick_with_window(target_midi, note.velocity, note_seed(note), 12.0, 24.0));
+    let Some(sample) = picked else {
+        return false;
+    };
+    let ratio =
+        2f32.powf((target_midi - sample.midi as f32) / 12.0) * (sample.sample_rate as f32 / sr);
+    if !ratio.is_finite() || ratio <= 0.0 {
+        return false;
+    }
+    let start = (note.start_time * sr) as usize;
+    let release = 0.25f32;
+    let out_len = ((note.duration + release) * sr) as usize;
+    let fade_in = if legato_from_prev {
+        ((0.015 * sr) as usize).max(1)
+    } else {
+        ((0.003 * sr) as usize).max(1)
+    };
+    let fade_start = (note.duration * sr) as usize;
+    // The sample was RECORDED at its dynamic layer (a soft layer already
+    // sounds soft), so velocity only trims level mildly on top.
+    let gain = 0.5 * (0.6 + 0.4 * note.velocity) * vol;
+    // 40ms: enough to soften the bow/tongue transient inside a slur while
+    // keeping some articulation — the first cut (80ms) erased the note
+    // starts entirely and strings read as "not played properly".
+    let sample_secs = sample.frames.len() as f32 / sample.sample_rate as f32;
+    let attack_skip_secs = if legato_from_prev {
+        0.04f32.min(sample_secs * 0.25)
+    } else {
+        0.0
+    };
+    let mut src_pos = attack_skip_secs * sample.sample_rate as f32;
+    for i in 0..out_len {
+        let si = start + i;
+        if si >= bl.len() {
+            break;
+        }
+        let idx = src_pos as usize;
+        if idx + 1 >= sample.frames.len() {
+            break;
+        }
+        let frac = src_pos - idx as f32;
+        let s = hermite_interpolate(&sample.frames, idx, frac);
+        let mut env = 1.0f32;
+        if i < fade_in {
+            env = i as f32 / fade_in as f32;
+        }
+        if i >= fade_start && out_len > fade_start {
+            env *= 1.0 - (i - fade_start) as f32 / (out_len - fade_start) as f32;
+        }
+        if sustained_shape && fade_start > 0 {
+            // Messa di voce: 0.85 at the bow start, swelling to 1.12 at
+            // 40% of the written duration, relaxing to 0.85 by the end.
+            // Piecewise-linear, so it adds no discontinuities of its own.
+            let pos = (i as f32 / fade_start as f32).min(1.0);
+            let arch = if pos < 0.4 {
+                0.85 + 0.27 * (pos / 0.4)
+            } else {
+                1.12 - 0.27 * ((pos - 0.4) / 0.6)
+            };
+            env *= arch;
+        }
+        let o = s * env * gain;
+        bl[si] += o * gl;
+        br[si] += o * gr;
+        src_pos += ratio;
+    }
+    true
+}
+
+/// Render one note through FM synthesis (see
+/// [`crate::instruments::render_fm_instrument`]) instead of the additive
+/// engine — used for the DX7-style/percussive-FM instruments
+/// ([`Instrument::uses_fm`]).
+#[allow(clippy::too_many_arguments)]
+fn render_fm_note(
+    bl: &mut [f32],
+    br: &mut [f32],
+    sample_rate: u32,
+    note: &Note,
+    vol: f32,
+    gl: f32,
+    gr: f32,
+    instrument: Instrument,
+) {
+    let buf = crate::instruments::render_fm_instrument(
+        instrument,
+        note.frequency,
+        note.velocity * vol,
+        note.duration,
+        sample_rate,
+    );
+    let start = (note.start_time * sample_rate as f32) as usize;
+    for (i, &s) in buf.iter().enumerate() {
+        let si = start + i;
+        if si >= bl.len() {
+            break;
+        }
+        let o = s * 0.6;
         bl[si] += o * gl;
         br[si] += o * gr;
     }
@@ -590,14 +1121,12 @@ fn peak_limit(x: f32, ceiling: f32) -> f32 {
     }
 }
 
+/// Soft clipper: identity below |x| = 0.8, smooth compression above, output
+/// bounded to (-1, 1). Delegates to `peak_limit` so the transfer curve is
+/// continuous and monotone. (A previous piecewise version jumped from 1.0
+/// down to 0.5 at |x| = 1.0, wavefolding any over-full-scale sample.)
 pub(crate) fn soft_clip(x: f32) -> f32 {
-    if x > 1.0 {
-        1.0 - (-x + 1.0).exp() * 0.5
-    } else if x < -1.0 {
-        -1.0 + (x + 1.0).exp() * 0.5
-    } else {
-        x
-    }
+    peak_limit(x, 1.0)
 }
 
 #[cfg(test)]
@@ -605,6 +1134,99 @@ mod tests {
     use super::*;
     use crate::voice::{Arrangement, Voice, VoiceRole};
     use crate::{MuseConfig, MusicalState, Note, OutputFormat};
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn legato_continuation_skips_the_recorded_attack() {
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../data/samples/vcsl");
+        let Some(lib) = crate::vcsl::VcslLibrary::load(&root) else {
+            eprintln!("VCSL not on disk — skipping");
+            return;
+        };
+        let Some(bank) = lib.bank(crate::instruments::Instrument::Violin) else {
+            eprintln!("violin bank absent — skipping");
+            return;
+        };
+        let sr = 44100.0f32;
+        let note = Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 0.6,
+            velocity: 0.7,
+        };
+        let render = |legato: bool| {
+            let n = (sr * 1.0) as usize;
+            let (mut bl, mut br) = (vec![0.0f32; n], vec![0.0f32; n]);
+            assert!(render_vcsl_note(
+                &mut bl, &mut br, sr, &note, 1.0, 0.7, 0.7, bank, legato, false
+            ));
+            bl
+        };
+        let plain = render(false);
+        let legato = render(true);
+        // The first 60ms must genuinely differ — the legato render starts
+        // playback past the recorded attack transient.
+        let w = (0.06 * sr) as usize;
+        let diff: f32 = plain[..w]
+            .iter()
+            .zip(&legato[..w])
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let energy: f32 = plain[..w].iter().map(|s| s.abs()).sum();
+        assert!(
+            diff > energy * 0.2,
+            "legato start must differ from the attack (diff {diff}, energy {energy})"
+        );
+        // And it is still real audio, not silence.
+        assert!(legato.iter().any(|s| s.abs() > 1e-4));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn sustained_shape_swells_toward_the_middle_of_a_long_note() {
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../data/samples/vcsl");
+        let Some(lib) = crate::vcsl::VcslLibrary::load(&root) else {
+            eprintln!("VCSL not on disk — skipping");
+            return;
+        };
+        let Some(bank) = lib.bank(crate::instruments::Instrument::Violin) else {
+            eprintln!("violin bank absent — skipping");
+            return;
+        };
+        let sr = 44100.0f32;
+        let note = Note {
+            frequency: 440.0,
+            start_time: 0.0,
+            duration: 2.0,
+            velocity: 0.7,
+        };
+        let render = |shape: bool| {
+            let n = (sr * 2.5) as usize;
+            let (mut bl, mut br) = (vec![0.0f32; n], vec![0.0f32; n]);
+            assert!(render_vcsl_note(
+                &mut bl, &mut br, sr, &note, 1.0, 0.7, 0.7, bank, false, shape
+            ));
+            bl
+        };
+        let flat = render(false);
+        let shaped = render(true);
+        // Same sample, same pick — the only difference is the arch. The
+        // shaped/flat gain ratio must be higher at 40% of the note than
+        // near its start (0.85 → 1.12 swell).
+        let rms = |b: &[f32], at: f32| {
+            let c = (at * 2.0 * sr) as usize;
+            let w = (0.1 * sr) as usize;
+            (b[c..c + w].iter().map(|s| s * s).sum::<f32>() / w as f32).sqrt()
+        };
+        let ratio_start = rms(&shaped, 0.05) / rms(&flat, 0.05).max(1e-9);
+        let ratio_peak = rms(&shaped, 0.40) / rms(&flat, 0.40).max(1e-9);
+        assert!(
+            ratio_peak > ratio_start + 0.1,
+            "arch must swell: start ratio {ratio_start:.3}, peak ratio {ratio_peak:.3}"
+        );
+    }
 
     fn one_note_arrangement(freq: f32) -> Arrangement {
         let note = Note {
@@ -620,15 +1242,341 @@ mod tests {
                 pitch_range: (130.0, 1000.0),
                 volume: 1.0,
                 pan: 0.0,
+                instrument: None,
             }],
         }
+    }
+
+    // ─── round-robin variation ──────────────────────────────────────────────
+
+    #[test]
+    fn repeated_identical_notes_render_differently() {
+        // Two notes identical in every field except start_time must NOT
+        // produce bit-identical waveforms — that phase-locked repetition is
+        // the "machine gun" artifact. Render each note alone into its own
+        // buffer and compare the two note windows sample-for-sample.
+        let sr = 44100.0f32;
+        let n = 4410; // 100ms window
+        let make = |start: f32| Note {
+            frequency: 440.0,
+            start_time: start,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let render = |note: &Note| -> Vec<f32> {
+            let total = ((note.start_time + 1.5) * sr) as usize;
+            let (mut bl, mut br) = (vec![0.0f32; total], vec![0.0f32; total]);
+            let timbre = NoteTimbre::legacy(&[1.0f32, 0.5, 0.33, 0.25]);
+            let adsr = Adsr {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.7,
+                release: 0.2,
+            };
+            render_tone(
+                &mut bl,
+                &mut br,
+                sr,
+                note,
+                note.frequency,
+                1.0,
+                0.7,
+                0.7,
+                &timbre,
+                &adsr,
+                0.0,
+                2.0,
+                8.0,
+                4.0,
+            );
+            let s = (note.start_time * sr) as usize;
+            bl[s..s + n].to_vec()
+        };
+        let a = render(&make(0.0));
+        let b = render(&make(1.0));
+        assert_eq!(a.len(), b.len());
+        assert!(
+            a.iter().zip(&b).any(|(x, y)| x != y),
+            "notes at different times must not be bit-identical"
+        );
+        // Same note re-rendered must reproduce exactly (determinism).
+        let a2 = render(&make(0.0));
+        assert_eq!(a, a2, "same note must render identically across runs");
+        // And the variation must be phase-level, not loudness-level: the two
+        // windows carry comparable energy.
+        let e = |v: &[f32]| v.iter().map(|x| (x * x) as f64).sum::<f64>();
+        let (ea, eb) = (e(&a), e(&b));
+        assert!(
+            (ea / eb).max(eb / ea) < 1.5,
+            "round-robin must not change loudness: {ea:.4} vs {eb:.4}"
+        );
+    }
+
+    // ─── per-note timbre (velocity→spectrum, transients, inharmonicity) ─────
+
+    fn tone_with_timbre(timbre: &NoteTimbre, secs: f32) -> Vec<f32> {
+        let sr = 44100.0f32;
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: secs,
+            velocity: 0.8,
+        };
+        let total = ((secs + 0.5) * sr) as usize;
+        let (mut bl, mut br) = (vec![0.0f32; total], vec![0.0f32; total]);
+        let adsr = Adsr {
+            attack: 0.01,
+            decay: 0.05,
+            sustain: 0.8,
+            release: 0.2,
+        };
+        render_tone(
+            &mut bl, &mut br, sr, &note, 220.0, 1.0, 0.7, 0.7, timbre, &adsr, 0.0, 2.0, 12.0, 8.0,
+        );
+        bl
+    }
+
+    #[test]
+    fn attack_transient_speaks_only_at_the_onset() {
+        let base = NoteTimbre::legacy(&[1.0f32, 0.5, 0.33]);
+        let with_chiff = NoteTimbre {
+            attack_amp: 0.12,
+            attack_dur: 0.04,
+            ..NoteTimbre::legacy(&[1.0f32, 0.5, 0.33])
+        };
+        let a = tone_with_timbre(&base, 1.0);
+        let b = tone_with_timbre(&with_chiff, 1.0);
+        let window = (0.04f32 * 44100.0) as usize;
+        assert!(
+            a[..window].iter().zip(&b[..window]).any(|(x, y)| x != y),
+            "transient must alter the onset"
+        );
+        assert_eq!(
+            &a[window..],
+            &b[window..],
+            "transient must be silent after its duration"
+        );
+    }
+
+    #[test]
+    fn sustained_instruments_keep_brightness_while_struck_ones_dull() {
+        // Same partials, same envelope — only the per-partial decay differs.
+        // Late in a long note, the sustained timbre must retain more energy
+        // (its upper partials are still being energized by the bow/breath).
+        let struck = NoteTimbre {
+            decay_rate: 0.8,
+            ..NoteTimbre::legacy(&[1.0f32, 0.8, 0.6, 0.5, 0.4])
+        };
+        let sustained = NoteTimbre {
+            decay_rate: 0.12,
+            ..NoteTimbre::legacy(&[1.0f32, 0.8, 0.6, 0.5, 0.4])
+        };
+        let a = tone_with_timbre(&struck, 2.0);
+        let b = tone_with_timbre(&sustained, 2.0);
+        let late = (1.5f32 * 44100.0) as usize..(2.0f32 * 44100.0) as usize;
+        let e = |v: &[f32]| v.iter().map(|x| (x * x) as f64).sum::<f64>();
+        assert!(
+            e(&b[late.clone()]) > e(&a[late]) * 1.2,
+            "sustained timbre must keep noticeably more late-note energy"
+        );
+    }
+
+    #[test]
+    fn piano_inharmonicity_changes_the_waveform() {
+        let harmonic = NoteTimbre::legacy(&[1.0f32, 0.8, 0.6, 0.5]);
+        let stretched = NoteTimbre {
+            inharmonicity: 0.0004,
+            ..NoteTimbre::legacy(&[1.0f32, 0.8, 0.6, 0.5])
+        };
+        let a = tone_with_timbre(&harmonic, 0.5);
+        let b = tone_with_timbre(&stretched, 0.5);
+        assert!(
+            a.iter().zip(&b).any(|(x, y)| x != y),
+            "stretched partials must render differently"
+        );
+    }
+
+    #[test]
+    fn ks_velocity_brightens_the_pluck() {
+        // A hard pluck must carry more high-frequency content than a soft
+        // one — measured here as zero crossings over the first 200ms
+        // (loudness alone cannot change a zero-crossing count).
+        let sr = 44100.0f32;
+        let render = |velocity: f32| -> Vec<f32> {
+            let note = Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity,
+            };
+            let total = (1.5 * sr) as usize;
+            let (mut bl, mut br) = (vec![0.0f32; total], vec![0.0f32; total]);
+            render_karplus_note(
+                &mut bl,
+                &mut br,
+                sr,
+                &note,
+                1.0,
+                0.7,
+                0.7,
+                Instrument::AcousticGuitar,
+            );
+            bl
+        };
+        let zc = |v: &[f32]| {
+            v.windows(2)
+                .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
+                .count()
+        };
+        let window = (0.2 * sr) as usize;
+        let soft = render(0.2);
+        let hard = render(1.0);
+        assert!(
+            zc(&hard[..window]) > zc(&soft[..window]),
+            "hard pluck must be brighter: soft={} hard={}",
+            zc(&soft[..window]),
+            zc(&hard[..window])
+        );
+    }
+
+    #[test]
+    fn vibrato_spreads_energy_off_the_carrier() {
+        // Goertzel |X| at the exact carrier frequency: a vibrato-modulated
+        // tone moves energy into sidebands, so the bin at cf must lose
+        // energy vs the identical stationary tone. (An amplitude change
+        // could not fake this — both renders share every other parameter.)
+        let goertzel = |v: &[f32], freq: f32, sr: f32| -> f32 {
+            let w = std::f32::consts::TAU * freq / sr;
+            let coeff = 2.0 * w.cos();
+            let (mut s1, mut s2) = (0.0f32, 0.0f32);
+            for &x in v {
+                let s0 = x + coeff * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            (s1 * s1 + s2 * s2 - coeff * s1 * s2).sqrt()
+        };
+        // Frequency matters: the FM index is β = cf·depth/rate, and the
+        // carrier retains J₀(β) of its amplitude. At 220 Hz with real violin
+        // vibrato (d=0.007, 5.5 Hz), β≈0.28 → J₀≈0.98 — a correct, subtle
+        // vibrato that a coarse threshold can't see (the first version of
+        // this test failed exactly there). At 880 Hz (violin E-string
+        // register), β≈1.12 → J₀≈0.66 — a robustly detectable 34% drop.
+        let sr = 44100.0f32;
+        let render = |vibrato: Option<(f32, f32, f32)>| -> Vec<f32> {
+            let note = Note {
+                frequency: 880.0,
+                start_time: 0.0,
+                duration: 2.0,
+                velocity: 0.8,
+            };
+            let timbre = NoteTimbre {
+                decay_rate: 0.12,
+                vibrato,
+                ..NoteTimbre::legacy(&[1.0f32])
+            };
+            let total = (2.5 * sr) as usize;
+            let (mut bl, mut br) = (vec![0.0f32; total], vec![0.0f32; total]);
+            let adsr = Adsr {
+                attack: 0.01,
+                decay: 0.05,
+                sustain: 0.8,
+                release: 0.2,
+            };
+            render_tone(
+                &mut bl, &mut br, sr, &note, 880.0, 1.0, 0.7, 0.7, &timbre, &adsr, 0.0, 2.0, 12.0,
+                8.0,
+            );
+            bl
+        };
+        let stationary = render(None);
+        let vibed = render(Some((5.5, 0.007, 0.2)));
+        // Late window: vibrato fully developed, envelope in flat sustain.
+        let (a, b) = ((1.0f32 * sr) as usize, (1.9f32 * sr) as usize);
+        let on_carrier_stationary = goertzel(&stationary[a..b], 880.0, sr);
+        let on_carrier_vibed = goertzel(&vibed[a..b], 880.0, sr);
+        assert!(
+            on_carrier_vibed < on_carrier_stationary * 0.8,
+            "vibrato must move energy off the carrier: {on_carrier_vibed} vs {on_carrier_stationary}"
+        );
+    }
+
+    #[test]
+    fn hermite_beats_linear_on_a_known_sine() {
+        // Resample a 1kHz sine by a fractional ratio; compare against the
+        // TRUE analytic values. Hermite must be at least 5x more accurate
+        // than linear — the interpolation error is exactly the "harsh"
+        // imaging noise the sampler used to add.
+        let sr = 44100.0f32;
+        let src: Vec<f32> = (0..2048)
+            .map(|i| (std::f32::consts::TAU * 1000.0 * i as f32 / sr).sin())
+            .collect();
+        let ratio = 1.29739f32; // awkward fraction, worst case for interp
+        let (mut err_h, mut err_l, mut n) = (0.0f64, 0.0f64, 0);
+        let mut pos = 4.0f32;
+        while (pos as usize) + 3 < src.len() {
+            let idx = pos as usize;
+            let frac = pos - idx as f32;
+            let truth = (std::f32::consts::TAU * 1000.0 * pos / sr).sin();
+            let lin = src[idx] * (1.0 - frac) + src[idx + 1] * frac;
+            let her = hermite_interpolate(&src, idx, frac);
+            err_l += (lin - truth).abs() as f64;
+            err_h += (her - truth).abs() as f64;
+            n += 1;
+            pos += ratio;
+        }
+        let (mae_h, mae_l) = (err_h / n as f64, err_l / n as f64);
+        assert!(
+            mae_h * 5.0 < mae_l,
+            "hermite MAE {mae_h} must be well under linear MAE {mae_l}"
+        );
+    }
+
+    // ─── VCSL sampled rendering ─────────────────────────────────────────────
+
+    /// Uses a LOCAL library instance on purpose: initializing the
+    /// process-global `vcsl::library()` from a test would silently switch
+    /// every other render test in this process onto samples.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn vcsl_sample_renders_real_audio_when_library_present() {
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../data/samples/vcsl");
+        let Some(lib) = crate::vcsl::VcslLibrary::load(&root) else {
+            eprintln!("VCSL not on disk — skipping");
+            return;
+        };
+        let Some(bank) = lib.bank(Instrument::Harp) else {
+            panic!("harp bank must index when the library is present");
+        };
+        let sr = 44100.0f32;
+        let note = Note {
+            frequency: 261.63, // C4
+            start_time: 0.0,
+            duration: 1.0,
+            velocity: 0.8,
+        };
+        let n = (2.0 * sr) as usize;
+        let (mut bl, mut br) = (vec![0.0f32; n], vec![0.0f32; n]);
+        assert!(
+            render_vcsl_note(
+                &mut bl, &mut br, sr, &note, 1.0, 0.7, 0.7, bank, false, false
+            ),
+            "a concert-harp C4 must be renderable from samples"
+        );
+        let energy: f32 = bl.iter().map(|x| x * x).sum();
+        assert!(energy > 0.0, "sampled note must produce audio");
+        assert!(bl.iter().chain(br.iter()).all(|x| x.is_finite()));
+        // Declick: the very first sample must be (near) zero, not a step.
+        assert!(bl[0].abs() < 1e-3);
     }
 
     // ─── soft_clip ────────────────────────────────────────────────────────────
 
     #[test]
-    fn soft_clip_identity_in_range() {
-        for x in [-0.9f32, -0.5, 0.0, 0.5, 0.9] {
+    fn soft_clip_identity_in_linear_region() {
+        // Identity below the 0.8 knee
+        for x in [-0.79f32, -0.5, 0.0, 0.5, 0.79] {
             assert!(
                 (soft_clip(x) - x).abs() < 1e-6,
                 "soft_clip({x}) should be identity"
@@ -637,25 +1585,38 @@ mod tests {
     }
 
     #[test]
-    fn soft_clip_bounded() {
-        for x in [-10.0f32, -2.0, 2.0, 10.0] {
+    fn soft_clip_bounded_at_full_scale() {
+        // The compression curve asymptotes to the ceiling; at f32 precision
+        // the exp() underflows for huge inputs and the output reaches exactly
+        // ±1.0 — never beyond.
+        for x in [-1000.0f32, -10.0, -2.0, -1.01, 1.01, 2.0, 10.0, 1000.0] {
             let y = soft_clip(x);
-            assert!(y > -1.5 && y < 1.5, "soft_clip({x}) = {y} exceeds bounds");
+            assert!(
+                y.abs() <= 1.0,
+                "soft_clip({x}) = {y} must never exceed ±1.0"
+            );
         }
     }
 
     #[test]
-    fn soft_clip_monotone_in_linear_region() {
-        // soft_clip is linear (identity) in [-1, 1] — verify monotone there
-        let mut prev = soft_clip(-1.0);
-        for i in 1..=20 {
-            let x = -1.0 + i as f32 * 0.1;
+    fn soft_clip_monotone_and_continuous() {
+        // The whole curve must be monotone non-decreasing and continuous —
+        // the old implementation jumped 1.0 → 0.5 just above x = 1.0
+        // (wavefolding). Sweep across the knee and the old discontinuity.
+        let mut prev = soft_clip(-3.0);
+        let mut x = -3.0f32;
+        while x <= 3.0 {
             let y = soft_clip(x);
             assert!(
                 y >= prev - 1e-6,
                 "soft_clip not monotone at {x}: {y} < {prev}"
             );
+            assert!(
+                (y - prev).abs() < 0.05,
+                "soft_clip discontinuity near {x}: jumped {prev} -> {y}"
+            );
             prev = y;
+            x += 0.01;
         }
     }
 
@@ -796,7 +1757,14 @@ mod tests {
     #[test]
     fn render_fm_depth_affects_output() {
         let arr = one_note_arrangement(440.0);
-        let state = MusicalState::default();
+        // FM is emotion-gated (render_arrangement:140): it only engages for
+        // tense (valence < -0.2, arousal > 0.5) or joyful states. The default
+        // state gates FM to zero, which would make both renders identical.
+        let state = MusicalState {
+            valence: -0.5,
+            arousal: 0.7,
+            ..Default::default()
+        };
         let samples = 22050;
 
         let clean = MuseConfig {
@@ -828,7 +1796,17 @@ mod tests {
     #[test]
     fn render_partials_affect_timbre() {
         let arr = one_note_arrangement(220.0);
-        let state = MusicalState::default();
+        // Timbre is emotion-gated (compute_timbre): the default state falls in
+        // the "sorrowful" branch, deliberately near-sine (0.3/h^2.8 rolloff),
+        // where num_partials is inaudible — and arousal > 0.4 caps partials
+        // regardless of config. Use the contemplative branch (valence > 0.2,
+        // arousal ≤ 0.4), which carries real 3rd/5th-harmonic content and
+        // honors config.num_partials.
+        let state = MusicalState {
+            valence: 0.5,
+            arousal: 0.3,
+            ..Default::default()
+        };
         let n = 22050;
 
         let thin = MuseConfig {
@@ -848,13 +1826,67 @@ mod tests {
         let rich_audio = render_arrangement(&arr, 44100, n, &state, &rich);
 
         if let (AudioData::F32(t), AudioData::F32(r)) = (thin_audio, rich_audio) {
-            // Rich should have higher RMS (more partials = more energy)
-            let rms = |v: &[f32]| (v.iter().map(|x| x * x).sum::<f32>() / v.len() as f32).sqrt();
+            // Loudness normalization equalizes RMS across timbres, so compare
+            // spectral content instead: normalized first-difference energy is a
+            // high-frequency proxy — 16 partials must carry more HF energy
+            // than a single 220 Hz sine.
+            let hf_ratio = |v: &[f32]| {
+                let total: f32 = v.iter().map(|x| x * x).sum();
+                let diff: f32 = v.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+                diff / total.max(1e-12)
+            };
+            let (thin_hf, rich_hf) = (hf_ratio(&t), hf_ratio(&r));
+            // Expected ≈1.5× from the contemplative 3rd/5th harmonics after
+            // the per-emotion filter envelope; 1.15 leaves headroom for the
+            // shared chord/reverb layers diluting the contrast.
             assert!(
-                rms(&r) > rms(&t),
-                "rich ({} partials) should have higher RMS than thin (1 partial)",
+                rich_hf > thin_hf * 1.15,
+                "rich ({} partials, hf={rich_hf}) should carry more high-frequency \
+                 energy than thin (1 partial, hf={thin_hf})",
                 rich.num_partials
             );
+        } else {
+            panic!("expected MonoF32 output");
+        }
+    }
+
+    #[test]
+    fn render_output_stays_within_full_scale() {
+        // Guards the soft_clip wavefolding regression: drive a hot, dense
+        // state (sub-bass + unison + noise + big reverb) and assert no sample
+        // ever leaves ±1.0 in the final mix.
+        let mut arr = one_note_arrangement(220.0);
+        for freq in [277.18, 329.63, 440.0, 554.37] {
+            arr.voices[0].notes.push(Note {
+                frequency: freq,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 1.0,
+            });
+        }
+        let state = MusicalState {
+            valence: -0.8,
+            arousal: 1.0,
+            noradrenaline: 1.0,
+            consciousness_level: 1.0,
+            ..Default::default()
+        };
+        let config = MuseConfig {
+            duration_secs: 0.5,
+            output_format: OutputFormat::StereoF32,
+            ..MuseConfig::horror()
+        };
+        let audio = render_arrangement(&arr, 44100, 22050, &state, &config);
+        if let AudioData::StereoF32(frames) = audio {
+            for (i, [l, r]) in frames.iter().enumerate() {
+                assert!(
+                    l.abs() <= 1.0 && r.abs() <= 1.0,
+                    "sample {i} out of full scale: L={l} R={r}"
+                );
+                assert!(l.is_finite() && r.is_finite(), "sample {i} not finite");
+            }
+        } else {
+            panic!("expected StereoF32 output");
         }
     }
 }

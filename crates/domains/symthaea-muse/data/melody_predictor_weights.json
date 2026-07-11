@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "trainer": "src/bin/train_melody_predictor.rs",
+    "dataset": "/opt/datasets/maestro/maestro-v3.0.0",
+    "unix_time": 1783405779,
+    "train_files": 1136,
+    "train_pairs": 4469624,
+    "test_files": 140,
+    "test_pairs": 535681,
+    "split": "file-level FNV-1a bucket 0 of 10, no augmentation",
+    "fit": "ridge least squares (lambda=1e-3*n) on atanh-inverse-decoded targets",
+    "held_out_direction_accuracy": 0.6908,
+    "held_out_interval_mae_semitones": 9.2882,
+    "held_out_duration_mae_beats": 0.2468,
+    "old_hand_tuned_direction_accuracy": 0.3817,
+    "naive_continue_direction_accuracy": 0.3565,
+    "naive_majority_direction_accuracy": 0.5146
+  },
+  "interval_weights": [0.0, 0.0047802003, 0.008346692, -0.0023770162, -0.020370215, -0.069344655, -0.14415215, -0.26819158, 0.005202547, 0.011590086, 0.012424752, 0.0277274, 0.029898224, 0.010830521, -0.044903915, -0.08089107, 0.00016700884, -0.0044015395, -0.0016860355, -0.0016860355],
+  "interval_bias": -0.003372071,
+  "duration_weights": [0.0, 0.0036403593, 0.00053012074, -0.0060894964, -0.011694111, -0.01659541, -0.021662524, -0.028513974, 0.34195772, 0.2755385, 0.28880858, 0.3059643, 0.33122855, 0.2888764, 0.38613296, 1.3064739, -0.0069557657, 0.0016920816, -0.5700701, -0.5700701],
+  "duration_bias": -1.1401402
+}

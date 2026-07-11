@@ -24,9 +24,15 @@ tracing = { workspace = true }
 h3o = "0.7"
 bincode = { workspace = true }
 rand = { workspace = true }
+# Optional real-electrical-physics simulator backend (battery/feeder/droop/
+# trip-envelope/islanding), behind the `grid_physics` feature -- see
+# grid_physics_simulator.rs. The default backend remains the fast coupled-
+# heuristic SimpleInfrastructureSimulator.
+symthaea-grid-physics = { path = "../../domains/symthaea-grid-physics", optional = true }
 
 [dev-dependencies]
 proptest = "1"
 
 [features]
 default = []
+grid_physics = ["dep:symthaea-grid-physics"]

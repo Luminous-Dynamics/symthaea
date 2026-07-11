@@ -111,7 +111,7 @@ impl EmbodimentBridge for DetritivoreEmbodiment {
     }
 
     fn platform(&self) -> EmbodimentPlatform {
-        EmbodimentPlatform::Scavenger
+        EmbodimentPlatform::Detritivore
     }
 
     fn num_actuators(&self) -> usize {

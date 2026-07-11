@@ -157,6 +157,48 @@ impl BinaryHV {
         result
     }
 
+    /// Reconstruct a full 16,384-bit hypervector by tiling a truncated byte
+    /// sequence across the whole dimension.
+    ///
+    /// Used to recover an approximate full-dimension `BinaryHV` from a
+    /// truncated wire-format embedding — e.g. the 256-bit `truncated_hdv`
+    /// carried by mesh `ContentAnnounce` packets
+    /// (`src/swarm/mesh/content_packet.rs`), which only ever ships the first
+    /// 32 bytes of the original embedding to keep packets small.
+    ///
+    /// This is a **lossy expansion, not a reconstruction of the original
+    /// vector**: repeating `bytes` every `bytes.len()` bytes introduces
+    /// artificial periodic self-similarity that a native full-dimension HDC
+    /// encoding would never have. It is good enough to make two *different*
+    /// truncated inputs map to two *different* (and reproducibly identical
+    /// for the same input) full vectors, which is all resonance-graph
+    /// Hamming-distance ranking needs to distinguish content — but it should
+    /// not be treated as semantically equivalent to a real 16,384-bit
+    /// embedding of the original content.
+    ///
+    /// # Panics
+    /// Panics if `bytes` is empty (nothing to tile).
+    ///
+    /// # Example
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::from_truncated_bytes(&[0xAA; 32]);
+    /// let b = BinaryHV::from_truncated_bytes(&[0xBB; 32]);
+    /// assert_ne!(a, b);
+    /// assert_eq!(a, BinaryHV::from_truncated_bytes(&[0xAA; 32])); // deterministic
+    /// ```
+    pub fn from_truncated_bytes(bytes: &[u8]) -> Self {
+        assert!(
+            !bytes.is_empty(),
+            "from_truncated_bytes requires at least 1 byte"
+        );
+        let mut result = [0u8; 2048];
+        for (i, out_byte) in result.iter_mut().enumerate() {
+            *out_byte = bytes[i % bytes.len()];
+        }
+        Self(result)
+    }
+
     /// Bind two vectors (XOR operation)
     ///
     /// Binding combines concepts: "cat" ⊗ "orange" = "orange cat"

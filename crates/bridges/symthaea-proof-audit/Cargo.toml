@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-proof-audit"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Axiom-provenance and spec-conformance gate for machine-generated proofs. Parses Lean `#print axioms` output and enforces that a proof reduces to a declared axiom base (no sorry, no undeclared/classical axioms), plus theorem-statement conformance against a pinned spec."
+
+# Pure-std, zero dependencies, toolchain-agnostic: it audits the *text* output of
+# a proof assistant, so it is testable without Lean installed. The formal bridge
+# can depend on it and feed real `#print axioms` output at gate time.
+[dependencies]

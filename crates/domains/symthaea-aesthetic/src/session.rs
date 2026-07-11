@@ -7,6 +7,12 @@
 //! they should feel related. The `CreativeSession` derives shared parameters —
 //! color palette, musical key, thematic vocabulary — from a single cognitive snapshot,
 //! ensuring cross-modal coherence.
+//!
+//! **Status (2026-07-10): built-but-unwired.** No consumers outside this
+//! crate — `CreativeManager`'s modality rotation generates each modality
+//! independently and does not thread a session through. Wire it there (one
+//! session per rotation sweep) or retire it; do not cite cross-modal
+//! coherence as a live capability until one of those happens.
 
 use serde::{Deserialize, Serialize};
 

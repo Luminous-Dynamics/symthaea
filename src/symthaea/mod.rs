@@ -129,6 +129,129 @@ pub struct ProcessResponse {
     pub consciousness_level: f64,
     /// Memory coordinator sigma (spectral MIP phi when available).
     pub sigma: Option<f64>,
+    /// Creative artifact (SVG artwork or WAV music) generated when the input
+    /// expresses art intent (Phase 8.5). Always `None` unless the `creative`
+    /// feature is enabled and an imperative art request was detected.
+    pub creative_artifact: Option<CreativeArtifact>,
+}
+
+/// A generated creative artifact attached to a [`ProcessResponse`].
+///
+/// The type is defined unconditionally so `ProcessResponse`'s shape is stable
+/// across feature combinations, but variants are only ever constructed when
+/// the `creative` feature is enabled (Phase 8.5 of `process()`).
+#[derive(Debug, Clone)]
+pub enum CreativeArtifact {
+    /// Generative SVG artwork (symthaea-atelier).
+    Svg {
+        /// Complete SVG document.
+        svg: String,
+        /// Composite aesthetic score of the selected artwork (0.0-1.0).
+        aesthetic_composite: f32,
+    },
+    /// Synthesized music as an in-memory WAV file (symthaea-muse).
+    MusicWav {
+        /// Complete WAV file bytes (RIFF/WAVE encoded).
+        wav_bytes: Vec<u8>,
+        /// Duration of the piece in seconds.
+        duration_secs: f32,
+        /// Composite aesthetic score from the music critic (0.0-1.0).
+        aesthetic_composite: f32,
+    },
+}
+
+/// Art intent detected in user input by [`classify_art_intent`].
+#[cfg_attr(not(feature = "creative"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArtIntent {
+    /// Visual art request (drawing, painting, picture).
+    Visual,
+    /// Music request (composition, song, melody).
+    Music,
+}
+
+/// Classify whether the input is an imperative request to *create* art.
+///
+/// Conservative by design: requires a creative verb (or a generic creation
+/// verb paired with an explicit art noun). Merely mentioning an art topic —
+/// "what do you think about music?" — is not a request to compose it, and
+/// leading question words ("what/why/how...") veto classification entirely.
+#[cfg_attr(not(feature = "creative"), allow(dead_code))]
+fn classify_art_intent(input: &str) -> Option<ArtIntent> {
+    let lower = input.to_lowercase();
+    let tokens: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .collect();
+    let has = |w: &str| tokens.iter().any(|t| *t == w);
+
+    // Informational questions are not creation requests.
+    if matches!(
+        tokens.first(),
+        Some(&"what")
+            | Some(&"which")
+            | Some(&"why")
+            | Some(&"who")
+            | Some(&"when")
+            | Some(&"where")
+            | Some(&"how")
+            | Some(&"is")
+            | Some(&"are")
+            | Some(&"does")
+    ) {
+        return None;
+    }
+
+    let music_noun = ["music", "song", "melody", "tune", "jingle", "lullaby"]
+        .iter()
+        .any(|w| has(w));
+    let visual_noun = [
+        "art",
+        "artwork",
+        "picture",
+        "image",
+        "drawing",
+        "painting",
+        "illustration",
+    ]
+    .iter()
+    .any(|w| has(w))
+        && !lower.contains("big picture");
+
+    // Prose targets: "compose"/"write" aimed at these is not an art request.
+    let prose_noun = ["email", "letter", "message", "reply", "essay", "report"]
+        .iter()
+        .any(|w| has(w));
+
+    // Direct music-creation verbs. "compose" alone implies music unless it is
+    // clearly prose composition.
+    if has("compose") && !prose_noun {
+        return Some(ArtIntent::Music);
+    }
+    if has("sing") || ((has("play") || has("write")) && music_noun && !prose_noun) {
+        return Some(ArtIntent::Music);
+    }
+
+    // Direct visual-creation verbs. "draw" gets idiom protection
+    // ("draw a conclusion", "draw the line", "draw attention").
+    if has("draw") && !has("conclusion") && !has("attention") && !lower.contains("draw the line") {
+        return Some(ArtIntent::Visual);
+    }
+    if has("paint") || has("sketch") || has("doodle") {
+        return Some(ArtIntent::Visual);
+    }
+
+    // Generic creation verbs require an explicit art noun to count.
+    if has("make") || has("create") || has("generate") || has("produce") || has("give") {
+        if music_noun {
+            return Some(ArtIntent::Music);
+        }
+        if visual_noun {
+            return Some(ArtIntent::Visual);
+        }
+    }
+
+    None
 }
 
 /// Result of introspecting the current consciousness state.
@@ -247,6 +370,12 @@ pub struct Symthaea {
     /// Brier Score calibration tracker for epistemic calibration.
     #[cfg(feature = "magi_loop")]
     calibration: BrierScoreTracker,
+    /// Persistence manager for the facade calibration tracker (warm-start
+    /// across sessions; see `magi.rs::init_facade_calibration`). `None` when
+    /// persistence is disabled or unavailable.
+    #[cfg(feature = "magi_loop")]
+    calibration_persistence:
+        Option<crate::consciousness::recursive_improvement::PersistenceManager>,
     /// Neural Bridge v2: BGE-M3 + linear probe for high-quality semantic encoding.
     /// When available, replaces hash-based encoding with true semantic understanding.
     #[cfg(feature = "neural-bridge")]
@@ -254,6 +383,16 @@ pub struct Symthaea {
     // ── Memory & Storage ──────────────────────────────────────────────
     /// Optional persistent database for long-term memory storage.
     database: Option<Arc<dyn ConsciousnessDatabase>>,
+    /// Experience bridge to the autonomous cognitive loop (AGW Phase 3,
+    /// Option B+C). When set, every `process()` call also drives one
+    /// `CognitiveLoopService::cycle()` on the same input — turn-synchronous,
+    /// not a separate ~31Hz clock, so this sidesteps Seam A's cadence-mixing
+    /// concern entirely (there is only one cadence: real user turns). The
+    /// loop's knowledge graph and episodic memory accumulate conversational
+    /// experience (Option C); the facade reads its `reasoning_context()`
+    /// back into the ethics evaluation the same turn (Option B). See
+    /// `enable_experience_bridge()`.
+    loop_bridge: Option<crate::cognitive_loop::CognitiveLoopService>,
     /// Memory coordinator: graduation pipeline + cross-tier signals.
     memory_coordinator: MemoryCoordinator,
     /// Episodic memory: Phi-weighted priority queue for significant moments.
@@ -443,6 +582,11 @@ impl Symthaea {
         let (somatic_bridge, pain_tx) = SomaticErrorBridge::new();
         let task_supervisor = TaskSupervisor::new(pain_tx.clone());
 
+        // Tier 0.3 (2026-07-06): restore persisted Brier calibration so the
+        // Phase 4.5 confidence adjustment survives restarts.
+        #[cfg(feature = "magi_loop")]
+        let (facade_calibration, facade_calibration_persistence) = Self::init_facade_calibration();
+
         #[allow(unused_mut)] // mutated conditionally under cfg(feature = "ssm-power")
         let mut instance = Self {
             mind,
@@ -456,10 +600,13 @@ impl Symthaea {
             #[cfg(feature = "full_language")]
             learning_persistence,
             #[cfg(feature = "magi_loop")]
-            calibration: BrierScoreTracker::with_defaults(),
+            calibration: facade_calibration,
+            #[cfg(feature = "magi_loop")]
+            calibration_persistence: facade_calibration_persistence,
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
             database: None,
+            loop_bridge: None,
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
@@ -534,20 +681,101 @@ impl Symthaea {
         db_config: DatabaseConfig,
     ) -> Result<Self> {
         let mut instance = Self::new(hdc_dim, ltc_neurons).await?;
-        let db = create_database(&db_config)
-            .await
-            .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
-        instance.database = Some(Arc::from(db));
+        instance.attach_database(db_config).await?;
         Ok(instance)
     }
 
     /// Attach a consciousness database to an existing instance.
+    ///
+    /// Also hydrates the action executor's causal world model from the
+    /// database (AGW Phase 2.3): `pause()` persists the dream engine's
+    /// action-outcome observations, and without this load-back the causal
+    /// veto forgot every learned failure on restart — the only
+    /// action-consequence learner in the system was session-scoped.
     pub async fn attach_database(&mut self, config: DatabaseConfig) -> Result<()> {
         let db = create_database(&config)
             .await
             .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
-        self.database = Some(Arc::from(db));
+        let db: Arc<dyn ConsciousnessDatabase> = Arc::from(db);
+
+        match db.get_causal_links().await {
+            Ok(links) if !links.is_empty() => {
+                tracing::info!(
+                    target: "symthaea::action",
+                    count = links.len(),
+                    "Hydrated executor causal world model from database"
+                );
+                self.executor.dream_engine.world_model.observations = links;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                tracing::debug!(target: "symthaea::action", error = %e, "Causal link hydration skipped");
+            }
+        }
+
+        self.database = Some(db);
         Ok(())
+    }
+
+    /// Enable the experience bridge to the autonomous cognitive loop (AGW
+    /// Phase 3). Constructs a `CognitiveLoopService` that `process()` will
+    /// drive once per call on the same input — Option A1 (shared store):
+    /// `knowledge_db_path` should normally point at the same SQLite file as
+    /// the facade's own `--database`, so the loop's knowledge graph survives
+    /// restarts in the same store. Known risk (flagged by the AGW plan):
+    /// two independent SQLite connections to one file can occasionally
+    /// return `SQLITE_BUSY` under concurrent writes; if that's observed in
+    /// practice, point them at sibling files instead.
+    pub fn enable_experience_bridge(&mut self, knowledge_db_path: Option<String>) -> Result<()> {
+        let config = crate::cognitive_loop::CognitiveLoopConfig {
+            knowledge_db_path,
+            ..Default::default()
+        };
+        let loop_service = crate::cognitive_loop::CognitiveLoopService::new(config)
+            .map_err(|e| anyhow::anyhow!("Experience bridge loop init failed: {e}"))?;
+        self.loop_bridge = Some(loop_service);
+        tracing::info!(target: "symthaea::experience_bridge", "Experience bridge to the autonomous cognitive loop enabled");
+        Ok(())
+    }
+
+    /// Whether the experience bridge to the autonomous loop is active.
+    pub fn experience_bridge_active(&self) -> bool {
+        self.loop_bridge.is_some()
+    }
+
+    /// Derive the ethics engine's `knowledge_moral_context` /
+    /// `knowledge_confidence_multiplier` inputs from the loop's reasoning
+    /// context (AGW Phase 3, Option B). Pure function so the mapping is
+    /// unit-testable without driving a full `process()` call — mirrors
+    /// `cycle_strategy.rs`'s own filter exactly, so facade-side and
+    /// loop-side ethics evaluation stay consistent with each other.
+    fn ethics_context_from_reasoning(
+        ctx: Option<&crate::knowledge::ReasoningContext>,
+    ) -> (Vec<String>, f64) {
+        ctx.map(|ctx| {
+            let moral_context: Vec<String> = ctx
+                .relevant_facts
+                .iter()
+                .filter(|f| {
+                    f.is_causal
+                        || f.domain.as_deref() == Some("social")
+                        || f.domain.as_deref() == Some("geopolitics")
+                })
+                .take(3)
+                .map(|f| f.text.clone())
+                .collect();
+            let query_result = crate::knowledge::reasoning_context::KnowledgeQueryResult {
+                facts: ctx.relevant_facts.clone(),
+                causal_chains: Vec::new(),
+                grounding_score: if ctx.epistemic_state.has_grounding {
+                    ctx.epistemic_state.confidence_multiplier.min(1.0)
+                } else {
+                    0.0
+                },
+            };
+            (moral_context, query_result.confidence_multiplier())
+        })
+        .unwrap_or_else(|| (Vec::new(), 1.0))
     }
 
     /// Get a reference to the consciousness database (if configured).
@@ -681,6 +909,11 @@ impl Symthaea {
         let (somatic_bridge, pain_tx) = SomaticErrorBridge::new();
         let task_supervisor = TaskSupervisor::new(pain_tx.clone());
 
+        // Tier 0.3 (2026-07-06): restore persisted Brier calibration so the
+        // Phase 4.5 confidence adjustment survives restarts.
+        #[cfg(feature = "magi_loop")]
+        let (facade_calibration, facade_calibration_persistence) = Self::init_facade_calibration();
+
         #[allow(unused_mut)] // mutated conditionally under cfg(feature = "liquid-mamba")
         let mut instance = Self {
             mind,
@@ -698,10 +931,13 @@ impl Symthaea {
             #[cfg(feature = "full_language")]
             learning_persistence,
             #[cfg(feature = "magi_loop")]
-            calibration: BrierScoreTracker::with_defaults(),
+            calibration: facade_calibration,
+            #[cfg(feature = "magi_loop")]
+            calibration_persistence: facade_calibration_persistence,
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
             database: None,
+            loop_bridge: None,
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
@@ -768,6 +1004,40 @@ impl Symthaea {
         }
 
         Ok(instance)
+    }
+
+    /// Rate the most recent facade-generated artwork with a human judgement
+    /// (`rating` in [-1, 1]; positive = beautiful). Returns the recalibrated
+    /// aesthetic expectation (EMA).
+    ///
+    /// Writes through to the same persisted aesthetic-memory file the
+    /// cognitive loop's `CreativeManager` uses, so human taste feedback
+    /// reaches Symthaea's long-term aesthetic identity from either side of
+    /// the facade/loop split. Uses the *unattributed* feedback variant —
+    /// the facade deliberately does not fabricate the harmony readings the
+    /// attributed path wants (see Phase 8.5's honesty note).
+    ///
+    /// Part of the first live human-feedback surface (2026-07-10,
+    /// VISUAL_ART_IMPROVEMENT_PLAN Phase 2.1).
+    #[cfg(feature = "creative")]
+    pub fn rate_art(&mut self, rating: f32) -> f32 {
+        let path =
+            std::path::PathBuf::from(crate::cognitive_loop::creative_bridge::AESTHETIC_MEMORY_PATH);
+        let memory = symthaea_aesthetic::AestheticMemory::load(&path);
+        let mut tracker = symthaea_aesthetic::AestheticTracker::from_memory(
+            symthaea_aesthetic::AestheticConfig::default(),
+            &memory,
+        );
+        let feedback = tracker.human_feedback_unattributed(rating);
+        tracker.to_memory(&memory).save(&path);
+        tracing::info!(
+            target: "symthaea::creative",
+            rating,
+            dopamine = feedback.dopamine_delta,
+            ema = tracker.expectation(),
+            "Human art rating recorded to persistent aesthetic memory"
+        );
+        tracker.expectation()
     }
 
     /// Process a query through the full consciousness pipeline.
@@ -1122,7 +1392,11 @@ impl Symthaea {
             let query_hv = input_embedding.to_binary(0.0);
             match db.search_similar(&query_hv, 3).await {
                 Ok(results) if !results.is_empty() => {
-                    tracing::trace!(
+                    // info-level deliberately: fires at most once per process()
+                    // call and is the primary observable evidence that the
+                    // persist→recall→re-perceive loop is alive (AGW Phase 1) —
+                    // at trace it was invisible even under -v.
+                    tracing::info!(
                         target: "symthaea::memory",
                         recalled = results.len(),
                         top_similarity = results[0].similarity,
@@ -1823,6 +2097,28 @@ impl Symthaea {
                 );
             }
 
+            // Tier 0.6 (2026-07-06): simulated execution may let the pipeline
+            // proceed (the retry loop accepts it to terminate), but it is NOT
+            // verification. Record it explicitly in the thought's code context
+            // and telemetry so every downstream consumer of this record knows
+            // the code was never actually compiled or run. The verified path
+            // below already requires `last_compiled && !last_simulated`.
+            if compile_ok && last_simulated {
+                if let Some(ref mut ctx) = thought.code_context {
+                    ctx.notes.push(
+                        "EXECUTION: simulated — sandbox did not actually compile/run this code; \
+                         not counted as verification"
+                            .to_string(),
+                    );
+                }
+                tracing::info!(
+                    target: "symthaea::code",
+                    execution = "simulated",
+                    attempts = attempt,
+                    "Phase 5.5: execution was simulated; verified flag NOT set"
+                );
+            }
+
             if tree_sitter_ok && compile_ok && last_compiled && !last_simulated {
                 let intent_hv = self.text_to_hv(
                     thought
@@ -1964,6 +2260,22 @@ impl Symthaea {
                     tracing::debug!(target: "symthaea::action", content_len = action_ctx.content.as_ref().map(|c| c.len()), "Fix content generated");
                 }
 
+                // Give the executor real cognitive context for causal learning
+                // (AGW Phase 2.3): a 64-D chunk-mean sketch of the current input
+                // embedding replaces the legacy all-zeros state, so the dream
+                // engine's veto matches prior experience by situation, not just
+                // by action fingerprint.
+                {
+                    let vals = &input_embedding.values;
+                    let chunk = (vals.len().div_ceil(64)).max(1);
+                    let sketch: Vec<f32> = vals
+                        .chunks(chunk)
+                        .take(64)
+                        .map(|c| c.iter().sum::<f32>() / c.len() as f32)
+                        .collect();
+                    self.executor.set_context_state(sketch);
+                }
+
                 tracing::info!(target: "symthaea::action", primitives = ?primitives, "Translating primitives to actions");
                 if let Ok(actions) = prim_executor.translate(&primitives, &action_ctx) {
                     let needs_workspace = actions.iter().any(|action| {
@@ -2048,12 +2360,60 @@ impl Symthaea {
                             _ => {}
                         }
 
+                        // ── CALIBRATION: world-graded action prediction (AGW Phase 2.2) ──
+                        // Commit to a confidence that this action will succeed BEFORE
+                        // executing, derived from the thought's epistemic status; resolve
+                        // by the actual execution outcome (exit code / executor error).
+                        // Unlike Phase 7.5's self-graded translation-fidelity prediction,
+                        // this one is graded by the world — it makes the ToolUse Brier
+                        // domain externally grounded, so Phase 4.5's confidence
+                        // adjustment learns from real action outcomes.
+                        #[cfg(feature = "magi_loop")]
+                        let mut action_prediction = {
+                            let confidence =
+                                Self::epistemic_to_confidence(&thought.epistemic_status);
+                            let action_context =
+                                WorldActionContext::new("autonomous_action", format!("{action:?}"))
+                                    .with_risk_tier(RiskTier::StateModifying);
+                            let mut p = WorldPrediction::new(
+                                format!("Autonomous action {action:?} will succeed"),
+                                OutcomeCategory::Success,
+                                confidence,
+                                action_context,
+                                ResolutionContract::shell_command(),
+                            );
+                            p.domain = PredictionDomain::ToolUse;
+                            p
+                        };
+
                         tracing::info!(target: "symthaea::action", ?action, "Executing autonomous action");
                         match self
                             .executor
                             .execute(&action, &policy, &sandbox, thought.psi)
                         {
                             Ok(execution_outcome) => {
+                                #[cfg(feature = "magi_loop")]
+                                {
+                                    let succeeded = match &execution_outcome.outcome {
+                                        crate::action::ActionOutcome::CommandOutput {
+                                            exit_code,
+                                            ..
+                                        } => *exit_code == 0,
+                                        crate::action::ActionOutcome::WasmResult {
+                                            output, ..
+                                        } => !output.is_empty() && output[0] == 1,
+                                        _ => true,
+                                    };
+                                    if succeeded {
+                                        action_prediction
+                                            .resolve_true(OutcomeCategory::Success, 1.0);
+                                    } else {
+                                        action_prediction
+                                            .resolve_false(OutcomeCategory::SafeFailure, 1.0);
+                                    }
+                                    self.calibration.record_prediction(&action_prediction);
+                                }
+
                                 let outcome_text = match &execution_outcome.outcome {
                                     crate::action::ActionOutcome::Success => {
                                         "Action succeeded.".to_string()
@@ -2136,6 +2496,14 @@ impl Symthaea {
                                 }
                             }
                             Err(e) => {
+                                // Executor refusal/veto/failure is still a world-graded
+                                // outcome: the predicted success did not materialize.
+                                #[cfg(feature = "magi_loop")]
+                                {
+                                    action_prediction
+                                        .resolve_false(OutcomeCategory::SafeFailure, 1.0);
+                                    self.calibration.record_prediction(&action_prediction);
+                                }
                                 tracing::error!(target: "symthaea::action", error = %e, "Action execution failed");
                                 let error_text = format!("Action failed with error: {}", e);
                                 let error_hv = self.text_to_hv(&error_text);
@@ -2231,10 +2599,19 @@ impl Symthaea {
         self.relational.push_ai_state(ai_hv);
 
         // ====================================================================
-        // PHASE 7.25: LEARNING PERSISTENCE AUTO-SAVE
+        // PHASE 7.25: LEARNING PERSISTENCE OUTCOME RECORDING + AUTO-SAVE
         // ====================================================================
         #[cfg(feature = "full_language")]
         if let Some(ref mut lp) = self.learning_persistence {
+            // Tier 0.4 (2026-07-06): record this interaction's fidelity
+            // outcome so the persisted AdaptiveThresholds/OutcomePatterns are
+            // genuinely adaptive. Before this, nothing ever mutated them —
+            // phase 7.25 saved a static struct every session.
+            lp.record_outcome(
+                thought.psi,
+                generation.confidence as f64,
+                translation_verified,
+            );
             lp.update_processed_count(self.interactions);
             if let Err(e) = lp.maybe_auto_save() {
                 tracing::warn!(
@@ -2282,6 +2659,27 @@ impl Symthaea {
             self.calibration.record_prediction(&prediction);
         }
 
+        // ── EXPERIENCE BRIDGE: drive the autonomous loop on this turn (AGW Phase 3) ──
+        // Turn-synchronous, not a separate clock — Option C (the loop's knowledge
+        // graph and episodic memory accumulate this conversation) and the setup
+        // for Option B (read back into the ethics evaluation immediately below)
+        // in one call. A loop error here must not break the response path.
+        if let Some(ref mut lb) = self.loop_bridge {
+            let _ = lb.cycle(content);
+        }
+
+        // Grounded moral context read back from the loop's reasoning context
+        // (AGW Phase 3, Option B). Empty/1.0 (no-op) when the bridge is
+        // disabled or the loop has no grounding yet for this input — this
+        // was ALWAYS the fallback value before Phase 3; the facade
+        // previously had no knowledge source to feed these fields at all.
+        let (knowledge_moral_context, knowledge_confidence_multiplier) =
+            Self::ethics_context_from_reasoning(
+                self.loop_bridge
+                    .as_ref()
+                    .and_then(|lb| lb.reasoning_context()),
+            );
+
         // ====================================================================
         // PHASE 8: RESPONSE ASSEMBLY
         // ====================================================================
@@ -2298,8 +2696,8 @@ impl Symthaea {
             stillness_boost: 0.0,
             semantic_embedding: None,
             action_hv: None,
-            knowledge_confidence_multiplier: 1.0,
-            knowledge_moral_context: Vec::new(),
+            knowledge_confidence_multiplier,
+            knowledge_moral_context,
         });
         let ethics_blocked = ethics_output.ahimsa_violated
             || ethics_output.unified_verdict == EthicalVerdict::Blocked;
@@ -2314,7 +2712,8 @@ impl Symthaea {
                 "Ethics engine blocked process() output"
             );
         }
-        let response_text = if ethics_blocked {
+        #[cfg_attr(not(feature = "creative"), allow(unused_mut))]
+        let mut response_text = if ethics_blocked {
             "I'm not able to respond to that — it was flagged by my ethics evaluation.".to_string()
         } else {
             response_text
@@ -2325,6 +2724,210 @@ impl Symthaea {
         } else {
             ((0.7 - consciousness) / 0.01).clamp(0.0, 1000.0) as usize
         };
+
+        // ====================================================================
+        // PHASE 8.5: CREATIVE ARTIFACT GENERATION (art/music intent)
+        // ====================================================================
+        // The facade holds no CognitiveLoopService, so the cognitive loop's
+        // CreativeManager is unreachable from here; instead we drive
+        // symthaea-atelier / symthaea-muse directly from the state the facade
+        // genuinely has (psi, emotional tone, coherence, the input
+        // hypervector). All other snapshot fields stay at their honest
+        // dormant() defaults — we do not fabricate neuromodulator, topology,
+        // or harmony readings the facade cannot observe.
+        #[cfg_attr(not(feature = "creative"), allow(unused_mut))]
+        let mut creative_artifact: Option<CreativeArtifact> = None;
+        #[cfg(feature = "creative")]
+        if !ethics_blocked {
+            if let Some(intent) = classify_art_intent(content) {
+                let span = tracing::info_span!(
+                    target: "symthaea::creative",
+                    "creative_artifact",
+                    correlation_id = %correlation_id,
+                    intent = ?intent
+                );
+                let _guard = span.enter();
+
+                let mut snap = symthaea_canvas::CognitiveSnapshot::dormant();
+                // Psi: the same consciousness read Phases 6.75/6.8 gate on.
+                snap.consciousness_level = thought.psi;
+                snap.valence = thought.emotional_tone.valence.clamp(-1.0, 1.0) as f32;
+                snap.arousal = thought.emotional_tone.arousal.clamp(0.0, 1.0) as f32;
+                snap.living_mind_coherence = thought.coherence;
+                snap.cycle_count = self.interactions;
+                // Thought vector: strided sample of the input hypervector.
+                // A strided slice preserves per-dimension variance (chunk
+                // averaging of a quasi-random HV collapses toward zero); it
+                // is an honest deterministic projection, not a learned one.
+                let stride = (input_embedding.values.len() / 32).max(1);
+                snap.thought_vector = input_embedding
+                    .values
+                    .iter()
+                    .step_by(stride)
+                    .take(32)
+                    .copied()
+                    .collect();
+
+                // Deterministic seed from the input text (no wall clock).
+                let seed = {
+                    let mut h = DefaultHasher::new();
+                    content.hash(&mut h);
+                    h.finish()
+                };
+
+                match intent {
+                    ArtIntent::Visual => {
+                        let config = symthaea_atelier::AtelierConfig::default();
+                        // The artist's eye (feature `art-eye`): perceptual
+                        // scoring of exploit-phase candidates. The facade
+                        // uses a fresh SelfCritic per request — unlike the
+                        // cognitive loop's persistent one, the facade holds
+                        // no CreativeManager to accumulate novelty/taste
+                        // state in (the known facade/loop split; unifying
+                        // artistic identity is Phase 4.3 of the visual-art
+                        // plan).
+                        #[cfg(feature = "art-eye")]
+                        let mut facade_critic = symthaea_atelier::critic::SelfCritic::new();
+                        #[cfg(feature = "art-eye")]
+                        let mut eye_scorer_impl =
+                            |scene: &symthaea_canvas::SceneNode,
+                             scorer_snap: &symthaea_canvas::CognitiveSnapshot|
+                             -> Option<f32> {
+                                let svg = symthaea_canvas::render_svg(
+                                    scene,
+                                    scorer_snap.consciousness_level,
+                                );
+                                let input = symthaea_art_eye::see(scene, &svg, 192).ok()?;
+                                Some(facade_critic.evaluate(&input, scorer_snap).composite)
+                            };
+                        #[cfg(feature = "art-eye")]
+                        let eye_scorer: Option<
+                            &mut symthaea_atelier::iterate::ExternalScorer<'_>,
+                        > = Some(&mut eye_scorer_impl);
+                        #[cfg(not(feature = "art-eye"))]
+                        let eye_scorer: Option<
+                            &mut symthaea_atelier::iterate::ExternalScorer<'_>,
+                        > = None;
+                        let artwork = symthaea_atelier::create_iterative_scored(
+                            &config, &snap, seed, eye_scorer,
+                        );
+                        tracing::info!(
+                            target: "symthaea::creative",
+                            style = ?artwork.style,
+                            generation_cycles = artwork.generation_cycles,
+                            aesthetic_composite = artwork.aesthetic_score.composite,
+                            "Phase 8.5: Generated SVG artwork"
+                        );
+                        response_text.push_str(
+                            " I've drawn something from my current state — see the attached artwork.",
+                        );
+
+                        // Phase 4.3 (gallery half): on-demand facade art
+                        // feeds the SAME persistent gallery the cognitive
+                        // loop's CreativeManager writes, so requested and
+                        // autonomous work build one artistic identity.
+                        // Known limitation, documented rather than hidden:
+                        // the index update is load-modify-save — if a live
+                        // CreativeManager saves concurrently in the same
+                        // deployment, one index entry can lose the race
+                        // (artifact files themselves are never clobbered).
+                        // The cultural-memory/canon half of 4.3 still needs
+                        // a CreativeManager and remains open.
+                        #[cfg(feature = "gallery")]
+                        {
+                            let storage = symthaea_gallery::storage::GalleryStorage::new(
+                                std::path::Path::new(
+                                    crate::cognitive_loop::creative_bridge::AESTHETIC_MEMORY_PATH,
+                                )
+                                .with_file_name("gallery"),
+                            );
+                            let filename =
+                                format!("facade-{:08}-{seed:016x}.svg", self.interactions);
+                            let saved = storage
+                                .ensure_dirs()
+                                .and_then(|_| storage.save_visual(&filename, &artwork.svg));
+                            match saved {
+                                Ok(_) => {
+                                    let mut index = storage.load_index().unwrap_or_else(|_| {
+                                        symthaea_gallery::GalleryIndex::new(200)
+                                    });
+                                    index.add(symthaea_gallery::create_entry(
+                                        symthaea_gallery::ArtModality::Visual { filename },
+                                        artwork.aesthetic_score,
+                                        snap.harmony_activations,
+                                        self.interactions,
+                                    ));
+                                    symthaea_gallery::curation::curate(&mut index, 16);
+                                    if let Err(e) = storage.save_index(&index) {
+                                        tracing::warn!(
+                                            target: "symthaea::creative",
+                                            error = %e,
+                                            "facade gallery: index save failed"
+                                        );
+                                    }
+                                }
+                                Err(e) => tracing::warn!(
+                                    target: "symthaea::creative",
+                                    error = %e,
+                                    "facade gallery: artifact save failed"
+                                ),
+                            }
+                        }
+
+                        creative_artifact = Some(CreativeArtifact::Svg {
+                            svg: artwork.svg,
+                            aesthetic_composite: artwork.aesthetic_score.composite,
+                        });
+                    }
+                    ArtIntent::Music => {
+                        // Minimal local snapshot→MusicalState mapping. The
+                        // richer VA-blended mapping lives in the cognitive
+                        // loop's creative_bridge, which the facade cannot
+                        // reach; fields the facade cannot source carry the
+                        // dormant() defaults copied here.
+                        let state = symthaea_muse::MusicalState {
+                            harmony_activations: snap.harmony_activations,
+                            dopamine: snap.dopamine,
+                            serotonin: snap.serotonin,
+                            noradrenaline: snap.noradrenaline,
+                            arousal: snap.arousal,
+                            valence: snap.valence,
+                            consciousness_level: snap.consciousness_level as f32,
+                            prediction_error: snap.prediction_error,
+                        };
+                        let config = symthaea_muse::MuseConfig::default();
+                        let comp = symthaea_muse::compose(&config, &state, seed);
+                        let verdict = symthaea_muse::critic::evaluate_composition(&comp, &state);
+                        match symthaea_muse::export::wav_bytes(&comp) {
+                            Ok(wav) => {
+                                tracing::info!(
+                                    target: "symthaea::creative",
+                                    duration_secs = comp.duration_secs,
+                                    notes = comp.notes.len(),
+                                    aesthetic_composite = verdict.composite,
+                                    "Phase 8.5: Composed music artifact"
+                                );
+                                response_text.push_str(
+                                    " I've composed a short piece — see the attached audio artifact.",
+                                );
+                                creative_artifact = Some(CreativeArtifact::MusicWav {
+                                    wav_bytes: wav,
+                                    duration_secs: comp.duration_secs,
+                                    aesthetic_composite: verdict.composite,
+                                });
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "symthaea::creative",
+                                    error = %e,
+                                    "Phase 8.5: WAV encoding failed; no artifact attached"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // ====================================================================
         // OBSERVABILITY: Structured logging for Broca pipeline
@@ -2391,6 +2994,10 @@ impl Symthaea {
                 domain_count = cal_summary.domain_stats.len(),
                 "Calibration summary (periodic)"
             );
+
+            // Tier 0.3 (2026-07-06): piggyback persistence on the same
+            // every-10-interactions cadence so calibration survives restarts.
+            self.persist_facade_calibration();
         }
 
         Ok(ProcessResponse {
@@ -2402,6 +3009,7 @@ impl Symthaea {
             structured_thought: Some(thought),
             consciousness_level: snapshot.consciousness_level,
             sigma: None,
+            creative_artifact,
         })
     }
 
@@ -2738,6 +3346,33 @@ impl Symthaea {
                         // DeclareCrisis handled directly in the bridge — maps to civic::create_incident
                         continue;
                     }
+                    GDC::SubmitRoboticsTelemetry {
+                        correlation_id,
+                        asset_hash,
+                        order_hash,
+                        lat,
+                        lon,
+                        alt,
+                        consciousness_level,
+                        safety_level,
+                        mission_progress,
+                        fuel_level,
+                        platform,
+                        platform_specific,
+                    } => DispatchCommand::SubmitRoboticsTelemetry {
+                        correlation_id,
+                        asset_hash,
+                        order_hash,
+                        lat,
+                        lon,
+                        alt,
+                        consciousness_level,
+                        safety_level,
+                        mission_progress,
+                        fuel_level,
+                        platform,
+                        platform_specific,
+                    },
                 };
                 if cmd_tx.send(dc).is_err() {
                     break;
@@ -2928,13 +3563,52 @@ impl Symthaea {
                             .len()
                             .saturating_sub(self.curriculum.objectives.len())
                     });
+                let curriculum_changed = objectives_added > 0
+                    || curriculum.objectives.len() != self.curriculum.objectives.len();
                 self.curriculum = curriculum;
-                if let Err(e) = self.record_research(&update.topic, objectives_added) {
+                if !curriculum_changed {
+                    // Nothing new landed — skip the disk write so the store
+                    // file's provenance metadata keeps pointing at the last
+                    // research task that actually added objectives.
+                    tracing::debug!(
+                        target: "symthaea::learning",
+                        topic = %update.topic,
+                        "Autonomous research produced no new objectives; skipping curriculum persistence"
+                    );
+                } else if !self.curriculum_persistence.auto_save {
+                    tracing::info!(
+                        target: "symthaea::learning",
+                        topic = %update.topic,
+                        objectives_added,
+                        path = %self.curriculum_persistence.path.display(),
+                        "Curriculum extended in memory only: auto-save disabled (SYMTHAEA_CURRICULUM_AUTO_SAVE=off)"
+                    );
+                    // Still record provenance metadata in memory (no save).
+                    if let Err(e) = self.record_research(&update.topic, objectives_added) {
+                        tracing::warn!(
+                            target: "symthaea::learning",
+                            topic = %update.topic,
+                            error = %e,
+                            "Failed to record autonomous research metadata"
+                        );
+                    }
+                } else if let Err(e) = self.record_research(&update.topic, objectives_added) {
+                    // record_research() auto-saves the curriculum store
+                    // (atomically, temp+rename) when auto_save is on.
                     tracing::warn!(
                         target: "symthaea::learning",
                         topic = %update.topic,
                         error = %e,
-                        "Failed to record autonomous research metadata"
+                        "Failed to persist autonomous curriculum extension"
+                    );
+                } else {
+                    tracing::info!(
+                        target: "symthaea::learning",
+                        topic = %update.topic,
+                        objectives_added,
+                        total_objectives = self.curriculum.objectives.len(),
+                        path = %self.curriculum_persistence.path.display(),
+                        "Autonomous curriculum extension persisted to disk"
                     );
                 }
 
@@ -3069,6 +3743,247 @@ impl Symthaea {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_art_intent_visual_positives() {
+        assert_eq!(
+            classify_art_intent("draw me something"),
+            Some(ArtIntent::Visual)
+        );
+        assert_eq!(
+            classify_art_intent("can you paint a sunset?"),
+            Some(ArtIntent::Visual)
+        );
+        assert_eq!(
+            classify_art_intent("make me some art"),
+            Some(ArtIntent::Visual)
+        );
+        assert_eq!(
+            classify_art_intent("generate a picture of a tree"),
+            Some(ArtIntent::Visual)
+        );
+        assert_eq!(
+            classify_art_intent("sketch your inner state"),
+            Some(ArtIntent::Visual)
+        );
+    }
+
+    #[test]
+    fn test_art_intent_music_positives() {
+        assert_eq!(
+            classify_art_intent("compose something for me"),
+            Some(ArtIntent::Music)
+        );
+        assert_eq!(
+            classify_art_intent("make me a song"),
+            Some(ArtIntent::Music)
+        );
+        assert_eq!(
+            classify_art_intent("write me a song about rain"),
+            Some(ArtIntent::Music)
+        );
+        assert_eq!(
+            classify_art_intent("play me a melody"),
+            Some(ArtIntent::Music)
+        );
+        assert_eq!(
+            classify_art_intent("create some music"),
+            Some(ArtIntent::Music)
+        );
+    }
+
+    #[test]
+    fn test_art_intent_negatives() {
+        // Asking ABOUT art topics is not a request to make art.
+        assert_eq!(classify_art_intent("what do you think about music?"), None);
+        assert_eq!(
+            classify_art_intent("tell me about the history of painting"),
+            None
+        );
+        assert_eq!(classify_art_intent("is this song good?"), None);
+        assert_eq!(classify_art_intent("explain how music works"), None);
+        assert_eq!(classify_art_intent("the picture looks nice"), None);
+        // Idioms with creative verbs.
+        assert_eq!(
+            classify_art_intent("draw a conclusion from this data"),
+            None
+        );
+        assert_eq!(classify_art_intent("where do we draw the line?"), None);
+        // Prose composition is not music.
+        assert_eq!(classify_art_intent("compose an email to my boss"), None);
+        // Generic verbs without an art noun.
+        assert_eq!(classify_art_intent("make me a sandwich"), None);
+        assert_eq!(classify_art_intent("give me the big picture"), None);
+    }
+
+    // ── AGW Phase 3: pre-registered falsifiable tests ────────────────────
+    // Claim under test: the ethics-context mapping is the ONLY new logic
+    // Phase 3 introduces on the facade's hot path (driving loop_bridge.cycle()
+    // is a one-line pass-through already covered by the loop's own test
+    // suite). These test the mapping directly against hand-built
+    // ReasoningContext values rather than the full process() pipeline —
+    // driving real knowledge extraction through cycle() in a unit test would
+    // depend on undocumented extraction-heuristic internals and be flaky by
+    // construction, not a stronger test.
+
+    #[test]
+    fn ethics_context_defaults_when_bridge_absent() {
+        // No loop bridge (or no grounding yet at all) must reproduce the
+        // EXACT pre-Phase-3 hardcoded values — a regression here would mean
+        // enabling the bridge changes behavior even when it has nothing to
+        // contribute, which is not the claim.
+        let (ctx, mult) = Symthaea::ethics_context_from_reasoning(None);
+        assert!(ctx.is_empty());
+        assert_eq!(mult, 1.0);
+    }
+
+    #[test]
+    fn ethics_context_surfaces_causal_and_social_facts_only() {
+        let reasoning = crate::knowledge::ReasoningContext {
+            relevant_facts: vec![
+                crate::knowledge::GroundedFact {
+                    text: "fire causes smoke".into(),
+                    confidence: 0.9,
+                    similarity: 0.8,
+                    domain: None,
+                    is_causal: true,
+                },
+                crate::knowledge::GroundedFact {
+                    text: "the sky is blue".into(),
+                    confidence: 0.9,
+                    similarity: 0.8,
+                    domain: Some("physics".into()), // neither causal nor social/geopolitics
+                    is_causal: false,
+                },
+                crate::knowledge::GroundedFact {
+                    text: "trust requires reciprocity".into(),
+                    confidence: 0.7,
+                    similarity: 0.6,
+                    domain: Some("social".into()),
+                    is_causal: false,
+                },
+            ],
+            epistemic_state: crate::knowledge::EpistemicState {
+                uncertainty: 0.2,
+                novelty: 0.1,
+                contradiction_count: 0,
+                has_grounding: true,
+                confidence_multiplier: 0.8,
+            },
+            ..Default::default()
+        };
+        let (ctx, mult) = Symthaea::ethics_context_from_reasoning(Some(&reasoning));
+        assert_eq!(
+            ctx,
+            vec![
+                "fire causes smoke".to_string(),
+                "trust requires reciprocity".to_string()
+            ],
+            "the ungrounded-domain physics fact must be filtered out, matching cycle_strategy.rs's own filter"
+        );
+        // KnowledgeQueryResult::confidence_multiplier() = 0.3 + grounding_score;
+        // grounding_score = min(epistemic_state.confidence_multiplier, 1.0) = 0.8.
+        assert!(
+            (mult - 1.1).abs() < 1e-9,
+            "expected 0.3 + 0.8 = 1.1, got {mult}"
+        );
+    }
+
+    #[test]
+    fn ethics_context_ungrounded_present_context_dampens_below_bridge_absent_default() {
+        // NOTE — an intentional, documented consequence of Option B, not a
+        // bug: when the bridge is ACTIVE but this specific input has no
+        // grounding yet, the multiplier is 0.3 (matching what
+        // cycle_strategy.rs already computes for the loop's OWN ethics
+        // evaluation under identical conditions) — lower than the 1.0
+        // no-bridge default. Enabling the bridge is not merely additive; it
+        // makes facade ethics confidence track the SAME grounding signal the
+        // loop already uses for itself, including its downside.
+        let reasoning = crate::knowledge::ReasoningContext {
+            epistemic_state: crate::knowledge::EpistemicState {
+                uncertainty: 1.0,
+                novelty: 1.0,
+                contradiction_count: 0,
+                has_grounding: false,
+                confidence_multiplier: 0.0,
+            },
+            ..Default::default()
+        };
+        let (_, mult) = Symthaea::ethics_context_from_reasoning(Some(&reasoning));
+        assert!((mult - 0.3).abs() < 1e-9, "expected 0.3, got {mult}");
+        assert!(
+            mult < 1.0,
+            "must be strictly below the no-bridge default of 1.0"
+        );
+    }
+
+    #[tokio::test]
+    async fn experience_bridge_enables_without_breaking_process() {
+        // Smoke test only: proves the wiring (loop_bridge.cycle() driven
+        // from process()) doesn't panic or deadlock. Does NOT assert that
+        // real knowledge extraction occurred this turn — see the module
+        // comment above for why that's not a safe claim to encode as a test.
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        assert!(!s.experience_bridge_active());
+        s.enable_experience_bridge(None)
+            .expect("in-memory experience bridge must construct cleanly");
+        assert!(s.experience_bridge_active());
+        let resp = s
+            .process("hello, this is a test of the experience bridge")
+            .await;
+        assert!(
+            resp.is_ok(),
+            "process() must not fail with the bridge active"
+        );
+    }
+
+    #[cfg(feature = "creative")]
+    #[tokio::test]
+    async fn test_process_draw_request_returns_svg_artifact() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let resp = s.process("draw me something").await.unwrap();
+        match resp.creative_artifact {
+            Some(CreativeArtifact::Svg {
+                ref svg,
+                aesthetic_composite,
+            }) => {
+                assert!(svg.contains("<svg"), "artifact should be an SVG document");
+                assert!((0.0..=1.0).contains(&aesthetic_composite));
+            }
+            other => panic!("Expected Some(Svg) artifact, got {other:?}"),
+        }
+        assert!(
+            resp.content.contains("attached"),
+            "response text should mention the attached artifact: {}",
+            resp.content
+        );
+    }
+
+    #[cfg(feature = "creative")]
+    #[tokio::test]
+    async fn test_process_music_request_returns_wav_artifact() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let resp = s.process("compose a short melody for me").await.unwrap();
+        match resp.creative_artifact {
+            Some(CreativeArtifact::MusicWav {
+                ref wav_bytes,
+                duration_secs,
+                aesthetic_composite,
+            }) => {
+                assert_eq!(&wav_bytes[0..4], b"RIFF", "artifact should be a WAV file");
+                assert!(duration_secs > 0.0);
+                assert!((0.0..=1.0).contains(&aesthetic_composite));
+            }
+            other => panic!("Expected Some(MusicWav) artifact, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_non_art_request_has_no_artifact() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let resp = s.process("What is consciousness?").await.unwrap();
+        assert!(resp.creative_artifact.is_none());
+    }
 
     #[tokio::test]
     async fn test_new_valid_dimension() {

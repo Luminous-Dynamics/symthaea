@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-astronomy"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Observational astronomy for Symthaea: Wien's blackbody peak, Kepler's third law, distance modulus / absolute magnitude, and Schwarzschild radius. Complements mycelix-space orbital mechanics. Closed-form, ground-truth-checked."
+
+[dependencies]

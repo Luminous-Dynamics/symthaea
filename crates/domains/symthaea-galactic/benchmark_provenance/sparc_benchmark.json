@@ -1,0 +1,145 @@
+{
+  "lsb_extrapolation_holdout": {
+    "n_held_out": 30,
+    "results": [
+      {
+        "baseline_mae": 11.76136290781729,
+        "baseline_r_squared": -0.05110510124433021,
+        "mae": 12.071333482145134,
+        "model_name": "newtonian_baryonic",
+        "n_test_examples": 372,
+        "n_train_examples": 2796,
+        "r_squared": -0.06196749210160579
+      },
+      {
+        "baseline_mae": 4.011176768184814,
+        "baseline_r_squared": -0.1724591820461454,
+        "mae": 4.448633321567326,
+        "model_name": "mond_rar",
+        "n_test_examples": 372,
+        "n_train_examples": 2796,
+        "r_squared": -0.27861057312448234
+      },
+      {
+        "baseline_mae": 5.414352670399477,
+        "baseline_r_squared": -0.38990804158848014,
+        "mae": 5.561941379772959,
+        "model_name": "conformal_mannheim",
+        "n_test_examples": 372,
+        "n_train_examples": 2796,
+        "r_squared": -0.4288954039426598
+      },
+      {
+        "baseline_mae": 1.1887596915733551,
+        "baseline_r_squared": -0.005710402875335641,
+        "mae": 1.2377732523730165,
+        "model_name": "nfw_halo",
+        "n_test_examples": 372,
+        "n_train_examples": 2796,
+        "r_squared": -0.01986559732335036
+      }
+    ]
+  },
+  "models": [
+    {
+      "aic": 1952253.016517335,
+      "bic": 1952253.016517335,
+      "n_converged": 153,
+      "n_free_params_per_galaxy": 0,
+      "n_galaxies": 153,
+      "name": "newtonian_baryonic",
+      "reduced_chi2": 616.2414824865325,
+      "total_chi2": 1952253.016517335,
+      "total_params": 0,
+      "total_points": 3168
+    },
+    {
+      "aic": 163049.45066275314,
+      "bic": 163049.45066275314,
+      "n_converged": 153,
+      "n_free_params_per_galaxy": 0,
+      "n_galaxies": 153,
+      "name": "mond_rar",
+      "reduced_chi2": 51.4676296283943,
+      "total_chi2": 163049.45066275314,
+      "total_params": 0,
+      "total_points": 3168
+    },
+    {
+      "aic": 476088.0412691798,
+      "bic": 476088.0412691798,
+      "n_converged": 153,
+      "n_free_params_per_galaxy": 0,
+      "n_galaxies": 153,
+      "name": "conformal_mannheim",
+      "reduced_chi2": 150.2803160571906,
+      "total_chi2": 476088.0412691798,
+      "total_params": 0,
+      "total_points": 3168
+    },
+    {
+      "aic": 19829.14768751288,
+      "bic": 21683.76954791078,
+      "n_converged": 138,
+      "n_free_params_per_galaxy": 2,
+      "n_galaxies": 153,
+      "name": "nfw_halo",
+      "reduced_chi2": 6.714586892911558,
+      "total_chi2": 19217.14768751288,
+      "total_params": 306,
+      "total_points": 3168
+    }
+  ],
+  "provenance": {
+    "data_dir": "data/benchmarks/sparc",
+    "dataset": "SPARC (Lelli, McGaugh & Schombert 2016)",
+    "git_sha": "23b562a837b793581a6a0563d3b16d2742d02a33",
+    "n_galaxies_after_cut": 153,
+    "n_galaxies_loaded": 175,
+    "quality_cut": "Q<=2, inclination>=30deg",
+    "residual_regressor_epochs": 5,
+    "upsilon_bulge": 0.7,
+    "upsilon_disk": 0.5
+  },
+  "residual_learnability": {
+    "note": "NOT directly comparable across models with different free-parameter counts (see README)",
+    "results": [
+      {
+        "baseline_mae": 12.15022920918812,
+        "baseline_r_squared": -0.009814002613267814,
+        "mae": 11.955373323026613,
+        "model_name": "newtonian_baryonic",
+        "n_test_examples": 437,
+        "n_train_examples": 2731,
+        "r_squared": -0.013719845129473551
+      },
+      {
+        "baseline_mae": 4.3583511850625305,
+        "baseline_r_squared": -0.011258015250941167,
+        "mae": 4.321553286838505,
+        "model_name": "mond_rar",
+        "n_test_examples": 437,
+        "n_train_examples": 2731,
+        "r_squared": -0.001482035685411942
+      },
+      {
+        "baseline_mae": 6.399004902945417,
+        "baseline_r_squared": -0.023464402824730612,
+        "mae": 6.36795920446329,
+        "model_name": "conformal_mannheim",
+        "n_test_examples": 437,
+        "n_train_examples": 2731,
+        "r_squared": -0.05168657045196379
+      },
+      {
+        "baseline_mae": 1.469121588277569,
+        "baseline_r_squared": -0.00019574666091259907,
+        "mae": 1.4636580372516992,
+        "model_name": "nfw_halo",
+        "n_test_examples": 437,
+        "n_train_examples": 2731,
+        "r_squared": -0.00025096118979517357
+      }
+    ]
+  }
+}

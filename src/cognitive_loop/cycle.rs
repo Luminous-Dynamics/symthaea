@@ -278,7 +278,13 @@ impl CognitiveLoopService {
         // PHASE 2.5: EMBODIMENT
         // Motor output → physics sim → proprioceptive HV → next cycle blend
         // Science: Lakoff & Johnson (1999) embodied cognition, Varela (1991) enactivism
-        // Platform-agnostic: works for all 10 robotics platforms via EmbodimentBridge trait.
+        // Platform-agnostic: works for ALL platforms via the EmbodimentBridge trait.
+        // This feature list MUST stay in sync with switch_embodiment()'s
+        // (accessors/system.rs) — platforms constructible there but absent
+        // here are silently never driven (motor, moral gate, and safety
+        // overrides all inert). That exact bug shipped for the six newer
+        // platforms below; a shared umbrella feature is the planned root fix
+        // (SYMTHAEA_ROBOTICS_IMPROVEMENT_PLAN_2026-07-06.md Tier 0.5).
         // ═══════════════════════════════════════════════════════════════════
         #[cfg(any(
             feature = "humanoid",
@@ -291,6 +297,12 @@ impl CognitiveLoopService {
             feature = "surgical",
             feature = "orbital",
             feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
             feature = "phone"
         ))]
         {
@@ -318,7 +330,26 @@ impl CognitiveLoopService {
                         ahimsa_violated: self.last_ahimsa_violated,
                     });
 
-                    let thought_hv = perception.encoding.encoding_result.hdv.clone();
+                    #[allow(unused_mut)]
+                    let mut thought_hv = perception.encoding.encoding_result.hdv.clone();
+                    // OMI-2 (2026-07-09): blend the grounded semantic HV into the
+                    // thought vector feeding the motor decoder. Off by default
+                    // (semantic_thought_blend = 0.0). The semantic HV is one
+                    // cycle stale (background embedding thread) — acceptable at
+                    // embodiment cadence.
+                    #[cfg(feature = "semantic-encoder")]
+                    {
+                        let w = self.config.semantic_thought_blend;
+                        if w > 0.0 {
+                            if let Some(ref sem) = self.feature_integ.last_semantic_continuous {
+                                if sem.len() == thought_hv.values.len() {
+                                    let sem_hv =
+                                        symthaea_core::hdc::ContinuousHV::from_vec(sem.clone());
+                                    thought_hv.lerp_in_place(&sem_hv, 1.0 - w, w);
+                                }
+                            }
+                        }
+                    }
                     let result = bridge.step(&thought_hv, dt, phi);
                     if result.success {
                         let proprioceptive_hv = bridge.encode_perception();
@@ -405,7 +436,8 @@ impl CognitiveLoopService {
             self.apply_safety_gates(&safety_result, feedback.consciousness.consciousness_level);
 
             // ── Gate 5: Embodiment motor halt carry-forward ──────────────
-            // Platform-agnostic: applies to all 10 robotics platforms.
+            // Platform-agnostic: applies to ALL embodiment platforms.
+            // Keep in sync with the Phase 2.5 list above.
             #[cfg(any(
                 feature = "humanoid",
                 feature = "helicopter",
@@ -417,6 +449,12 @@ impl CognitiveLoopService {
                 feature = "surgical",
                 feature = "orbital",
                 feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
                 feature = "phone"
             ))]
             if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {

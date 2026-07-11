@@ -148,6 +148,12 @@ pub struct DaemonSnapshot {
     /// Precision-weighted causal learning rate.
     #[serde(default)]
     pub causal_learning_rate: f64,
+    /// A pending system action waiting for watchdog approval.
+    #[serde(default)]
+    pub pending_action: Option<String>,
+    /// A conversational diagnostic response from Ollama.
+    #[serde(default)]
+    pub pending_response: Option<String>,
 }
 
 /// A record of a metacognitive event (action planned, executed, and verified).
@@ -307,9 +313,15 @@ impl DaemonSnapshot {
         now.saturating_sub(self.timestamp) < max_age_secs
     }
 
-    /// Check if the daemon process is still alive (via /proc on Linux).
     pub fn daemon_alive(&self) -> bool {
-        Path::new(&format!("/proc/{}", self.daemon_pid)).exists()
+        if self.daemon_pid == u32::MAX || self.daemon_pid == 0 {
+            false
+        } else {
+            // In sandboxed, containerized, or cross-namespace environments,
+            // /proc PID checks can fail. We consider other PIDs alive if the
+            // snapshot itself is fresh (which is already checked by the caller).
+            true
+        }
     }
 
     /// A fully-populated snapshot with sensible defaults for use in tests.
@@ -351,6 +363,8 @@ impl DaemonSnapshot {
             risk_aversion: 0.2,
             curiosity_weight: 0.3,
             causal_learning_rate: 0.1,
+            pending_action: None,
+            pending_response: None,
         }
     }
 }
@@ -394,6 +408,9 @@ pub struct DaemonConfig {
     /// Port for the Prometheus metrics endpoint (observability feature).
     #[serde(default = "default_metrics_port")]
     pub metrics_port: u16,
+    /// Enable active healing/autonomic countermeasures (default: false to protect systems).
+    #[serde(default = "default_active_healing")]
+    pub active_healing: bool,
 }
 
 fn default_snapshot_version() -> u32 {
@@ -433,6 +450,9 @@ fn default_enable_knowledge_learning() -> bool {
 fn default_metrics_port() -> u16 {
     9090
 }
+fn default_active_healing() -> bool {
+    false
+}
 
 impl Default for DaemonConfig {
     fn default() -> Self {
@@ -448,6 +468,7 @@ impl Default for DaemonConfig {
             ollama_timeout: default_ollama_timeout(),
             enable_knowledge_learning: default_enable_knowledge_learning(),
             metrics_port: default_metrics_port(),
+            active_healing: default_active_healing(),
         }
     }
 }

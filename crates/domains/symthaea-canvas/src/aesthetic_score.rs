@@ -59,7 +59,9 @@ fn compute_complexity(state: &AestheticState, scene: &SceneNode) -> f32 {
     let topo = (state.component_count + state.ring_count + state.void_count) as f32;
     let topological = (topo / 10.0).min(1.0);
 
-    let color_diversity = 0.5; // Palette always has 4 distinct colors
+    // Measured from the actual scene colors (was a hardcoded 0.5 until
+    // 2026-07-10, which made complexity blind to the palette in use).
+    let color_diversity = crate::scene_features::extract_scene_features(scene).color_diversity();
 
     (0.5 * structural + 0.3 * topological + 0.2 * color_diversity).clamp(0.01, 1.0)
 }
@@ -94,12 +96,19 @@ mod tests {
     fn symmetric_scores_higher() {
         let symmetric = make_state([0.8; 8], 0.7);
         let asymmetric = make_state([1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], 0.7);
-        // Need enough nodes for meaningful complexity so scores don't both clamp to 1.0
+        // Need enough nodes AND real color variety for meaningful complexity
+        // so scores don't both clamp to 1.0 — color_diversity is measured
+        // from actual fills since 2026-07-10, and unstyled circles score 0.
         let mut scene = SceneNode::group(None);
         for i in 0..20 {
             scene
                 .children
-                .push(SceneNode::circle(i as f32 * 10.0, 0.0, 5.0));
+                .push(SceneNode::circle(i as f32 * 10.0, 0.0, 5.0).with_style(
+                    crate::scene_graph::Style {
+                        fill: Some(crate::color::Color::from_hsl(i as f32 * 18.0, 0.8, 0.5)),
+                        ..Default::default()
+                    },
+                ));
         }
         let s1 = aesthetic_score(&symmetric, &scene);
         let s2 = aesthetic_score(&asymmetric, &scene);

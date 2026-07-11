@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-galactic"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Galactic rotation-curve model comparison on SPARC: Newtonian, NFW, MOND, and conformal-gravity baselines with HDC residual diagnostics"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+keywords = ["astrophysics", "rotation-curves", "dark-matter", "mond", "hdc"]
+categories = ["science", "simulation"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -50,6 +50,92 @@ fn test_generative_model_prediction() {
 }
 
 #[test]
+fn test_transition_bias_defaults_to_zero_and_is_a_true_no_op() {
+    // No behavior change for any existing caller who never sets a bias.
+    let model = GenerativeModel::new(4, 4, 4);
+    let mut state = HiddenState::new(4);
+    state.mean = vec![0.3, 0.5, 0.2, 0.1];
+    let predicted = model.predict_next_state(&state, 0);
+
+    let mut biased = model.clone();
+    biased.set_transition_bias(0, vec![0.0, 0.0, 0.0, 0.0]);
+    let predicted_with_zero_bias = biased.predict_next_state(&state, 0);
+
+    assert_eq!(predicted.mean, predicted_with_zero_bias.mean);
+}
+
+#[test]
+fn test_transition_bias_shifts_the_prediction() {
+    let mut model = GenerativeModel::new(4, 4, 4);
+    let mut state = HiddenState::new(4);
+    state.mean = vec![0.3, 0.5, 0.2, 0.1];
+
+    let before = model.predict_next_state(&state, 1).mean;
+    model.set_transition_bias(1, vec![0.0, 0.2, 0.0, 0.0]);
+    let after = model.predict_next_state(&state, 1).mean;
+
+    assert!((after[1] - before[1] - 0.2).abs() < 1e-9);
+    // Only the biased dimension moved; the others are untouched.
+    assert_eq!(before[0], after[0]);
+    assert_eq!(before[2], after[2]);
+    assert_eq!(before[3], after[3]);
+}
+
+#[test]
+fn test_transition_bias_represents_growth_a_bias_free_map_cannot() {
+    // The actual point of this feature (CULINARY_PLAN_2026-07-09.md Phase 3/4
+    // finding): with a low current value and a self-transition weight < 1
+    // (the only kind `learn()` ever produces, since it clamps entries to
+    // [0,1]), a bias-free linear map can never predict a value *larger* than
+    // the current one. An additive bias breaks that ceiling.
+    let mut model = GenerativeModel::new(2, 2, 2);
+    // Force a pure-decay self-transition on dim 0 (weight 0.5, no feed from
+    // other dims) so the bias-free prediction is provably bounded above by
+    // the current value.
+    model.transition_matrices[0][0][0] = 0.5;
+    model.transition_matrices[0][1][0] = 0.0;
+
+    let mut state = HiddenState::new(2);
+    state.mean = vec![0.3, 0.0];
+
+    let bias_free = model.predict_next_state(&state, 0).mean[0];
+    assert!(
+        bias_free <= state.mean[0],
+        "bias-free prediction should never exceed the current value here: {bias_free} > {}",
+        state.mean[0]
+    );
+
+    model.set_transition_bias(0, vec![0.25, 0.0]);
+    let biased = model.predict_next_state(&state, 0).mean[0];
+    assert!(
+        biased > state.mean[0],
+        "biased prediction should now represent genuine growth: {biased} <= {}",
+        state.mean[0]
+    );
+}
+
+#[test]
+fn test_set_transition_bias_ignores_wrong_length() {
+    let mut model = GenerativeModel::new(4, 4, 4);
+    let original = model.transition_bias.clone();
+    model.set_transition_bias(0, vec![1.0, 2.0]); // wrong length for state_dim=4
+    assert_eq!(model.transition_bias, original);
+}
+
+#[test]
+fn test_agent_set_transition_bias_delegates_to_model() {
+    let config = ActiveInferenceAgentConfig {
+        state_dim: 3,
+        obs_dim: 3,
+        num_actions: 2,
+        ..Default::default()
+    };
+    let mut agent = ActiveInferenceAgent::new(config);
+    agent.set_transition_bias(0, vec![0.1, 0.0, 0.0]);
+    assert_eq!(agent.model.transition_bias[0], vec![0.1, 0.0, 0.0]);
+}
+
+#[test]
 fn test_free_energy_computation() {
     let model = GenerativeModel::new(4, 4, 4);
     let state = HiddenState::new(4);

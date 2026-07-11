@@ -18,20 +18,24 @@ use crate::types::HumanoidState;
 
 // ─── Predictive Encoder Layer ───
 
-/// An HDC-LTC prediction layer that generates emergent prediction error.
+/// A temporal-novelty layer producing a change-based "prediction error".
 ///
-/// Instead of hacking derivatives as `channels[i] - prev_channels[i]`, this layer:
-/// 1. Maintains an internal temporal state via CfC closed-form dynamics
-/// 2. PREDICTS what the next encoding should look like (from its state)
-/// 3. Receives the actual encoding and computes PE as 1 - cosine_similarity
-/// 4. Updates its state via σ-interpolation toward the new equilibrium
-/// 5. Adapts tau based on PE magnitude (high surprise → faster response)
+/// Honest description (2026-07 robotics deep review — an earlier version of
+/// this doc claimed the layer "PREDICTS what the next encoding should look
+/// like"; it does not run a learned forward model). What it actually does:
+/// 1. Computes PE = 1 − cosine_similarity(raw_t, raw_{t−1}) — i.e. how
+///    different is this observation from the previous one (novelty), not
+///    from a model-generated prediction
+/// 2. Evolves a small CfC network with the raw input for temporal smoothing
+///    and returns the smoothed output
+/// 3. Tracks confidence as an EMA of 1 − PE
 ///
 /// The confidence signal (1 - PE, smoothed) IS the safety input.
 pub struct PredictiveLayer {
-    /// Small HDC-LTC network (1 layer × 4 neurons) for temporal prediction.
+    /// Small HDC-LTC network (1 layer × 4 neurons) for temporal smoothing.
     network: HdcLtcUnifiedNetwork,
-    /// The network's output after previous evolve (its prediction for next input).
+    /// The previous RAW input encoding (used for the t vs t−1 novelty
+    /// comparison — despite the field name, this is not a model prediction).
     last_prediction: Option<ContinuousHV>,
     /// Number of inputs processed (PE valid after >= 2).
     tick_count: u32,

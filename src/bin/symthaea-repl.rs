@@ -442,7 +442,11 @@ impl ReplState {
         // LLM sees what the cognitive loop has actually learned, not just
         // what's in-context. Empty when the knowledge engine isn't enabled
         // in the config; a no-op in that case.
-        let grounded: Vec<String> = vec![]; // Stubbed: top_grounded_facts gate
+        let grounded: Vec<String> = self
+            .cognitive
+            .knowledge_manager()
+            .map(|km| km.top_grounded_facts(5))
+            .unwrap_or_default();
         if !grounded.is_empty() {
             system_prompt.push_str("\n\n# Relevant knowledge (from cognitive loop)\n");
             for fact in grounded {
@@ -1430,6 +1434,35 @@ fn main() -> Result<()> {
                     );
                     println!();
                 }
+                continue;
+            }
+            _ if input.starts_with("/rate-art") => {
+                // Human rating of the most recent creative artwork, [-1, 1].
+                // First live surface for the aesthetic human-feedback path
+                // (visual-art plan Phase 2.1). Requires --features creative.
+                #[cfg(feature = "creative")]
+                {
+                    let arg = input.trim_start_matches("/rate-art").trim();
+                    match arg.parse::<f32>() {
+                        Ok(rating) if (-1.0..=1.0).contains(&rating) => {
+                            if state.cognitive.rate_creative_art(rating) {
+                                println!(
+                                    "\n  Rating {rating:+.2} recorded — aesthetic taste \
+                                     recalibrated (10x weight) and persisted.\n"
+                                );
+                            } else {
+                                println!(
+                                    "\n  No artwork generated yet this session — nothing to \
+                                     rate. (Art generates autonomously via the creative \
+                                     modality rotation.)\n"
+                                );
+                            }
+                        }
+                        _ => println!("\n  Usage: /rate-art <score in [-1, 1]>\n"),
+                    }
+                }
+                #[cfg(not(feature = "creative"))]
+                println!("\n  /rate-art requires building with --features creative\n");
                 continue;
             }
             _ if input.starts_with("compose ") => {

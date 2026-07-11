@@ -116,17 +116,25 @@ impl ExecutionResult {
         }
     }
 
-    /// Create a result for simulation mode
+    /// Create a result for simulation mode (sandbox refused real execution).
+    ///
+    /// `simulated` MUST be `true` here: nothing was compiled or run, so this
+    /// result must never count as real verification. Before 2026-07-06 this
+    /// constructor set `compiled: true, simulated: false`, which let
+    /// sandbox-rejected executions masquerade as genuine compile passes
+    /// downstream (Phase 5.5 episodic-memory storage, `is_success()`,
+    /// verified-generation gating).
     fn simulated_success() -> Self {
         Self {
             compiled: true,
             compile_errors: Vec::new(),
             tests_passed: 0,
             tests_failed: 0,
-            test_output: "[Simulated] Compilation successful".to_string(),
+            test_output: "[Simulated] Compilation not actually run (sandbox disallowed execution)"
+                .to_string(),
             runtime_error: None,
             elapsed: Duration::from_millis(0),
-            simulated: false,
+            simulated: true,
             binary_path: None,
             test_failures: Vec::new(),
         }
@@ -492,6 +500,23 @@ impl CodeExecutor {
                     };
                 }
 
+                // The compiled test binary's path is dynamically generated (a
+                // temp filename), so it can never be in the sandbox's static
+                // command allowlist checked by `is_command_allowed()` — without
+                // this, every run below hit `SandboxError::CommandNotAllowed`
+                // and silently reported `tests_passed: 0, tests_failed: 0` with
+                // the real reason buried in `runtime_error` (a field callers,
+                // including this crate's own benchmarks, don't check). This
+                // meant `execute_rust_with_inline_tests` — the sole compiler
+                // verification path used by both `CodeOrchestrator`'s own
+                // acceptance gate and every Rust benchmark run this week —
+                // could compile code but never actually execute a single test,
+                // silently passing anything that merely compiled. Mirrors the
+                // identical, correct fix already present in the sibling
+                // `execute_rust()` function just above (line ~360).
+                if let Some(path_str) = output_path.to_str() {
+                    self.sandbox.allow_command(path_str);
+                }
                 match self
                     .sandbox
                     .run(output_path.to_str().unwrap_or("./generated_test"), &[])
@@ -1553,5 +1578,63 @@ mod tests {
         let stderr = "error[E0308]: mismatched types";
         let errors = parse_compile_errors(stderr);
         assert_eq!(errors.len(), 1);
+    }
+
+    #[test]
+    fn test_simulated_success_is_labeled_simulated_and_not_verified() {
+        let result = ExecutionResult::simulated_success();
+        assert!(
+            result.simulated,
+            "sandbox-rejected execution must be labeled simulated"
+        );
+        assert!(
+            !result.is_success(),
+            "a simulated result must never count as full verification"
+        );
+    }
+
+    /// Regression test for a real bug (found 2026-07-07 via the Rust-native
+    /// orchestrator benchmark): the compiled test binary's dynamically
+    /// generated path was never in the sandbox's static command allowlist,
+    /// so `execute_rust_with_inline_tests` could compile code but never
+    /// actually execute a single test — every run silently reported
+    /// `tests_passed: 0, tests_failed: 0` (the real
+    /// `SandboxError::CommandNotAllowed` was buried in `runtime_error`,
+    /// which callers didn't check), making every candidate look like it
+    /// passed by simply not running anything. This test would have failed
+    /// before the fix: a genuinely failing assertion would have reported
+    /// `tests_failed: 0` instead of `1`.
+    #[test]
+    fn test_execute_rust_with_inline_tests_actually_runs_tests() {
+        let mut executor = CodeExecutor::with_real_execution();
+        if !executor.supports_real_execution() {
+            // No rustc available in this environment — nothing to verify.
+            return;
+        }
+
+        let passing = "pub fn add(a: i32, b: i32) -> i32 { a + b }\n\n\
+             #[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn t() { assert_eq!(add(2, 3), 5); }\n}\n";
+        let result = executor.execute_rust_with_inline_tests(passing);
+        assert!(
+            result.compiled,
+            "expected compile success: {:?}",
+            result.compile_errors
+        );
+        assert_eq!(
+            result.tests_passed, 1,
+            "a genuinely passing test must be detected as passed, not silently skipped (runtime_error: {:?})",
+            result.runtime_error
+        );
+        assert_eq!(result.tests_failed, 0);
+
+        let failing = "pub fn add(a: i32, b: i32) -> i32 { a + b }\n\n\
+             #[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn t() { assert_eq!(add(2, 3), 999); }\n}\n";
+        let result = executor.execute_rust_with_inline_tests(failing);
+        assert!(result.compiled);
+        assert_eq!(
+            result.tests_failed, 1,
+            "a genuinely failing test must be detected as failed, not silently reported as 0/0 (runtime_error: {:?})",
+            result.runtime_error
+        );
     }
 }

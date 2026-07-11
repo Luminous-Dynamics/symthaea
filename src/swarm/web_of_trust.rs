@@ -316,6 +316,22 @@ impl TrustGraph {
         &self.anomalies
     }
 
+    /// Whether `node` has ever been flagged by Sybil-anomaly detection
+    /// (`tick`'s sudden-mass-trust-change check).
+    ///
+    /// This is a coarse, binary signal — "has this node ever tripped
+    /// detection," not a graduated trust/reputation score. Used to gate
+    /// content admission (e.g. cross-agent cultural-memory sharing) without
+    /// requiring positive trust, which would create a cold-start deadlock:
+    /// an unknown, never-before-seen node has `direct_trust`/
+    /// `transitive_trust` of exactly 0.0, identical to a known bad actor, so
+    /// a positive-trust admission requirement would block every peer's
+    /// first contact forever. Rejecting only already-flagged nodes stops
+    /// caught bad actors without punishing legitimate newcomers.
+    pub fn is_flagged(&self, node: &str) -> bool {
+        self.anomalies.iter().any(|a| a.node == node)
+    }
+
     /// Total number of nodes.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
@@ -471,6 +487,33 @@ mod tests {
         g.tick(2, 0.999);
 
         assert!(g.anomaly_count() > 0, "Should detect Sybil anomaly");
+    }
+
+    #[test]
+    fn test_is_flagged_reflects_real_sybil_detection() {
+        let mut g = TrustGraph::new();
+        g.set_trust("alice", "bob", 0.5, false);
+        g.set_trust("alice", "carol", 0.5, false);
+        g.tick(1, 0.999);
+        for i in 0..10 {
+            g.set_trust("alice", &format!("sybil_{i}"), 0.9, false);
+        }
+        g.tick(2, 0.999);
+
+        assert!(
+            !g.anomalies().is_empty(),
+            "test setup must trigger detection"
+        );
+        let flagged_node = g.anomalies()[0].node.clone();
+
+        assert!(
+            g.is_flagged(&flagged_node),
+            "the node the real detection algorithm flagged must read as flagged"
+        );
+        assert!(
+            !g.is_flagged("someone_never_involved"),
+            "an unrelated node must not be flagged"
+        );
     }
 
     #[test]

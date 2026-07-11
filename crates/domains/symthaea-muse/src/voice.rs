@@ -16,6 +16,7 @@
 //! | Harmony | Mid-High | Parallel 3rds/5ths above lead | Psi > 0.6 |
 //! | Ostinato | Variable | Repeating rhythmic figure | Psi > 0.7 |
 
+use crate::instruments::Instrument;
 use crate::{MusicalState, Note};
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +46,13 @@ pub struct Voice {
     pub volume: f32,
     /// Stereo pan position [-1.0 left, 0.0 center, 1.0 right].
     pub pan: f32,
+    /// Which instrument timbre renders this voice. `None` preserves the
+    /// legacy behavior: `synth::render_arrangement` falls back to its
+    /// single mood-derived (valence/arousal quadrant) timbre shared by
+    /// every voice — the sound this field exists to move callers away
+    /// from, since one shared patch across melody/harmony/bass is exactly
+    /// what reads as "one chiptune voice in three registers."
+    pub instrument: Option<Instrument>,
 }
 
 /// Polyphonic arrangement: multiple voices derived from a lead melody.
@@ -71,6 +79,7 @@ pub fn arrange(lead_notes: &[Note], state: &MusicalState) -> Arrangement {
         pitch_range: (130.0, 1000.0),
         volume: 1.0,
         pan: 0.0,
+        instrument: None,
     });
 
     // Bass voice: root motion, octave below lead
@@ -111,6 +120,7 @@ fn derive_bass(lead: &[Note], state: &MusicalState) -> Voice {
         pitch_range: (55.0, 500.0),
         volume: 0.7,
         pan: -0.2, // slight left
+        instrument: None,
     }
 }
 
@@ -146,6 +156,7 @@ fn derive_harmony(lead: &[Note], state: &MusicalState) -> Voice {
         pitch_range: (200.0, 2000.0),
         volume: 0.5,
         pan: 0.4, // right
+        instrument: None,
     }
 }
 
@@ -164,6 +175,7 @@ fn derive_ostinato(lead: &[Note], state: &MusicalState) -> Voice {
             pitch_range: (100.0, 800.0),
             volume: 0.3,
             pan: -0.3,
+            instrument: None,
         };
     }
 
@@ -202,6 +214,7 @@ fn derive_ostinato(lead: &[Note], state: &MusicalState) -> Voice {
         pitch_range: (100.0, 800.0),
         volume: 0.3,
         pan: -0.3, // left
+        instrument: None,
     }
 }
 

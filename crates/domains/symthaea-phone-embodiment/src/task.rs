@@ -199,16 +199,34 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_open_and_search() {
+    fn test_parse_open_and_search_youtube_shortcut() {
+        // Known apps take the intent shortcut (single deep-link step), NOT
+        // the 4-step visual navigation this test asserted before the
+        // shortcut existed.
         let task = Task::parse("open YouTube and search NixOS");
-        assert_eq!(task.steps.len(), 4);
+        assert_eq!(task.steps.len(), 1);
+        assert!(matches!(task.steps[0].action, StepAction::SearchYouTube(ref s) if s == "nixos"));
+    }
+
+    #[test]
+    fn test_parse_open_and_search_visual_fallback() {
+        // Unknown apps fall back to 5-step visual navigation:
+        // Tap app → Wait → Tap search icon → Wait → Type query.
+        // (The pre-shortcut version of this test asserted 4 steps, which was
+        // stale even for the visual path.)
+        let task = Task::parse("open Settings and search wifi");
+        assert_eq!(task.steps.len(), 5);
         assert!(matches!(task.steps[0].action, StepAction::Tap));
         assert!(matches!(
             task.steps[1].action,
             StepAction::WaitForTransition
         ));
         assert!(matches!(task.steps[2].action, StepAction::Tap));
-        assert!(matches!(task.steps[3].action, StepAction::Type(ref s) if s == "nixos"));
+        assert!(matches!(
+            task.steps[3].action,
+            StepAction::WaitForTransition
+        ));
+        assert!(matches!(task.steps[4].action, StepAction::Type(ref s) if s == "wifi"));
     }
 
     #[test]

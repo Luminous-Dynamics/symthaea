@@ -16,6 +16,11 @@ pub enum HumanoidMorphology {
     Dmc21,
     Dexterous53,
     FullSpine,
+    /// WARNING (2026-07 robotics deep review): currently a NO-OP alias of
+    /// [`Dmc21`](Self::Dmc21) — same 21 actuators, same limits/inertia/
+    /// damping; no neck or wrist joints are actually added. Selecting it
+    /// gets plain DMC21. Implement the extra DOF or remove the variant
+    /// (SYMTHAEA_ROBOTICS_IMPROVEMENT_PLAN_2026-07-06.md Tier 2.2).
     WithNeckWrist,
 }
 
@@ -111,9 +116,17 @@ impl HumanoidMorphology {
         scales
     }
 
+    /// Joint names. The first 21 are the real dm_control humanoid MJCF names
+    /// (`crate::types::JOINT_NAMES`); extended-morphology joints (hands,
+    /// spine) get generated `j_N` names. Safety code (StandingLock) resolves
+    /// hip joints by these names — generic names here previously made the
+    /// Red-tier gravity-comp baseline a silent no-op.
     pub fn joint_names(&self) -> Vec<String> {
         (0..self.num_actuators())
-            .map(|i| format!("j_{}", i))
+            .map(|i| match crate::types::JOINT_NAMES.get(i) {
+                Some(name) => (*name).to_string(),
+                None => format!("j_{}", i),
+            })
             .collect()
     }
 
@@ -386,14 +399,28 @@ impl HumanoidMorphology {
     }
 }
 
-pub fn compute_hand_centroid(
-    hand_base: [f64; 3],
-    _joint_angles: &[f64],
-    dir: [f64; 3],
-) -> [f64; 3] {
+/// Fingertip-centroid position for a 16-joint hand.
+///
+/// The centroid's reach along `dir` shrinks as the fingers flex: an open
+/// hand (all finger joints at 0) reaches the full ~0.09 m; a fully closed
+/// fist curls the fingertips back to ~0.03 m from the wrist. Previously the
+/// finger joint angles were IGNORED and a fixed 0.08 m offset returned —
+/// so Dexterous53 grasp state (open vs closed) was unobservable in the
+/// extremities channels and grasp learning had no signal.
+pub fn compute_hand_centroid(hand_base: [f64; 3], joint_angles: &[f64], dir: [f64; 3]) -> [f64; 3] {
+    // Mean absolute finger flexion, normalized by a typical ~1.6 rad
+    // full-curl range → closure in [0, 1].
+    let closure = if joint_angles.is_empty() {
+        0.0
+    } else {
+        let mean_flex: f64 =
+            joint_angles.iter().map(|a| a.abs()).sum::<f64>() / joint_angles.len() as f64;
+        (mean_flex / 1.6).clamp(0.0, 1.0)
+    };
+    let reach = 0.09 - 0.06 * closure;
     [
-        hand_base[0] + dir[0] * 0.08,
-        hand_base[1] + dir[1] * 0.08,
-        hand_base[2] + dir[2] * 0.08,
+        hand_base[0] + dir[0] * reach,
+        hand_base[1] + dir[1] * reach,
+        hand_base[2] + dir[2] * reach,
     ]
 }

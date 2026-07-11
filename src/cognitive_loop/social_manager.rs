@@ -6,9 +6,10 @@
 //! Consolidates 6 previously scattered social/relational fields from
 //! CognitiveLoopService into a single coherent module.
 
-use crate::brain::social_coherence::{SocialCoherence, SocialCoherenceConfig};
+use crate::brain::social_coherence::{InteractionType, SocialCoherence, SocialCoherenceConfig};
 use crate::partnership::{HumanPartnerModel, PhiDyadCalculator};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
+use symthaea_pragmatics::speech_act::{SpeechAct, classify};
 
 /// Social/external signal state.
 pub(crate) struct SocialState {
@@ -142,11 +143,7 @@ impl SocialManager {
         their_response: &str,
     ) {
         if let Some(ref mut sc) = self.coherence {
-            let interaction_type = if outcome >= 0.0 {
-                crate::brain::social_coherence::InteractionType::Cooperation
-            } else {
-                crate::brain::social_coherence::InteractionType::Conflict
-            };
+            let interaction_type = classify_interaction(outcome, their_response);
             sc.record_interaction(
                 agent_id,
                 interaction_type,
@@ -156,5 +153,88 @@ impl SocialManager {
                 their_response,
             );
         }
+    }
+}
+
+/// Classify a social interaction, enriching the coarse outcome-sign signal with
+/// the *speech act* of the other agent's response (`symthaea-pragmatics`).
+///
+/// A promise (commissive) reads as cooperation regardless of the immediate
+/// outcome; a request/command/question (directive) is negotiation in good faith
+/// but competition under a negative outcome; positive affect (expressive) is
+/// help. Plain statements and performatives (assertive / declarative — also the
+/// default for empty or neutral text) keep the original outcome-sign behaviour,
+/// so this is additive: the pre-pragmatics mapping is unchanged for that case.
+fn classify_interaction(outcome: f32, their_response: &str) -> InteractionType {
+    let base = if outcome >= 0.0 {
+        InteractionType::Cooperation
+    } else {
+        InteractionType::Conflict
+    };
+    match classify(their_response) {
+        SpeechAct::Commissive => InteractionType::Cooperation,
+        SpeechAct::Directive => {
+            if outcome >= 0.0 {
+                InteractionType::Negotiation
+            } else {
+                InteractionType::Competition
+            }
+        }
+        SpeechAct::Expressive => {
+            if outcome >= 0.0 {
+                InteractionType::Help
+            } else {
+                InteractionType::Conflict
+            }
+        }
+        SpeechAct::Assertive | SpeechAct::Declarative => base,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::classify_interaction;
+    use crate::brain::social_coherence::InteractionType;
+
+    #[test]
+    fn neutral_text_keeps_outcome_sign_default() {
+        // Plain assertion / empty text → unchanged pre-pragmatics behaviour.
+        assert_eq!(
+            classify_interaction(0.5, "the sky is blue"),
+            InteractionType::Cooperation
+        );
+        assert_eq!(
+            classify_interaction(-0.5, "the sky is blue"),
+            InteractionType::Conflict
+        );
+        assert_eq!(classify_interaction(0.2, ""), InteractionType::Cooperation);
+    }
+
+    #[test]
+    fn promise_is_cooperation_even_if_outcome_negative() {
+        assert_eq!(
+            classify_interaction(-0.3, "I promise to help you rebuild it"),
+            InteractionType::Cooperation
+        );
+    }
+
+    #[test]
+    fn directive_splits_on_outcome() {
+        assert_eq!(
+            classify_interaction(0.4, "please send the report?"),
+            InteractionType::Negotiation
+        );
+        assert_eq!(
+            classify_interaction(-0.4, "give me the report now"),
+            InteractionType::Competition
+        );
+    }
+
+    #[test]
+    fn positive_affect_is_help() {
+        assert_eq!(
+            classify_interaction(0.6, "thank you so much for this"),
+            InteractionType::Help
+        );
     }
 }

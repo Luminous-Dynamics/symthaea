@@ -23,7 +23,7 @@ harness = false
 required-features = ["abstract_thought"]
 
 [dependencies]
-wgpu = { workspace = true, features = ["spirv"] }
+wgpu = { workspace = true, features = ["spirv"], optional = true }
 bytemuck = { version = "1", features = ["derive"] }
 
 
@@ -189,6 +189,6 @@ abstract_thought = []                        # Meta-HDC concept vectors, dynamic
 neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
 cantor-hdc = []                              # Hierarchical Cantor Hypervectors (RHN)
+gpu = ["dep:wgpu"]                            # WGPU-accelerated HDC compute primitives
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)
-

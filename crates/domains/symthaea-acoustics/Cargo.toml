@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-acoustics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Acoustics for Symthaea: speed of sound, wavelength/frequency, decibel combination, and the Doppler effect. Closed-form, ground-truth-checked."
+
+[dependencies]

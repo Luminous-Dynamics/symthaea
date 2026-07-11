@@ -287,8 +287,8 @@ impl ExtendedChordType {
             Self::Major9 => vec![1.0, 1.2599, 1.4983, 1.8877, 2.2449], // 1, M3, P5, M7, M9
             Self::Sus2 => vec![1.0, 1.1225, 1.4983],  // 1, M2, P5
             Self::Sus4 => vec![1.0, 1.3348, 1.4983],  // 1, P4, P5
-            Self::Diminished7 => vec![1.0, 1.1892, 1.4142, 1.6818], // 1, m3, dim5, dim7
-            Self::Augmented => vec![1.0, 1.2599, 1.5874], // 1, M3, aug5
+            Self::Diminished7 => vec![1.0, 1.1892, std::f32::consts::SQRT_2, 1.6818], // 1, m3, dim5 (2^(6/12) = √2), dim7
+            Self::Augmented => vec![1.0, 1.2599, 1.5874],                             // 1, M3, aug5
             Self::Add9 => vec![1.0, 1.2599, 1.4983, 2.2449], // 1, M3, P5, M9
             Self::Minor11 => vec![1.0, 1.1892, 1.4983, 1.7818, 2.2449, 2.6697], // + P11
             Self::Dominant9 => vec![1.0, 1.2599, 1.4983, 1.7818, 2.2449], // 1, M3, P5, m7, M9

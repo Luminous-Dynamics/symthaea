@@ -97,31 +97,56 @@ impl SampleLibrary {
         count
     }
 
-    /// Get the nearest sample for an instrument and frequency.
-    pub fn get_sample(&self, instrument: Instrument, freq: f32) -> Option<(&Sample, f64)> {
+    /// Resolve the nearest sample's map key + playback rate for a note.
+    ///
+    /// This performs the O(N) nearest-note scan over the library. Call it
+    /// ONCE per note (at spawn) and cache the result; then fetch per audio
+    /// sample with `get_by_key`, which is a single O(1) hash lookup. A
+    /// previous version ran this scan once per output sample per active note
+    /// (tens of millions of map iterations per second at 44.1 kHz), directly
+    /// threatening real-time underruns.
+    pub fn resolve_sample(
+        &self,
+        instrument: Instrument,
+        freq: f32,
+    ) -> Option<((InstrumentKey, u8), f64)> {
         let key = InstrumentKey::from_instrument(instrument);
         let target_note = freq_to_midi(freq);
 
-        // Find nearest available sample
-        let mut best: Option<(&Sample, u8)> = None;
-        for (&(k, note), sample) in &self.samples {
+        // Find nearest available sample note for this instrument family
+        let mut best: Option<u8> = None;
+        for &(k, note) in self.samples.keys() {
             if k == key {
-                if let Some((_, best_note)) = best {
-                    if (note as i16 - target_note as i16).abs()
-                        < (best_note as i16 - target_note as i16).abs()
+                best = match best {
+                    Some(b)
+                        if (b as i16 - target_note as i16).abs()
+                            <= (note as i16 - target_note as i16).abs() =>
                     {
-                        best = Some((sample, note));
+                        Some(b)
                     }
-                } else {
-                    best = Some((sample, note));
-                }
+                    _ => Some(note),
+                };
             }
         }
 
-        best.map(|(sample, root)| {
+        best.map(|root| {
             let playback_rate = 2.0f64.powf((target_note as f64 - root as f64) / 12.0);
-            (sample, playback_rate)
+            ((key, root), playback_rate)
         })
+    }
+
+    /// O(1) fetch by a key previously resolved with `resolve_sample`.
+    pub fn get_by_key(&self, key: (InstrumentKey, u8)) -> Option<&Sample> {
+        self.samples.get(&key)
+    }
+
+    /// Get the nearest sample for an instrument and frequency.
+    ///
+    /// Convenience combining `resolve_sample` + `get_by_key`. Do NOT call in
+    /// per-sample loops — resolve once and use `get_by_key` there.
+    pub fn get_sample(&self, instrument: Instrument, freq: f32) -> Option<(&Sample, f64)> {
+        self.resolve_sample(instrument, freq)
+            .and_then(|(key, rate)| self.samples.get(&key).map(|s| (s, rate)))
     }
 
     /// Generate synthetic reference samples from the additive engine.

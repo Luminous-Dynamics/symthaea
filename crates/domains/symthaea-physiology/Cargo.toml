@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-physiology"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Human physiology for Symthaea: nutrition/metabolism (BMI, BMR, TDEE, macros) and pharmacokinetics (half-life, one-compartment clearance/dosing). Complements the clinical crates. Closed-form, ground-truth-checked."
+
+[dependencies]

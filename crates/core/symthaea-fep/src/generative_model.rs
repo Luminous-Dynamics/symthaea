@@ -21,6 +21,26 @@ pub struct GenerativeModel {
     /// Maps (state, action) → next state distribution
     pub transition_matrices: Vec<Vec<Vec<f64>>>,
 
+    /// Optional additive bias per `[action][state_dim]`, added on top of the
+    /// transition matrices' multiplicative sum in `predict_next_state`.
+    /// Defaults to all zeros — **no behavior change for any existing caller**.
+    ///
+    /// Without this, `predict_next_state` can never predict a value larger
+    /// than a weighted average of the *current* state (a bias-free linear
+    /// map) — fine for representing decay toward zero, but unable to
+    /// represent genuine self-reinforcing growth. Found and root-caused via
+    /// `symthaea-culinary`'s active-inference palate
+    /// (`CULINARY_PLAN_2026-07-09.md` Phase 3/4): a kitchen's φ rises under
+    /// sustained heat regardless of its current value, which no seeding of
+    /// `transition_matrices` alone could represent. Set via
+    /// [`GenerativeModel::set_transition_bias`] — the transition-model
+    /// analogue of `ActiveInferenceAgent::inject_priors`'s "Passport Route"
+    /// for belief priors. Deliberately **not** touched by `learn()` or TD
+    /// learning in this version — an externally-set structural prior, same
+    /// scope as `inject_priors`, not a claim that bias learning is implemented.
+    #[serde(default)]
+    pub transition_bias: Vec<Vec<f64>>,
+
     /// Prior over initial states P(s_0)
     pub prior_mean: Vec<f64>,
     pub prior_precision: Vec<f64>,
@@ -85,6 +105,7 @@ impl GenerativeModel {
         Self {
             likelihood_matrix,
             transition_matrices,
+            transition_bias: vec![vec![0.0; state_dim]; num_actions],
             prior_mean: vec![0.5; state_dim],
             prior_precision: vec![1.0; state_dim],
             observation_precision: 5.0,
@@ -116,6 +137,11 @@ impl GenerativeModel {
         for i in 0..self.state_dim {
             for j in 0..self.state_dim.min(state.mean.len()) {
                 next_mean[i] += transition[j][i] * state.mean[j];
+            }
+            if let Some(bias) = self.transition_bias.get(action_idx)
+                && let Some(b) = bias.get(i)
+            {
+                next_mean[i] += b;
             }
         }
 
@@ -264,6 +290,20 @@ impl GenerativeModel {
         }
         if precision.len() == self.state_dim {
             self.prior_precision = precision;
+        }
+    }
+
+    /// Set the additive transition bias for `action` — the transition-model
+    /// analogue of [`GenerativeModel::inject_priors`]'s Passport Route, letting
+    /// `predict_next_state` represent genuine growth/decay that a bias-free
+    /// multiplicative transition matrix cannot (see `transition_bias`'s doc for
+    /// why this was needed). No-op if `action` is out of range or `bias`'s
+    /// length doesn't match `state_dim`.
+    pub fn set_transition_bias(&mut self, action: usize, bias: Vec<f64>) {
+        if bias.len() == self.state_dim
+            && let Some(slot) = self.transition_bias.get_mut(action)
+        {
+            *slot = bias;
         }
     }
 }

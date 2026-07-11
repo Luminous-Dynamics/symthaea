@@ -22,12 +22,14 @@
 
 #![allow(clippy::needless_range_loop)]
 
+pub mod admittance;
 pub mod co_assembly;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod kinematics;
+pub mod kitchen_scenario;
 pub mod perturbations;
 pub mod simulator;
 #[cfg(feature = "symtropy")]

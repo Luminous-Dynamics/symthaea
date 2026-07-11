@@ -573,12 +573,24 @@ impl HumanoidTrainer {
         } else {
             1.0
         };
+        // Gravity-scaled curriculum: early episodes run at reduced gravity
+        // (60%) so balance is learnable, ramping to full gravity by 60% of
+        // training. (`with_gravity()` existed but was never called from
+        // training — the "gravity-scaled curriculum" claim was unsupported
+        // until 2026-07, robotics plan Tier 2.2.)
+        let gravity_scale = if self.config.num_episodes > 1 {
+            let progress = (episode as f64 / (self.config.num_episodes - 1) as f64).clamp(0.0, 1.0);
+            (0.6 + 0.4 * (progress / 0.6)).min(1.0)
+        } else {
+            1.0
+        };
         let mut physics = SimpleHumanoidSimulator::new_for(self.config.morphology)
             .with_domain_randomization(self.config.domain_randomization)
             .with_actuator_noise(self.config.actuator_noise_std)
             .with_observation_noise(self.config.observation_noise_std)
             .with_terrain_variation(self.config.terrain_variation)
-            .with_noise_scale(noise_scale);
+            .with_noise_scale(noise_scale)
+            .with_gravity(gravity_scale);
         self.run_episode_with_sim(encoder, controller, fep_agent, &mut physics, episode)
     }
 

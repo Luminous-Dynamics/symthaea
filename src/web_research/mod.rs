@@ -31,6 +31,8 @@
 //! - `researcher.rs` - Research orchestrator
 //! - `integrator.rs` - Knowledge graph integration
 //! - `meta_learning.rs` - Self-improving verification
+//! - `conjecture_feed.rs` - Feeds research-acquired numeric data (with
+//!   epistemic provenance) into `symthaea_core`'s Conjecture Engine
 //!
 //! # Usage
 //!
@@ -81,6 +83,11 @@ pub mod extractor;
 // Epistemic verification
 pub mod verifier;
 
+// Feeds web-research-acquired numeric data into the Conjecture Engine
+// (symthaea-core's symbolic-regression discovery engine). Requires the
+// conjecture engine's math types, which live in symthaea-core unconditionally.
+pub mod conjecture_feed;
+
 // Research orchestration
 pub mod researcher;
 
@@ -91,7 +98,13 @@ pub mod integrator;
 pub mod meta_learning;
 
 // Re-exports for ergonomic access
-pub use extractor::{ContentExtractor, ContentMetadata, ContentType, ExtractedContent};
+pub use conjecture_feed::{
+    ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
+    ResearchProvenance,
+};
+pub use extractor::{
+    ContentExtractor, ContentMetadata, ContentType, ExtractedContent, NumericSeries,
+};
 pub use integrator::{IntegratorConfig, IntegratorStats, KnowledgeIntegrator};
 pub use knowledge_graph::{
     EdgeType, GraphStats, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeSource, NodeId,

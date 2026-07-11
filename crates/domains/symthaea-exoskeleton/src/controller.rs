@@ -11,6 +11,11 @@ pub struct ExoskeletonController {
     weights: Vec<f32>,
     bias: [f32; OUT],
     learning_rate: f32,
+    /// Cached final-layer HV from the last forward() (post-normalize) --
+    /// needed by train_step's delta rule.
+    last_features: Vec<f32>,
+    /// Cached post-tanh joint-torque outputs from the last forward().
+    last_torque_outputs: [f32; NUM_ACTUATORS],
 }
 
 impl ExoskeletonController {
@@ -42,6 +47,8 @@ impl ExoskeletonController {
             weights,
             bias,
             learning_rate: config.learning_rate,
+            last_features: Vec::new(),
+            last_torque_outputs: [0.0; NUM_ACTUATORS],
         }
     }
     pub fn forward(&mut self, hv: &ContinuousHV, dt: f32) -> ExoskeletonCommand {
@@ -64,14 +71,44 @@ impl ExoskeletonController {
         fn sig(x: f32) -> f32 {
             1.0 / (1.0 + (-x).exp())
         }
+        self.last_features = d.to_vec();
+        self.last_torque_outputs = t;
         ExoskeletonCommand {
             joint_torques: t,
             stiffness_gain: sig(raw[6]).clamp(0.0, 1.0),
             damping_gain: sig(raw[7]).clamp(0.0, 1.0),
         }
     }
+
+    /// One supervised update of the joint-torque output rows toward
+    /// `target` (delta rule through tanh), using the features cached by the
+    /// last `forward()`. The stiffness/damping gain rows are left untouched.
+    /// Returns the pre-update mean-squared error. This is what makes
+    /// `ExoskeletonTrainer` actually train (real-trainer follow-up to
+    /// SYMTHAEA_CLASSIC_PLATFORMS_FEP_HONESTY_2026-07-09.md).
+    pub fn train_step(&mut self, target: &[f32; NUM_ACTUATORS]) -> f32 {
+        if self.last_features.is_empty() {
+            return 0.0;
+        }
+        let mut mse = 0.0f32;
+        for i in 0..NUM_ACTUATORS {
+            let out = self.last_torque_outputs[i];
+            let err = target[i] - out;
+            mse += err * err;
+            let delta = self.learning_rate * err * (1.0 - out * out);
+            let off = i * HDC_DIM;
+            for (j, f) in self.last_features.iter().enumerate() {
+                self.weights[off + j] += delta * f;
+            }
+            self.bias[i] += delta;
+        }
+        mse / NUM_ACTUATORS as f32
+    }
+
     pub fn reset(&mut self) {
         self.network.reset();
+        self.last_features.clear();
+        self.last_torque_outputs = [0.0; NUM_ACTUATORS];
     }
 }
 

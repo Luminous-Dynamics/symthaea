@@ -425,7 +425,7 @@ impl MorphogeneticField {
                 // Same Kv-channel upregulation as neural commitment above --
                 // glia also hyperpolarize as part of differentiation.
                 self.bioelectric.k_channel_conductance[i] += K_CHANNEL_DIFFERENTIATION_BUMP;
-            } else if a < 0.3 {
+            } else if a < 0.3 / self.differentiation_threshold_multiplier {
                 cell.cell_type = OrganoidCellType::Undifferentiated;
             }
 

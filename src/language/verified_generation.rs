@@ -490,6 +490,14 @@ async fn generate_verified_inner<'a>(
                     executor.execute_workspace_tests(&repo_target.root)
                 }
             }
+            // Compiler verification is now genuinely multi-language — this was
+            // previously hardcoded to Rust regardless of `spec.language`, which
+            // meant a Python candidate was always compiled *as Rust* and always
+            // failed, so `CodeOrchestrator` (via `try_orchestrator_generation()`
+            // in `coding_agent/generation.rs`) could never accept a non-Rust
+            // candidate at all — see docs/CODE_ABILITY_IMPROVEMENT_PLAN.md,
+            // 2026-07-04 finding.
+            _ if spec.language == "python" => executor.execute_python(&full_source),
             _ => executor.execute_rust_with_inline_tests(&full_source),
         };
 
@@ -795,7 +803,11 @@ async fn generate_verified_inner<'a>(
                             } else {
                                 format!("{}\n\n{}", source, test_source)
                             };
-                            executor.execute_rust_with_inline_tests(&retry_full_source)
+                            if spec.language == "python" {
+                                executor.execute_python(&retry_full_source)
+                            } else {
+                                executor.execute_rust_with_inline_tests(&retry_full_source)
+                            }
                         }
                     };
                     retry_result.parse_test_failures();

@@ -94,6 +94,18 @@ impl SimpleManipulatorSimulator {
         }
         out
     }
+
+    /// Kinematics model, for computing the Jacobian-transpose admittance
+    /// correction outside the simulator (see `admittance.rs`).
+    pub fn kinematics(&self) -> &ManipulatorKinematics {
+        &self.kinematics
+    }
+
+    /// Per-joint max torque (Nm), for normalizing an admittance correction
+    /// into the `[-1, 1]` commanded-torque range.
+    pub fn max_torques(&self) -> &[f64; NUM_JOINTS] {
+        &self.max_torques
+    }
 }
 
 impl Default for SimpleManipulatorSimulator {
@@ -104,13 +116,22 @@ impl Default for SimpleManipulatorSimulator {
 
 impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
     fn step(&mut self, cmd: &ManipulatorCommand, dt: f64) {
+        // External Cartesian force -> equivalent joint torque via J^T*F,
+        // evaluated at the pose from the START of this step. Previously
+        // `external_forces` only reached `state.end_effector_force` as a
+        // telemetry label; it had zero effect on the arm's actual motion.
+        let tau_ext = self
+            .kinematics
+            .cartesian_force_to_joint_torque(&self.state.joint_angles, &self.external_forces);
+
         for i in 0..NUM_JOINTS {
             // Scale normalized torque to actual Nm
             let torque = cmd.joint_torques[i] as f64 * self.max_torques[i];
-            // Joint dynamics: I * ddq = torque - damping * dq - gravity
+            // Joint dynamics: I * ddq = torque + tau_ext - damping * dq - gravity
             let gravity = self.gravity_torque_at(i);
-            let ddq = (torque - self.damping[i] * self.state.joint_velocities[i] - gravity)
-                / self.inertias[i];
+            let ddq =
+                (torque + tau_ext[i] - self.damping[i] * self.state.joint_velocities[i] - gravity)
+                    / self.inertias[i];
             // Semi-implicit Euler
             self.state.joint_velocities[i] += ddq * dt;
             self.state.joint_angles[i] += self.state.joint_velocities[i] * dt;

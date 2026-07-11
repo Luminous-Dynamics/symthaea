@@ -8,9 +8,27 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 pub use symthaea_core::embodiment::{
-    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MotorSafetyLevel,
-    grounding_from_prediction_error, grounding_label,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, SafeFallback, grounding_from_prediction_error, grounding_label,
 };
+
+/// Emergency fallback for an agricultural stewardship platform.
+///
+/// Zeroing every actuator at Red (the trait's plain default, `motor_gain=0`)
+/// would hard-cut irrigation instantly rather than holding a safe-idle drip
+/// rate — undesirable for a drought-stressed field recovering from a
+/// commanded watering cycle. (Found in the 2026-07-07 unaudited-platforms
+/// review; this crate had no `SafeFallback` at all before this fix.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgribotFallbackStage {
+    /// Freeze drive/tool/seed/mast (no further field disturbance),
+    /// water_pump held at a safe-idle drip rate (not gain-scaled to zero).
+    IrrigationHold,
+}
+
+/// Safe-idle drip rate for water_pump during IrrigationHold — enough to
+/// avoid an abrupt hard-stop mid-cycle, well below full commanded flow.
+const IRRIGATION_HOLD_DRIP_RATE: f32 = 0.3;
 
 pub struct AgribotEmbodiment {
     controller: AgribotController,
@@ -20,8 +38,11 @@ pub struct AgribotEmbodiment {
     total_steps: usize,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
+    fallback_stage: AgribotFallbackStage,
+    fallback_cycles_in_stage: u32,
 }
 
 impl AgribotEmbodiment {
@@ -29,15 +50,44 @@ impl AgribotEmbodiment {
         let config = AgribotConfig::default();
         Self {
             controller: AgribotController::new(genesis, &config),
-            simulator: SimpleAgribotSimulator::new(),
+            simulator: SimpleAgribotSimulator::new(genesis),
             encoder: AgribotHdcEncoder::new(genesis, 32),
             last_perception: None,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
+            moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
+            fallback_stage: AgribotFallbackStage::IrrigationHold,
+            fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Apply moral gate from the ethics engine. Ahimsa forces Red
+    /// (IrrigationHold), a consent violation forces Orange, caution forces
+    /// a Yellow cap. Previously this crate never overrode the trait's no-op
+    /// default.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
+
+    /// SafeFallback: IrrigationHold. Freezes drive/tool/seed/mast and holds
+    /// water_pump at a safe-idle drip rate regardless of `motor_gain`.
+    fn apply_irrigation_hold(&self, cmd: &mut crate::types::AgribotCommand) {
+        *cmd = crate::types::AgribotCommand::zero();
+        cmd.torques[4] = IRRIGATION_HOLD_DRIP_RATE; // water_pump: safe-idle drip, not zero
+        // left_drive/right_drive/arm_lift/tool_head/seed_dispenser/
+        // canopy_sensor_mast: 0.0 — freeze all other field disturbance.
     }
 
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
@@ -46,11 +96,25 @@ impl AgribotEmbodiment {
             Some(o) => phi_level.max(o),
             None => phi_level,
         };
+        if let Some(m) = self.moral_safety {
+            self.current_safety = self.current_safety.max(m);
+        }
         let gain = self.current_safety.motor_gain();
         let mut cmd = self.controller.forward(thought_hv, dt);
-        if gain < 1.0 {
-            for t in &mut cmd.torques {
-                *t *= gain;
+
+        // ── SafeFallback: IrrigationHold at Red ───────────────────────
+        // Zeroing every actuator at Red (motor_gain=0) would hard-cut
+        // irrigation instantly instead of holding a safe-idle drip rate.
+        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
+            self.apply_irrigation_hold(&mut cmd);
+        } else {
+            self.fallback_stage = AgribotFallbackStage::IrrigationHold;
+            self.fallback_cycles_in_stage = 0;
+            if gain < 1.0 {
+                for t in &mut cmd.torques {
+                    *t *= gain;
+                }
             }
         }
         self.last_control_effort = cmd.control_effort();
@@ -88,8 +152,14 @@ impl AgribotEmbodiment {
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.fallback_stage = AgribotFallbackStage::IrrigationHold;
+        self.fallback_cycles_in_stage = 0;
+    }
+    pub fn fallback_stage(&self) -> AgribotFallbackStage {
+        self.fallback_stage
     }
     pub fn safety_level(&self) -> MotorSafetyLevel {
         self.current_safety
@@ -143,6 +213,10 @@ impl symthaea_core::embodiment::EmbodimentBridge for AgribotEmbodiment {
         self.clear_safety_override()
     }
 
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
+
     fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
         symthaea_core::embodiment::EmbodimentPlatform::Agribot
     }
@@ -157,6 +231,24 @@ impl symthaea_core::embodiment::EmbodimentBridge for AgribotEmbodiment {
 
     fn telemetry(&self) -> EmbodimentTelemetry {
         self.telemetry()
+    }
+}
+
+impl SafeFallback for AgribotEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "agribot"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        1 // Low: stationary/contained, no in-contact human safety stakes
+    }
+    fn safe_fallback_description(&self) -> &'static str {
+        "IrrigationHold: freeze drive/tool/seed/mast, water_pump held at safe-idle drip rate"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
     }
 }
 
@@ -176,5 +268,45 @@ mod tests {
         let hv = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
         let r = e.step(&hv, 0.005, 0.05);
         assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_red_holds_safe_idle_drip_not_hard_zero() {
+        // Regression: asserts the RESULTING COMMAND, not just the
+        // safety-tier enum.
+        let mut e = AgribotEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let mut cmd = crate::types::AgribotCommand::zero();
+        cmd.torques = [0.9; crate::types::NUM_ACTUATORS];
+        e.apply_irrigation_hold(&mut cmd);
+        assert_eq!(
+            cmd.water_pump(),
+            IRRIGATION_HOLD_DRIP_RATE,
+            "water_pump must hold a safe-idle drip, not hard zero"
+        );
+        assert_eq!(
+            cmd.tool_head(),
+            0.0,
+            "field disturbance must freeze during the fallback"
+        );
+    }
+
+    #[test]
+    fn test_red_still_relieves_drought() {
+        // End-to-end: starting from a drought-stressed field, sustained
+        // Red-tier stepping must still relieve drought risk via the
+        // safe-idle drip, not let it persist the way a hard-zero fallback
+        // would (watering=0 means no relief term at all).
+        let mut e = AgribotEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        e.simulator.reset();
+        e.simulator.state_mut().channels[crate::types::SOIL_MOISTURE] = 0.1;
+        let hv = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+        for _ in 0..500 {
+            e.step(&hv, 0.05, 0.05); // Phi < 0.1 -> Red
+        }
+        let moisture = e.simulator.state().channels[crate::types::SOIL_MOISTURE];
+        assert!(
+            moisture > 0.1,
+            "soil moisture must improve under sustained IrrigationHold, started at 0.1, got {moisture}"
+        );
     }
 }

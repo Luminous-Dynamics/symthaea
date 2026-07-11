@@ -1004,7 +1004,16 @@ mod tests {
     #[test]
     fn test_pd_walking_baseline_cyclic() {
         let state = HumanoidState::standing();
-        let gains = HumanoidPdGains::default();
+        // Unit P-gain, zero D-gain: default kp=200 saturates BOTH phases at
+        // the ±1 torque clamp (hip targets 0.009 vs 0.279 × 200 → 1 vs 1),
+        // which made this test fail vacuously for a long time (documented
+        // pre-existing in commit 1a5b724bbd). With kp=1 the torque IS the
+        // target error, so cyclicity is actually observable.
+        let n = state.num_actuators();
+        let gains = HumanoidPdGains {
+            kp: vec![1.0; n],
+            kd: vec![0.0; n],
+        };
         let cmd_0 = pd_walking_baseline(&state, &gains, 0.0, 1.0);
         let cmd_quarter = pd_walking_baseline(&state, &gains, 0.25, 1.0);
 

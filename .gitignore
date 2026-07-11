@@ -73,7 +73,16 @@ archive/
 !crates/domains/symthaea-broca/data/broca-vocab-*.json
 !crates/domains/symthaea-spore/data/broca-pipeline-distilled.bin
 !crates/core/symthaea-stt/data/mini_cmudict.txt
+!crates/domains/symthaea-muse/data/melody_predictor_weights.json
+!crates/domains/symthaea-muse/data/performance_model_weights.json
 !src/voice/data/cmudict.dict
+!crates/domains/symthaea-culinary/data/ingr_info.tsv
+!crates/domains/symthaea-culinary/data/ingr_comp.tsv
+!crates/domains/symthaea-culinary/data/recipes.csv
+!crates/domains/symthaea-culinary/data/PROVENANCE.md
+!crates/domains/symthaea-culinary/data/presets/
+!crates/domains/symthaea-culinary/data/presets/*.json
+!crates/domains/symthaea-culinary/data/presets/PROVENANCE.md
 !data/benchmarks/
 !data/benchmarks/humaneval/
 !data/benchmarks/humaneval/README.md

@@ -892,6 +892,795 @@ impl EngineeringReview {
     }
 }
 
+/// Result of a closed-form structural check via `symthaea-structural`.
+///
+/// **Epistemic envelope — do not over-trust.** The underlying solver is
+/// closed-form, linear-elastic, single-span 2D bending only. 3D /
+/// statically-indeterminate / dynamic analysis requires an external FEA bridge —
+/// see `ENGINEERING_FACULTY_PLAN_2026-07-07.md` Phase 3. The `solver_envelope`
+/// field carries this so downstream cognition never treats it as more than it is.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructuralAssessment {
+    pub result: symthaea_structural::BeamResult,
+    pub required_factor_of_safety: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+impl EngineeringManager {
+    /// Evaluate a beam design against a required factor of safety using the
+    /// `symthaea-structural` closed-form solver. Wires a previously-dark
+    /// structural discipline crate into the engineering faculty
+    /// (ENGINEERING_FACULTY_PLAN Phase 1c — orchestrator consumes all disciplines).
+    pub fn evaluate_structural(
+        &self,
+        beam: &symthaea_structural::Beam,
+        load: symthaea_structural::LoadCase,
+        required_factor_of_safety: f64,
+    ) -> StructuralAssessment {
+        let result = beam.analyze(load);
+        let passes = result.factor_of_safety >= required_factor_of_safety;
+        StructuralAssessment {
+            required_factor_of_safety,
+            passes,
+            solver_envelope: "closed-form, linear-elastic, single-span 2D bending (symthaea-structural)",
+            summary: format!(
+                "sigma_max={:.3e} Pa, delta_max={:.3e} m, FoS={:.2} vs required {:.2} -> {}",
+                result.max_bending_stress,
+                result.max_deflection,
+                result.factor_of_safety,
+                required_factor_of_safety,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+            result,
+        }
+    }
+
+    /// Run a structural check and, when it passes, discharge the matching
+    /// safety-case obligation on `concept` with the solver run as evidence.
+    ///
+    /// This is the cognition tie-in that distinguishes a *faculty* from a
+    /// tool-wrapper: a real discipline solver produces evidence that discharges a
+    /// formal proof obligation, so the engineering reasoning (safety case,
+    /// deployment gating) actually moves. Returns the assessment for inspection.
+    pub fn discharge_structural_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        beam: &symthaea_structural::Beam,
+        load: symthaea_structural::LoadCase,
+        required_factor_of_safety: f64,
+    ) -> StructuralAssessment {
+        let assessment = self.evaluate_structural(beam, load, required_factor_of_safety);
+        if assessment.passes {
+            for obligation in concept.safety_case.obligations.iter_mut() {
+                if obligation.claim == obligation_claim {
+                    obligation
+                        .evidence_refs
+                        .push(format!("symthaea-structural: {}", assessment.summary));
+                    obligation.status = formal_safety::ObligationStatus::Discharged;
+                }
+            }
+        }
+        assessment
+    }
+}
+
+/// Result of an electrical distribution-feeder check via `symthaea-grid-physics`.
+///
+/// **Epistemic envelope — do not over-trust.** The underlying solve is a
+/// *linearized* DistFlow power flow (the quadratic loss term is dropped) on a
+/// *radial* feeder topology only. Meshed networks, transient/dynamic stability,
+/// and unbalanced phases are out of scope — for those an external power-systems
+/// tool (e.g. OpenDSS / PSS/E) is the Phase-3 bridge. `solver_envelope` carries
+/// this so downstream cognition never over-reads a passing result.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ElectricalAssessment {
+    pub min_voltage_pu: f64,
+    pub max_voltage_pu: f64,
+    pub required_band_pu: (f64, f64),
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+impl EngineeringManager {
+    /// Evaluate a radial distribution feeder: solve the power flow and check that
+    /// every bus voltage stays within the required per-unit band (e.g. ANSI C84.1
+    /// 0.95–1.05 pu). Wires the previously-optional-off `symthaea-grid-physics`
+    /// electrical solver into the engineering faculty
+    /// (ENGINEERING_FACULTY_PLAN Phase 1c/1d).
+    pub fn evaluate_electrical(
+        &self,
+        feeder: &symthaea_grid_physics::feeder::Feeder,
+        min_voltage_pu: f64,
+        max_voltage_pu: f64,
+    ) -> ElectricalAssessment {
+        let solution = feeder.solve();
+        let mut min_pu = f64::INFINITY;
+        let mut max_pu = f64::NEG_INFINITY;
+        for i in 0..feeder.nodes.len() {
+            let v = solution.voltage_pu(i);
+            min_pu = min_pu.min(v);
+            max_pu = max_pu.max(v);
+        }
+        let passes = min_pu >= min_voltage_pu && max_pu <= max_voltage_pu;
+        ElectricalAssessment {
+            min_voltage_pu: min_pu,
+            max_voltage_pu: max_pu,
+            required_band_pu: (min_voltage_pu, max_voltage_pu),
+            passes,
+            solver_envelope: "linearized DistFlow, radial feeder, balanced (symthaea-grid-physics)",
+            summary: format!(
+                "V in [{:.4}, {:.4}] pu vs required [{:.3}, {:.3}] -> {}",
+                min_pu,
+                max_pu,
+                min_voltage_pu,
+                max_voltage_pu,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    /// Run an electrical feeder check and, when it passes, discharge the matching
+    /// safety-case obligation on `concept` with the solver run as evidence — the
+    /// same cognition tie-in as `discharge_structural_check`.
+    pub fn discharge_electrical_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        feeder: &symthaea_grid_physics::feeder::Feeder,
+        min_voltage_pu: f64,
+        max_voltage_pu: f64,
+    ) -> ElectricalAssessment {
+        let assessment = self.evaluate_electrical(feeder, min_voltage_pu, max_voltage_pu);
+        if assessment.passes {
+            for obligation in concept.safety_case.obligations.iter_mut() {
+                if obligation.claim == obligation_claim {
+                    obligation
+                        .evidence_refs
+                        .push(format!("symthaea-grid-physics: {}", assessment.summary));
+                    obligation.status = formal_safety::ObligationStatus::Discharged;
+                }
+            }
+        }
+        assessment
+    }
+}
+
+/// Result of a pipe-flow head-loss check via `symthaea-thermofluids`.
+///
+/// **Epistemic envelope — do not over-trust.** Steady, incompressible,
+/// single-phase pipe flow; the Darcy friction factor is *supplied*, not solved
+/// from roughness/Reynolds (no Colebrook/Moody iteration). Compressible flow,
+/// transients, and pipe networks are out of scope — an external CFD tool
+/// (e.g. OpenFOAM) is the Phase-3 bridge. `solver_envelope` carries this.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThermofluidAssessment {
+    pub head_loss_m: f64,
+    pub allowed_head_loss_m: f64,
+    pub reynolds: f64,
+    pub regime: symthaea_thermofluids::fluids::Regime,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+impl EngineeringManager {
+    /// Evaluate a pipe run: compute Darcy-Weisbach head loss and the flow regime,
+    /// and check the head loss against an allowed budget. Wires the previously-dark
+    /// `symthaea-thermofluids` solver into the faculty (ENGINEERING_FACULTY_PLAN 1c).
+    #[allow(clippy::too_many_arguments)]
+    pub fn evaluate_thermofluid(
+        &self,
+        density: f64,
+        viscosity: f64,
+        friction_factor: f64,
+        length: f64,
+        diameter: f64,
+        velocity: f64,
+        allowed_head_loss_m: f64,
+    ) -> ThermofluidAssessment {
+        use symthaea_thermofluids::fluids;
+        let reynolds = fluids::reynolds_number(density, velocity, diameter, viscosity);
+        let regime = fluids::flow_regime(reynolds);
+        let head_loss_m =
+            fluids::darcy_weisbach_head_loss(friction_factor, length, diameter, velocity);
+        let passes = head_loss_m <= allowed_head_loss_m;
+        ThermofluidAssessment {
+            head_loss_m,
+            allowed_head_loss_m,
+            reynolds,
+            regime,
+            passes,
+            solver_envelope: "steady incompressible single-phase pipe flow, supplied friction factor (symthaea-thermofluids)",
+            summary: format!(
+                "h_f={:.3} m vs budget {:.3} m, Re={:.0} ({:?}) -> {}",
+                head_loss_m,
+                allowed_head_loss_m,
+                reynolds,
+                regime,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    /// Run a pipe head-loss check and, when it passes, discharge the matching
+    /// safety-case obligation on `concept` with the solver run as evidence — the
+    /// same cognition tie-in as the structural/electrical checks.
+    #[allow(clippy::too_many_arguments)]
+    pub fn discharge_thermofluid_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        density: f64,
+        viscosity: f64,
+        friction_factor: f64,
+        length: f64,
+        diameter: f64,
+        velocity: f64,
+        allowed_head_loss_m: f64,
+    ) -> ThermofluidAssessment {
+        let assessment = self.evaluate_thermofluid(
+            density,
+            viscosity,
+            friction_factor,
+            length,
+            diameter,
+            velocity,
+            allowed_head_loss_m,
+        );
+        if assessment.passes {
+            for obligation in concept.safety_case.obligations.iter_mut() {
+                if obligation.claim == obligation_claim {
+                    obligation
+                        .evidence_refs
+                        .push(format!("symthaea-thermofluids: {}", assessment.summary));
+                    obligation.status = formal_safety::ObligationStatus::Discharged;
+                }
+            }
+        }
+        assessment
+    }
+}
+
+// ── Extended discipline faculties (ENGINEERING_FACULTY_PLAN Phase 1c batch) ──
+// Each wires a previously-dark real solver crate into the faculty via the proven
+// evaluate/discharge/envelope pattern (structural/electrical/thermofluids). Every
+// `Assessment` declares its solver's validity envelope so cognition never over-trusts.
+
+impl EngineeringManager {
+    /// Shared cognition tie-in: discharge the safety-case obligation matching `claim`
+    /// with solver evidence. Used by the discipline `discharge_*_check` methods.
+    fn discharge_obligation(concept: &mut EngineeringConcept, claim: &str, evidence: String) {
+        for ob in concept.safety_case.obligations.iter_mut() {
+            if ob.claim == claim {
+                ob.evidence_refs.push(evidence.clone());
+                ob.status = formal_safety::ObligationStatus::Discharged;
+            }
+        }
+    }
+}
+
+/// Control-systems check via `symthaea-control-theory`.
+/// Envelope: LTI SISO — Routh-Hurwitz on the characteristic polynomial + closed-form
+/// dominant-2nd-order transient metrics. Nonlinear / MIMO / discrete control is out of scope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ControlAssessment {
+    pub stable: bool,
+    pub rhp_roots: usize,
+    pub percent_overshoot: f64,
+    pub settling_time_s: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+/// Circuit power-rating check via `symthaea-circuits`.
+/// Envelope: linear resistive DC (Ohm/Joule). AC/transient/nonlinear devices out of scope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircuitAssessment {
+    pub current_a: f64,
+    pub power_w: f64,
+    pub max_power_w: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+/// Acoustic noise-limit check via `symthaea-acoustics`.
+/// Envelope: incoherent SPL summation of steady sources; no propagation/room modelling.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AcousticAssessment {
+    pub combined_spl_db: f64,
+    pub max_spl_db: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+/// Optical imaging check via `symthaea-optics`.
+/// Envelope: paraxial (thin-lens) geometric optics. Aberrations/diffraction out of scope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpticalAssessment {
+    pub image_distance: f64,
+    pub required_image_distance: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+/// Sampling / anti-alias check via `symthaea-dsp`.
+/// Envelope: ideal uniform sampling, Nyquist criterion only (no reconstruction filter modelling).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SignalAssessment {
+    pub signal_freq_hz: f64,
+    pub sample_rate_hz: f64,
+    pub nyquist_hz: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+/// Queueing service-level check via `symthaea-operations-research`.
+/// Envelope: M/M/1 (Poisson arrivals, exponential service, single server, steady state).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OperationsAssessment {
+    pub utilization: f64,
+    pub avg_time_in_system_s: f64,
+    pub max_wait_s: f64,
+    pub passes: bool,
+    pub solver_envelope: &'static str,
+    pub summary: String,
+}
+
+impl EngineeringManager {
+    /// Control loop: Routh stability of the characteristic polynomial + dominant
+    /// 2nd-order overshoot/settling against spec.
+    #[allow(clippy::too_many_arguments)]
+    pub fn evaluate_control(
+        &self,
+        char_poly_coeffs: &[f64],
+        natural_freq: f64,
+        damping_ratio: f64,
+        max_overshoot_pct: f64,
+        max_settling_time_s: f64,
+    ) -> ControlAssessment {
+        use symthaea_control_theory::routh;
+        use symthaea_control_theory::second_order::SecondOrder;
+        let stable = routh::is_stable(char_poly_coeffs);
+        let rhp_roots = routh::rhp_root_count(char_poly_coeffs);
+        let so = SecondOrder {
+            natural_freq,
+            damping_ratio,
+        };
+        let percent_overshoot = so.percent_overshoot();
+        let settling_time_s = so.settling_time();
+        let passes = stable
+            && percent_overshoot <= max_overshoot_pct
+            && settling_time_s <= max_settling_time_s;
+        ControlAssessment {
+            stable,
+            rhp_roots,
+            percent_overshoot,
+            settling_time_s,
+            passes,
+            solver_envelope: "LTI SISO, Routh-Hurwitz + closed-form 2nd-order (symthaea-control-theory)",
+            summary: format!(
+                "stable={} rhp={} PO={:.1}%<={:.1} ts={:.2}s<={:.2} -> {}",
+                stable,
+                rhp_roots,
+                percent_overshoot,
+                max_overshoot_pct,
+                settling_time_s,
+                max_settling_time_s,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn discharge_control_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        char_poly_coeffs: &[f64],
+        natural_freq: f64,
+        damping_ratio: f64,
+        max_overshoot_pct: f64,
+        max_settling_time_s: f64,
+    ) -> ControlAssessment {
+        let a = self.evaluate_control(
+            char_poly_coeffs,
+            natural_freq,
+            damping_ratio,
+            max_overshoot_pct,
+            max_settling_time_s,
+        );
+        if a.passes {
+            Self::discharge_obligation(
+                concept,
+                obligation_claim,
+                format!("symthaea-control-theory: {}", a.summary),
+            );
+        }
+        a
+    }
+
+    /// Circuit: resistor power dissipation `P = V·I` against a component rating.
+    pub fn evaluate_circuit(
+        &self,
+        voltage: f64,
+        resistance: f64,
+        max_power_w: f64,
+    ) -> CircuitAssessment {
+        use symthaea_circuits::dc;
+        let current_a = dc::current(voltage, resistance);
+        let power_w = dc::power(voltage, current_a);
+        let passes = power_w <= max_power_w;
+        CircuitAssessment {
+            current_a,
+            power_w,
+            max_power_w,
+            passes,
+            solver_envelope: "linear resistive DC, Ohm/Joule (symthaea-circuits)",
+            summary: format!(
+                "I={:.3} A, P={:.3} W vs rating {:.3} W -> {}",
+                current_a,
+                power_w,
+                max_power_w,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    pub fn discharge_circuit_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        voltage: f64,
+        resistance: f64,
+        max_power_w: f64,
+    ) -> CircuitAssessment {
+        let a = self.evaluate_circuit(voltage, resistance, max_power_w);
+        if a.passes {
+            Self::discharge_obligation(
+                concept,
+                obligation_claim,
+                format!("symthaea-circuits: {}", a.summary),
+            );
+        }
+        a
+    }
+
+    /// Acoustic: combined SPL of several sources against a noise limit.
+    pub fn evaluate_acoustic(
+        &self,
+        source_levels_db: &[f64],
+        max_spl_db: f64,
+    ) -> AcousticAssessment {
+        let combined_spl_db = symthaea_acoustics::combine_decibels(source_levels_db);
+        let passes = combined_spl_db <= max_spl_db;
+        AcousticAssessment {
+            combined_spl_db,
+            max_spl_db,
+            passes,
+            solver_envelope: "incoherent SPL summation, steady sources (symthaea-acoustics)",
+            summary: format!(
+                "SPL={:.1} dB vs limit {:.1} dB -> {}",
+                combined_spl_db,
+                max_spl_db,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    pub fn discharge_acoustic_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        source_levels_db: &[f64],
+        max_spl_db: f64,
+    ) -> AcousticAssessment {
+        let a = self.evaluate_acoustic(source_levels_db, max_spl_db);
+        if a.passes {
+            Self::discharge_obligation(
+                concept,
+                obligation_claim,
+                format!("symthaea-acoustics: {}", a.summary),
+            );
+        }
+        a
+    }
+
+    /// Optical: thin-lens image distance within tolerance of a required focal plane.
+    pub fn evaluate_optical(
+        &self,
+        focal_length: f64,
+        object_distance: f64,
+        required_image_distance: f64,
+        tolerance: f64,
+    ) -> OpticalAssessment {
+        let image_distance =
+            symthaea_optics::geometric::image_distance(focal_length, object_distance);
+        let passes = (image_distance - required_image_distance).abs() <= tolerance;
+        OpticalAssessment {
+            image_distance,
+            required_image_distance,
+            passes,
+            solver_envelope: "paraxial thin-lens geometric optics (symthaea-optics)",
+            summary: format!(
+                "image at {:.4} m vs required {:.4} m (tol {:.4}) -> {}",
+                image_distance,
+                required_image_distance,
+                tolerance,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    pub fn discharge_optical_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        focal_length: f64,
+        object_distance: f64,
+        required_image_distance: f64,
+        tolerance: f64,
+    ) -> OpticalAssessment {
+        let a = self.evaluate_optical(
+            focal_length,
+            object_distance,
+            required_image_distance,
+            tolerance,
+        );
+        if a.passes {
+            Self::discharge_obligation(
+                concept,
+                obligation_claim,
+                format!("symthaea-optics: {}", a.summary),
+            );
+        }
+        a
+    }
+
+    /// Signal: Nyquist anti-alias check for a signal at a given sample rate.
+    pub fn evaluate_signal(&self, signal_freq_hz: f64, sample_rate_hz: f64) -> SignalAssessment {
+        use symthaea_dsp::signal;
+        let nyquist_hz = signal::nyquist_frequency(sample_rate_hz);
+        let passes = !signal::will_alias(signal_freq_hz, sample_rate_hz);
+        SignalAssessment {
+            signal_freq_hz,
+            sample_rate_hz,
+            nyquist_hz,
+            passes,
+            solver_envelope: "ideal uniform sampling, Nyquist criterion (symthaea-dsp)",
+            summary: format!(
+                "f={:.1} Hz vs Nyquist {:.1} Hz (fs={:.1}) -> {}",
+                signal_freq_hz,
+                nyquist_hz,
+                sample_rate_hz,
+                if passes {
+                    "PASS (no alias)"
+                } else {
+                    "FAIL (aliases)"
+                }
+            ),
+        }
+    }
+
+    pub fn discharge_signal_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        signal_freq_hz: f64,
+        sample_rate_hz: f64,
+    ) -> SignalAssessment {
+        let a = self.evaluate_signal(signal_freq_hz, sample_rate_hz);
+        if a.passes {
+            Self::discharge_obligation(
+                concept,
+                obligation_claim,
+                format!("symthaea-dsp: {}", a.summary),
+            );
+        }
+        a
+    }
+
+    /// Operations: M/M/1 queue stability + average time-in-system against an SLA.
+    pub fn evaluate_operations(
+        &self,
+        arrival_rate: f64,
+        service_rate: f64,
+        max_wait_s: f64,
+    ) -> OperationsAssessment {
+        let q = symthaea_operations_research::queue::MM1 {
+            arrival_rate,
+            service_rate,
+        };
+        let stable = q.is_stable();
+        let avg_time_in_system_s = if stable {
+            q.avg_time_in_system()
+        } else {
+            f64::INFINITY
+        };
+        let passes = stable && avg_time_in_system_s <= max_wait_s;
+        OperationsAssessment {
+            utilization: q.utilization(),
+            avg_time_in_system_s,
+            max_wait_s,
+            passes,
+            solver_envelope: "M/M/1 steady-state (Poisson arrivals, exp service) (symthaea-operations-research)",
+            summary: format!(
+                "rho={:.2} W={:.3} s vs SLA {:.3} s -> {}",
+                q.utilization(),
+                avg_time_in_system_s,
+                max_wait_s,
+                if passes { "PASS" } else { "FAIL" }
+            ),
+        }
+    }
+
+    pub fn discharge_operations_check(
+        &self,
+        concept: &mut EngineeringConcept,
+        obligation_claim: &str,
+        arrival_rate: f64,
+        service_rate: f64,
+        max_wait_s: f64,
+    ) -> OperationsAssessment {
+        let a = self.evaluate_operations(arrival_rate, service_rate, max_wait_s);
+        if a.passes {
+            Self::discharge_obligation(
+                concept,
+                obligation_claim,
+                format!("symthaea-operations-research: {}", a.summary),
+            );
+        }
+        a
+    }
+}
+
+// ── Discipline capability registry (ENGINEERING_FACULTY_PLAN Phase 1b) ──
+// Turns the `EngineeringDomain` tag into a real switchboard: which domains are
+// backed by a wired native solver, and which. A tag with no dispatch is just
+// documentation; this makes it queryable so the cognitive loop (Phase 1a's
+// `EngineeringDomainPlugin`) can route a request to real reasoning — or honestly
+// report that a domain (Aerospace, ChemicalProcess, Nuclear, Environmental,
+// Robotics) has no faculty solver yet, rather than silently pretending to.
+
+/// One backed capability: an `EngineeringDomain` served by a real solver crate,
+/// with the faculty method that exercises it and the solver's validity envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FacultyCapability {
+    /// The engineering domain this capability serves.
+    pub domain: EngineeringDomain,
+    /// The faculty `evaluate_*` method that runs the solver.
+    pub method: &'static str,
+    /// The backing solver crate.
+    pub solver_crate: &'static str,
+    /// What the check verifies, in one line.
+    pub checks: &'static str,
+    /// The solver's validity envelope (epistemic-honesty gate).
+    pub envelope: &'static str,
+}
+
+impl EngineeringManager {
+    /// The full static registry of wired faculty capabilities. Each entry is a
+    /// real solver reachable via an `evaluate_*` method; disciplines with no
+    /// native solver are deliberately absent (see `uncovered_domains`).
+    pub fn capabilities() -> &'static [FacultyCapability] {
+        use EngineeringDomain::*;
+        &[
+            FacultyCapability {
+                domain: Materials,
+                method: "evaluate_material",
+                solver_crate: "symthaea-materials",
+                checks: "compound stability + property presets",
+                envelope: "closed-form stability heuristic at fixed 300 K",
+            },
+            FacultyCapability {
+                domain: Civil,
+                method: "evaluate_structural",
+                solver_crate: "symthaea-structural",
+                checks: "stress / deflection / buckling margins",
+                envelope: "closed-form, linear-elastic, 2D — no 3D/indeterminate/dynamics",
+            },
+            FacultyCapability {
+                domain: Electrical,
+                method: "evaluate_electrical",
+                solver_crate: "symthaea-grid-physics",
+                checks: "radial DistFlow bus voltages within a per-unit band",
+                envelope: "radial feeder, steady-state DistFlow — no meshed/transient",
+            },
+            FacultyCapability {
+                domain: Electrical,
+                method: "evaluate_circuit",
+                solver_crate: "symthaea-circuits",
+                checks: "resistor power dissipation vs rating",
+                envelope: "DC, linear resistive — no reactive/transient",
+            },
+            FacultyCapability {
+                domain: Electrical,
+                method: "evaluate_signal",
+                solver_crate: "symthaea-dsp",
+                checks: "Nyquist anti-alias check",
+                envelope: "ideal uniform sampling — no windowing/quantization noise",
+            },
+            FacultyCapability {
+                domain: Mechanical,
+                method: "evaluate_thermofluid",
+                solver_crate: "symthaea-thermofluids",
+                checks: "Darcy-Weisbach pipe head loss + flow regime vs budget",
+                envelope: "incompressible steady pipe flow — no networks/transient/compressible",
+            },
+            FacultyCapability {
+                domain: Mechanical,
+                method: "evaluate_acoustic",
+                solver_crate: "symthaea-acoustics",
+                checks: "combined sound-pressure level vs a noise limit",
+                envelope: "incoherent SPL summation — no directivity/room acoustics",
+            },
+            FacultyCapability {
+                domain: Systems,
+                method: "evaluate_control",
+                solver_crate: "symthaea-control-theory",
+                checks: "Routh-Hurwitz stability + 2nd-order overshoot/settling",
+                envelope: "LTI SISO — no nonlinear/MIMO/discrete control",
+            },
+            FacultyCapability {
+                domain: Systems,
+                method: "evaluate_optical",
+                solver_crate: "symthaea-optics",
+                checks: "thin-lens image distance vs focal plane",
+                envelope: "paraxial thin-lens — no aberrations/thick-lens/diffraction",
+            },
+            FacultyCapability {
+                domain: Systems,
+                method: "evaluate_operations",
+                solver_crate: "symthaea-operations-research",
+                checks: "M/M/1 queue stability + wait-time SLA",
+                envelope: "single-server Markovian queue — no M/M/c/priority/networks",
+            },
+        ]
+    }
+
+    /// The capabilities backing a given domain (empty if the domain is tag-only).
+    pub fn capabilities_for(domain: EngineeringDomain) -> Vec<&'static FacultyCapability> {
+        Self::capabilities()
+            .iter()
+            .filter(|c| c.domain == domain)
+            .collect()
+    }
+
+    /// Whether a domain is backed by at least one wired native solver.
+    pub fn is_covered(domain: EngineeringDomain) -> bool {
+        Self::capabilities().iter().any(|c| c.domain == domain)
+    }
+
+    /// Domains that are still tag-only — no faculty solver yet. Honest gap list
+    /// for the cognitive loop (do not claim reasoning we can't back).
+    pub fn uncovered_domains() -> Vec<EngineeringDomain> {
+        use EngineeringDomain::*;
+        [
+            Civil,
+            Mechanical,
+            Electrical,
+            Aerospace,
+            ChemicalProcess,
+            Robotics,
+            Nuclear,
+            Materials,
+            Environmental,
+            Systems,
+        ]
+        .into_iter()
+        .filter(|d| !Self::is_covered(*d))
+        .collect()
+    }
+}
+
 /// Synthesizes comprehensive technical documentation and blueprints for a design.
 pub struct DocumentGenerator;
 
@@ -1290,6 +2079,322 @@ fn estimate_rust_source_complexity(source: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evaluate_structural_wires_solver_into_faculty() {
+        use symthaea_structural::{Beam, LoadCase, Section, material::steel_a36};
+        let mgr = EngineeringManager::new();
+
+        // Steel cantilever, 1 m span, 50x100 mm rectangular section, 1 kN end load.
+        let beam = Beam {
+            length: 1.0,
+            section: Section::rectangular(0.05, 0.1),
+            material: steel_a36(),
+        };
+        let a = mgr.evaluate_structural(&beam, LoadCase::CantileverEndPoint(1000.0), 2.0);
+
+        // Known closed-form answer: max moment = P·L = 1000 N·m exactly.
+        assert!((a.result.max_moment - 1000.0).abs() < 1e-9);
+        // A36 steel is far stronger than a 12 MPa bending stress here → passes with margin.
+        assert!(a.passes);
+        assert!(a.result.factor_of_safety > 2.0);
+        assert!(a.solver_envelope.contains("closed-form"));
+    }
+
+    #[test]
+    fn structural_check_discharges_safety_obligation() {
+        use symthaea_structural::{Beam, LoadCase, Section, material::steel_a36};
+        let mgr = EngineeringManager::new();
+
+        let mut concept =
+            EngineeringConcept::new("beam-1", "cantilever bracket", EngineeringDomain::Civil);
+        concept.add_requirement(EngineeringRequirement::new(
+            "r-fos",
+            EngineeringDomain::Civil,
+            "beam factor of safety >= 2",
+            RequirementCriticality::Blocking,
+            EvidenceKind::Simulation,
+        ));
+        assert!(!concept.safety_case.is_discharged());
+
+        let beam = Beam {
+            length: 1.0,
+            section: Section::rectangular(0.05, 0.1),
+            material: steel_a36(),
+        };
+        // Real solver evidence discharges the formal obligation — cognition, not a wrapper.
+        mgr.discharge_structural_check(
+            &mut concept,
+            "beam factor of safety >= 2",
+            &beam,
+            LoadCase::CantileverEndPoint(1000.0),
+            2.0,
+        );
+        assert!(concept.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn evaluate_electrical_wires_grid_solver_into_faculty() {
+        use symthaea_grid_physics::feeder::{Feeder, Line, Node};
+        let mgr = EngineeringManager::new();
+
+        // 2-bus 7.2 kV radial feeder: substation + one 200 kW / 100 kVAR load
+        // behind a 2+j1 Ω line. Linearized DistFlow → ~1% drop, within band.
+        let feeder = Feeder::new(
+            7200.0,
+            vec![
+                Node::root(),
+                Node::load(
+                    0,
+                    Line {
+                        resistance_ohm: 2.0,
+                        reactance_ohm: 1.0,
+                    },
+                    200.0,
+                    100.0,
+                ),
+            ],
+        )
+        .expect("valid radial feeder");
+
+        let a = mgr.evaluate_electrical(&feeder, 0.95, 1.05);
+        assert!(a.passes);
+        // Substation bus is the slack bus at exactly 1.0 pu.
+        assert!((a.max_voltage_pu - 1.0).abs() < 1e-9);
+        // The loaded bus sagged but stayed inside the band.
+        assert!(a.min_voltage_pu > 0.95 && a.min_voltage_pu < 1.0);
+        assert!(a.solver_envelope.contains("DistFlow"));
+    }
+
+    #[test]
+    fn electrical_check_discharges_safety_obligation() {
+        use symthaea_grid_physics::feeder::{Feeder, Line, Node};
+        let mgr = EngineeringManager::new();
+
+        let mut concept = EngineeringConcept::new(
+            "feeder-1",
+            "distribution feeder",
+            EngineeringDomain::Electrical,
+        );
+        concept.add_requirement(EngineeringRequirement::new(
+            "r-volt",
+            EngineeringDomain::Electrical,
+            "all bus voltages within 0.95-1.05 pu",
+            RequirementCriticality::Blocking,
+            EvidenceKind::Simulation,
+        ));
+        assert!(!concept.safety_case.is_discharged());
+
+        let feeder = Feeder::new(
+            7200.0,
+            vec![
+                Node::root(),
+                Node::load(
+                    0,
+                    Line {
+                        resistance_ohm: 2.0,
+                        reactance_ohm: 1.0,
+                    },
+                    200.0,
+                    100.0,
+                ),
+            ],
+        )
+        .unwrap();
+        mgr.discharge_electrical_check(
+            &mut concept,
+            "all bus voltages within 0.95-1.05 pu",
+            &feeder,
+            0.95,
+            1.05,
+        );
+        assert!(concept.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn evaluate_thermofluid_wires_solver_into_faculty() {
+        let mgr = EngineeringManager::new();
+        // Water (ρ=1000, μ=1e-3) at 2 m/s in a 100 m × 0.1 m pipe, f=0.02.
+        // h_f = 0.02·(100/0.1)·2²/(2·9.81) ≈ 4.077 m; Re = 1000·2·0.1/1e-3 = 2e5 (turbulent).
+        let a = mgr.evaluate_thermofluid(1000.0, 1e-3, 0.02, 100.0, 0.1, 2.0, 5.0);
+        assert!((a.head_loss_m - 4.077).abs() < 0.01);
+        assert!((a.reynolds - 200_000.0).abs() < 1.0);
+        assert_eq!(a.regime, symthaea_thermofluids::fluids::Regime::Turbulent);
+        assert!(a.passes); // 4.077 m <= 5 m budget
+        assert!(a.solver_envelope.contains("pipe flow"));
+    }
+
+    #[test]
+    fn thermofluid_check_discharges_safety_obligation() {
+        let mgr = EngineeringManager::new();
+        let mut concept =
+            EngineeringConcept::new("pipe-1", "cooling loop", EngineeringDomain::Mechanical);
+        concept.add_requirement(EngineeringRequirement::new(
+            "r-hf",
+            EngineeringDomain::Mechanical,
+            "pipe head loss <= 5 m",
+            RequirementCriticality::Blocking,
+            EvidenceKind::Simulation,
+        ));
+        assert!(!concept.safety_case.is_discharged());
+        mgr.discharge_thermofluid_check(
+            &mut concept,
+            "pipe head loss <= 5 m",
+            1000.0,
+            1e-3,
+            0.02,
+            100.0,
+            0.1,
+            2.0,
+            5.0,
+        );
+        assert!(concept.safety_case.is_discharged());
+    }
+
+    // Helper: a concept with one blocking obligation whose claim == `claim`.
+    fn concept_with(domain: EngineeringDomain, claim: &str) -> EngineeringConcept {
+        let mut c = EngineeringConcept::new("c", "design", domain);
+        c.add_requirement(EngineeringRequirement::new(
+            "r",
+            domain,
+            claim,
+            RequirementCriticality::Blocking,
+            EvidenceKind::Simulation,
+        ));
+        c
+    }
+
+    #[test]
+    fn control_faculty_stability_and_discharge() {
+        let mgr = EngineeringManager::new();
+        // (s+1)^3 = s^3+3s^2+3s+1 — all roots at -1, stable, 0 RHP roots.
+        let a = mgr.evaluate_control(&[1.0, 3.0, 3.0, 1.0], 1.0, 0.7, 50.0, 100.0);
+        assert!(a.stable);
+        assert_eq!(a.rhp_roots, 0);
+        assert!(a.passes);
+        // s^2 - s + 1 has a sign change -> RHP roots -> unstable.
+        assert!(
+            !mgr.evaluate_control(&[1.0, -1.0, 1.0], 1.0, 0.7, 50.0, 100.0)
+                .stable
+        );
+        let mut c = concept_with(EngineeringDomain::Systems, "loop is stable");
+        mgr.discharge_control_check(
+            &mut c,
+            "loop is stable",
+            &[1.0, 3.0, 3.0, 1.0],
+            1.0,
+            0.7,
+            50.0,
+            100.0,
+        );
+        assert!(c.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn circuit_faculty_power_and_discharge() {
+        let mgr = EngineeringManager::new();
+        // 10 V across 100 Ω -> 0.1 A, 1 W; rating 2 W -> pass.
+        let a = mgr.evaluate_circuit(10.0, 100.0, 2.0);
+        assert!((a.current_a - 0.1).abs() < 1e-9);
+        assert!((a.power_w - 1.0).abs() < 1e-9);
+        assert!(a.passes);
+        let mut c = concept_with(EngineeringDomain::Electrical, "resistor within 2 W");
+        mgr.discharge_circuit_check(&mut c, "resistor within 2 W", 10.0, 100.0, 2.0);
+        assert!(c.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn acoustic_faculty_spl_and_discharge() {
+        let mgr = EngineeringManager::new();
+        // Two 80 dB sources -> 80 + 10·log10(2) ≈ 83.01 dB; limit 85 -> pass.
+        let a = mgr.evaluate_acoustic(&[80.0, 80.0], 85.0);
+        assert!((a.combined_spl_db - 83.01).abs() < 0.1);
+        assert!(a.passes);
+        let mut c = concept_with(EngineeringDomain::Mechanical, "noise <= 85 dB");
+        mgr.discharge_acoustic_check(&mut c, "noise <= 85 dB", &[80.0, 80.0], 85.0);
+        assert!(c.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn optical_faculty_imaging_and_discharge() {
+        let mgr = EngineeringManager::new();
+        // Thin lens f=0.1, object at 0.3 -> image at f·o/(o−f) = 0.15 m.
+        let a = mgr.evaluate_optical(0.1, 0.3, 0.15, 0.005);
+        assert!((a.image_distance - 0.15).abs() < 0.005);
+        assert!(a.passes);
+        let mut c = concept_with(EngineeringDomain::Systems, "image at 0.15 m");
+        mgr.discharge_optical_check(&mut c, "image at 0.15 m", 0.1, 0.3, 0.15, 0.005);
+        assert!(c.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn signal_faculty_nyquist_and_discharge() {
+        let mgr = EngineeringManager::new();
+        // 1 kHz at 8 kHz sampling: Nyquist 4 kHz, no alias -> pass.
+        let a = mgr.evaluate_signal(1000.0, 8000.0);
+        assert!((a.nyquist_hz - 4000.0).abs() < 1e-9);
+        assert!(a.passes);
+        // 5 kHz at 8 kHz aliases.
+        assert!(!mgr.evaluate_signal(5000.0, 8000.0).passes);
+        let mut c = concept_with(EngineeringDomain::Electrical, "no aliasing");
+        mgr.discharge_signal_check(&mut c, "no aliasing", 1000.0, 8000.0);
+        assert!(c.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn operations_faculty_queue_and_discharge() {
+        let mgr = EngineeringManager::new();
+        // λ=5, μ=10: ρ=0.5 stable, W=1/(μ−λ)=0.2 s; SLA 1 s -> pass.
+        let a = mgr.evaluate_operations(5.0, 10.0, 1.0);
+        assert!((a.utilization - 0.5).abs() < 1e-9);
+        assert!(a.passes);
+        // λ=10 > μ=5: unstable.
+        assert!(!mgr.evaluate_operations(10.0, 5.0, 1.0).passes);
+        let mut c = concept_with(EngineeringDomain::Systems, "queue wait <= 1 s");
+        mgr.discharge_operations_check(&mut c, "queue wait <= 1 s", 5.0, 10.0, 1.0);
+        assert!(c.safety_case.is_discharged());
+    }
+
+    #[test]
+    fn capability_registry_maps_tag_to_solvers() {
+        use EngineeringDomain::*;
+        // Electrical is backed by three distinct solver crates.
+        let elec = EngineeringManager::capabilities_for(Electrical);
+        assert_eq!(elec.len(), 3);
+        let crates: Vec<_> = elec.iter().map(|c| c.solver_crate).collect();
+        assert!(crates.contains(&"symthaea-grid-physics"));
+        assert!(crates.contains(&"symthaea-circuits"));
+        assert!(crates.contains(&"symthaea-dsp"));
+        // Systems: control + optics + operations research.
+        assert_eq!(EngineeringManager::capabilities_for(Systems).len(), 3);
+        // Covered domains report true; every registry entry names a real evaluate_* method.
+        for d in [Civil, Mechanical, Electrical, Materials, Systems] {
+            assert!(EngineeringManager::is_covered(d), "{d:?} should be covered");
+        }
+        for c in EngineeringManager::capabilities() {
+            assert!(c.method.starts_with("evaluate_"));
+            assert!(
+                !c.envelope.is_empty(),
+                "every capability declares its envelope"
+            );
+        }
+    }
+
+    #[test]
+    fn uncovered_domains_are_honestly_reported() {
+        use EngineeringDomain::*;
+        let gaps = EngineeringManager::uncovered_domains();
+        // These have no faculty solver yet — must be reported as gaps, not silently claimed.
+        for d in [Aerospace, ChemicalProcess, Robotics, Nuclear, Environmental] {
+            assert!(gaps.contains(&d), "{d:?} is a known gap");
+            assert!(!EngineeringManager::is_covered(d));
+        }
+        // Covered domains must NOT appear in the gap list.
+        for d in [Civil, Mechanical, Electrical, Materials, Systems] {
+            assert!(!gaps.contains(&d));
+        }
+    }
+
     #[test]
     fn blocking_requirement_creates_safety_gate() {
         let mut concept = EngineeringConcept::new(

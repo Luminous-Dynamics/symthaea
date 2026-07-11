@@ -74,6 +74,7 @@ impl DistillationCollector {
             target_ids: Vec::new(), // Will be tokenized during training
             valence: 0.0,
             arousal: 0.0,
+            ..Default::default()
         };
 
         match serde_json::to_string(&pair) {

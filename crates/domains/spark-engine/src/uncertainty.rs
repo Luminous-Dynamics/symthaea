@@ -6,7 +6,6 @@
 //! Monte Carlo uncertainty propagation for LCF rate calculations.
 //! Provides confidence intervals and sensitivity analysis.
 
-use crate::constants::*;
 use crate::physics::GamowIntegration;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;

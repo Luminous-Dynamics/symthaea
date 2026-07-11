@@ -204,6 +204,9 @@ pub(crate) mod canvas_bridge;
 #[cfg(feature = "creative")]
 pub(crate) mod creative_bridge;
 
+#[cfg(all(feature = "creative", feature = "social-fabric"))]
+pub(crate) mod cultural_memory;
+
 #[cfg(feature = "physics-bridge")]
 pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
@@ -918,6 +921,14 @@ pub struct CognitiveLoopService {
     /// Implements CognitiveSubsystem at interval 31. Feature-gated behind `social-fabric`.
     #[cfg(feature = "social-fabric")]
     social_fabric_manager: managers::SocialFabricManager,
+
+    /// Memetic immune system: screens incoming ideas for known-pathogen memes
+    /// before they enter the resonance graph, and tracks local idea-contagion
+    /// (arousal-coupled), with psi-derived guardian posture (Red ⇒ lockdown).
+    /// The agent's belief-state is the running set of memes it accepts.
+    /// Feature-gated behind `social-fabric`. See MEMETICS_ANTIMEMETICS_PLAN P2.
+    #[cfg(feature = "social-fabric")]
+    memetic_immune: symthaea_memetics::MemeticImmuneSystem,
 
     /// Survival Manager: IoT sensor monitoring, demand forecasting, emergency detection.
     /// Implements CognitiveSubsystem at interval 47. Feature-gated behind `survival`.

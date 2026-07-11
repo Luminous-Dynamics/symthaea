@@ -7,7 +7,8 @@
 //! 3. Remote nixpkgs search (via relay, searches live nixpkgs)
 //!
 //! Usage:
-//! ```
+//! ```no_run
+//! use symthaea_app_db::package_healer::heal_package;
 //! let fix = heal_package("firefox-esr");
 //! // Returns: Some(HealResult { original: "firefox-esr", replacement: "firefox-esr-128", ... })
 //! ```

@@ -389,6 +389,15 @@ pub struct SimpleHumanoidSimulator {
     morphology: crate::morphology::HumanoidMorphology,
     joint_limits: Vec<[f64; 2]>,
     gravity_scale: f64,
+    /// Dynamic root orientation [sagittal, coronal] (rad) — the torso as an
+    /// inverted pendulum about the ankles. 0 = upright, ±π/2 = flat on the
+    /// ground. Added 2026-07 (robotics plan Tier 2.2): previously
+    /// "uprightness" was a pure function of two abdomen JOINT angles, so the
+    /// body physically could not topple — every balance result was
+    /// untestable-by-failure.
+    root_tilt: [f64; 2],
+    /// Root tilt angular velocity [sagittal, coronal] (rad/s).
+    root_tilt_vel: [f64; 2],
 }
 
 impl SimpleHumanoidSimulator {
@@ -420,7 +429,20 @@ impl SimpleHumanoidSimulator {
             morphology,
             joint_limits,
             gravity_scale: 1.0,
+            root_tilt: [0.0; 2],
+            root_tilt_vel: [0.0; 2],
         }
+    }
+
+    /// Current dynamic root tilt [sagittal, coronal] in radians.
+    pub fn root_tilt(&self) -> [f64; 2] {
+        self.root_tilt
+    }
+
+    /// Set the root tilt directly (initialization / balance testing —
+    /// e.g. spawning the body past its support polygon to verify it falls).
+    pub fn set_root_tilt(&mut self, tilt: [f64; 2]) {
+        self.root_tilt = tilt;
     }
 
     pub fn with_domain_randomization(mut self, enabled: bool) -> Self {
@@ -580,15 +602,6 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             0.0
         };
 
-        let tilt_sagittal = abd_y.sin();
-        let tilt_coronal = abd_x.sin();
-        let tilt_mag = (tilt_sagittal * tilt_sagittal + tilt_coronal * tilt_coronal).sqrt();
-        let uprightness = (1.0 - tilt_mag).clamp(0.0, 1.0);
-
-        self.state.torso_vertical[0] = tilt_coronal;
-        self.state.torso_vertical[1] = abd_z.sin() * 0.3;
-        self.state.torso_vertical[2] = uprightness;
-
         let r_hip_y = if self.state.joint_angles.len() > 5 {
             self.state.joint_angles[5]
         } else {
@@ -613,8 +626,91 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         let right_leg_len = self.leg_vertical_length(r_hip_y, r_knee);
         let left_leg_len = self.leg_vertical_length(l_hip_y, l_knee);
 
-        let kinematic_height = right_leg_len.max(left_leg_len) * uprightness.max(0.2)
-            + self.body.segment_lengths[SEG_TORSO] * 0.5;
+        // ═══ DYNAMIC ROOT ORIENTATION (Tier 2.2, 2026-07) ═══════════════
+        // The torso-on-legs as an inverted pendulum about the ankles. Before
+        // this, uprightness was a pure function of two abdomen joint angles:
+        // the body could lean but never TOPPLE, so a zero-torque controller
+        // scored perfectly upright forever and no balance result was
+        // falsifiable.
+        //
+        // Model per tilt axis (0 = sagittal, 1 = coronal):
+        //   I·θ̈ = m·g·h·sin(θ)                  (gravity destabilizes)
+        //        − k_sup·m·g·h·θ − d_sup·θ̇       (passive support: feet flat
+        //          on ground + passive ankle stiffness — ONLY while the COM
+        //          projects inside the support polygon and feet are down)
+        //        − τ_ankle                        (commanded ankle torque —
+        //          real balance authority for controllers; positive ankle
+        //          torque tips the body toward negative θ)
+        //        + F_ext·h                        (horizontal pushes)
+        // Beyond the polygon there is no passive support: gravity wins and
+        // the body falls.
+        {
+            let m = self.body.total_mass.max(1.0);
+            let h_com = self.state.root_height.max(0.3);
+            let inertia_p = m * h_com * h_com;
+            // COM projection must stay inside the half-foot-length polygon.
+            let theta_support = (self.body.segment_lengths[SEG_FOOT] * 0.5 / h_com).atan();
+            // Foot clearance: the root sits a torso half-length above the
+            // hip, so subtract it before comparing against the leg length —
+            // without this offset the condition was never true at stand and
+            // passive support silently never engaged.
+            let torso_half = self.body.segment_lengths[SEG_TORSO] * 0.5;
+            let feet_down = (self.state.root_height - torso_half - right_leg_len) < 0.05
+                || (self.state.root_height - torso_half - left_leg_len) < 0.05;
+            // Passive support margin: > 1.0 so small tilts self-right (feet
+            // + stiff ankles hold quiet standing without active control).
+            const SUPPORT_STIFFNESS_FACTOR: f64 = 2.0;
+            const SUPPORT_DAMPING_FACTOR: f64 = 0.8;
+            let ankle_torque = |i: usize| -> f64 {
+                if cmd.torques.len() > i && self.body.joint_torque_scale.len() > i {
+                    cmd.torques[i] as f64 * self.body.joint_torque_scale[i]
+                } else {
+                    0.0
+                }
+            };
+            // Sagittal authority: ankle_y pair (8, 14); coronal: ankle_x (7, 13).
+            let tau_cmd = [
+                ankle_torque(8) + ankle_torque(14),
+                ankle_torque(7) + ankle_torque(13),
+            ];
+            let ext = [self.external_force[0], self.external_force[1]];
+            for axis in 0..2 {
+                let theta = self.root_tilt[axis];
+                let mut tau = m * g * h_com * theta.sin();
+                if feet_down && theta.abs() < theta_support {
+                    tau += -SUPPORT_STIFFNESS_FACTOR * m * g * h_com * theta
+                        - SUPPORT_DAMPING_FACTOR * m * g * h_com * self.root_tilt_vel[axis];
+                }
+                tau += -tau_cmd[axis] + ext[axis] * h_com;
+                self.root_tilt_vel[axis] += tau / inertia_p * dt;
+                self.root_tilt[axis] += self.root_tilt_vel[axis] * dt;
+                // Ground stops the fall at ±π/2 (flat).
+                let limit = std::f64::consts::FRAC_PI_2;
+                if self.root_tilt[axis].abs() >= limit {
+                    self.root_tilt[axis] = limit * self.root_tilt[axis].signum();
+                    self.root_tilt_vel[axis] = 0.0;
+                }
+            }
+        }
+
+        // Effective torso orientation = dynamic root tilt + abdomen
+        // articulation (the abdomen bends the torso on the pelvis; it
+        // contributes lean but can no longer fake whole-body uprightness).
+        let tilt_sagittal = (self.root_tilt[0] + abd_y * 0.5).sin();
+        let tilt_coronal = (self.root_tilt[1] + abd_x * 0.5).sin();
+        let tilt_mag = (tilt_sagittal * tilt_sagittal + tilt_coronal * tilt_coronal).sqrt();
+        let root_tilt_mag = (self.root_tilt[0].powi(2) + self.root_tilt[1].powi(2)).sqrt();
+        let uprightness = (1.0 - tilt_mag).clamp(0.0, 1.0);
+
+        self.state.torso_vertical[0] = tilt_coronal;
+        self.state.torso_vertical[1] = abd_z.sin() * 0.3;
+        self.state.torso_vertical[2] = uprightness;
+
+        // Legs tilt with the body: the vertical extent shrinks with the
+        // dynamic root tilt, so a fallen body's root is near the ground.
+        let kinematic_height =
+            right_leg_len.max(left_leg_len) * root_tilt_mag.cos().max(0.0) * uprightness.max(0.2)
+                + self.body.segment_lengths[SEG_TORSO] * 0.5;
 
         let lean_torque = -g * self.body.total_mass * tilt_mag * 0.15;
         self.state.root_linear_velocity[2] += (lean_torque / self.body.total_mass
@@ -885,6 +981,8 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         self.terrain.slope_x = 0.0;
         self.terrain.slope_y = 0.0;
         self.terrain.compliance = 0.0;
+        self.root_tilt = [0.0; 2];
+        self.root_tilt_vel = [0.0; 2];
     }
 
     fn reset_with_perturbation(&mut self, perturbation: f64, seed: u64) {
@@ -920,6 +1018,13 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         }
 
         self.state.root_height += perturbation * next_f64() * 0.02;
+        // Perturb the dynamic root tilt too — balance recovery is exactly
+        // what perturbation resets exist to exercise.
+        self.root_tilt = [
+            perturbation * next_f64() * 0.05,
+            perturbation * next_f64() * 0.05,
+        ];
+        self.root_tilt_vel = [0.0; 2];
         self.state.head_height = self.state.root_height
             + self.body.segment_lengths[SEG_TORSO] * 0.5
             + self.body.segment_lengths[SEG_HEAD];
@@ -1171,11 +1276,120 @@ mod tests {
 
     #[test]
     fn test_simple_physics_standing() {
+        // Quiet standing at zero torque holds via PASSIVE support (feet flat
+        // + passive ankle stiffness, only inside the support polygon). This
+        // used to be vacuous — the body couldn't fall at all; now the same
+        // assertion is meaningful because test_body_falls_past_support_polygon
+        // proves the failure mode exists.
         let mut sim = SimpleHumanoidSimulator::new();
         let cmd = HumanoidCommand::zero();
         for _ in 0..100 {
             sim.step(&cmd, 0.025);
         }
         assert!(sim.state().root_height > 0.5);
+        assert!(sim.state().torso_vertical[2] > 0.8);
+    }
+
+    #[test]
+    fn test_small_tilt_self_rights_inside_polygon() {
+        // A small perturbation inside the support polygon self-rights
+        // passively (stiff ankles + flat feet), like a quietly standing human.
+        let mut sim = SimpleHumanoidSimulator::new();
+        sim.set_root_tilt([0.05, 0.0]);
+        let cmd = HumanoidCommand::zero();
+        for _ in 0..200 {
+            sim.step(&cmd, 0.025);
+        }
+        let tilt = sim.root_tilt();
+        assert!(
+            tilt[0].abs() < 0.05,
+            "small tilt must decay inside the polygon, got {:.3}",
+            tilt[0]
+        );
+        assert!(sim.state().root_height > 0.5);
+    }
+
+    #[test]
+    fn test_body_falls_past_support_polygon() {
+        // THE falsifiability test: past the tipping point (COM outside the
+        // foot polygon), no passive support exists — gravity must win and
+        // the body must actually fall. Fails against the pre-2026-07 sim,
+        // where uprightness was a pure function of abdomen joint angles and
+        // a zero-torque body stayed "upright" forever.
+        let mut sim = SimpleHumanoidSimulator::new();
+        sim.set_root_tilt([0.35, 0.0]); // well beyond ~0.16 rad polygon
+        let cmd = HumanoidCommand::zero();
+        for _ in 0..300 {
+            sim.step(&cmd, 0.025);
+        }
+        let tilt = sim.root_tilt();
+        assert!(
+            tilt[0] > 1.4,
+            "body must topple past the support polygon, tilt = {:.3}",
+            tilt[0]
+        );
+        assert!(
+            sim.state().torso_vertical[2] < 0.3,
+            "fallen body cannot be upright, uprightness = {:.3}",
+            sim.state().torso_vertical[2]
+        );
+        assert!(
+            sim.state().root_height < 0.45,
+            "fallen root must be near the ground, height = {:.3}",
+            sim.state().root_height
+        );
+    }
+
+    #[test]
+    fn test_push_can_knock_the_body_over() {
+        // A sustained strong horizontal push must be able to topple the
+        // body — external disturbances are now genuinely dangerous.
+        let mut sim = SimpleHumanoidSimulator::new();
+        let cmd = HumanoidCommand::zero();
+        for _ in 0..200 {
+            sim.apply_external_force([220.0, 0.0, 0.0]);
+            sim.step(&cmd, 0.025);
+        }
+        // Let it settle after the push stops.
+        for _ in 0..200 {
+            sim.step(&cmd, 0.025);
+        }
+        assert!(
+            sim.root_tilt()[0].abs() > 0.5,
+            "a ~220 N sustained push must topple the ~52 kg body, tilt = {:.3}",
+            sim.root_tilt()[0]
+        );
+    }
+
+    #[test]
+    fn test_ankle_torque_gives_balance_authority() {
+        // Commanded ankle torque must influence the tilt dynamics — the
+        // controller has REAL balance authority, not decorative torques.
+        // Same beyond-polygon initial tilt; corrective ankle torque must
+        // leave the body measurably more upright than zero torque.
+        let tilt0 = [0.20, 0.0];
+
+        let mut passive = SimpleHumanoidSimulator::new();
+        passive.set_root_tilt(tilt0);
+        let zero = HumanoidCommand::zero();
+
+        let mut active = SimpleHumanoidSimulator::new();
+        active.set_root_tilt(tilt0);
+        // Positive ankle_y torque tips toward negative sagittal tilt
+        // (τ enters as −τ_cmd) → corrective for positive tilt.
+        let mut corrective = HumanoidCommand::zero();
+        corrective.torques[8] = 1.0; // right_ankle_y
+        corrective.torques[14] = 1.0; // left_ankle_y
+
+        for _ in 0..120 {
+            passive.step(&zero, 0.025);
+            active.step(&corrective, 0.025);
+        }
+        assert!(
+            active.root_tilt()[0] < passive.root_tilt()[0] - 0.05,
+            "corrective ankle torque must reduce tilt: active {:.3} vs passive {:.3}",
+            active.root_tilt()[0],
+            passive.root_tilt()[0]
+        );
     }
 }

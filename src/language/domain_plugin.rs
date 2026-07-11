@@ -563,6 +563,37 @@ impl PluginRegistry {
         let mut registry = Self::new(); // starts with GenericPlugin
         registry.register(Box::new(super::nixos_plugin::NixOsPlugin));
         registry.register(Box::new(super::math_plugin::MathPlugin::new()));
+        registry.register(Box::new(super::chemistry_plugin::ChemistryDomainPlugin));
+        registry.register(Box::new(super::physiology_plugin::PhysiologyDomainPlugin));
+        registry.register(Box::new(super::economics_plugin::EconomicsDomainPlugin));
+        registry.register(Box::new(super::geodesy_plugin::GeodesyDomainPlugin));
+        registry.register(Box::new(
+            super::epidemiology_plugin::EpidemiologyDomainPlugin,
+        ));
+        registry.register(Box::new(super::astronomy_plugin::AstronomyDomainPlugin));
+        registry.register(Box::new(
+            super::thermofluids_plugin::ThermofluidsDomainPlugin,
+        ));
+        registry.register(Box::new(super::structural_plugin::StructuralDomainPlugin));
+        registry.register(Box::new(super::optics_plugin::OpticsDomainPlugin));
+        registry.register(Box::new(
+            super::earth_system_plugin::EarthSystemDomainPlugin,
+        ));
+        registry.register(Box::new(super::circuits_plugin::CircuitsDomainPlugin));
+        registry.register(Box::new(super::control_plugin::ControlDomainPlugin));
+        registry.register(Box::new(super::acoustics_plugin::AcousticsDomainPlugin));
+        registry.register(Box::new(super::dsp_plugin::DspDomainPlugin));
+        registry.register(Box::new(
+            super::operations_research_plugin::OperationsResearchDomainPlugin,
+        ));
+        registry.register(Box::new(super::modal_plugin::ModalDomainPlugin));
+        registry.register(Box::new(super::statistics_plugin::StatisticsDomainPlugin));
+        registry.register(Box::new(
+            super::social_choice_plugin::SocialChoiceDomainPlugin,
+        ));
+        registry.register(Box::new(
+            super::formal_language_plugin::FormalLanguageDomainPlugin,
+        ));
         registry.register(Box::new(super::programming_plugin::ProgrammingPlugin));
         registry.register(Box::new(
             super::general_assistant_plugin::GeneralAssistantPlugin,

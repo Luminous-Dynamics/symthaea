@@ -7,9 +7,25 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
+# Real astrodynamics (two-body + drag primitives, StateVector). Path dep only
+# crosses the nalgebra-0.32-vs-0.34 version boundary at StateVector's accessor
+# methods; we convert to plain [f64; 3] immediately, never mixing nalgebra
+# versions across the API boundary.
+# [standalone-stripped] orbital-mechanics = { path = "../../../../mycelix-workspace/crates/orbital-mechanics" }
 serde = { workspace = true }
 rand = { workspace = true }
 proptest = "1"
+# Needed for orbital_mechanics::state::OrbitalState's epoch field
+# (chrono::DateTime<Utc>) in scenarios.rs's conjunction-avoidance scenario.
+chrono = { workspace = true }
+# Pinned to 0.32 (NOT `workspace = true`, which resolves to symthaea's 0.34)
+# to match orbital-mechanics's own nalgebra exactly -- solve_lambert() takes
+# &nalgebra::Vector3<f64>, and a 0.34-resolved Vector3 is a different type
+# than a 0.32-resolved one despite the same name. Used only internally in
+# trajectory_planning.rs to call solve_lambert(); the public API there uses
+# plain [f64; 3], same "convert at the boundary" pattern as the rest of this
+# crate (see the orbital-mechanics dependency comment above).
+nalgebra = "0.32"
 
 [features]
 default = []

@@ -124,16 +124,6 @@ fn gentle_limit(x: f32) -> f32 {
     }
 }
 
-fn soft_clip(x: f32) -> f32 {
-    if x > 1.0 {
-        1.0 - (-x + 1.0).exp() * 0.5
-    } else if x < -1.0 {
-        -1.0 + (x + 1.0).exp() * 0.5
-    } else {
-        x
-    }
-}
-
 // ─── Active note with wavetable + vibrato ───────────────────────────────────
 
 struct ActiveNote {
@@ -153,6 +143,10 @@ struct ActiveNote {
     ks: Option<KarplusStrong>,
     /// Pre-rendered FM buffer (for e-piano/bell, rendered at note start).
     fm_buffer: Option<Vec<f32>>,
+    /// Sample-library key + playback rate, resolved ONCE at note spawn.
+    /// The per-sample render loop must use `get_by_key` (O(1)) — resolving
+    /// per sample was an O(library) scan per sample per note.
+    sample_ref: Option<((crate::sample_player::InstrumentKey, u8), f64)>,
 }
 
 /// Full-pipeline streaming synthesis engine.
@@ -199,7 +193,8 @@ pub struct StreamingSynth {
     composer: ComposerMind,
     /// Dramatic state: silence, modulation, sub-bass, texture.
     dramatic: DramaticState,
-    /// Learned melody predictor (trained on 65M real music pairs).
+    /// Linear melody predictor (hand-tuned priors — see learned_melody.rs
+    /// provenance note; NOT verifiably trained).
     melody_predictor: MelodyPredictor,
     /// Taste-optimized melody generator (targets benchmark directly).
     pub taste_melody: TasteMelody,
@@ -421,6 +416,14 @@ impl StreamingSynth {
         self.substrate = Some(SubstrateTimbreModifier::for_substrate(substrate));
     }
 
+    /// A/B-testing support: swap the melody predictor to the pre-training
+    /// hand-tuned fallback weights (resets its context). Used by the
+    /// `ab_melody_weights` example to render blind trained-vs-fallback
+    /// listening pairs; never call this in a production path.
+    pub fn use_fallback_melody_weights(&mut self) {
+        self.melody_predictor = MelodyPredictor::with_fallback_weights();
+    }
+
     /// Enable voice synthesis (requires "voice" feature).
     #[cfg(feature = "voice")]
     pub fn enable_voice(&mut self) {
@@ -577,11 +580,10 @@ impl StreamingSynth {
                 let phi_factor = 2.0f32.powf(phi_vibrato_cents * phi_vib / 1200.0);
                 let freq = active.note.frequency * vibrato_factor * phi_factor;
 
-                // Sample-based synthesis: blend recorded sample with additive
-                let sample_contribution = if let Some((samp, rate)) = self
-                    .sample_lib
-                    .get_sample(active.instrument, active.note.frequency)
-                {
+                // Sample-based synthesis: blend recorded sample with additive.
+                // Key was resolved at note spawn; this is one O(1) hash get.
+                let sample_contribution = active.sample_ref.and_then(|(key, rate)| {
+                    let samp = self.sample_lib.get_by_key(key)?;
                     let idx = (active.sample_pos as f64 * rate) as usize;
                     if idx + 1 < samp.data.len() {
                         let frac = (active.sample_pos as f64 * rate - idx as f64) as f32;
@@ -590,9 +592,7 @@ impl StreamingSynth {
                     } else {
                         None
                     }
-                } else {
-                    None
-                };
+                });
 
                 let sample = if let Some(ref mut ks) = active.ks {
                     // Karplus-Strong (guitar, harp): self-sustaining, no external envelope
@@ -612,21 +612,21 @@ impl StreamingSynth {
                         let inst_partials = active.instrument.partials();
                         let mp = &self.manifold_partials;
                         let num_p = inst_partials.len().min(16);
-                        let blended: Vec<f32> = (0..num_p)
-                            .map(|h| {
-                                let inst = inst_partials.get(h).copied().unwrap_or(0.0);
-                                let mani = mp.get(h).copied().unwrap_or(0.0);
-                                // Manifold influence scales with emotional distance from neutral.
-                                // Near-neutral states → mostly instrument; extreme V-A → more manifold.
-                                let emotional_dist = (self.state.valence.abs()
-                                    + (self.state.arousal - 0.5).abs())
-                                .clamp(0.0, 1.0);
-                                let blend =
-                                    MANIFOLD_BLEND_MIN + emotional_dist * MANIFOLD_BLEND_SCALE;
-                                inst * (1.0 - blend) + mani * blend
-                            })
-                            .collect();
-                        let partial_sum: f32 = blended.iter().sum();
+                        // Manifold influence scales with emotional distance from neutral.
+                        // Near-neutral states → mostly instrument; extreme V-A → more manifold.
+                        let emotional_dist = (self.state.valence.abs()
+                            + (self.state.arousal - 0.5).abs())
+                        .clamp(0.0, 1.0);
+                        let blend = MANIFOLD_BLEND_MIN + emotional_dist * MANIFOLD_BLEND_SCALE;
+                        // Stack array — this runs once per output sample per
+                        // note; a heap Vec here allocated at audio rate.
+                        let mut blended = [0.0f32; 16];
+                        for (h, b) in blended.iter_mut().enumerate().take(num_p) {
+                            let inst = inst_partials.get(h).copied().unwrap_or(0.0);
+                            let mani = mp.get(h).copied().unwrap_or(0.0);
+                            *b = inst * (1.0 - blend) + mani * blend;
+                        }
+                        let partial_sum: f32 = blended[..num_p].iter().sum();
                         let norm = if partial_sum > 0.01 {
                             1.0 / partial_sum
                         } else {
@@ -678,7 +678,9 @@ impl StreamingSynth {
                     // Simple 1-pole: out = alpha * in + (1-alpha) * prev
                     // Use the note's fm_phase as scratch for LP state (it's unused in sample mode)
                     let lp_prev = active.fm_phase; // reuse as LP filter state
-                    let lp_out = lp_alpha * additive + (1.0 - lp_alpha) * lp_prev;
+                    let lp_out = crate::synth::flush_denormal(
+                        lp_alpha * additive + (1.0 - lp_alpha) * lp_prev,
+                    );
                     active.fm_phase = lp_out; // store state for next sample
 
                     // Dynamic blend ratio
@@ -963,10 +965,12 @@ impl StreamingSynth {
             let alpha = dt / (rc + dt);
 
             for pair in &mut buffer {
-                self.brightness_lp_l =
-                    self.brightness_lp_l + alpha * (pair[0] - self.brightness_lp_l);
-                self.brightness_lp_r =
-                    self.brightness_lp_r + alpha * (pair[1] - self.brightness_lp_r);
+                self.brightness_lp_l = crate::synth::flush_denormal(
+                    self.brightness_lp_l + alpha * (pair[0] - self.brightness_lp_l),
+                );
+                self.brightness_lp_r = crate::synth::flush_denormal(
+                    self.brightness_lp_r + alpha * (pair[1] - self.brightness_lp_r),
+                );
                 // Blend: significant LP darkening in quiet passages
                 let blend = 0.35; // 35% LP filtering in quiet passages → noticeably darker
                 pair[0] = pair[0] * (1.0 - blend * (1.0 - brightness))
@@ -1099,7 +1103,7 @@ impl StreamingSynth {
                 let ks = if instrument.uses_karplus_strong() {
                     let (damp, bright, _) = instrument.ks_params();
                     let mut k = KarplusStrong::new(note.frequency, self.sample_rate, damp, bright);
-                    k.excite(note.velocity);
+                    k.excite_seeded(note.velocity, crate::synth::note_seed(&note));
                     Some(k)
                 } else {
                     None
@@ -1117,6 +1121,7 @@ impl StreamingSynth {
                 };
                 self.active_notes.push(ActiveNote {
                     total_samples: (note.duration * sr) as usize + release_samples,
+                    sample_ref: self.sample_lib.resolve_sample(instrument, note.frequency),
                     note,
                     sample_pos: 0,
                     partial_phases: vec![0.0; 16],
@@ -1265,6 +1270,41 @@ impl StreamingSynth {
                     self.state.arousal,
                     self.state.consciousness_level,
                 );
+
+                // Trained melody predictor (MAESTRO-fit, see learned_melody):
+                // blend its proposal into the taste-melody choice. Weight
+                // scales with consciousness — higher Ψ = more learned melodic
+                // memory shaping the line. Blend in log-frequency (pitch)
+                // space, then snap back to the active scale so we stay in
+                // key. Until 2026-07-07 this predictor was write-only in the
+                // streaming path: record() fed it context but predict() was
+                // never called, so the learned weights shaped nothing.
+                if self.melody_predictor.has_context() {
+                    if let Some(prev) = self.prev_note_freq {
+                        let beat_pos = self.chord_beat_counter % 4.0;
+                        let (pred_interval, _) = self.melody_predictor.predict(
+                            beat_pos,
+                            phrase_pos.clamp(0.0, 1.0),
+                            self.state.valence,
+                            self.state.arousal,
+                        );
+                        let pred_freq = self.melody_predictor.interval_to_freq(
+                            prev,
+                            pred_interval,
+                            &taste_scale,
+                        );
+                        let w = (self.state.consciousness_level * 0.5).clamp(0.0, 0.5);
+                        let blended = (note.frequency.ln() * (1.0 - w) + pred_freq.ln() * w).exp();
+                        // Snap the blend back onto the scale (log-blend of two
+                        // scale tones generally lands between tones)
+                        note.frequency = taste_scale
+                            .iter()
+                            .copied()
+                            .min_by(|a, b| (a - blended).abs().total_cmp(&(b - blended).abs()))
+                            .unwrap_or(blended);
+                    }
+                }
+
                 note.duration = self
                     .taste_melody
                     .suggest_duration(self.state.arousal, self.muse_stream.tempo());
@@ -1515,7 +1555,7 @@ impl StreamingSynth {
                         let (damp, bright, _stiff) = instrument.ks_params();
                         let mut ks =
                             KarplusStrong::new(note.frequency, self.sample_rate, damp, bright);
-                        ks.excite(note.velocity);
+                        ks.excite_seeded(note.velocity, crate::synth::note_seed(&note));
                         Some(ks)
                     } else {
                         None
@@ -1546,6 +1586,7 @@ impl StreamingSynth {
 
                     self.active_notes.push(ActiveNote {
                         total_samples: (note.duration * sr) as usize + release_samples,
+                        sample_ref: self.sample_lib.resolve_sample(instrument, note.frequency),
                         note,
                         sample_pos: onset_offset, // jittered onset
                         partial_phases: vec![0.0; 16],

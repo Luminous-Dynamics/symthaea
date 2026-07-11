@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Compute the honest global mean-baseline MSE over the whole dataset.
 //!
-//! The per-file mean MSE reported by `train_hdc_decoder` on its probe file is
+//! The per-file mean MSE reported by `train_mel_mlp` on its probe file is
 //! misleading — it's an oracle that knows per-file statistics. The inference-
 //! time baseline is: predict the global mean mel frame for every input. The
 //! MSE of that prediction equals the dataset-wide mel variance — the fraction

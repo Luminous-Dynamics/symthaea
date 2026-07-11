@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-scenarios"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Cross-domain composition scenarios for Symthaea — worked models that combine several domain crates (epidemiology + economics + control + geodesy) to show they compose into more than the sum of their parts, plus invariant/property tests that harden the numeric crates."
+
+# Depends on several pure-std domain crates to demonstrate composition. No
+# symthaea-core link; still builds fast.
+[dependencies]
+symthaea-epidemiology = { path = "../symthaea-epidemiology" }
+symthaea-economics = { path = "../symthaea-economics" }
+symthaea-control-theory = { path = "../symthaea-control-theory" }
+symthaea-geodesy = { path = "../symthaea-geodesy" }

@@ -524,6 +524,18 @@ pub struct MycelixBridge {
     /// Monotonically increasing correlation ID counter.
     #[cfg(feature = "mycelix")]
     next_correlation_id: u64,
+    /// On-chain asset/order binding for robotics telemetry (None = not
+    /// registered → telemetry is not emitted).
+    #[cfg(feature = "mycelix")]
+    robotics_binding: Option<RoboticsDispatchBinding>,
+    /// Host-supplied mission status (None = no position/progress source →
+    /// telemetry is not emitted).
+    #[cfg(feature = "mycelix")]
+    robotics_status: Option<RoboticsMissionStatus>,
+    /// Last robotics telemetry dispatch time (rate limiting — the loop runs
+    /// ~31 Hz; one DHT entry per cycle would be abusive).
+    #[cfg(feature = "mycelix")]
+    last_robotics_dispatch: Option<Instant>,
     /// HyperFeel encoder for gradient compression (2000x via JL projection).
     /// Feature-gated: only available when the mycelix SDK is linked.
     #[cfg(feature = "mycelix_sdk")]
@@ -597,6 +609,65 @@ pub enum GovernanceDispatchCommand {
         /// Cycle at which the crisis was detected.
         detected_at_cycle: u64,
     },
+    /// Submit a robotics telemetry report to the robotics-dispatch zome.
+    ///
+    /// Field-for-field mirror of `symthaea-mycelix-conductor`'s
+    /// `DispatchCommand::SubmitRoboticsTelemetry` (the crate with the built
+    /// `submit_telemetry` zome-call handler). Only emitted when a
+    /// `RoboticsDispatchBinding` (asset + order hashes from on-chain
+    /// registration) AND a `RoboticsMissionStatus` (position/progress/fuel —
+    /// signals the cognitive loop itself has no source for) are both set;
+    /// never emitted with zeroed placeholders.
+    SubmitRoboticsTelemetry {
+        correlation_id: u64,
+        /// ActionHash of the registered RoboticAsset (raw 39-byte hash).
+        asset_hash: Vec<u8>,
+        /// ActionHash of the active DispatchOrder (raw 39-byte hash).
+        order_hash: Vec<u8>,
+        /// Current position (WGS84 lat/lon, meters altitude).
+        lat: f64,
+        lon: f64,
+        alt: f64,
+        /// Current Phi / consciousness level.
+        consciousness_level: f64,
+        /// Safety tier string — "Green"/"Yellow"/"Orange"/"Red".
+        safety_level: String,
+        /// Mission progress 0.0–1.0.
+        mission_progress: f64,
+        /// Fuel/battery level 0.0–1.0.
+        fuel_level: f64,
+        /// Platform name (e.g., "helicopter").
+        platform: String,
+        /// Platform-specific serialized telemetry bytes (opaque to the zome).
+        platform_specific: Vec<u8>,
+    },
+}
+
+/// On-chain identity binding for robotics telemetry: the ActionHashes minted
+/// by `register_asset` + `dispatch_mission` on the robotics-dispatch zome.
+/// The cognitive loop cannot invent these — the host application sets them
+/// after registration.
+#[cfg(feature = "mycelix")]
+#[derive(Debug, Clone)]
+pub struct RoboticsDispatchBinding {
+    pub asset_hash: Vec<u8>,
+    pub order_hash: Vec<u8>,
+}
+
+/// Mission-level status signals a telemetry report requires but the
+/// cognitive loop has no internal source for (GPS fix, mission driver,
+/// battery monitor). Updated by the host application; telemetry emission is
+/// gated on this being present rather than shipping zeros.
+#[cfg(feature = "mycelix")]
+#[derive(Debug, Clone, Copy)]
+pub struct RoboticsMissionStatus {
+    pub lat: f64,
+    pub lon: f64,
+    pub alt: f64,
+    /// Mission progress 0.0–1.0.
+    pub mission_progress: f64,
+    /// Fuel/battery level 0.0–1.0.
+    pub fuel_level: f64,
 }
 
 /// Outcome received from the conductor confirming or rejecting a dispatched command.
@@ -685,6 +756,12 @@ impl MycelixBridge {
             pending_confirmations: HashMap::new(),
             #[cfg(feature = "mycelix")]
             next_correlation_id: 1,
+            #[cfg(feature = "mycelix")]
+            robotics_binding: None,
+            #[cfg(feature = "mycelix")]
+            robotics_status: None,
+            #[cfg(feature = "mycelix")]
+            last_robotics_dispatch: None,
             #[cfg(feature = "mycelix_sdk")]
             hyperfeel_encoder: HyperFeelEncoder::new(EncodingConfig::default()),
         }
@@ -713,6 +790,12 @@ impl MycelixBridge {
             pending_confirmations: HashMap::new(),
             #[cfg(feature = "mycelix")]
             next_correlation_id: 1,
+            #[cfg(feature = "mycelix")]
+            robotics_binding: None,
+            #[cfg(feature = "mycelix")]
+            robotics_status: None,
+            #[cfg(feature = "mycelix")]
+            last_robotics_dispatch: None,
             #[cfg(feature = "mycelix_sdk")]
             hyperfeel_encoder: HyperFeelEncoder::new(EncodingConfig::default()),
         }
@@ -1294,6 +1377,109 @@ impl MycelixBridge {
         if disconnected {
             self.governance_dispatch_tx = None;
         }
+    }
+
+    /// Bind this agent to an on-chain robotics asset + dispatch order.
+    /// Telemetry is only emitted while a binding is present.
+    #[cfg(feature = "mycelix")]
+    pub fn set_robotics_binding(&mut self, binding: RoboticsDispatchBinding) {
+        self.robotics_binding = Some(binding);
+    }
+
+    /// Clear the robotics binding (mission complete / asset recalled).
+    #[cfg(feature = "mycelix")]
+    pub fn clear_robotics_binding(&mut self) {
+        self.robotics_binding = None;
+    }
+
+    /// Update the host-supplied mission status (position, progress, fuel).
+    /// Telemetry is only emitted while a status is present — the cognitive
+    /// loop has no GPS/mission/battery source of its own, and shipping
+    /// zeroed placeholders on-chain would be worse than silence.
+    #[cfg(feature = "mycelix")]
+    pub fn update_robotics_mission_status(&mut self, status: RoboticsMissionStatus) {
+        self.robotics_status = Some(status);
+    }
+
+    /// Minimum interval between robotics telemetry dispatches. The cognitive
+    /// loop runs ~31 Hz; one DHT entry per cycle would be abusive.
+    #[cfg(feature = "mycelix")]
+    const ROBOTICS_TELEMETRY_MIN_INTERVAL: Duration = Duration::from_secs(5);
+
+    /// Dispatch an embodiment telemetry report to the robotics-dispatch zome.
+    ///
+    /// This is the drain the 2026-07-06 robotics review found missing: the
+    /// loop populated `sensorimotor.embodiment_telemetry` every cycle while
+    /// `SubmitRoboticsTelemetry` was constructed only in conductor tests.
+    /// Call from the host between cycles (see
+    /// `CognitiveLoopService::poll_bridge_robotics_telemetry`).
+    ///
+    /// Returns `true` if a report was dispatched; `false` when unbound,
+    /// missing mission status, rate-limited, or the channel is unavailable.
+    #[cfg(feature = "mycelix")]
+    pub fn dispatch_robotics_telemetry(
+        &mut self,
+        telemetry: &symthaea_core::embodiment::EmbodimentTelemetry,
+        consciousness_level: f64,
+    ) -> bool {
+        let Some(binding) = self.robotics_binding.clone() else {
+            return false;
+        };
+        let Some(status) = self.robotics_status else {
+            return false;
+        };
+        if let Some(last) = self.last_robotics_dispatch
+            && last.elapsed() < Self::ROBOTICS_TELEMETRY_MIN_INTERVAL
+        {
+            return false;
+        }
+        let mut dispatched = false;
+        let mut disconnected = false;
+        if let Some(ref tx) = self.governance_dispatch_tx {
+            let cid = self.next_correlation_id;
+            self.next_correlation_id += 1;
+            match tx.try_send(GovernanceDispatchCommand::SubmitRoboticsTelemetry {
+                correlation_id: cid,
+                asset_hash: binding.asset_hash,
+                order_hash: binding.order_hash,
+                lat: status.lat,
+                lon: status.lon,
+                alt: status.alt,
+                consciousness_level,
+                safety_level: telemetry.safety_level.clone(),
+                mission_progress: status.mission_progress,
+                fuel_level: status.fuel_level,
+                platform: telemetry.platform.clone(),
+                platform_specific: telemetry.platform_specific.clone(),
+            }) {
+                Ok(()) => {
+                    self.pending_confirmations.insert(cid, Instant::now());
+                    self.last_robotics_dispatch = Some(Instant::now());
+                    dispatched = true;
+                    tracing::debug!(
+                        platform = %telemetry.platform,
+                        safety = %telemetry.safety_level,
+                        phi = consciousness_level,
+                        "Robotics telemetry dispatched to Mycelix robotics-dispatch"
+                    );
+                }
+                Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                    tracing::warn!(
+                        "Governance dispatch channel full — robotics telemetry not dispatched"
+                    );
+                }
+                Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                    tracing::warn!(
+                        "Governance dispatch channel disconnected — robotics telemetry not dispatched"
+                    );
+                    disconnected = true;
+                }
+            }
+        }
+        if disconnected {
+            self.governance_dispatch_tx = None;
+        }
+        dispatched
     }
 
     // ========================================================================
@@ -3025,5 +3211,71 @@ mod tests {
         assert_eq!(rt2.alignment.violations.len(), 2);
         assert_eq!(rt2.timestamp, 0);
         assert!((rt2.consciousness.affective_valence - (-0.2)).abs() < f64::EPSILON);
+    }
+
+    #[cfg(feature = "mycelix")]
+    #[test]
+    fn test_robotics_telemetry_dispatch_gating() {
+        use symthaea_core::embodiment::EmbodimentTelemetry;
+        let mut bridge = MycelixBridge::new("robotics-test");
+        let (tx, rx) = MycelixBridge::create_governance_channel();
+        bridge.set_governance_dispatch_tx(tx);
+
+        let telemetry = EmbodimentTelemetry {
+            total_steps: 100,
+            control_effort: 0.4,
+            prediction_error: 0.05,
+            safety_level: "Green".to_string(),
+            platform: "quadruped".to_string(),
+            num_actuators: 12,
+            epistemic_grounding: "sensorimotor".to_string(),
+            observation_confidence: 0.9,
+            platform_specific: vec![1, 2, 3],
+        };
+
+        // Unbound: never emits (no zeroed placeholders on-chain).
+        assert!(!bridge.dispatch_robotics_telemetry(&telemetry, 0.7));
+
+        // Binding without mission status: still gated off.
+        bridge.set_robotics_binding(RoboticsDispatchBinding {
+            asset_hash: vec![1; 39],
+            order_hash: vec![2; 39],
+        });
+        assert!(!bridge.dispatch_robotics_telemetry(&telemetry, 0.7));
+
+        // Fully bound: dispatches, and the command carries the telemetry.
+        bridge.update_robotics_mission_status(RoboticsMissionStatus {
+            lat: 32.95,
+            lon: -96.73,
+            alt: 120.0,
+            mission_progress: 0.5,
+            fuel_level: 0.8,
+        });
+        assert!(bridge.dispatch_robotics_telemetry(&telemetry, 0.7));
+        match rx.try_recv().expect("command must be on the channel") {
+            GovernanceDispatchCommand::SubmitRoboticsTelemetry {
+                platform,
+                safety_level,
+                consciousness_level,
+                asset_hash,
+                mission_progress,
+                ..
+            } => {
+                assert_eq!(platform, "quadruped");
+                assert_eq!(safety_level, "Green");
+                assert!((consciousness_level - 0.7).abs() < 1e-9);
+                assert_eq!(asset_hash, vec![1; 39]);
+                assert!((mission_progress - 0.5).abs() < 1e-9);
+            }
+            other => panic!("wrong command dispatched: {other:?}"),
+        }
+
+        // Rate limit: an immediate second call is suppressed.
+        assert!(!bridge.dispatch_robotics_telemetry(&telemetry, 0.7));
+        assert!(rx.try_recv().is_err());
+
+        // Clearing the binding gates it off again.
+        bridge.clear_robotics_binding();
+        assert!(!bridge.dispatch_robotics_telemetry(&telemetry, 0.7));
     }
 }

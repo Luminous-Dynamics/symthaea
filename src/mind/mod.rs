@@ -122,6 +122,9 @@ pub struct ContinuousMind {
     /// and drains inbound messages into `social_inbox` after each
     /// `process_social()` call.
     pub(crate) iroh_bridge: Option<crate::swarm::IrohBridgeHandle>,
+    /// Optional Sovereign Name Resolution registry.
+    #[cfg(feature = "mesh")]
+    pub(crate) name_resolver: Option<crate::swarm::name_resolver::NameResolver>,
     /// Optional mesh network bridge for physical radio consciousness exchange.
     /// When set, each `tick()` syncs mesh_outbox/mesh_inbox with the bridge actor.
     #[cfg(feature = "mesh")]
@@ -246,6 +249,8 @@ impl ContinuousMind {
         let dim = config.dimension;
         let perception_dim = config.dimension;
         let social_projection_enabled = config.social_projection_enabled;
+        #[cfg(feature = "mesh")]
+        let enable_name_resolution = config.enable_name_resolution;
         let social = if config.enable_social_coherence {
             Some(crate::brain::SocialCoherence::new(
                 crate::brain::SocialCoherenceConfig {
@@ -294,6 +299,12 @@ impl ContinuousMind {
             social_inbox: Vec::new(),
             social_outbox: Vec::new(),
             iroh_bridge: None,
+            #[cfg(feature = "mesh")]
+            name_resolver: if enable_name_resolution {
+                Some(crate::swarm::name_resolver::NameResolver::new(256))
+            } else {
+                None
+            },
             #[cfg(feature = "mesh")]
             mesh_bridge: None,
             #[cfg(feature = "mesh")]

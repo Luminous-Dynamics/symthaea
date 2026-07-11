@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-group-theory"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Finite group theory for Symthaea: permutations (compose/inverse/sign/order/cycles) and finite groups via Cayley tables (element order, generated subgroups, inverses, abelian test, Lagrange). Cyclic and symmetric group constructors. Pure-std, ground-truth-checked."
+
+# Pure-std, zero dependencies, no symthaea-core link.
+[dependencies]
