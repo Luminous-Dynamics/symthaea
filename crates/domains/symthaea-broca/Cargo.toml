@@ -47,7 +47,7 @@ sha2 = "0.10"
 sysinfo = "0.32"
 pqcrypto-dilithium = "0.5"
 pqcrypto-traits = "0.3"
-tree-sitter-rust = "0.23"
+tree-sitter-rust = "0.24"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
 symthaea-lean-bridge = { path = "../../bridges/symthaea-lean-bridge" }
