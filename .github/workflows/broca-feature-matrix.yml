@@ -42,7 +42,7 @@ jobs:
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_quality_gate_thresholds_fail
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
